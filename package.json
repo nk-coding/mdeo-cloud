@@ -1,0 +1,28 @@
+{
+    "name": "mdeo",
+    "version": "0.1.0",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "watch": "tsc -b tsconfig.base.json --watch"
+    },
+     "prettier": {
+        "tabWidth": 4,
+        "trailingComma": "none",
+        "printWidth": 120,
+        "overrides": [
+            {
+                "files": [
+                    "*.md",
+                    "*.yml",
+                    "*.yaml"
+                ],
+                "options": {
+                    "tabWidth": 2
+                }
+            }
+        ]
+    }
+}
