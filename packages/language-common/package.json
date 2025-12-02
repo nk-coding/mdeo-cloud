@@ -1,0 +1,17 @@
+{
+    "name": "@mdeo/language-common",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
+    "files": [
+        "lib",
+        "src"
+    ],
+    "dependencies": {
+        "chevrotain": "^11.0.3",
+        "prettier": "^3.7.3",
+        "vscode-languageserver": "^9.0.1",
+        "vscode-languageserver-textdocument": "^1.0.12"
+    }
+}

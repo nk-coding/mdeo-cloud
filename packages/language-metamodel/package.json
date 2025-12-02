@@ -1,0 +1,14 @@
+{
+    "name": "@mdeo/language-metamodel",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
+    "files": [
+        "lib",
+        "src"
+    ],
+    "dependencies": {
+        "@mdeo/language-common": "^0.1.0"
+    }
+}

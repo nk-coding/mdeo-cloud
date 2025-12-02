@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json",
+    "files": [],
+    "references": [
+        {
+            "path": "packages/language-common"
+        },
+        {
+            "path": "packages/language-metamodel"
+        }
+    ]
+}
