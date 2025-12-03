@@ -1,0 +1,27 @@
+import type { GrammarAST } from "langium";
+import type { SerializableGrammarNode } from "../../serialization/types.js";
+
+/**
+ * Represents a terminal rule in the grammar that matches specific text patterns
+ * and produces typed values. Terminal rules are the lowest-level parsing units
+ * that match against the input text using regular expressions or literal strings.
+ * 
+ * @template T The TypeScript type that this terminal rule produces
+ */
+export type TerminalRule<T> = {
+    /**
+     * Optional TypeScript type information for the value this terminal produces.
+     * Used for type inference and validation during compilation.
+     */
+    tsType?: T;
+} & SerializableGrammarNode<GrammarAST.TerminalRule>;
+
+/**
+ * Type guard to check if a value is a terminal rule.
+ * 
+ * @param node The value to check
+ * @returns True if the node is a terminal rule, false otherwise
+ */
+export function isTerminalRule(node: unknown): node is TerminalRule<any> {
+    return typeof node === "object" && node !== null && "$type" in node && node.$type === "TerminalRule";
+}
