@@ -6,7 +6,13 @@
         "packages/*"
     ],
     "scripts": {
-        "watch": "tsc -b tsconfig.build.json --watch"
+        "build": "tsc -b tsconfig.build.json",
+        "watch": "tsc -b tsconfig.build.json --watch",
+        "dev": "npm run -w @mdeo/workbench dev",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "lint": "eslint --fix",
+        "lint:check": "eslint"
     },
     "prettier": {
         "tabWidth": 4,

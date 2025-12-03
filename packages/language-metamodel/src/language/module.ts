@@ -1,9 +1,5 @@
 import { createModule } from "@mdeo/language-common";
 import { MetaModelRule } from "./rules.js";
-import { ID, INT, FLOAT } from "./terminals.js";
+import { WS, ML_COMMENT, SL_COMMENT } from "./terminals.js";
 
-export const MetaModelGrammar = createModule(MetaModelRule, [
-    ID,
-    INT,
-    FLOAT
-]);
+export const MetaModelGrammar = createModule(MetaModelRule, [WS, ML_COMMENT, SL_COMMENT]);

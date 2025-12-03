@@ -1,3 +1,4 @@
 package-lock.json
 packages/**/lib
+packages/**/tsconfig.tsbuildinfo
 node_modules

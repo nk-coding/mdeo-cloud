@@ -69,7 +69,6 @@ export const Association = createInterface("Association").attrs({
 export type AssociationType = ASTType<typeof Association>;
 
 export const MetaModel = createInterface("MetaModel").attrs({
-    name: String,
     classes: [MetaClass],
     associations: [Association]
 });

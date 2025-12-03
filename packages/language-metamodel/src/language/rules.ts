@@ -1,10 +1,4 @@
-import {
-    createRule,
-    or,
-    optional,
-    many,
-    ref
-} from "@mdeo/language-common";
+import { createRule, or, optional, many, ref } from "@mdeo/language-common";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -20,49 +14,23 @@ import { ID, INT } from "./terminals.js";
 
 export const PrimitiveTypeRule = createRule("PrimitiveTypeRule")
     .returns(PrimitiveType)
-    .as(({ set }) => [
-        set("name", "int", "string", "boolean", "long", "double", "float")
-    ]);
+    .as(({ set }) => [set("name", "int", "string", "boolean", "long", "double", "float")]);
 
 export const SingleMultiplicityRule = createRule("SingleMultiplicityRule")
     .returns(SingleMultiplicity)
-    .as(({ set }) => [
-        or(
-            set("numericValue", INT),
-            set("value", "*", "+", "?")
-        )
-    ]);
+    .as(({ set }) => [or(set("numericValue", INT), set("value", "*", "+", "?"))]);
 
 export const RangeMultiplicityRule = createRule("RangeMultiplicityRule")
     .returns(RangeMultiplicity)
-    .as(({ set }) => [
-        set("lower", INT),
-        "..",
-        or(
-            set("upper", "*"),
-            set("upperNumeric", INT)
-        )
-    ]);
+    .as(({ set }) => [set("lower", INT), "..", or(set("upper", "*"), set("upperNumeric", INT))]);
 
 export const MultiplicityRule = createRule("MultiplicityRule")
     .returns(Multiplicity)
-    .as(() => [
-        "[",
-        or(
-            SingleMultiplicityRule,
-            RangeMultiplicityRule
-        ),
-        "]"
-    ]);
+    .as(() => ["[", or(SingleMultiplicityRule, RangeMultiplicityRule), "]"]);
 
 export const PropertyRule = createRule("PropertyRule")
     .returns(Property)
-    .as(({ set }) => [
-        set("name", ID),
-        ":",
-        set("type", PrimitiveTypeRule),
-        optional("[", MultiplicityRule, "]")
-    ]);
+    .as(({ set }) => [set("name", ID), ":", set("type", PrimitiveTypeRule), optional("[", MultiplicityRule, "]")]);
 
 export const MetaClassRule = createRule("MetaClassRule")
     .returns(MetaClass)
@@ -86,19 +54,11 @@ export const AssociationEndWithPropertyRule = createRule("AssociationEndWithProp
 
 export const AssociationEndWithoutPropertyRule = createRule("AssociationEndWithoutPropertyRule")
     .returns(AssociationEnd)
-    .as(({ set }) => [
-        set("class", ref(MetaClass, ID)),
-        optional("[", MultiplicityRule, "]")
-    ]);
+    .as(({ set }) => [set("class", ref(MetaClass, ID)), optional("[", MultiplicityRule, "]")]);
 
 export const AssociationEndRule = createRule("AssociationEndRule")
     .returns(AssociationEnd)
-    .as(() => [
-        or(
-            AssociationEndWithPropertyRule,
-            AssociationEndWithoutPropertyRule
-        )
-    ]);
+    .as(() => [or(AssociationEndWithPropertyRule, AssociationEndWithoutPropertyRule)]);
 
 export const CompositionEndRule = createRule("CompositionEndRule")
     .returns(AssociationEnd)
@@ -127,46 +87,20 @@ export const RegularAssociationTargetWithPropertyRule = createRule("RegularAssoc
 
 export const RegularAssociationRule = createRule("RegularAssociationRule")
     .returns(Association)
-    .as(() => [
-        or(
-            RegularAssociationStartWithPropertyRule,
-            RegularAssociationTargetWithPropertyRule
-        )
-    ]);
+    .as(() => [or(RegularAssociationStartWithPropertyRule, RegularAssociationTargetWithPropertyRule)]);
 
 export const CompositionFromStartRule = createRule("CompositionFromStartRule")
     .returns(Association)
-    .as(({ set }) => [
-        set("start", CompositionEndRule),
-        set("operator", "*--"),
-        set("target", AssociationEndRule)
-    ]);
+    .as(({ set }) => [set("start", CompositionEndRule), set("operator", "*--"), set("target", AssociationEndRule)]);
 
 export const CompositionFromTargetRule = createRule("CompositionFromTargetRule")
     .returns(Association)
-    .as(({ set }) => [
-        set("start", AssociationEndRule),
-        set("operator", "--*"),
-        set("target", CompositionEndRule)
-    ]);
+    .as(({ set }) => [set("start", AssociationEndRule), set("operator", "--*"), set("target", CompositionEndRule)]);
 
 export const AssociationRule = createRule("AssociationRule")
     .returns(Association)
-    .as(() => [
-        or(
-            RegularAssociationRule,
-            CompositionFromStartRule,
-            CompositionFromTargetRule
-        )
-    ]);
+    .as(() => [or(RegularAssociationRule, CompositionFromStartRule, CompositionFromTargetRule)]);
 
 export const MetaModelRule = createRule("MetaModelRule")
     .returns(MetaModel)
-    .as(({ set, add }) => [
-        "metamodel",
-        set("name", ID),
-        "{",
-        many(add("classes", MetaClassRule)),
-        many(add("associations", AssociationRule)),
-        "}"
-    ]);
+    .as(({ add }) => [many(add("classes", MetaClassRule)), many(add("associations", AssociationRule))]);
