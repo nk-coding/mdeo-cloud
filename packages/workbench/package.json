@@ -16,13 +16,15 @@
         "@mdeo/language-metamodel": "^0.1.0",
         "@vueuse/core": "^14.1.0",
         "langium": "^4.1.2",
-        "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@^23.2.2",
         "monaco-languageclient": "^10.4.0",
         "splitpanes": "^4.0.4",
-        "vscode": "npm:@codingame/monaco-vscode-extension-api@^23.2.2",
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-protocol": "^3.17.5",
-        "vue": "^3.5.25"
+        "vue": "^3.5.25",
+        "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@^23.2.2",
+        "vscode": "npm:@codingame/monaco-vscode-extension-api@^23.2.2",
+        "@codingame/monaco-vscode-api": "^23.2.2",
+        "@codingame/monaco-vscode-search-service-override": "^23.2.2"
     },
     "devDependencies": {
         "@types/node": "^24.10.1",
