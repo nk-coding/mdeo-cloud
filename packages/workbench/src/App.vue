@@ -1,11 +1,25 @@
 <template>
-    <div ref="editorElement" class="editor-element"></div>
+    <div class="app-container">
+        <Splitpanes class="default-theme h-screen">
+            <Pane min-size="20" max-size="50" size="25">
+                <FileSystemExplorer
+                    :file-system="fileSystem"
+                    @file-activate="handleFileActivate"
+                    @folder-activate="handleFolderActivate"
+                    @fs-change="handleFileSystemChange"
+                />
+            </Pane>
+            <Pane>
+                <div ref="editorElement" class="editor-element h-full"></div>
+            </Pane>
+        </Splitpanes>
+    </div>
 </template>
 <script setup lang="ts">
 import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from 'monaco-languageclient/vscodeApiWrapper';
 import { useWorkerFactory } from 'monaco-languageclient/workerFactory';
 import { LogLevel, Uri } from 'vscode';
-import { onMounted, useTemplateRef } from 'vue';
+import { onMounted, ref, useTemplateRef } from 'vue';
 import monacoEditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { LanguageClientWrapper, type LanguageClientConfig } from 'monaco-languageclient/lcwrapper';
 import { BrowserMessageReader, BrowserMessageWriter } from 'vscode-languageserver-protocol/browser';
@@ -15,9 +29,48 @@ import { getService, ISearchService } from "@codingame/monaco-vscode-api";
 import getSearchServiceOverride from '@codingame/monaco-vscode-search-service-override';
 import { QueryType } from '@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search';
 import { E_COMMERCE_METAMODEL, LIBRARY_METAMODEL } from './testing/example';
+import { Splitpanes, Pane } from 'splitpanes';
+import 'splitpanes/dist/splitpanes.css';
+import FileSystemExplorer from './components/FileSystemExplorer.vue';
+import { BrowserFileSystem, type FileSystemEntry } from './lib/filesystem';
 
 
 const editorElement = useTemplateRef("editorElement");
+
+// File system instance
+const fileSystem = new BrowserFileSystem()
+const currentFile = ref<FileSystemEntry | null>(null)
+const refreshTrigger = ref(0)
+let editorApp: EditorApp | null = null
+
+/**
+ * Handles file activation from the file explorer
+ */
+function handleFileActivate(entry: FileSystemEntry): void {
+    currentFile.value = entry
+    if (editorApp && entry.content !== undefined) {
+        const editor = editorApp.getEditor()
+        if (editor) {
+            editor.setValue(entry.content)
+        }
+    }
+}
+
+/**
+ * Handles folder activation from the file explorer
+ */
+function handleFolderActivate(entry: FileSystemEntry): void {
+    // Currently just focus the folder, could expand in the future
+    console.log('Folder activated:', entry.name)
+}
+
+/**
+ * Handles file system changes to refresh the view
+ */
+function handleFileSystemChange(): void {
+    // Force reactivity update by incrementing trigger
+    refreshTrigger.value++
+}
 
 onMounted(async () => {
     const vscodeApiConfig: MonacoVscodeApiConfig = {
@@ -74,7 +127,7 @@ onMounted(async () => {
         overrideAutomaticLayout: false
     };
 
-    const editorApp = new EditorApp(editorAppConfig);
+    editorApp = new EditorApp(editorAppConfig);
     await editorApp.start(editorElement.value!);
     const editor = editorApp.getEditor()!;
     editor.layout();
@@ -95,8 +148,13 @@ onMounted(async () => {
 
 </script>
 <style scoped>
-.editor-element {
-    width: 100vw;
+.app-container {
     height: 100vh;
+    width: 100vw;
+}
+
+.editor-element {
+    width: 100%;
+    height: 100%;
 }
 </style>

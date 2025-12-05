@@ -2,10 +2,10 @@
     "name": "@mdeo/language-common",
     "version": "0.1.0",
     "type": "module",
-    "main": "lib/index.js",
-    "types": "lib/index.d.ts",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "files": [
-        "lib",
+        "dist",
         "src"
     ],
     "dependencies": {

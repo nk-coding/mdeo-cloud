@@ -1,4 +1,5 @@
 package-lock.json
-packages/**/lib
+packages/**/dist
 packages/**/tsconfig.tsbuildinfo
 node_modules
+copilot/
