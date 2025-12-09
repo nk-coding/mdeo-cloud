@@ -29,7 +29,7 @@ export interface LanguageModule {
      * This grammar can be used to create parsers and other language services.
      */
     grammar: Grammar;
-    
+
     /**
      * AST reflection metadata that provides runtime type information about
      * the AST node types defined in the grammar. This enables features like
@@ -40,7 +40,7 @@ export interface LanguageModule {
 
 /**
  * Creates a complete language module from a parser rule and additional terminal rules.
- * 
+ *
  * @param entry The root parser rule that serves as the entry point for parsing
  * @param additionalTerminals Array of terminal rules that should be included in the grammar
  * @returns A complete language module ready for use with Langium services
@@ -56,7 +56,6 @@ export function createModule(entry: ParserRule<any>, additionalTerminals: Termin
     const typeHierarchy = collectTypeHierarchy(mergeTypesAndInterfaces(astTypesFiltered));
 
     class AstReflection extends AbstractAstReflection {
-        
         override readonly types = Object.fromEntries([
             ...astTypesFiltered.interfaces.map((iface) => [
                 iface.name,
@@ -72,12 +71,12 @@ export function createModule(entry: ParserRule<any>, additionalTerminals: Termin
     return {
         grammar: loadGrammarFromJson(serializedGrammar),
         reflection: new AstReflection()
-    }
+    };
 }
 
 /**
  * Builds type metadata for a specific AST node type.
- * 
+ *
  * @param name The name of the AST node type
  * @param props Array of properties defined on this type
  * @param superTypes Array of parent type names this type extends from
@@ -93,7 +92,7 @@ function buildTypeMetaData(name: string, props: Property[], superTypes: readonly
 
 /**
  * Builds property metadata for a specific property of an AST node.
- * 
+ *
  * @param property The property definition to build metadata for
  * @returns Complete property metadata including reference type information
  */

@@ -2,17 +2,12 @@ import type { GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
 import type { TerminalRule } from "../terminal/types.js";
 import { isTerminalRule } from "../terminal/types.js";
-import type { 
-    AbstractElement, 
-    RuleEntry, 
-    CrossRef, 
-    RuleContext 
-} from "./types.js";
+import type { AbstractElement, RuleEntry, CrossRef, RuleContext } from "./types.js";
 import type { ParserRule } from "../types.js";
 
 /**
  * Type guard to check if a value is a parser rule.
- * 
+ *
  * @param node The value to check
  * @returns True if the node is a parser rule, false otherwise
  */
@@ -24,7 +19,7 @@ export function isParserRule(node: unknown): node is ParserRule<any> {
  * Groups multiple rule entries into a single abstract element.
  * If only one element is provided, returns it directly.
  * Otherwise, wraps multiple elements in a Group.
- * 
+ *
  * @param elements The rule entries to group
  * @returns A single abstract element representing the group
  */
@@ -42,7 +37,7 @@ export function groupIfNeeded(elements: RuleEntry[]): AbstractElement {
 /**
  * Creates a rule call element that references either a terminal rule or parser rule.
  * Rule calls are used to invoke other rules within a grammar definition.
- * 
+ *
  * @param element The terminal or parser rule to call
  * @returns An abstract element representing the rule call
  */
@@ -63,7 +58,7 @@ export function createRuleCall(element: TerminalRule<any> | ParserRule<any>): Ab
 /**
  * Converts a single rule entry into an abstract element.
  * Handles different types of entries (strings, terminals, parsers, cross-refs).
- * 
+ *
  * @param entry The rule entry to convert
  * @returns The corresponding abstract element
  */
@@ -81,7 +76,7 @@ export function simplifyEntry(entry: RuleEntry): AbstractElement {
 
 /**
  * Converts an array of rule entries into an array of abstract elements.
- * 
+ *
  * @param elements The rule entries to convert
  * @returns Array of corresponding abstract elements
  */
@@ -92,7 +87,7 @@ export function simplifyEntries(elements: RuleEntry[]): AbstractElement[] {
 /**
  * Creates an assignment element that assigns values to AST node properties.
  * Assignments define how parsed content is stored in the resulting AST.
- * 
+ *
  * @param key The property name to assign to
  * @param operator The assignment operator ("=", "+=", or "?=")
  * @param terminal The terminals or literal values to assign

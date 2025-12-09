@@ -9,7 +9,7 @@ import { primitiveTypeLookup } from "../../type/primitiveTypeLookup.js";
  * Builder for creating terminal rules with fluent interface.
  * Allows configuring various aspects of terminal rules like visibility,
  * return type, and matching pattern.
- * 
+ *
  * @template T The TypeScript type that this terminal rule will produce
  */
 export class TerminalRuleBuilder<T> {
@@ -19,7 +19,7 @@ export class TerminalRuleBuilder<T> {
      * affect parsing but don't appear in the final AST.
      */
     private isHidden: boolean = false;
-    
+
     /**
      * The primitive type that this terminal rule returns.
      * Used to convert matched text into typed values.
@@ -28,7 +28,7 @@ export class TerminalRuleBuilder<T> {
 
     /**
      * Creates a new terminal rule builder.
-     * 
+     *
      * @param name The unique name for this terminal rule in the grammar
      */
     constructor(private readonly name: string) {}
@@ -36,9 +36,9 @@ export class TerminalRuleBuilder<T> {
     /**
      * Marks this terminal rule as hidden. Hidden terminals are not included
      * in the concrete syntax tree but are still used for parsing (e.g., whitespace).
-     * 
+     *
      * @returns The same builder instance for method chaining
-     * 
+     *
      * @example
      * ```typescript
      * const WS = createTerminal("WS")
@@ -55,17 +55,17 @@ export class TerminalRuleBuilder<T> {
      * Specifies the TypeScript type that this terminal rule should return.
      * This enables type-safe parsing where matched text is converted to the
      * appropriate TypeScript type.
-     * 
+     *
      * @template T The primitive type to return
      * @param type The primitive type constructor (String, Number, Boolean, BigInt, Date)
      * @returns A new builder with updated type information
-     * 
+     *
      * @example
      * ```typescript
      * const INT = createTerminal("INT")
      *     .returns(Number)  // Convert matched text to number
      *     .as(/[0-9]+/);
-     * 
+     *
      * const BOOL = createTerminal("BOOL")
      *     .returns(Boolean)  // Convert "true"/"false" to boolean
      *     .as(/true|false/);
@@ -79,10 +79,10 @@ export class TerminalRuleBuilder<T> {
     /**
      * Defines the matching pattern for this terminal rule using a regular expression.
      * This completes the terminal rule definition.
-     * 
+     *
      * @param regex The regular expression
      * @returns A complete terminal rule that can be used in grammar definitions
-     * 
+     *
      * @example
      * ```typescript
      * const ID = createTerminal("ID").as(/[a-zA-Z_][a-zA-Z0-9_]*\/);
@@ -92,7 +92,7 @@ export class TerminalRuleBuilder<T> {
         const token: SerializableGrammarNode<GrammarAST.RegexToken> = {
             $type: "RegexToken",
             parenthesized: false,
-            regex: regex.toString(),
+            regex: regex.toString()
         };
         return {
             $type: "TerminalRule",
@@ -102,11 +102,11 @@ export class TerminalRuleBuilder<T> {
                 this.type != undefined
                     ? {
                           $type: "ReturnType",
-                          name: this.type,
+                          name: this.type
                       }
                     : undefined,
             fragment: false,
-            definition: token,
+            definition: token
         };
     }
 }

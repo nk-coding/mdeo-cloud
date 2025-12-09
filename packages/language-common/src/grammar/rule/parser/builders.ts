@@ -12,7 +12,7 @@ import type { ParserRule } from "../types.js";
 export class RuleBuilder {
     /**
      * Creates a new rule builder.
-     * 
+     *
      * @param name The unique name for this parser rule in the grammar
      */
     constructor(readonly name: string) {}
@@ -20,11 +20,11 @@ export class RuleBuilder {
     /**
      * Specifies the return type for this parser rule. The return type defines
      * the AST node interface that this rule will produce when parsed.
-     * 
+     *
      * @template T The AST node type this rule will produce
      * @param type The interface or type definition for the AST node
      * @returns A builder for defining the parsing logic
-     * 
+     *
      * @example
      * ```typescript
      * const PersonRule = createRule("Person")
@@ -40,26 +40,29 @@ export class RuleBuilder {
 /**
  * Builder for parser rules that have a return type specified. This builder
  * allows defining the actual parsing logic through a rule definition function.
- * 
+ *
  * @template T The AST node type this rule will produce
  */
 export class RuleBuilderWithType<T extends AstNode> {
     /**
      * Creates a typed rule builder.
-     * 
+     *
      * @param name The unique name for this parser rule
      * @param type The AST node type this rule will produce
      */
-    constructor(private readonly name: string, private readonly type: BaseType<T>) {}
+    constructor(
+        private readonly name: string,
+        private readonly type: BaseType<T>
+    ) {}
 
     /**
      * Defines the parsing logic for this rule using a function that returns
      * rule entries. The function receives a context object with methods for
      * creating assignments to populate the AST node properties.
-     * 
+     *
      * @param rule Function that defines the parsing structure using the rule context
      * @returns A complete parser rule that can be used in grammar generation
-     * 
+     *
      * @example
      * ```typescript
      * .as(({ set, add, flag }) => [

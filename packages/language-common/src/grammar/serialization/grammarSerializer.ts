@@ -9,7 +9,7 @@ import type { TerminalRule } from "../rule/terminal/types.js";
 /**
  * Utility type that represents either a single value or an array of values.
  * Used throughout serialization to handle properties that can be either singular or plural.
- * 
+ *
  * @template T The base type that can be singular or plural
  */
 type ArrayOrT<T> = T | T[];
@@ -41,22 +41,22 @@ export interface SerializableReference {
 /**
  * Type that transforms any AST node into a serializable form by converting
  * Langium references to serializable references and handling circular dependencies.
- * 
+ *
  * This transformation is necessary because AST nodes can contain circular references
  * and Langium-specific Reference types that cannot be directly serialized to JSON.
- * 
+ *
  * @template T The AST node type to make serializable
  */
 export type SerializedAstNode<T extends AstNode> = {
     [K in keyof T]: T[K] extends AstNode
         ? SerializedAstNode<T[K]>
         : T[K] extends AstNode[]
-        ? SerializedAstNode<T[K][number]>[]
-        : T[K] extends Reference<any>
-        ? SerializableReference
-        : T[K] extends Reference<any>[]
-        ? SerializableReference[]
-        : T[K];
+          ? SerializedAstNode<T[K][number]>[]
+          : T[K] extends Reference<any>
+            ? SerializableReference
+            : T[K] extends Reference<any>[]
+              ? SerializableReference[]
+              : T[K];
 };
 
 /**
@@ -71,7 +71,7 @@ type SerializedRule =
 /**
  * Internal data structure that pairs a grammar node with its serializable reference.
  * Used to track already-serialized nodes and avoid duplicating them in the output.
- * 
+ *
  * @template T The type of the grammar node being tracked
  */
 interface NodeWithRef<T> {
@@ -79,7 +79,7 @@ interface NodeWithRef<T> {
      * The actual grammar node instance.
      */
     node: T;
-    
+
     /**
      * The serializable reference that points to this node in the output.
      */
@@ -105,7 +105,7 @@ export class GrammarSerializer {
      * Prevents duplicate rules and enables cross-referencing.
      */
     private readonly ruleLookup = new Map<string, NodeWithRef<Rule>>();
-    
+
     /**
      * Lookup table mapping type names to their registered nodes and references.
      * Handles both Type and Interface definitions.
@@ -117,13 +117,13 @@ export class GrammarSerializer {
      * Undefined slots are placeholders during the registration process.
      */
     private readonly rules: (SerializedRule | undefined)[] = [];
-    
+
     /**
      * Array of serialized types in registration order.
      * Undefined slots are placeholders during the registration process.
      */
     private readonly types: (SerializedAstNode<GrammarAST.Type> | undefined)[] = [];
-    
+
     /**
      * Array of serialized interfaces in registration order.
      * Undefined slots are placeholders during the registration process.
@@ -134,7 +134,7 @@ export class GrammarSerializer {
      * Gets the complete serialized grammar containing all registered rules, types, and interfaces.
      * This property returns the final JSON-serializable grammar structure that can be
      * processed by Langium's loadGrammarFromJson function.
-     * 
+     *
      * @returns The complete serialized grammar ready for JSON conversion
      */
     get grammar(): SerializedAstNode<GrammarAST.Grammar> {
@@ -150,7 +150,7 @@ export class GrammarSerializer {
 
     /**
      * Creates a new grammar serializer and registers the entry rule and additional terminals.
-     * 
+     *
      * @param entry The main parser rule that serves as the grammar entry point
      * @param additionalTerminals Array of terminal rules to include in the grammar
      */
@@ -165,13 +165,13 @@ export class GrammarSerializer {
     /**
      * Recursively visits and serializes grammar entries, handling different value types
      * and converting function references to serializable references.
-     * 
+     *
      * This method is the core of the serialization process. It handles:
      * - Arrays by recursively visiting each element
      * - Objects by visiting all property values
      * - Functions by evaluating them and registering the returned nodes
      * - Primitive values by returning them unchanged
-     * 
+     *
      * @param entry The entry to visit and serialize
      * @returns The serialized representation of the entry
      * @throws Error if an unsupported reference type is encountered
@@ -202,11 +202,11 @@ export class GrammarSerializer {
 
     /**
      * Registers a rule in the serialization lookup and converts it to serialized form.
-     * 
+     *
      * This method handles rule deduplication by checking if a rule with the same name
      * has already been registered. If found, it verifies that it's the same rule instance
      * and returns the existing reference. Otherwise, it creates a new entry.
-     * 
+     *
      * @param rule The rule to register and serialize
      * @returns A serializable reference to the registered rule
      * @throws Error if a rule with the same name but different instance is found
@@ -230,10 +230,10 @@ export class GrammarSerializer {
 
     /**
      * Registers a type definition in the serialization lookup and converts it to serialized form.
-     * 
+     *
      * Similar to registerRule, this method handles type deduplication and ensures that
      * each type is only serialized once. It works with union type definitions.
-     * 
+     *
      * @param type The type definition to register and serialize
      * @returns A serializable reference to the registered type
      * @throws Error if a type with the same name but different instance is found
@@ -257,10 +257,10 @@ export class GrammarSerializer {
 
     /**
      * Registers an interface definition in the serialization lookup and converts it to serialized form.
-     * 
+     *
      * This method handles interface deduplication and ensures that each interface
      * is only serialized once. It works with structured interface definitions.
-     * 
+     *
      * @param iface The interface definition to register and serialize
      * @returns A serializable reference to the registered interface
      * @throws Error if an interface with the same name but different instance is found
@@ -284,7 +284,7 @@ export class GrammarSerializer {
 
     /**
      * Type guard to check if a value is a grammar rule (terminal, parser, or infix).
-     * 
+     *
      * @param value The value to check
      * @returns True if the value is a rule, false otherwise
      */
@@ -299,7 +299,7 @@ export class GrammarSerializer {
 
     /**
      * Type guard to check if a value is a Type definition.
-     * 
+     *
      * @param value The value to check
      * @returns True if the value is a Type, false otherwise
      */
@@ -309,7 +309,7 @@ export class GrammarSerializer {
 
     /**
      * Type guard to check if a value is an Interface definition.
-     * 
+     *
      * @param value The value to check
      * @returns True if the value is an Interface, false otherwise
      */

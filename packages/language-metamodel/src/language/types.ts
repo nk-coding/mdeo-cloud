@@ -1,10 +1,4 @@
-import {
-    createInterface,
-    createType,
-    Optional,
-    Ref,
-    Union
-} from "@mdeo/language-common";
+import { createInterface, createType, Optional, Ref, Union } from "@mdeo/language-common";
 import type { ASTType } from "@mdeo/language-common";
 
 export const PrimitiveType = createInterface("PrimitiveType").attrs({
@@ -28,10 +22,7 @@ export const RangeMultiplicity = createInterface("RangeMultiplicity").attrs({
 
 export type RangeMultiplicityType = ASTType<typeof RangeMultiplicity>;
 
-export const Multiplicity = createType("Multiplicity").types(
-    SingleMultiplicity,
-    RangeMultiplicity
-);
+export const Multiplicity = createType("Multiplicity").types(SingleMultiplicity, RangeMultiplicity);
 
 export type MultiplicityType = ASTType<typeof Multiplicity>;
 
@@ -45,7 +36,7 @@ export type PropertyType = ASTType<typeof Property>;
 
 export const MetaClass = createInterface("MetaClass").attrs({
     name: String,
-    isAbstract: Optional(Boolean),
+    isAbstract: Boolean,
     extends: [Ref(() => MetaClass)],
     properties: [Property]
 });

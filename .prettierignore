@@ -1,0 +1,6 @@
+package-lock.json
+packages/**/dist
+packages/**/tsconfig.tsbuildinfo
+node_modules
+packages/workbench/src/components/ui
+copilot/

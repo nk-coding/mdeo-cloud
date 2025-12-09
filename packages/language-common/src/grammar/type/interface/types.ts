@@ -136,28 +136,28 @@ export interface Resolve<T extends TypeType> {
 export type MapPrimitive<T extends SimpleInterfaceDeclarationValue> = T extends typeof BigInt
     ? bigint
     : T extends typeof Number
-    ? number
-    : T extends typeof String
-    ? string
-    : T extends typeof Boolean
-    ? boolean
-    : T extends typeof Date
-    ? Date
-    : T extends BaseType<infer U>
-    ? U
-    : T extends () => BaseType<infer U>
-    ? U
-    : T extends RefType<BaseType<infer U>>
-    ? Reference<U>
-    : T extends RefType<() => BaseType<infer U>>
-    ? Reference<U>
-    : T extends UnionType<infer U>
-    ? U
-    : T extends Resolve<BaseType<infer U>>
-    ? U
-    : T extends Resolve<() => BaseType<infer U>>
-    ? U
-    : never;
+      ? number
+      : T extends typeof String
+        ? string
+        : T extends typeof Boolean
+          ? boolean
+          : T extends typeof Date
+            ? Date
+            : T extends BaseType<infer U>
+              ? U
+              : T extends () => BaseType<infer U>
+                ? U
+                : T extends RefType<BaseType<infer U>>
+                  ? Reference<U>
+                  : T extends RefType<() => BaseType<infer U>>
+                    ? Reference<U>
+                    : T extends UnionType<infer U>
+                      ? U
+                      : T extends Resolve<BaseType<infer U>>
+                        ? U
+                        : T extends Resolve<() => BaseType<infer U>>
+                          ? U
+                          : never;
 
 /**
  * Maps interface declaration values to their TypeScript equivalents.
@@ -168,10 +168,10 @@ export type MapPrimitive<T extends SimpleInterfaceDeclarationValue> = T extends 
 type MapInterfaceDeclarationValue<T extends InterfaceDeclarationValue> = T extends SimpleInterfaceDeclarationValue
     ? MapPrimitive<T>
     : T extends [infer U extends SimpleInterfaceDeclarationValue]
-    ? MapPrimitive<U>[]
-    : T extends OptionalType<infer U>
-    ? MapPrimitive<U> | undefined
-    : never;
+      ? MapPrimitive<U>[]
+      : T extends OptionalType<infer U>
+        ? MapPrimitive<U> | undefined
+        : never;
 
 /**
  * Maps a complete interface declaration to its TypeScript object type.

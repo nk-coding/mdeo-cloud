@@ -5,7 +5,7 @@ import type { SerializableGrammarNode } from "../../serialization/types.js";
  * Represents a terminal rule in the grammar that matches specific text patterns
  * and produces typed values. Terminal rules are the lowest-level parsing units
  * that match against the input text using regular expressions or literal strings.
- * 
+ *
  * @template T The TypeScript type that this terminal rule produces
  */
 export type TerminalRule<T> = {
@@ -18,7 +18,7 @@ export type TerminalRule<T> = {
 
 /**
  * Type guard to check if a value is a terminal rule.
- * 
+ *
  * @param node The value to check
  * @returns True if the node is a terminal rule, false otherwise
  */
