@@ -1,17 +1,17 @@
 <template>
-    <TreeButton v-if="!items" v-bind="$attrs" :data="data">
+    <TreeButton v-if="!items" v-bind="$attrs" :data="data" :mode="mode">
         <slot name="content" />
     </TreeButton>
 
     <li v-else data-slot="tree-item" data-tree="item" :class="cn('group/tree-item relative')">
         <Collapsible class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
             <CollapsibleTrigger as-child>
-                <TreeButton v-bind="$attrs" :data="data" data-tree="button">
+                <TreeButton v-bind="$attrs" :data="data" :mode="mode">
                     <ChevronRight class="transition-transform" />
                     <slot name="content" />
                 </TreeButton>
             </CollapsibleTrigger>
-            <CollapsibleContent>
+            <CollapsibleContent v-if="items.length > 0">
                 <ul
                     data-slot="tree-sub"
                     data-tree="sub"
@@ -32,7 +32,7 @@
     </li>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends TreeItem">
 import { ChevronRight } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
@@ -40,10 +40,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import TreeButton, { type TreeButtonProps } from "./TreeButton.vue";
 import type { TreeItem } from "./util";
 
-const props = defineProps<
+defineProps<
     {
-        data: TreeItem;
-        items?: TreeItem[];
+        data: T;
+        items?: T[];
     } & TreeButtonProps
 >();
 </script>

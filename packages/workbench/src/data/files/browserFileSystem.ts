@@ -1,4 +1,4 @@
-import { FileSystem, type FileSystemStats } from "./fileSystem.js";
+import { FileSystem } from "./fileSystem.js";
 import type {
     FileSystemNode,
     File,
@@ -9,6 +9,7 @@ import type {
     MoveOptions
 } from "./file.js";
 import { FileType } from "./file.js";
+import { reactive } from "vue";
 
 /**
  * Internal representation of a node as stored in IndexedDB.
@@ -36,69 +37,143 @@ interface IndexedDBNode {
      */
     path: string;
     /**
-     * Creation timestamp as ISO string
-     */
-    createdAt: string;
-    /**
-     * Last modification timestamp as ISO string
-     */
-    modifiedAt: string;
-    /**
      * Text content (files only)
      */
     content?: string;
     /**
-     * MIME type (files only)
-     */
-    mimeType?: string;
-    /**
      * Array of child node IDs (folders only)
      */
-    children?: string[];
-    /**
-     * Size in bytes (files only)
-     */
-    size?: number;
+    childrenIds?: string[];
 }
 
 /**
  * File system implementation using IndexedDB for browser-based persistent storage.
  * Provides a hierarchical file system that persists data across browser sessions.
+ *
+ * All data is loaded into reactive objects on initialization for optimal performance.
+ * All operations update both the reactive state and persist to IndexedDB.
+ *
+ * @example
+ * ```typescript
+ * const fileSystem = new BrowserFileSystem();
+ * await fileSystem.initialize();
+ *
+ * // Get reactive root folder - automatically updates when changed
+ * const rootFolder = await fileSystem.getRootFolder();
+ * const rootEntries = rootFolder.children; // Direct access to children array
+ *
+ * // All returned objects are reactive and will update UI automatically
+ * ```
  */
 export class BrowserFileSystem extends FileSystem {
-    private dbPromise: Promise<IDBDatabase> | null = null;
+    private db: IDBDatabase | null = null;
     private readonly dbName = "FileSystemDB";
     private readonly dbVersion = 1;
     private readonly storeName = "nodes";
-    private rootFolderId: string | null = null;
+
+    // Reactive state - entire filesystem loaded in memory
+    private nodes = reactive(new Map<string, FileSystemNode>());
+    private rootFolder: Folder | null = null;
+
+    // Initialization promise that resolves when the filesystem is ready
+    private readonly initialized: Promise<void>;
+
+    constructor() {
+        super();
+        this.initialized = this.initializeInternal();
+    }
 
     async initialize(): Promise<void> {
-        if (!this.dbPromise) {
-            this.dbPromise = new Promise((resolve, reject) => {
-                const request = indexedDB.open(this.dbName, this.dbVersion);
+        await this.initialized;
+    }
 
-                request.onerror = () => {
-                    reject(new Error("Failed to open IndexedDB"));
-                };
+    private async initializeInternal(): Promise<void> {
+        // Initialize IndexedDB
+        this.db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, this.dbVersion);
 
-                request.onsuccess = () => {
-                    resolve(request.result);
-                };
+            request.onerror = () => {
+                reject(new Error("Failed to open IndexedDB"));
+            };
 
-                request.onupgradeneeded = (event) => {
-                    const db = (event.target as IDBOpenDBRequest).result;
+            request.onsuccess = () => {
+                resolve(request.result);
+            };
 
-                    if (!db.objectStoreNames.contains(this.storeName)) {
-                        const store = db.createObjectStore(this.storeName, { keyPath: "id" });
-                        store.createIndex("parentId", "parentId", { unique: false });
-                        store.createIndex("path", "path", { unique: true });
-                    }
-                };
-            });
+            request.onupgradeneeded = (event) => {
+                const db = (event.target as IDBOpenDBRequest).result;
+
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    const store = db.createObjectStore(this.storeName, { keyPath: "id" });
+                    store.createIndex("parentId", "parentId", { unique: false });
+                    store.createIndex("path", "path", { unique: true });
+                }
+            };
+        });
+
+        // Load entire filesystem into memory
+        await this.loadFileSystem();
+    }
+
+    /**
+     * Load entire filesystem from IndexedDB into reactive memory.
+     */
+    private async loadFileSystem(): Promise<void> {
+        const allStoredNodes = await this.getAllStoredNodes();
+
+        // Clear existing state
+        this.nodes.clear();
+        this.rootFolder = null;
+
+        // Convert and store all nodes first
+        for (const storedNode of allStoredNodes) {
+            const node = this.convertFromIndexedDB(storedNode);
+            this.nodes.set(node.id, node);
+
+            // Find root folder
+            if (node.type === FileType.FOLDER && node.parentId === null) {
+                this.rootFolder = node;
+            }
         }
 
-        await this.dbPromise;
-        await this.ensureRootFolder();
+        // Now populate folder children with actual nodes
+        for (const storedNode of allStoredNodes) {
+            if (storedNode.type === FileType.FOLDER && storedNode.childrenIds) {
+                const folder = this.nodes.get(storedNode.id) as Folder;
+                if (folder) {
+                    folder.children = storedNode.childrenIds
+                        .map((childId) => this.nodes.get(childId))
+                        .filter((child) => child !== undefined) as FileSystemNode[];
+                }
+            }
+        }
+        // Create root folder if it doesn't exist
+        if (!this.rootFolder) {
+            await this.createRootFolder();
+        }
+    }
+
+    /**
+     * Create the root folder if it doesn't exist.
+     */
+    private async createRootFolder(): Promise<void> {
+        const rootId = this.generateId();
+        const rootFolder: Folder = reactive({
+            id: rootId,
+            name: "",
+            type: FileType.FOLDER,
+            parentId: null,
+            path: "/",
+            createdAt: new Date(),
+            modifiedAt: new Date(),
+            children: []
+        });
+
+        this.nodes.set(rootId, rootFolder);
+        this.rootFolder = rootFolder;
+
+        // Persist to IndexedDB
+        await this.storeNode(this.convertToIndexedDB(rootFolder));
     }
 
     /**
@@ -106,37 +181,10 @@ export class BrowserFileSystem extends FileSystem {
      * @returns The IndexedDB database instance
      */
     private async getDatabase(): Promise<IDBDatabase> {
-        if (!this.dbPromise) {
-            await this.initialize();
+        if (!this.db) {
+            throw new Error("Database not initialized");
         }
-        return this.dbPromise!;
-    }
-
-    /**
-     * Ensure the root folder exists in the database.
-     * Creates it if it doesn't exist.
-     */
-    private async ensureRootFolder(): Promise<void> {
-        const existingRoot = await this.getNodeByPath("/");
-        if (existingRoot) {
-            this.rootFolderId = existingRoot.id;
-            return;
-        }
-
-        const rootId = this.generateId();
-        const rootFolder: IndexedDBNode = {
-            id: rootId,
-            name: "",
-            type: FileType.FOLDER,
-            parentId: null,
-            path: "/",
-            createdAt: new Date().toISOString(),
-            modifiedAt: new Date().toISOString(),
-            children: []
-        };
-
-        await this.storeNode(rootFolder);
-        this.rootFolderId = rootId;
+        return this.db;
     }
 
     /**
@@ -153,47 +201,6 @@ export class BrowserFileSystem extends FileSystem {
 
             request.onsuccess = () => resolve();
             request.onerror = () => reject(new Error("Failed to store node"));
-        });
-    }
-
-    /**
-     * Retrieve a node from IndexedDB by its ID.
-     * @param id - The unique identifier of the node
-     * @returns The stored node or null if not found
-     */
-    private async getStoredNode(id: string): Promise<IndexedDBNode | null> {
-        const db = await this.getDatabase();
-
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([this.storeName], "readonly");
-            const store = transaction.objectStore(this.storeName);
-            const request = store.get(id);
-
-            request.onsuccess = () => {
-                resolve(request.result || null);
-            };
-            request.onerror = () => reject(new Error("Failed to get node"));
-        });
-    }
-
-    /**
-     * Retrieve a node from IndexedDB by its path.
-     * @param path - The full path of the node
-     * @returns The stored node or null if not found
-     */
-    private async getStoredNodeByPath(path: string): Promise<IndexedDBNode | null> {
-        const db = await this.getDatabase();
-
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([this.storeName], "readonly");
-            const store = transaction.objectStore(this.storeName);
-            const index = store.index("path");
-            const request = index.get(path);
-
-            request.onsuccess = () => {
-                resolve(request.result || null);
-            };
-            request.onerror = () => reject(new Error("Failed to get node by path"));
         });
     }
 
@@ -244,25 +251,21 @@ export class BrowserFileSystem extends FileSystem {
             name: node.name,
             type: node.type,
             parentId: node.parentId,
-            path: node.path,
-            createdAt: new Date(node.createdAt),
-            modifiedAt: new Date(node.modifiedAt)
+            path: node.path
         };
 
         if (node.type === FileType.FILE) {
-            return {
+            return reactive({
                 ...base,
                 type: FileType.FILE,
-                content: node.content || "",
-                mimeType: node.mimeType,
-                size: node.size
-            } as File;
+                content: node.content || ""
+            }) as File;
         } else {
-            return {
+            return reactive({
                 ...base,
                 type: FileType.FOLDER,
-                children: node.children || []
-            } as Folder;
+                children: [] // Will be populated after all nodes are loaded
+            }) as Folder;
         }
     }
 
@@ -277,19 +280,15 @@ export class BrowserFileSystem extends FileSystem {
             name: node.name,
             type: node.type,
             parentId: node.parentId,
-            path: node.path,
-            createdAt: node.createdAt.toISOString(),
-            modifiedAt: node.modifiedAt.toISOString()
+            path: node.path
         };
 
         if (node.type === FileType.FILE) {
             const file = node as File;
             base.content = file.content;
-            base.mimeType = file.mimeType;
-            base.size = file.size || file.content.length;
         } else {
             const folder = node as Folder;
-            base.children = folder.children;
+            base.childrenIds = folder.children.map((child) => child.id);
         }
 
         return base;
@@ -298,22 +297,24 @@ export class BrowserFileSystem extends FileSystem {
     async createFile(options: CreateFileOptions): Promise<File> {
         this.validateName(options.name);
 
-        const parentId = options.parentId || this.rootFolderId || (await this.getDatabase(), this.rootFolderId);
+        const parentId = options.parentId || this.rootFolder!.id;
         if (!parentId) throw new Error("No root folder found");
 
-        const parent = await this.getStoredNode(parentId);
+        const parent = this.nodes.get(parentId);
         if (!parent || parent.type !== FileType.FOLDER) {
             throw new Error("Parent folder not found");
         }
 
         const path = this.buildPath(parent.path === "/" ? null : parent.path, options.name);
 
-        const existing = await this.getStoredNodeByPath(path);
-        if (existing) {
-            throw new Error(`File or folder already exists at path: ${path}`);
+        // Check if path already exists
+        for (const node of this.nodes.values()) {
+            if (node.path === path) {
+                throw new Error(`File or folder already exists at path: ${path}`);
+            }
         }
 
-        const file: File = {
+        const file = reactive({
             id: this.generateId(),
             name: options.name,
             type: FileType.FILE,
@@ -322,16 +323,16 @@ export class BrowserFileSystem extends FileSystem {
             createdAt: new Date(),
             modifiedAt: new Date(),
             content: options.content || "",
-            mimeType: options.mimeType,
             size: (options.content || "").length
-        };
+        }) as File;
 
+        // Update reactive state
+        this.nodes.set(file.id, file);
+        (parent as Folder).children.push(file);
+
+        // Persist to IndexedDB
         await this.storeNode(this.convertToIndexedDB(file));
-
-        parent.children = parent.children || [];
-        parent.children.push(file.id);
-        parent.modifiedAt = new Date().toISOString();
-        await this.storeNode(parent);
+        await this.storeNode(this.convertToIndexedDB(parent));
 
         this.emitEvent({ type: "created", node: file });
         return file;
@@ -340,22 +341,24 @@ export class BrowserFileSystem extends FileSystem {
     async createFolder(options: CreateFolderOptions): Promise<Folder> {
         this.validateName(options.name);
 
-        const parentId = options.parentId || this.rootFolderId || (await this.getDatabase(), this.rootFolderId);
+        const parentId = options.parentId || this.rootFolder!.id;
         if (!parentId) throw new Error("No root folder found");
 
-        const parent = await this.getStoredNode(parentId);
+        const parent = this.nodes.get(parentId);
         if (!parent || parent.type !== FileType.FOLDER) {
             throw new Error("Parent folder not found");
         }
 
         const path = this.buildPath(parent.path === "/" ? null : parent.path, options.name);
 
-        const existing = await this.getStoredNodeByPath(path);
-        if (existing) {
-            throw new Error(`File or folder already exists at path: ${path}`);
+        // Check if path already exists
+        for (const node of this.nodes.values()) {
+            if (node.path === path) {
+                throw new Error(`File or folder already exists at path: ${path}`);
+            }
         }
 
-        const folder: Folder = {
+        const folder = reactive({
             id: this.generateId(),
             name: options.name,
             type: FileType.FOLDER,
@@ -364,148 +367,162 @@ export class BrowserFileSystem extends FileSystem {
             createdAt: new Date(),
             modifiedAt: new Date(),
             children: []
-        };
+        }) as Folder;
 
+        // Update reactive state
+        this.nodes.set(folder.id, folder);
+        (parent as Folder).children.push(folder);
+
+        // Persist to IndexedDB
         await this.storeNode(this.convertToIndexedDB(folder));
-
-        parent.children = parent.children || [];
-        parent.children.push(folder.id);
-        parent.modifiedAt = new Date().toISOString();
-        await this.storeNode(parent);
+        await this.storeNode(this.convertToIndexedDB(parent));
 
         this.emitEvent({ type: "created", node: folder });
         return folder;
     }
 
     async getNode(id: string): Promise<FileSystemNode | null> {
-        const stored = await this.getStoredNode(id);
-        return stored ? this.convertFromIndexedDB(stored) : null;
+        return this.nodes.get(id) || null;
     }
 
     async getNodeByPath(path: string): Promise<FileSystemNode | null> {
-        const stored = await this.getStoredNodeByPath(path);
-        return stored ? this.convertFromIndexedDB(stored) : null;
+        for (const node of this.nodes.values()) {
+            if (node.path === path) {
+                return node;
+            }
+        }
+        return null;
     }
 
     async updateFile(id: string, options: UpdateFileOptions): Promise<File> {
-        const stored = await this.getStoredNode(id);
-        if (!stored || stored.type !== FileType.FILE) {
+        const file = this.nodes.get(id) as File;
+        if (!file || file.type !== FileType.FILE) {
             throw new Error(`File with id ${id} not found`);
         }
 
-        if (options.name && options.name !== stored.name) {
+        if (options.name && options.name !== file.name) {
             this.validateName(options.name);
 
-            const parent = stored.parentId ? await this.getStoredNode(stored.parentId) : null;
+            const parent = file.parentId ? this.nodes.get(file.parentId) : null;
             const parentPath = parent ? (parent.path === "/" ? null : parent.path) : null;
             const newPath = this.buildPath(parentPath, options.name);
 
-            const existing = await this.getStoredNodeByPath(newPath);
-            if (existing && existing.id !== id) {
-                throw new Error(`File or folder already exists at path: ${newPath}`);
+            // Check if new path already exists
+            for (const node of this.nodes.values()) {
+                if (node.path === newPath && node.id !== id) {
+                    throw new Error(`File or folder already exists at path: ${newPath}`);
+                }
             }
 
-            stored.name = options.name;
-            stored.path = newPath;
+            file.name = options.name;
+            file.path = newPath;
         }
 
         if (options.content !== undefined) {
-            stored.content = options.content;
-            stored.size = options.content.length;
+            file.content = options.content;
         }
 
-        stored.modifiedAt = new Date().toISOString();
-        await this.storeNode(stored);
+        // Persist to IndexedDB
+        await this.storeNode(this.convertToIndexedDB(file));
 
-        const updatedFile = this.convertFromIndexedDB(stored) as File;
-        this.emitEvent({ type: "updated", node: updatedFile });
-
-        return updatedFile;
+        this.emitEvent({ type: "updated", node: file });
+        return file;
     }
 
     async deleteNode(id: string): Promise<void> {
-        const stored = await this.getStoredNode(id);
-        if (!stored) {
+        const node = this.nodes.get(id);
+        if (!node) {
             throw new Error(`Node with id ${id} not found`);
         }
 
-        if (stored.type === FileType.FOLDER && stored.children) {
-            for (const childId of stored.children) {
-                await this.deleteNode(childId);
+        // Recursively delete children if it's a folder
+        if (node.type === FileType.FOLDER) {
+            const folder = node as Folder;
+            for (const child of [...folder.children]) {
+                await this.deleteNode(child.id);
             }
         }
 
-        if (stored.parentId) {
-            const parent = await this.getStoredNode(stored.parentId);
-            if (parent && parent.children) {
-                parent.children = parent.children.filter((childId) => childId !== id);
-                parent.modifiedAt = new Date().toISOString();
-                await this.storeNode(parent);
+        // Remove from parent's children list
+        if (node.parentId) {
+            const parent = this.nodes.get(node.parentId) as Folder;
+            if (parent) {
+                const index = parent.children.findIndex((child) => child.id === id);
+                if (index !== -1) {
+                    parent.children.splice(index, 1);
+                }
+                await this.storeNode(this.convertToIndexedDB(parent));
             }
         }
 
-        const node = this.convertFromIndexedDB(stored);
+        // Remove from reactive state
+        this.nodes.delete(id);
+
+        // Remove from IndexedDB
         await this.deleteStoredNode(id);
 
         this.emitEvent({ type: "deleted", node });
     }
 
     async moveNode(id: string, options: MoveOptions): Promise<FileSystemNode> {
-        const stored = await this.getStoredNode(id);
-        if (!stored) {
+        const node = this.nodes.get(id);
+        if (!node) {
             throw new Error(`Node with id ${id} not found`);
         }
 
-        const targetParentId =
-            options.targetParentId || this.rootFolderId || (await this.getDatabase(), this.rootFolderId);
+        const targetParentId = options.targetParentId || this.rootFolder!.id;
         if (!targetParentId) throw new Error("No root folder found");
 
-        if (stored.parentId) {
-            const currentParent = await this.getStoredNode(stored.parentId);
-            if (currentParent && currentParent.children) {
-                currentParent.children = currentParent.children.filter((childId) => childId !== id);
-                currentParent.modifiedAt = new Date().toISOString();
-                await this.storeNode(currentParent);
-            }
-        }
-
-        const newParent = await this.getStoredNode(targetParentId);
+        const newParent = this.nodes.get(targetParentId) as Folder;
         if (!newParent || newParent.type !== FileType.FOLDER) {
             throw new Error("Target parent folder not found");
         }
 
-        const newName = options.newName || stored.name;
+        const newName = options.newName || node.name;
         this.validateName(newName);
 
         const newPath = this.buildPath(newParent.path === "/" ? null : newParent.path, newName);
 
-        const existing = await this.getStoredNodeByPath(newPath);
-        if (existing && existing.id !== id) {
-            throw new Error(`File or folder already exists at path: ${newPath}`);
+        // Check if new path already exists
+        for (const existingNode of this.nodes.values()) {
+            if (existingNode.path === newPath && existingNode.id !== id) {
+                throw new Error(`File or folder already exists at path: ${newPath}`);
+            }
         }
 
-        const oldPath = stored.path;
+        const oldPath = node.path;
 
-        stored.name = newName;
-        stored.parentId = targetParentId;
-        stored.path = newPath;
-        stored.modifiedAt = new Date().toISOString();
-
-        if (stored.type === FileType.FOLDER) {
-            await this.updateDescendantPaths(id, oldPath, newPath);
+        // Remove from current parent
+        if (node.parentId) {
+            const currentParent = this.nodes.get(node.parentId) as Folder;
+            if (currentParent) {
+                const index = currentParent.children.findIndex((child) => child.id === id);
+                if (index !== -1) {
+                    currentParent.children.splice(index, 1);
+                }
+                await this.storeNode(this.convertToIndexedDB(currentParent));
+            }
         }
 
-        await this.storeNode(stored);
+        // Update node properties
+        node.name = newName;
+        node.parentId = targetParentId;
+        node.path = newPath;
 
-        newParent.children = newParent.children || [];
-        newParent.children.push(id);
-        newParent.modifiedAt = new Date().toISOString();
-        await this.storeNode(newParent);
+        // Update descendant paths if it's a folder
+        if (node.type === FileType.FOLDER) {
+            this.updateDescendantPaths(id, oldPath, newPath);
+        }
 
-        const movedNode = this.convertFromIndexedDB(stored);
-        this.emitEvent({ type: "moved", node: movedNode, oldPath });
+        // Add to new parent
+        newParent.children.push(node);
 
-        return movedNode;
+        // Persist changes
+        await this.storeNode(this.convertToIndexedDB(node));
+        await this.storeNode(this.convertToIndexedDB(newParent));
+
+        this.emitEvent({ type: "moved", node, oldPath });
+        return node;
     }
 
     /**
@@ -514,76 +531,18 @@ export class BrowserFileSystem extends FileSystem {
      * @param oldFolderPath - The old path of the folder
      * @param newFolderPath - The new path of the folder
      */
-    private async updateDescendantPaths(folderId: string, oldFolderPath: string, newFolderPath: string): Promise<void> {
-        const allNodes = await this.getAllStoredNodes();
-
-        for (const node of allNodes) {
+    private updateDescendantPaths(folderId: string, oldFolderPath: string, newFolderPath: string): void {
+        for (const node of this.nodes.values()) {
             if (node.path.startsWith(oldFolderPath + "/")) {
                 const relativePath = node.path.substring(oldFolderPath.length + 1);
                 node.path = `${newFolderPath}/${relativePath}`;
-                node.modifiedAt = new Date().toISOString();
-                await this.storeNode(node);
             }
         }
-    }
-
-    async listChildren(folderId: string): Promise<FileSystemNode[]> {
-        const stored = await this.getStoredNode(folderId);
-        if (!stored || stored.type !== FileType.FOLDER) {
-            throw new Error(`Folder with id ${folderId} not found`);
-        }
-
-        const children: FileSystemNode[] = [];
-        if (stored.children) {
-            for (const childId of stored.children) {
-                const child = await this.getStoredNode(childId);
-                if (child) {
-                    children.push(this.convertFromIndexedDB(child));
-                }
-            }
-        }
-
-        return children.sort((a, b) => {
-            if (a.type !== b.type) {
-                return a.type === FileType.FOLDER ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-        });
     }
 
     async getRootFolder(): Promise<Folder> {
-        if (!this.rootFolderId) {
-            await this.getDatabase(); // This will trigger initialization if needed
-        }
+        await this.initialize();
 
-        if (!this.rootFolderId) {
-            throw new Error("Root folder not found after initialization");
-        }
-
-        const root = await this.getNode(this.rootFolderId);
-        if (!root || root.type !== FileType.FOLDER) {
-            throw new Error("Root folder not found");
-        }
-
-        return root as Folder;
-    }
-
-    async getStats(): Promise<FileSystemStats> {
-        const allNodes = await this.getAllStoredNodes();
-
-        let totalFiles = 0;
-        let totalFolders = 0;
-        let totalSize = 0;
-
-        for (const node of allNodes) {
-            if (node.type === FileType.FILE) {
-                totalFiles++;
-                totalSize += node.size || 0;
-            } else {
-                totalFolders++;
-            }
-        }
-
-        return { totalFiles, totalFolders, totalSize };
+        return this.rootFolder!;
     }
 }

@@ -1,18 +1,24 @@
 <template>
-    <ContextMenu>
+    <ContextMenu v-model:open="isContextMenuOpen">
         <ContextMenuTrigger as-child>
-            <TreeItem :data="treeItemData" :items="treeItems" @click="handleClick">
+            <TreeItem
+                :data="entry"
+                :items="treeItems"
+                @click="handleClick"
+                :data-state="isContextMenuOpenFixed ? 'open' : 'closed'"
+            >
                 <template #content>
                     <component :is="entry.type === FileType.FOLDER ? FolderIcon : FileIcon" class="w-4 h-4" />
                     <span>{{ entry.name }}</span>
                 </template>
                 <template v-if="entry.type === FileType.FOLDER" #item="{ item }">
                     <FileSystemItem
-                        :entry="getEntryFromTreeItem(item)"
+                        :entry="item"
                         :filesystem="filesystem"
+                        :fileTypes="fileTypes"
                         @select="$emit('select', $event)"
-                        @create-file="$emit('createFile', $event, getEntryFromTreeItem(item).id)"
-                        @create-folder="$emit('createFolder', $event, getEntryFromTreeItem(item).id)"
+                        @create-file="(name, parentId) => $emit('createFile', name, parentId)"
+                        @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
                         @rename="$emit('rename', $event)"
                         @delete="$emit('delete', $event)"
                     />
@@ -38,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { Folder as FolderIcon, File as FileIcon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import {
@@ -48,12 +54,15 @@ import {
     ContextMenuItem,
     ContextMenuSeparator
 } from "@/components/ui/context-menu";
-import type { BrowserFileSystem, FileSystemNode } from "@/data/files";
-import { FileType } from "@/data/files";
+import { FileType, type FileSystemNode } from "@/data/files/file";
+import type { BrowserFileSystem } from "@/data/files/browserFileSystem";
+import type { WorkbenchFileType } from "./types";
+import { sortFileSystemNodes } from "./util";
 
 const props = defineProps<{
     entry: FileSystemNode;
     filesystem: BrowserFileSystem;
+    fileTypes: WorkbenchFileType[];
 }>();
 
 const emit = defineEmits<{
@@ -64,19 +73,12 @@ const emit = defineEmits<{
     delete: [id: string];
 }>();
 
-const treeItemData = computed(() => ({
-    key: props.entry.id
-}));
-
 const treeItems = computed(() => {
-    // For now, we'll not display nested children directly
-    // This would need to be implemented with async loading
+    if (props.entry.type === FileType.FOLDER) {
+        return sortFileSystemNodes(props.entry.children);
+    }
     return undefined;
 });
-
-const getEntryFromTreeItem = (item: any): FileSystemNode => {
-    return item as FileSystemNode;
-};
 
 const handleClick = () => {
     emit("select", props.entry);
@@ -99,4 +101,17 @@ const handleRename = () => {
 const handleDelete = () => {
     emit("delete", props.entry.id);
 };
+
+const isContextMenuOpen = ref(false);
+const isContextMenuOpenFixed = ref(false);
+
+watch(isContextMenuOpen, (newVal) => {
+    if (newVal) {
+        isContextMenuOpenFixed.value = true;
+    } else {
+        setTimeout(() => {
+            isContextMenuOpenFixed.value = false;
+        }, 200);
+    }
+});
 </script>

@@ -5,18 +5,21 @@
         :class="cn('flex min-h-0 flex-1 flex-col gap-2 overflow-x-auto w-full group/tree', props.class)"
         @keydown="handleKeydown"
     >
-        <slot />
+        <template v-for="(item, index) in items" :key="index">
+            <slot name="item" :item="item" />
+        </template>
     </div>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends TreeItem">
 import { computed, provide, ref, useTemplateRef, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
-import { activeItemKey } from "./util";
+import { activeItemKey, type TreeItem } from "./util";
 
 const props = defineProps<{
     class?: HTMLAttributes["class"];
     activeElement?: any;
+    items: T[];
 }>();
 
 const treeRef = useTemplateRef("treeRef");

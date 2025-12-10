@@ -12,24 +12,6 @@ import type {
 import { FileType } from "./file.js";
 
 /**
- * Statistics about the file system contents.
- */
-export interface FileSystemStats {
-    /**
-     * Total number of files
-     */
-    totalFiles: number;
-    /**
-     * Total number of folders
-     */
-    totalFolders: number;
-    /**
-     * Total size of all files in bytes
-     */
-    totalSize: number;
-}
-
-/**
  * Abstract base class for file system implementations.
  * Provides common functionality and defines the interface for concrete implementations.
  */
@@ -92,23 +74,10 @@ export abstract class FileSystem {
     abstract moveNode(id: string, options: MoveOptions): Promise<FileSystemNode>;
 
     /**
-     * List all children of a folder.
-     * @param folderId - The unique identifier of the folder
-     * @returns Promise resolving to array of child nodes
-     */
-    abstract listChildren(folderId: string): Promise<FileSystemNode[]>;
-
-    /**
      * Get the root folder of the file system.
      * @returns Promise resolving to the root folder
      */
     abstract getRootFolder(): Promise<Folder>;
-
-    /**
-     * Get statistics about the file system contents.
-     * @returns Promise resolving to file system statistics
-     */
-    abstract getStats(): Promise<FileSystemStats>;
 
     /**
      * Add an event listener for file system changes.
@@ -168,34 +137,6 @@ export abstract class FileSystem {
     }
 
     /**
-     * Get the content of a file by its ID.
-     * @param id - The unique identifier of the file
-     * @returns Promise resolving to the file content
-     * @throws Error if the node is not a file
-     */
-    async getFileContent(id: string): Promise<string> {
-        const node = await this.getNode(id);
-        if (!node || node.type !== FileType.FILE) {
-            throw new Error(`File with id ${id} not found`);
-        }
-        return (node as File).content;
-    }
-
-    /**
-     * Get all children of a folder by its ID.
-     * @param id - The unique identifier of the folder
-     * @returns Promise resolving to array of child nodes
-     * @throws Error if the node is not a folder
-     */
-    async getFolderChildren(id: string): Promise<FileSystemNode[]> {
-        const node = await this.getNode(id);
-        if (!node || node.type !== FileType.FOLDER) {
-            throw new Error(`Folder with id ${id} not found`);
-        }
-        return this.listChildren(id);
-    }
-
-    /**
      * Build a full path from parent path and node name.
      * @param parentPath - The parent's path
      * @param name - The node's name
@@ -230,46 +171,7 @@ export abstract class FileSystem {
      * @returns A unique string identifier
      */
     protected generateId(): string {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
-
-    /**
-     * Get all root entries (direct children of root folder).
-     * @returns Array of root-level nodes
-     */
-    async getRootEntries(): Promise<FileSystemNode[]> {
-        const rootFolder = await this.getRootFolder();
-        return this.listChildren(rootFolder.id);
-    }
-
-    /**
-     * Get a node by its ID (alias for getNode).
-     * @param id - The unique identifier of the node
-     * @returns The node or null if not found
-     */
-    async getEntry(id: string): Promise<FileSystemNode | null> {
-        return this.getNode(id);
-    }
-
-    /**
-     * Create a file with simple parameters (convenience method).
-     * @param name - The name of the file
-     * @param content - Initial content of the file
-     * @param parentId - ID of parent folder (optional, defaults to root)
-     * @returns The created file
-     */
-    async createFileSimple(name: string, content: string = "", parentId?: string): Promise<File> {
-        const rootFolder = await this.getRootFolder();
-        const actualParentId = parentId || rootFolder.id;
-
-        const options: CreateFileOptions = {
-            name,
-            parentId: actualParentId,
-            content,
-            mimeType: "text/plain"
-        };
-
-        return this.createFile(options);
+        return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     }
 
     /**
@@ -304,23 +206,8 @@ export abstract class FileSystem {
             if (node.type === FileType.FILE) {
                 await this.updateFile(id, { name: newName });
             } else {
-                // For folders, we need to use moveNode to rename
                 await this.moveNode(id, { targetParentId: node.parentId, newName });
             }
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * Delete a node (convenience method).
-     * @param id - The unique identifier of the node to delete
-     * @returns True if successful
-     */
-    async deleteEntry(id: string): Promise<boolean> {
-        try {
-            await this.deleteNode(id);
             return true;
         } catch {
             return false;

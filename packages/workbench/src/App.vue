@@ -4,8 +4,10 @@
             <Pane min-size="0" max-size="50" size="25">
                 <div class="p-4 h-full overflow-auto">
                     <h3 class="mb-3 text-sm font-medium">Project Explorer</h3>
+                    <Input aria-invalid="false" />
                     <Files
                         :filesystem="fileSystem"
+                        :fileTypes="supportedFileTypes"
                         @select="handleFileSelect"
                         @create-file="handleCreateFile"
                         @create-folder="handleCreateFolder"
@@ -36,14 +38,26 @@ import { QueryType } from "@codingame/monaco-vscode-api/vscode/vs/workbench/serv
 // @ts-ignoreimport
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
-import { BrowserFileSystem, type FileSystemNode } from "./data/files";
 import Files from "./components/files/Files.vue";
+import { BrowserFileSystem } from "./data/files/browserFileSystem";
+import type { FileSystemNode } from "./data/files/file";
+import type { WorkbenchFileType } from "./components/files/types";
+import Input from "./components/ui/input/Input.vue";
 
 const editorElement = useTemplateRef("editorElement");
 
 // File system instance
 const fileSystem = new BrowserFileSystem();
 let editorApp: EditorApp | null = null;
+
+// Supported file types for the workbench
+const supportedFileTypes: WorkbenchFileType[] = [
+    {
+        name: "Metamodel File",
+        extension: ".mm",
+        defaultContent: "// New metamodel file\n"
+    }
+];
 
 const selectedEntry = ref<FileSystemNode | null>(null);
 
@@ -55,7 +69,11 @@ function handleFileSelect(entry: FileSystemNode) {
 async function handleCreateFile(name: string, parentId?: string) {
     if (name.trim()) {
         try {
-            const newFile = await fileSystem.createFileSimple(name, "", parentId);
+            const newFile = await fileSystem.createFile({
+                name,
+                content: "",
+                parentId
+            });
             console.log("Created file:", newFile);
         } catch (error) {
             console.error("Failed to create file:", error);
@@ -85,25 +103,21 @@ async function handleRename(id: string, newName: string) {
 
 async function handleDelete(id: string) {
     try {
-        const success = await fileSystem.deleteEntry(id);
-        console.log("Deleted:", success ? "success" : "failed");
+        await fileSystem.deleteNode(id);
+        console.log("Deleted: success");
     } catch (error) {
         console.error("Failed to delete:", error);
     }
 }
 
 onMounted(async () => {
-    // Initialize filesystem
-    await fileSystem.initialize();
-    console.log("Filesystem initialized");
-
     const vscodeApiConfig: MonacoVscodeApiConfig = {
         $type: "classic",
         viewsConfig: {
             $type: "EditorService",
             htmlContainer: editorElement.value!
         },
-        logLevel: LogLevel.Debug,
+        logLevel: LogLevel.Warning,
         serviceOverrides: {
             ...getSearchServiceOverride()
         },
@@ -118,7 +132,10 @@ onMounted(async () => {
     const vscodeApi = new MonacoVscodeApiWrapper(vscodeApiConfig);
     await vscodeApi.start();
 
-    monaco.languages.register({ id: "metamodel" });
+    monaco.languages.register({ 
+        id: "metamodel",
+        extensions: [".mm"]
+    });
 
     const worker = new Worker(new URL("./server/metamodelServer.ts", import.meta.url), { type: "module" });
     const reader = new BrowserMessageReader(worker);
@@ -127,7 +144,7 @@ onMounted(async () => {
     const languageClientConfig: LanguageClientConfig = {
         languageId: "metamodel",
         clientOptions: {
-            documentSelector: ["metamodel"]
+            documentSelector: [{ scheme: "file", language: "metamodel" }]
         },
         connection: {
             options: {

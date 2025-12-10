@@ -36,18 +36,6 @@ export interface FileMetadata {
      * Full path from root to this node
      */
     path: string;
-    /**
-     * Timestamp when the node was created
-     */
-    createdAt: Date;
-    /**
-     * Timestamp when the node was last modified
-     */
-    modifiedAt: Date;
-    /**
-     * Size in bytes (only applicable for files)
-     */
-    size?: number;
 }
 
 /**
@@ -77,9 +65,9 @@ export interface Folder extends FileMetadata {
      */
     type: FileType.FOLDER;
     /**
-     * Array of child node IDs contained in this folder
+     * Array of child nodes contained in this folder
      */
-    children: string[];
+    children: FileSystemNode[];
 }
 
 /**
@@ -122,10 +110,6 @@ export interface CreateFileOptions {
      * Initial content of the file
      */
     content?: string;
-    /**
-     * MIME type of the file content
-     */
-    mimeType?: string;
     /**
      * ID of parent folder, null for root
      */
