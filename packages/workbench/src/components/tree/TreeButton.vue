@@ -3,7 +3,7 @@
         data-slot="tree-button"
         data-tree="button"
         :data-active="isActive"
-        :class="cn(buttonModes({ mode }) ,props.class)"
+        :class="cn(buttonModes({ mode }), props.class)"
         :as="mode === 'edit' ? 'div' : 'button'"
         :as-child="asChild"
         v-bind="$attrs"
@@ -51,7 +51,7 @@ const buttonModes = cva(
             mode: {
                 default: [
                     "hover:bg-surface-container",
-                    "group-focus-within/tree:data-[active=true]:bg-primary group-focus-within/tree:data-[active=true]:text-primary-foreground",
+                    "group-focus/tree:data-[active=true]:bg-primary group-focus/tree:data-[active=true]:text-primary-foreground focus:data-[active=true]:bg-primary focus:data-[active=true]:text-primary-foreground",
                     "focus-within:data-[active=false]:[&:not(:active)]:bg-primary-container focus-within:data-[active=false]:[&:not(:active)]:text-primary-container-foreground",
                     "data-[state=open]:bg-primary-container data-[state=open]:text-primary-container-foreground",
                     "data-[active=true]:bg-surface-container-highest"
@@ -59,7 +59,7 @@ const buttonModes = cva(
                 edit: [
                     "border",
                     "border-ring ring-ring/50 ring-[3px]",
-                    "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                    "[&:has([aria-invalid='true'])]:ring-destructive/20 dark:[&:has([aria-invalid='true'])]:ring-destructive/40 [&:has([aria-invalid='true'])]:border-destructive"
                 ]
             }
         }

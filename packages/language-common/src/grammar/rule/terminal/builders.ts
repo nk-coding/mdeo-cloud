@@ -1,4 +1,4 @@
-import { GrammarAST } from "langium";
+import type { GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
 import { type Primitive } from "../../type/types.js";
 import type { MapPrimitive } from "../../type/interface/types.js";

@@ -1,12 +1,14 @@
 import { FileType, type FileSystemNode } from "@/data/files/file";
 
-export function sortFileSystemNodes(nodes: FileSystemNode[]): FileSystemNode[] {
-    return nodes.sort((a, b) => {
-        // Folders come before files
-        if (a.type !== b.type) {
-            return a.type === FileType.FOLDER ? -1 : 1;
-        }
-        // Then sort alphabetically by name
-        return a.name.localeCompare(b.name);
-    });
+/**
+ * Sorts an array of FileSystemNode objects such that folders appear before files,
+ * and both folders and files are sorted alphabetically by their name.
+ *
+ * @param nodes Array of FileSystemNode objects to sort
+ * @returns An object containing two arrays: one for sorted folders and one for sorted files
+ */
+export function sortFileSystemNodes(nodes: FileSystemNode[]): { folders: FileSystemNode[]; files: FileSystemNode[] } {
+    const folders = nodes.filter((node) => node.type === FileType.FOLDER).sort((a, b) => a.name.localeCompare(b.name));
+    const files = nodes.filter((node) => node.type === FileType.FILE).sort((a, b) => a.name.localeCompare(b.name));
+    return { folders, files };
 }

@@ -1,6 +1,5 @@
 import type { AstNode, GrammarAST, Reference } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
-import type { BaseType } from "../../type/types.js";
 import type { TerminalRule } from "../terminal/types.js";
 import type { ParserRule } from "../types.js";
 

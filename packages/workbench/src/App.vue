@@ -132,7 +132,7 @@ onMounted(async () => {
     const vscodeApi = new MonacoVscodeApiWrapper(vscodeApiConfig);
     await vscodeApi.start();
 
-    monaco.languages.register({ 
+    monaco.languages.register({
         id: "metamodel",
         extensions: [".mm"]
     });

@@ -17,7 +17,7 @@ import {
 } from "langium/lsp";
 import { MetaModelGrammar } from "./language/module.js";
 
-export type MetamodelAddedServices = {};
+export type MetamodelAddedServices = object;
 
 export type MetamodelServices = LangiumServices & MetamodelAddedServices;
 

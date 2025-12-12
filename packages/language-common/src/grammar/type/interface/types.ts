@@ -26,7 +26,7 @@ export type Interface<T extends AstNode> = {
  */
 type MergeInterface<T extends Interface<AstNode>[]> = T extends [Interface<infer First>, ...infer Rest]
     ? First & MergeInterface<Rest extends Interface<AstNode>[] ? Rest : []>
-    : {};
+    : object;
 
 /**
  * Utility type that creates a clean object type representation by distributing

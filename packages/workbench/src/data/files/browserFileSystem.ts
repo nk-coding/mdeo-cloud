@@ -131,20 +131,30 @@ export class BrowserFileSystem extends FileSystem {
             this.nodes.set(node.id, node);
 
             // Find root folder
-            if (node.type === FileType.FOLDER && node.parentId === null) {
+            if (node.type === FileType.FOLDER && storedNode.parentId === null) {
                 this.rootFolder = node;
             }
         }
 
-        // Now populate folder children with actual nodes
+        // Now populate folder children and parent references
         for (const storedNode of allStoredNodes) {
-            if (storedNode.type === FileType.FOLDER && storedNode.childrenIds) {
-                const folder = this.nodes.get(storedNode.id) as Folder;
-                if (folder) {
-                    folder.children = storedNode.childrenIds
-                        .map((childId) => this.nodes.get(childId))
-                        .filter((child) => child !== undefined) as FileSystemNode[];
+            const node = this.nodes.get(storedNode.id);
+            if (!node) continue;
+
+            // Set parent reference
+            if (storedNode.parentId) {
+                const parent = this.nodes.get(storedNode.parentId) as Folder;
+                if (parent) {
+                    node.parent = parent;
                 }
+            }
+
+            // Populate folder children with actual nodes
+            if (storedNode.type === FileType.FOLDER && storedNode.childrenIds) {
+                const folder = node as Folder;
+                folder.children = storedNode.childrenIds
+                    .map((childId) => this.nodes.get(childId))
+                    .filter((child) => child !== undefined) as FileSystemNode[];
             }
         }
         // Create root folder if it doesn't exist
@@ -162,10 +172,8 @@ export class BrowserFileSystem extends FileSystem {
             id: rootId,
             name: "",
             type: FileType.FOLDER,
-            parentId: null,
+            parent: null,
             path: "/",
-            createdAt: new Date(),
-            modifiedAt: new Date(),
             children: []
         });
 
@@ -246,11 +254,12 @@ export class BrowserFileSystem extends FileSystem {
      * @returns Converted file system node
      */
     private convertFromIndexedDB(node: IndexedDBNode): FileSystemNode {
+        // Note: parent will be set after all nodes are loaded
         const base = {
             id: node.id,
             name: node.name,
             type: node.type,
-            parentId: node.parentId,
+            parent: null as Folder | null,
             path: node.path
         };
 
@@ -279,7 +288,7 @@ export class BrowserFileSystem extends FileSystem {
             id: node.id,
             name: node.name,
             type: node.type,
-            parentId: node.parentId,
+            parentId: node.parent?.id || null,
             path: node.path
         };
 
@@ -318,12 +327,9 @@ export class BrowserFileSystem extends FileSystem {
             id: this.generateId(),
             name: options.name,
             type: FileType.FILE,
-            parentId,
+            parent: parent as Folder,
             path,
-            createdAt: new Date(),
-            modifiedAt: new Date(),
-            content: options.content || "",
-            size: (options.content || "").length
+            content: options.content || ""
         }) as File;
 
         // Update reactive state
@@ -362,10 +368,8 @@ export class BrowserFileSystem extends FileSystem {
             id: this.generateId(),
             name: options.name,
             type: FileType.FOLDER,
-            parentId,
+            parent: parent as Folder,
             path,
-            createdAt: new Date(),
-            modifiedAt: new Date(),
             children: []
         }) as Folder;
 
@@ -403,7 +407,7 @@ export class BrowserFileSystem extends FileSystem {
         if (options.name && options.name !== file.name) {
             this.validateName(options.name);
 
-            const parent = file.parentId ? this.nodes.get(file.parentId) : null;
+            const parent = file.parent;
             const parentPath = parent ? (parent.path === "/" ? null : parent.path) : null;
             const newPath = this.buildPath(parentPath, options.name);
 
@@ -444,15 +448,13 @@ export class BrowserFileSystem extends FileSystem {
         }
 
         // Remove from parent's children list
-        if (node.parentId) {
-            const parent = this.nodes.get(node.parentId) as Folder;
-            if (parent) {
-                const index = parent.children.findIndex((child) => child.id === id);
-                if (index !== -1) {
-                    parent.children.splice(index, 1);
-                }
-                await this.storeNode(this.convertToIndexedDB(parent));
+        if (node.parent) {
+            const parent = node.parent;
+            const index = parent.children.findIndex((child) => child.id === id);
+            if (index !== -1) {
+                parent.children.splice(index, 1);
             }
+            await this.storeNode(this.convertToIndexedDB(parent));
         }
 
         // Remove from reactive state
@@ -470,10 +472,7 @@ export class BrowserFileSystem extends FileSystem {
             throw new Error(`Node with id ${id} not found`);
         }
 
-        const targetParentId = options.targetParentId || this.rootFolder!.id;
-        if (!targetParentId) throw new Error("No root folder found");
-
-        const newParent = this.nodes.get(targetParentId) as Folder;
+        const newParent = options.targetParent || this.rootFolder!;
         if (!newParent || newParent.type !== FileType.FOLDER) {
             throw new Error("Target parent folder not found");
         }
@@ -493,20 +492,18 @@ export class BrowserFileSystem extends FileSystem {
         const oldPath = node.path;
 
         // Remove from current parent
-        if (node.parentId) {
-            const currentParent = this.nodes.get(node.parentId) as Folder;
-            if (currentParent) {
-                const index = currentParent.children.findIndex((child) => child.id === id);
-                if (index !== -1) {
-                    currentParent.children.splice(index, 1);
-                }
-                await this.storeNode(this.convertToIndexedDB(currentParent));
+        if (node.parent) {
+            const currentParent = node.parent;
+            const index = currentParent.children.findIndex((child) => child.id === id);
+            if (index !== -1) {
+                currentParent.children.splice(index, 1);
             }
+            await this.storeNode(this.convertToIndexedDB(currentParent));
         }
 
         // Update node properties
         node.name = newName;
-        node.parentId = targetParentId;
+        node.parent = newParent;
         node.path = newPath;
 
         // Update descendant paths if it's a folder

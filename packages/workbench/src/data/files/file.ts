@@ -29,9 +29,9 @@ export interface FileMetadata {
      */
     type: FileType;
     /**
-     * ID of parent folder, null for root
+     * Parent folder, null for root
      */
-    parentId: string | null;
+    parent: Folder | null;
     /**
      * Full path from root to this node
      */
@@ -149,9 +149,9 @@ export interface UpdateFileOptions {
  */
 export interface MoveOptions {
     /**
-     * ID of the target parent folder
+     * Target parent folder, null for root
      */
-    targetParentId: string | null;
+    targetParent: Folder | null;
     /**
      * New name for the node (optional)
      */

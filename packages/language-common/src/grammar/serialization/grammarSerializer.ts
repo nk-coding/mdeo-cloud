@@ -212,7 +212,7 @@ export class GrammarSerializer {
      * @throws Error if a rule with the same name but different instance is found
      */
     private registerRule(rule: Rule): SerializableReference {
-        let existing = this.ruleLookup.get(rule.name);
+        const existing = this.ruleLookup.get(rule.name);
         if (existing) {
             if (existing.node !== rule) {
                 throw new Error(`Duplicate rule name: ${rule.name}`);
@@ -239,7 +239,7 @@ export class GrammarSerializer {
      * @throws Error if a type with the same name but different instance is found
      */
     private registerType(type: Type<any>): SerializableReference {
-        let existing = this.typeLookup.get(type.name);
+        const existing = this.typeLookup.get(type.name);
         if (existing) {
             if (existing.node !== type) {
                 throw new Error(`Duplicate type name: ${type.name}`);
@@ -266,7 +266,7 @@ export class GrammarSerializer {
      * @throws Error if an interface with the same name but different instance is found
      */
     private registerInterface(iface: Interface<any>): SerializableReference {
-        let existing = this.typeLookup.get(iface.name);
+        const existing = this.typeLookup.get(iface.name);
         if (existing) {
             if (existing.node !== iface) {
                 throw new Error(`Duplicate interface name: ${iface.name}`);

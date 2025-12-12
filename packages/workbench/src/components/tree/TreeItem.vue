@@ -1,17 +1,20 @@
 <template>
-    <TreeButton v-if="!items" v-bind="$attrs" :data="data" :mode="mode">
+    <TreeButton v-if="!isFolder" v-bind="$attrs" :data="data" :mode="mode">
         <slot name="content" />
     </TreeButton>
 
     <li v-else data-slot="tree-item" data-tree="item" :class="cn('group/tree-item relative')">
-        <Collapsible class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
+        <Collapsible
+            v-model:open="isOpen"
+            class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
+        >
             <CollapsibleTrigger as-child>
                 <TreeButton v-bind="$attrs" :data="data" :mode="mode">
                     <ChevronRight class="transition-transform" />
                     <slot name="content" />
                 </TreeButton>
             </CollapsibleTrigger>
-            <CollapsibleContent v-if="items.length > 0">
+            <CollapsibleContent v-if="hasChildren">
                 <ul
                     data-slot="tree-sub"
                     data-tree="sub"
@@ -23,9 +26,7 @@
                     "
                     @click.stop
                 >
-                    <template v-for="(item, index) in items" :key="index">
-                        <slot name="item" :item="item" />
-                    </template>
+                    <slot name="items" />
                 </ul>
             </CollapsibleContent>
         </Collapsible>
@@ -39,11 +40,27 @@ import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import TreeButton, { type TreeButtonProps } from "./TreeButton.vue";
 import type { TreeItem } from "./util";
+import { computed, ref } from "vue";
 
-defineProps<
+const props = defineProps<
     {
         data: T;
-        items?: T[];
+        isFolder: boolean;
+        hasChildren: boolean;
+        forceOpen?: boolean;
     } & TreeButtonProps
 >();
+
+const _isOpen = ref(false);
+
+const isOpen = computed({
+    get() {
+        return props.forceOpen || _isOpen.value;
+    },
+    set(value: boolean) {
+        if (props.forceOpen != true) {
+            _isOpen.value = value;
+        }
+    }
+});
 </script>

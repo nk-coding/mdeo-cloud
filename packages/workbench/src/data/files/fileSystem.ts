@@ -206,7 +206,7 @@ export abstract class FileSystem {
             if (node.type === FileType.FILE) {
                 await this.updateFile(id, { name: newName });
             } else {
-                await this.moveNode(id, { targetParentId: node.parentId, newName });
+                await this.moveNode(id, { targetParent: node.parent, newName });
             }
             return true;
         } catch {

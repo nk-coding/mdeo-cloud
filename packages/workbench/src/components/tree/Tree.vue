@@ -5,13 +5,11 @@
         :class="cn('flex min-h-0 flex-1 flex-col gap-2 overflow-x-auto w-full group/tree', props.class)"
         @keydown="handleKeydown"
     >
-        <template v-for="(item, index) in items" :key="index">
-            <slot name="item" :item="item" />
-        </template>
+        <slot />
     </div>
 </template>
 
-<script setup lang="ts" generic="T extends TreeItem">
+<script setup lang="ts">
 import { computed, provide, ref, useTemplateRef, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
 import { activeItemKey, type TreeItem } from "./util";
@@ -19,7 +17,6 @@ import { activeItemKey, type TreeItem } from "./util";
 const props = defineProps<{
     class?: HTMLAttributes["class"];
     activeElement?: any;
-    items: T[];
 }>();
 
 const treeRef = useTemplateRef("treeRef");
@@ -27,7 +24,7 @@ const activeElement = computed(() => props.activeElement);
 
 provide(activeItemKey, activeElement);
 
-const handleKeydown = (event: KeyboardEvent) => {
+function handleKeydown(event: KeyboardEvent) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
         return;
     }
@@ -78,5 +75,5 @@ const handleKeydown = (event: KeyboardEvent) => {
     if (nextButton) {
         nextButton.focus();
     }
-};
+}
 </script>
