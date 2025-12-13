@@ -20,17 +20,17 @@ import { computed, ref } from "vue";
 import { File as FileIcon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
-import type { WorkbenchFileType } from "./types";
-import type { Folder } from "@/data/files/file";
+import type { Folder } from "@/data/filesystem/file";
+import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
 
 const props = defineProps<{
     itemType: "file" | "folder";
     parent: Folder;
-    fileType?: WorkbenchFileType;
+    fileType?: FileTypePlugin;
 }>();
 
 const emit = defineEmits<{
-    submit: [name: string, itemType: "file" | "folder", parentId: string, fileType?: WorkbenchFileType];
+    submit: [name: string, itemType: "file" | "folder", parentId: string, fileType?: FileTypePlugin];
     cancel: [];
 }>();
 

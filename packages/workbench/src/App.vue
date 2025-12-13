@@ -4,20 +4,14 @@
             <Pane min-size="0" max-size="50" size="25">
                 <div class="p-4 h-full overflow-auto">
                     <h3 class="mb-3 text-sm font-medium">Project Explorer</h3>
-                    <Input aria-invalid="false" />
-                    <Files
-                        :filesystem="fileSystem"
-                        :fileTypes="supportedFileTypes"
-                        @select="handleFileSelect"
-                        @create-file="handleCreateFile"
-                        @create-folder="handleCreateFolder"
-                        @rename="handleRename"
-                        @delete="handleDelete"
-                    />
+                    <Files />
                 </div>
             </Pane>
             <Pane>
-                <div ref="editorElement" class="editor-element h-full"></div>
+                <div class="flex flex-col h-full">
+                    <Tabs />
+                    <div ref="editorElement" class="editor-element flex-1"></div>
+                </div>
             </Pane>
         </Splitpanes>
     </div>
@@ -26,7 +20,7 @@
 import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from "monaco-languageclient/vscodeApiWrapper";
 import { useWorkerFactory } from "monaco-languageclient/workerFactory";
 import { LogLevel, Uri } from "vscode";
-import { onMounted, ref, useTemplateRef } from "vue";
+import { onMounted, provide, shallowRef, useTemplateRef } from "vue";
 import monacoEditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { LanguageClientWrapper, type LanguageClientConfig } from "monaco-languageclient/lcwrapper";
 import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserver-protocol/browser";
@@ -39,76 +33,27 @@ import { QueryType } from "@codingame/monaco-vscode-api/vscode/vs/workbench/serv
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
 import Files from "./components/files/Files.vue";
-import { BrowserFileSystem } from "./data/files/browserFileSystem";
-import type { FileSystemNode } from "./data/files/file";
-import type { WorkbenchFileType } from "./components/files/types";
-import Input from "./components/ui/input/Input.vue";
+import Tabs from "./components/tabs/Tabs.vue";
+import { BrowserFileSystem } from "./data/filesystem/browserFileSystem";
+import { WorkbenchState, workbenchStateKey } from "./data/workbenchState";
+import { useColorMode } from "@vueuse/core";
 
 const editorElement = useTemplateRef("editorElement");
 
-// File system instance
-const fileSystem = new BrowserFileSystem();
+const workbenchState = shallowRef(
+    new WorkbenchState(new BrowserFileSystem(), [
+        {
+            name: "Metamodel",
+            extension: ".mm"
+        }
+    ])
+);
+
+const mode = useColorMode();
+
 let editorApp: EditorApp | null = null;
 
-// Supported file types for the workbench
-const supportedFileTypes: WorkbenchFileType[] = [
-    {
-        name: "Metamodel File",
-        extension: ".mm",
-        defaultContent: "// New metamodel file\n"
-    }
-];
-
-const selectedEntry = ref<FileSystemNode | null>(null);
-
-function handleFileSelect(entry: FileSystemNode) {
-    selectedEntry.value = entry;
-    console.log("Selected:", entry);
-}
-
-async function handleCreateFile(name: string, parentId?: string) {
-    if (name.trim()) {
-        try {
-            const newFile = await fileSystem.createFile({
-                name,
-                content: "",
-                parentId
-            });
-            console.log("Created file:", newFile);
-        } catch (error) {
-            console.error("Failed to create file:", error);
-        }
-    }
-}
-
-async function handleCreateFolder(name: string, parentId?: string) {
-    if (name.trim()) {
-        try {
-            const newFolder = await fileSystem.createFolderSimple(name, parentId);
-            console.log("Created folder:", newFolder);
-        } catch (error) {
-            console.error("Failed to create folder:", error);
-        }
-    }
-}
-
-async function handleRename(id: string, newName: string) {
-    try {
-        const success = await fileSystem.renameEntry(id, newName);
-        console.log("Renamed:", success ? "success" : "failed");
-    } catch (error) {
-        console.error("Failed to rename:", error);
-    }
-}
-
-async function handleDelete(id: string) {
-    try {
-        await fileSystem.deleteNode(id);
-        console.log("Deleted: success");
-    } catch (error) {
-        console.error("Failed to delete:", error);
-    }
-}
+provide(workbenchStateKey, workbenchState);
 
 onMounted(async () => {
     const vscodeApiConfig: MonacoVscodeApiConfig = {
@@ -194,4 +139,22 @@ onMounted(async () => {
     width: 100%;
     height: 100%;
 }
+</style>
+<style>
+@supports selector(::-webkit-scrollbar) {
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background: var(--muted);
+  }
+}
+
 </style>

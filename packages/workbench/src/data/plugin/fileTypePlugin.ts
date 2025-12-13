@@ -1,7 +1,7 @@
 /**
- * A type of file which can be handled by the workbench
+ * A plugin for a file type handled by the workbench
  */
-export interface WorkbenchFileType {
+export interface FileTypePlugin {
     /**
      * The name of the file type, displayed in the UI
      */

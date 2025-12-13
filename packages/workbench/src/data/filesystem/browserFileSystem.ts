@@ -33,17 +33,9 @@ interface IndexedDBNode {
      */
     parentId: string | null;
     /**
-     * Full path from root to this node
-     */
-    path: string;
-    /**
      * Text content (files only)
      */
     content?: string;
-    /**
-     * Array of child node IDs (folders only)
-     */
-    childrenIds?: string[];
 }
 
 /**
@@ -106,7 +98,6 @@ export class BrowserFileSystem extends FileSystem {
                 if (!db.objectStoreNames.contains(this.storeName)) {
                     const store = db.createObjectStore(this.storeName, { keyPath: "id" });
                     store.createIndex("parentId", "parentId", { unique: false });
-                    store.createIndex("path", "path", { unique: true });
                 }
             };
         });
@@ -125,41 +116,69 @@ export class BrowserFileSystem extends FileSystem {
         this.nodes.clear();
         this.rootFolder = null;
 
-        // Convert and store all nodes first
+        // Convert and store all nodes first (without parent/children relationships)
         for (const storedNode of allStoredNodes) {
             const node = this.convertFromIndexedDB(storedNode);
             this.nodes.set(node.id, node);
 
             // Find root folder
             if (node.type === FileType.FOLDER && storedNode.parentId === null) {
-                this.rootFolder = node;
+                this.rootFolder = node as Folder;
             }
         }
 
-        // Now populate folder children and parent references
-        for (const storedNode of allStoredNodes) {
-            const node = this.nodes.get(storedNode.id);
-            if (!node) continue;
-
-            // Set parent reference
-            if (storedNode.parentId) {
-                const parent = this.nodes.get(storedNode.parentId) as Folder;
-                if (parent) {
-                    node.parent = parent;
-                }
-            }
-
-            // Populate folder children with actual nodes
-            if (storedNode.type === FileType.FOLDER && storedNode.childrenIds) {
-                const folder = node as Folder;
-                folder.children = storedNode.childrenIds
-                    .map((childId) => this.nodes.get(childId))
-                    .filter((child) => child !== undefined) as FileSystemNode[];
-            }
-        }
         // Create root folder if it doesn't exist
         if (!this.rootFolder) {
             await this.createRootFolder();
+            return;
+        }
+
+        // Build parent-child relationships and paths
+        this.buildRelationshipsAndPaths(allStoredNodes);
+    }
+
+    /**
+     * Build parent-child relationships and compute paths for all nodes.
+     */
+    private buildRelationshipsAndPaths(storedNodes: IndexedDBNode[]): void {
+        // Group nodes by parent ID for efficient lookup
+        const nodesByParent = new Map<string | null, IndexedDBNode[]>();
+        for (const storedNode of storedNodes) {
+            const parentId = storedNode.parentId;
+            if (!nodesByParent.has(parentId)) {
+                nodesByParent.set(parentId, []);
+            }
+            nodesByParent.get(parentId)!.push(storedNode);
+        }
+
+        // Recursively build relationships starting from root
+        this.buildNodeRelationships(this.rootFolder!, nodesByParent, "/");
+    }
+
+    /**
+     * Recursively build parent-child relationships and paths for a node and its descendants.
+     */
+    private buildNodeRelationships(
+        node: FileSystemNode, 
+        nodesByParent: Map<string | null, IndexedDBNode[]>, 
+        path: string
+    ): void {
+        node.path = path;
+        
+        if (node.type === FileType.FOLDER) {
+            const folder = node as Folder;
+            const childStoredNodes = nodesByParent.get(node.id) || [];
+            
+            folder.children = childStoredNodes
+                .map(childStored => this.nodes.get(childStored.id))
+                .filter(child => child !== undefined) as FileSystemNode[];
+            
+            // Set parent references and recursively process children
+            for (const child of folder.children) {
+                child.parent = folder;
+                const childPath = path === "/" ? `/${child.name}` : `${path}/${child.name}`;
+                this.buildNodeRelationships(child, nodesByParent, childPath);
+            }
         }
     }
 
@@ -254,13 +273,13 @@ export class BrowserFileSystem extends FileSystem {
      * @returns Converted file system node
      */
     private convertFromIndexedDB(node: IndexedDBNode): FileSystemNode {
-        // Note: parent will be set after all nodes are loaded
+        // Note: parent, path, and children will be set during relationship building
         const base = {
             id: node.id,
             name: node.name,
             type: node.type,
             parent: null as Folder | null,
-            path: node.path
+            path: "" // Will be computed during relationship building
         };
 
         if (node.type === FileType.FILE) {
@@ -273,7 +292,7 @@ export class BrowserFileSystem extends FileSystem {
             return reactive({
                 ...base,
                 type: FileType.FOLDER,
-                children: [] // Will be populated after all nodes are loaded
+                children: [] // Will be populated during relationship building
             }) as Folder;
         }
     }
@@ -288,16 +307,12 @@ export class BrowserFileSystem extends FileSystem {
             id: node.id,
             name: node.name,
             type: node.type,
-            parentId: node.parent?.id || null,
-            path: node.path
+            parentId: node.parent?.id || null
         };
 
         if (node.type === FileType.FILE) {
             const file = node as File;
             base.content = file.content;
-        } else {
-            const folder = node as Folder;
-            base.childrenIds = folder.children.map((child) => child.id);
         }
 
         return base;
@@ -357,11 +372,10 @@ export class BrowserFileSystem extends FileSystem {
 
         const path = this.buildPath(parent.path === "/" ? null : parent.path, options.name);
 
-        // Check if path already exists
-        for (const node of this.nodes.values()) {
-            if (node.path === path) {
-                throw new Error(`File or folder already exists at path: ${path}`);
-            }
+        // Check if a child with the same name already exists in the parent folder
+        const parentFolder = parent as Folder;
+        if (parentFolder.children.some(child => child.name === options.name)) {
+            throw new Error(`File or folder with name "${options.name}" already exists in this folder`);
         }
 
         const folder = reactive({
@@ -407,16 +421,17 @@ export class BrowserFileSystem extends FileSystem {
         if (options.name && options.name !== file.name) {
             this.validateName(options.name);
 
+            // Check if a sibling with the same name already exists
+            if (file.parent) {
+                const siblings = file.parent.children.filter(child => child.id !== id);
+                if (siblings.some(sibling => sibling.name === options.name)) {
+                    throw new Error(`File or folder with name "${options.name}" already exists in this folder`);
+                }
+            }
+
             const parent = file.parent;
             const parentPath = parent ? (parent.path === "/" ? null : parent.path) : null;
             const newPath = this.buildPath(parentPath, options.name);
-
-            // Check if new path already exists
-            for (const node of this.nodes.values()) {
-                if (node.path === newPath && node.id !== id) {
-                    throw new Error(`File or folder already exists at path: ${newPath}`);
-                }
-            }
 
             file.name = options.name;
             file.path = newPath;
@@ -480,16 +495,13 @@ export class BrowserFileSystem extends FileSystem {
         const newName = options.newName || node.name;
         this.validateName(newName);
 
-        const newPath = this.buildPath(newParent.path === "/" ? null : newParent.path, newName);
-
-        // Check if new path already exists
-        for (const existingNode of this.nodes.values()) {
-            if (existingNode.path === newPath && existingNode.id !== id) {
-                throw new Error(`File or folder already exists at path: ${newPath}`);
-            }
+        // Check if a child with the same name already exists in the target parent
+        if (newParent.children.some(child => child.name === newName && child.id !== id)) {
+            throw new Error(`File or folder with name "${newName}" already exists in the target folder`);
         }
 
         const oldPath = node.path;
+        const newPath = this.buildPath(newParent.path === "/" ? null : newParent.path, newName);
 
         // Remove from current parent
         if (node.parent) {
@@ -508,7 +520,7 @@ export class BrowserFileSystem extends FileSystem {
 
         // Update descendant paths if it's a folder
         if (node.type === FileType.FOLDER) {
-            this.updateDescendantPaths(id, oldPath, newPath);
+            this.updateDescendantPaths(node as Folder, oldPath, newPath);
         }
 
         // Add to new parent
@@ -524,17 +536,24 @@ export class BrowserFileSystem extends FileSystem {
 
     /**
      * Update the paths of all descendants when a folder is moved.
-     * @param folderId - The ID of the moved folder
+     * @param folder - The moved folder
      * @param oldFolderPath - The old path of the folder
      * @param newFolderPath - The new path of the folder
      */
-    private updateDescendantPaths(folderId: string, oldFolderPath: string, newFolderPath: string): void {
-        for (const node of this.nodes.values()) {
-            if (node.path.startsWith(oldFolderPath + "/")) {
-                const relativePath = node.path.substring(oldFolderPath.length + 1);
-                node.path = `${newFolderPath}/${relativePath}`;
+    private updateDescendantPaths(folder: Folder, oldFolderPath: string, newFolderPath: string): void {
+        // Recursively update paths for all descendants
+        const updateChildPaths = (parent: Folder, parentPath: string) => {
+            for (const child of parent.children) {
+                const childPath = parentPath === "/" ? `/${child.name}` : `${parentPath}/${child.name}`;
+                child.path = childPath;
+                
+                if (child.type === FileType.FOLDER) {
+                    updateChildPaths(child as Folder, childPath);
+                }
             }
-        }
+        };
+        
+        updateChildPaths(folder, newFolderPath);
     }
 
     async getRootFolder(): Promise<Folder> {

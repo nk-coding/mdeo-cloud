@@ -25,21 +25,20 @@
                 <template v-if="entry.type === FileType.FOLDER" #items>
                     <FileSystemItemList
                         :parent="entry"
-                        :filesystem="filesystem"
-                        :fileTypes="fileTypes"
                         v-model:new-item="newItem"
                         @select="$emit('select', $event)"
                         @create-file="(name, parentId, fileType) => $emit('createFile', name, parentId, fileType)"
                         @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
                         @rename="(id, newName) => $emit('rename', id, newName)"
                         @delete="$emit('delete', $event)"
+                        @move="(itemId: string, targetFolderId: string) => $emit('move', itemId, targetFolderId)"
                     />
                 </template>
             </TreeItem>
         </ContextMenuTrigger>
         <ContextMenuContent @close-auto-focus="$event.preventDefault()">
             <ContextMenuItem
-                v-for="fileType in fileTypes"
+                v-for="fileType in workbenchState.supportedFileTypes.value"
                 :key="fileType.extension"
                 @click="() => handleCreateFileOfType(fileType)"
             >
@@ -60,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, inject } from "vue";
 import { Folder as FolderIcon, File as FileIcon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
@@ -72,24 +71,25 @@ import {
     ContextMenuItem,
     ContextMenuSeparator
 } from "@/components/ui/context-menu";
-import { FileType, type FileSystemNode } from "@/data/files/file";
-import type { WorkbenchFileType } from "./types";
+import { FileType, type FileSystemNode } from "@/data/filesystem/file";
 import type { NewItemState } from "./FileSystemItemList.vue";
-import type { FileSystem } from "@/data/files/fileSystem";
+import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
+import { workbenchStateKey } from "@/data/workbenchState";
 
 const props = defineProps<{
     entry: FileSystemNode;
-    filesystem: FileSystem;
-    fileTypes: WorkbenchFileType[];
 }>();
+
+const workbenchState = inject(workbenchStateKey)!;
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [name: string, parentId?: string, fileType?: WorkbenchFileType];
+    createFile: [name: string, parentId?: string, fileType?: FileTypePlugin];
     createFolder: [name: string, parentId?: string];
     rename: [id: string, newName: string];
     delete: [id: string];
-    delegateCreateFile: [fileType?: WorkbenchFileType];
+    move: [itemId: string, targetFolderId: string];
+    delegateCreateFile: [fileType?: FileTypePlugin];
     delegateCreateFolder: [];
 }>();
 
@@ -101,7 +101,7 @@ const handleClick = () => {
     emit("select", props.entry);
 };
 
-const handleCreateFileOfType = (fileType: WorkbenchFileType) => {
+const handleCreateFileOfType = (fileType: FileTypePlugin) => {
     if (props.entry.type === FileType.FOLDER) {
         newItem.value = {
             type: "file",

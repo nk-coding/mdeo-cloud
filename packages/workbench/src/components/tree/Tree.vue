@@ -2,8 +2,10 @@
     <div
         ref="treeRef"
         tabindex="0"
-        :class="cn('flex min-h-0 flex-1 flex-col gap-2 overflow-x-auto w-full group/tree', props.class)"
+        :class="cn('flex-row min-h-0 flex-1 flex-col gap-2 overflow-x-auto w-full group/tree', props.class)"
         @keydown="handleKeydown"
+        @dragover="handleDragOver"
+        @drop="handleDrop"
     >
         <slot />
     </div>
@@ -12,17 +14,25 @@
 <script setup lang="ts">
 import { computed, provide, ref, useTemplateRef, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
-import { activeItemKey, type TreeItem } from "./util";
+import { activeItemKey, dragAndDropKey, type TreeItem, type DragAndDropCallbacks } from "./util";
 
 const props = defineProps<{
     class?: HTMLAttributes["class"];
     activeElement?: any;
+    enableDragAndDrop?: boolean;
+    dragAndDropCallbacks?: DragAndDropCallbacks;
 }>();
 
 const treeRef = useTemplateRef("treeRef");
 const activeElement = computed(() => props.activeElement);
 
+const dragAndDropConfig = computed(() => ({
+    enabled: props.enableDragAndDrop ?? false,
+    callbacks: props.dragAndDropCallbacks
+}));
+
 provide(activeItemKey, activeElement);
+provide(dragAndDropKey, dragAndDropConfig);
 
 function handleKeydown(event: KeyboardEvent) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
@@ -75,5 +85,32 @@ function handleKeydown(event: KeyboardEvent) {
     if (nextButton) {
         nextButton.focus();
     }
+}
+
+function handleDragOver(event: DragEvent) {
+    if (!dragAndDropConfig.value.enabled) {
+        return;
+    }
+
+    event.preventDefault();
+}
+
+function handleDrop(event: DragEvent) {
+    if (!dragAndDropConfig.value.enabled) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const draggedItemData = event.dataTransfer?.getData("application/json");
+    if (!draggedItemData) {
+        return;
+    }
+
+    const draggedItemInfo = JSON.parse(draggedItemData);
+    const draggedItem = { id: draggedItemInfo.id };
+
+    dragAndDropConfig.value.callbacks?.onTreeDrop?.(draggedItem, event);
 }
 </script>

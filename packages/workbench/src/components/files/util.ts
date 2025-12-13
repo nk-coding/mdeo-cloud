@@ -1,4 +1,4 @@
-import { FileType, type FileSystemNode } from "@/data/files/file";
+import { FileType, type FileSystemNode } from "@/data/filesystem/file";
 
 /**
  * Sorts an array of FileSystemNode objects such that folders appear before files,

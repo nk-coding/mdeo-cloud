@@ -11,13 +11,12 @@
             v-for="item in items.folders"
             :key="item.id"
             :entry="item"
-            :filesystem="filesystem"
-            :fileTypes="fileTypes"
             @select="$emit('select', $event)"
             @create-file="(name, parentId, fileType) => $emit('createFile', name, parentId, fileType)"
             @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
             @rename="(id, newName) => $emit('rename', id, newName)"
             @delete="$emit('delete', $event)"
+            @move="(itemId: string, targetFolderId: string) => $emit('move', itemId, targetFolderId)"
             @delegate-create-file="newItem = { type: 'file', fileType: $event }"
             @delegate-create-folder="newItem = { type: 'folder' }"
         />
@@ -33,13 +32,12 @@
             v-for="item in items.files"
             :key="item.id"
             :entry="item"
-            :filesystem="filesystem"
-            :fileTypes="fileTypes"
             @select="$emit('select', $event)"
             @create-file="(name, parentId, fileType) => $emit('createFile', name, parentId, fileType)"
             @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
             @rename="(id, newName) => $emit('rename', id, newName)"
             @delete="$emit('delete', $event)"
+            @move="(itemId: string, targetFolderId: string) => $emit('move', itemId, targetFolderId)"
             @delegate-create-file="newItem = { type: 'file', fileType: $event }"
             @delegate-create-folder="newItem = { type: 'folder' }"
         />
@@ -50,28 +48,26 @@
 import { computed } from "vue";
 import FileSystemItem from "./FileSystemItem.vue";
 import NewFileSystemItem from "./NewFileSystemItem.vue";
-import type { FileSystemNode, Folder } from "@/data/files/file";
-import type { WorkbenchFileType } from "./types";
+import type { FileSystemNode, Folder } from "@/data/filesystem/file";
 import { sortFileSystemNodes } from "./util";
-import type { FileSystem } from "@/data/files/fileSystem";
+import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
 
 export interface NewItemState {
     type: "file" | "folder";
-    fileType?: WorkbenchFileType;
+    fileType?: FileTypePlugin;
 }
 
 const props = defineProps<{
     parent: Folder;
-    filesystem: FileSystem;
-    fileTypes: WorkbenchFileType[];
 }>();
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [name: string, parentId?: string, fileType?: WorkbenchFileType];
+    createFile: [name: string, parentId?: string, fileType?: FileTypePlugin];
     createFolder: [name: string, parentId?: string];
     rename: [id: string, newName: string];
     delete: [id: string];
+    move: [itemId: string, targetFolderId: string];
     "update:newItem": [value: NewItemState | null];
 }>();
 
@@ -85,7 +81,7 @@ function handleNewItemSubmit(
     name: string,
     itemType: "file" | "folder",
     parentId?: string,
-    fileType?: WorkbenchFileType
+    fileType?: FileTypePlugin
 ) {
     if (itemType === "file") {
         emit("createFile", name, parentId, fileType);

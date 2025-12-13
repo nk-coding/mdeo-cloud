@@ -6,6 +6,9 @@
         :class="cn(buttonModes({ mode }), props.class)"
         :as="mode === 'edit' ? 'div' : 'button'"
         :as-child="asChild"
+        :draggable="dragAndDropConfig?.enabled && mode !== 'edit'"
+        @dragstart="handleDragStart"
+        @dragend="handleDragEnd"
         v-bind="$attrs"
     >
         <slot />
@@ -17,7 +20,7 @@ import { computed, inject, type HTMLAttributes } from "vue";
 import type { PrimitiveProps } from "reka-ui";
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
-import { activeItemKey, type TreeItem } from "./util";
+import { activeItemKey, dragAndDropKey, type TreeItem } from "./util";
 import { cva } from "class-variance-authority";
 
 export interface TreeButtonProps extends PrimitiveProps {
@@ -35,10 +38,29 @@ const props = withDefaults(defineProps<TreeButtonProps>(), {
 });
 
 const activeItem = inject(activeItemKey);
+const dragAndDropConfig = inject(dragAndDropKey);
 
 const isActive = computed(() => {
     return activeItem?.value?.id === props.data.id;
 });
+
+function handleDragStart(event: DragEvent) {
+    if (!dragAndDropConfig?.value.enabled || props.mode === "edit") {
+        return;
+    }
+
+    event.dataTransfer?.setData("application/json", JSON.stringify({ id: props.data.id }));
+    event.dataTransfer!.effectAllowed = "move";
+    dragAndDropConfig.value.callbacks?.onDragStart?.(props.data, event);
+}
+
+function handleDragEnd(event: DragEvent) {
+    if (!dragAndDropConfig?.value.enabled || props.mode === "edit") {
+        return;
+    }
+
+    dragAndDropConfig.value.callbacks?.onDragEnd?.(props.data, event);
+}
 
 const buttonModes = cva(
     [
@@ -50,11 +72,12 @@ const buttonModes = cva(
         variants: {
             mode: {
                 default: [
-                    "hover:bg-surface-container",
+                    "hover:bg-surface-container-high",
                     "group-focus/tree:data-[active=true]:bg-primary group-focus/tree:data-[active=true]:text-primary-foreground focus:data-[active=true]:bg-primary focus:data-[active=true]:text-primary-foreground",
                     "focus-within:data-[active=false]:[&:not(:active)]:bg-primary-container focus-within:data-[active=false]:[&:not(:active)]:text-primary-container-foreground",
                     "data-[state=open]:bg-primary-container data-[state=open]:text-primary-container-foreground",
-                    "data-[active=true]:bg-surface-container-highest"
+                    "data-[active=true]:bg-accent",
+                    "[&_*]:pointer-events-none"
                 ],
                 edit: [
                     "border",
