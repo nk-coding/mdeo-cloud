@@ -119,20 +119,6 @@ export interface CreateFileOptions {
 }
 
 /**
- * Options for creating a new folder.
- */
-export interface CreateFolderOptions {
-    /**
-     * Name of the folder to create
-     */
-    name: string;
-    /**
-     * ID of parent folder, null for root
-     */
-    parentId?: string | null;
-}
-
-/**
  * Options for updating an existing file.
  */
 export interface UpdateFileOptions {
@@ -140,22 +126,4 @@ export interface UpdateFileOptions {
      * New content for the file
      */
     content?: string;
-    /**
-     * New name for the file
-     */
-    name?: string;
-}
-
-/**
- * Options for moving a node to a different location.
- */
-export interface MoveOptions {
-    /**
-     * Target parent folder, null for root
-     */
-    targetParent: Folder | null;
-    /**
-     * New name for the node (optional)
-     */
-    newName?: string;
 }

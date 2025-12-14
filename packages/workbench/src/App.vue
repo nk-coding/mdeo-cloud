@@ -1,7 +1,7 @@
 <template>
     <div class="h-screen w-screen flex">
         <SidebarRail />
-        <div ref="workbench" class="flex-1">
+        <div ref="workbench" class="flex-1 min-w-0">
             <ResizablePanelGroup direction="horizontal">
                 <SplitterPanel
                     ref="sidebarPanel"
@@ -18,7 +18,7 @@
                 </SplitterPanel>
                 <ResizableHandle />
                 <SplitterPanel>
-                    <div class="flex flex-col h-full">
+                    <div class="flex flex-col h-full w-full">
                         <Tabs />
                         <Editor />
                     </div>
@@ -30,7 +30,8 @@
 <script setup lang="ts">
 import { computed, provide, ref, shallowRef, useTemplateRef, watch } from "vue";
 import Tabs from "./components/tabs/Tabs.vue";
-import { BrowserFileSystem } from "./data/filesystem/browserFileSystem";
+import { BrowserFileSystemAdapter } from "./data/filesystem/browserFileSystem";
+import { FileSystem } from "./data/filesystem/fileSystem";
 import { WorkbenchState, workbenchStateKey } from "./data/workbenchState";
 import { ResizablePanelGroup, ResizableHandle } from "./components/ui/resizable";
 import Sidebar from "./components/sidebar/Sidebar.vue";
@@ -40,7 +41,7 @@ import { useResizeObserver } from "@vueuse/core";
 import { SplitterPanel } from "reka-ui";
 
 const workbenchState = shallowRef(
-    new WorkbenchState(new BrowserFileSystem(), [
+    new WorkbenchState(new FileSystem(new BrowserFileSystemAdapter()), [
         {
             id: "metamodel",
             name: "Metamodel",
@@ -93,20 +94,3 @@ watch(
     { immediate: true }
 );
 </script>
-<style>
-@supports selector(::-webkit-scrollbar) {
-    *::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-    }
-
-    *::-webkit-scrollbar-thumb {
-        background: transparent;
-    }
-
-    *:hover::-webkit-scrollbar-thumb,
-    *:focus-within::-webkit-scrollbar-thumb {
-        background: var(--muted);
-    }
-}
-</style>

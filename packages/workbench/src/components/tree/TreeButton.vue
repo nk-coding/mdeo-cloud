@@ -73,9 +73,9 @@ const buttonModes = cva(
             mode: {
                 default: [
                     "hover:bg-accent/75",
-                    "group-focus/tree:data-[active=true]:bg-sidebar-primary group-focus/tree:data-[active=true]:text-sidebar-primary-foreground focus:data-[active=true]:bg-sidebar-primary focus:data-[active=true]:text-sidebar-primary-foreground",
-                    "focus-within:data-[active=false]:[&:not(:active)]:bg-sidebar-primary/75 focus-within:data-[active=false]:[&:not(:active)]:text-sidebar-primary-foreground",
-                    "data-[state=open]:bg-sidebar-primary/75 data-[state=open]:text-sidebar-primary-foreground",
+                    "group-focus-within/tree:data-[active=true]:bg-sidebar-primary group-focus-within/tree:data-[active=true]:text-sidebar-primary-foreground",
+                    "focus-within:data-[active=false]:[&:not(:active)]:bg-sidebar-primary/50 focus-within:data-[active=false]:[&:not(:active)]:text-sidebar-primary-foreground",
+                    "data-[state=open]:bg-sidebar-primary/50 data-[state=open]:text-sidebar-primary-foreground",
                     "data-[active=true]:bg-accent",
                     "[&_*]:pointer-events-none"
                 ],

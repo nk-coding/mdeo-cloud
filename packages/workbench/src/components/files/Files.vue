@@ -1,9 +1,10 @@
 <template>
-    <div class="files-container h-full w-full m-1">
+    <ScrollArea class="files-container flex-1 min-h-0 w-full">
         <ContextMenu>
             <ContextMenuTrigger as-child>
                 <Tree
-                    class="h-full w-full p-1 -m-1"
+                    ref="treeRef"
+                    class="flex-1 w-full p-2"
                     :active-element="activeEntry"
                     :enable-drag-and-drop="true"
                     :drag-and-drop-callbacks="dragAndDropCallbacks"
@@ -34,11 +35,11 @@
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
-    </div>
+    </ScrollArea>
 </template>
 
 <script setup lang="ts">
-import { ref, inject, computed, watch } from "vue";
+import { ref, inject, computed, watch, nextTick, useTemplateRef } from "vue";
 import Tree from "@/components/tree/Tree.vue";
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
 import { asyncComputed } from "@vueuse/core";
@@ -48,6 +49,7 @@ import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
 import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
 import { workbenchStateKey } from "@/data/workbenchState";
+import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 
 const workbenchState = inject(workbenchStateKey)!;
 
@@ -55,6 +57,8 @@ const activeEntry = ref<FileSystemNode | undefined>();
 const expandedItems = ref<Set<FileSystemNode>>(new Set());
 
 const newItem = ref<NewItemState>();
+
+const treeRef = useTemplateRef("treeRef");
 
 const rootFolder = asyncComputed(async () => {
     return await workbenchState.value.fileSystem.getRootFolder();
@@ -73,6 +77,17 @@ watch(
                 expandedItems.value.add(parent);
                 parent = parent.parent;
             }
+            nextTick(() => {
+                const element = treeRef.value!.$el.querySelector(`[data-active=true]`) as HTMLElement;
+                if (element != undefined) {
+                    const rect = element.getBoundingClientRect();
+                    const completelyVisible =
+                        rect.top >= 0 && rect.bottom <= (window.innerHeight || document.documentElement.clientHeight);
+                    if (!completelyVisible) {
+                        element.scrollIntoView({ block: "center", behavior: "instant" });
+                    }
+                }
+            });
         }
     },
     { immediate: true }
@@ -97,12 +112,12 @@ async function handleCreateFile(name: string, parentId: string | undefined, file
 
 async function handleCreateFolder(name: string, parentId?: string) {
     if (name.trim()) {
-        await workbenchState.value.fileSystem.createFolderSimple(name, parentId);
+        await workbenchState.value.fileSystem.createFolder(name, parentId);
     }
 }
 
 async function handleRename(id: string, newName: string) {
-    await workbenchState.value.fileSystem.renameEntry(id, newName);
+    await workbenchState.value.fileSystem.rename(id, newName);
 }
 
 async function handleDelete(id: string) {
@@ -111,7 +126,7 @@ async function handleDelete(id: string) {
 
 async function handleMove(itemId: string, targetFolderId: string) {
     const targetFolder = await workbenchState.value.fileSystem.getNode(targetFolderId);
-    await workbenchState.value.fileSystem.moveNode(itemId, { targetParent: targetFolder as Folder });
+    await workbenchState.value.fileSystem.move(itemId, targetFolder as Folder);
 }
 
 function handleCreateFileOfType(fileType: FileTypePlugin) {
@@ -180,3 +195,8 @@ const dragAndDropCallbacks: DragAndDropCallbacks = {
     }
 };
 </script>
+<style scoped>
+.files-container :deep(div[data-reka-scroll-area-viewport] > div:first-child) {
+    @apply min-h-full flex flex-col;
+}
+</style>

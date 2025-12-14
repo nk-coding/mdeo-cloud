@@ -2,7 +2,7 @@
     <div
         ref="treeRef"
         tabindex="0"
-        :class="cn('flex-row min-h-0 flex-1 flex-col gap-2 overflow-x-auto w-full group/tree', props.class)"
+        :class="cn('flex flex-col gap-1 overflow-x-auto w-full group/tree', props.class)"
         @keydown="handleKeydown"
         @dragover="handleDragOver"
         @drop="handleDrop"
@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref, useTemplateRef, type HTMLAttributes } from "vue";
+import { computed, provide, useTemplateRef, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
 import { activeItemKey, dragAndDropKey, type TreeItem, type DragAndDropCallbacks, expandedItemsKey } from "./util";
 

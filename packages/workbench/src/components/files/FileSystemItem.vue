@@ -123,8 +123,8 @@ function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
             workbenchState.value.tabs.value.push(newTab);
             workbenchState.value.activeTab.value = newTab;
         }
-        emit("select", props.entry);
     }
+    emit("select", props.entry);
 }
 
 function handleCreateFileOfType(fileType: FileTypePlugin) {
