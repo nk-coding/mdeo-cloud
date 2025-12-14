@@ -19,3 +19,4 @@ export interface DragAndDropConfig {
 
 export const activeItemKey = Symbol("activeItemKey") as InjectionKey<ComputedRef<TreeItem | undefined>>;
 export const dragAndDropKey = Symbol("dragAndDropKey") as InjectionKey<ComputedRef<DragAndDropConfig>>;
+export const expandedItemsKey = Symbol("expandedItemsKey") as InjectionKey<ComputedRef<Set<TreeItem>>>;

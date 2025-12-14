@@ -1,160 +1,112 @@
 <template>
-    <div class="app-container">
-        <Splitpanes class="h-screen">
-            <Pane min-size="0" max-size="50" size="25">
-                <div class="p-4 h-full overflow-auto">
-                    <h3 class="mb-3 text-sm font-medium">Project Explorer</h3>
-                    <Files />
-                </div>
-            </Pane>
-            <Pane>
-                <div class="flex flex-col h-full">
-                    <Tabs />
-                    <div ref="editorElement" class="editor-element flex-1"></div>
-                </div>
-            </Pane>
-        </Splitpanes>
+    <div class="h-screen w-screen flex">
+        <SidebarRail />
+        <div ref="workbench" class="flex-1">
+            <ResizablePanelGroup direction="horizontal">
+                <SplitterPanel
+                    ref="sidebarPanel"
+                    :min-size="minSidebarWidth"
+                    :max-size="80"
+                    :default-size="sidebarDefaultWidth"
+                    :collapsed-size="0"
+                    collapsible
+                    @resize="onSidebarResize"
+                    @collapse="workbenchState.sidebarCollapsed.value = true"
+                    @expand="workbenchState.sidebarCollapsed.value = false"
+                >
+                    <Sidebar />
+                </SplitterPanel>
+                <ResizableHandle />
+                <SplitterPanel>
+                    <div class="flex flex-col h-full">
+                        <Tabs />
+                        <Editor />
+                    </div>
+                </SplitterPanel>
+            </ResizablePanelGroup>
+        </div>
     </div>
 </template>
 <script setup lang="ts">
-import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from "monaco-languageclient/vscodeApiWrapper";
-import { useWorkerFactory } from "monaco-languageclient/workerFactory";
-import { LogLevel, Uri } from "vscode";
-import { onMounted, provide, shallowRef, useTemplateRef } from "vue";
-import monacoEditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-import { LanguageClientWrapper, type LanguageClientConfig } from "monaco-languageclient/lcwrapper";
-import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserver-protocol/browser";
-import { EditorApp, type EditorAppConfig } from "monaco-languageclient/editorApp";
-import * as monaco from "monaco-editor";
-import { getService, ISearchService } from "@codingame/monaco-vscode-api";
-import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";
-import { QueryType } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
-// @ts-ignoreimport
-import { Splitpanes, Pane } from "splitpanes";
-import "splitpanes/dist/splitpanes.css";
-import Files from "./components/files/Files.vue";
+import { computed, provide, ref, shallowRef, useTemplateRef, watch } from "vue";
 import Tabs from "./components/tabs/Tabs.vue";
 import { BrowserFileSystem } from "./data/filesystem/browserFileSystem";
 import { WorkbenchState, workbenchStateKey } from "./data/workbenchState";
-import { useColorMode } from "@vueuse/core";
-
-const editorElement = useTemplateRef("editorElement");
+import { ResizablePanelGroup, ResizableHandle } from "./components/ui/resizable";
+import Sidebar from "./components/sidebar/Sidebar.vue";
+import SidebarRail from "./components/sidebar/SidebarRail.vue";
+import Editor from "./components/editor/Editor.vue";
+import { useResizeObserver } from "@vueuse/core";
+import { SplitterPanel } from "reka-ui";
 
 const workbenchState = shallowRef(
     new WorkbenchState(new BrowserFileSystem(), [
         {
+            id: "metamodel",
             name: "Metamodel",
             extension: ".mm"
         }
     ])
 );
-
-const mode = useColorMode();
-
-let editorApp: EditorApp | null = null;
-
 provide(workbenchStateKey, workbenchState);
 
-onMounted(async () => {
-    const vscodeApiConfig: MonacoVscodeApiConfig = {
-        $type: "classic",
-        viewsConfig: {
-            $type: "EditorService",
-            htmlContainer: editorElement.value!
-        },
-        logLevel: LogLevel.Warning,
-        serviceOverrides: {
-            ...getSearchServiceOverride()
-        },
-        monacoWorkerFactory: () => {
-            useWorkerFactory({
-                workerLoaders: {
-                    TextEditorWorker: () => new monacoEditorWorker()
-                }
-            });
-        }
-    };
-    const vscodeApi = new MonacoVscodeApiWrapper(vscodeApiConfig);
-    await vscodeApi.start();
+const workbenchWidth = ref<number>();
+const absoluteMinSidebarWidth = 150;
+const minSidebarWidth = ref(10);
+const absoluteSidebarWidth = ref(300);
 
-    monaco.languages.register({
-        id: "metamodel",
-        extensions: [".mm"]
-    });
+const workbench = useTemplateRef("workbench");
+const sidebarPanel = useTemplateRef("sidebarPanel");
 
-    const worker = new Worker(new URL("./server/metamodelServer.ts", import.meta.url), { type: "module" });
-    const reader = new BrowserMessageReader(worker);
-    const writer = new BrowserMessageWriter(worker);
-
-    const languageClientConfig: LanguageClientConfig = {
-        languageId: "metamodel",
-        clientOptions: {
-            documentSelector: [{ scheme: "file", language: "metamodel" }]
-        },
-        connection: {
-            options: {
-                $type: "WorkerDirect",
-                worker
-            },
-            messageTransports: {
-                reader,
-                writer
-            }
-        }
-    };
-
-    const languageClientWrapper = new LanguageClientWrapper(languageClientConfig);
-    await languageClientWrapper.start();
-
-    const editorAppConfig: EditorAppConfig = {
-        editorOptions: {
-            language: "metamodel"
-        },
-        overrideAutomaticLayout: false
-    };
-
-    editorApp = new EditorApp(editorAppConfig);
-    await editorApp.start(editorElement.value!);
-    const editor = editorApp.getEditor()!;
-    editor.layout();
-
-    const searchService = await getService(ISearchService);
-    const serachResult = await searchService.textSearch({
-        type: QueryType.Text,
-        contentPattern: {
-            pattern: "class"
-        },
-        folderQueries: []
-    });
-    console.log(serachResult);
+const sidebarDefaultWidth = computed(() => {
+    if (workbenchWidth.value != undefined) {
+        return (absoluteSidebarWidth.value / workbenchWidth.value) * 100;
+    }
+    return undefined;
 });
-</script>
-<style scoped>
-.app-container {
-    height: 100vh;
-    width: 100vw;
+
+useResizeObserver(workbench, (entries) => {
+    const entry = entries[0];
+    if (entry != undefined) {
+        workbenchWidth.value = entry.contentRect.width;
+        minSidebarWidth.value = Math.max((absoluteMinSidebarWidth / entry.contentRect.width) * 100, 0.1);
+    }
+});
+
+function onSidebarResize(size: number) {
+    if (workbenchWidth.value != undefined) {
+        absoluteSidebarWidth.value = (size / 100) * workbenchWidth.value;
+    }
 }
 
-.editor-element {
-    width: 100%;
-    height: 100%;
-}
-</style>
+const sidebarCollapsed = computed(() => workbenchState.value.sidebarCollapsed.value);
+
+watch(
+    sidebarCollapsed,
+    (newValue) => {
+        if (newValue) {
+            sidebarPanel.value?.collapse();
+        } else {
+            sidebarPanel.value?.expand();
+        }
+    },
+    { immediate: true }
+);
+</script>
 <style>
 @supports selector(::-webkit-scrollbar) {
-  *::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
+    *::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
 
-  *::-webkit-scrollbar-thumb {
-    background: transparent;
-  }
+    *::-webkit-scrollbar-thumb {
+        background: transparent;
+    }
 
-  *:hover::-webkit-scrollbar-thumb,
-  *:focus-within::-webkit-scrollbar-thumb {
-    background: var(--muted);
-  }
+    *:hover::-webkit-scrollbar-thumb,
+    *:focus-within::-webkit-scrollbar-thumb {
+        background: var(--muted);
+    }
 }
-
 </style>

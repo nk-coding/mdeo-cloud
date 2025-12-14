@@ -36,6 +36,10 @@ interface IndexedDBNode {
      * Text content (files only)
      */
     content?: string;
+    /**
+     * The id of the file type plugin that can handle this file (files only)
+     */
+    fileType?: string;
 }
 
 /**
@@ -159,20 +163,20 @@ export class BrowserFileSystem extends FileSystem {
      * Recursively build parent-child relationships and paths for a node and its descendants.
      */
     private buildNodeRelationships(
-        node: FileSystemNode, 
-        nodesByParent: Map<string | null, IndexedDBNode[]>, 
+        node: FileSystemNode,
+        nodesByParent: Map<string | null, IndexedDBNode[]>,
         path: string
     ): void {
         node.path = path;
-        
+
         if (node.type === FileType.FOLDER) {
             const folder = node as Folder;
             const childStoredNodes = nodesByParent.get(node.id) || [];
-            
+
             folder.children = childStoredNodes
-                .map(childStored => this.nodes.get(childStored.id))
-                .filter(child => child !== undefined) as FileSystemNode[];
-            
+                .map((childStored) => this.nodes.get(childStored.id))
+                .filter((child) => child !== undefined) as FileSystemNode[];
+
             // Set parent references and recursively process children
             for (const child of folder.children) {
                 child.parent = folder;
@@ -283,17 +287,18 @@ export class BrowserFileSystem extends FileSystem {
         };
 
         if (node.type === FileType.FILE) {
-            return reactive({
+            return reactive<File>({
                 ...base,
                 type: FileType.FILE,
-                content: node.content || ""
-            }) as File;
+                content: node.content || "",
+                fileType: node.fileType!
+            });
         } else {
-            return reactive({
+            return reactive<Folder>({
                 ...base,
                 type: FileType.FOLDER,
                 children: [] // Will be populated during relationship building
-            }) as Folder;
+            });
         }
     }
 
@@ -313,6 +318,7 @@ export class BrowserFileSystem extends FileSystem {
         if (node.type === FileType.FILE) {
             const file = node as File;
             base.content = file.content;
+            base.fileType = file.fileType;
         }
 
         return base;
@@ -338,14 +344,15 @@ export class BrowserFileSystem extends FileSystem {
             }
         }
 
-        const file = reactive({
+        const file = reactive<File>({
             id: this.generateId(),
             name: options.name,
             type: FileType.FILE,
             parent: parent as Folder,
             path,
-            content: options.content || ""
-        }) as File;
+            content: options.plugin.defaultContent || "",
+            fileType: options.plugin.id
+        });
 
         // Update reactive state
         this.nodes.set(file.id, file);
@@ -374,7 +381,7 @@ export class BrowserFileSystem extends FileSystem {
 
         // Check if a child with the same name already exists in the parent folder
         const parentFolder = parent as Folder;
-        if (parentFolder.children.some(child => child.name === options.name)) {
+        if (parentFolder.children.some((child) => child.name === options.name)) {
             throw new Error(`File or folder with name "${options.name}" already exists in this folder`);
         }
 
@@ -423,8 +430,8 @@ export class BrowserFileSystem extends FileSystem {
 
             // Check if a sibling with the same name already exists
             if (file.parent) {
-                const siblings = file.parent.children.filter(child => child.id !== id);
-                if (siblings.some(sibling => sibling.name === options.name)) {
+                const siblings = file.parent.children.filter((child) => child.id !== id);
+                if (siblings.some((sibling) => sibling.name === options.name)) {
                     throw new Error(`File or folder with name "${options.name}" already exists in this folder`);
                 }
             }
@@ -496,7 +503,7 @@ export class BrowserFileSystem extends FileSystem {
         this.validateName(newName);
 
         // Check if a child with the same name already exists in the target parent
-        if (newParent.children.some(child => child.name === newName && child.id !== id)) {
+        if (newParent.children.some((child) => child.name === newName && child.id !== id)) {
             throw new Error(`File or folder with name "${newName}" already exists in the target folder`);
         }
 
@@ -546,13 +553,13 @@ export class BrowserFileSystem extends FileSystem {
             for (const child of parent.children) {
                 const childPath = parentPath === "/" ? `/${child.name}` : `${parentPath}/${child.name}`;
                 child.path = childPath;
-                
+
                 if (child.type === FileType.FOLDER) {
                     updateChildPaths(child as Folder, childPath);
                 }
             }
         };
-        
+
         updateChildPaths(folder, newFolderPath);
     }
 

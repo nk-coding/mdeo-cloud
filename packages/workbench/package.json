@@ -25,7 +25,6 @@
         "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@^23.2.2",
         "monaco-languageclient": "^10.4.0",
         "reka-ui": "^2.6.1",
-        "splitpanes": "^4.0.4",
         "tailwind-merge": "^3.4.0",
         "tailwindcss": "^4.1.17",
         "vscode": "npm:@codingame/monaco-vscode-extension-api@^23.2.2",

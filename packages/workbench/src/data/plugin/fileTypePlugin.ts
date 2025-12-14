@@ -3,6 +3,10 @@
  */
 export interface FileTypePlugin {
     /**
+     * Unique identifier for the file type
+     */
+    id: string;
+    /**
      * The name of the file type, displayed in the UI
      */
     name: string;

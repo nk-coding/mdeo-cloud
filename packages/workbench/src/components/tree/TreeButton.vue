@@ -64,7 +64,7 @@ function handleDragEnd(event: DragEvent) {
 
 const buttonModes = cva(
     [
-        "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 tet-left text-sm outline-none ring-primary h-8 cursor-pointer",
+        "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 tet-left text-sm outline-none ring-sidebar-primary h-8 cursor-pointer",
         "[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
         "transition-[width,height,padding,color,box-shadow]"
     ],
@@ -72,10 +72,10 @@ const buttonModes = cva(
         variants: {
             mode: {
                 default: [
-                    "hover:bg-surface-container-high",
-                    "group-focus/tree:data-[active=true]:bg-primary group-focus/tree:data-[active=true]:text-primary-foreground focus:data-[active=true]:bg-primary focus:data-[active=true]:text-primary-foreground",
-                    "focus-within:data-[active=false]:[&:not(:active)]:bg-primary-container focus-within:data-[active=false]:[&:not(:active)]:text-primary-container-foreground",
-                    "data-[state=open]:bg-primary-container data-[state=open]:text-primary-container-foreground",
+                    "hover:bg-accent/75",
+                    "group-focus/tree:data-[active=true]:bg-sidebar-primary group-focus/tree:data-[active=true]:text-sidebar-primary-foreground focus:data-[active=true]:bg-sidebar-primary focus:data-[active=true]:text-sidebar-primary-foreground",
+                    "focus-within:data-[active=false]:[&:not(:active)]:bg-sidebar-primary/75 focus-within:data-[active=false]:[&:not(:active)]:text-sidebar-primary-foreground",
+                    "data-[state=open]:bg-sidebar-primary/75 data-[state=open]:text-sidebar-primary-foreground",
                     "data-[active=true]:bg-accent",
                     "[&_*]:pointer-events-none"
                 ],

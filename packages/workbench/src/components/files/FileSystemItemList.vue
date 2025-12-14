@@ -63,7 +63,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [name: string, parentId?: string, fileType?: FileTypePlugin];
+    createFile: [name: string, parentId: string | undefined, fileType: FileTypePlugin];
     createFolder: [name: string, parentId?: string];
     rename: [id: string, newName: string];
     delete: [id: string];
@@ -77,14 +77,9 @@ const items = computed(() => {
     return sortFileSystemNodes(props.parent.children);
 });
 
-function handleNewItemSubmit(
-    name: string,
-    itemType: "file" | "folder",
-    parentId?: string,
-    fileType?: FileTypePlugin
-) {
+function handleNewItemSubmit(name: string, itemType: "file" | "folder", parentId?: string, fileType?: FileTypePlugin) {
     if (itemType === "file") {
-        emit("createFile", name, parentId, fileType);
+        emit("createFile", name, parentId, fileType!);
     } else {
         emit("createFolder", name, parentId);
     }

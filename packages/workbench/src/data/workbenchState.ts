@@ -24,7 +24,14 @@ export class WorkbenchState {
      * Manager for the plugins used by the workbench
      */
     readonly pluginManager: PluginManager;
-
+    /**
+     * The currently active sidebar
+     */
+    readonly activeSidebar = ref<SidebarType>("projects");
+    /**
+     * Whether the sidebar is collapsed
+     */
+    readonly sidebarCollapsed = ref(false);
 
     /**
      * Supported file types for the workbench
@@ -38,6 +45,11 @@ export class WorkbenchState {
         this.pluginManager = new PluginManager(fileTypePlugins);
     }
 }
+
+/**
+ * Type for the sidebar
+ */
+export type SidebarType = "files" | "search" | "projects";
 
 /**
  * Injection key for the WorkbenchState

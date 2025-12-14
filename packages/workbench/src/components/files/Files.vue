@@ -1,12 +1,13 @@
 <template>
-    <div class="files-container h-full w-full">
+    <div class="files-container h-full w-full m-1">
         <ContextMenu>
             <ContextMenuTrigger as-child>
                 <Tree
-                    class="h-full w-full p-2 -m-2"
+                    class="h-full w-full p-1 -m-1"
                     :active-element="activeEntry"
                     :enable-drag-and-drop="true"
                     :drag-and-drop-callbacks="dragAndDropCallbacks"
+                    :expanded-items="expandedItems"
                 >
                     <FileSystemItemList
                         v-if="rootFolder"
@@ -37,11 +38,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject } from "vue";
+import { ref, inject, computed, watch } from "vue";
 import Tree from "@/components/tree/Tree.vue";
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
 import { asyncComputed } from "@vueuse/core";
-import type { FileSystemNode } from "@/data/filesystem/file";
+import type { FileSystemNode, Folder } from "@/data/filesystem/file";
 import { FileType } from "@/data/filesystem/file";
 import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
@@ -51,6 +52,7 @@ import { workbenchStateKey } from "@/data/workbenchState";
 const workbenchState = inject(workbenchStateKey)!;
 
 const activeEntry = ref<FileSystemNode | undefined>();
+const expandedItems = ref<Set<FileSystemNode>>(new Set());
 
 const newItem = ref<NewItemState>();
 
@@ -58,78 +60,58 @@ const rootFolder = asyncComputed(async () => {
     return await workbenchState.value.fileSystem.getRootFolder();
 }, null);
 
+const activeTab = computed(() => workbenchState.value.activeTab.value);
+
+watch(
+    activeTab,
+    (newTab) => {
+        if (newTab != undefined) {
+            const file = newTab.file;
+            activeEntry.value = file;
+            let parent = file.parent;
+            while (parent != undefined) {
+                expandedItems.value.add(parent);
+                parent = parent.parent;
+            }
+        }
+    },
+    { immediate: true }
+);
+
 function handleSelect(entry: FileSystemNode) {
     activeEntry.value = entry;
-    console.log("Selected:", entry);
 }
 
-async function handleCreateFile(name: string, parentId?: string, fileType?: FileTypePlugin) {
+async function handleCreateFile(name: string, parentId: string | undefined, fileType: FileTypePlugin) {
     if (name.trim()) {
-        try {
-            const content = fileType?.defaultContent || "";
-            const fileName =
-                fileType?.extension && !name.endsWith(fileType.extension) ? `${name}${fileType.extension}` : name;
+        const fileName =
+            fileType?.extension && !name.endsWith(fileType.extension) ? `${name}${fileType.extension}` : name;
 
-            const newFile = await workbenchState.value.fileSystem.createFile({
-                name: fileName,
-                content,
-                parentId
-            });
-            console.log("Created file:", newFile);
-        } catch (error) {
-            console.error("Failed to create file:", error);
-        }
+        await workbenchState.value.fileSystem.createFile({
+            name: fileName,
+            parentId,
+            plugin: fileType
+        });
     }
 }
 
 async function handleCreateFolder(name: string, parentId?: string) {
     if (name.trim()) {
-        try {
-            const newFolder = await workbenchState.value.fileSystem.createFolderSimple(name, parentId);
-            console.log("Created folder:", newFolder);
-        } catch (error) {
-            console.error("Failed to create folder:", error);
-        }
+        await workbenchState.value.fileSystem.createFolderSimple(name, parentId);
     }
 }
 
 async function handleRename(id: string, newName: string) {
-    try {
-        const node = await workbenchState.value.fileSystem.getNode(id);
-        if (!node) {
-            console.error("Node not found");
-            return;
-        }
-
-        await workbenchState.value.fileSystem.renameEntry(id, newName);
-        console.log("Renamed: success");
-    } catch (error) {
-        console.error("Failed to rename:", error);
-    }
+    await workbenchState.value.fileSystem.renameEntry(id, newName);
 }
 
 async function handleDelete(id: string) {
-    try {
-        await workbenchState.value.fileSystem.deleteNode(id);
-        console.log("Deleted: success");
-    } catch (error) {
-        console.error("Failed to delete:", error);
-    }
+    await workbenchState.value.fileSystem.deleteNode(id);
 }
 
 async function handleMove(itemId: string, targetFolderId: string) {
-    try {
-        const targetFolder = await workbenchState.value.fileSystem.getNode(targetFolderId);
-        console.log("Moving item", itemId, "to folder", targetFolder);
-        if (targetFolder && targetFolder.type === FileType.FOLDER) {
-            await workbenchState.value.fileSystem.moveNode(itemId, { targetParent: targetFolder });
-            console.log("Moved: success");
-        } else {
-            console.error("Target is not a folder");
-        }
-    } catch (error) {
-        console.error("Failed to move:", error);
-    }
+    const targetFolder = await workbenchState.value.fileSystem.getNode(targetFolderId);
+    await workbenchState.value.fileSystem.moveNode(itemId, { targetParent: targetFolder as Folder });
 }
 
 function handleCreateFileOfType(fileType: FileTypePlugin) {
@@ -188,12 +170,8 @@ const dragAndDropCallbacks: DragAndDropCallbacks = {
     onTreeDrop: async (draggedItem) => {
         if (rootFolder.value) {
             const draggedNode = await workbenchState.value.fileSystem.getNode(draggedItem.id);
-            if (!draggedNode) {
-                console.error("Dragged item not found");
-                return;
-            }
 
-            if (draggedNode.parent?.id === rootFolder.value.id) {
+            if (draggedNode!.parent?.id === rootFolder.value.id) {
                 return;
             }
 

@@ -14,13 +14,14 @@
 <script setup lang="ts">
 import { computed, provide, ref, useTemplateRef, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
-import { activeItemKey, dragAndDropKey, type TreeItem, type DragAndDropCallbacks } from "./util";
+import { activeItemKey, dragAndDropKey, type TreeItem, type DragAndDropCallbacks, expandedItemsKey } from "./util";
 
 const props = defineProps<{
     class?: HTMLAttributes["class"];
     activeElement?: any;
     enableDragAndDrop?: boolean;
     dragAndDropCallbacks?: DragAndDropCallbacks;
+    expandedItems: Set<TreeItem>;
 }>();
 
 const treeRef = useTemplateRef("treeRef");
@@ -33,6 +34,10 @@ const dragAndDropConfig = computed(() => ({
 
 provide(activeItemKey, activeElement);
 provide(dragAndDropKey, dragAndDropConfig);
+provide(
+    expandedItemsKey,
+    computed(() => props.expandedItems)
+);
 
 function handleKeydown(event: KeyboardEvent) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {

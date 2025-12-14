@@ -1,3 +1,5 @@
+import type { FileTypePlugin } from "../plugin/fileTypePlugin";
+
 /**
  * Enumeration of file system node types.
  */
@@ -51,9 +53,9 @@ export interface File extends FileMetadata {
      */
     content: string;
     /**
-     * MIME type of the file content
+     * The id of the file type plugin that can handle this file
      */
-    mimeType?: string;
+    fileType: string;
 }
 
 /**
@@ -107,9 +109,9 @@ export interface CreateFileOptions {
      */
     name: string;
     /**
-     * Initial content of the file
+     * The plugin that will handle this file
      */
-    content?: string;
+    plugin: FileTypePlugin;
     /**
      * ID of parent folder, null for root
      */
