@@ -22,6 +22,7 @@ import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
 import type { Folder } from "@/data/filesystem/file";
 import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
+import { Uri } from "vscode";
 
 const props = defineProps<{
     itemType: "file" | "folder";
@@ -30,7 +31,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    submit: [name: string, itemType: "file" | "folder", parentId: string, fileType?: FileTypePlugin];
+    submit: [uri: Uri, fileType?: FileTypePlugin];
     cancel: [];
 }>();
 
@@ -57,10 +58,10 @@ function handleSubmit(value: string) {
         return;
     }
     if (value.trim()) {
-        const fullName =
-            props.itemType === "file" && fileExtension.value ? `${value.trim()}${fileExtension.value}` : value.trim();
+        const fullName = props.itemType === "file" ? `${value.trim()}${fileExtension.value}` : value.trim();
+        const newUri = Uri.joinPath(props.parent.id, fullName);
         submitted.value = true;
-        emit("submit", fullName, props.itemType, props.parent.id, props.fileType);
+        emit("submit", newUri, props.fileType);
     } else {
         handleCancel();
     }

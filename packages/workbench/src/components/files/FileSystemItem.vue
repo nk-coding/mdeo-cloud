@@ -3,16 +3,16 @@
         <ContextMenuTrigger as-child>
             <TreeItem
                 :data="entry"
-                :items="entry.type === FileType.FOLDER ? entry.children : undefined"
+                :items="entry.type === FileType.Directory ? entry.children : undefined"
                 :mode="isRenaming ? 'edit' : 'default'"
-                :is-folder="entry.type === FileType.FOLDER"
-                :has-children="entry.type === FileType.FOLDER && (entry.children.length > 0 || newItem != undefined)"
+                :is-folder="entry.type === FileType.Directory"
+                :has-children="entry.type === FileType.Directory && (entry.children.length > 0 || newItem != undefined)"
                 @click="openTab(true, $event)"
                 @dblclick="openTab(false, $event)"
                 @keydown.enter="openTab(false, $event)"
             >
                 <template #content>
-                    <FileIcon v-if="entry.type === FileType.FILE" :is="FolderIcon" class="w-4 h-4" />
+                    <FileIcon v-if="entry.type === FileType.File" :is="FolderIcon" class="w-4 h-4" />
                     <span v-if="isRenaming" class="flex flex-1">
                         <TreeItemInput
                             :model-value="getFileNameWithoutExtension(entry.name)"
@@ -23,24 +23,24 @@
                     </span>
                     <span v-else>{{ entry.name }}</span>
                 </template>
-                <template v-if="entry.type === FileType.FOLDER" #items>
+                <template v-if="entry.type === FileType.Directory" #items>
                     <FileSystemItemList
                         :parent="entry"
                         v-model:new-item="newItem"
                         @select="$emit('select', $event)"
-                        @create-file="(name, parentId, fileType) => $emit('createFile', name, parentId, fileType)"
-                        @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
-                        @rename="(id, newName) => $emit('rename', id, newName)"
-                        @delete="$emit('delete', $event)"
-                        @move="(itemId: string, targetFolderId: string) => $emit('move', itemId, targetFolderId)"
+                        @create-file="handleCreateFileFromChild"
+                        @create-folder="handleCreateFolderFromChild"
+                        @rename="handleRenameFromChild"
+                        @delete="handleDeleteFromChild"
+                        @move="handleMoveFromChild"
                     />
                 </template>
             </TreeItem>
         </ContextMenuTrigger>
         <ContextMenuContent @close-auto-focus="$event.preventDefault()">
             <ContextMenuItem
-                v-for="fileType in workbenchState.supportedFileTypes.value"
-                :key="fileType.extension"
+                v-for="fileType in workbenchState.fileTypePlugins.value"
+                :key="fileType.id"
                 @click="() => handleCreateFileOfType(fileType)"
             >
                 <span>Create New {{ fileType.name }}</span>
@@ -72,11 +72,13 @@ import {
     ContextMenuItem,
     ContextMenuSeparator
 } from "@/components/ui/context-menu";
-import { FileType, type FileSystemNode } from "@/data/filesystem/file";
+import { type FileSystemNode } from "@/data/filesystem/file";
 import type { NewItemState } from "./FileSystemItemList.vue";
 import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
-import { workbenchStateKey } from "@/data/workbenchState";
+import { workbenchStateKey } from "@/components/workbench/util";
 import { expandedItemsKey } from "../tree/util";
+import { FileType } from "@codingame/monaco-vscode-files-service-override";
+import { Uri } from "vscode";
 
 const props = defineProps<{
     entry: FileSystemNode;
@@ -87,11 +89,11 @@ const expandedItems = inject(expandedItemsKey)!;
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [name: string, parentId: string | undefined, fileType: FileTypePlugin];
-    createFolder: [name: string, parentId?: string];
-    rename: [id: string, newName: string];
-    delete: [id: string];
-    move: [itemId: string, targetFolderId: string];
+    createFile: [uri: Uri, fileType: FileTypePlugin];
+    createFolder: [uri: Uri];
+    rename: [oldUri: Uri, newUri: Uri];
+    delete: [uri: Uri];
+    move: [itemUri: Uri, targetFolderUri: Uri];
     delegateCreateFile: [fileType: FileTypePlugin];
     delegateCreateFolder: [];
 }>();
@@ -101,17 +103,17 @@ const isRenaming = ref(false);
 const newItem = ref<NewItemState>();
 
 function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
-    if (props.entry.type === FileType.FILE && !isRenaming.value) {
+    if (props.entry.type === FileType.File && !isRenaming.value) {
         const file = props.entry;
 
         if (event instanceof KeyboardEvent) {
             event.preventDefault();
         }
 
-        const existingTab = workbenchState.value.tabs.value.find((tab) => tab.file.path === file.path);
+        const existingTab = workbenchState.tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
 
         if (existingTab) {
-            workbenchState.value.activeTab.value = existingTab;
+            workbenchState.activeTab.value = existingTab;
             if (!temporary && existingTab.temporary) {
                 existingTab.temporary = false;
             }
@@ -120,15 +122,15 @@ function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
                 file: file,
                 temporary: temporary
             };
-            workbenchState.value.tabs.value.push(newTab);
-            workbenchState.value.activeTab.value = newTab;
+            workbenchState.tabs.value.push(newTab);
+            workbenchState.activeTab.value = newTab;
         }
     }
     emit("select", props.entry);
 }
 
 function handleCreateFileOfType(fileType: FileTypePlugin) {
-    if (props.entry.type === FileType.FOLDER) {
+    if (props.entry.type === FileType.Directory) {
         newItem.value = {
             type: "file",
             fileType
@@ -140,7 +142,7 @@ function handleCreateFileOfType(fileType: FileTypePlugin) {
 }
 
 function handleCreateFolder() {
-    if (props.entry.type === FileType.FOLDER) {
+    if (props.entry.type === FileType.Directory) {
         newItem.value = {
             type: "folder"
         };
@@ -161,10 +163,32 @@ function handleDelete() {
 function handleRenameSubmit(newName: string) {
     if (newName.trim() && newName !== getFileNameWithoutExtension(props.entry.name)) {
         const extension = getFileExtension(props.entry.name);
-        const fullName = extension ? `${newName.trim()}${extension}` : newName.trim();
-        emit("rename", props.entry.id, fullName);
+        const fullName = `${newName.trim()}${extension}`;
+        const parent = props.entry.parent;
+        const newUri = parent ? Uri.joinPath(parent.id, fullName) : Uri.file(`/${fullName}`);
+        emit("rename", props.entry.id, newUri);
     }
     isRenaming.value = false;
+}
+
+function handleCreateFileFromChild(uri: Uri, fileType: FileTypePlugin) {
+    emit("createFile", uri, fileType);
+}
+
+function handleCreateFolderFromChild(uri: Uri) {
+    emit("createFolder", uri);
+}
+
+function handleRenameFromChild(oldUri: Uri, newUri: Uri) {
+    emit("rename", oldUri, newUri);
+}
+
+function handleDeleteFromChild(uri: Uri) {
+    emit("delete", uri);
+}
+
+function handleMoveFromChild(itemUri: Uri, targetFolderUri: Uri) {
+    emit("move", itemUri, targetFolderUri);
 }
 
 function handleRenameCancel() {
@@ -190,6 +214,10 @@ function validateRename(newName: string): boolean {
         return true;
     }
     const parent = props.entry.parent;
-    return parent?.children.every((child) => child.id === props.entry.id || child.name !== fullName) ?? true;
+    return (
+        parent?.children.every(
+            (child) => child.id.toString() === props.entry.id.toString() || child.name !== fullName
+        ) ?? true
+    );
 }
 </script>

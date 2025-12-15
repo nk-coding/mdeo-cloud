@@ -9,14 +9,14 @@
         />
         <FileSystemItem
             v-for="item in items.folders"
-            :key="item.id"
+            :key="item.id.toString()"
             :entry="item"
             @select="$emit('select', $event)"
-            @create-file="(name, parentId, fileType) => $emit('createFile', name, parentId, fileType)"
-            @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
-            @rename="(id, newName) => $emit('rename', id, newName)"
-            @delete="$emit('delete', $event)"
-            @move="(itemId: string, targetFolderId: string) => $emit('move', itemId, targetFolderId)"
+            @create-file="handleCreateFile"
+            @create-folder="handleCreateFolder"
+            @rename="handleRename"
+            @delete="handleDelete"
+            @move="handleMove"
             @delegate-create-file="newItem = { type: 'file', fileType: $event }"
             @delegate-create-folder="newItem = { type: 'folder' }"
         />
@@ -30,14 +30,14 @@
         />
         <FileSystemItem
             v-for="item in items.files"
-            :key="item.id"
+            :key="item.id.toString()"
             :entry="item"
             @select="$emit('select', $event)"
-            @create-file="(name, parentId, fileType) => $emit('createFile', name, parentId, fileType)"
-            @create-folder="(name, parentId) => $emit('createFolder', name, parentId)"
-            @rename="(id, newName) => $emit('rename', id, newName)"
-            @delete="$emit('delete', $event)"
-            @move="(itemId: string, targetFolderId: string) => $emit('move', itemId, targetFolderId)"
+            @create-file="handleCreateFile"
+            @create-folder="handleCreateFolder"
+            @rename="handleRename"
+            @delete="handleDelete"
+            @move="handleMove"
             @delegate-create-file="newItem = { type: 'file', fileType: $event }"
             @delegate-create-folder="newItem = { type: 'folder' }"
         />
@@ -51,6 +51,7 @@ import NewFileSystemItem from "./NewFileSystemItem.vue";
 import type { FileSystemNode, Folder } from "@/data/filesystem/file";
 import { sortFileSystemNodes } from "./util";
 import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
+import type { Uri } from "vscode";
 
 export interface NewItemState {
     type: "file" | "folder";
@@ -63,11 +64,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [name: string, parentId: string | undefined, fileType: FileTypePlugin];
-    createFolder: [name: string, parentId?: string];
-    rename: [id: string, newName: string];
-    delete: [id: string];
-    move: [itemId: string, targetFolderId: string];
+    createFile: [uri: Uri, fileType: FileTypePlugin];
+    createFolder: [uri: Uri];
+    rename: [oldUri: Uri, newUri: Uri];
+    delete: [uri: Uri];
+    move: [itemUri: Uri, targetFolderUri: Uri];
     "update:newItem": [value: NewItemState | null];
 }>();
 
@@ -77,11 +78,31 @@ const items = computed(() => {
     return sortFileSystemNodes(props.parent.children);
 });
 
-function handleNewItemSubmit(name: string, itemType: "file" | "folder", parentId?: string, fileType?: FileTypePlugin) {
-    if (itemType === "file") {
-        emit("createFile", name, parentId, fileType!);
+function handleCreateFile(uri: Uri, fileType: FileTypePlugin) {
+    emit("createFile", uri, fileType);
+}
+
+function handleCreateFolder(uri: Uri) {
+    emit("createFolder", uri);
+}
+
+function handleRename(oldUri: Uri, newUri: Uri) {
+    emit("rename", oldUri, newUri);
+}
+
+function handleDelete(uri: Uri) {
+    emit("delete", uri);
+}
+
+function handleMove(itemUri: Uri, targetFolderUri: Uri) {
+    emit("move", itemUri, targetFolderUri);
+}
+
+function handleNewItemSubmit(uri: Uri, fileType?: FileTypePlugin) {
+    if (fileType) {
+        emit("createFile", uri, fileType);
     } else {
-        emit("createFolder", name, parentId);
+        emit("createFolder", uri);
     }
     newItem.value = undefined;
 }

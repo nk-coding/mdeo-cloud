@@ -6,12 +6,12 @@
                     <Icon :showText="false" class="size-8!" />
                 </SidebarRailButton>
             </li>
-            <li>
+            <li v-if="project != undefined">
                 <SidebarRailButton id="files" tooltip="Files">
                     <File />
                 </SidebarRailButton>
             </li>
-            <li>
+            <li v-if="project != undefined">
                 <SidebarRailButton id="search" tooltip="Search">
                     <Search />
                 </SidebarRailButton>
@@ -27,6 +27,10 @@ import { File, Sun, Moon, Search } from "lucide-vue-next";
 import { useColorMode } from "@vueuse/core";
 import Icon from "../Icon.vue";
 import SidebarRailButton from "./SidebarRailButton.vue";
+import { inject } from "vue";
+import { workbenchStateKey } from "../workbench/util";
+
+const { project } = inject(workbenchStateKey)!;
 
 const theme = useColorMode();
 

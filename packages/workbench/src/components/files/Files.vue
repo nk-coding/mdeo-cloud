@@ -24,8 +24,8 @@
             </ContextMenuTrigger>
             <ContextMenuContent @close-auto-focus="$event.preventDefault()">
                 <ContextMenuItem
-                    v-for="fileType in workbenchState.supportedFileTypes.value"
-                    :key="fileType.extension"
+                    v-for="fileType in fileTypePlugins"
+                    :key="fileType.id"
                     @click="() => handleCreateFileOfType(fileType)"
                 >
                     <span>Create New {{ fileType.name }}</span>
@@ -42,16 +42,17 @@
 import { ref, inject, computed, watch, nextTick, useTemplateRef } from "vue";
 import Tree from "@/components/tree/Tree.vue";
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
-import { asyncComputed } from "@vueuse/core";
 import type { FileSystemNode, Folder } from "@/data/filesystem/file";
-import { FileType } from "@/data/filesystem/file";
 import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
 import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
-import { workbenchStateKey } from "@/data/workbenchState";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
+import { VSBuffer } from "@codingame/monaco-vscode-api/vscode/vs/base/common/buffer";
+import { workbenchStateKey } from "../workbench/util";
+import { Uri } from "vscode";
+import { FileType } from "@codingame/monaco-vscode-files-service-override";
 
-const workbenchState = inject(workbenchStateKey)!;
+const { fileTree: rootFolder, activeTab, monacoApi, fileTypePlugins } = inject(workbenchStateKey)!;
 
 const activeEntry = ref<FileSystemNode | undefined>();
 const expandedItems = ref<Set<FileSystemNode>>(new Set());
@@ -59,12 +60,6 @@ const expandedItems = ref<Set<FileSystemNode>>(new Set());
 const newItem = ref<NewItemState>();
 
 const treeRef = useTemplateRef("treeRef");
-
-const rootFolder = asyncComputed(async () => {
-    return await workbenchState.value.fileSystem.getRootFolder();
-}, null);
-
-const activeTab = computed(() => workbenchState.value.activeTab.value);
 
 watch(
     activeTab,
@@ -97,36 +92,31 @@ function handleSelect(entry: FileSystemNode) {
     activeEntry.value = entry;
 }
 
-async function handleCreateFile(name: string, parentId: string | undefined, fileType: FileTypePlugin) {
-    if (name.trim()) {
-        const fileName =
-            fileType?.extension && !name.endsWith(fileType.extension) ? `${name}${fileType.extension}` : name;
-
-        await workbenchState.value.fileSystem.createFile({
-            name: fileName,
-            parentId,
-            plugin: fileType
-        });
-    }
+async function handleCreateFile(uri: Uri, fileType: FileTypePlugin) {
+    const fileService = monacoApi.fileService;
+    await fileService.createFile(uri, VSBuffer.fromString(fileType.defaultContent ?? ""));
 }
 
-async function handleCreateFolder(name: string, parentId?: string) {
-    if (name.trim()) {
-        await workbenchState.value.fileSystem.createFolder(name, parentId);
-    }
+async function handleCreateFolder(uri: Uri) {
+    const fileService = monacoApi.fileService;
+    await fileService.createFolder(uri);
 }
 
-async function handleRename(id: string, newName: string) {
-    await workbenchState.value.fileSystem.rename(id, newName);
+async function handleRename(oldUri: Uri, newUri: Uri) {
+    const fileService = monacoApi.fileService;
+    await fileService.move(oldUri, newUri, false);
 }
 
-async function handleDelete(id: string) {
-    await workbenchState.value.fileSystem.deleteNode(id);
+async function handleDelete(uri: Uri) {
+    const fileService = monacoApi.fileService;
+    await fileService.del(uri, { recursive: true });
 }
 
-async function handleMove(itemId: string, targetFolderId: string) {
-    const targetFolder = await workbenchState.value.fileSystem.getNode(targetFolderId);
-    await workbenchState.value.fileSystem.move(itemId, targetFolder as Folder);
+async function handleMove(itemUri: Uri, targetFolderUri: Uri) {
+    const fileService = monacoApi.fileService;
+    const fileName = itemUri.path.split("/").pop() || "";
+    const newUri = Uri.joinPath(targetFolderUri, fileName);
+    await fileService.move(itemUri, newUri, false);
 }
 
 function handleCreateFileOfType(fileType: FileTypePlugin) {
@@ -144,13 +134,14 @@ function handleCreateFolderFromContext() {
 
 const dragAndDropCallbacks: DragAndDropCallbacks = {
     canDrop: (draggedItem, targetItem) => {
-        const targetNode = targetItem as FileSystemNode;
+        const draggedNode = draggedItem as unknown as FileSystemNode;
+        const targetNode = targetItem as unknown as FileSystemNode;
 
-        if (targetNode.type !== FileType.FOLDER) {
+        if (targetNode.type !== FileType.Directory) {
             return false;
         }
 
-        if (draggedItem.id === targetNode.id) {
+        if (draggedNode.id.toString() === targetNode.id.toString()) {
             return false;
         }
 
@@ -158,40 +149,34 @@ const dragAndDropCallbacks: DragAndDropCallbacks = {
     },
 
     onDrop: async (draggedItem, targetItem) => {
-        const targetNode = targetItem as FileSystemNode;
+        const draggedNode = draggedItem as unknown as FileSystemNode;
+        const targetNode = targetItem as unknown as FileSystemNode;
 
-        if (targetNode.type !== FileType.FOLDER) {
+        if (targetNode.type !== FileType.Directory) {
             return;
         }
 
-        const draggedNode = await workbenchState.value.fileSystem.getNode(draggedItem.id);
-        if (!draggedNode) {
-            return;
-        }
-
-        if (draggedNode.type === FileType.FOLDER) {
+        if (draggedNode.type === FileType.Directory) {
             let current = targetNode.parent;
             while (current) {
-                if (current.id === draggedNode.id) {
+                if (current.id.toString() === draggedNode.id.toString()) {
                     return;
                 }
                 current = current.parent;
             }
         }
 
-        handleMove(draggedItem.id, targetNode.id);
+        handleMove(draggedNode.id, targetNode.id);
     },
 
     onTreeDrop: async (draggedItem) => {
-        if (rootFolder.value) {
-            const draggedNode = await workbenchState.value.fileSystem.getNode(draggedItem.id);
+        const draggedNode = draggedItem as unknown as FileSystemNode;
 
-            if (draggedNode!.parent?.id === rootFolder.value.id) {
-                return;
-            }
-
-            handleMove(draggedItem.id, rootFolder.value.id);
+        if (draggedNode.parent?.id.toString() === rootFolder.id.toString()) {
+            return;
         }
+
+        handleMove(draggedNode.id, rootFolder.id);
     }
 };
 </script>

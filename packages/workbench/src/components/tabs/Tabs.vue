@@ -8,7 +8,7 @@
                 >
                     <FileTab
                         v-for="tab in tabs"
-                        :key="tab.file.path"
+                        :key="tab.file.id.toString()"
                         :tab="tab"
                         :is-active="activeTab === tab"
                         @close="closeTab"
@@ -23,25 +23,22 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, useTemplateRef, watch } from "vue";
 import { TabsRoot, TabsList } from "reka-ui";
-import { workbenchStateKey } from "@/data/workbenchState";
 import FileTab from "./FileTab.vue";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { Separator } from "../ui/separator";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
+import { workbenchStateKey } from "../workbench/util";
 
-const workbenchState = inject(workbenchStateKey)!;
+const { tabs, activeTab } = inject(workbenchStateKey)!;
 
 const tabsRef = useTemplateRef("tabsRef");
 
-const tabs = computed(() => workbenchState.value.tabs.value);
-const activeTab = computed(() => workbenchState.value.activeTab.value);
-
 const activeTabPath = computed({
-    get: () => activeTab.value?.file.path ?? "",
+    get: () => activeTab.value?.file?.id?.toString(),
     set: (path: string) => {
-        const tab = tabs.value.find((t) => t.file.path === path);
-        if (tab) {
-            workbenchState.value.activeTab.value = tab;
+        const tab = tabs.value.find((t) => t.file.id.toString() === path);
+        if (tab != undefined) {
+            activeTab.value = tab;
         }
     }
 });
@@ -54,15 +51,15 @@ function closeTab(tab: EditorTab) {
         return;
     }
 
-    workbenchState.value.tabs.value = currentTabs.filter((t) => t !== tab);
+    tabs.value = currentTabs.filter((t) => t !== tab);
 
     if (activeTab.value === tab) {
-        const remainingTabs = workbenchState.value.tabs.value;
+        const remainingTabs = tabs.value;
         if (remainingTabs.length > 0) {
             const newIndex = Math.min(index, remainingTabs.length - 1);
-            workbenchState.value.activeTab.value = remainingTabs[newIndex];
+            activeTab.value = remainingTabs[newIndex];
         } else {
-            workbenchState.value.activeTab.value = undefined;
+            activeTab.value = undefined;
         }
     }
 }

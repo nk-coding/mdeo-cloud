@@ -1,18 +1,32 @@
 import * as monaco from "monaco-editor";
 import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from "monaco-languageclient/vscodeApiWrapper";
 import { LogLevel } from "vscode";
-import { type Plugin, type InjectionKey, watch } from "vue";
+import { type Plugin, type InjectionKey, watch, provide } from "vue";
 import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";
 import { useWorkerFactory } from "monaco-languageclient/workerFactory";
 import monacoEditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useColorMode } from "@vueuse/core";
+import { getService, IFileService, ISearchService } from "@codingame/monaco-vscode-api";
+import {
+    InMemoryFileSystemProvider,
+    registerFileSystemOverlay,
+    type IFileWriteOptions
+} from "@codingame/monaco-vscode-files-service-override";
+import { MOVE_CURSOR_1_LINE_COMMAND } from "@codingame/monaco-vscode-api/vscode/vs/workbench/contrib/notebook/common/notebookCommon";
+import { ProviderId } from "@codingame/monaco-vscode-api/vscode/vs/editor/common/languages";
 
-export const monacoReadyKey: InjectionKey<Promise<void>> = Symbol("monacoReady");
+export interface MonacoApi {
+    monaco: typeof monaco;
+    fileService: IFileService;
+    searchService: ISearchService;
+}
+
+export const monacoApiProviderKey: InjectionKey<Promise<MonacoApi>> = Symbol("monaco");
 
 export const monacoPlugin: Plugin = {
     install(app) {
         const monacoReadyPromise = setupMonaco();
-        app.provide(monacoReadyKey, monacoReadyPromise);
+        app.provide(monacoApiProviderKey, monacoReadyPromise);
 
         monacoReadyPromise.then(() => {
             monaco.editor.defineTheme("custom-dark", customDarkTheme);
@@ -31,7 +45,7 @@ export const monacoPlugin: Plugin = {
     }
 };
 
-async function setupMonaco() {
+async function setupMonaco(): Promise<MonacoApi> {
     const vscodeApiConfig: MonacoVscodeApiConfig = {
         $type: "classic",
         viewsConfig: {
@@ -53,6 +67,16 @@ async function setupMonaco() {
     };
     const vscodeApi = new MonacoVscodeApiWrapper(vscodeApiConfig);
     await vscodeApi.start();
+
+    const fsProvider = new InMemoryFileSystemProvider();
+
+    (await getService(IFileService)).onDidRunOperation;
+
+    return {
+        monaco,
+        fileService: await getService(IFileService),
+        searchService: await getService(ISearchService)
+    };
 }
 
 /**

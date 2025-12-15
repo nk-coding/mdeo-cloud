@@ -14,9 +14,7 @@
                             '[&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0'
                         )
                     "
-                    :data-active="
-                        workbenchState?.activeSidebar?.value === id && !workbenchState?.sidebarCollapsed?.value
-                    "
+                    :data-active="activeSidebar === id && !sidebarCollapsed"
                     @click="
                         () => {
                             if (id !== undefined) {
@@ -36,25 +34,25 @@
 </template>
 
 <script setup lang="ts">
-import { workbenchStateKey, type SidebarType } from "@/data/workbenchState";
 import { cn } from "../../lib/utils";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { inject } from "vue";
+import { workbenchStateKey } from "../workbench/util";
+import type { SidebarType } from "@/data/workbenchState";
 
 defineProps<{
     id?: SidebarType;
     tooltip: string;
 }>();
 
-const workbenchState = inject(workbenchStateKey);
+const { activeSidebar, sidebarCollapsed } = inject(workbenchStateKey)!;
 
 function showSidebar(id: SidebarType) {
-    const state = workbenchState!.value;
-    if (state?.activeSidebar.value === id) {
-        state.sidebarCollapsed.value = !state.sidebarCollapsed.value;
+    if (activeSidebar.value === id) {
+        sidebarCollapsed.value = !sidebarCollapsed.value;
     } else {
-        state!.activeSidebar.value = id;
-        state!.sidebarCollapsed.value = false;
+        activeSidebar.value = id;
+        sidebarCollapsed.value = false;
     }
 }
 </script>

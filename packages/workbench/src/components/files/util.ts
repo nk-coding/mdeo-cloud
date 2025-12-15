@@ -1,4 +1,5 @@
-import { FileType, type FileSystemNode } from "@/data/filesystem/file";
+import { type FileSystemNode } from "@/data/filesystem/file";
+import { FileType } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 
 /**
  * Sorts an array of FileSystemNode objects such that folders appear before files,
@@ -8,7 +9,9 @@ import { FileType, type FileSystemNode } from "@/data/filesystem/file";
  * @returns An object containing two arrays: one for sorted folders and one for sorted files
  */
 export function sortFileSystemNodes(nodes: FileSystemNode[]): { folders: FileSystemNode[]; files: FileSystemNode[] } {
-    const folders = nodes.filter((node) => node.type === FileType.FOLDER).sort((a, b) => a.name.localeCompare(b.name));
-    const files = nodes.filter((node) => node.type === FileType.FILE).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = nodes
+        .filter((node) => node.type === FileType.Directory)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    const files = nodes.filter((node) => node.type === FileType.File).sort((a, b) => a.name.localeCompare(b.name));
     return { folders, files };
 }

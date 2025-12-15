@@ -1,7 +1,7 @@
 <template>
     <div class="group relative">
         <TabsTrigger
-            :value="tab.file.path"
+            :value="tab.file.id.toString()"
             :class="
                 cn(
                     'data-[state=active]:bg-accent hover:bg-accent/75 text-foreground cursor-pointer',
@@ -44,8 +44,8 @@ const emit = defineEmits<{
 }>();
 
 const fileName = computed(() => {
-    const path = props.tab.file.path;
-    return path.split("/").pop() || path;
+    const path = props.tab.file.id;
+    return path.path.split("/").pop() ?? path.path;
 });
 
 function handleClose() {

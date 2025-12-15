@@ -14,11 +14,10 @@ import Files from "../files/Files.vue";
 import Projects from "../projects/Projects.vue";
 import Search from "../search/Search.vue";
 import SidebarPanel from "./SidebarPanel.vue";
-import { workbenchStateKey } from "@/data/workbenchState";
 import { Separator } from "../ui/separator";
+import { workbenchStateKey } from "../workbench/util";
 
-const workbenchState = inject(workbenchStateKey);
-const activeSidebar = computed(() => workbenchState?.value.activeSidebar.value);
+const { activeSidebar } = inject(workbenchStateKey)!;
 
 const sidebarEntries = {
     projects: {
