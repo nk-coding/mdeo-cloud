@@ -10,16 +10,13 @@
     </ResizablePanelGroup>
 </template>
 <script setup lang="ts">
-import { EditorApp, type EditorAppConfig } from "monaco-languageclient/editorApp";
 import { computed, inject, onMounted, shallowRef, useTemplateRef, watch } from "vue";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable";
 import { useResizeObserver, watchArray } from "@vueuse/core";
 import * as monacoType from "monaco-editor";
 import { workbenchStateKey } from "../workbench/util";
-import type { IDisposable } from "monaco-editor";
-import type { Uri } from "vscode";
 import type { EditorTab } from "@/data/tab/editorTab";
-import { createModelReference, type IReference, type ITextFileEditorModel } from "@codingame/monaco-vscode-api/monaco";
+import { EditorState } from "./util";
 
 const { tabs, activeTab, languagePlugins: fileTypePlugins, monacoApi } = inject(workbenchStateKey)!;
 const editorElement = useTemplateRef("editorElement");
@@ -58,21 +55,28 @@ const languageId = computed(() => {
 
 watch(
     [activeTab, activeTabUri, languageId],
-    async ([newTab, newTabUri, newLanguageId], [_oldTab, oldTabUri, oldLanguageId]) => {
+    async ([newTab, newTabUri, newLanguageId], [oldTab, oldTabUri, oldLanguageId]) => {
         if (newTab == undefined || newTabUri == undefined || newLanguageId == undefined) {
             editor.value?.setModel(null);
             return;
         }
-        let editorState = editorStates.get(newTab);
-        if (editorState == undefined) {
-            editorState = new EditorState(newTab.file.id);
-            await editorState.updateUri(newTab.file.id, newLanguageId);
-            editorStates.set(newTab, editorState);
+        const oldEditorState = oldTab != undefined ? editorStates.get(oldTab) : undefined;
+        let newEditorState = editorStates.get(newTab);
+        if (newEditorState == undefined) {
+            newEditorState = new EditorState(newTab.file.id);
+            await newEditorState.updateUri(newTab.file.id, newLanguageId);
+            editorStates.set(newTab, newEditorState);
         } else if (newTabUri !== oldTabUri || newLanguageId !== oldLanguageId) {
-            await editorState.updateUri(newTabUri, newLanguageId);
+            await newEditorState.updateUri(newTabUri, newLanguageId);
+        }
+        if (oldEditorState != undefined && editor.value != undefined) {
+            oldEditorState.viewState = editor.value.saveViewState() ?? undefined;
         }
         if (editor.value != undefined) {
-            editor.value.setModel(editorState.modelReference!.object.textEditorModel);
+            editor.value.setModel(newEditorState.modelReference!.object.textEditorModel);
+            if (newEditorState.viewState != undefined) {
+                editor.value.restoreViewState(newEditorState.viewState);
+            }
         }
     },
     {
@@ -93,21 +97,4 @@ onMounted(() => {
     monacoEditor.layout();
     editor.value = monacoEditor;
 });
-
-class EditorState implements IDisposable {
-    modelReference: IReference<ITextFileEditorModel> | undefined;
-
-    constructor(public uri: Uri) {}
-
-    async updateUri(newUri: Uri, language: string) {
-        this.uri = newUri;
-        this.modelReference?.dispose();
-        this.modelReference = await createModelReference(newUri);
-        this.modelReference.object.setLanguageId(language);
-    }
-
-    dispose(): void {
-        this.modelReference?.dispose();
-    }
-}
 </script>

@@ -1,11 +1,11 @@
 <template>
     <svg viewBox="-75 -75 150 150">
         <defs>
-            <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient :id="gradientId" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" style="stop-color: #0078d4; stop-opacity: 1" />
                 <stop offset="100%" style="stop-color: #00b4d8; stop-opacity: 1" />
             </linearGradient>
-            <mask id="iconMask">
+            <mask :id="maskId">
                 <g transform="translate(-26, 0) rotate(0)">
                     <rect stroke="none" fill="white" x="-15" y="-11.5" width="30" height="23" rx="5" />
                     <path
@@ -116,12 +116,25 @@
                 </g>
             </mask>
         </defs>
-        <rect x="-75" y="-75" width="150" height="150" fill="url(#iconGradient)" mask="url(#iconMask)" />
+        <rect
+            x="-75"
+            y="-75"
+            width="150"
+            height="150"
+            :fill="solid ? 'var(--color-muted)' : `url(#${gradientId})`"
+            :opacity="solid ? 0.8 : 1"
+            :mask="`url(#${maskId})`"
+        />
     </svg>
 </template>
-
 <script setup lang="ts">
+import { useId } from "vue";
+
 defineProps<{
     showText?: boolean;
+    solid?: boolean;
 }>();
+
+const maskId = useId();
+const gradientId = useId();
 </script>

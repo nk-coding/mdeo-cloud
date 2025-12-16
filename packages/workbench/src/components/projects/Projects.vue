@@ -1,7 +1,7 @@
 <template>
     <div class="flex flex-col h-full">
         <div class="px-3 pt-3 pb-2">
-            <Button @click="openNewProjectDialog" class="w-full mb-2 cursor-pointer">
+            <Button @click="openNewProjectDialog" class="w-full mb-2">
                 <Plus class="w-4 h-4 mr-2" />New Project
             </Button>
             <Input v-model="searchText" placeholder="Search projects..." />
@@ -34,12 +34,8 @@
                     <Input v-model="newProjectName" placeholder="Project name" @keydown.enter="handleCreateProject" />
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" @click="isNewProjectDialogOpen = false" class="cursor-pointer">
-                        Cancel
-                    </Button>
-                    <Button @click="handleCreateProject" :disabled="!newProjectName.trim()" class="cursor-pointer">
-                        Create
-                    </Button>
+                    <Button variant="outline" @click="isNewProjectDialogOpen = false"> Cancel </Button>
+                    <Button @click="handleCreateProject" :disabled="!newProjectName.trim()"> Create </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

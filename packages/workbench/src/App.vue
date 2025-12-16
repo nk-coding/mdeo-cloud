@@ -22,5 +22,17 @@ onMounted(async () => {
     const backendApi = new BrowserBackendApi();
     workspaceState.value = new WorkbenchState(monacoApi, backendApi);
     workspaceState.value.plugins.value.set(examplePlugin.id, examplePlugin);
+
+    const path = window.location.pathname;
+    if (path !== "/") {
+        const projectId = path.startsWith("/") ? path.slice(1) : path;
+
+        const projects = await backendApi.getProjects();
+        const project = projects.find((p) => p.id === projectId);
+
+        if (project) {
+            workspaceState.value.project.value = project;
+        }
+    }
 });
 </script>

@@ -122,13 +122,13 @@ async function handleFileOperation(
     const projectPrefix = `/${currentProject.id}`;
 
     if (event.operation === FileOperation.CREATE && event.target != undefined) {
-        handleCreate(monacoApi, root, event.target);
+        handleCreate(monacoApi, root, event.target, projectPrefix);
     } else if (event.operation === FileOperation.DELETE) {
         handleDelete(root, event.resource, projectPrefix, workbenchState);
     } else if (event.operation === FileOperation.MOVE && event.target != undefined) {
         handleMove(root, event.resource, event.target.resource, projectPrefix);
     } else if (event.operation === FileOperation.COPY && event.target != undefined) {
-        handleCreate(monacoApi, root, event.target);
+        handleCreate(monacoApi, root, event.target, projectPrefix);
     }
 }
 
@@ -137,10 +137,21 @@ async function handleFileOperation(
  *
  * @param monacoApi Monaco API instance providing access to file service
  * @param root Root folder of the file tree
- * @param target the created file/folder
+ * @param target The created file/folder
+ * @param projectPrefix Uri prefix for the current project
  */
-async function handleCreate(monacoApi: MonacoApi, root: Folder, target: IFileStatWithMetadata): Promise<void> {
+async function handleCreate(
+    monacoApi: MonacoApi,
+    root: Folder,
+    target: IFileStatWithMetadata,
+    projectPrefix: string
+): Promise<void> {
     const resource = target.resource;
+    const resourcePath = resource.path;
+    if (!resourcePath.startsWith(projectPrefix)) {
+        return;
+    }
+
     const parent = findParentFolder(root, resource);
     if (parent == undefined) {
         return;
@@ -219,6 +230,11 @@ function handleDelete(root: Folder, resource: Uri, projectPrefix: string, workbe
 function handleMove(root: Folder, oldResource: Uri, newResource: Uri, projectPrefix: string): void {
     const oldResourcePath = oldResource.path;
     if (!oldResourcePath.startsWith(projectPrefix)) {
+        return;
+    }
+
+    const newResourcePath = newResource.path;
+    if (!newResourcePath.startsWith(projectPrefix)) {
         return;
     }
 

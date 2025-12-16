@@ -1,7 +1,7 @@
 <template>
     <div
         ref="treeRef"
-        tabindex="0"
+        tabindex="-1"
         :class="cn('flex flex-col gap-1 overflow-x-auto w-full group/tree', props.class)"
         @keydown="handleKeydown"
         @dragover="handleDragOver"
@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { computed, provide, useTemplateRef, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
-import { activeItemKey, dragAndDropKey, type TreeItem, type DragAndDropCallbacks, expandedItemsKey } from "./util";
+import { treeContextKey, type TreeItem, type DragAndDropCallbacks } from "./util";
 
 const props = defineProps<{
     class?: HTMLAttributes["class"];
@@ -25,19 +25,17 @@ const props = defineProps<{
 }>();
 
 const treeRef = useTemplateRef("treeRef");
-const activeElement = computed(() => props.activeElement);
 
-const dragAndDropConfig = computed(() => ({
-    enabled: props.enableDragAndDrop ?? false,
-    callbacks: props.dragAndDropCallbacks
-}));
+const treeContext = {
+    activeItem: computed(() => props.activeElement),
+    dragAndDrop: computed(() => ({
+        enabled: props.enableDragAndDrop ?? false,
+        callbacks: props.dragAndDropCallbacks
+    })),
+    expandedItems: computed(() => props.expandedItems)
+};
 
-provide(activeItemKey, activeElement);
-provide(dragAndDropKey, dragAndDropConfig);
-provide(
-    expandedItemsKey,
-    computed(() => props.expandedItems)
-);
+provide(treeContextKey, treeContext);
 
 function handleKeydown(event: KeyboardEvent) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
@@ -93,7 +91,7 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 function handleDragOver(event: DragEvent) {
-    if (!dragAndDropConfig.value.enabled) {
+    if (!treeContext.dragAndDrop.value.enabled) {
         return;
     }
 
@@ -101,7 +99,7 @@ function handleDragOver(event: DragEvent) {
 }
 
 function handleDrop(event: DragEvent) {
-    if (!dragAndDropConfig.value.enabled) {
+    if (!treeContext.dragAndDrop.value.enabled) {
         return;
     }
 
@@ -116,6 +114,6 @@ function handleDrop(event: DragEvent) {
     const draggedItemInfo = JSON.parse(draggedItemData);
     const draggedItem = { id: draggedItemInfo.id };
 
-    dragAndDropConfig.value.callbacks?.onTreeDrop?.(draggedItem, event);
+    treeContext.dragAndDrop.value.callbacks?.onTreeDrop?.(draggedItem, event);
 }
 </script>

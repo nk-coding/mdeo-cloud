@@ -51,6 +51,7 @@ import { VSBuffer } from "@codingame/monaco-vscode-api/vscode/vs/base/common/buf
 import { workbenchStateKey } from "../workbench/util";
 import { Uri } from "vscode";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
+import { findFileInTree } from "@/data/filesystem/util";
 
 const workbenchState = inject(workbenchStateKey)!;
 const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins: fileTypePlugins, tabs } = workbenchState;
@@ -91,39 +92,6 @@ watch(
 
 function handleSelect(entry: FileSystemNode) {
     activeEntry.value = entry;
-}
-
-/**
- * Traverses the file tree to find a file node by its URI
- *
- * @param root Root of the file tree
- * @param targetUri URI of the target file
- * @returns The found file node or undefined if not found
- */
-function findFileInTree(root: FileSystemNode, targetUri: Uri): FileSystemNode | undefined {
-    const path = targetUri.path;
-    const segments = path.split("/").filter((s) => s.length > 0);
-
-    if (segments.length <= 1) {
-        return root;
-    }
-
-    let current: FileSystemNode = root;
-
-    for (let i = 1; i < segments.length; i++) {
-        if (current.type !== FileType.Directory) {
-            return undefined;
-        }
-
-        const child: FileSystemNode | undefined = current.children.find((c) => c.name === segments[i]);
-        if (child == undefined) {
-            return undefined;
-        }
-
-        current = child;
-    }
-
-    return current;
 }
 
 async function handleCreateFile(uri: Uri, fileType: LanguagePlugin) {

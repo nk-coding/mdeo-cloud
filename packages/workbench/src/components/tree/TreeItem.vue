@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import TreeButton, { type TreeButtonProps } from "./TreeButton.vue";
-import { dragAndDropKey, expandedItemsKey, type TreeItem } from "./util";
+import { treeContextKey, type TreeItem } from "./util";
 import { computed, inject, ref } from "vue";
 
 const props = defineProps<
@@ -70,24 +70,24 @@ const props = defineProps<
 
 const hoverTimeout = ref<number | null>(null);
 
-const dragAndDropConfig = inject(dragAndDropKey);
-const expandedItems = inject(expandedItemsKey)!;
+const treeContext = inject(treeContextKey);
 
 const isOpen = computed({
     get() {
-        return expandedItems.value.has(props.data);
+        return treeContext?.expandedItems.value.has(props.data) ?? false;
     },
     set(value: boolean) {
+        if (!treeContext) return;
         if (value) {
-            expandedItems.value.add(props.data);
+            treeContext.expandedItems.value.add(props.data);
         } else {
-            expandedItems.value.delete(props.data);
+            treeContext.expandedItems.value.delete(props.data);
         }
     }
 });
 
 function handleDragEnter(event: DragEvent) {
-    if (!dragAndDropConfig?.value.enabled || !props.isFolder) {
+    if (!treeContext?.dragAndDrop.value.enabled || !props.isFolder) {
         return;
     }
 
@@ -104,7 +104,7 @@ function handleDragEnter(event: DragEvent) {
 }
 
 function handleDragLeave(event: DragEvent) {
-    if (!dragAndDropConfig?.value.enabled) {
+    if (!treeContext?.dragAndDrop.value.enabled) {
         return;
     }
 
@@ -115,7 +115,7 @@ function handleDragLeave(event: DragEvent) {
 }
 
 function handleDragOver(event: DragEvent) {
-    if (!dragAndDropConfig?.value.enabled) {
+    if (!treeContext?.dragAndDrop.value.enabled) {
         return;
     }
 
@@ -123,7 +123,7 @@ function handleDragOver(event: DragEvent) {
 }
 
 function handleDrop(event: DragEvent) {
-    if (!dragAndDropConfig?.value.enabled) {
+    if (!treeContext?.dragAndDrop.value.enabled) {
         return;
     }
 
@@ -143,14 +143,14 @@ function handleDrop(event: DragEvent) {
 
     const draggedItem = { id: draggedItemInfo.id };
 
-    const canDrop = dragAndDropConfig.value.callbacks?.canDrop?.(draggedItem, props.data) ?? true;
+    const canDrop = treeContext.dragAndDrop.value.callbacks?.canDrop?.(draggedItem, props.data) ?? true;
     if (!canDrop) {
         return;
     }
 
     if (props.isFolder) {
         event.stopPropagation();
-        dragAndDropConfig.value.callbacks?.onDrop?.(draggedItem, props.data, event);
+        treeContext.dragAndDrop.value.callbacks?.onDrop?.(draggedItem, props.data, event);
     }
 }
 </script>

@@ -1,19 +1,21 @@
 import * as monaco from "monaco-editor";
 import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from "monaco-languageclient/vscodeApiWrapper";
-import { LogLevel } from "vscode";
-import { type Plugin, type InjectionKey, watch, provide } from "vue";
+import { debug, LogLevel } from "vscode";
+import { type Plugin, type InjectionKey, watch } from "vue";
 import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";
 import { useWorkerFactory } from "monaco-languageclient/workerFactory";
 import monacoEditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useColorMode } from "@vueuse/core";
-import { getService, IFileService, ISearchService } from "@codingame/monaco-vscode-api";
 import {
-    InMemoryFileSystemProvider,
-    registerFileSystemOverlay,
-    type IFileWriteOptions
-} from "@codingame/monaco-vscode-files-service-override";
-import { MOVE_CURSOR_1_LINE_COMMAND } from "@codingame/monaco-vscode-api/vscode/vs/workbench/contrib/notebook/common/notebookCommon";
-import { ProviderId } from "@codingame/monaco-vscode-api/vscode/vs/editor/common/languages";
+    getService,
+    IConfigurationService,
+    IFileService,
+    ILogService,
+    ISearchService,
+    IWorkspaceContextService
+} from "@codingame/monaco-vscode-api";
+import { WorkspaceSearchProvider } from "@codingame/monaco-vscode-search-service-override/service-override/tools/search-providers/workspace-search-provider";
+import { SearchProviderType } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
 
 export interface MonacoApi {
     monaco: typeof monaco;
@@ -49,9 +51,7 @@ async function setupMonaco(): Promise<MonacoApi> {
     const vscodeApiConfig: MonacoVscodeApiConfig = {
         $type: "classic",
         viewsConfig: {
-            $type: "EditorService",
-            // @ts-expect-error will be provided later
-            htmlContainer: undefined
+            $type: "EditorService"
         },
         logLevel: LogLevel.Warning,
         serviceOverrides: {
@@ -68,14 +68,29 @@ async function setupMonaco(): Promise<MonacoApi> {
     const vscodeApi = new MonacoVscodeApiWrapper(vscodeApiConfig);
     await vscodeApi.start();
 
-    const fsProvider = new InMemoryFileSystemProvider();
+    const workspaceContextService = await getService(IWorkspaceContextService);
+    const fileService = await getService(IFileService);
+    const configurationService = await getService(IConfigurationService);
+    const logService = await getService(ILogService);
+    const searchService = await getService(ISearchService);
 
-    (await getService(IFileService)).onDidRunOperation;
+    workspaceContextService.onDidChangeWorkspaceFolders(() => {
+        const provider = new WorkspaceSearchProvider(
+            fileService,
+            logService,
+            workspaceContextService,
+            undefined,
+            configurationService
+        );
+
+        searchService.registerSearchResultProvider("file", SearchProviderType.file, provider);
+        searchService.registerSearchResultProvider("file", SearchProviderType.text, provider);
+    });
 
     return {
         monaco,
-        fileService: await getService(IFileService),
-        searchService: await getService(ISearchService)
+        fileService,
+        searchService
     };
 }
 

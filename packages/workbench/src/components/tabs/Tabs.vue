@@ -28,6 +28,7 @@ import type { EditorTab } from "@/data/tab/editorTab";
 import { Separator } from "../ui/separator";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { workbenchStateKey } from "../workbench/util";
+import { watchArray } from "@vueuse/core";
 
 const { tabs, activeTab } = inject(workbenchStateKey)!;
 
@@ -76,10 +77,7 @@ function handleWheel(event: WheelEvent) {
     }
 }
 
-watch(activeTab, (newTab, oldTab) => {
-    if (newTab !== oldTab && oldTab?.temporary === true) {
-        closeTab(oldTab);
-    }
+watch(activeTab, (newTab) => {
     if (newTab != undefined) {
         nextTick(() => {
             const tabsElement = tabsRef.value!.$el as HTMLElement | undefined;
@@ -90,4 +88,18 @@ watch(activeTab, (newTab, oldTab) => {
         });
     }
 });
+
+watchArray(
+    tabs,
+    (newTabs, oldTabs) => {
+        const oldTemporaryTabs = oldTabs.filter((tab) => tab.temporary);
+        const newTemporaryTabs = newTabs.filter((tab) => tab.temporary);
+        if (newTemporaryTabs.length > oldTemporaryTabs.length) {
+            for (const tab of oldTemporaryTabs) {
+                closeTab(tab);
+            }
+        }
+    },
+    { deep: true }
+);
 </script>

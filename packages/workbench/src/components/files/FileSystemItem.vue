@@ -78,7 +78,7 @@ import { type FileSystemNode } from "@/data/filesystem/file";
 import type { NewItemState } from "./FileSystemItemList.vue";
 import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
 import { workbenchStateKey } from "@/components/workbench/util";
-import { expandedItemsKey } from "../tree/util";
+import { treeContextKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 import { Uri } from "vscode";
 
@@ -87,7 +87,7 @@ const props = defineProps<{
 }>();
 
 const workbenchState = inject(workbenchStateKey)!;
-const expandedItems = inject(expandedItemsKey)!;
+const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
@@ -112,21 +112,7 @@ function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
             event.preventDefault();
         }
 
-        const existingTab = workbenchState.tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
-
-        if (existingTab) {
-            workbenchState.activeTab.value = existingTab;
-            if (!temporary && existingTab.temporary) {
-                existingTab.temporary = false;
-            }
-        } else {
-            const newTab = {
-                file: file,
-                temporary: temporary
-            };
-            workbenchState.tabs.value.push(newTab);
-            workbenchState.activeTab.value = newTab;
-        }
+        workbenchState.openTab(file, temporary);
     }
     emit("select", props.entry);
 }
@@ -137,7 +123,7 @@ function handleCreateFileOfType(fileType: LanguagePlugin) {
             type: "file",
             fileType
         };
-        expandedItems.value.add(props.entry);
+        treeContext.expandedItems.value.add(props.entry);
     } else {
         emit("delegateCreateFile", fileType);
     }
@@ -148,7 +134,7 @@ function handleCreateFolder() {
         newItem.value = {
             type: "folder"
         };
-        expandedItems.value.add(props.entry);
+        treeContext.expandedItems.value.add(props.entry);
     } else {
         emit("delegateCreateFolder");
     }

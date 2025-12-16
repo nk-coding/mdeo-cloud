@@ -6,7 +6,7 @@
                     v-bind="$attrs"
                     :class="
                         cn(
-                            'flex items-center justify-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm h-10 w-10 cursor-pointer',
+                            'flex items-center justify-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm h-10 w-10',
                             'outline-hidden ring-sidebar-ring transition-[width,height,padding] focus-visible:ring-2',
                             'hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground',
                             'data-[active=true]:bg-accent data-[active=true]:font-medium data-[active=true]:text-accent-foreground',

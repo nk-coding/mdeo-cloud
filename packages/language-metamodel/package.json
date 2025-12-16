@@ -9,7 +9,6 @@
         "src"
     ],
     "dependencies": {
-        "@mdeo/language-common": "^0.1.0",
-        "langium": "^4.1.2"
+        "@mdeo/language-common": "^0.1.0"
     }
 }

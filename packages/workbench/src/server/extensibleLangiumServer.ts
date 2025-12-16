@@ -1,10 +1,18 @@
-import { createConnection, BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserver/browser.js";
+import {
+    createConnection,
+    BrowserMessageReader,
+    BrowserMessageWriter,
+    RequestType,
+    type ResponseMessage,
+    type RequestMessage
+} from "vscode-languageserver/browser.js";
 import * as langium from "langium";
 import * as langiumLsp from "langium/lsp";
-import type { ServerLanguagePlugin } from "@/data/plugin/serverPlugin";
+import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
-import type { ResolvedServerLanguagePlugin } from "./types";
+import { type ResolvedServerLanguagePlugin } from "./types";
+import { GetPluginsRequest, ServerReadyNotification } from "./protocol";
 import type {
     LangiumCoreServices,
     LangiumGeneratedCoreServices,
@@ -17,17 +25,30 @@ import type {
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
 
-const connection = createConnection(messageReader, messageWriter);
+const plugins = await requestPluginsFromClient();
 
-// TODO generalize this
-const plugins: ServerLanguagePlugin[] = [
-    {
-        type: "language",
-        languageId: "metamodel",
-        extension: ".mm",
-        import: "/modules/defaultPlugin.js"
-    }
-];
+/**
+ * Requests the plugin configuration from the client using temporary message listening
+ */
+async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
+    return new Promise((resolve) => {
+        let requestId = "request/plugins";
+
+        messageReader.listen((message: any) => {
+            if (message.id === requestId && message.result !== undefined && message.result.plugins !== undefined) {
+                resolve(message.result.plugins);
+            }
+        });
+
+        const requestMessage: RequestMessage = {
+            jsonrpc: "2.0",
+            id: requestId,
+            method: GetPluginsRequest.method,
+            params: {}
+        };
+        messageWriter.write(requestMessage);
+    });
+}
 
 const pluginContext: PluginContext = {
     langium,
@@ -35,14 +56,18 @@ const pluginContext: PluginContext = {
 };
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
-    plugins.map(async (plugin) => {
-        const module = await import(/* @vite-ignore */ plugin.import);
-        return {
-            ...plugin,
-            languagePlugin: (module.default as LanguagePluginProvider<any>).generate(pluginContext)
-        };
-    })
+    plugins
+        .filter((plugin) => plugin.type === "language")
+        .map(async (plugin) => {
+            const module = await import(/* @vite-ignore */ plugin.import);
+            return {
+                ...plugin,
+                languagePlugin: (module.default as LanguagePluginProvider<any>).generate(pluginContext)
+            };
+        })
 );
+
+const connection = createConnection(messageReader, messageWriter);
 
 function createLanguageServices(context: DefaultSharedModuleContext) {
     const languageModule = createModule(resolvedPlugins.map((plugin) => plugin.languagePlugin));
@@ -86,5 +111,7 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
 }
 
 const shared = createLanguageServices({ connection, ...langium.EmptyFileSystem });
+
+connection.sendNotification(ServerReadyNotification.method, {});
 
 langiumLsp.startLanguageServer(shared);

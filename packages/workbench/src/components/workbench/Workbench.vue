@@ -20,7 +20,8 @@
                 <SplitterPanel>
                     <div class="flex flex-col h-full w-full">
                         <Tabs />
-                        <Editor />
+                        <Editor v-if="workbenchState.tabs.value.length > 0" />
+                        <WorkbenchBackground v-else />
                     </div>
                 </SplitterPanel>
             </ResizablePanelGroup>
@@ -34,6 +35,7 @@ import { ResizablePanelGroup, ResizableHandle } from "../ui/resizable";
 import Sidebar from "../sidebar/Sidebar.vue";
 import SidebarRail from "../sidebar/SidebarRail.vue";
 import Editor from "../editor/Editor.vue";
+import WorkbenchBackground from "./WorkbenchBackground.vue";
 import { useResizeObserver } from "@vueuse/core";
 import { SplitterPanel } from "reka-ui";
 import { workbenchStateKey } from "./util";

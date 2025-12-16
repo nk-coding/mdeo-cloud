@@ -4,7 +4,7 @@
             :value="tab.file.id.toString()"
             :class="
                 cn(
-                    'data-[state=active]:bg-accent hover:bg-accent/75 text-foreground cursor-pointer',
+                    'data-[state=active]:bg-accent hover:bg-accent/75 text-foreground',
                     'inline-flex h-[calc(100%-1px)] items-center justify-center gap-1.5 rounded-md border border-transparent pl-2 pr-1 py-1 text-sm whitespace-nowrap transition-[color,box-shadow]',
                     'group/tab',
                     'scroll-m-2'
@@ -16,7 +16,7 @@
             <span class="truncate max-w-64" :class="{ italic: tab.temporary }">{{ fileName }}</span>
             <span
                 @click.stop="handleClose"
-                class="flex-shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 transition-opacity cursor-pointer flex items-center justify-center size-4 invisible group-hover/tab:visible group-data-[state=active]/tab:visible"
+                class="flex-shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 transition-opacity flex items-center justify-center size-4 invisible group-hover/tab:visible group-data-[state=active]/tab:visible"
                 role="button"
                 tabindex="0"
                 @keydown.enter.stop="handleClose"

@@ -17,6 +17,10 @@ export interface DragAndDropConfig {
     callbacks?: DragAndDropCallbacks;
 }
 
-export const activeItemKey = Symbol("activeItemKey") as InjectionKey<ComputedRef<TreeItem | undefined>>;
-export const dragAndDropKey = Symbol("dragAndDropKey") as InjectionKey<ComputedRef<DragAndDropConfig>>;
-export const expandedItemsKey = Symbol("expandedItemsKey") as InjectionKey<ComputedRef<Set<TreeItem>>>;
+export interface TreeContext {
+    activeItem: ComputedRef<TreeItem | undefined>;
+    dragAndDrop: ComputedRef<DragAndDropConfig>;
+    expandedItems: ComputedRef<Set<TreeItem>>;
+}
+
+export const treeContextKey = Symbol("treeContext") as InjectionKey<TreeContext>;
