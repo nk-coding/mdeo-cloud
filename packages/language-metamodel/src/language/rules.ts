@@ -35,8 +35,8 @@ export const PropertyRule = createRule("PropertyRule")
 export const MetaClassRule = createRule("MetaClassRule")
     .returns(MetaClass)
     .as(({ set, add, flag }) => [
+        optional(flag("isAbstract", "abstract")),
         "class",
-        flag("isAbstract", "abstract"),
         set("name", ID),
         "{",
         many(add("properties", PropertyRule)),

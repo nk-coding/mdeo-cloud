@@ -9,10 +9,13 @@ import { BrowserBackendApi } from "./data/api/browserBackendApi";
 import { WorkbenchState } from "./data/workbenchState";
 import Workbench from "./components/workbench/Workbench.vue";
 import { examplePlugin } from "./testing/examplePlugin";
+import { useColorMode } from "@vueuse/core";
 
 const monaco = inject(monacoApiProviderKey)!;
 
 const workspaceState = shallowRef<WorkbenchState>();
+
+useColorMode();
 
 onMounted(async () => {
     const monacoApi = await monaco;

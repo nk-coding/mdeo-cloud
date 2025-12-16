@@ -11,6 +11,7 @@
                 )
             "
             @dblclick="tab.temporary = false"
+            @click.middle="handleClose"
         >
             <span class="truncate max-w-64" :class="{ italic: tab.temporary }">{{ fileName }}</span>
             <span

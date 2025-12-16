@@ -1,4 +1,5 @@
-import type { FileTypePlugin } from "./fileTypePlugin";
+import type { LanguagePlugin } from "./languagePlugin";
+import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin";
 
 /**
  * Plugin interface for the workbench
@@ -9,7 +10,11 @@ export interface Plugin {
      */
     id: string;
     /**
-     * Contributed file types by this plugin
+     * Language plugins provided by the plugin
      */
-    fileTypes: FileTypePlugin[];
+    languagePlugins: LanguagePlugin[];
+    /**
+     * Server contribution plugins provided by the plugin
+     */
+    serverContributionPlugins: ServerContributionPlugin[];
 }

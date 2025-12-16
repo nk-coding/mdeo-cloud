@@ -39,20 +39,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, computed, watch, nextTick, useTemplateRef } from "vue";
+import { ref, inject, watch, nextTick, useTemplateRef } from "vue";
 import Tree from "@/components/tree/Tree.vue";
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
-import type { FileSystemNode, Folder } from "@/data/filesystem/file";
+import type { FileSystemNode } from "@/data/filesystem/file";
 import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
-import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
+import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { VSBuffer } from "@codingame/monaco-vscode-api/vscode/vs/base/common/buffer";
 import { workbenchStateKey } from "../workbench/util";
 import { Uri } from "vscode";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 
-const { fileTree: rootFolder, activeTab, monacoApi, fileTypePlugins } = inject(workbenchStateKey)!;
+const workbenchState = inject(workbenchStateKey)!;
+const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins: fileTypePlugins, tabs } = workbenchState;
 
 const activeEntry = ref<FileSystemNode | undefined>();
 const expandedItems = ref<Set<FileSystemNode>>(new Set());
@@ -92,9 +93,61 @@ function handleSelect(entry: FileSystemNode) {
     activeEntry.value = entry;
 }
 
-async function handleCreateFile(uri: Uri, fileType: FileTypePlugin) {
+/**
+ * Traverses the file tree to find a file node by its URI
+ *
+ * @param root Root of the file tree
+ * @param targetUri URI of the target file
+ * @returns The found file node or undefined if not found
+ */
+function findFileInTree(root: FileSystemNode, targetUri: Uri): FileSystemNode | undefined {
+    const path = targetUri.path;
+    const segments = path.split("/").filter((s) => s.length > 0);
+
+    if (segments.length <= 1) {
+        return root;
+    }
+
+    let current: FileSystemNode = root;
+
+    for (let i = 1; i < segments.length; i++) {
+        if (current.type !== FileType.Directory) {
+            return undefined;
+        }
+
+        const child: FileSystemNode | undefined = current.children.find((c) => c.name === segments[i]);
+        if (child == undefined) {
+            return undefined;
+        }
+
+        current = child;
+    }
+
+    return current;
+}
+
+async function handleCreateFile(uri: Uri, fileType: LanguagePlugin) {
     const fileService = monacoApi.fileService;
     await fileService.createFile(uri, VSBuffer.fromString(fileType.defaultContent ?? ""));
+    await nextTick();
+
+    const file = findFileInTree(rootFolder, uri);
+
+    if (file != undefined && file.type === FileType.File) {
+        const existingTab = tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
+
+        if (existingTab) {
+            workbenchState.activeTab.value = existingTab;
+            existingTab.temporary = false;
+        } else {
+            const newTab = {
+                file: file,
+                temporary: false
+            };
+            tabs.value.push(newTab);
+            workbenchState.activeTab.value = newTab;
+        }
+    }
 }
 
 async function handleCreateFolder(uri: Uri) {
@@ -119,7 +172,7 @@ async function handleMove(itemUri: Uri, targetFolderUri: Uri) {
     await fileService.move(itemUri, newUri, false);
 }
 
-function handleCreateFileOfType(fileType: FileTypePlugin) {
+function handleCreateFileOfType(fileType: LanguagePlugin) {
     newItem.value = {
         type: "file",
         fileType

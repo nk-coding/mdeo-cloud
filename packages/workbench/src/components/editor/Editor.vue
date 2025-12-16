@@ -21,7 +21,7 @@ import type { Uri } from "vscode";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { createModelReference, type IReference, type ITextFileEditorModel } from "@codingame/monaco-vscode-api/monaco";
 
-const { tabs, activeTab, fileTypePlugins, monacoApi } = inject(workbenchStateKey)!;
+const { tabs, activeTab, languagePlugins: fileTypePlugins, monacoApi } = inject(workbenchStateKey)!;
 const editorElement = useTemplateRef("editorElement");
 const editor = shallowRef<monacoType.editor.IStandaloneCodeEditor>();
 

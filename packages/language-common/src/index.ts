@@ -22,3 +22,5 @@ export * from "./grammar/type/type/factory.js";
 export * from "./grammar/type/type/types.js";
 export * from "./grammar/type/primitiveTypeLookup.js";
 export * from "./grammar/type/types.js";
+export * from "./plugin/languagePlugin.js";
+export * from "./plugin/pluginContext.js";

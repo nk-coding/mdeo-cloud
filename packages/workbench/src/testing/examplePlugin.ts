@@ -2,11 +2,15 @@ import type { Plugin } from "@/data/plugin/plugin";
 
 export const examplePlugin: Plugin = {
     id: "example-plugin",
-    fileTypes: [
+    languagePlugins: [
         {
             id: "metamodel",
             extension: ".mm",
-            name: "Metamodel"
+            name: "Metamodel",
+            serverPlugin: {
+                import: "/modules/defaultPlugin.js"
+            }
         }
-    ]
+    ],
+    serverContributionPlugins: []
 };

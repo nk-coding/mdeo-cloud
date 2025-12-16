@@ -21,17 +21,17 @@ import { File as FileIcon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
 import type { Folder } from "@/data/filesystem/file";
-import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
+import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
 import { Uri } from "vscode";
 
 const props = defineProps<{
     itemType: "file" | "folder";
     parent: Folder;
-    fileType?: FileTypePlugin;
+    fileType?: LanguagePlugin;
 }>();
 
 const emit = defineEmits<{
-    submit: [uri: Uri, fileType?: FileTypePlugin];
+    submit: [uri: Uri, fileType?: LanguagePlugin];
     cancel: [];
 }>();
 

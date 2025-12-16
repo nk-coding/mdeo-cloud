@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, inject } from "vue";
+import { ref, computed, inject, onActivated } from "vue";
 import Tree from "@/components/tree/Tree.vue";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import { Input } from "@/components/ui/input";
@@ -108,8 +108,7 @@ async function handleCreateProject() {
     newProjectName.value = "";
 }
 
-onMounted(async () => {
-    console.log("reloading projects");
+onActivated(async () => {
     await loadProjects();
 });
 </script>

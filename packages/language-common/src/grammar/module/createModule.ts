@@ -6,8 +6,6 @@ import {
     type PropertyMetaData,
     type TypeMetaData
 } from "langium";
-import type { TerminalRule } from "../rule/terminal/types.js";
-import type { ParserRule } from "../rule/types.js";
 import { GrammarSerializer } from "../serialization/grammarSerializer.js";
 import {
     collectAst,
@@ -18,9 +16,10 @@ import {
     type AstTypes,
     type Property
 } from "langium/grammar";
+import type { LanguagePlugin } from "../../plugin/languagePlugin.js";
 
 /**
- * Provides both the grammar and AstReflection for a Langium language, which would
+ * Provides both the grammar and AstReflection for several langium language, which would
  * typically be handled via code generation.
  */
 export interface LanguageModule {
@@ -28,7 +27,7 @@ export interface LanguageModule {
      * The compiled Langium grammar that defines the language syntax and parsing rules.
      * This grammar can be used to create parsers and other language services.
      */
-    grammar: Grammar;
+    grammars: Map<LanguagePlugin<any>, Grammar>;
 
     /**
      * AST reflection metadata that provides runtime type information about
@@ -41,14 +40,19 @@ export interface LanguageModule {
 /**
  * Creates a complete language module from a parser rule and additional terminal rules.
  *
- * @param entry The root parser rule that serves as the entry point for parsing
- * @param additionalTerminals Array of terminal rules that should be included in the grammar
+ * @param plugins Array of language plugins to include in the module
  * @returns A complete language module ready for use with Langium services
  */
-export function createModule(entry: ParserRule<any>, additionalTerminals: TerminalRule<any>[]): LanguageModule {
-    const serializableGrammar = new GrammarSerializer(entry, additionalTerminals).grammar;
-    const serializedGrammar = JSON.stringify(serializableGrammar);
-    const astTypes = collectAst(loadGrammarFromJson(serializedGrammar));
+export function createModule(plugins: LanguagePlugin<any>[]): LanguageModule {
+    const serializedGrammars = new Map<LanguagePlugin<any>, string>();
+    for (const plugin of plugins) {
+        const serializableGrammar = new GrammarSerializer(plugin.rootRule, plugin.additionalTerminals).grammar;
+        const serializedGrammar = JSON.stringify(serializableGrammar);
+        serializedGrammars.set(plugin, serializedGrammar);
+    }
+    const astTypes = collectAst(
+        [...serializedGrammars.values()].map((serializedGrammar) => loadGrammarFromJson(serializedGrammar))
+    );
     const astTypesFiltered: AstTypes = {
         interfaces: [...astTypes.interfaces],
         unions: astTypes.unions.filter((e) => isAstType(e.type))
@@ -69,7 +73,12 @@ export function createModule(entry: ParserRule<any>, additionalTerminals: Termin
     }
 
     return {
-        grammar: loadGrammarFromJson(serializedGrammar),
+        grammars: new Map(
+            [...serializedGrammars.entries()].map(([plugin, serializedGrammar]) => [
+                plugin,
+                loadGrammarFromJson(serializedGrammar)
+            ])
+        ),
         reflection: new AstReflection()
     };
 }

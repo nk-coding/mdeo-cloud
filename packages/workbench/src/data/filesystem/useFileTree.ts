@@ -4,7 +4,11 @@ import type { Folder, FileSystemNode, File } from "./file";
 import type { Project } from "../project/project";
 import type { WorkbenchState } from "../workbenchState";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
-import { FileOperationEvent, FileOperation } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
+import {
+    FileOperationEvent,
+    FileOperation,
+    type IFileStatWithMetadata
+} from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import { Uri } from "vscode";
 
 /**
@@ -118,13 +122,13 @@ async function handleFileOperation(
     const projectPrefix = `/${currentProject.id}`;
 
     if (event.operation === FileOperation.CREATE && event.target != undefined) {
-        handleCreate(monacoApi, root, event.target.resource);
+        handleCreate(monacoApi, root, event.target);
     } else if (event.operation === FileOperation.DELETE) {
         handleDelete(root, event.resource, projectPrefix, workbenchState);
     } else if (event.operation === FileOperation.MOVE && event.target != undefined) {
         handleMove(root, event.resource, event.target.resource, projectPrefix);
     } else if (event.operation === FileOperation.COPY && event.target != undefined) {
-        handleCreate(monacoApi, root, event.target.resource);
+        handleCreate(monacoApi, root, event.target);
     }
 }
 
@@ -133,9 +137,10 @@ async function handleFileOperation(
  *
  * @param monacoApi Monaco API instance providing access to file service
  * @param root Root folder of the file tree
- * @param resource Uri of the created resource
+ * @param target the created file/folder
  */
-async function handleCreate(monacoApi: MonacoApi, root: Folder, resource: Uri): Promise<void> {
+async function handleCreate(monacoApi: MonacoApi, root: Folder, target: IFileStatWithMetadata): Promise<void> {
+    const resource = target.resource;
     const parent = findParentFolder(root, resource);
     if (parent == undefined) {
         return;
@@ -146,10 +151,9 @@ async function handleCreate(monacoApi: MonacoApi, root: Folder, resource: Uri): 
         return;
     }
 
-    const stat = await monacoApi.fileService.resolve(resource);
     const childUri = markRaw(resource);
 
-    if (stat.isDirectory) {
+    if (target.isDirectory) {
         const folder = reactive<Folder>({
             name,
             type: FileType.Directory,

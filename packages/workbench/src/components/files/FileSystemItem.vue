@@ -10,6 +10,8 @@
                 @click="openTab(true, $event)"
                 @dblclick="openTab(false, $event)"
                 @keydown.enter="openTab(false, $event)"
+                @keydown.f2="handleRename"
+                @keydown.delete="handleDelete"
             >
                 <template #content>
                     <FileIcon v-if="entry.type === FileType.File" :is="FolderIcon" class="w-4 h-4" />
@@ -39,7 +41,7 @@
         </ContextMenuTrigger>
         <ContextMenuContent @close-auto-focus="$event.preventDefault()">
             <ContextMenuItem
-                v-for="fileType in workbenchState.fileTypePlugins.value"
+                v-for="fileType in workbenchState.languagePlugins.value"
                 :key="fileType.id"
                 @click="() => handleCreateFileOfType(fileType)"
             >
@@ -74,7 +76,7 @@ import {
 } from "@/components/ui/context-menu";
 import { type FileSystemNode } from "@/data/filesystem/file";
 import type { NewItemState } from "./FileSystemItemList.vue";
-import type { FileTypePlugin } from "@/data/plugin/fileTypePlugin";
+import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
 import { workbenchStateKey } from "@/components/workbench/util";
 import { expandedItemsKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
@@ -89,12 +91,12 @@ const expandedItems = inject(expandedItemsKey)!;
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [uri: Uri, fileType: FileTypePlugin];
+    createFile: [uri: Uri, fileType: LanguagePlugin];
     createFolder: [uri: Uri];
     rename: [oldUri: Uri, newUri: Uri];
     delete: [uri: Uri];
     move: [itemUri: Uri, targetFolderUri: Uri];
-    delegateCreateFile: [fileType: FileTypePlugin];
+    delegateCreateFile: [fileType: LanguagePlugin];
     delegateCreateFolder: [];
 }>();
 
@@ -129,7 +131,7 @@ function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
     emit("select", props.entry);
 }
 
-function handleCreateFileOfType(fileType: FileTypePlugin) {
+function handleCreateFileOfType(fileType: LanguagePlugin) {
     if (props.entry.type === FileType.Directory) {
         newItem.value = {
             type: "file",
@@ -171,7 +173,7 @@ function handleRenameSubmit(newName: string) {
     isRenaming.value = false;
 }
 
-function handleCreateFileFromChild(uri: Uri, fileType: FileTypePlugin) {
+function handleCreateFileFromChild(uri: Uri, fileType: LanguagePlugin) {
     emit("createFile", uri, fileType);
 }
 
