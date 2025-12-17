@@ -1,5 +1,14 @@
-import { createInterface, createType, Optional, Ref, Union } from "@mdeo/language-common";
-import type { ASTType } from "@mdeo/language-common";
+import {
+    createInterface,
+    createType,
+    FileScopingConfig,
+    generateImportTypes,
+    Optional,
+    Ref,
+    Union
+} from "@mdeo/language-common";
+import type { ASTType, BaseType, Type, UnionTypes } from "@mdeo/language-common";
+import type { AstNode } from "langium";
 
 export const PrimitiveType = createInterface("PrimitiveType").attrs({
     name: Union("int", "string", "boolean", "long", "double", "float")
@@ -37,14 +46,23 @@ export type PropertyType = ASTType<typeof Property>;
 export const MetaClass = createInterface("MetaClass").attrs({
     name: String,
     isAbstract: Boolean,
-    extends: [Ref(() => MetaClass)],
+    extends: [Ref(() => MetaClassOrImport)],
     properties: [Property]
 });
 
 export type MetaClassType = ASTType<typeof MetaClass>;
 
+export const metamodelFileScopingConfig = new FileScopingConfig<MetaClassType>("MetaClass", MetaClass);
+
+export const { importType: MetaClassImport, fileImportType: MetaClassFileImport } =
+    generateImportTypes(metamodelFileScopingConfig);
+
+export const MetaClassOrImport: BaseType<AstNode> = createType("MetaClassOrImport").types(MetaClass, MetaClassImport);
+
+export type MetaClassOrImportType = ASTType<typeof MetaClassOrImport>;
+
 export const AssociationEnd = createInterface("AssociationEnd").attrs({
-    class: Ref(() => MetaClass),
+    class: Ref(() => MetaClassOrImport),
     property: Optional(String),
     multiplicity: Optional(Multiplicity)
 });
@@ -60,6 +78,7 @@ export const Association = createInterface("Association").attrs({
 export type AssociationType = ASTType<typeof Association>;
 
 export const MetaModel = createInterface("MetaModel").attrs({
+    imports: [MetaClassFileImport],
     classes: [MetaClass],
     associations: [Association]
 });

@@ -14,7 +14,7 @@ export const examplePlugin: Plugin = {
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: {
                 ...defaultMonarchTokenProvider,
-                keywords: ["class", "extends", "abstract"]
+                keywords: ["class", "extends", "abstract", "import", "from"]
             }
         }
     ],

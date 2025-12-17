@@ -45,3 +45,11 @@ export interface LanguagePlugin<T> {
      */
     postCreate?: (services: LangiumServices & T, context: DefaultSharedModuleContext) => void;
 }
+
+/**
+ * Type for a function which when provided a PluginContext returns a service provider function which can be used for module definitions.
+ *
+ * @template T The type of the language's additional services
+ * @template V The type of the provided service
+ */
+export type ServiceProvider<T, V> = (context: PluginContext) => (services: LangiumServices & T) => V;
