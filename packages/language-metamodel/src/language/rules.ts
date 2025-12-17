@@ -1,4 +1,4 @@
-import { createRule, or, optional, many, ref } from "@mdeo/language-common";
+import { createRule, or, optional, many, ref, ID, INT } from "@mdeo/language-common";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -10,7 +10,6 @@ import {
     Association,
     MetaModel
 } from "./types.js";
-import { ID, INT } from "./terminals.js";
 
 export const PrimitiveTypeRule = createRule("PrimitiveTypeRule")
     .returns(PrimitiveType)

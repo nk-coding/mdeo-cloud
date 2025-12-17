@@ -88,16 +88,12 @@
     </div>
 </template>
 <script setup lang="ts">
-import { inject, ref, shallowRef, nextTick, onActivated } from "vue";
+import { inject, ref, shallowRef, onActivated, onMounted, onDeactivated, computed } from "vue";
 import { Input } from "../ui/input";
 import { Toggle } from "../ui/toggle";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { throttledWatch } from "@vueuse/core";
-import {
-    QueryType,
-    type ITextSearchMatch,
-    type SearchRangeSetPairing
-} from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
+import type { ITextSearchMatch } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
 import { Uri } from "vscode";
 import { workbenchStateKey } from "../workbench/util";
 import Tree from "@/components/tree/Tree.vue";
@@ -105,25 +101,19 @@ import TreeItem from "@/components/tree/TreeItem.vue";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { File, CaseSensitive, WholeWord, Regex } from "lucide-vue-next";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
-import type { TreeItem as TreeItemType } from "@/components/tree/util";
 import { findFileInTree } from "@/data/filesystem/util";
+import type { SearchMatch, FileSearchResult } from "./types";
+import {
+    createSearchQuery,
+    createFileSearchResult,
+    getFileName,
+    getRelativePath,
+    getPreviewBefore,
+    getPreviewHighlight,
+    getPreviewAfter
+} from "./util";
 
-interface SearchMatch extends TreeItemType {
-    id: string;
-    previewText?: string;
-    range?: SearchRangeSetPairing;
-    fileResult: FileSearchResult;
-    index: number;
-}
-
-interface FileSearchResult extends TreeItemType {
-    id: string;
-    resource: Uri;
-    results?: SearchMatch[];
-}
-
-const workbenchState = inject(workbenchStateKey)!;
-const { monacoApi, fileTree, project } = workbenchState;
+const { monacoApi, fileTree, project, activeTab } = inject(workbenchStateKey)!;
 
 const searchText = ref("");
 const isCaseSensitive = ref(false);
@@ -132,28 +122,49 @@ const isRegex = ref(false);
 const searchResults = shallowRef<FileSearchResult[]>([]);
 const activeElement = ref<SearchMatch | FileSearchResult>();
 const expandedItems = ref<Set<SearchMatch | FileSearchResult>>(new Set());
+const isSearchActive = ref(true);
+
+const shouldPerformSerach = computed(
+    () => isSearchActive.value && searchText.value.trim() !== "" && project.value != undefined
+);
+
+async function searchSingleFile(uri: Uri): Promise<FileSearchResult | null> {
+    if (!shouldPerformSerach.value) {
+        return null;
+    }
+
+    try {
+        const relativePath = uri.path.startsWith("/") ? uri.path.substring(1) : uri.path;
+
+        const searchResult = await monacoApi.searchService.textSearch(
+            createSearchQuery(searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value, relativePath)
+        );
+
+        const fileResult = searchResult.results.find((result) => result.resource.path === uri.path);
+
+        if (fileResult && fileResult.results && fileResult.results.length > 0) {
+            return createFileSearchResult(
+                fileResult.resource,
+                fileResult.results as ITextSearchMatch<Uri>[] | undefined
+            );
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+}
 
 async function performSearch() {
-    if (searchText.value.trim() === "" || project.value == undefined) {
+    if (!shouldPerformSerach.value) {
         searchResults.value = [];
         expandedItems.value.clear();
         return;
     }
 
-    const searchResult = await monacoApi.searchService.textSearch({
-        type: QueryType.Text,
-        contentPattern: {
-            pattern: searchText.value,
-            isRegExp: isRegex.value,
-            isCaseSensitive: isCaseSensitive.value,
-            isWordMatch: isWholeWord.value
-        },
-        folderQueries: [
-            {
-                folder: Uri.parse("file:///")
-            }
-        ]
-    });
+    const searchResult = await monacoApi.searchService.textSearch(
+        createSearchQuery(searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value)
+    );
 
     const processedPaths = new Set<string>();
     searchResults.value = searchResult.results
@@ -165,25 +176,51 @@ async function performSearch() {
             return true;
         })
         .map((result): FileSearchResult => {
-            const fileResult: FileSearchResult = {
-                id: result.resource.path,
-                resource: result.resource,
-                results: undefined
-            };
-
-            fileResult.results =
-                (result.results as ITextSearchMatch<Uri>[] | undefined)?.map((match, index) => ({
-                    id: `${result.resource.path}-${index}`,
-                    previewText: match.previewText,
-                    range: match.rangeLocations[0],
-                    fileResult,
-                    index
-                })) ?? [];
-
-            return fileResult;
+            return createFileSearchResult(result.resource, result.results as ITextSearchMatch<Uri>[] | undefined);
         });
 
     expandedItems.value = new Set(searchResults.value);
+}
+
+async function updateFileSearchResults(changedUris: Uri[]) {
+    if (!shouldPerformSerach.value) {
+        return;
+    }
+
+    const updatedResults = [...searchResults.value];
+    let resultsChanged = false;
+
+    for (const uri of changedUris) {
+        const existingIndex = updatedResults.findIndex((r) => r.resource.path === uri.path);
+        const newResult = await searchSingleFile(uri);
+
+        if (newResult && newResult.results && newResult.results.length > 0) {
+            if (existingIndex !== -1) {
+                updatedResults[existingIndex] = newResult;
+            } else {
+                updatedResults.push(newResult);
+            }
+            resultsChanged = true;
+        } else if (existingIndex !== -1) {
+            updatedResults.splice(existingIndex, 1);
+            resultsChanged = true;
+        }
+    }
+
+    if (resultsChanged) {
+        searchResults.value = updatedResults;
+
+        const newExpandedItems = new Set<SearchMatch | FileSearchResult>();
+        for (const item of expandedItems.value) {
+            if ("resource" in item) {
+                const updatedResult = updatedResults.find((r) => r.resource.path === item.resource.path);
+                if (updatedResult) {
+                    newExpandedItems.add(updatedResult);
+                }
+            }
+        }
+        expandedItems.value = newExpandedItems;
+    }
 }
 
 throttledWatch([searchText, isCaseSensitive, isWholeWord, isRegex], performSearch, {
@@ -192,47 +229,43 @@ throttledWatch([searchText, isCaseSensitive, isWholeWord, isRegex], performSearc
     trailing: true
 });
 
+onMounted(() => {
+    monacoApi.fileService.onDidRunOperation(() => {
+        if (!shouldPerformSerach.value) {
+            return;
+        }
+        performSearch();
+    });
+
+    monacoApi.fileService.onDidFilesChange((event) => {
+        if (!shouldPerformSerach.value) {
+            return;
+        }
+
+        const changedUris: Uri[] = [];
+        const rawChanges = (event as any).raw;
+        if (Array.isArray(rawChanges)) {
+            for (const change of rawChanges) {
+                if (change.resource) {
+                    changedUris.push(change.resource);
+                }
+            }
+        }
+
+        if (changedUris.length > 0) {
+            updateFileSearchResults(changedUris);
+        }
+    });
+});
+
 onActivated(async () => {
+    isSearchActive.value = true;
     await performSearch();
 });
 
-function getFileName(uri: Uri): string {
-    const pathSegments = uri.path.split("/").filter((s) => s.length > 0);
-    return pathSegments[pathSegments.length - 1] ?? "";
-}
-
-function getRelativePath(uri: Uri): string {
-    const pathSegments = uri.path.split("/").filter((s) => s.length > 0);
-    if (pathSegments.length <= 2) {
-        return "";
-    }
-    return pathSegments.slice(1, -1).join("/");
-}
-
-function getPreviewBefore(match: SearchMatch): string {
-    if (!match.previewText || !match.range) {
-        return "";
-    }
-    const startOffset = match.range.preview.startColumn;
-    return match.previewText.substring(0, startOffset);
-}
-
-function getPreviewHighlight(match: SearchMatch): string {
-    if (!match.previewText || !match.range) {
-        return "";
-    }
-    const startOffset = match.range.preview.startColumn;
-    const endOffset = match.range.preview.endColumn;
-    return match.previewText.substring(startOffset, endOffset);
-}
-
-function getPreviewAfter(match: SearchMatch): string {
-    if (!match.previewText || !match.range) {
-        return "";
-    }
-    const endOffset = match.range.preview.endColumn;
-    return match.previewText.substring(endOffset);
-}
+onDeactivated(() => {
+    isSearchActive.value = false;
+});
 
 async function handleSelectResult(match: SearchMatch, temporary: boolean) {
     activeElement.value = match;
@@ -240,10 +273,25 @@ async function handleSelectResult(match: SearchMatch, temporary: boolean) {
     const file = findFileInTree(fileTree, match.fileResult.resource);
 
     if (file != undefined && file.type === FileType.File) {
-        workbenchState.openTab(file, temporary);
-
-        await nextTick();
-        // TODO: Use match.range() to navigate to the specific line/column if needed
+        const range = match.range?.source;
+        await monacoApi.editorService.openEditor({
+            resource: file.id,
+            options: {
+                preserveFocus: true,
+                selection:
+                    range != undefined
+                        ? {
+                              startLineNumber: range.startLineNumber + 1,
+                              startColumn: range.startColumn + 1,
+                              endLineNumber: range.endLineNumber + 1,
+                              endColumn: range.endColumn + 1
+                          }
+                        : undefined
+            }
+        });
+        if (!temporary && activeTab.value != undefined) {
+            activeTab.value.temporary = false;
+        }
     }
 }
 </script>

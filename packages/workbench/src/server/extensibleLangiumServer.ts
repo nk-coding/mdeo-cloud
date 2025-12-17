@@ -2,12 +2,11 @@ import {
     createConnection,
     BrowserMessageReader,
     BrowserMessageWriter,
-    RequestType,
-    type ResponseMessage,
     type RequestMessage
 } from "vscode-languageserver/browser.js";
 import * as langium from "langium";
 import * as langiumLsp from "langium/lsp";
+import * as mdeoLanguageCommon from "@mdeo/language-common";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
@@ -52,7 +51,8 @@ async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
 
 const pluginContext: PluginContext = {
     langium,
-    "langium/lsp": langiumLsp
+    "langium/lsp": langiumLsp,
+    "@mdeo/language-common": mdeoLanguageCommon
 };
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(

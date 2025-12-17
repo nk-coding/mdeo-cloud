@@ -24,3 +24,6 @@ export * from "./grammar/type/primitiveTypeLookup.js";
 export * from "./grammar/type/types.js";
 export * from "./plugin/languagePlugin.js";
 export * from "./plugin/pluginContext.js";
+export * from "./language/defaultTokens.js";
+export * from "./language/defaultLanguageConfiguration.js";
+export * from "./language/defaultMonarchTokenProvider.js";

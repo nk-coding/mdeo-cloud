@@ -1,14 +1,14 @@
-import { computed, ref, watch, type Reactive, type Ref } from "vue";
+import { computed, ref, watch, type Reactive } from "vue";
 import { type EditorTab } from "./tab/editorTab";
 import type { Plugin } from "./plugin/plugin";
 import type { BackendApi } from "./api/backendApi";
 import type { MonacoApi } from "@/plugins/monacoPlugin";
 import type { Project } from "./project/project";
-import type { File, Folder } from "./filesystem/file";
+import type { Folder } from "./filesystem/file";
 import { useFileTree } from "./filesystem/useFileTree";
 import { BackendFileSystemProvider } from "./filesystem/fileSystemProvider";
 import { registerFileSystemOverlay } from "@codingame/monaco-vscode-files-service-override";
-import type { ServerLanguagePlugin, ServerPlugin } from "./plugin/serverPlugin";
+import type { ServerContributionPlugin, ServerLanguagePlugin, ServerPlugin } from "./plugin/serverPlugin";
 import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserver-protocol/browser";
 import { MonacoLanguageClient } from "monaco-languageclient";
 import { CloseAction, ErrorAction, State, type ResponseMessage } from "vscode-languageclient";
@@ -16,6 +16,7 @@ import { Uri } from "vscode";
 import { watchArray } from "@vueuse/core";
 import { reinitializeWorkspace } from "@codingame/monaco-vscode-configuration-service-override";
 import { GetPluginsRequest, ServerReadyNotification } from "@/server/protocol";
+import type { ResolvedLanguagePlugin } from "./plugin/languagePlugin";
 
 /**
  * Manager for the overall state of the workbench
@@ -54,25 +55,40 @@ export class WorkbenchState {
     /**
      * File type plugins provided by any plugin
      */
-    readonly languagePlugins = computed(() =>
-        [...this.plugins.value.values()].flatMap((plugin) => plugin.languagePlugins)
-    );
+    readonly languagePlugins = computed<ResolvedLanguagePlugin[]>(() => {
+        const plugins = [...this.plugins.value.values()];
+        const contributionPluginsByLanguage = new Map<string, ServerContributionPlugin[]>();
+        for (const plugin of plugins) {
+            for (const contributionPlugin of plugin.serverContributionPlugins) {
+                if (!contributionPluginsByLanguage.has(contributionPlugin.languageId)) {
+                    contributionPluginsByLanguage.set(contributionPlugin.languageId, []);
+                }
+                contributionPluginsByLanguage.get(contributionPlugin.languageId)!.push(contributionPlugin);
+            }
+        }
+
+        return plugins
+            .flatMap((plugin) =>
+                plugin.languagePlugins.map((langPlugin) => ({ ...langPlugin }) as ResolvedLanguagePlugin)
+            )
+            .map((langPlugin) => ({
+                ...langPlugin,
+                serverContributionPlugins: contributionPluginsByLanguage.get(langPlugin.id) ?? []
+            }));
+    });
 
     /**
      * Server plugins provided by any plugin
      */
     readonly serverPlugins = computed<ServerPlugin[]>(() =>
-        [...this.plugins.value.values()].flatMap((plugin) => [
+        [...this.languagePlugins.value].flatMap((plugin) => [
             ...plugin.serverContributionPlugins,
-            ...plugin.languagePlugins.map(
-                (languagePlugin) =>
-                    ({
-                        ...languagePlugin.serverPlugin,
-                        type: "language",
-                        languageId: languagePlugin.id,
-                        extension: languagePlugin.extension
-                    }) satisfies ServerLanguagePlugin
-            )
+            {
+                ...plugin.serverPlugin,
+                type: "language",
+                languageId: plugin.id,
+                extension: plugin.extension
+            } satisfies ServerLanguagePlugin
         ])
     );
 
@@ -150,6 +166,14 @@ export class WorkbenchState {
                 for (const plugin of added) {
                     if (!this.registeredLanguages.has(plugin.id)) {
                         this.monacoApi.monaco.languages.register({ id: plugin.id });
+                        this.monacoApi.monaco.languages.setLanguageConfiguration(
+                            plugin.id,
+                            plugin.languageConfiguration
+                        );
+                        this.monacoApi.monaco.languages.setMonarchTokensProvider(
+                            plugin.id,
+                            this.generateMonarchTokensProvider(plugin)
+                        );
                         this.registeredLanguages.add(plugin.id);
                     }
                 }
@@ -164,6 +188,24 @@ export class WorkbenchState {
             },
             { immediate: true }
         );
+    }
+
+    /**
+     * Generates monarch tokens provider with merged keywords from contribution plugins
+     *
+     * @param plugin The resolved language plugin
+     * @returns The monarch tokens provider with merged keywords
+     */
+    private generateMonarchTokensProvider(plugin: ResolvedLanguagePlugin) {
+        return {
+            ...plugin.monarchTokensProvider,
+            keywords: [
+                ...plugin.monarchTokensProvider.keywords,
+                ...plugin.serverContributionPlugins.flatMap(
+                    (contributionPlugin) => contributionPlugin.additionalKeywords ?? []
+                )
+            ]
+        };
     }
 
     /**
@@ -284,24 +326,6 @@ export class WorkbenchState {
                 await this.recreateLanguageServer(project, this.serverPlugins.value);
             }
         }, 1000);
-    }
-
-    openTab(file: File, temporary: boolean) {
-        const existingTab = this.tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
-
-        if (existingTab) {
-            this.activeTab.value = existingTab;
-            if (!temporary && existingTab.temporary) {
-                existingTab.temporary = false;
-            }
-        } else {
-            const newTab = {
-                file: file,
-                temporary: temporary
-            };
-            this.tabs.value.push(newTab);
-            this.activeTab.value = newTab;
-        }
     }
 }
 

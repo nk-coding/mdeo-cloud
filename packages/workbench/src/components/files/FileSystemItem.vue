@@ -41,7 +41,7 @@
         </ContextMenuTrigger>
         <ContextMenuContent @close-auto-focus="$event.preventDefault()">
             <ContextMenuItem
-                v-for="fileType in workbenchState.languagePlugins.value"
+                v-for="fileType in languagePlugins"
                 :key="fileType.id"
                 @click="() => handleCreateFileOfType(fileType)"
             >
@@ -86,7 +86,7 @@ const props = defineProps<{
     entry: FileSystemNode;
 }>();
 
-const workbenchState = inject(workbenchStateKey)!;
+const { monacoApi, languagePlugins, activeTab } = inject(workbenchStateKey)!;
 const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{
@@ -104,15 +104,22 @@ const isRenaming = ref(false);
 
 const newItem = ref<NewItemState>();
 
-function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
+async function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
     if (props.entry.type === FileType.File && !isRenaming.value) {
         const file = props.entry;
 
         if (event instanceof KeyboardEvent) {
             event.preventDefault();
         }
-
-        workbenchState.openTab(file, temporary);
+        await monacoApi.editorService.openEditor({
+            resource: file.id,
+            options: {
+                preserveFocus: temporary
+            }
+        });
+        if (!temporary && activeTab.value != undefined) {
+            activeTab.value.temporary = false;
+        }
     }
     emit("select", props.entry);
 }

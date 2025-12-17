@@ -1,6 +1,6 @@
 <template>
     <div class="flex items-center justify-center w-full h-full bg-background">
-        <div class="w-full h-full max-w-[500px] max-h-[500px] p-16">
+        <div class="w-full h-full max-w-[550px] max-h-[550px] p-16">
             <Icon show-text solid />
         </div>
     </div>

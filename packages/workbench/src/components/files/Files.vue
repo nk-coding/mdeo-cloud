@@ -85,6 +85,8 @@ watch(
                     }
                 }
             });
+        } else {
+            activeEntry.value = undefined;
         }
     },
     { immediate: true }

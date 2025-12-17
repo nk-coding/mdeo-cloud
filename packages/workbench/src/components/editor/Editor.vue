@@ -17,8 +17,10 @@ import * as monacoType from "monaco-editor";
 import { workbenchStateKey } from "../workbench/util";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { EditorState } from "./util";
+import type { File } from "@/data/filesystem/file";
+import { findFileInTree } from "@/data/filesystem/util";
 
-const { tabs, activeTab, languagePlugins: fileTypePlugins, monacoApi } = inject(workbenchStateKey)!;
+const { tabs, activeTab, languagePlugins: fileTypePlugins, monacoApi, fileTree } = inject(workbenchStateKey)!;
 const editorElement = useTemplateRef("editorElement");
 const editor = shallowRef<monacoType.editor.IStandaloneCodeEditor>();
 
@@ -92,9 +94,34 @@ useResizeObserver(editorElement, () => {
     }
 });
 
+function openTab(file: File, temporary: boolean) {
+    const existingTab = tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
+
+    if (existingTab) {
+        activeTab.value = existingTab;
+        if (!temporary && existingTab.temporary) {
+            existingTab.temporary = false;
+        }
+    } else {
+        const newTab = {
+            file: file,
+            temporary: temporary
+        };
+        tabs.value.push(newTab);
+        activeTab.value = newTab;
+    }
+}
+
 onMounted(() => {
     const monacoEditor = monacoApi.monaco.editor.create(editorElement.value!);
     monacoEditor.layout();
     editor.value = monacoEditor;
+    monacoApi.openEditorFunc = async (createModelReference, options) => {
+        openTab(
+            findFileInTree(fileTree, createModelReference.object.textEditorModel.uri) as File,
+            options?.pinned !== true
+        );
+        return monacoEditor;
+    };
 });
 </script>

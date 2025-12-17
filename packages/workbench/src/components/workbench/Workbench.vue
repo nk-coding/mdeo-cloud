@@ -20,8 +20,8 @@
                 <SplitterPanel>
                     <div class="flex flex-col h-full w-full">
                         <Tabs />
-                        <Editor v-if="workbenchState.tabs.value.length > 0" />
-                        <WorkbenchBackground v-else />
+                        <Editor v-show="workbenchState.tabs.value.length > 0" />
+                        <WorkbenchBackground v-show="workbenchState.tabs.value.length == 0" />
                     </div>
                 </SplitterPanel>
             </ResizablePanelGroup>

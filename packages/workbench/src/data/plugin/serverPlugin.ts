@@ -40,6 +40,14 @@ export interface ServerLanguagePlugin extends ServerPluginBase {
  */
 export interface ServerContributionPlugin extends ServerPluginBase {
     type: "contribution";
+    /**
+     * The language ID that this contribution plugin is associated with.
+     */
+    languageId: string;
+    /**
+     * Optional array of additional keywords that this contribution plugin introduces.
+     */
+    additionalKeywords?: string[];
 }
 
 /**

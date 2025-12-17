@@ -1,4 +1,5 @@
-import type { ServerLanguagePlugin } from "./serverPlugin.js";
+import type { languages } from "monaco-editor";
+import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin.js";
 
 /**
  * A plugin for a language handled by the workbench
@@ -24,4 +25,22 @@ export interface LanguagePlugin {
      * Server plugin for the language
      */
     serverPlugin: Omit<ServerLanguagePlugin, "type" | "languageId" | "extension">;
+    /**
+     * Configuration for the language in the editor
+     */
+    languageConfiguration: languages.LanguageConfiguration;
+    /**
+     * Monarch tokens provider for syntax highlighting in the editor
+     */
+    monarchTokensProvider: languages.IMonarchLanguage;
+}
+
+/**
+ * A language plugin that has been resolved with its associated server contribution plugins
+ */
+export interface ResolvedLanguagePlugin extends LanguagePlugin {
+    /**
+     * The server contribution plugins associated with this language plugin
+     */
+    serverContributionPlugins: ServerContributionPlugin[];
 }

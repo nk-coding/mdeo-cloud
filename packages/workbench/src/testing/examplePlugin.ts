@@ -1,4 +1,5 @@
 import type { Plugin } from "@/data/plugin/plugin";
+import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 
 export const examplePlugin: Plugin = {
     id: "example-plugin",
@@ -9,6 +10,11 @@ export const examplePlugin: Plugin = {
             name: "Metamodel",
             serverPlugin: {
                 import: "/modules/defaultPlugin.js"
+            },
+            languageConfiguration: defaultLanguageConfiguration,
+            monarchTokensProvider: {
+                ...defaultMonarchTokenProvider,
+                keywords: ["class", "extends", "abstract"]
             }
         }
     ],

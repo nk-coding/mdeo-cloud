@@ -9,6 +9,7 @@ import { useColorMode } from "@vueuse/core";
 import {
     getService,
     IConfigurationService,
+    IEditorService,
     IFileService,
     ILogService,
     ISearchService,
@@ -16,11 +17,14 @@ import {
 } from "@codingame/monaco-vscode-api";
 import { WorkspaceSearchProvider } from "@codingame/monaco-vscode-search-service-override/service-override/tools/search-providers/workspace-search-provider";
 import { SearchProviderType } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
+import { type OpenEditor } from "@codingame/monaco-vscode-editor-service-override";
 
 export interface MonacoApi {
     monaco: typeof monaco;
     fileService: IFileService;
     searchService: ISearchService;
+    editorService: IEditorService;
+    openEditorFunc: OpenEditor | undefined;
 }
 
 export const monacoApiProviderKey: InjectionKey<Promise<MonacoApi>> = Symbol("monaco");
@@ -48,10 +52,14 @@ export const monacoPlugin: Plugin = {
 };
 
 async function setupMonaco(): Promise<MonacoApi> {
+    let monacoApi: MonacoApi | undefined;
     const vscodeApiConfig: MonacoVscodeApiConfig = {
         $type: "classic",
         viewsConfig: {
-            $type: "EditorService"
+            $type: "EditorService",
+            openEditorFunc: async (modelRef, options, sideBySide) => {
+                return monacoApi?.openEditorFunc?.(modelRef, options, sideBySide);
+            }
         },
         logLevel: LogLevel.Warning,
         serviceOverrides: {
@@ -73,6 +81,7 @@ async function setupMonaco(): Promise<MonacoApi> {
     const configurationService = await getService(IConfigurationService);
     const logService = await getService(ILogService);
     const searchService = await getService(ISearchService);
+    const editorService = await getService(IEditorService);
 
     workspaceContextService.onDidChangeWorkspaceFolders(() => {
         const provider = new WorkspaceSearchProvider(
@@ -87,11 +96,14 @@ async function setupMonaco(): Promise<MonacoApi> {
         searchService.registerSearchResultProvider("file", SearchProviderType.text, provider);
     });
 
-    return {
+    monacoApi = {
         monaco,
         fileService,
-        searchService
+        searchService,
+        editorService,
+        openEditorFunc: undefined
     };
+    return monacoApi;
 }
 
 /**

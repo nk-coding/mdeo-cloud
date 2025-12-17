@@ -15,6 +15,7 @@
     "dependencies": {
         "@codingame/monaco-vscode-api": "^23.3.0",
         "@codingame/monaco-vscode-configuration-service-override": "^23.3.0",
+        "@codingame/monaco-vscode-editor-service-override": "^23.3.0",
         "@codingame/monaco-vscode-files-service-override": "^23.3.0",
         "@codingame/monaco-vscode-search-service-override": "^23.3.0",
         "@mdeo/language-common": "^0.1.0",
