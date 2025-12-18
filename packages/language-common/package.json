@@ -9,10 +9,10 @@
         "src"
     ],
     "dependencies": {
-        "langium": "^4.1.2",
         "prettier": "^3.7.4"
     },
     "devDependencies": {
+        "langium": "^4.1.2",
         "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@^23.3.0"
     }
 }

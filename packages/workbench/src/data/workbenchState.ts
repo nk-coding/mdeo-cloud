@@ -15,7 +15,18 @@ import { CloseAction, ErrorAction, State, type ResponseMessage } from "vscode-la
 import { Uri } from "vscode";
 import { watchArray } from "@vueuse/core";
 import { reinitializeWorkspace } from "@codingame/monaco-vscode-configuration-service-override";
-import { GetPluginsRequest, ServerReadyNotification } from "@/server/protocol";
+import {
+    GetPluginsRequest,
+    ServerReadyNotification,
+    ReadFileRequest,
+    StatRequest,
+    ReadDirectoryRequest,
+    type ReadFileParams,
+    type StatParams,
+    type StatResponse,
+    type ReadDirectoryParams,
+    type FileSystemNode
+} from "@/server/protocol";
 import type { ResolvedLanguagePlugin } from "./plugin/languagePlugin";
 
 /**
@@ -149,7 +160,7 @@ export class WorkbenchState {
         readonly monacoApi: MonacoApi,
         readonly backendApi: BackendApi
     ) {
-        const fileSystemProvider = new BackendFileSystemProvider(backendApi, this._project);
+        const fileSystemProvider = new BackendFileSystemProvider(backendApi);
         registerFileSystemOverlay(1, fileSystemProvider);
         this.fileTree = useFileTree(monacoApi, this);
         this.initiLsp();
@@ -319,6 +330,10 @@ export class WorkbenchState {
             messageTransports: { reader, writer }
         });
         this.languageClient = languageClient;
+
+        // Register file system request handlers
+        this.registerFileSystemHandlers(languageClient);
+
         languageClient.start();
 
         setTimeout(async () => {
@@ -326,6 +341,42 @@ export class WorkbenchState {
                 await this.recreateLanguageServer(project, this.serverPlugins.value);
             }
         }, 1000);
+    }
+
+    /**
+     * Registers file system request handlers on the language client
+     *
+     * @param client The language client to register handlers on
+     */
+    private registerFileSystemHandlers(client: MonacoLanguageClient) {
+        client.onRequest(ReadFileRequest.type, async (params: ReadFileParams): Promise<string> => {
+            const uri = Uri.parse(params.uri);
+            const result = await this.monacoApi.fileService.readFile(uri);
+            return result.value.toString();
+        });
+
+        client.onRequest(StatRequest.type, async (params: StatParams): Promise<StatResponse> => {
+            const uri = Uri.parse(params.uri);
+            const stat = await this.monacoApi.fileService.resolve(uri, { resolveMetadata: false });
+            return {
+                isFile: stat.isFile,
+                isDirectory: stat.isDirectory,
+                uri: params.uri
+            };
+        });
+
+        client.onRequest(ReadDirectoryRequest.type, async (params: ReadDirectoryParams): Promise<FileSystemNode[]> => {
+            const uri = Uri.parse(params.uri);
+            const stat = await this.monacoApi.fileService.resolve(uri, { resolveMetadata: false });
+            if (!stat.children) {
+                throw new Error("Not a directory");
+            }
+            return stat.children.map((child) => ({
+                isFile: child.isFile,
+                isDirectory: child.isDirectory,
+                uri: child.resource.toString()
+            }));
+        });
     }
 }
 

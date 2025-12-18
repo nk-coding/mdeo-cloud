@@ -21,7 +21,7 @@ export const defaultMonarchTokenProvider: languages.IMonarchLanguage = {
 
             // functions
             [
-                /`[^`\n\r]+`(?=\s*[({\[])|[\p{ID_Start}][\p{ID_Continue}]*(?=\s*\()/u,
+                /`[^`\n\r]+`(?=\s*[({[])|[\p{ID_Start}][\p{ID_Continue}]*(?=\s*\()/u,
                 {
                     cases: {
                         "@keywords": { token: "keyword", switchTo: "expression" },

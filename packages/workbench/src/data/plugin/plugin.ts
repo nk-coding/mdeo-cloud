@@ -1,5 +1,5 @@
 import type { LanguagePlugin } from "./languagePlugin";
-import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin";
+import type { ServerContributionPlugin } from "./serverPlugin";
 
 /**
  * Plugin interface for the workbench

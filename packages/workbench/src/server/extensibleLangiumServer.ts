@@ -6,7 +6,7 @@ import {
 } from "vscode-languageserver/browser.js";
 import * as langium from "langium";
 import * as langiumLsp from "langium/lsp";
-import * as mdeoLanguageCommon from "@mdeo/language-common";
+import * as langiumGrammar from "langium/grammar";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
@@ -20,6 +20,7 @@ import type {
     LanguageMetaData,
     Module
 } from "langium";
+import { lspFileSystem } from "./lspFileSystem";
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
@@ -31,7 +32,7 @@ const plugins = await requestPluginsFromClient();
  */
 async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
     return new Promise((resolve) => {
-        let requestId = "request/plugins";
+        const requestId = "request/plugins";
 
         messageReader.listen((message: any) => {
             if (message.id === requestId && message.result !== undefined && message.result.plugins !== undefined) {
@@ -52,7 +53,7 @@ async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
 const pluginContext: PluginContext = {
     langium,
     "langium/lsp": langiumLsp,
-    "@mdeo/language-common": mdeoLanguageCommon
+    "langium/grammar": langiumGrammar
 };
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
@@ -70,7 +71,10 @@ const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
 const connection = createConnection(messageReader, messageWriter);
 
 function createLanguageServices(context: DefaultSharedModuleContext) {
-    const languageModule = createModule(resolvedPlugins.map((plugin) => plugin.languagePlugin));
+    const languageModule = createModule(
+        pluginContext,
+        resolvedPlugins.map((plugin) => plugin.languagePlugin)
+    );
 
     const generatedSharedModule: Module<LangiumSharedCoreServices, LangiumGeneratedSharedCoreServices> = {
         AstReflection: () => languageModule.reflection
@@ -110,7 +114,7 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
     return shared;
 }
 
-const shared = createLanguageServices({ connection, ...langium.EmptyFileSystem });
+const shared = createLanguageServices({ connection, ...lspFileSystem(connection) });
 
 connection.sendNotification(ServerReadyNotification.method, {});
 

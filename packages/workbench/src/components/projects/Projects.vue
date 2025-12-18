@@ -80,7 +80,10 @@ const filteredProjects = computed(() => {
 });
 
 async function loadProjects() {
-    projects.value = await backendApi.getProjects();
+    const result = await backendApi.getProjects();
+    if (result.success) {
+        projects.value = result.value;
+    }
 }
 
 function handleSelectProject(selectedProject: Project) {
@@ -98,10 +101,12 @@ async function handleCreateProject() {
         return;
     }
 
-    await backendApi.createProject(name);
-    await loadProjects();
-    isNewProjectDialogOpen.value = false;
-    newProjectName.value = "";
+    const result = await backendApi.createProject(name);
+    if (result.success) {
+        await loadProjects();
+        isNewProjectDialogOpen.value = false;
+        newProjectName.value = "";
+    }
 }
 
 onActivated(async () => {

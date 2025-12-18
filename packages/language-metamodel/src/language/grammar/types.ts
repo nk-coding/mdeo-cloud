@@ -7,7 +7,7 @@ import {
     Ref,
     Union
 } from "@mdeo/language-common";
-import type { ASTType, BaseType, Type, UnionTypes } from "@mdeo/language-common";
+import type { ASTType, BaseType } from "@mdeo/language-common";
 import type { AstNode } from "langium";
 
 export const PrimitiveType = createInterface("PrimitiveType").attrs({

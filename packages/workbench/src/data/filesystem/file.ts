@@ -1,5 +1,5 @@
 import type { Uri } from "vscode";
-import { FileType } from "@codingame/monaco-vscode-files-service-override";
+import type { FileType } from "@codingame/monaco-vscode-files-service-override";
 
 /**
  * Base metadata shared by all file system nodes.

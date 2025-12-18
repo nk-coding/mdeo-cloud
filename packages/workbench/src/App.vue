@@ -27,11 +27,13 @@ onMounted(async () => {
     if (path !== "/") {
         const projectId = path.startsWith("/") ? path.slice(1) : path;
 
-        const projects = await backendApi.getProjects();
-        const project = projects.find((p) => p.id === projectId);
+        const result = await backendApi.getProjects();
+        if (result.success) {
+            const project = result.value.find((p) => p.id === projectId);
 
-        if (project) {
-            workspaceState.value.project.value = project;
+            if (project) {
+                workspaceState.value.project.value = project;
+            }
         }
     }
 });

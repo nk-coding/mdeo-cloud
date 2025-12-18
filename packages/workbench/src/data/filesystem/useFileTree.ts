@@ -1,11 +1,11 @@
 import type { MonacoApi } from "@/plugins/monacoPlugin";
-import { reactive, watch, markRaw, type Ref } from "vue";
+import { reactive, watch, markRaw } from "vue";
 import type { Folder, FileSystemNode, File } from "./file";
 import type { Project } from "../project/project";
 import type { WorkbenchState } from "../workbenchState";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
+import type { FileOperationEvent } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import {
-    FileOperationEvent,
     FileOperation,
     type IFileStatWithMetadata
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";

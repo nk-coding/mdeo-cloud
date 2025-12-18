@@ -4,13 +4,18 @@ import type {
     IFileWriteOptions,
     FileType
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
-import {
-    createFileSystemProviderError,
-    FileSystemProviderErrorCode,
-    FileType as VSCodeFileType
-} from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
+import { FileType as VSCodeFileType } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { BackendApi } from "./backendApi";
 import type { Project } from "../project/project";
+import type { ApiResult, FileSystemError, ProjectError } from "./apiResult";
+import {
+    success,
+    fileSystemFailure,
+    projectFailure,
+    FileSystemErrorCode,
+    ProjectErrorCode,
+    CommonErrorCode
+} from "./apiResult";
 
 interface FileEntry {
     type: FileType;
@@ -74,10 +79,7 @@ export class BrowserBackendApi implements BackendApi {
             await this.initDB();
         }
         if (!this.db) {
-            throw createFileSystemProviderError(
-                "Failed to initialize database",
-                FileSystemProviderErrorCode.Unavailable
-            );
+            throw new Error("Failed to initialize database");
         }
         return this.db;
     }
@@ -187,10 +189,7 @@ export class BrowserBackendApi implements BackendApi {
     private async addChildToDirectory(projectId: string, dirPath: string, childName: string): Promise<void> {
         const dir = await this.getFileEntry(projectId, dirPath);
         if (!dir || dir.type !== VSCodeFileType.Directory) {
-            throw createFileSystemProviderError(
-                `Not a directory: ${dirPath}`,
-                FileSystemProviderErrorCode.FileNotADirectory
-            );
+            throw new Error(`Not a directory: ${dirPath}`);
         }
 
         if (!dir.children) {
@@ -218,45 +217,38 @@ export class BrowserBackendApi implements BackendApi {
         }
     }
 
-    async readFile(projectId: string, path: string): Promise<Uint8Array> {
+    async readFile(projectId: string, path: string): Promise<ApiResult<Uint8Array, FileSystemError>> {
         const entry = await this.getFileEntry(projectId, path);
 
         if (!entry) {
-            throw createFileSystemProviderError(`File not found: ${path}`, FileSystemProviderErrorCode.FileNotFound);
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File not found: ${path}`);
         }
 
         if (entry.type === VSCodeFileType.Directory) {
-            throw createFileSystemProviderError(
-                `Is a directory: ${path}`,
-                FileSystemProviderErrorCode.FileIsADirectory
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileIsADirectory, `Is a directory: ${path}`);
         }
 
-        return entry.content || new Uint8Array(0);
+        return success(entry.content || new Uint8Array(0));
     }
 
-    async writeFile(projectId: string, path: string, content: Uint8Array, opts: IFileWriteOptions): Promise<void> {
+    async writeFile(
+        projectId: string,
+        path: string,
+        content: Uint8Array,
+        opts: IFileWriteOptions
+    ): Promise<ApiResult<void, FileSystemError>> {
         const entry = await this.getFileEntry(projectId, path);
 
         if (entry) {
             if (entry.type === VSCodeFileType.Directory) {
-                throw createFileSystemProviderError(
-                    `Is a directory: ${path}`,
-                    FileSystemProviderErrorCode.FileIsADirectory
-                );
+                return fileSystemFailure(FileSystemErrorCode.FileIsADirectory, `Is a directory: ${path}`);
             }
             if (!opts.overwrite) {
-                throw createFileSystemProviderError(
-                    `File already exists: ${path}`,
-                    FileSystemProviderErrorCode.FileExists
-                );
+                return fileSystemFailure(FileSystemErrorCode.FileExists, `File already exists: ${path}`);
             }
         } else {
             if (!opts.create) {
-                throw createFileSystemProviderError(
-                    `File not found: ${path}`,
-                    FileSystemProviderErrorCode.FileNotFound
-                );
+                return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File not found: ${path}`);
             }
 
             // Ensure parent directories exist
@@ -274,17 +266,19 @@ export class BrowserBackendApi implements BackendApi {
             type: VSCodeFileType.File,
             content
         });
+
+        return success(undefined);
     }
 
-    async mkdir(projectId: string, path: string): Promise<void> {
+    async mkdir(projectId: string, path: string): Promise<ApiResult<void, FileSystemError>> {
         const entry = await this.getFileEntry(projectId, path);
 
         if (entry) {
             if (entry.type === VSCodeFileType.Directory) {
                 // Directory already exists, this is OK
-                return;
+                return success(undefined);
             }
-            throw createFileSystemProviderError(`File already exists: ${path}`, FileSystemProviderErrorCode.FileExists);
+            return fileSystemFailure(FileSystemErrorCode.FileExists, `File already exists: ${path}`);
         }
 
         // Ensure parent directories exist
@@ -301,23 +295,19 @@ export class BrowserBackendApi implements BackendApi {
             type: VSCodeFileType.Directory,
             children: []
         });
+
+        return success(undefined);
     }
 
-    async readdir(projectId: string, path: string): Promise<[string, FileType][]> {
+    async readdir(projectId: string, path: string): Promise<ApiResult<[string, FileType][], FileSystemError>> {
         const entry = await this.getFileEntry(projectId, path);
 
         if (!entry) {
-            throw createFileSystemProviderError(
-                `Directory not found: ${path}`,
-                FileSystemProviderErrorCode.FileNotFound
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `Directory not found: ${path}`);
         }
 
         if (entry.type !== VSCodeFileType.Directory) {
-            throw createFileSystemProviderError(
-                `Not a directory: ${path}`,
-                FileSystemProviderErrorCode.FileNotADirectory
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileNotADirectory, `Not a directory: ${path}`);
         }
 
         const children = entry.children || [];
@@ -330,45 +320,39 @@ export class BrowserBackendApi implements BackendApi {
                 result.push([child, childEntry.type]);
             }
         }
-        return result;
+        return success(result);
     }
 
-    async stat(projectId: string, path: string): Promise<FileType> {
+    async stat(projectId: string, path: string): Promise<ApiResult<FileType, FileSystemError>> {
         const entry = await this.getFileEntry(projectId, path);
 
         if (!entry) {
-            throw createFileSystemProviderError(
-                `File or directory not found: ${path}`,
-                FileSystemProviderErrorCode.FileNotFound
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File or directory not found: ${path}`);
         }
 
-        return entry.type;
+        return success(entry.type);
     }
 
-    async delete(projectId: string, path: string, opts: IFileDeleteOptions): Promise<void> {
+    async delete(projectId: string, path: string, opts: IFileDeleteOptions): Promise<ApiResult<void, FileSystemError>> {
         const entry = await this.getFileEntry(projectId, path);
 
         if (!entry) {
-            throw createFileSystemProviderError(
-                `File or directory not found: ${path}`,
-                FileSystemProviderErrorCode.FileNotFound
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File or directory not found: ${path}`);
         }
 
         if (entry.type === VSCodeFileType.Directory) {
             const children = entry.children || [];
             if (children.length > 0 && !opts.recursive) {
-                throw createFileSystemProviderError(
-                    `Directory not empty: ${path}`,
-                    FileSystemProviderErrorCode.Unknown
-                );
+                return fileSystemFailure(FileSystemErrorCode.DirectoryNotEmpty, `Directory not empty: ${path}`);
             }
 
             // Delete all children recursively
             for (const child of children) {
                 const childPath = path ? `${path}/${child}` : child;
-                await this.delete(projectId, childPath, { ...opts, recursive: true });
+                const deleteResult = await this.delete(projectId, childPath, { ...opts, recursive: true });
+                if (!deleteResult.success) {
+                    return deleteResult;
+                }
             }
         }
 
@@ -380,29 +364,32 @@ export class BrowserBackendApi implements BackendApi {
         }
 
         await this.deleteFileEntry(projectId, path);
+        return success(undefined);
     }
 
-    async rename(projectId: string, from: string, to: string, opts: IFileOverwriteOptions): Promise<void> {
+    async rename(
+        projectId: string,
+        from: string,
+        to: string,
+        opts: IFileOverwriteOptions
+    ): Promise<ApiResult<void, FileSystemError>> {
         const fromEntry = await this.getFileEntry(projectId, from);
 
         if (!fromEntry) {
-            throw createFileSystemProviderError(
-                `File or directory not found: ${from}`,
-                FileSystemProviderErrorCode.FileNotFound
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File or directory not found: ${from}`);
         }
 
         const toEntry = await this.getFileEntry(projectId, to);
         if (toEntry && !opts.overwrite) {
-            throw createFileSystemProviderError(
-                `File or directory already exists: ${to}`,
-                FileSystemProviderErrorCode.FileExists
-            );
+            return fileSystemFailure(FileSystemErrorCode.FileExists, `File or directory already exists: ${to}`);
         }
 
         // If destination exists and overwrite is allowed, delete it first
         if (toEntry) {
-            await this.delete(projectId, to, { recursive: true, useTrash: false, atomic: false });
+            const deleteResult = await this.delete(projectId, to, { recursive: true, useTrash: false, atomic: false });
+            if (!deleteResult.success) {
+                return deleteResult;
+            }
         }
 
         // Ensure parent directories exist for destination
@@ -413,13 +400,19 @@ export class BrowserBackendApi implements BackendApi {
             const children = fromEntry.children || [];
 
             // Create new directory
-            await this.mkdir(projectId, to);
+            const mkdirResult = await this.mkdir(projectId, to);
+            if (!mkdirResult.success) {
+                return mkdirResult;
+            }
 
             // Move all children
             for (const child of children) {
                 const fromChildPath = from ? `${from}/${child}` : child;
                 const toChildPath = to ? `${to}/${child}` : child;
-                await this.rename(projectId, fromChildPath, toChildPath, { overwrite: true });
+                const renameResult = await this.rename(projectId, fromChildPath, toChildPath, { overwrite: true });
+                if (!renameResult.success) {
+                    return renameResult;
+                }
             }
         } else {
             // Move file
@@ -442,29 +435,37 @@ export class BrowserBackendApi implements BackendApi {
 
         // Delete old entry
         await this.deleteFileEntry(projectId, from);
+        return success(undefined);
     }
 
-    async getProjects(): Promise<Project[]> {
+    async getProjects(): Promise<ApiResult<Project[], ProjectError>> {
         const db = await this.ensureDB();
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const transaction = db.transaction(["projects"], "readonly");
             const store = transaction.objectStore("projects");
             const request = store.getAll();
 
             request.onsuccess = () => {
                 const projects = request.result as ProjectData[];
-                resolve(projects.map((p) => ({ id: p.id, name: p.name })));
+                resolve(success(projects.map((p) => ({ id: p.id, name: p.name }))));
             };
-            request.onerror = () => reject(request.error);
+            request.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to get projects: ${request.error?.message || "Unknown error"}`
+                    )
+                );
+            };
         });
     }
 
-    async createProject(name: string): Promise<string> {
+    async createProject(name: string): Promise<ApiResult<string, ProjectError>> {
         const db = await this.ensureDB();
         const id = `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const transaction = db.transaction(["projects", "files"], "readwrite");
             const projectStore = transaction.objectStore("projects");
             const fileStore = transaction.objectStore("files");
@@ -472,7 +473,14 @@ export class BrowserBackendApi implements BackendApi {
             const projectData: ProjectData = { id, name };
             const projectRequest = projectStore.add(projectData);
 
-            projectRequest.onerror = () => reject(projectRequest.error);
+            projectRequest.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to create project: ${projectRequest.error?.message || "Unknown error"}`
+                    )
+                );
+            };
 
             // Create root directory for the project
             const rootKey = this.makeFileKey(id, "");
@@ -482,17 +490,31 @@ export class BrowserBackendApi implements BackendApi {
             };
             const fileRequest = fileStore.put({ ...rootEntry, projectId: id }, rootKey);
 
-            fileRequest.onerror = () => reject(fileRequest.error);
+            fileRequest.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to create project root: ${fileRequest.error?.message || "Unknown error"}`
+                    )
+                );
+            };
 
-            transaction.oncomplete = () => resolve(id);
-            transaction.onerror = () => reject(transaction.error);
+            transaction.oncomplete = () => resolve(success(id));
+            transaction.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to create project: ${transaction.error?.message || "Unknown error"}`
+                    )
+                );
+            };
         });
     }
 
-    async updateProject(projectId: string, updates: { name?: string }): Promise<void> {
+    async updateProject(projectId: string, updates: { name?: string }): Promise<ApiResult<void, ProjectError>> {
         const db = await this.ensureDB();
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const transaction = db.transaction(["projects"], "readwrite");
             const store = transaction.objectStore("projects");
             const getRequest = store.get(projectId);
@@ -500,12 +522,7 @@ export class BrowserBackendApi implements BackendApi {
             getRequest.onsuccess = () => {
                 const project = getRequest.result as ProjectData | undefined;
                 if (!project) {
-                    reject(
-                        createFileSystemProviderError(
-                            `Project not found: ${projectId}`,
-                            FileSystemProviderErrorCode.FileNotFound
-                        )
-                    );
+                    resolve(projectFailure(ProjectErrorCode.ProjectNotFound, `Project not found: ${projectId}`));
                     return;
                 }
 
@@ -515,25 +532,46 @@ export class BrowserBackendApi implements BackendApi {
                 };
 
                 const putRequest = store.put(updatedProject);
-                putRequest.onsuccess = () => resolve();
-                putRequest.onerror = () => reject(putRequest.error);
+                putRequest.onsuccess = () => resolve(success(undefined));
+                putRequest.onerror = () => {
+                    resolve(
+                        projectFailure(
+                            CommonErrorCode.Unknown,
+                            `Failed to update project: ${putRequest.error?.message || "Unknown error"}`
+                        )
+                    );
+                };
             };
 
-            getRequest.onerror = () => reject(getRequest.error);
+            getRequest.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to get project: ${getRequest.error?.message || "Unknown error"}`
+                    )
+                );
+            };
         });
     }
 
-    async deleteProject(projectId: string): Promise<void> {
+    async deleteProject(projectId: string): Promise<ApiResult<void, ProjectError>> {
         const db = await this.ensureDB();
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const transaction = db.transaction(["projects", "files"], "readwrite");
             const projectStore = transaction.objectStore("projects");
             const fileStore = transaction.objectStore("files");
 
             // Delete project
             const deleteProjectRequest = projectStore.delete(projectId);
-            deleteProjectRequest.onerror = () => reject(deleteProjectRequest.error);
+            deleteProjectRequest.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to delete project: ${deleteProjectRequest.error?.message || "Unknown error"}`
+                    )
+                );
+            };
 
             // Delete all files for this project
             const index = fileStore.index("projectId");
@@ -548,10 +586,24 @@ export class BrowserBackendApi implements BackendApi {
                 }
             };
 
-            cursorRequest.onerror = () => reject(cursorRequest.error);
+            cursorRequest.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to delete project files: ${cursorRequest.error?.message || "Unknown error"}`
+                    )
+                );
+            };
 
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = () => reject(transaction.error);
+            transaction.oncomplete = () => resolve(success(undefined));
+            transaction.onerror = () => {
+                resolve(
+                    projectFailure(
+                        CommonErrorCode.Unknown,
+                        `Failed to delete project: ${transaction.error?.message || "Unknown error"}`
+                    )
+                );
+            };
         });
     }
 }

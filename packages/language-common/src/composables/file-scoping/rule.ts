@@ -1,5 +1,4 @@
 import type { AstNode } from "langium";
-import type { BaseType } from "../../grammar/type/types.js";
 import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
 import { createRule, many, optional, ref } from "../../grammar/rule/parser/factory.js";
 import { ID, STRING } from "../../language/defaultTokens.js";

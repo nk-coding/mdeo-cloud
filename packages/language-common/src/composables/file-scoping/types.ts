@@ -1,7 +1,6 @@
 import type { AstNode } from "langium";
 import { createInterface } from "../../grammar/type/interface/factory.js";
 import { Ref, Optional } from "../../grammar/type/interface/helpers.js";
-import type { BaseType } from "../../grammar/type/types.js";
 import type { FileScopingConfig } from "./config.js";
 
 /**

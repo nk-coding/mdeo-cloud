@@ -1,4 +1,5 @@
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
+import { RequestType } from "vscode-languageserver-protocol";
 
 /**
  * Namespace for the get plugins request
@@ -12,9 +13,7 @@ export namespace GetPluginsRequest {
     /**
      * Request parameters for getting plugin configuration
      */
-    export interface Params {
-        // No parameters needed for now
-    }
+    export type Params = Record<string, never>;
 
     /**
      * Response containing the list of plugins to load
@@ -39,7 +38,101 @@ export namespace ServerReadyNotification {
     /**
      * Notification parameters
      */
-    export interface Params {
-        // No parameters needed for now
-    }
+    export type Params = Record<string, never>;
+}
+
+/**
+ * Request parameters for reading a file
+ */
+export interface ReadFileParams {
+    /**
+     * The URI of the file to read
+     */
+    uri: string;
+}
+
+/**
+ * Namespace for the read file request
+ */
+export namespace ReadFileRequest {
+    /**
+     * Request type for reading a file
+     */
+    export const type = new RequestType<ReadFileParams, string, any>("fs/readFile");
+}
+
+/**
+ * Request parameters for getting file/directory stats
+ */
+export interface StatParams {
+    /**
+     * The URI of the file or directory to stat
+     */
+    uri: string;
+}
+
+/**
+ * Response containing the file system node information
+ */
+export interface StatResponse {
+    /**
+     * Whether this is a file
+     */
+    isFile: boolean;
+    /**
+     * Whether this is a directory
+     */
+    isDirectory: boolean;
+    /**
+     * The URI of the file or directory
+     */
+    uri: string;
+}
+
+/**
+ * Namespace for the stat request
+ */
+export namespace StatRequest {
+    /**
+     * Request type for getting file/directory stats
+     */
+    export const type = new RequestType<StatParams, StatResponse, any>("fs/stat");
+}
+
+/**
+ * Request parameters for reading a directory
+ */
+export interface ReadDirectoryParams {
+    /**
+     * The URI of the directory to read
+     */
+    uri: string;
+}
+
+/**
+ * File system node information
+ */
+export interface FileSystemNode {
+    /**
+     * Whether this is a file
+     */
+    isFile: boolean;
+    /**
+     * Whether this is a directory
+     */
+    isDirectory: boolean;
+    /**
+     * The URI of the file or directory
+     */
+    uri: string;
+}
+
+/**
+ * Namespace for the read directory request
+ */
+export namespace ReadDirectoryRequest {
+    /**
+     * Request type for reading a directory
+     */
+    export const type = new RequestType<ReadDirectoryParams, FileSystemNode[], any>("fs/readDirectory");
 }

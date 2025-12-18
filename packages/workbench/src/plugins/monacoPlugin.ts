@@ -1,6 +1,6 @@
 import * as monaco from "monaco-editor";
 import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from "monaco-languageclient/vscodeApiWrapper";
-import { debug, LogLevel } from "vscode";
+import { LogLevel } from "vscode";
 import { type Plugin, type InjectionKey, watch } from "vue";
 import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";
 import { useWorkerFactory } from "monaco-languageclient/workerFactory";
@@ -52,6 +52,7 @@ export const monacoPlugin: Plugin = {
 };
 
 async function setupMonaco(): Promise<MonacoApi> {
+    // eslint-disable-next-line prefer-const
     let monacoApi: MonacoApi | undefined;
     const vscodeApiConfig: MonacoVscodeApiConfig = {
         $type: "classic",
