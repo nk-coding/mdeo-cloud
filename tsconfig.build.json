@@ -7,6 +7,21 @@
         },
         {
             "path": "packages/language-metamodel"
+        },
+        {
+            "path": "packages/language-expression"
+        },
+        {
+            "path": "packages/language-model"
+        },
+        {
+            "path": "packages/language-model-transformation"
+        },
+        {
+            "path": "packages/language-config"
+        },
+        {
+            "path": "packages/language-script"
         }
     ]
 }

@@ -7,6 +7,7 @@ import {
 import * as langium from "langium";
 import * as langiumLsp from "langium/lsp";
 import * as langiumGrammar from "langium/grammar";
+import * as typirLangium from "typir-langium";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
@@ -53,7 +54,8 @@ async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
 const pluginContext: PluginContext = {
     langium,
     "langium/lsp": langiumLsp,
-    "langium/grammar": langiumGrammar
+    "langium/grammar": langiumGrammar,
+    "typir-langium": typirLangium
 };
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(

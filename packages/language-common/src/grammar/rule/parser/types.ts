@@ -108,9 +108,9 @@ export interface RuleContext<T extends AstNode> {
         key: K & string,
         ...value:
             | [TerminalRule<T[K]>]
-            | (T[K] extends AstNode ? [ParserRule<T[K]>] : never)
-            | (T[K] extends Reference<infer U extends AstNode> ? [CrossRef<U>] : never)
-            | (T[K] extends string ? T[K][] : never)
+            | (NonNullable<T[K]> extends AstNode ? [ParserRule<NonNullable<T[K]>>] : never)
+            | (NonNullable<T[K]> extends Reference<infer U extends AstNode> ? [CrossRef<U>] : never)
+            | (NonNullable<T[K]> extends string ? T[K][] : never)
     ): AbstractElement;
 
     /**

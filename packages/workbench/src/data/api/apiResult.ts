@@ -38,7 +38,13 @@ export type ApiErrorCode = CommonErrorCode | FileSystemErrorCode | ProjectErrorC
  * Base interface for API errors.
  */
 export interface ApiError<TCode extends ApiErrorCode = ApiErrorCode> {
+    /**
+     * The error code indicating the type of error.
+     */
     code: TCode;
+    /**
+     * A descriptive error message explaining the failure.
+     */
     message: string;
 }
 

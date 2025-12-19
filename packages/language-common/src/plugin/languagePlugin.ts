@@ -2,7 +2,8 @@ import type { Module } from "langium";
 import type { TerminalRule } from "../grammar/rule/terminal/types.js";
 import type { ParserRule } from "../grammar/rule/types.js";
 import type { PluginContext } from "./pluginContext.js";
-import type { DefaultSharedModuleContext, LangiumServices, PartialLangiumServices } from "langium/lsp";
+import type { DefaultSharedModuleContext } from "langium/lsp";
+import type { ExtendedLangiumServices, PartialExtendedLangiumServices } from "../grammar/module/extendedServices.js";
 
 /**
  * Provider for a language plugin, which provides support for one language for a langium-based language server.
@@ -36,14 +37,14 @@ export interface LanguagePlugin<T> {
     /**
      * The module for the language
      */
-    module: Module<LangiumServices & T, PartialLangiumServices & T>;
+    module: Module<ExtendedLangiumServices & T, PartialExtendedLangiumServices & T>;
     /**
      * Optional callback that is invoked after the language services have been created.
      *
      * @param services the created language services
      * @param context module context with the LSP connection
      */
-    postCreate?: (services: LangiumServices & T, context: DefaultSharedModuleContext) => void;
+    postCreate?: (services: ExtendedLangiumServices & T, context: DefaultSharedModuleContext) => void;
 }
 
 /**
@@ -52,4 +53,4 @@ export interface LanguagePlugin<T> {
  * @template T The type of the language's additional services
  * @template V The type of the provided service
  */
-export type ServiceProvider<T, V> = (context: PluginContext) => (services: LangiumServices & T) => V;
+export type ServiceProvider<T, V> = (context: PluginContext) => (services: ExtendedLangiumServices & T) => V;

@@ -57,12 +57,12 @@ export const AssociationEndWithPropertyRule = createRule("AssociationEndWithProp
         set("class", ref(MetaClassOrImport, ID)),
         ".",
         set("property", ID),
-        optional("[", MultiplicityRule, "]")
+        optional(set("multiplicity", MultiplicityRule))
     ]);
 
 export const AssociationEndWithoutPropertyRule = createRule("AssociationEndWithoutPropertyRule")
     .returns(AssociationEnd)
-    .as(({ set }) => [set("class", ref(MetaClassOrImport, ID)), optional("[", MultiplicityRule, "]")]);
+    .as(({ set }) => [set("class", ref(MetaClassOrImport, ID)), optional(set("multiplicity", MultiplicityRule))]);
 
 export const AssociationEndRule = createRule("AssociationEndRule")
     .returns(AssociationEnd)
@@ -74,7 +74,7 @@ export const CompositionEndRule = createRule("CompositionEndRule")
         set("class", ref(MetaClassOrImport, ID)),
         ".",
         set("property", ID),
-        optional("[", MultiplicityRule, "]")
+        optional(set("multiplicity", MultiplicityRule))
     ]);
 
 export const RegularAssociationStartWithPropertyRule = createRule("RegularAssociationStartWithPropertyRule")

@@ -2,6 +2,7 @@ export * from "./composables/file-scoping/config.js";
 export * from "./composables/file-scoping/rule.js";
 export * from "./composables/file-scoping/scopeProvider.js";
 export * from "./composables/file-scoping/types.js";
+export * from "./composables/scoping/localScopeProvider.js";
 export * from "./grammar/module/createModule.js";
 export * from "./grammar/rule/infix/builders.js";
 export * from "./grammar/rule/infix/factory.js";

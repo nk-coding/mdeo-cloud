@@ -1,27 +1,10 @@
-import type { AstReflection, Grammar, PropertyMetaData, TypeMetaData } from "langium";
+import type { AstNode, PropertyMetaData, TypeMetaData } from "langium";
 import { GrammarSerializer } from "../serialization/grammarSerializer.js";
 import type { AstTypes, Property } from "langium/grammar";
 import type { LanguagePlugin } from "../../plugin/languagePlugin.js";
 import type { PluginContext } from "../../plugin/pluginContext.js";
-
-/**
- * Provides both the grammar and AstReflection for several langium language, which would
- * typically be handled via code generation.
- */
-export interface LanguageModule {
-    /**
-     * The compiled Langium grammar that defines the language syntax and parsing rules.
-     * This grammar can be used to create parsers and other language services.
-     */
-    grammars: Map<LanguagePlugin<any>, Grammar>;
-
-    /**
-     * AST reflection metadata that provides runtime type information about
-     * the AST node types defined in the grammar. This enables features like
-     * type checking, validation, and code completion.
-     */
-    reflection: AstReflection;
-}
+import type { LanguageModule } from "./module.js";
+import type { Interface } from "../type/interface/types.js";
 
 /**
  * Creates a complete language module from a parser rule and additional terminal rules.
@@ -65,6 +48,15 @@ export function createModule(
                 buildTypeMetaData(union.name, [], typeHierarchy.superTypes.get(union.name), langiumGrammar)
             ])
         ]);
+
+        override isInstance(node: unknown, type: string): boolean;
+        override isInstance<T extends AstNode>(node: unknown, type: Interface<T>): node is T;
+        override isInstance(node: unknown, type: string | Interface<any>): boolean {
+            if (typeof type === "string") {
+                return super.isInstance(node, type);
+            }
+            return super.isInstance(node, type.name);
+        }
     }
 
     return {
