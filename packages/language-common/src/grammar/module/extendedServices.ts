@@ -6,17 +6,17 @@ import type { DeepPartial } from "langium";
  * Langium services with custom extensions
  */
 export type ExtendedLangiumServices = LangiumServices & {
-    shared: ExtendedLangiumSharedServices
-}
+    shared: ExtendedLangiumSharedServices;
+};
 
-/** 
+/**
  * Partial Langium services with custom extensions
  */
-export type PartialExtendedLangiumServices = DeepPartial<ExtendedLangiumServices>
+export type PartialExtendedLangiumServices = DeepPartial<ExtendedLangiumServices>;
 
 /**
  * Langium shared services with custom extensions
  */
 export type ExtendedLangiumSharedServices = LangiumSharedServices & {
-    AstReflection: AstReflection
-}
+    AstReflection: AstReflection;
+};

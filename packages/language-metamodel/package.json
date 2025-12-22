@@ -12,6 +12,6 @@
         "@mdeo/language-common": "^0.1.0"
     },
     "devDependencies": {
-        "langium": "^4.1.2"
+        "langium": "^4.1.3"
     }
 }

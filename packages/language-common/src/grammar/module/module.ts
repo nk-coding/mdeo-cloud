@@ -25,7 +25,7 @@ export interface LanguageModule {
 export interface AstReflection extends LangiumAstReflection {
     /**
      * Checks whether the given AST node is an instance of the specified type.
-     * 
+     *
      * @param node The AST node to check
      * @param type The type to check against, either as a string name or an Interface type
      * @returns True if the node is an instance of the specified type, false otherwise

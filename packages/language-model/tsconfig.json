@@ -6,7 +6,7 @@
     },
     "references": [
         {
-            "path": "../language-common",
+            "path": "../language-common"
         },
         {
             "path": "../language-expression"
