@@ -1,7 +1,8 @@
-import type { InferenceProblem, TypirSpecifics, Type as TypirType } from "typir";
+import type { InferenceProblem, TypirSpecifics } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
+import type { ValueType, FunctionType } from "../config/type.js";
 
 /**
  * Infer the type of a member access expression.
@@ -40,23 +41,30 @@ export function inferMemberAccess<Specifics extends TypirSpecifics>(
         };
     }
 
-    const property = ownerType.getProperty(name);
-    if (property != undefined) {
+    const member = ownerType.getMember(name);
+    if (member == undefined) {
+        return <InferenceProblem<Specifics>>{
+            $problem: InferenceProblem,
+            languageNode,
+            location: `Member '${name}' does not exist on type '${ownerType.getName()}'.`,
+            subProblems: []
+        };
+    }
+
+    if (member.isProperty) {
+        const resolvedType = services.TypeDefinitions.resolveCustomClassOrLambdaType(
+            member.type as ValueType,
+            ownerType.details.typeArgs as Map<string, CustomValueType>
+        );
         if (ownerType.isNullable) {
-            return property.asNullable;
+            return resolvedType.asNullable;
         }
-        return property;
+        return resolvedType;
+    } else {
+        return services.TypeDefinitions.resolveCustomFunctionType(
+            member.type as FunctionType,
+            `${ownerType.getIdentifier()}.${name}`,
+            ownerType.details.typeArgs as Map<string, CustomValueType>
+        );
     }
-
-    const method = ownerType.getMethod(name);
-    if (method !== undefined) {
-        return method;
-    }
-
-    return <InferenceProblem<Specifics>>{
-        $problem: InferenceProblem,
-        languageNode,
-        location: `Member '${name}' does not exist on type '${ownerType.getName()}'.`,
-        subProblems: []
-    };
 }

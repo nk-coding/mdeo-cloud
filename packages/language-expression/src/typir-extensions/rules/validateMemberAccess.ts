@@ -51,7 +51,7 @@ export function validateMemberAccess<Specifics extends TypirSpecifics>(
         return errors;
     }
 
-    if (ownerType.getProperty(name) == undefined && ownerType.getMethod(name) == undefined) {
+    if (ownerType.getMember(name) == undefined) {
         errors.push({
             $problem: ValidationProblem,
             languageNode,

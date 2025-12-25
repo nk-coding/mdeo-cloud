@@ -1,7 +1,6 @@
 import { createInterface, Optional } from "@mdeo/language-common";
 import type { StatementConfig } from "./statementConfig.js";
-import type { ExpressionTypes, BaseExpressionType } from "./expressionTypes.js";
-import type { BaseTypeType } from "./typeTypes.js";
+import type { ExpressionTypes } from "./expressionTypes.js";
 
 /**
  * Generates statement-related type interfaces based on the provided configuration.

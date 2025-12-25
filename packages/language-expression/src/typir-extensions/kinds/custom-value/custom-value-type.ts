@@ -1,8 +1,7 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics } from "typir";
 import type { CustomClassType } from "../custom-class/custom-class-type.js";
-import type { CustomFunctionType } from "../custom-function/custom-function-type.js";
 import type { ExtendedTypirServices, Provider } from "../../service/extendedTypirServices.js";
-import type { BaseClassTypeRef, FunctionType, ValueType } from "../../config/type.js";
+import type { BaseClassTypeRef, Member } from "../../config/type.js";
 
 /**
  * Type details for custom value types.
@@ -77,40 +76,22 @@ export interface CustomValueType<
     get isNullable(): boolean;
 
     /**
-     * Get the type of a property by name, including inherited properties.
+     * Get a member (property or method) by name, including inherited members.
      * Uses caching to avoid repeated lookups.
      *
-     * @param fieldName The name of the property to look up
-     * @returns The property's custom value type, or undefined if not found
+     * @param memberName The name of the member to look up
+     * @returns The member wrapper object, or undefined if not found
      */
-    getProperty(fieldName: string): CustomValueType | undefined;
+    getMember(memberName: string): Member | undefined;
 
     /**
-     * Get the type of a method by name, including inherited methods.
-     * Uses caching to avoid repeated lookups.
+     * Get a member for a specific member name (without inheritance).
+     * Must be implemented by subclasses to provide local member lookup.
      *
-     * @param methodName The name of the method to look up
-     * @returns The method's custom function type, or undefined if not found
+     * @param memberName The name of the member
+     * @returns The member wrapper object, or undefined if not found
      */
-    getMethod(methodName: string): CustomFunctionType | undefined;
-
-    /**
-     * Get the property type for a specific property name (without inheritance).
-     * Must be implemented by subclasses to provide local property lookup.
-     *
-     * @param propertyName The name of the property
-     * @returns The property's value type, or undefined if not found
-     */
-    getLocalPropertyType(propertyName: string): ValueType | undefined;
-
-    /**
-     * Get the method type for a specific method name (without inheritance).
-     * Must be implemented by subclasses to provide local method lookup.
-     *
-     * @param methodName The name of the method
-     * @returns The method's function type, or undefined if not found
-     */
-    getLocalMethodType(methodName: string): FunctionType | undefined;
+    getLocalMember(memberName: string): Member | undefined;
 
     /**
      * Register this type as a subtype of its super classes.
@@ -135,9 +116,7 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
     {
         readonly superClasses: CustomClassType[];
 
-        private readonly cachedProperties: Map<string, CustomValueType> = new Map();
-
-        private readonly cachedMethods: Map<string, CustomFunctionType> = new Map();
+        private readonly cachedMembers: Map<string, Member> = new Map();
 
         get asNullable(): CustomValueType {
             throw new Error("Method not implemented.");
@@ -178,11 +157,7 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
             );
         }
 
-        getLocalPropertyType(propertyName: string): ValueType | undefined {
-            throw new Error("Method not implemented.");
-        }
-
-        getLocalMethodType(methodName: string): FunctionType | undefined {
+        getLocalMember(_memberName: string): Member | undefined {
             throw new Error("Method not implemented.");
         }
 
@@ -195,51 +170,23 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
             }
         }
 
-        getProperty(fieldName: string): CustomValueType | undefined {
-            if (this.cachedProperties.has(fieldName)) {
-                return this.cachedProperties.get(fieldName);
+        getMember(memberName: string): Member | undefined {
+            if (this.cachedMembers.has(memberName)) {
+                return this.cachedMembers.get(memberName);
             }
-            const propertyType = this.getLocalPropertyType(fieldName);
-            if (propertyType == undefined) {
+            const member = this.getLocalMember(memberName);
+            if (member == undefined) {
                 for (const superClass of this.superClasses) {
-                    const superProperty = superClass.getProperty(fieldName);
-                    if (superProperty != undefined) {
-                        this.cachedProperties.set(fieldName, superProperty);
-                        return superProperty;
+                    const superMember = superClass.getMember(memberName);
+                    if (superMember != undefined) {
+                        this.cachedMembers.set(memberName, superMember);
+                        return superMember;
                     }
                 }
                 return undefined;
             }
-            const resolvedType = this.services.TypeDefinitions.resolveCustomClassOrLambdaType(
-                propertyType,
-                this.details.typeArgs as Map<string, CustomValueType>
-            );
-            this.cachedProperties.set(fieldName, resolvedType);
-            return resolvedType;
-        }
-
-        getMethod(methodName: string): CustomFunctionType | undefined {
-            if (this.cachedMethods.has(methodName)) {
-                return this.cachedMethods.get(methodName);
-            }
-            const methodType = this.getLocalMethodType(methodName);
-            if (methodType == undefined) {
-                for (const superClass of this.superClasses) {
-                    const superMethod = superClass.getMethod(methodName);
-                    if (superMethod != undefined) {
-                        this.cachedMethods.set(methodName, superMethod);
-                        return superMethod;
-                    }
-                }
-                return undefined;
-            }
-            const resolvedMethodType = this.services.TypeDefinitions.resolveCustomFunctionType(
-                methodType,
-                `${this.getIdentifier()}.${methodName}`,
-                this.details.typeArgs as Map<string, CustomValueType>
-            );
-            this.cachedMethods.set(methodName, resolvedMethodType);
-            return resolvedMethodType;
+            this.cachedMembers.set(memberName, member);
+            return member;
         }
 
         override getName(): string {
@@ -250,7 +197,7 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
             throw new Error("Method not implemented.");
         }
 
-        override analyzeTypeEqualityProblems(otherType: TypirType): TypirProblem[] {
+        override analyzeTypeEqualityProblems(_otherType: TypirType): TypirProblem[] {
             throw new Error("Method not implemented.");
         }
     }

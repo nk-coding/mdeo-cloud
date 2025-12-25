@@ -1,7 +1,7 @@
 import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProblem } from "typir";
 import type { CustomClassDetails, CustomClassKind } from "./custom-class-kind.js";
-import type { CustomValueType, CustomValueTypeConstructor } from "../custom-value/custom-value-type.js";
-import type { FunctionType, ValueType } from "../../config/type.js";
+import type { CustomValueType } from "../custom-value/custom-value-type.js";
+import type { Member } from "../../config/type.js";
 import type { Provider } from "../../service/extendedTypirServices.js";
 
 /**
@@ -113,12 +113,8 @@ export const CustomClassTypeProvider: Provider<CustomClassTypeConstructor> = (se
             }
         }
 
-        override getLocalPropertyType(propertyName: string): ValueType | undefined {
-            return this.details.definition.properties.get(propertyName);
-        }
-
-        override getLocalMethodType(methodName: string): FunctionType | undefined {
-            return this.details.definition.methods.get(methodName);
+        override getLocalMember(memberName: string): Member | undefined {
+            return this.details.definition.members.get(memberName);
         }
     }
 

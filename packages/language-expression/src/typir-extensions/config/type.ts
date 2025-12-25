@@ -100,7 +100,29 @@ export interface FunctionType {
 }
 
 /**
- * A type definition with its properties, methods, and type hierarchy.
+ * Represents a member (property or function) of a class type.
+ */
+export interface Member {
+    /**
+     * The name of the member
+     */
+    name: string;
+    /**
+     * Whether this is a property (true) or function/method (false)
+     */
+    isProperty: boolean;
+    /**
+     * Whether this property is readonly (only applicable for properties)
+     */
+    readonly?: boolean;
+    /**
+     * The type of the member (ValueType for properties, FunctionType for functions)
+     */
+    type: ValueType | FunctionType;
+}
+
+/**
+ * A type definition with its members (properties and methods) and type hierarchy.
  */
 export interface ClassType {
     /**
@@ -113,13 +135,9 @@ export interface ClassType {
      */
     package: string;
     /**
-     * A mapping of property names to their type references
+     * A mapping of member names to their definitions (unified properties and methods)
      */
-    properties: Map<string, ValueType>;
-    /**
-     * A mapping of method names to their method definitions
-     */
-    methods: Map<string, FunctionType>;
+    members: Map<string, Member>;
     /**
      * Optional list of generic type parameter names (e.g., ['T', 'U'])
      */

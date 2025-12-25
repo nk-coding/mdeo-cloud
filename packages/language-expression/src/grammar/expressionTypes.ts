@@ -1,4 +1,4 @@
-import { createInterface, createType, Union, type ASTType } from "@mdeo/language-common";
+import { createInterface, Union, type ASTType } from "@mdeo/language-common";
 import type { ExpressionConfig } from "./expressionConfig.js";
 import type { TypeTypes } from "./typeTypes.js";
 

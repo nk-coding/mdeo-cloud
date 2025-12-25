@@ -3,7 +3,6 @@ import {
     type ASTType,
     FileScopingConfig,
     generateImportTypes,
-    Ref,
     Optional,
     createType
 } from "@mdeo/language-common";
@@ -15,7 +14,6 @@ import {
     StatementConfig,
     generateStatementTypes
 } from "@mdeo/language-expression";
-import type { AstNode } from "langium";
 
 /**
  * Configuration for the Script language types.

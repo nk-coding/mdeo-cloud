@@ -2,7 +2,7 @@ import type { Kind, TypirSpecifics } from "typir";
 import { CustomValueTypeProvider, type CustomValueType, type CustomValueTypeConstructor } from "./custom-value-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 
-export interface CustomValueFactoryService<_Specifics extends TypirSpecifics> {
+export interface CustomValueFactoryService {
     /**
      * The custom value type constructor
      */
@@ -19,7 +19,7 @@ export interface CustomValueFactoryService<_Specifics extends TypirSpecifics> {
 
 export const CustomValueKindName = "CustomValue";
 
-export class CustomValueKind<Specifics extends TypirSpecifics> implements Kind, CustomValueFactoryService<Specifics> {
+export class CustomValueKind<Specifics extends TypirSpecifics> implements Kind, CustomValueFactoryService {
     readonly $name: string = CustomValueKindName;
 
     readonly CustomValueType: CustomValueTypeConstructor;

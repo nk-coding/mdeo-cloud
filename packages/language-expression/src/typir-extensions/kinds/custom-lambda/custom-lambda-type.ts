@@ -111,11 +111,7 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
             }
         }
 
-        override getLocalPropertyType(): undefined {
-            return undefined;
-        }
-
-        override getLocalMethodType(): undefined {
+        override getLocalMember(): undefined {
             return undefined;
         }
 

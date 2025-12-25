@@ -1,5 +1,3 @@
-import type { RuleOverride } from "@mdeo/language-common";
-
 /**
  * Configuration for expressions
  */

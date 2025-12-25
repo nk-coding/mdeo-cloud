@@ -9,7 +9,7 @@ import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js
  * This service maintains a registry of all class types and provides lookup functionality.
  * Also handles resolution of type references to Typir custom types.
  */
-export interface TypeDefinitionService<_Specifics extends TypirSpecifics = TypirSpecifics> {
+export interface TypeDefinitionService {
     /**
      * Register class types with the service
      *
@@ -65,9 +65,7 @@ export interface TypeDefinitionService<_Specifics extends TypirSpecifics = Typir
 /**
  * Default implementation of the TypeDefinitionService
  */
-export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics>
-    implements TypeDefinitionService<Specifics>
-{
+export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> implements TypeDefinitionService {
     private readonly typeMap = new Map<string, ClassType>();
 
     private lambdaSuperTypes: BaseClassTypeRef[] = [];

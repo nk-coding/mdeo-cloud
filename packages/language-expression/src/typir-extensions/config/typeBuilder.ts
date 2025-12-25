@@ -7,7 +7,8 @@ import type {
     ClassTypeRef,
     GenericTypeRef,
     LambdaType,
-    BaseClassTypeRef
+    BaseClassTypeRef,
+    Member
 } from "./type.js";
 
 /**
@@ -278,8 +279,29 @@ export function method(): MethodBuilder {
 }
 
 /**
- * Builder for creating ClassType definitions with a fluent API.
+ * Type for tracking registered member names in the builder
+ * Use an empty object literal type, not Record<string, never>
+ */
+type MemberNames = object;
+
+/**
+ * Utility type to ensure a string is not already a member
+ * If K is already in T, returns never (causing a type error)
+ * Otherwise returns K
+ */
+type EnsureNotMember<T, K extends string> = K extends keyof T ? never : K;
+
+/**
+ * Type representing the built ClassType with specific member names
+ */
+type TypedClassType<T extends MemberNames> = ClassType & {
+    members: Map<string, Member> & { _memberNames?: T };
+};
+
+/**
+ * Builder for creating ClassType definitions with a fluent API and compile-time member tracking.
  *
+ * @template T The type tracking registered member names
  * @example
  * ```typescript
  * classType('string', 'builtin')
@@ -293,11 +315,10 @@ export function method(): MethodBuilder {
  *   .build()
  * ```
  */
-export class ClassTypeBuilder {
+export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     private name: string;
     private package: string;
-    private properties: Map<string, ValueType> = new Map();
-    private methods: Map<string, FunctionType> = new Map();
+    protected members: Map<string, Member> = new Map();
     private genericNames?: string[];
     private superTypes: BaseClassTypeRef[] = [];
 
@@ -308,27 +329,47 @@ export class ClassTypeBuilder {
 
     /**
      * Add a property to the class.
-     * @param name The property name
+     *
+     * @param name The property name (must not already exist as a member)
      * @param type The property type
+     * @param readonly Whether this property is readonly (defaults to false)
      */
-    property(name: string, type: ValueType): this {
-        this.properties.set(name, type);
-        return this;
+    property<K extends string>(
+        name: EnsureNotMember<T, K>,
+        type: ValueType,
+        readonly: boolean = false
+    ): ClassTypeBuilder<T & Record<K, never>> {
+        this.members.set(name, {
+            name,
+            isProperty: true,
+            readonly,
+            type
+        });
+        return this as unknown as ClassTypeBuilder<T & Record<K, never>>;
     }
 
     /**
      * Add a method to the class.
-     * @param name The method name
+     *
+     * @param name The method name (must not already exist as a member)
      * @param builder A function that configures a MethodBuilder
      */
-    method(name: string, builder: (method: MethodBuilder) => MethodBuilder): this {
+    method<K extends string>(
+        name: EnsureNotMember<T, K>,
+        builder: (method: MethodBuilder) => MethodBuilder
+    ): ClassTypeBuilder<T & Record<K, never>> {
         const methodBuilder = builder(new MethodBuilder());
-        this.methods.set(name, methodBuilder.build());
-        return this;
+        this.members.set(name, {
+            name,
+            isProperty: false,
+            type: methodBuilder.build()
+        });
+        return this as unknown as ClassTypeBuilder<T & Record<K, never>>;
     }
 
     /**
      * Add generic type parameters to the class.
+     *
      * @param names The names of the generic type parameters (e.g., ['T', 'U'])
      */
     generics(...names: string[]): this {
@@ -351,14 +392,53 @@ export class ClassTypeBuilder {
     }
 
     /**
-     * Build the ClassType.
+     * Create a new builder based on this type, keeping only specified members.
+     *
+     * @param memberNames Array of member names to keep
      */
-    build(): ClassType {
+    keepMembers<K extends keyof T & string>(...memberNames: readonly K[]): ClassTypeBuilder<Pick<T, K>> {
+        const builder = new ClassTypeBuilder<Pick<T, K>>(this.name, this.package);
+        builder.genericNames = this.genericNames;
+        builder.superTypes = [...this.superTypes];
+
+        for (const memberName of memberNames) {
+            const member = this.members.get(memberName);
+            if (member) {
+                builder.members.set(memberName, member);
+            }
+        }
+
+        return builder;
+    }
+
+    /**
+     * Create a new builder based on this type, omitting specified members.
+     *
+     * @param memberNames Array of member names to omit
+     */
+    omitMembers<K extends keyof T & string>(...memberNames: readonly K[]): ClassTypeBuilder<Omit<T, K>> {
+        const builder = new ClassTypeBuilder<Omit<T, K>>(this.name, this.package);
+        builder.genericNames = this.genericNames;
+        builder.superTypes = [...this.superTypes];
+
+        const omitSet = new Set(memberNames);
+        for (const [memberName, member] of this.members.entries()) {
+            if (!omitSet.has(memberName as K)) {
+                builder.members.set(memberName, member);
+            }
+        }
+
+        return builder;
+    }
+
+    /**
+     * Build the ClassType with typed members.
+     */
+    build(): TypedClassType<T> {
         const result: ClassType = {
             name: this.name,
             package: this.package,
-            properties: this.properties,
-            methods: this.methods
+            members: this.members
         };
 
         if (this.genericNames && this.genericNames.length > 0) {
@@ -369,15 +449,48 @@ export class ClassTypeBuilder {
             result.superTypes = this.superTypes;
         }
 
-        return result;
+        return result as TypedClassType<T>;
     }
 }
 
 /**
  * Create a new ClassTypeBuilder.
+ *
  * @param name The name of the class type
  * @param pkg The package where the type is defined (defaults to 'builtin')
  */
 export function classType(name: string, pkg: string = "builtin"): ClassTypeBuilder {
     return new ClassTypeBuilder(name, pkg);
+}
+
+/**
+ * Create a new ClassTypeBuilder based on an existing ClassType.
+ * This allows copying a type and then filtering its members.
+ * Note: The type information about member names is lost when copying from a runtime ClassType.
+ * To preserve type safety, use the builder directly or the typed result from .build().
+ *
+ * @param existingType The existing class type to copy from
+ */
+export function classTypeFrom(existingType: ClassType): ClassTypeBuilder<any> {
+    const builder = new ClassTypeBuilder<any>(existingType.name, existingType.package);
+
+    for (const [memberName, member] of existingType.members.entries()) {
+        if (member.isProperty) {
+            (builder as any).members.set(memberName, member);
+        } else {
+            (builder as any).members.set(memberName, member);
+        }
+    }
+
+    if (existingType.generics) {
+        builder.generics(...existingType.generics);
+    }
+
+    if (existingType.superTypes) {
+        for (const superType of existingType.superTypes) {
+            builder.extends(superType.type, superType.typeArgs);
+        }
+    }
+
+    return builder;
 }

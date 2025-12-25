@@ -35,13 +35,13 @@ export interface AdditionalTypirServices<Specifics extends TypirSpecifics> {
         /**
          * Factory for creating and retrieving custom value types
          */
-        readonly CustomValues: CustomValueFactoryService<Specifics>;
+        readonly CustomValues: CustomValueFactoryService;
     };
 
     /**
      * Service for managing and resolving type definitions
      */
-    readonly TypeDefinitions: TypeDefinitionService<Specifics>;
+    readonly TypeDefinitions: TypeDefinitionService;
 
     /**
      * Plugin context providing access to shared dependencies
