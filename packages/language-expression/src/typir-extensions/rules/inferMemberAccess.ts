@@ -1,25 +1,26 @@
 import type { InferenceProblem, TypirSpecifics, Type as TypirType } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
+import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 
 /**
- * Infer the type of a property access expression.
- * Validates that the owner supports property access, handles nullable types,
- * and resolves the property type including inheritance.
+ * Infer the type of a member access expression.
+ * Validates that the owner supports member access, handles nullable types,
+ * and resolves the member type (property or method) including inheritance.
  *
  * @template Specifics Language-specific types extending TypirSpecifics
- * @param languageNode The AST node representing the property access expression
+ * @param languageNode The AST node representing the member access expression
  * @param owner The AST node representing the object being accessed
- * @param name The name of the property being accessed
+ * @param name The name of the member being accessed
  * @param services Extended Typir services for type operations
- * @returns The inferred property type, or an inference problem if inference fails
+ * @returns The inferred member type, or an inference problem if inference fails
  */
-export function inferPropertyAccess<Specifics extends TypirSpecifics>(
+export function inferMemberAccess<Specifics extends TypirSpecifics>(
     languageNode: Specifics["LanguageType"],
     owner: Specifics["LanguageType"],
     name: string,
     services: ExtendedTypirServices<Specifics>
-): InferenceProblem<Specifics> | CustomValueType {
+): InferenceProblem<Specifics> | CustomValueType | CustomFunctionType {
     const { InferenceProblem } = services.context.typir;
     const ownerType = services.Inference.inferType(owner);
     if (!services.factory.CustomClasses.isCustomClassType(ownerType)) {
@@ -34,21 +35,28 @@ export function inferPropertyAccess<Specifics extends TypirSpecifics>(
         return <InferenceProblem<Specifics>>{
             $problem: InferenceProblem,
             languageNode,
-            location: `Type '${ownerType.getName()}' does not support property access.`,
+            location: `Type '${ownerType.getName()}' does not support member access.`,
             subProblems: []
         };
     }
+
     const property = ownerType.getProperty(name);
-    if (property == undefined) {
-        return <InferenceProblem<Specifics>>{
-            $problem: InferenceProblem,
-            languageNode,
-            location: `Property '${name}' does not exist on type '${ownerType.getName()}'.`,
-            subProblems: []
-        };
+    if (property != undefined) {
+        if (ownerType.isNullable) {
+            return property.asNullable;
+        }
+        return property;
     }
-    if (ownerType.isNullable) {
-        return property.asNullable;
+
+    const method = ownerType.getMethod(name);
+    if (method !== undefined) {
+        return method;
     }
-    return property;
+
+    return <InferenceProblem<Specifics>>{
+        $problem: InferenceProblem,
+        languageNode,
+        location: `Member '${name}' does not exist on type '${ownerType.getName()}'.`,
+        subProblems: []
+    };
 }

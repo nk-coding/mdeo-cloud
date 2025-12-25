@@ -10,8 +10,8 @@ export class FileScopingConfig<T extends AstNode> {
     /**
      * Creates a new FileScopingConfig.
      *
-     * @param prefix - Prefix for naming generated rules and types.
-     * @param type - The element type handled by this scoping config.
+     * @param prefix Prefix for naming generated rules and types.
+     * @param type The element type handled by this scoping config.
      */
     constructor(
         readonly prefix: string,

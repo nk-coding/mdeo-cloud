@@ -41,12 +41,16 @@ export function groupIfNeeded(elements: RuleEntry[]): AbstractElement {
  * @param element The terminal or parser rule to call
  * @returns An abstract element representing the rule call
  */
-export function createRuleCall(element: TerminalRule<any> | ParserRule<any>): AbstractElement {
+export function createRuleCall(
+    element: TerminalRule<any> | ParserRule<any> | (() => ParserRule<any>)
+): AbstractElement {
     return {
         $type: "RuleCall",
         rule: () => {
             if (isTerminalRule(element)) {
                 return element;
+            } else if (typeof element === "function") {
+                return element().toRule();
             } else {
                 return element.toRule();
             }
@@ -68,7 +72,7 @@ export function simplifyEntry(entry: RuleEntry): AbstractElement {
             $type: "Keyword",
             value: entry
         };
-    } else if (isTerminalRule(entry) || isParserRule(entry)) {
+    } else if (isTerminalRule(entry) || isParserRule(entry) || typeof entry === "function") {
         return createRuleCall(entry);
     }
     return entry;
@@ -96,7 +100,7 @@ export function simplifyEntries(elements: RuleEntry[]): AbstractElement[] {
 export function createAssignment(
     key: string,
     operator: GrammarAST.Assignment["operator"],
-    terminal: [TerminalRule<any> | ParserRule<any> | CrossRef<any>] | string[]
+    terminal: [TerminalRule<any> | ParserRule<any> | (() => ParserRule<any>) | CrossRef<any>] | string[]
 ): SerializableGrammarNode<GrammarAST.Assignment> {
     let terminalEntry: AbstractElement;
     if (terminal.length !== 1) {

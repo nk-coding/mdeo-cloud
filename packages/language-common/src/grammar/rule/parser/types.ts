@@ -23,7 +23,13 @@ export type AbstractElement =
  * Union type representing all possible entries that can be used when defining
  * a parser rule. These are converted to AbstractElements during rule compilation.
  */
-export type RuleEntry = AbstractElement | string | TerminalRule<any> | ParserRule<any> | CrossRef<any>;
+export type RuleEntry =
+    | AbstractElement
+    | string
+    | TerminalRule<any>
+    | ParserRule<any>
+    | (() => ParserRule<any>)
+    | CrossRef<any>;
 
 /**
  * Represents a cross-reference to another AST node type in the grammar.
@@ -108,7 +114,9 @@ export interface RuleContext<T extends AstNode> {
         key: K & string,
         ...value:
             | [TerminalRule<T[K]>]
-            | (NonNullable<T[K]> extends AstNode ? [ParserRule<NonNullable<T[K]>>] : never)
+            | (NonNullable<T[K]> extends AstNode
+                  ? [ParserRule<NonNullable<T[K]>> | (() => ParserRule<NonNullable<T[K]>>)]
+                  : never)
             | (NonNullable<T[K]> extends Reference<infer U extends AstNode> ? [CrossRef<U>] : never)
             | (NonNullable<T[K]> extends string ? T[K][] : never)
     ): AbstractElement;
@@ -134,7 +142,7 @@ export interface RuleContext<T extends AstNode> {
         key: K & string,
         ...value:
             | (T[K] extends (infer U)[] ? [TerminalRule<U>] : never)
-            | (T[K] extends (infer U extends AstNode)[] ? [ParserRule<U>] : never)
+            | (T[K] extends (infer U extends AstNode)[] ? [ParserRule<U> | (() => ParserRule<U>)] : never)
             | (T[K] extends Reference<infer U extends AstNode>[] ? [CrossRef<U>] : never)
             | (T[K] extends string[] ? T[K] : never)
     ): AbstractElement;

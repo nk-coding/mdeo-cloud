@@ -8,7 +8,7 @@ import { monacoApiProviderKey } from "./plugins/monacoPlugin";
 import { BrowserBackendApi } from "./data/api/browserBackendApi";
 import { WorkbenchState } from "./data/workbenchState";
 import Workbench from "./components/workbench/Workbench.vue";
-import { examplePlugin } from "./testing/examplePlugin";
+import { examplePlugin, examplePlugin2 } from "./testing/examplePlugin";
 import { useColorMode } from "@vueuse/core";
 
 const monaco = inject(monacoApiProviderKey)!;
@@ -22,6 +22,7 @@ onMounted(async () => {
     const backendApi = new BrowserBackendApi();
     workspaceState.value = new WorkbenchState(monacoApi, backendApi);
     workspaceState.value.plugins.value.set(examplePlugin.id, examplePlugin);
+    workspaceState.value.plugins.value.set(examplePlugin2.id, examplePlugin2);
 
     const path = window.location.pathname;
     if (path !== "/") {

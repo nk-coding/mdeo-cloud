@@ -31,7 +31,21 @@ export const STRING = createTerminal("STRING")
 /**
  * Whitespace token
  */
-export const WS = createTerminal("WS").hidden().as(/\s+/);
+export const WS = createTerminal("WS")
+    .hidden()
+    .as(/[^\S\n]+/);
+
+/**
+ * Newline token which not hidden
+ */
+export const NEWLINE = createTerminal("NEWLINE").as(/(\r\n|\r|\n)/);
+
+/**
+ * Newline token which is hidden
+ */
+export const HIDDEN_NEWLINE = createTerminal("SKIPPED_NEWLINE")
+    .hidden()
+    .as(/(\r\n|\r|\n)/);
 
 /**
  * Multi-line comment token
