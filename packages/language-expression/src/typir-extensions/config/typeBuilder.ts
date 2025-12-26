@@ -12,34 +12,23 @@ import type {
 } from "./type.js";
 
 /**
- * Builder for creating ValueType references with a fluent API.
- * Supports creating class type references, generic type references, and lambda types.
+ * Builder for creating ClassType references with a fluent API.
  *
  * @example
  * ```typescript
  * // Simple type reference
  * typeRef('string').nullable().build()
  *
- * // Generic type reference
- * typeRef().generic('T').build()
- *
- * // Lambda type
- * typeRef().lambda()
- *   .param('x', typeRef('number').build())
- *   .returns(typeRef('number').build())
- *   .build()
+ * // Type reference with type arguments
+ * typeRef('Collection').withTypeArgs(new Map([['T', genericTypeRef('T')]])).build()
  * ```
  */
 export class ValueTypeBuilder {
-    private type?: string;
+    private type: string;
     private isNullable: boolean = false;
-    private genericName?: string;
     private typeArgs?: Map<string, ValueType>;
-    private isLambda: boolean = false;
-    private parameters: Parameter[] = [];
-    private returnType?: ValueType;
 
-    constructor(type?: string) {
+    constructor(type: string) {
         this.type = type;
     }
 
@@ -48,15 +37,6 @@ export class ValueTypeBuilder {
      */
     nullable(): this {
         this.isNullable = true;
-        return this;
-    }
-
-    /**
-     * Set this as a generic type reference.
-     * @param name The name of the generic type parameter (e.g., 'T')
-     */
-    generic(name: string): this {
-        this.genericName = name;
         return this;
     }
 
@@ -70,63 +50,9 @@ export class ValueTypeBuilder {
     }
 
     /**
-     * Start building a lambda type.
+     * Build the ClassTypeRef.
      */
-    lambda(): this {
-        this.isLambda = true;
-        this.parameters = [];
-        return this;
-    }
-
-    /**
-     * Add a parameter to a lambda type.
-     * @param name The parameter name
-     * @param type The parameter type
-     */
-    param(name: string, type: ValueType): this {
-        this.parameters.push({ name, type });
-        return this;
-    }
-
-    /**
-     * Set the return type for a lambda type.
-     * @param type The return type
-     */
-    returns(type: ValueType): this {
-        this.returnType = type;
-        return this;
-    }
-
-    /**
-     * Build the ValueType.
-     */
-    build(): ValueType {
-        if (this.genericName) {
-            const result: GenericTypeRef = {
-                generic: this.genericName
-            };
-            if (this.isNullable) {
-                result.isNullable = true;
-            }
-            return result;
-        }
-
-        if (this.isLambda) {
-            if (!this.returnType) {
-                throw new Error("Lambda type must have a return type");
-            }
-            const result: LambdaType = {
-                parameters: this.parameters,
-                returnType: this.returnType,
-                isNullable: this.isNullable
-            };
-            return result;
-        }
-
-        if (!this.type) {
-            throw new Error("Type reference must have a type or be a generic");
-        }
-
+    build(): ClassTypeRef {
         const result: ClassTypeRef = {
             type: this.type,
             isNullable: this.isNullable
@@ -139,11 +65,80 @@ export class ValueTypeBuilder {
 }
 
 /**
- * Create a new ValueTypeBuilder.
- * @param type The type identifier (e.g., 'string', 'number')
+ * Create a new ValueTypeBuilder for a class type reference.
+ * @param type The type identifier (e.g., 'string', 'number', 'Collection')
  */
-export function typeRef(type?: string): ValueTypeBuilder {
+export function typeRef(type: string): ValueTypeBuilder {
     return new ValueTypeBuilder(type);
+}
+
+/**
+ * Create a generic type reference.
+ * @param name The name of the generic type parameter (e.g., 'T', 'U')
+ * @param nullable Whether the generic type is nullable (defaults to false)
+ */
+export function genericTypeRef(name: string, nullable: boolean = false): GenericTypeRef {
+    const result: GenericTypeRef = {
+        generic: name
+    };
+    if (nullable) {
+        result.isNullable = true;
+    }
+    return result;
+}
+
+/**
+ * Builder for creating lambda types with a fluent API.
+ *
+ * @example
+ * ```typescript
+ * lambdaType()
+ *   .param('x', typeRef('number').build())
+ *   .param('y', typeRef('number').build())
+ *   .returns(typeRef('number').build())
+ * ```
+ */
+export class LambdaTypeBuilder {
+    private parameters: Parameter[] = [];
+    private isNullable: boolean = false;
+
+    /**
+     * Add a parameter to the lambda type.
+     * @param name The parameter name
+     * @param type The parameter type
+     */
+    param(name: string, type: ValueType): this {
+        this.parameters.push({ name, type });
+        return this;
+    }
+
+    /**
+     * Mark this lambda type as nullable.
+     */
+    nullable(): this {
+        this.isNullable = true;
+        return this;
+    }
+
+    /**
+     * Set the return type and build the lambda type.
+     * @param type The return type
+     */
+    returns(type: ValueType): LambdaType {
+        const result: LambdaType = {
+            parameters: this.parameters,
+            returnType: type,
+            isNullable: this.isNullable
+        };
+        return result;
+    }
+}
+
+/**
+ * Create a new LambdaTypeBuilder.
+ */
+export function lambdaType(): LambdaTypeBuilder {
+    return new LambdaTypeBuilder();
 }
 
 /**

@@ -446,7 +446,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      */
     private readonly callResolvedGenericArgumentStates = new Map<string, TypeResolutionState>();
 
-    private readonly typeDefinitionsService: TypeDefinitionService<Specifics>;
+    private readonly typeDefinitionsService: TypeDefinitionService;
     private readonly assignabilityService: TypeAssignability;
     private readonly equalityService: TypeEquality;
 
