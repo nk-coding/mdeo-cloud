@@ -1,5 +1,8 @@
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in string type exported as `stringType`.
+ */
 export const stringType = classType("string", "builtin")
     .extends("Any")
     .method("characterAt", (m) =>

@@ -1,5 +1,8 @@
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in float type exported as `floatType`.
+ */
 export const floatType = classType("float", "builtin")
     .extends("Any")
     .method("abs", (m) => m.signature((s) => s.returns(typeRef("float").build())))

@@ -1,5 +1,8 @@
 import { classType, typeRef, lambdaType, genericTypeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in generic ReadonlyCollection type exported as `ReadonlyCollectionType`.
+ */
 export const ReadonlyCollectionType = classType("ReadonlyCollection", "builtin")
     .generics("T")
     .extends("Any")

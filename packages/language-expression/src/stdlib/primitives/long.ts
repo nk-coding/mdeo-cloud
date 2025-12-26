@@ -1,5 +1,8 @@
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in long type exported as `longType`.
+ */
 export const longType = classType("long", "builtin")
     .extends("Any")
     .method("abs", (m) => m.signature((s) => s.returns(typeRef("long").build())))

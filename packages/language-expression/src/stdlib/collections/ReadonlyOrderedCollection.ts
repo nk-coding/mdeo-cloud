@@ -1,5 +1,8 @@
 import { classType, typeRef, genericTypeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in generic ReadonlyOrderedCollection type exported as `ReadonlyOrderedCollectionType`.
+ */
 export const ReadonlyOrderedCollectionType = classType("ReadonlyOrderedCollection", "builtin")
     .generics("T")
     .extends("ReadonlyCollection", new Map([["T", genericTypeRef("T")]]))

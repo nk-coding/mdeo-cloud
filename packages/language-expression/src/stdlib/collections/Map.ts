@@ -1,5 +1,8 @@
 import { classType, typeRef, genericTypeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in generic Map type exported as `MapType`.
+ */
 export const MapType = classType("Map", "builtin")
     .generics("K", "V")
     .extends(

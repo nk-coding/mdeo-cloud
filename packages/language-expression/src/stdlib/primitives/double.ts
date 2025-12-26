@@ -1,5 +1,8 @@
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in double type exported as `doubleType`.
+ */
 export const doubleType = classType("double", "builtin")
     .extends("Any")
     .method("abs", (m) => m.signature((s) => s.returns(typeRef("double").build())))

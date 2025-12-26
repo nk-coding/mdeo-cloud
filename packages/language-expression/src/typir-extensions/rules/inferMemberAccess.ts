@@ -52,14 +52,10 @@ export function inferMemberAccess<Specifics extends TypirSpecifics>(
     }
 
     if (member.isProperty) {
-        const resolvedType = services.TypeDefinitions.resolveCustomClassOrLambdaType(
+        return services.TypeDefinitions.resolveCustomClassOrLambdaType(
             member.type as ValueType,
             ownerType.details.typeArgs as Map<string, CustomValueType>
         );
-        if (ownerType.isNullable) {
-            return resolvedType.asNullable;
-        }
-        return resolvedType;
     } else {
         return services.TypeDefinitions.resolveCustomFunctionType(
             member.type as FunctionType,

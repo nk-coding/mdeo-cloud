@@ -1,5 +1,8 @@
 import { classType, typeRef, genericTypeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in generic ReadonlyMap type exported as `ReadonlyMapType`.
+ */
 export const ReadonlyMapType = classType("ReadonlyMap", "builtin")
     .generics("K", "V")
     .extends("Any")

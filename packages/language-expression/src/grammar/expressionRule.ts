@@ -4,10 +4,8 @@ import {
     createInfixRule,
     createRule,
     createTerminal,
-    FLOAT,
     group,
     ID,
-    INT,
     LeadingTrailing,
     manySep,
     optional,
@@ -18,6 +16,41 @@ import {
 import type { ExpressionConfig } from "./expressionConfig.js";
 import type { BaseExpressionType, ExpressionTypes } from "./expressionTypes.js";
 import type { BaseTypeType } from "./typeTypes.js";
+
+/**
+ * Integer token (32-bit) - returns string to preserve precision
+ */
+const INT_LITERAL = createTerminal("INT_LITERAL")
+    .returns(String)
+    .as(/[0-9]+/);
+
+/**
+ * Long token (64-bit integer, suffixed with L or l) - returns string to preserve precision
+ */
+const LONG_LITERAL = createTerminal("LONG_LITERAL")
+    .returns(String)
+    .as(/[0-9]+[Ll]/);
+
+/**
+ * Float token (32-bit floating point, suffixed with F or f) - returns string to preserve precision
+ */
+const FLOAT_LITERAL = createTerminal("FLOAT_LITERAL")
+    .returns(String)
+    .as(/[0-9]+\.[0-9]+[Ff]/);
+
+/**
+ * Double token (64-bit floating point, optionally suffixed with D or d) - returns string to preserve precision
+ */
+const DOUBLE_LITERAL = createTerminal("DOUBLE_LITERAL")
+    .returns(String)
+    .as(/[0-9]+\.[0-9]+[Dd]?/);
+
+/**
+ * Boolean token
+ */
+const BOOLEAN = createTerminal("BOOLEAN")
+    .returns(Boolean)
+    .as(/true|false/);
 
 /**
  * Generates expression-related parser rules based on the provided configuration.
@@ -44,13 +77,21 @@ export function generateExpressionRules(
         .returns(types.stringLiteralExpressionType)
         .as(({ set }) => [set("value", STRING)]);
 
-    const numberLiteralExpressionRule = createRule(config.numberLiteralExpressionRuleName)
-        .returns(types.numberLiteralExpressionType)
-        .as(({ set }) => [or(set("value", INT), set("value", FLOAT))]);
+    const intLiteralExpressionRule = createRule(config.intLiteralExpressionRuleName)
+        .returns(types.intLiteralExpressionType)
+        .as(({ set }) => [set("value", INT_LITERAL)]);
 
-    const BOOLEAN = createTerminal("BOOLEAN")
-        .returns(Boolean)
-        .as(/true|false/);
+    const longLiteralExpressionRule = createRule(config.longLiteralExpressionRuleName)
+        .returns(types.longLiteralExpressionType)
+        .as(({ set }) => [set("value", LONG_LITERAL)]);
+
+    const floatLiteralExpressionRule = createRule(config.floatLiteralExpressionRuleName)
+        .returns(types.floatLiteralExpressionType)
+        .as(({ set }) => [set("value", FLOAT_LITERAL)]);
+
+    const doubleLiteralExpressionRule = createRule(config.doubleLiteralExpressionRuleName)
+        .returns(types.doubleLiteralExpressionType)
+        .as(({ set }) => [set("value", DOUBLE_LITERAL)]);
 
     const booleanLiteralExpressionRule = createRule(config.booleanLiteralExpressionRuleName)
         .returns(types.booleanLiteralExpressionType)
@@ -65,7 +106,10 @@ export function generateExpressionRules(
         .as(() => [
             or(
                 stringLiteralExpressionRule,
-                numberLiteralExpressionRule,
+                intLiteralExpressionRule,
+                longLiteralExpressionRule,
+                floatLiteralExpressionRule,
+                doubleLiteralExpressionRule,
                 booleanLiteralExpressionRule,
                 identifierExpressionRule,
                 group("(", () => expressionRule, ")"),
@@ -78,9 +122,9 @@ export function generateExpressionRules(
         .as(() => [
             or(
                 primaryExpressionRule,
-                action(types.memberAccessExpressionType, ({ set }) => [
+                action(types.memberAccessExpressionType, ({ set, flag }) => [
                     set("expression", primaryExpressionRule),
-                    ".",
+                    or(flag("isNullChaining", "?."), "."),
                     set("member", ID)
                 ])
             )

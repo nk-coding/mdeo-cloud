@@ -1,5 +1,8 @@
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in int type exported as `intType`.
+ */
 export const intType = classType("int", "builtin")
     .extends("Any")
     .method("abs", (m) => m.signature((s) => s.returns(typeRef("int").build())))

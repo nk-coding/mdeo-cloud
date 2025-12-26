@@ -53,7 +53,8 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         .extends(baseExpressionType)
         .attrs({
             expression: baseExpressionType,
-            member: String
+            member: String,
+            isNullChaining: Boolean
         });
 
     const identifierExpressionType = createInterface(config.identifierExpressionTypeName)
@@ -68,10 +69,28 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
             value: String
         });
 
-    const numberLiteralExpressionType = createInterface(config.numberLiteralExpressionTypeName)
+    const intLiteralExpressionType = createInterface(config.intLiteralExpressionTypeName)
         .extends(baseExpressionType)
         .attrs({
-            value: Number
+            value: String
+        });
+
+    const longLiteralExpressionType = createInterface(config.longLiteralExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            value: String
+        });
+
+    const floatLiteralExpressionType = createInterface(config.floatLiteralExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            value: String
+        });
+
+    const doubleLiteralExpressionType = createInterface(config.doubleLiteralExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            value: String
         });
 
     const booleanLiteralExpressionType = createInterface(config.booleanLiteralExpressionTypeName)
@@ -90,7 +109,10 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         memberAccessExpressionType,
         identifierExpressionType,
         stringLiteralExpressionType,
-        numberLiteralExpressionType,
+        intLiteralExpressionType,
+        longLiteralExpressionType,
+        floatLiteralExpressionType,
+        doubleLiteralExpressionType,
         booleanLiteralExpressionType,
         baseTypeType,
         classTypeType,
@@ -107,3 +129,13 @@ export type ExpressionTypes = ReturnType<typeof generateExpressionTypes>;
  * Type representing the base expression type.
  */
 export type BaseExpressionType = ASTType<ExpressionTypes["baseExpressionType"]>;
+
+/**
+ * Type representing the member access expression
+ */
+export type MemberAccessExpressionType = ASTType<ExpressionTypes["memberAccessExpressionType"]>;
+
+/**
+ * Type representing the call expression
+ */
+export type CallExpressionType = ASTType<ExpressionTypes["callExpressionType"]>;

@@ -93,14 +93,44 @@ export class ExpressionConfig {
     readonly stringLiteralExpressionRuleName: string;
 
     /**
-     * The name for the NumberLiteralExpression type.
+     * The name for the IntLiteralExpression type.
      */
-    readonly numberLiteralExpressionTypeName: string;
+    readonly intLiteralExpressionTypeName: string;
 
     /**
-     * The name for the NumberLiteralExpression rule.
+     * The name for the IntLiteralExpression rule.
      */
-    readonly numberLiteralExpressionRuleName: string;
+    readonly intLiteralExpressionRuleName: string;
+
+    /**
+     * The name for the LongLiteralExpression type.
+     */
+    readonly longLiteralExpressionTypeName: string;
+
+    /**
+     * The name for the LongLiteralExpression rule.
+     */
+    readonly longLiteralExpressionRuleName: string;
+
+    /**
+     * The name for the FloatLiteralExpression type.
+     */
+    readonly floatLiteralExpressionTypeName: string;
+
+    /**
+     * The name for the FloatLiteralExpression rule.
+     */
+    readonly floatLiteralExpressionRuleName: string;
+
+    /**
+     * The name for the DoubleLiteralExpression type.
+     */
+    readonly doubleLiteralExpressionTypeName: string;
+
+    /**
+     * The name for the DoubleLiteralExpression rule.
+     */
+    readonly doubleLiteralExpressionRuleName: string;
 
     /**
      * The name for the BooleanLiteralExpression type.
@@ -150,8 +180,14 @@ export class ExpressionConfig {
         this.identifierExpressionRuleName = prefix + "IdentifierExpressionRule";
         this.stringLiteralExpressionTypeName = prefix + "StringLiteralExpression";
         this.stringLiteralExpressionRuleName = prefix + "StringLiteralExpressionRule";
-        this.numberLiteralExpressionTypeName = prefix + "NumberLiteralExpression";
-        this.numberLiteralExpressionRuleName = prefix + "NumberLiteralExpressionRule";
+        this.intLiteralExpressionTypeName = prefix + "IntLiteralExpression";
+        this.intLiteralExpressionRuleName = prefix + "IntLiteralExpressionRule";
+        this.longLiteralExpressionTypeName = prefix + "LongLiteralExpression";
+        this.longLiteralExpressionRuleName = prefix + "LongLiteralExpressionRule";
+        this.floatLiteralExpressionTypeName = prefix + "FloatLiteralExpression";
+        this.floatLiteralExpressionRuleName = prefix + "FloatLiteralExpressionRule";
+        this.doubleLiteralExpressionTypeName = prefix + "DoubleLiteralExpression";
+        this.doubleLiteralExpressionRuleName = prefix + "DoubleLiteralExpressionRule";
         this.booleanLiteralExpressionTypeName = prefix + "BooleanLiteralExpression";
         this.booleanLiteralExpressionRuleName = prefix + "BooleanLiteralExpressionRule";
         this.bracketedExpressionTypeName = prefix + "BracketedExpression";

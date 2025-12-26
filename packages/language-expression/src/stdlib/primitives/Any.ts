@@ -1,5 +1,8 @@
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
+/**
+ * The built-in Any type exported as `AnyType`.
+ */
 export const AnyType = classType("Any", "builtin")
     .method("asBag", (m) =>
         m.signature((s) =>
