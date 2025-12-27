@@ -1,4 +1,5 @@
 import type { InferenceProblem, Type, TypeAssignability, TypeEquality, TypirProblem, TypirSpecifics } from "typir";
+import { isSubTypeEdge, isConversionEdge } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import type { CustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
@@ -10,7 +11,6 @@ import type { TypeDefinitionService } from "../service/type-definition-service.j
 import { findCommonParentType, findSuperTypeWithTypeArgs } from "./commonParentType.js";
 import { getClassTypeIdentifier } from "./util.js";
 import { assertUnreachable } from "@mdeo/language-common";
-
 
 /**
  * Result of validating a function signature against provided arguments.
@@ -30,6 +30,10 @@ interface FunctionSignatureValidationResult<TProblem> {
      * The resolved return type, if it could be determined
      */
     returnType: CustomValueType | CustomVoidType | undefined;
+    /**
+     * The generic resolver used for this signature, needed for score calculation
+     */
+    genericResolver: GenericResolver<any>;
 }
 
 /**
@@ -210,8 +214,61 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             errors,
             returnType: genericResolver.isFullyDefined(signature.returnType)
                 ? genericResolver.resolveType(signature.returnType)
-                : undefined
+                : undefined,
+            genericResolver
         };
+    }
+
+    /**
+     * Calculates a score for how well the arguments match the signature.
+     * Lower scores are better matches.
+     * - Exact type matches have cost 0
+     * - Subtype relationships have cost 1 per edge
+     * - Conversions have cost 2 per edge
+     *
+     * @param args The inferred types of the arguments
+     * @param signature The signature being validated
+     * @param genericResolver The generic type resolver
+     * @returns The total cost/score for this signature match
+     */
+    private calculateSignatureScore(
+        args: (Type | InferenceProblem<Specifics>[])[],
+        signature: FunctionSignature,
+        genericResolver: GenericResolver<Specifics>
+    ): number {
+        let totalScore = 0;
+
+        for (let i = 0; i < args.length; i++) {
+            const argType = args[i];
+            if (Array.isArray(argType) || !this.services.factory.CustomValues.isCustomValueType(argType)) {
+                continue;
+            }
+
+            if (i >= signature.parameters.length) {
+                if (signature.isVarArgs !== true) {
+                    continue;
+                }
+            }
+
+            const paramIndex = Math.min(i, signature.parameters.length - 1);
+            const paramType = signature.parameters[paramIndex]!.type;
+            const declaredType = genericResolver.resolveType(paramType);
+
+            const assignabilityResult = this.services.Assignability.getAssignabilityResult(argType, declaredType);
+            if (assignabilityResult.result) {
+                for (const edge of assignabilityResult.path) {
+                    if (isSubTypeEdge(edge)) {
+                        totalScore += 1;
+                    } else if (isConversionEdge(edge)) {
+                        totalScore += 2;
+                    } else {
+                        assertUnreachable(edge);
+                    }
+                }
+            }
+        }
+
+        return totalScore;
     }
 
     /**
@@ -275,52 +332,86 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
     private processFunctionSignatureResults(
         signatureValidationResults: FunctionSignatureValidationResult<TProblem>[]
     ): void {
-        signatureValidationResults.sort((a, b) => a.errors.length - b.errors.length);
-
         const validResults = signatureValidationResults.filter((result) => result.errors.length === 0);
+
+        if (validResults.length === 0) {
+            this.handleNoValidSignatures(signatureValidationResults);
+            return;
+        }
 
         if (validResults.length === 1) {
             this.inferredReturnType = validResults[0]!.returnType;
             return;
         }
 
+        this.handleMultipleValidSignatures(validResults);
+    }
+
+    /**
+     * Handles the case when there are no valid signatures.
+     * Finds the best matching signatures (with fewest errors) and reports errors.
+     *
+     * @param signatureValidationResults All signature validation results
+     */
+    private handleNoValidSignatures(signatureValidationResults: FunctionSignatureValidationResult<TProblem>[]): void {
+        signatureValidationResults.sort((a, b) => a.errors.length - b.errors.length);
+
         const bestResults = signatureValidationResults.filter(
             (result) => result.errors.length === signatureValidationResults[0]!.errors.length
         );
 
-        this.reportSignatureMatchingErrors(validResults, bestResults);
-
-        this.tryInferReturnTypeFromBestResults(bestResults);
-    }
-
-    /**
-     * Reports errors when no valid signature or multiple valid signatures are found.
-     *
-     * @param validResults All signatures without errors
-     * @param bestResults Signatures with the fewest errors
-     */
-    private reportSignatureMatchingErrors(
-        validResults: FunctionSignatureValidationResult<TProblem>[],
-        bestResults: FunctionSignatureValidationResult<TProblem>[]
-    ): void {
         const subErrors: TypirProblem[] = [];
         for (const result of bestResults) {
             subErrors.push(...(result.errors as TypirProblem[]));
         }
 
-        if (validResults.length === 0) {
-            this.errors.push(
-                this.createError(this.languageNode, `No valid signature found for function call.`, subErrors)
-            );
-        } else {
-            this.errors.push(
-                this.createError(
-                    this.languageNode,
-                    `Ambiguous function call: multiple valid signatures found.`,
-                    subErrors
-                )
-            );
+        this.errors.push(this.createError(this.languageNode, `No valid signature found for function call.`, subErrors));
+
+        this.tryInferReturnTypeFromBestResults(bestResults);
+    }
+
+    /**
+     * Handles the case when there are multiple valid signatures.
+     * Uses scoring to find the best match(es).
+     *
+     * @param validResults All valid signature results
+     */
+    private handleMultipleValidSignatures(validResults: FunctionSignatureValidationResult<TProblem>[]): void {
+        const args = this.argumentNodes.map((argNode) => this.services.Inference.inferType(argNode));
+
+        const resultsWithScores = validResults.map((result) => ({
+            result,
+            score: this.calculateSignatureScore(args, result.signature, result.genericResolver)
+        }));
+
+        resultsWithScores.sort((a, b) => a.score - b.score);
+
+        const bestScore = resultsWithScores[0]!.score;
+        const bestScoringResults = resultsWithScores
+            .filter((item) => item.score === bestScore)
+            .map((item) => item.result);
+
+        if (bestScoringResults.length === 1) {
+            this.inferredReturnType = bestScoringResults[0]!.returnType;
+            return;
         }
+
+        this.reportAmbiguousSignatures(bestScoringResults);
+        this.tryInferReturnTypeFromBestResults(bestScoringResults);
+    }
+
+    /**
+     * Reports an error for ambiguous function calls with multiple best-matching signatures.
+     *
+     * @param bestScoringResults The best scoring signature results
+     */
+    private reportAmbiguousSignatures(bestScoringResults: FunctionSignatureValidationResult<TProblem>[]): void {
+        this.errors.push(
+            this.createError(
+                this.languageNode,
+                `Ambiguous function call: multiple valid signatures found with equal scores.`
+            )
+        );
     }
 
     /**
@@ -532,7 +623,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             }
             return true;
         } else {
-            assertUnreachable(type)
+            assertUnreachable(type);
         }
     }
 
@@ -664,7 +755,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         // Handle void return type
         const declaredReturnType = declaredType.returnType;
         const actualReturnType = actualType.details.returnType;
-        
+
         let returnTypeValid: boolean;
         if (VoidType.is(declaredReturnType)) {
             // Declared type is void - actual type must also be void
