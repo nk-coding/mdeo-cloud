@@ -7,6 +7,7 @@ import {
     ExpressionTypeSystem,
     floatType,
     intType,
+    IterableType,
     ListType,
     longType,
     OrderedCollectionType,
@@ -23,6 +24,7 @@ import {
 } from "@mdeo/language-expression";
 import type { ScriptTypirSpecifics } from "../plugin.js";
 import { expressionTypes } from "../grammar/types.js";
+import type { TypirLangiumServices } from "typir-langium";
 
 export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics> {
     constructor() {
@@ -35,7 +37,7 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
                 double: doubleType,
                 string: stringType,
                 boolean: booleanType,
-                void: voidType,
+                Iterable: IterableType,
                 additionalTypes: [
                     CollectionType,
                     ReadonlyCollectionType,

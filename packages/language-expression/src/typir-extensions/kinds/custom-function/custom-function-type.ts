@@ -1,8 +1,10 @@
 import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProblem } from "typir";
 import type { CustomFunctionDetails, CustomFunctionKind } from "./custom-function-kind.js";
-import type { FunctionSignature } from "../../config/type.js";
+import type { FunctionSignature, ReturnType } from "../../config/type.js";
+import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../../config/type.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
 import type { Provider } from "../../service/extendedTypirServices.js";
+import { assertUnreachable } from "@mdeo/language-common";
 
 /**
  * Constructor interface for custom function types.
@@ -135,22 +137,24 @@ function buildFunctionSignatureName(
 
 /**
  * Resolve a value type definition to a string representation.
- * Handles generic types, class types, and lambda types.
+ * Handles generic types, class types, lambda types, and void types.
  *
  * @param type The value type definition to resolve
  * @param typeArgs Map of generic type arguments
  * @param isIdentifier Whether to build a full identifier or just a name
  * @returns The string representation of the type
  */
-function resolveTypeFromDefinition(type: any, typeArgs: Map<string, CustomValueType>, isIdentifier: boolean): string {
-    if ("generic" in type) {
+function resolveTypeFromDefinition(type: ReturnType, typeArgs: Map<string, CustomValueType>, isIdentifier: boolean): string {
+    if (VoidType.is(type)) {
+        return "void";
+    } else if (GenericTypeRef.is(type)) {
         const resolvedGeneric = typeArgs.get(type.generic);
         if (resolvedGeneric) {
             return isIdentifier ? resolvedGeneric.getIdentifier() : resolvedGeneric.getName();
         }
         return type.generic;
-    } else if ("type" in type) {
-        const baseType = isIdentifier ? `${type.type.package}.${type.type.name}` : type.type.name;
+    } else if (ClassTypeRef.is(type)) {
+        const baseType = type.type;
 
         if (type.typeArgs && type.typeArgs.size > 0) {
             const typeArgsStr = Array.from(type.typeArgs.values())
@@ -160,14 +164,14 @@ function resolveTypeFromDefinition(type: any, typeArgs: Map<string, CustomValueT
         }
 
         return `${baseType}${type.isNullable ? "?" : ""}`;
-    } else if ("parameters" in type) {
+    } else if (LambdaType.is(type)) {
         const params = type.parameters.map((param: any) =>
             resolveTypeFromDefinition(param.type, typeArgs, isIdentifier)
         );
         const returnType = resolveTypeFromDefinition(type.returnType, typeArgs, isIdentifier);
         const lambdaStr = `(${params.join(",")}) => ${returnType}`;
         return type.isNullable ? `(${lambdaStr})?` : lambdaStr;
+    } else {
+        assertUnreachable(type)
     }
-
-    return "unknown";
 }

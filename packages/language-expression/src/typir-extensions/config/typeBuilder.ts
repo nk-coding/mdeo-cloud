@@ -8,7 +8,9 @@ import type {
     GenericTypeRef,
     LambdaType,
     BaseClassTypeRef,
-    Member
+    Member,
+    VoidType,
+    ReturnType
 } from "./type.js";
 
 /**
@@ -88,6 +90,13 @@ export function genericTypeRef(name: string, nullable: boolean = false): Generic
 }
 
 /**
+ * Create a void type.
+ */
+export function voidType(): VoidType {
+    return { kind: "void" };
+}
+
+/**
  * Builder for creating lambda types with a fluent API.
  *
  * @example
@@ -155,7 +164,7 @@ export function lambdaType(): LambdaTypeBuilder {
  */
 export class SignatureBuilder {
     private parameters: Parameter[] = [];
-    private returnType?: ValueType;
+    private returnType?: ReturnType;
     private genericNames?: string[];
     private isVarArgs: boolean = false;
 
@@ -173,7 +182,7 @@ export class SignatureBuilder {
      * Set the return type for the signature.
      * @param type The return type
      */
-    returns(type: ValueType): this {
+    returns(type: ReturnType): this {
         this.returnType = type;
         return this;
     }
@@ -313,7 +322,7 @@ type TypedClassType<T extends MemberNames> = ClassType & {
 export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     private name: string;
     private package: string;
-    protected members: Map<string, Member> = new Map();
+    members: Map<string, Member> = new Map();
     private genericNames?: string[];
     private superTypes: BaseClassTypeRef[] = [];
 
@@ -471,7 +480,7 @@ export function classTypeFrom(existingType: ClassType): ClassTypeBuilder<any> {
 
     for (const [memberName, member] of existingType.members.entries()) {
         if (member.isProperty) {
-            (builder as any).members.set(memberName, member);
+            builder.members.set(memberName, member);
         } else {
             (builder as any).members.set(memberName, member);
         }

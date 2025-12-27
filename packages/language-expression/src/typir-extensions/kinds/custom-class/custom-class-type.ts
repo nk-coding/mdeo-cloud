@@ -52,7 +52,7 @@ export const CustomClassTypeProvider: Provider<CustomClassTypeConstructor> = (se
         constructor(kind: CustomClassKind<TypirSpecifics>, details: CustomClassDetails<TypirSpecifics>) {
             super(buildCustomClassIdentifier(details), details, kind.services, details.isNullable);
             this.kind = kind;
-            this.registerSubtypes();
+            this.registerSubtypesAndConversion();
             this.defineTheInitializationProcessOfThisType({});
         }
 

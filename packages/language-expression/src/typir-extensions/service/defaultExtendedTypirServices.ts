@@ -6,10 +6,12 @@ import { CustomClassKind, CustomClassKindName } from "../kinds/custom-class/cust
 import { CustomLambdaKind, CustomLambdaKindName } from "../kinds/custom-lambda/custom-lambda-kind.js";
 import { CustomFunctionKind, CustomFunctionKindName } from "../kinds/custom-function/custom-function-kind.js";
 import { CustomValueKind, CustomValueKindName } from "../kinds/custom-value/custom-value-kind.js";
+import { CustomVoidKind, CustomVoidKindName } from "../kinds/custom-void/custom-void-kind.js";
+import { CustomNullKind, CustomNullKindName } from "../kinds/custom-null/custom-null-kind.js";
 
 /**
  * Provides the default implementation for the additional typir services
- * 
+ *
  * @param context The plugin context
  * @returns The module with the default extended typir services
  */
@@ -37,6 +39,16 @@ export function defaultExtendedTypirServices<Specifics extends TypirSpecifics>(
                 services.infrastructure.Kinds.getOrCreateKind(
                     CustomValueKindName,
                     () => new CustomValueKind<Specifics>(services)
+                ),
+            CustomVoid: (services) =>
+                services.infrastructure.Kinds.getOrCreateKind(
+                    CustomVoidKindName,
+                    () => new CustomVoidKind<Specifics>(services)
+                ),
+            CustomNull: (services) =>
+                services.infrastructure.Kinds.getOrCreateKind(
+                    CustomNullKindName,
+                    () => new CustomNullKind<Specifics>(services)
                 )
         },
         TypeDefinitions: (services) => new DefaultTypeDefinitionService(services),

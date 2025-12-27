@@ -33,6 +33,21 @@ export class TypeConfig {
     readonly lambdaTypeRuleName: string;
 
     /**
+     * The name for the VoidType type.
+     */
+    readonly voidTypeTypeName: string;
+
+    /**
+     * The name for the VoidType rule.
+     */
+    readonly voidTypeRuleName: string;
+
+    /**
+     * The name for the ReturnType type.
+     */
+    readonly returnTypeTypeName: string;
+
+    /**
      * Creates a new TypeConfig.
      *
      * @param prefix Prefix for naming generated rules and types.
@@ -44,5 +59,8 @@ export class TypeConfig {
         this.classTypeRuleName = prefix + "ClassTypeRule";
         this.lambdaTypeTypeName = prefix + "LambdaType";
         this.lambdaTypeRuleName = prefix + "LambdaTypeRule";
+        this.voidTypeTypeName = prefix + "VoidType";
+        this.voidTypeRuleName = prefix + "VoidTypeRule";
+        this.returnTypeTypeName = prefix + "ReturnType";
     }
 }

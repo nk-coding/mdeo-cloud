@@ -3,9 +3,14 @@ import type { ExtendedTypirServices } from "../service/extendedTypirServices.js"
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import type { CustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
-import type { FunctionSignature, GenericTypeRef, ValueType, ClassType, FunctionType } from "../config/type.js";
-import type { CustomClassType } from "../kinds/custom-class/custom-class-type.js";
+import type { CustomVoidType } from "../kinds/custom-void/custom-void-type.js";
+import type { FunctionSignature, ValueType, FunctionType, ReturnType } from "../config/type.js";
+import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../config/type.js";
 import type { TypeDefinitionService } from "../service/type-definition-service.js";
+import { findCommonParentType, findSuperTypeWithTypeArgs } from "./commonParentType.js";
+import { getClassTypeIdentifier } from "./util.js";
+import { assertUnreachable } from "@mdeo/language-common";
+
 
 /**
  * Result of validating a function signature against provided arguments.
@@ -24,7 +29,7 @@ interface FunctionSignatureValidationResult<TProblem> {
     /**
      * The resolved return type, if it could be determined
      */
-    returnType: CustomValueType | undefined;
+    returnType: CustomValueType | CustomVoidType | undefined;
 }
 
 /**
@@ -76,7 +81,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
     /**
      * The inferred return type of the call, if it could be determined
      */
-    inferredReturnType: CustomValueType | undefined = undefined;
+    inferredReturnType: CustomValueType | CustomVoidType | undefined = undefined;
 
     /**
      * Creates a new call validation helper.
@@ -495,8 +500,10 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @param type The value type to check
      * @returns true if all generic parameters are resolved
      */
-    isFullyDefined(type: ValueType): boolean {
-        if ("generic" in type) {
+    isFullyDefined(type: ReturnType): boolean {
+        if (VoidType.is(type)) {
+            return true;
+        } else if (GenericTypeRef.is(type)) {
             const localStatus = this.callResolvedGenericArgumentStates.get(type.generic);
             if (localStatus != undefined) {
                 return localStatus !== TypeResolutionState.Undefined && localStatus !== TypeResolutionState.Conflict;
@@ -505,7 +512,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             } else {
                 return false;
             }
-        } else if ("type" in type) {
+        } else if (ClassTypeRef.is(type)) {
             if (type.typeArgs != undefined) {
                 for (const typeArg of type.typeArgs.values()) {
                     if (!this.isFullyDefined(typeArg)) {
@@ -514,7 +521,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
                 }
             }
             return true;
-        } else {
+        } else if (LambdaType.is(type)) {
             if (!this.isFullyDefined(type.returnType)) {
                 return false;
             }
@@ -524,6 +531,8 @@ class GenericResolver<Specifics extends TypirSpecifics> {
                 }
             }
             return true;
+        } else {
+            assertUnreachable(type)
         }
     }
 
@@ -533,7 +542,12 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @param type The value type to resolve
      * @returns The resolved concrete type
      */
-    resolveType(type: ValueType): CustomValueType {
+    resolveType(type: ValueType): CustomValueType;
+    resolveType(type: ReturnType): CustomValueType | CustomVoidType;
+    resolveType(type: ValueType | ReturnType): CustomValueType | CustomVoidType {
+        if (VoidType.is(type)) {
+            return this.callValidator.services.factory.CustomVoid.getOrCreate();
+        }
         return this.typeDefinitionsService.resolveCustomClassOrLambdaType(
             type,
             new Map([...this.functionType.details.typeArgs.entries(), ...this.callResolvedGenericArguments.entries()])
@@ -565,9 +579,9 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @returns true if the types are compatible
      */
     private checkAndUpdateType(declaredType: ValueType, actualType: CustomValueType, allowSubtypes: boolean): boolean {
-        if ("generic" in declaredType) {
+        if (GenericTypeRef.is(declaredType)) {
             return this.checkAndUpdateGenericType(declaredType, actualType, allowSubtypes);
-        } else if ("type" in declaredType) {
+        } else if (ClassTypeRef.is(declaredType)) {
             return this.checkAndUpdateClassType(declaredType, actualType, allowSubtypes);
         } else {
             return this.checkAndUpdateLambdaType(declaredType, actualType);
@@ -604,11 +618,11 @@ class GenericResolver<Specifics extends TypirSpecifics> {
 
         if (!allowSubtypes) {
             isAllowed =
-                this.getClassTypeIdentifier(actualType.details.definition) ===
-                this.getClassTypeIdentifier(declaredTypeDefinition);
+                getClassTypeIdentifier(actualType.details.definition) ===
+                getClassTypeIdentifier(declaredTypeDefinition);
             actualTypeArgs = actualType.details.typeArgs;
         } else {
-            const result = this.findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition);
+            const result = findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition, this.callValidator.services);
             isAllowed = result != undefined;
             actualTypeArgs = result?.typeArgs;
         }
@@ -634,7 +648,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      */
     private checkAndUpdateLambdaType(
         declaredType: {
-            returnType: ValueType;
+            returnType: ReturnType;
             parameters: Array<{ type: ValueType }>;
             isNullable?: boolean;
         },
@@ -647,7 +661,25 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return false;
         }
 
-        const returnTypeValid = this.checkAndUpdateType(declaredType.returnType, actualType.details.returnType, false);
+        // Handle void return type
+        const declaredReturnType = declaredType.returnType;
+        const actualReturnType = actualType.details.returnType;
+        
+        let returnTypeValid: boolean;
+        if (VoidType.is(declaredReturnType)) {
+            // Declared type is void - actual type must also be void
+            returnTypeValid = this.callValidator.services.factory.CustomVoid.isCustomVoidType(actualReturnType);
+        } else if (this.callValidator.services.factory.CustomVoid.isCustomVoidType(actualReturnType)) {
+            // Actual type is void - declared type must also be void
+            returnTypeValid = VoidType.is(declaredReturnType);
+        } else {
+            // Neither is void - check as normal value types
+            returnTypeValid = this.checkAndUpdateType(
+                declaredReturnType as ValueType,
+                actualReturnType as CustomValueType,
+                false
+            );
+        }
 
         let paramsValid = true;
         for (let i = 0; i < Math.min(declaredType.parameters.length, actualType.details.parameterTypes.length); i++) {
@@ -870,7 +902,11 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         isNullable: boolean,
         current: CustomValueType
     ): boolean {
-        const commonType = this.findCommonParentType(current.asNonNullable, actualType.asNonNullable);
+        const commonType = findCommonParentType(
+            current.asNonNullable,
+            actualType.asNonNullable,
+            this.callValidator.services
+        );
 
         if (commonType !== undefined) {
             this.callResolvedGenericArguments.set(
@@ -911,168 +947,5 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             this.callResolvedGenericArgumentStates.set(genericName, TypeResolutionState.Conflict);
             return false;
         }
-    }
-
-    /**
-     * Finds the closest common parent type between two class types.
-     * Uses Dijkstra's algorithm to find the nearest common ancestor in the type hierarchy.
-     *
-     * @param typeA First class type
-     * @param typeB Second class type
-     * @returns The common parent type, or undefined if none exists
-     */
-    private findCommonParentType(typeA: CustomValueType, typeB: CustomValueType): CustomValueType | undefined {
-        if (
-            !this.callValidator.services.factory.CustomClasses.isCustomClassType(typeA) ||
-            !this.callValidator.services.factory.CustomClasses.isCustomClassType(typeB)
-        ) {
-            return undefined;
-        }
-        const superTypesA = this.findSuperTypesWithDistance(typeA);
-        const superTypesB = this.findSuperTypesWithDistance(typeB);
-
-        let bestType: CustomClassType | undefined = undefined;
-        let bestDistance = Number.MAX_SAFE_INTEGER;
-
-        for (const [superType, distanceA] of superTypesA.entries()) {
-            const distanceB = superTypesB.get(superType);
-            if (distanceB != undefined) {
-                const totalDistance = distanceA + distanceB;
-                if (totalDistance < bestDistance) {
-                    bestDistance = totalDistance;
-                    bestType = superType;
-                }
-            }
-        }
-        return bestType;
-    }
-
-    /**
-     * Get a unique identifier for a ClassType based on its package and name.
-     *
-     * @param classType The class type definition
-     * @returns A unique string identifier
-     */
-    private getClassTypeIdentifier(classType: ClassType): string {
-        return classType.package + "." + classType.name;
-    }
-
-    /**
-     * Search for a specific supertype using Dijkstra's algorithm.
-     * Returns the supertype instance with its resolved type arguments if found.
-     *
-     * @param type The class type to search from
-     * @param targetDefinition The target supertype definition to find
-     * @returns Object with the supertype and its type arguments, or undefined if not found
-     */
-    private findSuperTypeWithTypeArgs(
-        type: CustomClassType,
-        targetDefinition: ClassType
-    ): { type: CustomClassType; typeArgs: Map<string, CustomValueType> } | undefined {
-        const targetIdentifier = this.getClassTypeIdentifier(targetDefinition);
-        const visited = new Set<string>();
-
-        const queue: Array<{ type: CustomClassType; distance: number }> = [{ type, distance: 0 }];
-
-        while (queue.length > 0) {
-            queue.sort((a, b) => a.distance - b.distance);
-            const current = queue.shift()!;
-
-            const currentIdentifier = this.getClassTypeIdentifier(current.type.details.definition);
-
-            if (currentIdentifier === targetIdentifier) {
-                return {
-                    type: current.type,
-                    typeArgs: current.type.details.typeArgs
-                };
-            }
-
-            if (visited.has(currentIdentifier)) {
-                continue;
-            }
-
-            visited.add(currentIdentifier);
-
-            const superTypes = current.type.details.definition.superTypes;
-            if (superTypes) {
-                for (const superTypeRef of superTypes) {
-                    const superType = this.typeDefinitionsService.resolveCustomClassOrLambdaType({
-                        ...superTypeRef,
-                        isNullable: false
-                    } as ValueType);
-
-                    if (this.callValidator.services.factory.CustomClasses.isCustomClassType(superType)) {
-                        const superIdentifier = this.getClassTypeIdentifier(superType.details.definition);
-                        const newDistance = current.distance + 1;
-
-                        if (!visited.has(superIdentifier)) {
-                            queue.push({
-                                type: superType,
-                                distance: newDistance
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        return undefined;
-    }
-
-    /**
-     * Finds all supertypes of a given class type with their distances in the hierarchy.
-     * Uses Dijkstra's algorithm to compute shortest paths to all supertypes.
-     *
-     * @param type The class type to search from
-     * @returns Map of supertype to its distance from the original type
-     */
-    private findSuperTypesWithDistance(type: CustomClassType): Map<CustomClassType, number> {
-        const distances = new Map<CustomClassType, number>();
-        const visited = new Set<string>();
-
-        const queue: Array<{ type: CustomClassType; distance: number }> = [{ type, distance: 0 }];
-
-        distances.set(type, 0);
-
-        while (queue.length > 0) {
-            queue.sort((a, b) => a.distance - b.distance);
-            const current = queue.shift()!;
-
-            const currentIdentifier = this.getClassTypeIdentifier(current.type.details.definition);
-
-            if (visited.has(currentIdentifier)) {
-                continue;
-            }
-
-            visited.add(currentIdentifier);
-
-            const superTypes = current.type.details.definition.superTypes;
-            if (superTypes) {
-                for (const superTypeRef of superTypes) {
-                    const superType = this.typeDefinitionsService.resolveCustomClassOrLambdaType({
-                        ...superTypeRef,
-                        isNullable: false
-                    } as ValueType);
-
-                    if (this.callValidator.services.factory.CustomClasses.isCustomClassType(superType)) {
-                        const superIdentifier = this.getClassTypeIdentifier(superType.details.definition);
-                        const newDistance = current.distance + 1;
-
-                        if (!visited.has(superIdentifier)) {
-                            const existingDistance = distances.get(superType);
-                            if (existingDistance === undefined || newDistance < existingDistance) {
-                                distances.set(superType, newDistance);
-                                queue.push({
-                                    type: superType,
-                                    distance: newDistance
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return distances;
     }
 }

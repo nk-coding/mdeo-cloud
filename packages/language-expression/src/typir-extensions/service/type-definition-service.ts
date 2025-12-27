@@ -1,5 +1,6 @@
 import type { TypirSpecifics } from "typir";
-import type { ClassType, ValueType, FunctionType, GenericTypeRef, BaseClassTypeRef } from "../config/type.js";
+import type { ClassType, ValueType, FunctionType, BaseClassTypeRef } from "../config/type.js";
+import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../config/type.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import type { ExtendedTypirServices } from "./extendedTypirServices.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
@@ -24,6 +25,14 @@ export interface TypeDefinitionService {
      * @returns The class type definition or undefined if not found
      */
     getClassType(identifier: string): ClassType;
+
+    /**
+     * Look up a class type by its identifier (package.name) if it exists
+     *
+     * @param identifier - The fully qualified identifier (e.g., "builtin.string")
+     * @returns The class type definition or undefined if not found
+     */
+    getClassTypeIfExisting(identifier: string): ClassType | undefined;
 
     /**
      * Get all registered class types
@@ -84,9 +93,9 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
     }
 
     resolveCustomClassOrLambdaType(type: ValueType, genericTypeArgs?: Map<string, CustomValueType>): CustomValueType {
-        if ("generic" in type) {
+        if (GenericTypeRef.is(type)) {
             return this.resolveGenericTypeRef(type, genericTypeArgs);
-        } else if ("type" in type) {
+        } else if (ClassTypeRef.is(type)) {
             const classTypeDef = this.getClassType(type.type);
 
             return this.services.factory.CustomClasses.getOrCreate({
@@ -101,9 +110,14 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
                 superTypes: classTypeDef.superTypes ?? []
             });
         } else {
+            const returnType = type.returnType;
+            const resolvedReturnType = VoidType.is(returnType)
+                ? this.services.factory.CustomVoid.getOrCreate()
+                : this.resolveCustomClassOrLambdaType(returnType as ValueType, genericTypeArgs);
+
             return this.services.factory.CustomLambdas.getOrCreate({
                 definition: type,
-                returnType: this.resolveCustomClassOrLambdaType(type.returnType, genericTypeArgs),
+                returnType: resolvedReturnType,
                 parameterTypes: type.parameters.map((paramType) =>
                     this.resolveCustomClassOrLambdaType(paramType.type, genericTypeArgs)
                 ),
@@ -121,6 +135,11 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
             throw new Error(`Type '${typeIdentifier}' not found in type definitions`);
         }
         return classType;
+    }
+
+    getClassTypeIfExisting(typeIdentifier: string): ClassType | undefined {
+        const identifier = typeIdentifier.includes(".") ? typeIdentifier : `builtin.${typeIdentifier}`;
+        return this.typeMap.get(identifier);
     }
 
     private resolveGenericTypeRef(

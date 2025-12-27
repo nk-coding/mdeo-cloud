@@ -1,4 +1,4 @@
-import { classType, typeRef, genericTypeRef } from "../../typir-extensions/config/typeBuilder.js";
+import { classType, typeRef, genericTypeRef, voidType } from "../../typir-extensions/config/typeBuilder.js";
 
 /**
  * The built-in generic Map type exported as `MapType`.
@@ -12,10 +12,10 @@ export const MapType = classType("Map", "builtin")
             ["V", genericTypeRef("V")]
         ])
     )
-    .method("clear", (m) => m.signature((s) => s.returns(typeRef("void").build())))
+    .method("clear", (m) => m.signature((s) => s.returns(voidType())))
     .method("put", (m) =>
         m.signature((s) =>
-            s.param("key", genericTypeRef("K")).param("value", genericTypeRef("V")).returns(typeRef("void").build())
+            s.param("key", genericTypeRef("K")).param("value", genericTypeRef("V")).returns(voidType())
         )
     )
     .method("putAll", (m) =>
@@ -32,7 +32,7 @@ export const MapType = classType("Map", "builtin")
                         )
                         .build()
                 )
-                .returns(typeRef("void").build())
+                .returns(voidType())
         )
     )
     .method("remove", (m) => m.signature((s) => s.param("key", genericTypeRef("K")).returns(genericTypeRef("V"))))

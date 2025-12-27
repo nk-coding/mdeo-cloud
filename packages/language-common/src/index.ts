@@ -39,3 +39,4 @@ export * from "./language/defaultMonarchTokenProvider.js";
 export * from "./language/defaultTokens.js";
 export * from "./plugin/languagePlugin.js";
 export * from "./plugin/pluginContext.js";
+export * from "./util/assertUnreachable.js";

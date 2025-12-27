@@ -96,6 +96,10 @@ export function generateExpressionRules(
     const booleanLiteralExpressionRule = createRule(config.booleanLiteralExpressionRuleName)
         .returns(types.booleanLiteralExpressionType)
         .as(({ set }) => [set("value", BOOLEAN)]);
+    
+    const nullLiteralExpressionRule = createRule(config.nullLiteralExpressionTypeName)
+        .returns(types.nullLiteralExpressionType)
+        .as(() => ["null"]);
 
     const identifierExpressionRule = createRule(config.identifierExpressionRuleName)
         .returns(types.identifierExpressionType)
@@ -111,6 +115,7 @@ export function generateExpressionRules(
                 floatLiteralExpressionRule,
                 doubleLiteralExpressionRule,
                 booleanLiteralExpressionRule,
+                nullLiteralExpressionRule,
                 identifierExpressionRule,
                 group("(", () => expressionRule, ")"),
                 ...additionalExpressionRules

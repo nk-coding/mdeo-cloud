@@ -6,10 +6,43 @@ import { classType, typeRef, lambdaType, genericTypeRef } from "../../typir-exte
 export const ReadonlyCollectionType = classType("ReadonlyCollection", "builtin")
     .generics("T")
     .extends("Any")
-    .method("asBag", (m) => m.signature((s) => s.returns(typeRef("void").build())))
-    .method("asOrderedSet", (m) => m.signature((s) => s.returns(typeRef("void").build())))
-    .method("asList", (m) => m.signature((s) => s.returns(typeRef("void").build())))
-    .method("asSet", (m) => m.signature((s) => s.returns(typeRef("void").build())))
+    .extends("Iterable", new Map([["T", genericTypeRef("T")]]))
+    .method("asBag", (m) =>
+        m.signature((s) =>
+            s.returns(
+                typeRef("Bag")
+                    .withTypeArgs(new Map([["T", genericTypeRef("T")]]))
+                    .build()
+            )
+        )
+    )
+    .method("asOrderedSet", (m) =>
+        m.signature((s) =>
+            s.returns(
+                typeRef("OrderedSet")
+                    .withTypeArgs(new Map([["T", genericTypeRef("T")]]))
+                    .build()
+            )
+        )
+    )
+    .method("asList", (m) =>
+        m.signature((s) =>
+            s.returns(
+                typeRef("List")
+                    .withTypeArgs(new Map([["T", genericTypeRef("T")]]))
+                    .build()
+            )
+        )
+    )
+    .method("asSet", (m) =>
+        m.signature((s) =>
+            s.returns(
+                typeRef("Set")
+                    .withTypeArgs(new Map([["T", genericTypeRef("T")]]))
+                    .build()
+            )
+        )
+    )
     .method("clone", (m) =>
         m.signature((s) =>
             s.returns(

@@ -97,7 +97,7 @@ export interface CustomValueType<
      * Register this type as a subtype of its super classes.
      * Called during initialization to establish the type hierarchy.
      */
-    registerSubtypes(): void;
+    registerSubtypesAndConversion(): void;
 }
 
 export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (services) => {
@@ -161,12 +161,20 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
             throw new Error("Method not implemented.");
         }
 
-        registerSubtypes() {
+        registerSubtypesAndConversion() {
             for (const superClass of this.superClasses) {
                 this.services.Subtype.markAsSubType(this, superClass);
             }
             if (!this.isNullable) {
-                this.services.Subtype.markAsSubType(this, this.asNullable as unknown as TypirType);
+                this.services.Subtype.markAsSubType(this, this.asNullable);
+            }
+            if (this.isNullable) {
+                const nullType = this.services.factory.CustomNull.getOrCreate();
+                this.services.Conversion.markAsConvertible(
+                    nullType,
+                    this,
+                    "IMPLICIT_EXPLICIT"
+                );
             }
         }
 

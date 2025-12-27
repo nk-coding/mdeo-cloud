@@ -1,5 +1,6 @@
 import type { InferenceProblem, TypirProblem, TypirSpecifics } from "typir";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
+import type { CustomVoidType } from "../kinds/custom-void/custom-void-type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import { CallValidationHelper } from "./callValidationHelper.js";
 
@@ -22,7 +23,7 @@ export function inferCall<Specifics extends TypirSpecifics>(
     genericArgumentsNodes: Specifics["LanguageType"][],
     argumentNodes: Specifics["LanguageType"][],
     services: ExtendedTypirServices<Specifics>
-): InferenceProblem<Specifics> | CustomValueType {
+): InferenceProblem<Specifics> | CustomValueType | CustomVoidType {
     const validator = new InferenceCallValidator<Specifics>(
         languageNode,
         functionReferenceNode,

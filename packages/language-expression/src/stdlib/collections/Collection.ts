@@ -1,4 +1,4 @@
-import { classType, typeRef, genericTypeRef } from "../../typir-extensions/config/typeBuilder.js";
+import { classType, typeRef, genericTypeRef, voidType } from "../../typir-extensions/config/typeBuilder.js";
 
 /**
  * The built-in generic Collection type exported as `CollectionType`.
@@ -19,7 +19,7 @@ export const CollectionType = classType("Collection", "builtin")
                 .returns(typeRef("boolean").build())
         )
     )
-    .method("clear", (m) => m.signature((s) => s.returns(typeRef("void").build())))
+    .method("clear", (m) => m.signature((s) => s.returns(voidType())))
     .method("remove", (m) =>
         m.signature((s) => s.param("item", genericTypeRef("T")).returns(typeRef("boolean").build()))
     )

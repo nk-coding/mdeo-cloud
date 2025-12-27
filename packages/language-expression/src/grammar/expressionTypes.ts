@@ -98,6 +98,10 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         .attrs({
             value: Boolean
         });
+    
+    const nullLiteralExpressionType = createInterface(config.nullLiteralExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({});
 
     return {
         baseExpressionType,
@@ -114,6 +118,7 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         floatLiteralExpressionType,
         doubleLiteralExpressionType,
         booleanLiteralExpressionType,
+        nullLiteralExpressionType,
         baseTypeType,
         classTypeType,
         lambdaTypeType

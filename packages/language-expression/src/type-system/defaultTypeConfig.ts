@@ -18,40 +18,40 @@ export interface DefaultTypeConfig {
      * The root Any type from which all other types derive.
      */
     Any: ClassType;
-    /** 
+    /**
      * 32-bit integer type
      */
-    int: ClassType,
+    int: ClassType;
     /**
      * 64-bit integer type
      */
-    long: ClassType,
+    long: ClassType;
     /**
      * single-precision floating point
      */
-    float: ClassType,
+    float: ClassType;
     /**
      * double-precision floating point
      */
-    double: ClassType,
+    double: ClassType;
     /**
      * immutable sequence of characters
      */
-    string: ClassType,
+    string: ClassType;
     /**
      * boolean true/false
      */
-    boolean: ClassType,
+    boolean: ClassType;
     /**
-     * absence of value (used for procedures/functions with no return)
+     * The iterable type for types which can be iterated, should have exactly one generic type param
      */
-    void: ClassType,
+    Iterable: ClassType;
     /**
      * Additional types to register in the type system
      */
-    additionalTypes: ClassType[],
+    additionalTypes: ClassType[];
     /**
      * Super types for lambda types
      */
-    lambdaSuperTypes: BaseClassTypeRef[]
+    lambdaSuperTypes: BaseClassTypeRef[];
 }

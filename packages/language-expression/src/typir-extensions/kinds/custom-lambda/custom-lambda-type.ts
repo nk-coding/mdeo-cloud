@@ -51,7 +51,7 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
         constructor(kind: CustomLambdaKind<TypirSpecifics>, details: CustomLambdaDetails<TypirSpecifics>) {
             super(buildCustomLambdaIdentifier(details), details, kind.services, details.definition.isNullable);
             this.kind = kind;
-            this.registerSubtypes();
+            this.registerSubtypesAndConversion();
             this.defineTheInitializationProcessOfThisType({});
         }
 

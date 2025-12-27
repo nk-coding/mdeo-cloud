@@ -9,6 +9,7 @@ import {
 } from "./custom-lambda-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomValueType, CustomValueTypeDetail } from "../custom-value/custom-value-type.js";
+import type { CustomVoidType } from "../custom-void/custom-void-type.js";
 
 /**
  * Type details specific to custom lambda types.
@@ -24,7 +25,7 @@ export interface CustomLambdaDetails<Specifics extends TypirSpecifics> extends C
     /**
      * The resolved return type of the lambda
      */
-    returnType: CustomValueType;
+    returnType: CustomValueType | CustomVoidType;
 
     /**
      * The resolved parameter types of the lambda

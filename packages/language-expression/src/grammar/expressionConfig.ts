@@ -143,6 +143,11 @@ export class ExpressionConfig {
     readonly booleanLiteralExpressionRuleName: string;
 
     /**
+     * The name for the NullLiteralExpression type.
+     */
+    readonly nullLiteralExpressionTypeName: string;
+
+    /**
      * The name for the BracketedExpression type.
      */
     readonly bracketedExpressionTypeName: string;
@@ -190,6 +195,7 @@ export class ExpressionConfig {
         this.doubleLiteralExpressionRuleName = prefix + "DoubleLiteralExpressionRule";
         this.booleanLiteralExpressionTypeName = prefix + "BooleanLiteralExpression";
         this.booleanLiteralExpressionRuleName = prefix + "BooleanLiteralExpressionRule";
+        this.nullLiteralExpressionTypeName = prefix + "NullLiteralExpression";
         this.bracketedExpressionTypeName = prefix + "BracketedExpression";
         this.bracketedExpressionRuleName = prefix + "BracketedExpressionRule";
         this.expressionRuleName = prefix + "ExpressionRule";

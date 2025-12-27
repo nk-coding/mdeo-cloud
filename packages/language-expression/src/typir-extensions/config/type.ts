@@ -43,6 +43,22 @@ export interface ClassTypeRef extends BaseClassTypeRef {
 export type ValueType = ClassTypeRef | GenericTypeRef | LambdaType;
 
 /**
+ * A void type reference.
+ * Used for functions/methods that don't return a value.
+ */
+export interface VoidType {
+    /**
+     * Marker to distinguish void type from other types
+     */
+    readonly kind: 'void';
+}
+
+/**
+ * A return type can be either a value type or void.
+ */
+export type ReturnType = ValueType | VoidType;
+
+/**
  * A method or function parameter.
  */
 export interface Parameter {
@@ -61,9 +77,9 @@ export interface Parameter {
  */
 export interface CallableType {
     /**
-     * The return type of the callable. Omit for void callables
+     * The return type of the callable. Use VoidType for void callables
      */
-    returnType: ValueType;
+    returnType: ReturnType;
     /**
      * The parameters of the callable
      */
@@ -146,4 +162,68 @@ export interface ClassType {
      * Optional list of super types that this type extends
      */
     superTypes?: BaseClassTypeRef[];
+}
+
+/**
+ * Namespace containing type guard for ClassTypeRef
+ */
+export namespace ClassTypeRef {
+    /**
+     * Type guard to check if a ReturnType is a ClassTypeRef.
+     * A ClassTypeRef has a 'type' property (which is a string identifier).
+     * 
+     * @param type The type to check
+     * @returns true if the type is a ClassTypeRef
+     */
+    export function is(type: ReturnType): type is ClassTypeRef {
+        return typeof type === 'object' && type !== null && 'type' in type;
+    }
+}
+
+/**
+ * Namespace containing type guard for GenericTypeRef
+ */
+export namespace GenericTypeRef {
+    /**
+     * Type guard to check if a ReturnType is a GenericTypeRef.
+     * A GenericTypeRef has a 'generic' property (which is a string identifier).
+     * 
+     * @param type The type to check
+     * @returns true if the type is a GenericTypeRef
+     */
+    export function is(type: ReturnType): type is GenericTypeRef {
+        return typeof type === 'object' && type !== null && 'generic' in type;
+    }
+}
+
+/**
+ * Namespace containing type guard for LambdaType
+ */
+export namespace LambdaType {
+    /**
+     * Type guard to check if a ReturnType is a LambdaType.
+     * A LambdaType has 'parameters' and 'returnType' properties.
+     * 
+     * @param type The type to check
+     * @returns true if the type is a LambdaType
+     */
+    export function is(type: ReturnType): type is LambdaType {
+        return typeof type === 'object' && type !== null && 'parameters' in type;
+    }
+}
+
+/**
+ * Namespace containing type guard for VoidType
+ */
+export namespace VoidType {
+    /**
+     * Type guard to check if a ReturnType is a VoidType.
+     * A VoidType has a 'kind' property with the value 'void'.
+     * 
+     * @param type The type to check
+     * @returns true if the type is a VoidType
+     */
+    export function is(type: ReturnType): type is VoidType {
+        return typeof type === 'object' && type !== null && 'kind' in type && type.kind === 'void';
+    }
 }

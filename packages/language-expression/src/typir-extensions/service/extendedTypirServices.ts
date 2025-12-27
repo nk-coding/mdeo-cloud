@@ -3,6 +3,8 @@ import type { CustomClassFactoryService } from "../kinds/custom-class/custom-cla
 import type { CustomLambdaFactoryService } from "../kinds/custom-lambda/custom-lambda-kind.js";
 import type { CustomFunctionFactoryService } from "../kinds/custom-function/custom-function-kind.js";
 import type { CustomValueFactoryService } from "../kinds/custom-value/custom-value-kind.js";
+import type { CustomVoidFactoryService } from "../kinds/custom-void/custom-void-kind.js";
+import type { CustomNullFactoryService } from "../kinds/custom-null/custom-null-kind.js";
 import type { TypeDefinitionService } from "./type-definition-service.js";
 import type { PluginContext } from "@mdeo/language-common";
 
@@ -36,6 +38,16 @@ export interface AdditionalTypirServices<Specifics extends TypirSpecifics> {
          * Factory for creating and retrieving custom value types
          */
         readonly CustomValues: CustomValueFactoryService;
+
+        /**
+         * Factory for the void type singleton
+         */
+        readonly CustomVoid: CustomVoidFactoryService;
+
+        /**
+         * Factory for the null type singleton
+         */
+        readonly CustomNull: CustomNullFactoryService;
     };
 
     /**

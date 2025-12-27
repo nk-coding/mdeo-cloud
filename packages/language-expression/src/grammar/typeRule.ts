@@ -25,6 +25,10 @@ export function generateTypeRules(config: TypeConfig, types: TypeTypes): ParserR
             )
         ]);
 
+    const voidTypeRule = createRule(config.voidTypeRuleName)
+        .returns(types.voidTypeType)
+        .as(() => ["void"]);
+
     const lambdaTypeRule = createRule(config.lambdaTypeRuleName)
         .returns(types.lambdaTypeType)
         .as(({ set, add }) => [
@@ -36,7 +40,7 @@ export function generateTypeRules(config: TypeConfig, types: TypeTypes): ParserR
             ),
             ")",
             "=>",
-            set("returnType", classTypeRule)
+            or(set("returnType", classTypeRule), set("returnType", voidTypeRule))
         ]);
 
     const typeRule = createRule(config.typeRuleName)

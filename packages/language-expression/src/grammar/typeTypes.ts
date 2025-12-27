@@ -1,4 +1,4 @@
-import { createInterface, type ASTType } from "@mdeo/language-common";
+import { createInterface, createType, type ASTType } from "@mdeo/language-common";
 import type { TypeConfig } from "./typeConfig.js";
 
 /**
@@ -9,6 +9,10 @@ import type { TypeConfig } from "./typeConfig.js";
  */
 export function generateTypeTypes(config: TypeConfig) {
     const baseTypeType = createInterface(config.baseTypeName).attrs({});
+
+    const voidTypeType = createInterface(config.voidTypeTypeName).attrs({});
+
+    const returnTypeType = createType(config.returnTypeTypeName).types(baseTypeType, voidTypeType);
 
     const classTypeType = createInterface(config.classTypeTypeName)
         .extends(baseTypeType)
@@ -21,11 +25,13 @@ export function generateTypeTypes(config: TypeConfig) {
         .extends(baseTypeType)
         .attrs({
             parameters: [baseTypeType],
-            returnType: baseTypeType
+            returnType: returnTypeType
         });
 
     return {
         baseTypeType,
+        voidTypeType,
+        returnTypeType,
         classTypeType,
         lambdaTypeType
     };
