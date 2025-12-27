@@ -7,6 +7,9 @@ import type { CustomVoidFactoryService } from "../kinds/custom-void/custom-void-
 import type { CustomNullFactoryService } from "../kinds/custom-null/custom-null-kind.js";
 import type { TypeDefinitionService } from "./type-definition-service.js";
 import type { PluginContext } from "@mdeo/language-common";
+import type { ScopeProviderCaching } from "../scope/scopeProviderCache.js";
+import type { ScopeProvider } from "../scope/scopeProvider.js";
+import type { TypirLangiumAddedServices, TypirLangiumSpecifics } from "typir-langium";
 
 /**
  * Additional services extending the base Typir services.
@@ -51,9 +54,24 @@ export interface AdditionalTypirServices<Specifics extends TypirSpecifics> {
     };
 
     /**
+     * Caching services
+     */
+    readonly caching: {
+        /**
+         * Cache for scope providers to optimize scope resolution
+         */
+        readonly ScopeProvider: ScopeProviderCaching<Specifics>;
+    };
+
+    /**
      * Service for managing and resolving type definitions
      */
     readonly TypeDefinitions: TypeDefinitionService;
+
+    /**
+     * Scope provider service for resolving scopes of language nodes
+     */
+    readonly ScopeProvider: ScopeProvider<Specifics>;
 
     /**
      * Plugin context providing access to shared dependencies
@@ -69,6 +87,12 @@ export interface AdditionalTypirServices<Specifics extends TypirSpecifics> {
  */
 export type ExtendedTypirServices<Specifics extends TypirSpecifics> = TypirServices<Specifics> &
     AdditionalTypirServices<Specifics>;
+
+/**
+ * Extended Typir Langium services combining extended Typir services with Typir Langium added services.
+ */
+export type ExtendedTypirLangiumServices<Specifics extends TypirLangiumSpecifics> = ExtendedTypirServices<Specifics> &
+    TypirLangiumAddedServices<Specifics>;
 
 /**
  * Type for a function which when provided Extended Typir services returns an entity of type T.

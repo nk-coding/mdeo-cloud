@@ -48,6 +48,11 @@ export class TypeConfig {
     readonly returnTypeTypeName: string;
 
     /**
+     * The name for the ReturnType rule.
+     */
+    readonly returnTypeRuleName: string;
+
+    /**
      * Creates a new TypeConfig.
      *
      * @param prefix Prefix for naming generated rules and types.
@@ -62,5 +67,6 @@ export class TypeConfig {
         this.voidTypeTypeName = prefix + "VoidType";
         this.voidTypeRuleName = prefix + "VoidTypeRule";
         this.returnTypeTypeName = prefix + "ReturnType";
+        this.returnTypeRuleName = prefix + "ReturnTypeRule";
     }
 }

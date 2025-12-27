@@ -1,7 +1,9 @@
-import type { TypirLangiumAddedServices, TypirLangiumSpecifics } from "typir-langium";
-import type { AdditionalTypirServices } from "../typir-extensions/service/extendedTypirServices.js";
+import type { TypirLangiumSpecifics } from "typir-langium";
+import type {
+    AdditionalTypirServices,
+    ExtendedTypirLangiumServices
+} from "../typir-extensions/service/extendedTypirServices.js";
 import type { ExtendedLangiumSharedServices } from "@mdeo/language-common";
-import type { TypirServices } from "typir";
 
 /**
  * Additional services specific to the expression language,
@@ -22,6 +24,5 @@ export type ExpressionAddedServices<Specifics extends TypirLangiumSpecifics> = A
  *
  * @template Specifics Language-specific types extending TypirLangiumSpecifics
  */
-export type ExpressionTypirServices<Specifics extends TypirLangiumSpecifics> = TypirServices<Specifics> &
-    TypirLangiumAddedServices<Specifics> &
+export type ExpressionTypirServices<Specifics extends TypirLangiumSpecifics> = ExtendedTypirLangiumServices<Specifics> &
     ExpressionAddedServices<Specifics>;

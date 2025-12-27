@@ -1,4 +1,4 @@
-import { createInterface, Union, type ASTType } from "@mdeo/language-common";
+import { createInterface, createType, Optional, Union, type ASTType } from "@mdeo/language-common";
 import type { ExpressionConfig } from "./expressionConfig.js";
 import type { TypeTypes } from "./typeTypes.js";
 
@@ -46,7 +46,7 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         .attrs({
             expression: baseExpressionType,
             arguments: [baseExpressionType],
-            genericArgs: callExpressionGenericArgsType
+            genericArgs: Optional(callExpressionGenericArgsType)
         });
 
     const memberAccessExpressionType = createInterface(config.memberAccessExpressionTypeName)
@@ -98,10 +98,15 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         .attrs({
             value: Boolean
         });
-    
+
     const nullLiteralExpressionType = createInterface(config.nullLiteralExpressionTypeName)
         .extends(baseExpressionType)
         .attrs({});
+
+    const assignableExpressionType = createType(config.assignableExpressionTypeName).types(
+        identifierExpressionType,
+        memberAccessExpressionType
+    );
 
     return {
         baseExpressionType,
@@ -121,7 +126,8 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         nullLiteralExpressionType,
         baseTypeType,
         classTypeType,
-        lambdaTypeType
+        lambdaTypeType,
+        assignableExpressionType
     };
 }
 
@@ -144,3 +150,8 @@ export type MemberAccessExpressionType = ASTType<ExpressionTypes["memberAccessEx
  * Type representing the call expression
  */
 export type CallExpressionType = ASTType<ExpressionTypes["callExpressionType"]>;
+
+/**
+ * Type representing the assignable expression
+ */
+export type AssingableExpressionType = ASTType<ExpressionTypes["assignableExpressionType"]>;

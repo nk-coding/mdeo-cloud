@@ -19,13 +19,17 @@ import {
     ReadonlyOrderedSetType,
     ReadonlySetType,
     SetType,
+    StatementPartialTypeSystem,
     stringType,
-    voidType
+    TypePartialTypeSystem,
+    type ExpressionTypirServices
 } from "@mdeo/language-expression";
 import type { ScriptTypirSpecifics } from "../plugin.js";
-import { expressionTypes } from "../grammar/types.js";
-import type { TypirLangiumServices } from "typir-langium";
+import { expressionTypes, statementTypes, typeTypes } from "../grammar/types.js";
 
+/**
+ * The type system for the Script language.
+ */
 export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics> {
     constructor() {
         super(
@@ -54,7 +58,27 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
                 ],
                 lambdaSuperTypes: [{ type: AnyType.name }]
             },
-            expressionTypes
+            expressionTypes,
+            []
         );
+    }
+
+    protected override onInitializeExtended(typir: ExpressionTypirServices<ScriptTypirSpecifics>): void {
+        const statementPartialTypeSystem = new StatementPartialTypeSystem<ScriptTypirSpecifics>(
+            typir,
+            statementTypes,
+            this.expressionTypes,
+            this.primitiveTypes,
+            this.nullablePrimitiveTypes,
+            this.voidType,
+            this.defaultTypeConfig.Iterable
+        );
+        statementPartialTypeSystem.registerRules();
+        const typePartialTypeSystem = new TypePartialTypeSystem<ScriptTypirSpecifics>(
+            typir,
+            typeTypes,
+            this.nullablePrimitiveTypes.Any
+        );
+        typePartialTypeSystem.registerRules();
     }
 }

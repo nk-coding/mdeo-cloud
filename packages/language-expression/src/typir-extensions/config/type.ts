@@ -50,7 +50,7 @@ export interface VoidType {
     /**
      * Marker to distinguish void type from other types
      */
-    readonly kind: 'void';
+    readonly kind: "void";
 }
 
 /**
@@ -171,12 +171,12 @@ export namespace ClassTypeRef {
     /**
      * Type guard to check if a ReturnType is a ClassTypeRef.
      * A ClassTypeRef has a 'type' property (which is a string identifier).
-     * 
+     *
      * @param type The type to check
      * @returns true if the type is a ClassTypeRef
      */
     export function is(type: ReturnType): type is ClassTypeRef {
-        return typeof type === 'object' && type !== null && 'type' in type;
+        return typeof type === "object" && type !== null && "type" in type;
     }
 }
 
@@ -187,12 +187,12 @@ export namespace GenericTypeRef {
     /**
      * Type guard to check if a ReturnType is a GenericTypeRef.
      * A GenericTypeRef has a 'generic' property (which is a string identifier).
-     * 
+     *
      * @param type The type to check
      * @returns true if the type is a GenericTypeRef
      */
     export function is(type: ReturnType): type is GenericTypeRef {
-        return typeof type === 'object' && type !== null && 'generic' in type;
+        return typeof type === "object" && type !== null && "generic" in type;
     }
 }
 
@@ -203,12 +203,12 @@ export namespace LambdaType {
     /**
      * Type guard to check if a ReturnType is a LambdaType.
      * A LambdaType has 'parameters' and 'returnType' properties.
-     * 
+     *
      * @param type The type to check
      * @returns true if the type is a LambdaType
      */
     export function is(type: ReturnType): type is LambdaType {
-        return typeof type === 'object' && type !== null && 'parameters' in type;
+        return typeof type === "object" && type !== null && "parameters" in type;
     }
 }
 
@@ -219,11 +219,11 @@ export namespace VoidType {
     /**
      * Type guard to check if a ReturnType is a VoidType.
      * A VoidType has a 'kind' property with the value 'void'.
-     * 
+     *
      * @param type The type to check
      * @returns true if the type is a VoidType
      */
     export function is(type: ReturnType): type is VoidType {
-        return typeof type === 'object' && type !== null && 'kind' in type && type.kind === 'void';
+        return typeof type === "object" && type !== null && "kind" in type && type.kind === "void";
     }
 }

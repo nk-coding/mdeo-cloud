@@ -8,9 +8,7 @@ import type { Provider } from "../../service/extendedTypirServices.js";
  *
  * @template Specifics Language-specific types extending TypirSpecifics
  */
-export interface CustomVoidDetails<Specifics extends TypirSpecifics> extends TypeDetails<Specifics> {
-    
-}
+export type CustomVoidDetails<Specifics extends TypirSpecifics> = TypeDetails<Specifics>;
 
 /**
  * Constructor interface for custom void type.
@@ -53,7 +51,10 @@ export const CustomVoidTypeProvider: Provider<CustomVoidTypeConstructor> = (serv
          * @param kind The kind that created this type
          * @param details The void type details
          */
-        constructor(kind: CustomVoidKind<TypirSpecifics>, readonly details: CustomVoidDetails<TypirSpecifics>) {
+        constructor(
+            kind: CustomVoidKind<TypirSpecifics>,
+            readonly details: CustomVoidDetails<TypirSpecifics>
+        ) {
             super("void", details);
             this.kind = kind;
             this.defineTheInitializationProcessOfThisType({});

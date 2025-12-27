@@ -1,12 +1,15 @@
-import type { LangiumTypeSystemDefinition, TypirLangiumServices, TypirLangiumSpecifics } from "typir-langium";
-import type { DefaultTypeConfig } from "./defaultTypeConfig.js";
+import type { TypirLangiumServices, TypirLangiumSpecifics } from "typir-langium";
+import type { TypeSystemConfig } from "./typeSystemConfig.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
-import type { ClassType } from "../typir-extensions/config/type.js";
+import type { ClassType, Member } from "../typir-extensions/config/type.js";
 import type { TypeDefinitionService } from "../typir-extensions/service/type-definition-service.js";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { ExpressionTypirServices } from "./services.js";
 import { ExpressionPartialTypeSystem } from "./expressionPartialTypeSystem.js";
 import type { PrimitiveTypes } from "./partialTypeSystem.js";
+import type { ExtendedTypeSystemDefinition } from "../typir-extensions/langium/typeSystemDefinition.js";
+import type { Scope } from "../typir-extensions/scope/scope.js";
+import { GlobalScope } from "../typir-extensions/scope/globalScope.js";
 
 /**
  * Defines the modes for type conversions within the type system.
@@ -33,7 +36,7 @@ enum ConversionMode {
  * @template Specifics The language-specific type system configuration extending TypirLangiumSpecifics
  */
 export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
-    implements LangiumTypeSystemDefinition<Specifics>
+    implements ExtendedTypeSystemDefinition<Specifics>
 {
     /**
      * Non-nullable primitive types (int, long, float, double, string, boolean, Any).
@@ -51,14 +54,28 @@ export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
     protected voidType!: CustomClassType;
 
     /**
+     * The global scope containing top-level declarations and built-in members.
+     */
+    private _globalScope: Scope<Specifics> | undefined;
+
+    get globalScope(): Scope<Specifics> {
+        if (!this._globalScope) {
+            throw new Error("Global scope accessed before initialization");
+        }
+        return this._globalScope;
+    }
+
+    /**
      * Creates a new ExpressionTypeSystem instance.
      *
      * @param defaultTypeConfig Configuration for default/primitive types
      * @param expressionTypes Type definitions for various expression AST nodes
+     * @param globalScopeEntries Members to include in the global scope
      */
     constructor(
-        readonly defaultTypeConfig: DefaultTypeConfig,
-        readonly expressionTypes: ExpressionTypes
+        readonly defaultTypeConfig: TypeSystemConfig,
+        readonly expressionTypes: ExpressionTypes,
+        readonly globalScopeEntries: Member[]
     ) {}
 
     onInitialize(typir: TypirLangiumServices<Specifics>): void {
@@ -69,6 +86,8 @@ export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
         this.nullablePrimitiveTypes = this.buildPrimitiveTypes(TypeDefinitions, true);
 
         this.registerTypeConversions(Conversion);
+
+        this._globalScope = new GlobalScope<Specifics>(this.globalScopeEntries, extendedTypir);
 
         const expressionPartialTypeSystem = new ExpressionPartialTypeSystem(
             extendedTypir,
@@ -82,7 +101,7 @@ export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
 
     /**
      * Variant of onInitialize called with the extended Typir services.
-     * 
+     *
      * @param _typir The extended Typir services instance
      * @see LangiumTypeSystemDefinition.onInitialize
      */
@@ -136,7 +155,7 @@ export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
      * @param typeDefinitions The type definition service to register types with
      */
     private registerTypes(typeDefinitions: TypeDefinitionService): void {
-        typeDefinitions.registerClassTypes([
+        [
             this.defaultTypeConfig.Any,
             this.defaultTypeConfig.int,
             this.defaultTypeConfig.long,
@@ -146,7 +165,9 @@ export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
             this.defaultTypeConfig.boolean,
             this.defaultTypeConfig.Iterable,
             ...this.defaultTypeConfig.additionalTypes
-        ]);
+        ].forEach((type) => {
+            typeDefinitions.addClassType(type);
+        });
         typeDefinitions.registerLambdaSuperTypes(this.defaultTypeConfig.lambdaSuperTypes);
     }
 

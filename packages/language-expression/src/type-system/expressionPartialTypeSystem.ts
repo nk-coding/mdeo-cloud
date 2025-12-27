@@ -32,6 +32,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
 
     override registerRules(): void {
         this.registerLiteralRules();
+        this.registerIdentifierRules();
         this.registerMemberAccessRules();
         this.registerCallRules();
         this.registerUnaryExpressionRules();
@@ -50,7 +51,61 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         this.registerInferenceRule(this.types.doubleLiteralExpressionType, () => this.primitiveTypes.double);
         this.registerInferenceRule(this.types.stringLiteralExpressionType, () => this.primitiveTypes.string);
         this.registerInferenceRule(this.types.booleanLiteralExpressionType, () => this.primitiveTypes.boolean);
-        this.registerInferenceRule(this.types.nullLiteralExpressionType, () => this.typir.factory.CustomNull.getOrCreate());
+        this.registerInferenceRule(this.types.nullLiteralExpressionType, () =>
+            this.typir.factory.CustomNull.getOrCreate()
+        );
+    }
+
+    /**
+     * Registers type inference and validation rules for identifier expressions.
+     * Uses the scope provider to infer types and validates that identifiers exist and are initialized.
+     */
+    private registerIdentifierRules(): void {
+        this.registerInferenceRule(this.types.identifierExpressionType, (node) => {
+            const scope = this.typir.ScopeProvider.getScope(node);
+            const entry = scope.getEntry(node.name);
+
+            if (entry == undefined) {
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `Cannot find identifier '${node.name}'.`,
+                    subProblems: []
+                };
+            }
+
+            const inferredType = entry.inferType();
+            if (Array.isArray(inferredType)) {
+                return inferredType[0];
+            }
+            return inferredType;
+        });
+
+        this.registerValidationRule(this.types.identifierExpressionType, (node, accept) => {
+            const scope = this.typir.ScopeProvider.getScope(node);
+            const entry = scope.getEntry(node.name);
+
+            if (!entry) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node,
+                    message: `Cannot find identifier '${node.name}'.`,
+                    subProblems: []
+                });
+                return;
+            }
+
+            if (!scope.isEntryInitialized(entry)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node,
+                    message: `Identifier '${node.name}' is used before being initialized.`,
+                    subProblems: []
+                });
+            }
+        });
     }
 
     /**
@@ -80,14 +135,14 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
             const inferResult = inferCall(
                 node,
                 node.expression,
-                node.genericArgs.typeArguments,
+                node.genericArgs?.typeArguments ?? [],
                 node.arguments,
                 this.typir
             );
             if (this.typir.factory.CustomValues.isCustomValueType(inferResult)) {
                 const expression = node.expression;
                 if (this.astReflection.isInstance(expression, this.types.memberAccessExpressionType)) {
-                    if ((expression as any).isNullChaining) {
+                    if (expression.isNullChaining) {
                         return inferResult.asNullable;
                     }
                 }
@@ -96,9 +151,13 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         });
 
         this.registerValidationRule(this.types.callExpressionType, (node, accept) =>
-            validateCall(node, node.expression, node.genericArgs.typeArguments, node.arguments, this.typir).forEach(
-                accept
-            )
+            validateCall(
+                node,
+                node.expression,
+                node.genericArgs?.typeArguments ?? [],
+                node.arguments,
+                this.typir
+            ).forEach(accept)
         );
     }
 

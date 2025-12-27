@@ -13,7 +13,7 @@ import type { BaseClassTypeRef, ClassType } from "../typir-extensions/config/typ
  * available in the language-expression package and maps their canonical
  * names to `ClassType` objects.
  */
-export interface DefaultTypeConfig {
+export interface TypeSystemConfig {
     /**
      * The root Any type from which all other types derive.
      */

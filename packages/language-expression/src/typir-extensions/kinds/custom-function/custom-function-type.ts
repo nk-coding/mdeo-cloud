@@ -144,7 +144,11 @@ function buildFunctionSignatureName(
  * @param isIdentifier Whether to build a full identifier or just a name
  * @returns The string representation of the type
  */
-function resolveTypeFromDefinition(type: ReturnType, typeArgs: Map<string, CustomValueType>, isIdentifier: boolean): string {
+function resolveTypeFromDefinition(
+    type: ReturnType,
+    typeArgs: Map<string, CustomValueType>,
+    isIdentifier: boolean
+): string {
     if (VoidType.is(type)) {
         return "void";
     } else if (GenericTypeRef.is(type)) {
@@ -172,6 +176,6 @@ function resolveTypeFromDefinition(type: ReturnType, typeArgs: Map<string, Custo
         const lambdaStr = `(${params.join(",")}) => ${returnType}`;
         return type.isNullable ? `(${lambdaStr})?` : lambdaStr;
     } else {
-        assertUnreachable(type)
+        assertUnreachable(type);
     }
 }

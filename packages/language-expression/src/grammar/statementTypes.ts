@@ -1,4 +1,4 @@
-import { createInterface, Optional } from "@mdeo/language-common";
+import { createInterface, Optional, type ASTType } from "@mdeo/language-common";
 import type { StatementConfig } from "./statementConfig.js";
 import type { ExpressionTypes } from "./expressionTypes.js";
 
@@ -43,8 +43,13 @@ export function generateStatementTypes(config: StatementConfig, expressionTypes:
         condition: baseExpressionType
     });
 
+    const forStatementVariableDeclarationType = createInterface(config.forStatementVariableDeclarationTypeName).attrs({
+        name: String,
+        type: Optional(baseTypeType)
+    });
+
     const forStatementType = createInterface(config.forStatementTypeName).extends(baseStatementType).attrs({
-        variable: String,
+        variable: forStatementVariableDeclarationType,
         iterable: baseExpressionType,
         body: statementsScopeType
     });
@@ -60,7 +65,7 @@ export function generateStatementTypes(config: StatementConfig, expressionTypes:
     const assignmentStatementType = createInterface(config.assignmentStatementTypeName)
         .extends(baseStatementType)
         .attrs({
-            left: baseExpressionType,
+            left: expressionTypes.assignableExpressionType,
             right: baseExpressionType
         });
 
@@ -77,6 +82,7 @@ export function generateStatementTypes(config: StatementConfig, expressionTypes:
         whileStatementType,
         doWhileStatementType,
         forStatementType,
+        forStatementVariableDeclarationType,
         variableDeclarationStatementType,
         assignmentStatementType,
         expressionStatementType,
@@ -92,4 +98,19 @@ export type StatementTypes = ReturnType<typeof generateStatementTypes>;
 /**
  * Type representing the base statement type.
  */
-export type BaseStatementType = StatementTypes["baseStatementType"];
+export type BaseStatementType = ASTType<StatementTypes["baseStatementType"]>;
+
+/**
+ * Type representing the statements scope type.
+ */
+export type StatementsScopeType = ASTType<StatementTypes["statementsScopeType"]>;
+
+/**
+ * Type representing the for statement type.
+ */
+export type ForStatementType = ASTType<StatementTypes["forStatementType"]>;
+
+/**
+ * Type representing the for statement variable declaration type.
+ */
+export type ForStatementVariableDeclarationType = ASTType<StatementTypes["forStatementVariableDeclarationType"]>;

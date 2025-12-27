@@ -51,6 +51,11 @@ export interface CustomValueType<
     readonly superClasses: CustomClassType[];
 
     /**
+     * All super classes including inherited ones
+     */
+    readonly allSuperClasses: CustomClassType[];
+
+    /**
      * The type details including type arguments and super types
      */
     readonly details: T;
@@ -63,17 +68,17 @@ export interface CustomValueType<
     /**
      * Get the nullable version of this type
      */
-    get asNullable(): CustomValueType;
+    readonly asNullable: CustomValueType;
 
     /**
      * Get the non-nullable version of this type
      */
-    get asNonNullable(): CustomValueType;
+    readonly asNonNullable: CustomValueType;
 
     /**
      * Whether this type can be null
      */
-    get isNullable(): boolean;
+    readonly isNullable: boolean;
 
     /**
      * Get a member (property or method) by name, including inherited members.
@@ -115,6 +120,20 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
         implements CustomValueType<T>
     {
         readonly superClasses: CustomClassType[];
+
+        private _allSuperClasses: CustomClassType[] | undefined = undefined;
+
+        get allSuperClasses(): CustomClassType[] {
+            if (this._allSuperClasses == undefined) {
+                const allSupers = new Set<CustomClassType>();
+                for (const superClass of this.superClasses) {
+                    allSupers.add(superClass);
+                    superClass.allSuperClasses.forEach((indirectSuperClass) => allSupers.add(indirectSuperClass));
+                }
+                this._allSuperClasses = [...allSupers];
+            }
+            return this._allSuperClasses;
+        }
 
         private readonly cachedMembers: Map<string, Member> = new Map();
 
@@ -170,11 +189,7 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
             }
             if (this.isNullable) {
                 const nullType = this.services.factory.CustomNull.getOrCreate();
-                this.services.Conversion.markAsConvertible(
-                    nullType,
-                    this,
-                    "IMPLICIT_EXPLICIT"
-                );
+                this.services.Conversion.markAsConvertible(nullType, this, "IMPLICIT_EXPLICIT");
             }
         }
 

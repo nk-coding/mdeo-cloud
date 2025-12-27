@@ -175,7 +175,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                     };
                 }
                 parameterTypes.push(inferredType);
-                
+
                 parameters.push({
                     name: `param${i}`,
                     type: {
@@ -200,10 +200,10 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
             let returnType: CustomValueType | CustomVoidType;
             let returnTypeDefinition: ReturnType;
-            
+
             if (this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType)) {
                 returnType = inferredReturnType;
-                returnTypeDefinition = { kind: 'void' as const };
+                returnTypeDefinition = { kind: "void" as const };
             } else if (this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)) {
                 returnType = inferredReturnType;
                 returnTypeDefinition = {

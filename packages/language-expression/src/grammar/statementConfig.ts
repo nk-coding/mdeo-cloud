@@ -58,6 +58,16 @@ export class StatementConfig {
     readonly forStatementRuleName: string;
 
     /**
+     * The name for the ForStatementVariableDeclaration type.
+     */
+    readonly forStatementVariableDeclarationTypeName: string;
+
+    /**
+     * The name for the ForStatementVariableDeclaration rule.
+     */
+    readonly forStatementVariableDeclarationRuleName: string;
+
+    /**
      * The name for the VariableDeclarationStatement type.
      */
     readonly variableDeclarationStatementTypeName: string;
@@ -118,6 +128,8 @@ export class StatementConfig {
         this.doWhileStatementRuleName = prefix + "DoWhileStatementRule";
         this.forStatementTypeName = prefix + "ForStatement";
         this.forStatementRuleName = prefix + "ForStatementRule";
+        this.forStatementVariableDeclarationTypeName = prefix + "ForStatementVariableDeclaration";
+        this.forStatementVariableDeclarationRuleName = prefix + "ForStatementVariableDeclarationRule";
         this.variableDeclarationStatementTypeName = prefix + "VariableDeclarationStatement";
         this.variableDeclarationStatementRuleName = prefix + "VariableDeclarationStatementRule";
         this.assignmentStatementTypeName = prefix + "AssignmentStatement";

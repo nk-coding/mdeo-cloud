@@ -15,12 +15,17 @@ import {
     scriptFileScopingConfig
 } from "./types.js";
 
-const TypeRule = generateTypeRules(typeConfig, typeTypes);
+const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);
 
 /**
  * The expression and type rules.
  */
-const ExpressionRule = generateExpressionRules(expressionConfig, expressionTypes, TypeRule, []);
+const { expressionRule: ExpressionRule, assignableExpressionRule: AssignableExpressionRule } = generateExpressionRules(
+    expressionConfig,
+    expressionTypes,
+    TypeRule,
+    []
+);
 
 /**
  * The statement rules.
@@ -29,6 +34,7 @@ const { statementsScopeRule: StatementsScopeRule } = generateStatementRules(
     statementConfig,
     statementTypes,
     ExpressionRule,
+    AssignableExpressionRule,
     TypeRule,
     []
 );
@@ -51,7 +57,7 @@ const FunctionRule = createRule("ScriptFunctionRule")
         "(",
         ...manySep(add("parameters", FunctionParameterRule), ",", LeadingTrailing.TRAILING),
         ")",
-        optional(":", set("returnType", TypeRule)),
+        optional(":", set("returnType", ReturnTypeRule)),
         set("body", StatementsScopeRule)
     ]);
 

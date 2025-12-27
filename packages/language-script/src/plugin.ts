@@ -11,18 +11,22 @@ import { ScriptRule } from "./grammar/rule.js";
 import {
     defaultExtendedTypirServices,
     type AdditionalTypirServices,
-    type ExtendedTypirServices
+    type ExpressionTypirServices
 } from "@mdeo/language-expression";
-import type { TypirLangiumSpecifics } from "typir-langium";
+import { type TypirLangiumSpecifics } from "typir-langium";
 import { ScriptTypeSystem } from "./services/typeSystem.js";
+import { ScriptScopeProvider } from "./services/scopeProvider.js";
 
-export interface ScriptTypirSpecifics extends TypirLangiumSpecifics {}
+/**
+ * The Typir specifics for the Script language.
+ */
+export type ScriptTypirSpecifics = TypirLangiumSpecifics;
 
 /**
  * The additional services for the Script language.
  */
 export type ScriptServices = {
-    typir: ExtendedTypirServices<ScriptTypirSpecifics>;
+    typir: ExpressionTypirServices<ScriptTypirSpecifics>;
 };
 
 /**
@@ -50,8 +54,15 @@ export const scriptPluginProvider: LanguagePluginProvider<ScriptServices> = {
                     services.shared as any,
                     services.shared.AstReflection as any,
                     new ScriptTypeSystem(),
-                    defaultExtendedTypirServices<ScriptTypirSpecifics>(context)
-                )
+                    defaultExtendedTypirServices<ScriptTypirSpecifics>(context),
+                    {
+                        ScopeProvider: (services) =>
+                            new ScriptScopeProvider(services as ExpressionTypirServices<ScriptTypirSpecifics>)
+                    }
+                ) as ExpressionTypirServices<ScriptTypirSpecifics>
+        },
+        postCreate(services) {
+            context["typir-langium"].initializeLangiumTypirServices(services as any, services.typir);
         }
     })
 };

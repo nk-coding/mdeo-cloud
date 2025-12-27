@@ -1,5 +1,5 @@
-import type { Module, TypirSpecifics } from "typir";
-import type { AdditionalTypirServices, ExtendedTypirServices } from "./extendedTypirServices.js";
+import type { DeepPartial, Module } from "typir";
+import type { AdditionalTypirServices, ExtendedTypirLangiumServices } from "./extendedTypirServices.js";
 import { DefaultTypeDefinitionService } from "./type-definition-service.js";
 import type { PluginContext } from "@mdeo/language-common";
 import { CustomClassKind, CustomClassKindName } from "../kinds/custom-class/custom-class-kind.js";
@@ -8,6 +8,10 @@ import { CustomFunctionKind, CustomFunctionKindName } from "../kinds/custom-func
 import { CustomValueKind, CustomValueKindName } from "../kinds/custom-value/custom-value-kind.js";
 import { CustomVoidKind, CustomVoidKindName } from "../kinds/custom-void/custom-void-kind.js";
 import { CustomNullKind, CustomNullKindName } from "../kinds/custom-null/custom-null-kind.js";
+import type { TypirLangiumAddedServices, TypirLangiumSpecifics } from "typir-langium";
+import { generateTypeCreator } from "../langium/typeCreator.js";
+import { generateScopeProviderCache } from "../langium/scopeProviderCache.js";
+import { DefaultScopeProvider } from "../scope/scopeProvider.js";
 
 /**
  * Provides the default implementation for the additional typir services
@@ -15,9 +19,12 @@ import { CustomNullKind, CustomNullKindName } from "../kinds/custom-null/custom-
  * @param context The plugin context
  * @returns The module with the default extended typir services
  */
-export function defaultExtendedTypirServices<Specifics extends TypirSpecifics>(
+export function defaultExtendedTypirServices<Specifics extends TypirLangiumSpecifics>(
     context: PluginContext
-): Module<ExtendedTypirServices<Specifics>, AdditionalTypirServices<Specifics>> {
+): Module<
+    ExtendedTypirLangiumServices<Specifics>,
+    AdditionalTypirServices<Specifics> & DeepPartial<TypirLangiumAddedServices<Specifics>>
+> {
     return {
         factory: {
             CustomClasses: (services) =>
@@ -51,7 +58,14 @@ export function defaultExtendedTypirServices<Specifics extends TypirSpecifics>(
                     () => new CustomNullKind<Specifics>(services)
                 )
         },
+        caching: {
+            ...generateScopeProviderCache<Specifics>(context)
+        },
+        langium: {
+            ...generateTypeCreator<Specifics>(context)
+        },
         TypeDefinitions: (services) => new DefaultTypeDefinitionService(services),
+        ScopeProvider: () => new DefaultScopeProvider<Specifics>(),
         context: () => context
     };
 }

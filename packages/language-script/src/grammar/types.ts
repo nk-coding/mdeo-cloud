@@ -70,7 +70,7 @@ export const ScriptBaseType = typeTypes.baseTypeType;
  */
 export const FunctionParameter = createInterface("ScriptFunctionParameter").attrs({
     name: String,
-    type: Optional(ScriptBaseType)
+    type: ScriptBaseType
 });
 
 /**
@@ -79,7 +79,7 @@ export const FunctionParameter = createInterface("ScriptFunctionParameter").attr
 export const Function = createInterface("ScriptFunction").attrs({
     name: String,
     parameters: [FunctionParameter],
-    returnType: Optional(ScriptBaseType),
+    returnType: Optional(typeTypes.returnTypeType),
     body: StatementsScope
 });
 

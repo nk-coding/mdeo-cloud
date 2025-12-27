@@ -24,7 +24,7 @@ export function inferMemberAccess<Specifics extends TypirSpecifics>(
 ): InferenceProblem<Specifics> | CustomValueType | CustomFunctionType {
     const { InferenceProblem } = services.context.typir;
     const ownerType = services.Inference.inferType(owner);
-    if (!services.factory.CustomClasses.isCustomClassType(ownerType)) {
+    if (!services.factory.CustomValues.isCustomValueType(ownerType)) {
         if (Array.isArray(ownerType)) {
             return <InferenceProblem<Specifics>>{
                 $problem: InferenceProblem,

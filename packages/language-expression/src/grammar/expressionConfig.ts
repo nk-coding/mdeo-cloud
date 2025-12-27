@@ -163,6 +163,16 @@ export class ExpressionConfig {
     readonly expressionRuleName: string;
 
     /**
+     * The name for the AssignableExpression type.
+     */
+    readonly assignableExpressionTypeName: string;
+
+    /**
+     * The name for the AssignableExpression rule.
+     */
+    readonly assignableExpressionRuleName: string;
+
+    /**
      * Creates a new ExpressionConfig.
      * @param prefix Prefix for naming generated rules and types.
      */
@@ -172,7 +182,7 @@ export class ExpressionConfig {
         this.unaryExpressionTypeName = prefix + "UnaryExpression";
         this.unaryExpressionRuleName = prefix + "UnaryExpressionRule";
         this.binaryExpressionTypeName = prefix + "BinaryExpression";
-        this.binaryExpressionRuleName = prefix + "BinaryExpressionRule";
+        this.binaryExpressionRuleName = prefix + "BinaryExpression";
         this.ternaryExpressionTypeName = prefix + "TernaryExpression";
         this.ternaryExpressionRuleName = prefix + "TernaryExpressionRule";
         this.callExpressionTypeName = prefix + "CallExpression";
@@ -199,5 +209,7 @@ export class ExpressionConfig {
         this.bracketedExpressionTypeName = prefix + "BracketedExpression";
         this.bracketedExpressionRuleName = prefix + "BracketedExpressionRule";
         this.expressionRuleName = prefix + "ExpressionRule";
+        this.assignableExpressionTypeName = prefix + "AssignableExpression";
+        this.assignableExpressionRuleName = prefix + "AssignableExpressionRule";
     }
 }

@@ -14,9 +14,7 @@ export const MapType = classType("Map", "builtin")
     )
     .method("clear", (m) => m.signature((s) => s.returns(voidType())))
     .method("put", (m) =>
-        m.signature((s) =>
-            s.param("key", genericTypeRef("K")).param("value", genericTypeRef("V")).returns(voidType())
-        )
+        m.signature((s) => s.param("key", genericTypeRef("K")).param("value", genericTypeRef("V")).returns(voidType()))
     )
     .method("putAll", (m) =>
         m.signature((s) =>

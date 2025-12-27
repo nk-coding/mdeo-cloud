@@ -396,21 +396,16 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             return;
         }
 
-        this.reportAmbiguousSignatures(bestScoringResults);
+        this.reportAmbiguousSignatures();
         this.tryInferReturnTypeFromBestResults(bestScoringResults);
     }
 
     /**
      * Reports an error for ambiguous function calls with multiple best-matching signatures.
-     *
-     * @param bestScoringResults The best scoring signature results
      */
-    private reportAmbiguousSignatures(bestScoringResults: FunctionSignatureValidationResult<TProblem>[]): void {
+    private reportAmbiguousSignatures(): void {
         this.errors.push(
-            this.createError(
-                this.languageNode,
-                `Ambiguous function call: multiple valid signatures found with equal scores.`
-            )
+            this.createError(this.languageNode, `Ambiguous function call: multiple valid signatures found.`)
         );
     }
 

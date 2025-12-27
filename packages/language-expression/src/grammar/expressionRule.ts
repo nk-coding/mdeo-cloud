@@ -72,7 +72,7 @@ export function generateExpressionRules(
     types: ExpressionTypes,
     typeRule: ParserRule<BaseTypeType>,
     additionalExpressionRules: ParserRule<BaseExpressionType>[]
-): ParserRule<BaseExpressionType> {
+) {
     const stringLiteralExpressionRule = createRule(config.stringLiteralExpressionRuleName)
         .returns(types.stringLiteralExpressionType)
         .as(({ set }) => [set("value", STRING)]);
@@ -96,7 +96,7 @@ export function generateExpressionRules(
     const booleanLiteralExpressionRule = createRule(config.booleanLiteralExpressionRuleName)
         .returns(types.booleanLiteralExpressionType)
         .as(({ set }) => [set("value", BOOLEAN)]);
-    
+
     const nullLiteralExpressionRule = createRule(config.nullLiteralExpressionTypeName)
         .returns(types.nullLiteralExpressionType)
         .as(() => ["null"]);
@@ -202,5 +202,12 @@ export function generateExpressionRules(
         .returns(types.baseExpressionType)
         .as(() => [ternaryExpressionRule]);
 
-    return expressionRule;
+    const assignableExpressionRule = createRule(config.assignableExpressionRuleName)
+        .returns(types.assignableExpressionType)
+        .as(() => [or(identifierExpressionRule, memberAccessExpressionRule)]);
+
+    return {
+        expressionRule,
+        assignableExpressionRule
+    };
 }

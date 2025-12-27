@@ -11,7 +11,7 @@ import {
 } from "@mdeo/language-common";
 import type { StatementConfig } from "./statementConfig.js";
 import type { BaseStatementType, StatementTypes } from "./statementTypes.js";
-import type { BaseExpressionType } from "./expressionTypes.js";
+import type { AssingableExpressionType, BaseExpressionType } from "./expressionTypes.js";
 import type { BaseTypeType } from "./typeTypes.js";
 
 /**
@@ -25,6 +25,7 @@ import type { BaseTypeType } from "./typeTypes.js";
  * @param config Configuration object containing naming for all statement rules and types
  * @param types The generated statement type interfaces to use as return types
  * @param expressionRule The expression parser rule to use for conditions, values, etc.
+ * @param assignableExpressionRule The assignable expression parser rule to use for assignment left-hand sides
  * @param typeRule The type parser rule to use for variable type annotations
  * @param additionalStatementRules Optional array of custom statement rules to include
  * @returns Object containing all generated statement parser rules
@@ -33,6 +34,7 @@ export function generateStatementRules(
     config: StatementConfig,
     types: StatementTypes,
     expressionRule: ParserRule<BaseExpressionType>,
+    assignableExpressionRule: ParserRule<AssingableExpressionType>,
     typeRule: ParserRule<BaseTypeType>,
     additionalStatementRules: ParserRule<BaseStatementType>[]
 ) {
@@ -80,12 +82,16 @@ export function generateStatementRules(
         .returns(types.doWhileStatementType)
         .as(({ set }) => ["do", set("body", statementsScopeRule), "while", "(", set("condition", expressionRule), ")"]);
 
+    const forStatementVariableDeclarationRule = createRule(config.forStatementVariableDeclarationRuleName)
+        .returns(types.forStatementVariableDeclarationType)
+        .as(({ set }) => [set("name", ID), optional(":", set("type", typeRule))]);
+
     const forStatementRule = createRule(config.forStatementRuleName)
         .returns(types.forStatementType)
         .as(({ set }) => [
             "for",
             "(",
-            set("variable", ID),
+            set("variable", forStatementVariableDeclarationRule),
             "in",
             set("iterable", expressionRule),
             ")",
@@ -105,7 +111,7 @@ export function generateStatementRules(
 
     const assignmentStatementRule = createRule(config.assignmentStatementRuleName)
         .returns(types.assignmentStatementType)
-        .as(({ set }) => [set("left", expressionRule), "=", set("right", expressionRule)]);
+        .as(({ set }) => [set("left", assignableExpressionRule), "=", set("right", expressionRule)]);
 
     const expressionStatementRule = createRule(config.expressionStatementRuleName)
         .returns(types.expressionStatementType)
@@ -134,6 +140,7 @@ export function generateStatementRules(
         whileStatementRule,
         doWhileStatementRule,
         forStatementRule,
+        forStatementVariableDeclarationRule,
         variableDeclarationStatementRule,
         assignmentStatementRule,
         expressionStatementRule

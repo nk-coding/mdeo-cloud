@@ -10,14 +10,14 @@ import {
     type ValidationCollector,
     type ValidationRuleFunctional
 } from "typir";
-import type { DefaultTypeConfig } from "./defaultTypeConfig.js";
+import type { TypeSystemConfig } from "./typeSystemConfig.js";
 
 /**
  * Represents a mapping of primitive type names to their corresponding CustomClassType instances.
  * Excludes special type configuration keys like "additionalTypes", "lambdaSuperTypes", and "void".
  */
 export type PrimitiveTypes = Record<
-    Exclude<keyof DefaultTypeConfig, "additionalTypes" | "lambdaSuperTypes" | "Iterable">,
+    Exclude<keyof TypeSystemConfig, "additionalTypes" | "lambdaSuperTypes" | "Iterable">,
     CustomClassType
 >;
 
