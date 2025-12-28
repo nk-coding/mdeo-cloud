@@ -1,4 +1,4 @@
-import { createRule, ID, LeadingTrailing, manySep, optional, or, type ParserRule } from "@mdeo/language-common";
+import { createRule, group, ID, LeadingTrailing, manySep, optional, or, type ParserRule } from "@mdeo/language-common";
 import type { TypeConfig } from "./typeConfig.js";
 import type { TypeTypes } from "./typeTypes.js";
 
@@ -12,7 +12,7 @@ import type { TypeTypes } from "./typeTypes.js";
 export function generateTypeRules(config: TypeConfig, types: TypeTypes) {
     const classTypeRule: ParserRule<any> = createRule(config.classTypeRuleName)
         .returns(types.classTypeType)
-        .as(({ set, add }) => [
+        .as(({ set, add, flag }) => [
             set("name", ID),
             optional(
                 "<",
@@ -22,7 +22,8 @@ export function generateTypeRules(config: TypeConfig, types: TypeTypes) {
                     LeadingTrailing.TRAILING
                 ),
                 ">"
-            )
+            ),
+            optional(flag("isNullable", "?"))
         ]);
 
     const voidTypeRule = createRule(config.voidTypeRuleName)
@@ -35,17 +36,20 @@ export function generateTypeRules(config: TypeConfig, types: TypeTypes) {
 
     const lambdaTypeRule = createRule(config.lambdaTypeRuleName)
         .returns(types.lambdaTypeType)
-        .as(({ set, add }) => [
-            "(",
-            ...manySep(
-                add("parameters", () => classTypeRule),
-                ",",
-                LeadingTrailing.TRAILING
-            ),
-            ")",
-            "=>",
-            set("returnType", returnTypeRule)
-        ]);
+        .as(({ set, add, flag }) => {
+            const inner = [
+                "(",
+                ...manySep(
+                    add("parameters", () => classTypeRule),
+                    ",",
+                    LeadingTrailing.TRAILING
+                ),
+                ")",
+                "=>",
+                set("returnType", returnTypeRule)
+            ];
+            return [or(group(...inner), flag("isNullable", group("(", ...inner, ")", "?")))];
+        });
 
     const typeRule = createRule(config.typeRuleName)
         .returns(types.baseTypeType)

@@ -24,7 +24,10 @@ import type { ClassType } from "../typir-extensions/config/type.js";
  *
  * @template Specifics The language-specific Typir-Langium configuration.
  */
-export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> extends BaseScopeProvider<Specifics> {
+export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> extends BaseScopeProvider<
+    Specifics,
+    ExpressionTypirServices<Specifics>
+> {
     protected readonly reflection: AstReflection;
     protected readonly inference: TypeInferenceCollector<Specifics>;
 

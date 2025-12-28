@@ -1,3 +1,6 @@
+export * from "./features/inferLambdaType.js";
+export * from "./features/returnAnalyzer.js";
+export * from "./features/statementsScopeProvider.js";
 export * from "./grammar/expressionConfig.js";
 export * from "./grammar/expressionRule.js";
 export * from "./grammar/expressionTypes.js";
@@ -7,8 +10,6 @@ export * from "./grammar/statementTypes.js";
 export * from "./grammar/typeConfig.js";
 export * from "./grammar/typeRule.js";
 export * from "./grammar/typeTypes.js";
-export * from "./scope-provider/returnAnalyzer.js";
-export * from "./scope-provider/statementsScopeProvider.js";
 export * from "./stdlib/collections/Bag.js";
 export * from "./stdlib/collections/Collection.js";
 export * from "./stdlib/collections/Iterable.js";

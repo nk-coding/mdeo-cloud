@@ -1,5 +1,6 @@
 export * from "./grammar/rule.js";
 export * from "./grammar/types.js";
+export * from "./services/lambdaScope.js";
 export * from "./services/scopeProvider.js";
 export * from "./services/scriptPartialTypeSystem.js";
 export * from "./services/scriptReturnStatementAccessor.js";

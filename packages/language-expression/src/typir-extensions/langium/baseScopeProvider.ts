@@ -12,8 +12,13 @@ import type { ExtendedTypeSystemDefinition } from "./typeSystemDefinition.js";
  * to find scope-relevant nodes and build a chain of nested scopes.
  *
  * @template Specifics The language-specific Typir-Langium configuration.
+ * @template S The extended Typir-Langium services type.
  */
-export abstract class BaseScopeProvider<Specifics extends TypirLangiumSpecifics> implements ScopeProvider<Specifics> {
+export abstract class BaseScopeProvider<
+    Specifics extends TypirLangiumSpecifics,
+    S extends ExtendedTypirLangiumServices<Specifics>
+> implements ScopeProvider<Specifics>
+{
     /**
      * Caching mechanism for storing and retrieving scopes associated with language nodes.
      */
@@ -29,7 +34,7 @@ export abstract class BaseScopeProvider<Specifics extends TypirLangiumSpecifics>
      *
      * @param typir The Typir services including Langium-specific services for scope management.
      */
-    constructor(protected readonly typir: ExtendedTypirLangiumServices<Specifics>) {
+    constructor(protected readonly typir: S) {
         this.caching = typir.caching.ScopeProvider;
         this.typeSystemDefinition = typir.langium.TypeSystemDefinition as ExtendedTypeSystemDefinition<Specifics>;
     }

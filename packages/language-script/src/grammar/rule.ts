@@ -6,7 +6,8 @@ import {
     optional,
     generateImportRules,
     newlineSep,
-    NewlineSepSectionCardinality
+    NewlineSepSectionCardinality,
+    or
 } from "@mdeo/language-common";
 import { generateExpressionRules, generateStatementRules, generateTypeRules } from "@mdeo/language-expression";
 import {
@@ -22,10 +23,32 @@ import {
     FunctionImport,
     FunctionFileImport,
     scriptFileScopingConfig,
-    ReturnStatement
+    ReturnStatement,
+    LambdaExpression,
+    LambdaParameter
 } from "./types.js";
 
 const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);
+
+/**
+ * Lambda parameter rule.
+ */
+const LambdaParameterRule = createRule("ScriptLambdaParameterRule")
+    .returns(LambdaParameter)
+    .as(({ set }) => [set("name", ID)]);
+
+/**
+ * Lambda expression rule.
+ */
+const LambdaExpressionRule = createRule("ScriptLambdaExpressionRule")
+    .returns(LambdaExpression)
+    .as(({ add, set }) => [
+        "(",
+        ...manySep(add("parameters", LambdaParameterRule), ",", LeadingTrailing.TRAILING),
+        ")",
+        "=>",
+        or(set("expression", ExpressionRule), set("body", StatementsScopeRule))
+    ]);
 
 /**
  * The expression and type rules.
@@ -34,7 +57,7 @@ const { expressionRule: ExpressionRule, assignableExpressionRule: AssignableExpr
     expressionConfig,
     expressionTypes,
     TypeRule,
-    []
+    [LambdaExpressionRule]
 );
 
 /**

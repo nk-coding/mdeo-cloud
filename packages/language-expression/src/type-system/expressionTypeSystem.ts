@@ -49,11 +49,6 @@ export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
     protected nullablePrimitiveTypes!: PrimitiveTypes;
 
     /**
-     * The void type.
-     */
-    protected voidType!: CustomClassType;
-
-    /**
      * The global scope containing top-level declarations and built-in members.
      */
     private _globalScope: Scope<Specifics> | undefined;

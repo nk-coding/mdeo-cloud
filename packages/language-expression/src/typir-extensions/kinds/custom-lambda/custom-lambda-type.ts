@@ -2,6 +2,7 @@ import type { TypirProblem, TypirSpecifics, Type as TypirType, TypeEqualityProbl
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
 import type { CustomLambdaDetails, CustomLambdaKind } from "./custom-lambda-kind.js";
 import type { Provider } from "../../service/extendedTypirServices.js";
+import type { LambdaType } from "../../config/type.js";
 
 /**
  * Constructor interface for custom lambda types.
@@ -93,6 +94,10 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
             });
             this.nullInvertedTypeCache = nonNullableType;
             return nonNullableType;
+        }
+
+        override get definition(): LambdaType {
+            return this.details.definition;
         }
 
         override getName(): string {

@@ -28,7 +28,6 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         protected readonly expressionTypes: ExpressionTypes,
         protected readonly primitiveTypes: PrimitiveTypes,
         protected readonly nullablePrimitiveTypes: PrimitiveTypes,
-        protected readonly voidType: CustomClassType,
         protected readonly iterableType: ClassType
     ) {
         super(typir, types);
@@ -39,6 +38,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         this.registerControlFlowStatementRules();
         this.registerAssignmentRules();
         this.registerBreakContinueStatementRules();
+        this.registerExpressionStatementRules();
 
         this.registerInferenceRule(this.types.forStatementVariableDeclarationType, (node) => {
             return this.inferForStatementVariableDeclarationType(node);
@@ -336,5 +336,33 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                 severity: "error"
             });
         }
+    }
+
+    /**
+     * Registers validation rules for expression statements.
+     *
+     * Expression statements must evaluate to either void or a custom value type.
+     * This prevents expressions that evaluate to class types from being used as statements.
+     */
+    private registerExpressionStatementRules(): void {
+        this.registerValidationRule(this.types.expressionStatementType, (node, accept) => {
+            const expressionType = this.inference.inferType(node.expression);
+            
+            if (Array.isArray(expressionType)) {
+                return;
+            }
+
+            const isVoid = this.typir.factory.CustomVoid.isCustomVoidType(expressionType);
+            const isCustomValue = this.typir.factory.CustomValues.isCustomValueType(expressionType);
+
+            if (!isVoid && !isCustomValue) {
+                accept({
+                    $problem: this.validationProblem,
+                    languageNode: node,
+                    message: `Expression statement must evaluate to void or a value type, but got '${expressionType.getName()}'.`,
+                    severity: "error"
+                });
+            }
+        });
     }
 }

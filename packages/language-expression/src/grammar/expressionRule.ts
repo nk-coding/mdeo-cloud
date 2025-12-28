@@ -7,10 +7,12 @@ import {
     group,
     ID,
     LeadingTrailing,
+    many,
     manySep,
     optional,
     or,
     STRING,
+    treeRewriteAction,
     type ParserRule
 } from "@mdeo/language-common";
 import type { ExpressionConfig } from "./expressionConfig.js";
@@ -99,7 +101,7 @@ export function generateExpressionRules(
 
     const nullLiteralExpressionRule = createRule(config.nullLiteralExpressionTypeName)
         .returns(types.nullLiteralExpressionType)
-        .as(() => ["null"]);
+        .as(() => [action(types.nullLiteralExpressionType, () => ["null"])]);
 
     const identifierExpressionRule = createRule(config.identifierExpressionRuleName)
         .returns(types.identifierExpressionType)
@@ -122,16 +124,27 @@ export function generateExpressionRules(
             )
         ]);
 
-    const memberAccessExpressionRule = createRule(config.memberAccessExpressionRuleName)
+    const memberAccessAndCallExpressionRule = createRule(config.memberAccessAndCallExpressionRuleName)
         .returns(types.baseExpressionType)
         .as(() => [
-            or(
-                primaryExpressionRule,
-                action(types.memberAccessExpressionType, ({ set, flag }) => [
-                    set("expression", primaryExpressionRule),
-                    or(flag("isNullChaining", "?."), "."),
-                    set("member", ID)
-                ])
+            primaryExpressionRule,
+            many(
+                or(
+                    treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
+                        or(flag("isNullChaining", "?."), "."),
+                        set("member", ID)
+                    ]),
+                    treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
+                        set("genericArgs", callExpressionGenericArgsRule),
+                        "(",
+                        ...manySep(
+                            add("arguments", () => expressionRule),
+                            ",",
+                            LeadingTrailing.TRAILING
+                        ),
+                        ")"
+                    ])
+                )
             )
         ]);
 
@@ -141,33 +154,14 @@ export function generateExpressionRules(
             optional("<", ...atLeastOneSep(add("typeArguments", typeRule), ",", LeadingTrailing.TRAILING), ">")
         ]);
 
-    const callExpressionRule = createRule(config.callExpressionRuleName)
-        .returns(types.baseExpressionType)
-        .as(() => [
-            or(
-                memberAccessExpressionRule,
-                action(types.callExpressionType, ({ set, add }) => [
-                    set("expression", memberAccessExpressionRule),
-                    set("genericArgs", callExpressionGenericArgsRule),
-                    "(",
-                    ...manySep(
-                        add("arguments", () => expressionRule),
-                        ",",
-                        LeadingTrailing.TRAILING
-                    ),
-                    ")"
-                ])
-            )
-        ]);
-
     const unaryExpressionRule = createRule(config.unaryExpressionRuleName)
         .returns(types.baseExpressionType)
         .as(() => [
             or(
-                callExpressionRule,
+                memberAccessAndCallExpressionRule,
                 action(types.unaryExpressionType, ({ set }) => [
                     set("operator", "!", "-"),
-                    set("expression", callExpressionRule)
+                    set("expression", memberAccessAndCallExpressionRule)
                 ])
             )
         ]);
@@ -204,7 +198,7 @@ export function generateExpressionRules(
 
     const assignableExpressionRule = createRule(config.assignableExpressionRuleName)
         .returns(types.assignableExpressionType)
-        .as(() => [or(identifierExpressionRule, memberAccessExpressionRule)]);
+        .as(() => [or(identifierExpressionRule, memberAccessAndCallExpressionRule)]);
 
     return {
         expressionRule,

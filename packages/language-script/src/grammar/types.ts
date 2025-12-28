@@ -83,6 +83,34 @@ export const BaseStatement = statementTypes.baseStatementType;
 export const StatementsScope = statementTypes.statementsScopeType;
 
 /**
+ * Lambda parameter type.
+ */
+export const LambdaParameter = createInterface("ScriptLambdaParameter").attrs({
+    name: String
+});
+
+/**
+ * Lambda expression type for Script.
+ */
+export const LambdaExpression = createInterface("ScriptLambdaExpression")
+    .extends(BaseExpression)
+    .attrs({
+        parameters: [LambdaParameter],
+        expression: Optional(BaseExpression),
+        body: Optional(StatementsScope)
+    });
+
+/**
+ * Type representing a LambdaExpression AST node.
+ */
+export type LambdaExpressionType = ASTType<typeof LambdaExpression>;
+
+/**
+ * Type representing a LambdaParameter AST node.
+ */
+export type LambdaParameterType = ASTType<typeof LambdaParameter>;
+
+/**
  * Type representing the base type annotation.
  */
 export const ScriptBaseType = typeTypes.baseTypeType;

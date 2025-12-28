@@ -83,7 +83,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
             return this.typir.factory.CustomClasses.getOrCreate({
                 definition: classTypeDef,
-                isNullable: false,
+                isNullable: node.isNullable,
                 typeArgs: typeArgMap,
                 superTypes: classTypeDef.superTypes ?? []
             });
@@ -119,7 +119,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                     $problem: this.validationProblem,
                     severity: "error",
                     languageNode: node,
-                    message: `Type '${typeName}' expects ${expectedGenericCount} generic parameter(s), but ${providedGenericCount} were provided. Extra parameters will be ignored.`,
+                    message: `Type '${typeName}' expects ${expectedGenericCount} generic parameter(s), but ${providedGenericCount} were provided.`,
                     subProblems: []
                 });
             }
@@ -129,7 +129,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                     $problem: this.validationProblem,
                     severity: "warning",
                     languageNode: node,
-                    message: `Type '${typeName}' expects ${expectedGenericCount} generic parameter(s), but only ${providedGenericCount} were provided. Missing parameters will be filled with 'Any'.`,
+                    message: `Type '${typeName}' expects ${expectedGenericCount} generic parameter(s), but only ${providedGenericCount} were provided.`,
                     subProblems: []
                 });
             }
@@ -178,11 +178,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
                 parameters.push({
                     name: `param${i}`,
-                    type: {
-                        type: inferredType.getName(),
-                        isNullable: inferredType.isNullable,
-                        typeArgs: new Map()
-                    }
+                    type: inferredType.definition
                 });
             }
 
@@ -199,18 +195,11 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
             }
 
             let returnType: CustomValueType | CustomVoidType;
-            let returnTypeDefinition: ReturnType;
 
-            if (this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType)) {
+            if (this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType) || this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)) {
                 returnType = inferredReturnType;
-                returnTypeDefinition = { kind: "void" as const };
             } else if (this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)) {
                 returnType = inferredReturnType;
-                returnTypeDefinition = {
-                    type: inferredReturnType.getName(),
-                    isNullable: inferredReturnType.isNullable,
-                    typeArgs: new Map()
-                };
             } else {
                 return {
                     $problem: this.inferenceProblem,
@@ -222,8 +211,8 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
             const lambdaDefinition: LambdaType = {
                 parameters,
-                returnType: returnTypeDefinition,
-                isNullable: false
+                returnType: returnType.definition,
+                isNullable: node.isNullable
             };
 
             return this.typir.factory.CustomLambdas.getOrCreate({

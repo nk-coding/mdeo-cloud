@@ -2,7 +2,7 @@ import type { TypirProblem, TypirSpecifics, Type as TypirType, TypeEqualityProbl
 import type { CustomValueType, CustomValueTypeDetail } from "../custom-value/custom-value-type.js";
 import type { CustomNullKind } from "./custom-null-kind.js";
 import type { Provider } from "../../service/extendedTypirServices.js";
-import type { Member } from "../../config/type.js";
+import type { ClassTypeRef, Member } from "../../config/type.js";
 
 /**
  * Type details for the null type.
@@ -71,6 +71,13 @@ export const CustomNullTypeProvider: Provider<CustomNullTypeConstructor> = (serv
 
         override get asNonNullable(): CustomNullType {
             return this;
+        }
+
+        override get definition(): ClassTypeRef {
+            return {
+                type: "Any",
+                isNullable: true
+            };
         }
 
         override getName(): string {

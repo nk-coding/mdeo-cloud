@@ -240,7 +240,7 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
         name: string,
         genericTypeArgs?: Map<string, CustomValueType>
     ): CustomFunctionType {
-        return this.services.factory.CustomFunctions.getOrCreate({
+        return this.services.factory.CustomFunctions.create({
             definition: type,
             name,
             typeArgs: genericTypeArgs ?? new Map()

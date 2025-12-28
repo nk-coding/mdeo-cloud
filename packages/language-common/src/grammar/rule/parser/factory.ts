@@ -212,7 +212,7 @@ export function unorderedGroup(...elements: RuleEntry[]): AbstractElement {
  * @param handler Function that defines what should be parsed after creating the node
  * @returns An abstract element representing the action
  *
- * @see {@link https://langium.org/docs/grammar-language/#actions | Langium Actions Documentation}
+ * @see {@link https://langium.org/docs/reference/grammar-language/#simple-actions | Langium Actions Documentation}
  *
  * @example
  * ```typescript
@@ -247,7 +247,7 @@ export function action<T extends AstNode>(
  * @param handler Function that defines how to parse the value for the property
  * @returns An abstract element representing the tree rewrite action
  *
- * @see {@link https://langium.org/docs/grammar-language/#tree-rewriting-actions | Langium Tree Rewriting Documentation}
+ * @see {@link https://langium.org/docs/reference/grammar-language/#tree-rewriting-actions | Langium Tree Rewriting Documentation}
  *
  * @example
  * ```typescript

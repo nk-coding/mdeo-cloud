@@ -1,4 +1,5 @@
 import {
+    generateIdValueConverter,
     generateNewlineAwareTokenBuilder,
     HIDDEN_NEWLINE,
     ML_COMMENT,
@@ -44,7 +45,8 @@ export const scriptPluginProvider: LanguagePluginProvider<ScriptServices> = {
         additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
         module: {
             parser: {
-                ...generateNewlineAwareTokenBuilder(context, new Set(["{"]), new Set(["("]), new Set(["}", ")"]))
+                ...generateNewlineAwareTokenBuilder(context, new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
+                ...generateIdValueConverter(context)
             },
             typir: (services) =>
                 context["typir-langium"].createTypirLangiumServicesWithAdditionalServices<

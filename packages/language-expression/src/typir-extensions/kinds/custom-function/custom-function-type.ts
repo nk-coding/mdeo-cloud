@@ -58,11 +58,11 @@ export const CustomFunctionTypeProvider: Provider<CustomFunctionTypeConstructor>
         }
 
         override getName(): string {
-            return buildCustomFunctionName(this.details, false);
+            return buildCustomFunctionName(this.details);
         }
 
         override getUserRepresentation(): string {
-            return buildCustomFunctionIdentifier(this.details);
+            return buildCustomFunctionName(this.details);
         }
 
         override analyzeTypeEqualityProblems(otherType: TypirType): TypirProblem[] {
@@ -85,13 +85,18 @@ export const CustomFunctionTypeProvider: Provider<CustomFunctionTypeConstructor>
 };
 
 /**
+ * Counter for generating unique function type identifiers.
+ */
+let functionNameCounter = 0;
+
+/**
  * Build a unique identifier for a custom function type.
  *
  * @param details The function type details
  * @returns The unique identifier string
  */
 export function buildCustomFunctionIdentifier(details: CustomFunctionDetails<any>): string {
-    return buildCustomFunctionName(details, true);
+    return `CustomFunction#${functionNameCounter++}`;
 }
 
 /**
@@ -99,12 +104,11 @@ export function buildCustomFunctionIdentifier(details: CustomFunctionDetails<any
  * Includes all signature overloads separated by newlines.
  *
  * @param details The function type details
- * @param isIdentifier Whether to build a full identifier or just a name
  * @returns The name string
  */
-export function buildCustomFunctionName(details: CustomFunctionDetails<any>, isIdentifier: boolean): string {
+export function buildCustomFunctionName(details: CustomFunctionDetails<any>): string {
     return details.definition.signatures
-        .map((signature) => buildFunctionSignatureName(details, signature, isIdentifier))
+        .map((signature) => buildFunctionSignatureName(details, signature))
         .join("\n");
 }
 
@@ -113,16 +117,14 @@ export function buildCustomFunctionName(details: CustomFunctionDetails<any>, isI
  *
  * @param details The function type details
  * @param signature The specific signature to build a name for
- * @param isIdentifier Whether to build a full identifier or just a name
  * @returns The signature name string in the format "name(param1,param2): returnType"
  */
 function buildFunctionSignatureName(
     details: CustomFunctionDetails<any>,
     signature: FunctionSignature,
-    isIdentifier: boolean
 ): string {
     const paramTypes = signature.parameters.map((param) => {
-        const resolvedType = resolveTypeFromDefinition(param.type, details.typeArgs, isIdentifier);
+        const resolvedType = resolveTypeFromDefinition(param.type, details.typeArgs);
         return resolvedType;
     });
 
@@ -130,7 +132,7 @@ function buildFunctionSignatureName(
         paramTypes[paramTypes.length - 1] = `...${paramTypes[paramTypes.length - 1]}`;
     }
 
-    const returnTypeStr = resolveTypeFromDefinition(signature.returnType, details.typeArgs, isIdentifier);
+    const returnTypeStr = resolveTypeFromDefinition(signature.returnType, details.typeArgs);
 
     return `${details.name}(${paramTypes.join(",")}): ${returnTypeStr}`;
 }
@@ -141,20 +143,18 @@ function buildFunctionSignatureName(
  *
  * @param type The value type definition to resolve
  * @param typeArgs Map of generic type arguments
- * @param isIdentifier Whether to build a full identifier or just a name
  * @returns The string representation of the type
  */
 function resolveTypeFromDefinition(
     type: ReturnType,
     typeArgs: Map<string, CustomValueType>,
-    isIdentifier: boolean
 ): string {
     if (VoidType.is(type)) {
         return "void";
     } else if (GenericTypeRef.is(type)) {
         const resolvedGeneric = typeArgs.get(type.generic);
         if (resolvedGeneric) {
-            return isIdentifier ? resolvedGeneric.getIdentifier() : resolvedGeneric.getName();
+            return  resolvedGeneric.getName();
         }
         return type.generic;
     } else if (ClassTypeRef.is(type)) {
@@ -162,7 +162,7 @@ function resolveTypeFromDefinition(
 
         if (type.typeArgs && type.typeArgs.size > 0) {
             const typeArgsStr = Array.from(type.typeArgs.values())
-                .map((arg: any) => resolveTypeFromDefinition(arg, typeArgs, isIdentifier))
+                .map((arg: any) => resolveTypeFromDefinition(arg, typeArgs))
                 .join(",");
             return `${baseType}<${typeArgsStr}>${type.isNullable ? "?" : ""}`;
         }
@@ -170,9 +170,9 @@ function resolveTypeFromDefinition(
         return `${baseType}${type.isNullable ? "?" : ""}`;
     } else if (LambdaType.is(type)) {
         const params = type.parameters.map((param: any) =>
-            resolveTypeFromDefinition(param.type, typeArgs, isIdentifier)
+            resolveTypeFromDefinition(param.type, typeArgs)
         );
-        const returnType = resolveTypeFromDefinition(type.returnType, typeArgs, isIdentifier);
+        const returnType = resolveTypeFromDefinition(type.returnType, typeArgs);
         const lambdaStr = `(${params.join(",")}) => ${returnType}`;
         return type.isNullable ? `(${lambdaStr})?` : lambdaStr;
     } else {

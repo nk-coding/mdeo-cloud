@@ -6,6 +6,7 @@ export * from "./composables/file-scoping/scopeProvider.js";
 export * from "./composables/file-scoping/types.js";
 export * from "./composables/grammar-utils/manySep.js";
 export * from "./composables/grammar-utils/newlineSep.js";
+export * from "./composables/id-value-converter/idValueConverter.js";
 export * from "./composables/multimode-lexer/newlineAwareTokenBuilder.js";
 export * from "./composables/scoping/localScopeProvider.js";
 export * from "./grammar/module/createModule.js";

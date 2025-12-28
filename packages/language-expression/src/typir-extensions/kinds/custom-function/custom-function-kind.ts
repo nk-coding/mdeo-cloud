@@ -5,7 +5,6 @@ import {
     CustomFunctionTypeProvider,
     type CustomFunctionType,
     type CustomFunctionTypeConstructor,
-    buildCustomFunctionIdentifier
 } from "./custom-function-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
@@ -50,7 +49,7 @@ export interface CustomFunctionFactoryService<Specifics extends TypirSpecifics> 
      * @param details The function type details
      * @returns The custom function type instance
      */
-    getOrCreate(details: CustomFunctionDetails<Specifics>): CustomFunctionType;
+    create(details: CustomFunctionDetails<Specifics>): CustomFunctionType;
 
     /**
      * Type guard to check if a value is a CustomFunctionType.
@@ -97,16 +96,8 @@ export class CustomFunctionKind<Specifics extends TypirSpecifics>
      * @param details The function type details
      * @returns The custom function type instance
      */
-    getOrCreate(details: CustomFunctionDetails<Specifics>): CustomFunctionType {
-        const key = buildCustomFunctionIdentifier(details);
-        const existingType = this.services.infrastructure.Graph.getType(key);
-        if (existingType != undefined) {
-            return existingType as CustomFunctionType;
-        } else {
-            const newType = new this.CustomFunctionType(this as unknown as CustomFunctionKind<TypirSpecifics>, details);
-            this.services.infrastructure.Graph.addNode(newType);
-            return newType;
-        }
+    create(details: CustomFunctionDetails<Specifics>): CustomFunctionType {
+        return new this.CustomFunctionType(this as unknown as CustomFunctionKind<TypirSpecifics>, details);
     }
 
     /**

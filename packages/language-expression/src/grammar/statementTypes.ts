@@ -116,3 +116,13 @@ export type ForStatementType = ASTType<StatementTypes["forStatementType"]>;
  * Type representing the for statement variable declaration type.
  */
 export type ForStatementVariableDeclarationType = ASTType<StatementTypes["forStatementVariableDeclarationType"]>;
+
+/**
+ * Type representing the variable declaration statement type.
+ */
+export type VariableDeclarationStatementType = ASTType<StatementTypes["variableDeclarationStatementType"]>;
+
+/**
+ * Type representing the assignment statement type.
+ */
+export type AssignmentStatementType = ASTType<StatementTypes["assignmentStatementType"]>;

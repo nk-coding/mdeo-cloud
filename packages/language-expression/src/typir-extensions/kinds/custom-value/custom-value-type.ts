@@ -1,7 +1,7 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics } from "typir";
 import type { CustomClassType } from "../custom-class/custom-class-type.js";
 import type { ExtendedTypirServices, Provider } from "../../service/extendedTypirServices.js";
-import type { BaseClassTypeRef, Member } from "../../config/type.js";
+import type { BaseClassTypeRef, Member, ValueType } from "../../config/type.js";
 
 /**
  * Type details for custom value types.
@@ -59,6 +59,11 @@ export interface CustomValueType<
      * The type details including type arguments and super types
      */
     readonly details: T;
+
+    /**
+     * The type definition associated with this value type
+     */
+    readonly definition: ValueType;
 
     /**
      * The extended Typir services available for this type
@@ -146,6 +151,10 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
         }
 
         get isNullable(): boolean {
+            throw new Error("Method not implemented.");
+        }
+
+        get definition(): ValueType {
             throw new Error("Method not implemented.");
         }
 

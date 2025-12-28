@@ -48,11 +48,6 @@ export class ExpressionConfig {
     readonly callExpressionTypeName: string;
 
     /**
-     * The name for the CallExpression rule.
-     */
-    readonly callExpressionRuleName: string;
-
-    /**
      * The name for the CallExpressionGenericArgs type.
      */
     readonly callExpressionGenericArgsTypeName: string;
@@ -70,7 +65,7 @@ export class ExpressionConfig {
     /**
      * The name for the MemberAccessExpression rule.
      */
-    readonly memberAccessExpressionRuleName: string;
+    readonly memberAccessAndCallExpressionRuleName: string;
 
     /**
      * The name for the IdentifierExpression type.
@@ -177,7 +172,7 @@ export class ExpressionConfig {
      * @param prefix Prefix for naming generated rules and types.
      */
     constructor(readonly prefix: string) {
-        this.baseExpressionTypeName = prefix + "PrimaryExpression";
+        this.baseExpressionTypeName = prefix + "BaseExpression";
         this.primaryExpressionRuleName = prefix + "PrimaryExpressionRule";
         this.unaryExpressionTypeName = prefix + "UnaryExpression";
         this.unaryExpressionRuleName = prefix + "UnaryExpressionRule";
@@ -186,11 +181,10 @@ export class ExpressionConfig {
         this.ternaryExpressionTypeName = prefix + "TernaryExpression";
         this.ternaryExpressionRuleName = prefix + "TernaryExpressionRule";
         this.callExpressionTypeName = prefix + "CallExpression";
-        this.callExpressionRuleName = prefix + "CallExpressionRule";
         this.callExpressionGenericArgsTypeName = prefix + "CallExpressionGenericArgs";
         this.callExpressionGenericArgsRuleName = prefix + "CallExpressionGenericArgsRule";
         this.memberAccessExpressionTypeName = prefix + "MemberAccessExpression";
-        this.memberAccessExpressionRuleName = prefix + "MemberAccessExpressionRule";
+        this.memberAccessAndCallExpressionRuleName = prefix + "MemberAccessAndCallExpressionRule";
         this.identifierExpressionTypeName = prefix + "IdentifierExpression";
         this.identifierExpressionRuleName = prefix + "IdentifierExpressionRule";
         this.stringLiteralExpressionTypeName = prefix + "StringLiteralExpression";

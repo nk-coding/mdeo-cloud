@@ -1,6 +1,7 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics, TypeEqualityProblem } from "typir";
 import type { CustomVoidKind } from "./custom-void-kind.js";
 import type { Provider } from "../../service/extendedTypirServices.js";
+import type { VoidType } from "../../config/type.js";
 
 /**
  * Type details for the void type.
@@ -31,6 +32,11 @@ export interface CustomVoidType extends TypirType {
      * The void type details
      */
     readonly details: CustomVoidDetails<TypirSpecifics>;
+
+    /**
+     * The type definition associated with this void type
+     */
+    readonly definition: VoidType;
 }
 
 export const CustomVoidTypeProvider: Provider<CustomVoidTypeConstructor> = (services) => {
@@ -58,6 +64,12 @@ export const CustomVoidTypeProvider: Provider<CustomVoidTypeConstructor> = (serv
             super("void", details);
             this.kind = kind;
             this.defineTheInitializationProcessOfThisType({});
+        }
+
+        get definition(): VoidType {
+            return {
+                kind: "void"
+            };
         }
 
         override getName(): string {

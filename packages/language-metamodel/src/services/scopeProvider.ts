@@ -8,7 +8,7 @@ import {
 import type { ReferenceInfo, Scope, ScopeProvider } from "langium";
 import type { MetamodelServiceProvider } from "../plugin.js";
 import { MetaClassOrImport, metamodelFileScopingConfig, type MetaModelType } from "../grammar/types.js";
-import { createLocalScope } from "@mdeo/language-common/src/composables/scoping/localScopeProvider.js";
+import { createLocalScope } from "@mdeo/language-common";
 
 export const MetamodelScopeProvider: MetamodelServiceProvider<ScopeProvider> = (context: PluginContext) => {
     class ScopeProvider extends context.langium.DefaultScopeProvider {

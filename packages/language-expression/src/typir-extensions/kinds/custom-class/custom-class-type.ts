@@ -1,7 +1,7 @@
 import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProblem } from "typir";
 import type { CustomClassDetails, CustomClassKind } from "./custom-class-kind.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
-import type { Member } from "../../config/type.js";
+import type { ClassTypeRef, Member, ValueType } from "../../config/type.js";
 import type { Provider } from "../../service/extendedTypirServices.js";
 
 /**
@@ -88,6 +88,19 @@ export const CustomClassTypeProvider: Provider<CustomClassTypeConstructor> = (se
             });
             this.nullInvertedTypeCache = nonNullableType;
             return nonNullableType;
+        }
+
+        override get definition(): ClassTypeRef {
+            const definition = this.details.definition;
+            const typeArgs = new Map<string, ValueType>();
+            for (const [argName, argType] of this.details.typeArgs) {
+                typeArgs.set(argName, argType.definition);
+            }
+            return {
+                type: `${definition.package}.${definition.name}`,
+                isNullable: this.isNullable,
+                typeArgs: typeArgs
+            };
         }
 
         override getName(): string {

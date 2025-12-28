@@ -2,8 +2,10 @@ import {
     DefaultScope,
     IterableType,
     StatementsScopeProvider,
+    inferLambdaTypeFromContext,
     type BoundScope,
     type ExpressionTypirServices,
+    type LambdaTypeInferenceResult,
     type Scope,
     type ScopeEntry
 } from "@mdeo/language-expression";
@@ -11,11 +13,14 @@ import type { ScriptTypirSpecifics } from "../plugin.js";
 import {
     expressionTypes,
     Function,
+    LambdaExpression,
     Script,
     statementTypes,
     type FunctionType,
+    type LambdaExpressionType,
     type ScriptType
 } from "../grammar/types.js";
+import { LambdaScope } from "./lambdaScope.js";
 
 /**
  * The scope provider for the Script language.
@@ -30,7 +35,8 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
         return (
             super.isScopeRelevantNode(node) ||
             this.reflection.isInstance(node, Function) ||
-            this.reflection.isInstance(node, Script)
+            this.reflection.isInstance(node, Script) ||
+            this.reflection.isInstance(node, LambdaExpression)
         );
     }
 
@@ -42,6 +48,8 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             return this.createScopeForFunctionNode(languageNode, parentScope);
         } else if (this.reflection.isInstance(languageNode, Script)) {
             return this.createScopeForScriptNode(languageNode, parentScope);
+        } else if (this.reflection.isInstance(languageNode, LambdaExpression)) {
+            return this.createScopeForLambdaNode(languageNode, parentScope);
         }
         return super.createScope(languageNode, parentScope);
     }
@@ -133,6 +141,78 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             languageNode: func,
             definingScope: scope,
             inferType: () => this.inference.inferType(func)
+        }));
+    }
+
+    /**
+     * Creates a scope for a lambda expression node.
+     * Lambda scopes include the lambda's parameters as scope entries.
+     * The scope stores the result of lambda type inference for later use during type checking.
+     *
+     * @param node The lambda expression node to create a scope for
+     * @param parentScope The parent scope of this lambda scope
+     * @returns A new LambdaScope containing the lambda's parameters and type inference result
+     */
+    private createScopeForLambdaNode(
+        node: LambdaExpressionType,
+        parentScope: BoundScope<ScriptTypirSpecifics> | undefined
+    ): Scope<ScriptTypirSpecifics> {
+        const lambdaTypeInference = inferLambdaTypeFromContext<ScriptTypirSpecifics>(
+            node,
+            this.typir,
+            expressionTypes,
+            statementTypes
+        );
+
+        return new LambdaScope(
+            parentScope,
+            (scope) => this.getLambdaScopeEntries(node, scope, lambdaTypeInference),
+            () => [],
+            node.parameters.map((param) => ({
+                name: param.name,
+                position: -1
+            })),
+            node,
+            lambdaTypeInference
+        );
+    }
+
+    /**
+     * Retrieves the scope entries for a lambda expression node.
+     * Each parameter of the lambda becomes a scope entry with its name, type (inferred from context),
+     * and defining scope.
+     *
+     * @param node The lambda expression node to get scope entries from
+     * @param scope The scope that these entries belong to
+     * @param lambdaTypeInference The result of lambda type inference
+     * @returns An array of scope entries, one for each lambda parameter
+     */
+    private getLambdaScopeEntries(
+        node: LambdaExpressionType,
+        scope: Scope<ScriptTypirSpecifics>,
+        lambdaTypeInference: LambdaTypeInferenceResult<ScriptTypirSpecifics>
+    ): ScopeEntry<ScriptTypirSpecifics>[] {
+        if (Array.isArray(lambdaTypeInference)) {
+            return node.parameters.map((param) => ({
+                name: param.name,
+                position: -1,
+                languageNode: param,
+                definingScope: scope,
+                inferType: () => lambdaTypeInference
+            }));
+        }
+
+        const parameterTypes =
+            "type" in lambdaTypeInference
+                ? lambdaTypeInference.type.details.parameterTypes
+                : lambdaTypeInference.parameterTypes;
+
+        return node.parameters.map((param, index) => ({
+            name: param.name,
+            position: -1,
+            languageNode: param,
+            definingScope: scope,
+            inferType: () => parameterTypes[index] ?? lambdaTypeInference
         }));
     }
 }

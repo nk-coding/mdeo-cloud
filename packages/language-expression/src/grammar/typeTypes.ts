@@ -18,14 +18,16 @@ export function generateTypeTypes(config: TypeConfig) {
         .extends(baseTypeType)
         .attrs({
             name: String,
-            typeArgs: [baseTypeType]
+            typeArgs: [baseTypeType],
+            isNullable: Boolean
         });
 
     const lambdaTypeType = createInterface(config.lambdaTypeTypeName)
         .extends(baseTypeType)
         .attrs({
             parameters: [baseTypeType],
-            returnType: returnTypeType
+            returnType: returnTypeType,
+            isNullable: Boolean
         });
 
     return {
