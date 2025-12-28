@@ -98,6 +98,26 @@ export class StatementConfig {
     readonly expressionStatementRuleName: string;
 
     /**
+     * The name for the BreakStatement type.
+     */
+    readonly breakStatementTypeName: string;
+
+    /**
+     * The name for the BreakStatement rule.
+     */
+    readonly breakStatementRuleName: string;
+
+    /**
+     * The name for the ContinueStatement type.
+     */
+    readonly continueStatementTypeName: string;
+
+    /**
+     * The name for the ContinueStatement rule.
+     */
+    readonly continueStatementRuleName: string;
+
+    /**
      * The name for the Statement rule.
      */
     readonly statementRuleName: string;
@@ -136,6 +156,10 @@ export class StatementConfig {
         this.assignmentStatementRuleName = prefix + "AssignmentStatementRule";
         this.expressionStatementTypeName = prefix + "ExpressionStatement";
         this.expressionStatementRuleName = prefix + "ExpressionStatementRule";
+        this.breakStatementTypeName = prefix + "BreakStatement";
+        this.breakStatementRuleName = prefix + "BreakStatementRule";
+        this.continueStatementTypeName = prefix + "ContinueStatement";
+        this.continueStatementRuleName = prefix + "ContinueStatementRule";
         this.statementRuleName = prefix + "StatementRule";
         this.statementsScopeTypeName = prefix + "StatementsScope";
         this.statementsScopeRuleName = prefix + "StatementsScopeRule";

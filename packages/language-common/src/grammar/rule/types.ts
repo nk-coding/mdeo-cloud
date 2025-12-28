@@ -1,4 +1,4 @@
-import type { AstNode, GrammarAST } from "langium";
+import type { GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../serialization/types.js";
 
 /**
@@ -9,7 +9,7 @@ import type { SerializableGrammarNode } from "../serialization/types.js";
  *
  * @template T The AST node type that this parser rule produces
  */
-export type ParserRule<T extends AstNode> = {
+export type ParserRule<T> = {
     /**
      * TypeScript type information for the AST node this rule produces.
      * Only used for type inference and validation during compilation,

@@ -3,6 +3,7 @@ import { BaseScopeProvider } from "../typir-extensions/langium/baseScopeProvider
 import {
     DefaultScope,
     type BoundScope,
+    type ControlFlowEntry,
     type Scope,
     type ScopeEntry,
     type ScopeLocalInitialization
@@ -14,10 +15,27 @@ import type { TypeInferenceCollector } from "typir";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
 
+/**
+ * Scope provider for statement-based language constructs.
+ *
+ * Handles scope creation and management for statements including variable declarations,
+ * control flow statements (if/else, loops), and for-loop iteration variables. Manages
+ * variable visibility, control flow analysis, and initialization tracking within scopes.
+ *
+ * @template Specifics The language-specific Typir-Langium configuration.
+ */
 export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> extends BaseScopeProvider<Specifics> {
     protected readonly reflection: AstReflection;
     protected readonly inference: TypeInferenceCollector<Specifics>;
 
+    /**
+     * Creates a new StatementsScopeProvider instance.
+     *
+     * @param typir The Typir services including type inference and language services.
+     * @param statementTypes Type definitions for statement AST nodes.
+     * @param expressionTypes Type definitions for expression AST nodes.
+     * @param iterableType The class type used for iterable collections in for-loops.
+     */
     constructor(
         typir: ExpressionTypirServices<Specifics>,
         protected readonly statementTypes: StatementTypes,
@@ -48,6 +66,16 @@ export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> ex
         throw new Error("Unsupported language node type for scope creation.");
     }
 
+    /**
+     * Creates a scope for a statements block node.
+     *
+     * The scope includes all variable declarations, control flow entries for conditional
+     * and loop statements, and tracks variable initializations within the block.
+     *
+     * @param node The statements block AST node.
+     * @param parentScope The parent scope containing this statements block, if any.
+     * @returns A new scope for the statements block.
+     */
     protected createScopeForStatementsNode(
         node: StatementsScopeType,
         parentScope: BoundScope<Specifics> | undefined
@@ -55,11 +83,22 @@ export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> ex
         return new DefaultScope<Specifics>(
             parentScope,
             (scope) => this.getStatementsScopeEntries(node, scope),
-            () => this.getStatementsSequentialChildScopes(node),
-            this.getStatementsLocalInitializations(node)
+            () => this.getStatementsControlFlowEntries(node),
+            this.getStatementsLocalInitializations(node),
+            node
         );
     }
 
+    /**
+     * Creates a scope for a for-statement node.
+     *
+     * The scope includes the loop iteration variable, which is accessible within
+     * the for-loop body. The variable's type is inferred from the loop's iterable.
+     *
+     * @param node The for-statement AST node.
+     * @param parentScope The parent scope containing this for-statement, if any.
+     * @returns A new scope for the for-statement.
+     */
     protected createScopeForForStatementNode(
         node: ForStatementType,
         parentScope: BoundScope<Specifics> | undefined
@@ -84,10 +123,21 @@ export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> ex
                     name: variable.name,
                     position: -1
                 }
-            ]
+            ],
+            node
         );
     }
 
+    /**
+     * Extracts scope entries from a statements block.
+     *
+     * Collects all variable declarations within the statements block, creating
+     * scope entries with their names, positions, and type inference functions.
+     *
+     * @param node The statements block AST node.
+     * @param scope The scope being populated with entries.
+     * @returns An array of scope entries for variables declared in the block.
+     */
     protected getStatementsScopeEntries(node: StatementsScopeType, scope: Scope<Specifics>): ScopeEntry<Specifics>[] {
         const entries: ScopeEntry<Specifics>[] = [];
         for (let i = 0; i < node.statements.length; i++) {
@@ -105,27 +155,57 @@ export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> ex
         return entries;
     }
 
-    protected getStatementsSequentialChildScopes(node: StatementsScopeType): (Scope<Specifics>[] | undefined)[] {
-        const childScopes: (Scope<Specifics>[] | undefined)[] = [];
-        for (const statement of node.statements) {
-            if (
-                this.reflection.isInstance(statement, this.statementTypes.ifStatementType) &&
-                statement.elseBlock != undefined
+    /**
+     * Extracts control flow entries from a statements block.
+     *
+     * Identifies control flow statements (if/else-if/else, while, do-while, for)
+     * and creates entries that track their nested scopes and completeness.
+     * Control flow completeness affects variable initialization analysis.
+     *
+     * @param node The statements block AST node.
+     * @returns An array of control flow entries for statements with branching or loops.
+     */
+    protected getStatementsControlFlowEntries(node: StatementsScopeType): ControlFlowEntry<Specifics>[] {
+        const controlFlowEntries: ControlFlowEntry<Specifics>[] = [];
+        for (let i = 0; i < node.statements.length; i++) {
+            const statement = node.statements[i];
+            if (this.reflection.isInstance(statement, this.statementTypes.ifStatementType)) {
+                const scopes: Scope<Specifics>[] = [this.getScope(statement.thenBlock).scope];
+                for (const elseIf of statement.elseIfs) {
+                    scopes.push(this.getScope(elseIf.thenBlock).scope);
+                }
+                if (statement.elseBlock != undefined) {
+                    scopes.push(this.getScope(statement.elseBlock).scope);
+                }
+                controlFlowEntries.push({
+                    position: i,
+                    scopes,
+                    isComplete: statement.elseBlock != undefined
+                });
+            } else if (
+                this.reflection.isInstance(statement, this.statementTypes.forStatementType) ||
+                this.reflection.isInstance(statement, this.statementTypes.whileStatementType)
             ) {
-                childScopes.push([
-                    this.getScope(statement.thenBlock),
-                    ...statement.elseIfs.map((elseIf) => this.getScope(elseIf.thenBlock)),
-                    this.getScope(statement.elseBlock)
-                ]);
-            } else if (this.reflection.isInstance(statement, this.statementTypes.doWhileStatementType)) {
-                childScopes.push([this.getScope(statement.body)]);
-            } else {
-                childScopes.push(undefined);
+                controlFlowEntries.push({
+                    position: i,
+                    scopes: [this.getScope(statement.body).scope],
+                    isComplete: false
+                });
             }
         }
-        return childScopes;
+        return controlFlowEntries;
     }
 
+    /**
+     * Extracts local variable initializations from a statements block.
+     *
+     * Tracks where variables are initialized within the block, including both
+     * variable declarations with initial values and assignment statements.
+     * This information is used for definite assignment analysis.
+     *
+     * @param node The statements block AST node.
+     * @returns An array of initialization records with variable names and positions.
+     */
     protected getStatementsLocalInitializations(node: StatementsScopeType): ScopeLocalInitialization[] {
         const initializations: ScopeLocalInitialization[] = [];
         for (let i = 0; i < node.statements.length; i++) {

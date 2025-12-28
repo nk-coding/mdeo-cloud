@@ -1,9 +1,11 @@
 import type { AstNode, GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
-import type { BaseType } from "../../type/types.js";
+import type { BaseType, Primitive } from "../../type/types.js";
+import type { MapPrimitive } from "../../type/interface/types.js";
 import type { RuleEntry, RuleContext } from "./types.js";
 import { groupIfNeeded, defaultRuleContext } from "./helpers.js";
 import type { ParserRule } from "../types.js";
+import { primitiveTypeLookup } from "../../type/primitiveTypeLookup.js";
 
 /**
  * Initial builder for creating parser rules. This is the entry point for
@@ -32,8 +34,35 @@ export class RuleBuilder {
      *     .as(({ set, add, flag }) => [...]);
      * ```
      */
-    returns<T extends AstNode>(type: BaseType<T>): RuleBuilderWithType<T> {
-        return new RuleBuilderWithType(this.name, type);
+    returns<T extends AstNode>(type: BaseType<T>): RuleBuilderWithType<T>;
+    /**
+     * Specifies the primitive data type for this parser rule. The data type defines
+     * the primitive value that this rule will produce when parsed.
+     *
+     * @template T The primitive type this rule will produce
+     * @param type The primitive type constructor (String, Number, Boolean, BigInt, Date)
+     * @returns A builder for defining the parsing logic
+     *
+     * @example
+     * ```typescript
+     * const NumberRule = createRule("NumberLiteral")
+     *     .returns(Number)  // Specify the primitive type
+     *     .as(({ set, add, flag }) => [...]);
+     * ```
+     */
+    returns<T extends Primitive>(type: T): RuleBuilderWithDataType<MapPrimitive<T>>;
+    returns<T extends AstNode | Primitive>(
+        type: BaseType<T extends AstNode ? T : never> | (T extends Primitive ? T : never)
+    ):
+        | RuleBuilderWithType<T extends AstNode ? T : never>
+        | RuleBuilderWithDataType<T extends Primitive ? MapPrimitive<T> : never> {
+        if (typeof type === "function") {
+            // It's a primitive type constructor
+            return new RuleBuilderWithDataType(this.name, type as Primitive) as any;
+        } else {
+            // It's a BaseType (Interface or Type)
+            return new RuleBuilderWithType(this.name, type as BaseType<AstNode>) as any;
+        }
     }
 }
 
@@ -79,6 +108,72 @@ export class RuleBuilderWithType<T extends AstNode> {
             $type: "ParserRule",
             name: this.name,
             returnType: () => this.type,
+            fragment: false,
+            entry: false,
+            definition: {
+                $type: "EndOfFile"
+            },
+            parameters: []
+        };
+        return {
+            toRule: () => {
+                if (!initialized) {
+                    initialized = true;
+                    createdRule.definition = groupIfNeeded(rule(defaultRuleContext));
+                }
+                return createdRule;
+            }
+        };
+    }
+}
+
+/**
+ * Builder for parser rules that have a primitive data type specified. This builder
+ * allows defining the actual parsing logic through a rule definition function.
+ *
+ * @template T The primitive type this rule will produce
+ */
+export class RuleBuilderWithDataType<T> {
+    /**
+     * The primitive type that this parser rule returns.
+     * Used to convert matched text into typed values.
+     */
+    private primitiveType: GrammarAST.PrimitiveType;
+
+    /**
+     * Creates a typed rule builder with a primitive data type.
+     *
+     * @param name The unique name for this parser rule
+     * @param type The primitive type constructor this rule will produce
+     */
+    constructor(
+        private readonly name: string,
+        type: Primitive
+    ) {
+        this.primitiveType = primitiveTypeLookup.get(type)!;
+    }
+
+    /**
+     * Defines the parsing logic for this rule using a function that returns
+     * rule entries. The function receives a context object with methods for
+     * creating assignments to populate values.
+     *
+     * @param rule Function that defines the parsing structure using the rule context
+     * @returns A complete parser rule that can be used in grammar generation
+     *
+     * @example
+     * ```typescript
+     * .as(({ set, add, flag }) => [
+     *     set("value", STRING_TERMINAL)  // Assign value property
+     * ])
+     * ```
+     */
+    as(rule: (context: RuleContext<T>) => RuleEntry[]): ParserRule<T> {
+        let initialized = false;
+        const createdRule: SerializableGrammarNode<GrammarAST.ParserRule> = {
+            $type: "ParserRule",
+            name: this.name,
+            dataType: this.primitiveType,
             fragment: false,
             entry: false,
             definition: {

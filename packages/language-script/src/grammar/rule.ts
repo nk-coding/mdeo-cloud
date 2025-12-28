@@ -1,4 +1,13 @@
-import { createRule, ID, many, manySep, LeadingTrailing, optional, generateImportRules } from "@mdeo/language-common";
+import {
+    createRule,
+    ID,
+    manySep,
+    LeadingTrailing,
+    optional,
+    generateImportRules,
+    newlineSep,
+    NewlineSepSectionCardinality
+} from "@mdeo/language-common";
 import { generateExpressionRules, generateStatementRules, generateTypeRules } from "@mdeo/language-expression";
 import {
     expressionConfig,
@@ -12,7 +21,8 @@ import {
     Function,
     FunctionImport,
     FunctionFileImport,
-    scriptFileScopingConfig
+    scriptFileScopingConfig,
+    ReturnStatement
 } from "./types.js";
 
 const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);
@@ -28,6 +38,13 @@ const { expressionRule: ExpressionRule, assignableExpressionRule: AssignableExpr
 );
 
 /**
+ * Return statement rule.
+ */
+const ReturnStatementRule = createRule("ScriptReturnStatementRule")
+    .returns(ReturnStatement)
+    .as(({ set }) => ["return", optional(set("value", ExpressionRule))]);
+
+/**
  * The statement rules.
  */
 const { statementsScopeRule: StatementsScopeRule } = generateStatementRules(
@@ -36,7 +53,7 @@ const { statementsScopeRule: StatementsScopeRule } = generateStatementRules(
     ExpressionRule,
     AssignableExpressionRule,
     TypeRule,
-    []
+    [ReturnStatementRule]
 );
 
 /**
@@ -76,4 +93,15 @@ const { importRule: FunctionImportRule, fileImportRule: FunctionFileImportRule }
  */
 export const ScriptRule = createRule("ScriptRule")
     .returns(Script)
-    .as(({ add }) => [many(add("imports", FunctionFileImportRule)), many(add("functions", FunctionRule))]);
+    .as(({ add }) => [
+        newlineSep([
+            {
+                entry: add("imports", FunctionFileImportRule),
+                cardinality: NewlineSepSectionCardinality.MANY
+            },
+            {
+                entry: add("functions", FunctionRule),
+                cardinality: NewlineSepSectionCardinality.MANY
+            }
+        ])
+    ]);

@@ -1,5 +1,5 @@
 import type { Type, TypirSpecifics } from "typir";
-import type { Scope, ScopeEntry } from "./scope.js";
+import type { ControlFlowEntry, Scope, ScopeEntry } from "./scope.js";
 import type { FunctionType, Member, ValueType } from "../config/type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 
@@ -17,6 +17,8 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
      * Map of member names to their corresponding scope entries.
      */
     private readonly entriesMap: Map<string, ScopeEntry<Specifics>> = new Map();
+
+    readonly executionGuaranteedUntil: number | undefined = undefined;
 
     /**
      * Creates a new global scope with the specified member entries.
@@ -64,5 +66,9 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
 
     getInitializedEntries(): Set<ScopeEntry<Specifics>> {
         return new Set<ScopeEntry<Specifics>>();
+    }
+
+    getControlFlowEntries(): ControlFlowEntry<Specifics>[] {
+        return [];
     }
 }

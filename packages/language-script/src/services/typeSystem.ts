@@ -26,6 +26,7 @@ import {
 } from "@mdeo/language-expression";
 import type { ScriptTypirSpecifics } from "../plugin.js";
 import { expressionTypes, statementTypes, typeTypes } from "../grammar/types.js";
+import { ScriptPartialTypeSystem } from "./scriptPartialTypeSystem.js";
 
 /**
  * The type system for the Script language.
@@ -80,5 +81,8 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
             this.nullablePrimitiveTypes.Any
         );
         typePartialTypeSystem.registerRules();
+
+        const scriptPartialTypeSystem = new ScriptPartialTypeSystem<ScriptTypirSpecifics>(typir);
+        scriptPartialTypeSystem.registerRules();
     }
 }

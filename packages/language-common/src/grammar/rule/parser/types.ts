@@ -92,7 +92,7 @@ type NonArrayKeys<T> = Exclude<keyof T, ArrayKeys<T>>;
  *     ]);
  * ```
  */
-export interface RuleContext<T extends AstNode> {
+export interface RuleContext<T> {
     /**
      * Creates an assignment that sets a single value to a property.
      * Used for non-array properties that should be assigned exactly once.
@@ -113,7 +113,7 @@ export interface RuleContext<T extends AstNode> {
     set<K extends NonArrayKeys<Omit<T, keyof AstNode>>>(
         key: K & string,
         ...value:
-            | [TerminalRule<T[K]>]
+            | [TerminalRule<T[K]> | ParserRule<T[K]>]
             | (NonNullable<T[K]> extends AstNode
                   ? [ParserRule<NonNullable<T[K]>> | (() => ParserRule<NonNullable<T[K]>>)]
                   : never)
@@ -141,7 +141,7 @@ export interface RuleContext<T extends AstNode> {
     add<K extends ArrayKeys<Omit<T, keyof AstNode>>>(
         key: K & string,
         ...value:
-            | (T[K] extends (infer U)[] ? [TerminalRule<U>] : never)
+            | (T[K] extends (infer U)[] ? [TerminalRule<U> | ParserRule<U>] : never)
             | (T[K] extends (infer U extends AstNode)[] ? [ParserRule<U> | (() => ParserRule<U>)] : never)
             | (T[K] extends Reference<infer U extends AstNode>[] ? [CrossRef<U>] : never)
             | (T[K] extends string[] ? T[K] : never)

@@ -46,11 +46,11 @@ const DOUBLE_LITERAL = createTerminal("DOUBLE_LITERAL")
     .as(/[0-9]+\.[0-9]+[Dd]?/);
 
 /**
- * Boolean token
+ * Boolean token (technically a data type rule)
  */
-const BOOLEAN = createTerminal("BOOLEAN")
+const BOOLEAN = createRule("BOOLEAN")
     .returns(Boolean)
-    .as(/true|false/);
+    .as(() => [or("true", "false")]);
 
 /**
  * Generates expression-related parser rules based on the provided configuration.

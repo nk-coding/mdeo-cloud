@@ -78,10 +78,6 @@ export function generateStatementRules(
         .returns(types.whileStatementType)
         .as(({ set }) => ["while", "(", set("condition", expressionRule), ")", set("body", statementsScopeRule)]);
 
-    const doWhileStatementRule = createRule(config.doWhileStatementRuleName)
-        .returns(types.doWhileStatementType)
-        .as(({ set }) => ["do", set("body", statementsScopeRule), "while", "(", set("condition", expressionRule), ")"]);
-
     const forStatementVariableDeclarationRule = createRule(config.forStatementVariableDeclarationRuleName)
         .returns(types.forStatementVariableDeclarationType)
         .as(({ set }) => [set("name", ID), optional(":", set("type", typeRule))]);
@@ -117,16 +113,25 @@ export function generateStatementRules(
         .returns(types.expressionStatementType)
         .as(({ set }) => [set("expression", expressionRule)]);
 
+    const breakStatementRule = createRule(config.breakStatementRuleName)
+        .returns(types.breakStatementType)
+        .as(() => ["break"]);
+
+    const continueStatementRule = createRule(config.continueStatementRuleName)
+        .returns(types.continueStatementType)
+        .as(() => ["continue"]);
+
     const statementRule = createRule(config.statementRuleName)
         .returns(types.baseStatementType)
         .as(() => [
             or(
                 ifStatementRule,
                 whileStatementRule,
-                doWhileStatementRule,
                 forStatementRule,
                 variableDeclarationStatementRule,
                 assignmentStatementRule,
+                breakStatementRule,
+                continueStatementRule,
                 expressionStatementRule,
                 ...additionalStatementRules
             )
@@ -138,11 +143,12 @@ export function generateStatementRules(
         ifStatementRule,
         elseIfClauseRule,
         whileStatementRule,
-        doWhileStatementRule,
         forStatementRule,
         forStatementVariableDeclarationRule,
         variableDeclarationStatementRule,
         assignmentStatementRule,
-        expressionStatementRule
+        expressionStatementRule,
+        breakStatementRule,
+        continueStatementRule
     };
 }

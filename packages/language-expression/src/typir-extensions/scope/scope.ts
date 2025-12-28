@@ -5,6 +5,11 @@ import type { InferenceProblem, Type, TypirSpecifics } from "typir";
  */
 export interface Scope<Specifics extends TypirSpecifics> {
     /**
+     * The language AST node that this scope is associated with.
+     */
+    readonly languageNode?: Specifics["LanguageType"];
+
+    /**
      * Gets the scope entry with the given name at the given position.
      * Utilizes lexical scoping rules.
      *
@@ -32,18 +37,30 @@ export interface Scope<Specifics extends TypirSpecifics> {
     getEntries(position: number): ScopeEntry<Specifics>[];
 
     /**
-     * Get all entries that are newly initialized in this scope.
+     * Get all entries that are guaranteed newly initialized in this scope.
      * Excludes entries initialized in parent scopes, and entries defined in this scope.
      *
      * @returns the set of newly initialized entries
      */
     getInitializedEntries(): Set<ScopeEntry<Specifics>>;
+
+    /**
+     * Gets all control flow entries in this scope.
+     *
+     * @returns the list of control flow entries
+     */
+    getControlFlowEntries(): ControlFlowEntry<Specifics>[];
 }
 
 /**
  * A scope that is bound to a specific position.
  */
-export interface BoundScope<Specifics extends TypirSpecifics> extends Scope<Specifics> {
+export interface BoundScope<Specifics extends TypirSpecifics> {
+    /**
+     * The underlying scope.
+     */
+    readonly scope: Scope<Specifics>;
+
     /**
      * Gets the scope entry with the given name at the given position.
      * Utilizes lexical scoping rules.
@@ -63,6 +80,7 @@ export interface BoundScope<Specifics extends TypirSpecifics> extends Scope<Spec
 
     /**
      * Gets all scope entries visible at the given position.
+     * Guaranteed to be ordered by position.
      *
      * @returns the list of scope entries
      */
@@ -127,6 +145,24 @@ export interface ScopeLocalInitialization {
 }
 
 /**
+ * A control flow entry representing possible sub-scopes that may be entered
+ */
+export interface ControlFlowEntry<Specifics extends TypirSpecifics> {
+    /**
+     * The scopes which may be entered from this control flow entry.
+     */
+    scopes: Scope<Specifics>[];
+    /**
+     * The position in the parent scope at which this control flow entry occurs.
+     */
+    position: number;
+    /**
+     * If it is guaranteed that at least one of the scopes will be completed when control flow leaves this entry
+     */
+    isComplete: boolean;
+}
+
+/**
  * The default implementation of a scope.
  */
 export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Specifics> {
@@ -145,23 +181,25 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
     private readonly localEntryLookup: Map<string, ScopeEntry<Specifics>> = new Map();
 
     /**
-     * The index until which the sequential child scopes have been initialized.
+     * Tracks the highest position up to which control flow entries have been processed for initialization.
      */
-    private sequentialChildScopesInitializedUntil = -1;
+    private controlFlowEntriesInitializedUntil = -1;
 
     /**
-     * Lazy cache for sequential child scopes returned by {@link sequencialChildScopesProvider}.
+     * Lazy cache for control flow entries, sorted by position.
      */
-    private _sequencialChildScopes: (Scope<Specifics>[] | undefined)[] = [];
+    private _sortedControlFlowEntries: ControlFlowEntry<Specifics>[] | undefined;
 
     /**
-     * Lazily resolves and returns the sequential child scopes.
+     * Lazily resolves and returns the control flow entries sorted by position.
      */
-    private get sequencialChildScopes(): (Scope<Specifics>[] | undefined)[] {
-        if (this._sequencialChildScopes.length === 0) {
-            this._sequencialChildScopes = this.sequencialChildScopesProvider(this);
+    private get sortedControlFlowEntries(): ControlFlowEntry<Specifics>[] {
+        if (this._sortedControlFlowEntries === undefined) {
+            this._sortedControlFlowEntries = this.controlFlowEntriesProvider(this).sort(
+                (a, b) => a.position - b.position
+            );
         }
-        return this._sequencialChildScopes;
+        return this._sortedControlFlowEntries;
     }
 
     /**
@@ -169,14 +207,15 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
      *
      * @param parent the optional parent scope
      * @param entriesProvider provider for the local scope entries
-     * @param sequencialChildScopesProvider provider for child scopes which are executed sequencially, used for initialization checks, may not include all child scopes
+     * @param controlFlowEntriesProvider provider for the control flow entries in this scope
      * @param localInitializedEntries a map of entry names to the position at which they are initialized in this scope
      */
     constructor(
         private readonly parent: BoundScope<Specifics> | undefined,
-        private readonly entriesProvider: (scope: Scope<Specifics>) => ScopeEntry<Specifics>[],
-        private readonly sequencialChildScopesProvider: (scope: Scope<Specifics>) => (Scope<Specifics>[] | undefined)[],
-        localInitializations: ScopeLocalInitialization[]
+        entriesProvider: (scope: Scope<Specifics>) => ScopeEntry<Specifics>[],
+        private readonly controlFlowEntriesProvider: (scope: Scope<Specifics>) => ControlFlowEntry<Specifics>[],
+        localInitializations: ScopeLocalInitialization[],
+        readonly languageNode: Specifics["LanguageType"] | undefined
     ) {
         for (const entry of entriesProvider(this)) {
             this.localEntryLookup.set(entry.name, entry);
@@ -205,7 +244,7 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
         if (cached != undefined) {
             return this.isInitializedAt(position, cached);
         }
-        if (this.initializeSequentialChildScopesUntil(position)) {
+        if (this.initializeControlFlowEntriesUntil(position)) {
             const updated = this.initializationLookup.get(entry);
             if (updated != undefined) {
                 return this.isInitializedAt(position, updated);
@@ -223,7 +262,9 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
     }
 
     getEntries(position: number): ScopeEntry<Specifics>[] {
-        const localEntries = [...this.localEntryLookup.values()].filter((entry) => entry.position <= position);
+        const localEntries = [...this.localEntryLookup.values()]
+            .filter((entry) => entry.position <= position)
+            .sort((a, b) => a.position - b.position);
         if (this.parent != undefined) {
             const parentEntries = this.parent.getEntries();
             return [...localEntries, ...parentEntries];
@@ -233,7 +274,7 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
     }
 
     getInitializedEntries(): Set<ScopeEntry<Specifics>> {
-        this.initializeSequentialChildScopesUntil(Number.POSITIVE_INFINITY);
+        this.initializeControlFlowEntriesUntil(Number.POSITIVE_INFINITY);
         const initializedEntries: Set<ScopeEntry<Specifics>> = new Set();
         for (const [entry, init] of this.initializationLookup.entries()) {
             if (typeof init === "number" && entry.definingScope !== this) {
@@ -243,37 +284,56 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
         return initializedEntries;
     }
 
+    getControlFlowEntries(): ControlFlowEntry<Specifics>[] {
+        return this.controlFlowEntriesProvider(this);
+    }
+
     /**
-     * Initializes the initialization lookup for sequential child scopes until the given position.
+     * Initializes the initialization lookup for control flow entries until the given position.
+     * Processes control flow entries sorted by their position.
      *
      * @param position the position until which to initialize
      * @return true if any new initializations were made, false otherwise
      */
-    private initializeSequentialChildScopesUntil(position: number): boolean {
-        const actualPosition = Math.min(position, this.sequencialChildScopes.length - 1);
-        if (this.sequentialChildScopesInitializedUntil >= actualPosition) {
+    private initializeControlFlowEntriesUntil(position: number): boolean {
+        if (this.controlFlowEntriesInitializedUntil >= position) {
             return false;
         }
-        for (let i = this.sequentialChildScopesInitializedUntil + 1; i <= actualPosition; i++) {
-            const childScopes = this.sequencialChildScopes[i];
-            if (childScopes == undefined) {
+
+        let hasNewInitializations = false;
+
+        for (const controlFlowEntry of this.sortedControlFlowEntries) {
+            if (controlFlowEntry.position <= this.controlFlowEntriesInitializedUntil) {
                 continue;
             }
-            const childInitializations = childScopes
-                .map((scope) => scope.getInitializedEntries())
-                .reduce<Set<ScopeEntry<Specifics>> | undefined>((previous, current) => {
-                    if (previous == undefined) {
-                        return current;
-                    } else {
-                        return current.intersection(previous);
-                    }
-                }, undefined);
-            for (const entry of childInitializations ?? []) {
-                this.updateInitializationLookup(entry, i);
+
+            if (controlFlowEntry.position > position) {
+                break;
+            }
+
+            if (controlFlowEntry.isComplete && controlFlowEntry.scopes.length > 0) {
+                const childInitializations = controlFlowEntry.scopes
+                    .map((scope) => scope.getInitializedEntries())
+                    .reduce<Set<ScopeEntry<Specifics>> | undefined>((previous, current) => {
+                        if (previous === undefined) {
+                            return current;
+                        } else {
+                            return current.intersection(previous);
+                        }
+                    }, undefined);
+
+                for (const entry of childInitializations ?? []) {
+                    this.updateInitializationLookup(entry, controlFlowEntry.position);
+                    hasNewInitializations = true;
+                }
             }
         }
-        this.sequentialChildScopesInitializedUntil = actualPosition;
-        return true;
+
+        if (this.controlFlowEntriesInitializedUntil < position) {
+            this.controlFlowEntriesInitializedUntil = position;
+        }
+
+        return hasNewInitializations;
     }
 
     /**
@@ -331,7 +391,7 @@ export class DefaultBoundScope<Specifics extends TypirSpecifics> implements Boun
      * @param position the position to bind the scope to
      */
     constructor(
-        private readonly scope: Scope<Specifics>,
+        readonly scope: Scope<Specifics>,
         private readonly position: number
     ) {}
 

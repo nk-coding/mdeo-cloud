@@ -65,7 +65,8 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             node.parameters.map((param) => ({
                 name: param.name,
                 position: -1
-            }))
+            })),
+            node
         );
     }
 
@@ -109,7 +110,8 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             node.functions.map((func) => ({
                 name: func.name,
                 position: -1
-            }))
+            })),
+            node
         );
     }
 

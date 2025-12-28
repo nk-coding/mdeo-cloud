@@ -43,7 +43,29 @@ export const statementConfig = new StatementConfig("Script");
 /**
  * Generated statement types for the Script language.
  */
-export const statementTypes = generateStatementTypes(statementConfig, expressionTypes);
+const baseStatementTypes = generateStatementTypes(statementConfig, expressionTypes);
+
+/**
+ * Return statement type for Script functions.
+ */
+export const ReturnStatement = createInterface("ScriptReturnStatement")
+    .extends(baseStatementTypes.baseStatementType)
+    .attrs({
+        value: Optional(expressionTypes.baseExpressionType)
+    });
+
+/**
+ * Type representing a ReturnStatement AST node.
+ */
+export type ReturnStatementType = ASTType<typeof ReturnStatement>;
+
+/**
+ * All statement types including Script-specific statements.
+ */
+export const statementTypes = {
+    ...baseStatementTypes,
+    returnStatementType: ReturnStatement
+};
 
 /**
  * Type representing the base expression type.

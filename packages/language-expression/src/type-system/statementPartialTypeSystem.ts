@@ -11,6 +11,7 @@ import type { InferenceProblem, TypeInferenceResultWithoutInferringChildren, Val
 import type { BaseExpressionType, ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
+import { type AstNode } from "langium";
 
 /**
  * Partial type syste m implementation for statement-related AST nodes.
@@ -37,6 +38,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         this.registerVariableDeclarationRules();
         this.registerControlFlowStatementRules();
         this.registerAssignmentRules();
+        this.registerBreakContinueStatementRules();
 
         this.registerInferenceRule(this.types.forStatementVariableDeclarationType, (node) => {
             return this.inferForStatementVariableDeclarationType(node);
@@ -88,14 +90,6 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
 
         this.registerValidationRule(this.types.whileStatementType, (node, accept) => {
             this.validateBooleanCondition(node.condition, accept, "While statement condition must be of type boolean.");
-        });
-
-        this.registerValidationRule(this.types.doWhileStatementType, (node, accept) => {
-            this.validateBooleanCondition(
-                node.condition,
-                accept,
-                "Do-while statement condition must be of type boolean."
-            );
         });
     }
 
@@ -292,5 +286,55 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         }
 
         return typeArgs.values().next().value!;
+    }
+
+    /**
+     * Registers validation rules for break and continue statements.
+     *
+     * These statements must be contained (directly or indirectly) within a loop statement
+     * (for, while, or do-while). Uses Langium's AstUtils.getContainerOfType to traverse
+     * the AST hierarchy.
+     */
+    private registerBreakContinueStatementRules(): void {
+        this.registerValidationRule(this.types.breakStatementType, (node, accept) => {
+            this.validateInsideLoop(node, accept, "Break statement must be inside a loop (for, while, or do-while).");
+        });
+
+        this.registerValidationRule(this.types.continueStatementType, (node, accept) => {
+            this.validateInsideLoop(
+                node,
+                accept,
+                "Continue statement must be inside a loop (for, while, or do-while)."
+            );
+        });
+    }
+
+    /**
+     * Helper to validate that a statement is contained within a loop statement.
+     *
+     * Uses Langium's AstUtils.getContainerOfType to find the nearest ancestor matching
+     * one of the loop statement types (for, while, do-while).
+     *
+     * @param node The statement node to validate
+     * @param accept The validation problem acceptor function
+     * @param message The error message to use if validation fails
+     */
+    private validateInsideLoop(node: AstNode, accept: ValidationProblemAcceptor<Specifics>, message: string): void {
+        const isInsideLoop =
+            this.typir.context.langium.AstUtils.getContainerOfType(
+                node,
+                (n): n is AstNode =>
+                    this.astReflection.isInstance(n, this.types.forStatementType) ||
+                    this.astReflection.isInstance(n, this.types.whileStatementType)
+            ) !== undefined;
+
+        if (!isInsideLoop) {
+            accept({
+                $problem: this.validationProblem,
+                languageNode: node,
+                message,
+                severity: "error"
+            });
+        }
     }
 }

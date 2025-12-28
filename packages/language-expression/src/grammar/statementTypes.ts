@@ -38,11 +38,6 @@ export function generateStatementTypes(config: StatementConfig, expressionTypes:
         body: statementsScopeType
     });
 
-    const doWhileStatementType = createInterface(config.doWhileStatementTypeName).extends(baseStatementType).attrs({
-        body: statementsScopeType,
-        condition: baseExpressionType
-    });
-
     const forStatementVariableDeclarationType = createInterface(config.forStatementVariableDeclarationTypeName).attrs({
         name: String,
         type: Optional(baseTypeType)
@@ -75,17 +70,24 @@ export function generateStatementTypes(config: StatementConfig, expressionTypes:
             expression: baseExpressionType
         });
 
+    const breakStatementType = createInterface(config.breakStatementTypeName).extends(baseStatementType).attrs({});
+
+    const continueStatementType = createInterface(config.continueStatementTypeName)
+        .extends(baseStatementType)
+        .attrs({});
+
     return {
         baseStatementType,
         ifStatementType,
         elseIfClauseType,
         whileStatementType,
-        doWhileStatementType,
         forStatementType,
         forStatementVariableDeclarationType,
         variableDeclarationStatementType,
         assignmentStatementType,
         expressionStatementType,
+        breakStatementType,
+        continueStatementType,
         statementsScopeType
     };
 }

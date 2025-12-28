@@ -12,30 +12,39 @@ import { NEWLINE } from "../../language/defaultTokens.js";
  * @returns A grouped rule entry representing the complete newline-separated structure
  */
 export function newlineSep(sections: NewlineSepSection[]): RuleEntry {
-    const allOptional = sections.every((section) => isOptionalCardinality(section.cardinality));
-
-    if (allOptional) {
-        const options: RuleEntry[] = [];
-
-        options.push(many(NEWLINE));
-
-        for (let i = 0; i < sections.length; i++) {
-            const modifiedSections = sections.map((section, index) => {
-                if (index === i) {
-                    return {
-                        entry: section.entry,
-                        cardinality: toNonOptionalCardinality(section.cardinality)
-                    };
-                }
-                return section;
-            });
-            options.push(newlineSepInternal(modifiedSections));
+    let optionalPrefix = 0;
+    for (const section of sections) {
+        if (isOptionalCardinality(section.cardinality)) {
+            optionalPrefix++;
+        } else {
+            break;
         }
+    }
 
-        return or(...options);
-    } else {
+    if (optionalPrefix === 0) {
         return newlineSepInternal(sections);
     }
+
+    const options: RuleEntry[] = [];
+
+    for (let i = 0; i < optionalPrefix; i++) {
+        const modifiedSections: NewlineSepSection[] = [
+            {
+                entry: sections[i].entry,
+                cardinality: toNonOptionalCardinality(sections[i].cardinality)
+            }
+        ];
+        for (let j = i + 1; j < sections.length; j++) {
+            modifiedSections.push(sections[j]);
+        }
+        options.push(newlineSepInternal(modifiedSections));
+    }
+
+    if (optionalPrefix === sections.length) {
+        options.push(many(NEWLINE));
+    }
+
+    return or(...options);
 }
 
 /**

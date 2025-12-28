@@ -35,10 +35,8 @@ export const examplePlugin2: Plugin = {
             monarchTokensProvider: {
                 ...defaultMonarchTokenProvider,
                 keywords: [
-                    // Literals
                     "true",
                     "false",
-                    // Statements
                     "if",
                     "else",
                     "while",
@@ -46,9 +44,8 @@ export const examplePlugin2: Plugin = {
                     "for",
                     "in",
                     "var",
-                    // Functions
+                    "return",
                     "fun",
-                    // Imports
                     "import",
                     "from",
                     "as"
