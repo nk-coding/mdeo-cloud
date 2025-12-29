@@ -9,6 +9,8 @@ import * as langiumLsp from "langium/lsp";
 import * as langiumGrammar from "langium/grammar";
 import * as typirLangium from "typir-langium";
 import * as typir from "typir";
+import * as prettier from "prettier";
+import * as glspServer from "@eclipse-glsp/server";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
@@ -57,7 +59,9 @@ const pluginContext: PluginContext = {
     "langium/lsp": langiumLsp,
     "langium/grammar": langiumGrammar,
     "typir-langium": typirLangium,
-    typir
+    typir,
+    prettier,
+    "@eclipse-glsp/server": glspServer
 };
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(

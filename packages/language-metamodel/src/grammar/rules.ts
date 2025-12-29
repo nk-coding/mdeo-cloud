@@ -82,7 +82,12 @@ export const MetaClassRule = createRule("MetaClassRule")
             many(",", add("extends", ref(MetaClassOrImport, ID)))
         ),
         "{",
-        many(add("properties", PropertyRule)),
+        newlineSep([
+            {
+                entry: add("properties", PropertyRule),
+                cardinality: NewlineSepSectionCardinality.MANY
+            }
+        ]),
         "}"
     ]);
 
@@ -207,7 +212,7 @@ export const MetaModelRule = createRule("MetaModelRule")
                 cardinality: NewlineSepSectionCardinality.MANY
             },
             {
-                entry: or(add("classes", MetaClassRule), add("associations", AssociationRule)),
+                entry: or(add("classesAndAssociations", MetaClassRule), add("classesAndAssociations", AssociationRule)),
                 cardinality: NewlineSepSectionCardinality.MANY
             }
         ])

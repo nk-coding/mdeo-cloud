@@ -150,13 +150,17 @@ export const Association = createInterface("Association").attrs({
 export type AssociationType = ASTType<typeof Association>;
 
 /**
+ * Union type for MetaClass or Association.
+ */
+export const ClassOrAssociation = createType("ClassOrAssociation").types(MetaClass, Association);
+
+/**
  * The root MetaModel type.
  * Contains imports, class definitions, and associations.
  */
 export const MetaModel = createInterface("MetaModel").attrs({
     imports: [MetaClassFileImport],
-    classes: [MetaClass],
-    associations: [Association]
+    classesAndAssociations: [ClassOrAssociation]
 });
 
 /**

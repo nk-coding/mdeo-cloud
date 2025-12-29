@@ -1,7 +1,7 @@
 import type { DefaultTokenBuilder, Grammar, LangiumCoreServices, TokenBuilder, TokenBuilderOptions } from "langium";
 import type { PluginContext } from "../../plugin/pluginContext.js";
 import type { IMultiModeLexerDefinition, TokenType, TokenVocabulary } from "chevrotain";
-import { HIDDEN_NEWLINE, NEWLINE } from "../../language/defaultTokens.js";
+import { HIDDEN_NEWLINE, ID, NEWLINE } from "../../language/defaultTokens.js";
 
 /**
  * Provides a newline aware token builder that can switch lexer modes based on specific tokens.
@@ -53,6 +53,17 @@ export function generateNewlineAwareTokenBuilder(
             }
 
             return token;
+        }
+
+        protected override findLongerAlt(keyword: Keyword, terminalTokens: TokenType[]): TokenType[] {
+            const longerAlts = super.findLongerAlt(keyword, terminalTokens);
+            if (/^[\p{ID_Start}][\p{ID_Continue}]*$/v.test(keyword.value)) {
+                const idToken = terminalTokens.find((t) => t.name === ID.name);
+                if (idToken != undefined) {
+                    longerAlts.push(idToken);
+                }
+            }
+            return longerAlts;
         }
     }
 

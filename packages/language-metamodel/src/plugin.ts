@@ -7,14 +7,19 @@ import {
     type ServiceProvider,
     HIDDEN_NEWLINE,
     generateIdValueConverter,
-    generateNewlineAwareTokenBuilder
+    generateNewlineAwareTokenBuilder,
+    type AstSerializerAdditionalServices,
+    generateDefaultAstSerializer,
+    generateSerializerFormatter,
+    registerDefaultTokenSerializers
 } from "@mdeo/language-common";
-import { MetamodelScopeProvider } from "./services/scopeProvider.js";
+import { MetamodelScopeProvider } from "./features/scopeProvider.js";
+import { registerMetamodelSerializers } from "./features/metamodelSerializers.js";
 
 /**
  * The additional services for the Metamodel language.
  */
-export type MetamodelServices = object;
+export type MetamodelServices = AstSerializerAdditionalServices;
 
 /**
  * The service provider for the Metamodel language.
@@ -37,7 +42,15 @@ export const metamodelPluginProvider: LanguagePluginProvider<MetamodelServices> 
             },
             references: {
                 ScopeProvider: MetamodelScopeProvider(context)
-            }
+            },
+            lsp: {
+                ...generateSerializerFormatter(context)
+            },
+            ...generateDefaultAstSerializer(context)
+        },
+        postCreate(services) {
+            registerDefaultTokenSerializers(context, services);
+            registerMetamodelSerializers(context, services);
         }
     })
 };
