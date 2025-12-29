@@ -43,6 +43,11 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
         private nullInvertedTypeCache: CustomLambdaType | undefined = undefined;
 
         /**
+         * Cached definition of this lambda type
+         */
+        private _definition: LambdaType | undefined = undefined;
+
+        /**
          * Creates a new custom lambda type.
          * Automatically registers subtype relationships and initializes the type.
          *
@@ -50,14 +55,20 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
          * @param details The lambda type details
          */
         constructor(kind: CustomLambdaKind<TypirSpecifics>, details: CustomLambdaDetails<TypirSpecifics>) {
-            super(buildCustomLambdaIdentifier(details), details, kind.services, details.definition.isNullable);
+            super(
+                buildCustomLambdaIdentifier(details),
+                details,
+                kind.services,
+                details.isNullable,
+                kind.services.TypeDefinitions.getLambdaSuperTypes()
+            );
             this.kind = kind;
             this.registerSubtypesAndConversion();
             this.defineTheInitializationProcessOfThisType({});
         }
 
         override get isNullable(): boolean {
-            return this.details.definition.isNullable;
+            return this.details.isNullable;
         }
 
         override get asNullable(): CustomLambdaType {
@@ -69,10 +80,7 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
             }
             const nullableType = this.kind.services.factory.CustomLambdas.getOrCreate({
                 ...this.details,
-                definition: {
-                    ...this.details.definition,
-                    isNullable: true
-                }
+                isNullable: true
             });
             this.nullInvertedTypeCache = nullableType;
             return nullableType;
@@ -87,17 +95,24 @@ export const CustomLambdaTypeProvider: Provider<CustomLambdaTypeConstructor> = (
             }
             const nonNullableType = this.kind.services.factory.CustomLambdas.getOrCreate({
                 ...this.details,
-                definition: {
-                    ...this.details.definition,
-                    isNullable: false
-                }
+                isNullable: false
             });
             this.nullInvertedTypeCache = nonNullableType;
             return nonNullableType;
         }
 
         override get definition(): LambdaType {
-            return this.details.definition;
+            if (this._definition == undefined) {
+                this._definition = {
+                    isNullable: this.isNullable,
+                    parameters: this.details.parameterTypes.map((paramType, idx) => ({
+                        name: `param${idx}`,
+                        type: paramType.definition
+                    })),
+                    returnType: this.details.returnType.definition
+                };
+            }
+            return this._definition;
         }
 
         override getName(): string {
@@ -236,5 +251,5 @@ export function buildCustomLambdaName(details: CustomLambdaDetails<any>, isIdent
         .map((paramType) => (isIdentifier ? paramType.getIdentifier() : paramType.getName()))
         .join(", ");
     const lambdaType = `(${parameterTypes}) => ${returnType}`;
-    return details.definition.isNullable ? `(${lambdaType})?` : lambdaType;
+    return details.isNullable ? `(${lambdaType})?` : lambdaType;
 }

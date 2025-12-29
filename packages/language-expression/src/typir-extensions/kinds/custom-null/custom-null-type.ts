@@ -56,7 +56,7 @@ export const CustomNullTypeProvider: Provider<CustomNullTypeConstructor> = (serv
          * @param details The null type details
          */
         constructor(kind: CustomNullKind<TypirSpecifics>, details: CustomNullDetails<TypirSpecifics>) {
-            super("null", details, kind.services, true);
+            super("null", details, kind.services, true, []);
             this.kind = kind;
             this.defineTheInitializationProcessOfThisType({});
         }
@@ -74,10 +74,7 @@ export const CustomNullTypeProvider: Provider<CustomNullTypeConstructor> = (serv
         }
 
         override get definition(): ClassTypeRef {
-            return {
-                type: "Any",
-                isNullable: true
-            };
+            throw new Error("Definition not supported for null type.");
         }
 
         override getName(): string {

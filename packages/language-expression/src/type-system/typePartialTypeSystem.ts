@@ -5,7 +5,6 @@ import type { ExpressionTypirServices } from "./services.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
-import type { LambdaType, Parameter, ReturnType } from "../typir-extensions/config/type.js";
 
 /**
  * Partial type system implementation for type-related AST nodes.
@@ -84,8 +83,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
             return this.typir.factory.CustomClasses.getOrCreate({
                 definition: classTypeDef,
                 isNullable: node.isNullable,
-                typeArgs: typeArgMap,
-                superTypes: classTypeDef.superTypes ?? []
+                typeArgs: typeArgMap
             });
         });
     }
@@ -153,7 +151,6 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
     private registerLambdaTypeInferenceRule(): void {
         this.registerInferenceRule(this.types.lambdaTypeType, (node) => {
             const parameterTypes: CustomValueType[] = [];
-            const parameters: Parameter[] = [];
 
             for (let i = 0; i < node.parameters.length; i++) {
                 const param = node.parameters[i];
@@ -175,11 +172,6 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                     };
                 }
                 parameterTypes.push(inferredType);
-
-                parameters.push({
-                    name: `param${i}`,
-                    type: inferredType.definition
-                });
             }
 
             const returnTypeNode = node.returnType;
@@ -196,9 +188,10 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
             let returnType: CustomValueType | CustomVoidType;
 
-            if (this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType) || this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)) {
-                returnType = inferredReturnType;
-            } else if (this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)) {
+            if (
+                this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType) ||
+                this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)
+            ) {
                 returnType = inferredReturnType;
             } else {
                 return {
@@ -209,18 +202,11 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                 };
             }
 
-            const lambdaDefinition: LambdaType = {
-                parameters,
-                returnType: returnType.definition,
-                isNullable: node.isNullable
-            };
-
             return this.typir.factory.CustomLambdas.getOrCreate({
-                definition: lambdaDefinition,
                 returnType,
                 parameterTypes,
                 typeArgs: new Map(),
-                superTypes: []
+                isNullable: node.isNullable
             });
         });
     }

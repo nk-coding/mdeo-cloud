@@ -14,11 +14,6 @@ export interface CustomValueTypeDetail<Specifics extends TypirSpecifics> extends
      * Map of generic type parameter names to their resolved concrete types
      */
     typeArgs: Map<string, CustomValueType>;
-
-    /**
-     * References to super types that this type extends
-     */
-    superTypes: BaseClassTypeRef[];
 }
 
 /**
@@ -32,7 +27,8 @@ export interface CustomValueTypeConstructor {
         identifier: string,
         details: T,
         services: ExtendedTypirServices<TypirSpecifics>,
-        isNullable: boolean
+        isNullable: boolean,
+        superTypes: BaseClassTypeRef[]
     ): CustomValueType<T>;
 }
 
@@ -165,15 +161,17 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
          * @param details The type details including type arguments and super types
          * @param services Extended Typir services for type operations
          * @param isNullable Whether this type is nullable
+         * @param superTypes Resolved super class types
          */
         constructor(
             identifier: string,
             readonly details: T,
             readonly services: ExtendedTypirServices<TypirSpecifics>,
-            isNullable: boolean
+            isNullable: boolean,
+            superTypes: BaseClassTypeRef[]
         ) {
             super(identifier, details);
-            this.superClasses = (details.superTypes || []).map(
+            this.superClasses = (superTypes || []).map(
                 (superTypeRef) =>
                     services.TypeDefinitions.resolveCustomClassOrLambdaType(
                         {

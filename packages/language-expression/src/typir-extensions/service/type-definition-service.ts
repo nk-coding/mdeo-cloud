@@ -105,6 +105,13 @@ export interface TypeDefinitionService {
     registerLambdaSuperTypes(superTypes: BaseClassTypeRef[]): void;
 
     /**
+     * Get the registered super types for lambda types.
+     *
+     * @returns The super types for lambda types
+     */
+    getLambdaSuperTypes(): BaseClassTypeRef[];
+
+    /**
      * Add a listener to receive notifications about class type changes.
      *
      * @param listener - The listener to add
@@ -180,8 +187,7 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
                         key,
                         this.resolveCustomClassOrLambdaType(typeArg, genericTypeArgs)
                     ])
-                ),
-                superTypes: classTypeDef.superTypes ?? []
+                )
             });
         } else {
             const returnType = type.returnType;
@@ -190,13 +196,12 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
                 : this.resolveCustomClassOrLambdaType(returnType as ValueType, genericTypeArgs);
 
             return this.services.factory.CustomLambdas.getOrCreate({
-                definition: type,
                 returnType: resolvedReturnType,
                 parameterTypes: type.parameters.map((paramType) =>
                     this.resolveCustomClassOrLambdaType(paramType.type, genericTypeArgs)
                 ),
                 typeArgs: new Map(),
-                superTypes: this.lambdaSuperTypes
+                isNullable: type.isNullable
             });
         }
     }
@@ -249,6 +254,10 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
 
     registerLambdaSuperTypes(superTypes: BaseClassTypeRef[]): void {
         this.lambdaSuperTypes = superTypes;
+    }
+
+    getLambdaSuperTypes(): BaseClassTypeRef[] {
+        return this.lambdaSuperTypes;
     }
 
     addListener(listener: TypeDefinitionListener): void {

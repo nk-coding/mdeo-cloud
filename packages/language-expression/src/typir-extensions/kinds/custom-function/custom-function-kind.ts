@@ -4,7 +4,7 @@ import type { FunctionType } from "../../config/type.js";
 import {
     CustomFunctionTypeProvider,
     type CustomFunctionType,
-    type CustomFunctionTypeConstructor,
+    type CustomFunctionTypeConstructor
 } from "./custom-function-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";

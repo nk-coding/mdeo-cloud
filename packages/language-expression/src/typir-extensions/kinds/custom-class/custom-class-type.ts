@@ -43,6 +43,11 @@ export const CustomClassTypeProvider: Provider<CustomClassTypeConstructor> = (se
         private nullInvertedTypeCache: CustomClassType | undefined = undefined;
 
         /**
+         * Cached definition of this class type
+         */
+        private _definition: ClassTypeRef | undefined = undefined;
+
+        /**
          * Creates a new custom class type.
          * Automatically registers subtype relationships and initializes the type.
          *
@@ -50,7 +55,13 @@ export const CustomClassTypeProvider: Provider<CustomClassTypeConstructor> = (se
          * @param details The class type details
          */
         constructor(kind: CustomClassKind<TypirSpecifics>, details: CustomClassDetails<TypirSpecifics>) {
-            super(buildCustomClassIdentifier(details), details, kind.services, details.isNullable);
+            super(
+                buildCustomClassIdentifier(details),
+                details,
+                kind.services,
+                details.isNullable,
+                details.definition.superTypes ?? []
+            );
             this.kind = kind;
             this.registerSubtypesAndConversion();
             this.defineTheInitializationProcessOfThisType({});
@@ -91,16 +102,19 @@ export const CustomClassTypeProvider: Provider<CustomClassTypeConstructor> = (se
         }
 
         override get definition(): ClassTypeRef {
-            const definition = this.details.definition;
-            const typeArgs = new Map<string, ValueType>();
-            for (const [argName, argType] of this.details.typeArgs) {
-                typeArgs.set(argName, argType.definition);
+            if (this._definition == undefined) {
+                const definition = this.details.definition;
+                const typeArgs = new Map<string, ValueType>();
+                for (const [argName, argType] of this.details.typeArgs) {
+                    typeArgs.set(argName, argType.definition);
+                }
+                this._definition = {
+                    type: `${definition.package}.${definition.name}`,
+                    isNullable: this.isNullable,
+                    typeArgs: typeArgs
+                };
             }
-            return {
-                type: `${definition.package}.${definition.name}`,
-                isNullable: this.isNullable,
-                typeArgs: typeArgs
-            };
+            return this._definition;
         }
 
         override getName(): string {

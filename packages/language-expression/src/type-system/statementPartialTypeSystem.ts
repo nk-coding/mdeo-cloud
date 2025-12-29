@@ -347,7 +347,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
     private registerExpressionStatementRules(): void {
         this.registerValidationRule(this.types.expressionStatementType, (node, accept) => {
             const expressionType = this.inference.inferType(node.expression);
-            
+
             if (Array.isArray(expressionType)) {
                 return;
             }

@@ -503,6 +503,10 @@ enum TypeResolutionState {
      */
     Undefined,
     /**
+     * Known to be nullable, but nothing else yet
+     */
+    Nullable,
+    /**
      * Defined, but still generalizable
      */
     Defined,
@@ -511,7 +515,7 @@ enum TypeResolutionState {
      */
     DefinedInvariant,
     /**
-     * Defined via generic argument, cannot be changed
+     * Defined via generic argument or from parent type, cannot be changed
      */
     Fixed,
     /**
@@ -559,6 +563,10 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         this.assignabilityService = callValidator.services.Assignability;
         this.equalityService = callValidator.services.Equality;
         const genericArgumentTypes = callValidator.genericArgumentTypes;
+        for (const [name, type] of this.functionType.details.typeArgs) {
+            this.callResolvedGenericArguments.set(name, type);
+            this.callResolvedGenericArgumentStates.set(name, TypeResolutionState.Fixed);
+        }
         if (this.signature.generics != undefined && genericArgumentTypes.length > 0) {
             for (const generic of this.signature.generics ?? []) {
                 this.callResolvedGenericArgumentStates.set(generic, TypeResolutionState.Conflict);
@@ -592,9 +600,11 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         } else if (GenericTypeRef.is(type)) {
             const localStatus = this.callResolvedGenericArgumentStates.get(type.generic);
             if (localStatus != undefined) {
-                return localStatus !== TypeResolutionState.Undefined && localStatus !== TypeResolutionState.Conflict;
-            } else if (this.functionType.details.typeArgs?.has(type.generic)) {
-                return true;
+                return (
+                    localStatus !== TypeResolutionState.Undefined &&
+                    localStatus !== TypeResolutionState.Conflict &&
+                    localStatus !== TypeResolutionState.Nullable
+                );
             } else {
                 return false;
             }
@@ -636,7 +646,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         }
         return this.typeDefinitionsService.resolveCustomClassOrLambdaType(
             type,
-            new Map([...this.functionType.details.typeArgs.entries(), ...this.callResolvedGenericArguments.entries()])
+            new Map([...this.callResolvedGenericArguments.entries()])
         );
     }
 
@@ -665,6 +675,9 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @returns true if the types are compatible
      */
     private checkAndUpdateType(declaredType: ValueType, actualType: CustomValueType, allowSubtypes: boolean): boolean {
+        if (!allowSubtypes && this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            throw new Error("Null type cannot be used in invariant position.");
+        }
         if (GenericTypeRef.is(declaredType)) {
             return this.checkAndUpdateGenericType(declaredType, actualType, allowSubtypes);
         } else if (ClassTypeRef.is(declaredType)) {
@@ -683,19 +696,18 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @returns true if the types are compatible
      */
     private checkAndUpdateClassType(
-        declaredType: {
-            type: string;
-            typeArgs?: Map<string, ValueType>;
-            isNullable?: boolean;
-        },
+        declaredType: ClassTypeRef,
         actualType: CustomValueType,
         allowSubtypes: boolean
     ): boolean {
         const declaredTypeDefinition = this.typeDefinitionsService.getClassType(declaredType.type);
-        if (!this.callValidator.services.factory.CustomClasses.isCustomClassType(actualType)) {
+        if (actualType.isNullable && !declaredType.isNullable) {
             return false;
         }
-        if (actualType.isNullable && !declaredType.isNullable) {
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            return declaredType.isNullable === true;
+        }
+        if (!this.callValidator.services.factory.CustomClasses.isCustomClassType(actualType)) {
             return false;
         }
 
@@ -729,17 +741,12 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      *
      * @param declaredType The expected lambda type
      * @param actualType The actual type being checked
-     * @param allowSubtypes Whether to allow subtype relationships (unused for lambdas)
      * @returns true if the types are compatible
      */
-    private checkAndUpdateLambdaType(
-        declaredType: {
-            returnType: ReturnType;
-            parameters: Array<{ type: ValueType }>;
-            isNullable?: boolean;
-        },
-        actualType: CustomValueType
-    ): boolean {
+    private checkAndUpdateLambdaType(declaredType: LambdaType, actualType: CustomValueType): boolean {
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            return declaredType.isNullable === true;
+        }
         if (!this.callValidator.services.factory.CustomLambdas.isCustomLambdaType(actualType)) {
             return false;
         }
@@ -747,19 +754,15 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return false;
         }
 
-        // Handle void return type
         const declaredReturnType = declaredType.returnType;
         const actualReturnType = actualType.details.returnType;
 
         let returnTypeValid: boolean;
         if (VoidType.is(declaredReturnType)) {
-            // Declared type is void - actual type must also be void
             returnTypeValid = this.callValidator.services.factory.CustomVoid.isCustomVoidType(actualReturnType);
         } else if (this.callValidator.services.factory.CustomVoid.isCustomVoidType(actualReturnType)) {
-            // Actual type is void - declared type must also be void
             returnTypeValid = VoidType.is(declaredReturnType);
         } else {
-            // Neither is void - check as normal value types
             returnTypeValid = this.checkAndUpdateType(
                 declaredReturnType as ValueType,
                 actualReturnType as CustomValueType,
@@ -814,6 +817,10 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return this.handleUndefinedGenericState(genericName, actualType, isNullable, allowSubtypes);
         }
 
+        if (state === TypeResolutionState.Nullable) {
+            return this.handleNullableGenericState(genericName, actualType, allowSubtypes);
+        }
+
         return this.handleDefinedGenericState(genericName, actualType, isNullable, allowSubtypes, state);
     }
 
@@ -833,11 +840,46 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         isNullable: boolean,
         allowSubtypes: boolean
     ): boolean {
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            if (isNullable) {
+                return true;
+            }
+            this.callResolvedGenericArgumentStates.set(genericName, TypeResolutionState.Nullable);
+            return true;
+        }
         this.callResolvedGenericArguments.set(genericName, isNullable ? actualType.asNonNullable : actualType);
         this.callResolvedGenericArgumentStates.set(
             genericName,
             allowSubtypes ? TypeResolutionState.Defined : TypeResolutionState.DefinedInvariant
         );
+        return true;
+    }
+
+    /**
+     * Handles the case when a ganaric type parameter is known to be nullable, but not further defined.
+     *
+     * @param genericName The name of the generic parameter
+     * @param actualType The actual type being assigned
+     * @param allowSubtypes Whether to allow covariant matching
+     * @returns true if compatible
+     */
+    private handleNullableGenericState(
+        genericName: string,
+        actualType: CustomValueType,
+        allowSubtypes: boolean
+    ): boolean {
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            return true;
+        }
+        if (!allowSubtypes && !actualType.isNullable) {
+            this.callResolvedGenericArgumentStates.set(genericName, TypeResolutionState.Conflict);
+            return false;
+        }
+        this.callResolvedGenericArgumentStates.set(
+            genericName,
+            allowSubtypes ? TypeResolutionState.Defined : TypeResolutionState.DefinedInvariant
+        );
+        this.callResolvedGenericArguments.set(genericName, actualType.asNullable);
         return true;
     }
 
@@ -906,6 +948,14 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return false;
         }
 
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            if (!(isNullable || current.isNullable)) {
+                this.callResolvedGenericArgumentStates.set(genericName, TypeResolutionState.Conflict);
+                return false;
+            }
+            return true;
+        }
+
         const isAssignable = this.assignabilityService.isAssignable(
             isNullable ? actualType.asNonNullable : actualType,
             current
@@ -937,6 +987,13 @@ class GenericResolver<Specifics extends TypirSpecifics> {
     ): boolean {
         if (!allowSubtypes) {
             return false;
+        }
+
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            if (!(isNullable || current.isNullable)) {
+                return false;
+            }
+            return true;
         }
 
         const isAssignable = this.assignabilityService.isAssignable(
@@ -988,6 +1045,13 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         isNullable: boolean,
         current: CustomValueType
     ): boolean {
+        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+            if (!(isNullable || current.isNullable)) {
+                this.callResolvedGenericArguments.set(genericName, current.asNullable);
+            }
+            return true;
+        }
+
         const commonType = findCommonParentType(
             current.asNonNullable,
             actualType.asNonNullable,

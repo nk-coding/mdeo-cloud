@@ -1,6 +1,5 @@
 import type { Kind } from "typir";
 import type { TypirSpecifics } from "typir";
-import type { LambdaType } from "../../config/type.js";
 import {
     buildCustomLambdaIdentifier,
     CustomLambdaTypeProvider,
@@ -18,11 +17,6 @@ import type { CustomVoidType } from "../custom-void/custom-void-type.js";
  */
 export interface CustomLambdaDetails<Specifics extends TypirSpecifics> extends CustomValueTypeDetail<Specifics> {
     /**
-     * The lambda type definition containing parameter and return types
-     */
-    definition: LambdaType;
-
-    /**
      * The resolved return type of the lambda
      */
     returnType: CustomValueType | CustomVoidType;
@@ -31,6 +25,11 @@ export interface CustomLambdaDetails<Specifics extends TypirSpecifics> extends C
      * The resolved parameter types of the lambda
      */
     parameterTypes: CustomValueType[];
+
+    /**
+     * Whether this lambda type is nullable
+     */
+    isNullable: boolean;
 }
 
 /**

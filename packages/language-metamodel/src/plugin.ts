@@ -5,7 +5,9 @@ import {
     ML_COMMENT,
     SL_COMMENT,
     type ServiceProvider,
-    HIDDEN_NEWLINE
+    HIDDEN_NEWLINE,
+    generateIdValueConverter,
+    generateNewlineAwareTokenBuilder
 } from "@mdeo/language-common";
 import { MetamodelScopeProvider } from "./services/scopeProvider.js";
 
@@ -22,12 +24,17 @@ export type MetamodelServiceProvider<T> = ServiceProvider<MetamodelServices, T>;
 
 /**
  * The plugin provider for the Metamodel language.
+ * Configures the language with newline-aware lexing and custom parsing behavior.
  */
 export const metamodelPluginProvider: LanguagePluginProvider<MetamodelServices> = {
     generate: (context) => ({
         rootRule: MetaModelRule,
         additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
         module: {
+            parser: {
+                ...generateNewlineAwareTokenBuilder(context, new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
+                ...generateIdValueConverter(context)
+            },
             references: {
                 ScopeProvider: MetamodelScopeProvider(context)
             }

@@ -25,7 +25,7 @@ import {
     type ExpressionTypirServices
 } from "@mdeo/language-expression";
 import type { ScriptTypirSpecifics } from "../plugin.js";
-import { expressionTypes, Function, statementTypes, typeTypes } from "../grammar/types.js";
+import { expressionTypes, statementTypes, typeTypes } from "../grammar/types.js";
 import { ScriptPartialTypeSystem } from "./scriptPartialTypeSystem.js";
 
 /**

@@ -92,10 +92,10 @@ let functionNameCounter = 0;
 /**
  * Build a unique identifier for a custom function type.
  *
- * @param details The function type details
+ * @param _details The function type details
  * @returns The unique identifier string
  */
-export function buildCustomFunctionIdentifier(details: CustomFunctionDetails<any>): string {
+export function buildCustomFunctionIdentifier(_details: CustomFunctionDetails<any>): string {
     return `CustomFunction#${functionNameCounter++}`;
 }
 
@@ -107,9 +107,7 @@ export function buildCustomFunctionIdentifier(details: CustomFunctionDetails<any
  * @returns The name string
  */
 export function buildCustomFunctionName(details: CustomFunctionDetails<any>): string {
-    return details.definition.signatures
-        .map((signature) => buildFunctionSignatureName(details, signature))
-        .join("\n");
+    return details.definition.signatures.map((signature) => buildFunctionSignatureName(details, signature)).join("\n");
 }
 
 /**
@@ -119,10 +117,7 @@ export function buildCustomFunctionName(details: CustomFunctionDetails<any>): st
  * @param signature The specific signature to build a name for
  * @returns The signature name string in the format "name(param1,param2): returnType"
  */
-function buildFunctionSignatureName(
-    details: CustomFunctionDetails<any>,
-    signature: FunctionSignature,
-): string {
+function buildFunctionSignatureName(details: CustomFunctionDetails<any>, signature: FunctionSignature): string {
     const paramTypes = signature.parameters.map((param) => {
         const resolvedType = resolveTypeFromDefinition(param.type, details.typeArgs);
         return resolvedType;
@@ -145,16 +140,13 @@ function buildFunctionSignatureName(
  * @param typeArgs Map of generic type arguments
  * @returns The string representation of the type
  */
-function resolveTypeFromDefinition(
-    type: ReturnType,
-    typeArgs: Map<string, CustomValueType>,
-): string {
+function resolveTypeFromDefinition(type: ReturnType, typeArgs: Map<string, CustomValueType>): string {
     if (VoidType.is(type)) {
         return "void";
     } else if (GenericTypeRef.is(type)) {
         const resolvedGeneric = typeArgs.get(type.generic);
         if (resolvedGeneric) {
-            return  resolvedGeneric.getName();
+            return resolvedGeneric.getName();
         }
         return type.generic;
     } else if (ClassTypeRef.is(type)) {
@@ -169,9 +161,7 @@ function resolveTypeFromDefinition(
 
         return `${baseType}${type.isNullable ? "?" : ""}`;
     } else if (LambdaType.is(type)) {
-        const params = type.parameters.map((param: any) =>
-            resolveTypeFromDefinition(param.type, typeArgs)
-        );
+        const params = type.parameters.map((param: any) => resolveTypeFromDefinition(param.type, typeArgs));
         const returnType = resolveTypeFromDefinition(type.returnType, typeArgs);
         const lambdaStr = `(${params.join(",")}) => ${returnType}`;
         return type.isNullable ? `(${lambdaStr})?` : lambdaStr;

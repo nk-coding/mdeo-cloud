@@ -1,5 +1,4 @@
 import {
-    LambdaType,
     PartialTypeSystem,
     ReturnInferenceAnalyzer,
     ReturnValidationAnalyzer,
@@ -288,21 +287,12 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 };
             }
 
-            const parameters = parameterTypes.map((type: CustomValueType, index: number) => {
-                return {
-                    name: node.parameters[index]?.name ?? `param${index}`,
-                    type: type.definition
-                };
-            });
-            const returnTypeDefinition = returnType.definition;
-
-            const lambdaDefinition: LambdaType = {
-                parameters,
-                returnType: returnTypeDefinition,
+            return this.typir.factory.CustomLambdas.getOrCreate({
+                returnType,
+                parameterTypes,
+                typeArgs: new Map(),
                 isNullable: false
-            };
-
-            return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(lambdaDefinition, new Map());
+            });
         });
     }
 
@@ -317,7 +307,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
         const accessor = new ScriptReturnStatementAccessor<ScriptTypirSpecifics>(this.typir);
 
         this.registerValidationRule(LambdaExpression, (node, accept) => {
-            const scope = this.typir.ScopeProvider.getScope(node);
+            const scope = this.typir.ScopeProvider.getScope(node).scope;
 
             if (!(scope instanceof LambdaScope)) {
                 return;
@@ -354,16 +344,17 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 });
             }
 
-            if (node.body != undefined) {
-                const inferredLambdaType = this.inference.inferType(node);
-                if (Array.isArray(inferredLambdaType)) {
-                    return;
-                }
-                if (!this.typir.factory.CustomLambdas.isCustomLambdaType(inferredLambdaType)) {
-                    return;
-                }
+            const inferredLambdaType = this.inference.inferType(node);
+            if (Array.isArray(inferredLambdaType)) {
+                return;
+            }
+            if (!this.typir.factory.CustomLambdas.isCustomLambdaType(inferredLambdaType)) {
+                return;
+            }
 
-                const expectedReturnType = inferredLambdaType.details.returnType;
+            const expectedReturnType = inferredLambdaType.details.returnType;
+
+            if (node.body != undefined) {
                 const bodyScope = this.typir.ScopeProvider.getScope(node.body);
                 if (bodyScope == undefined) {
                     return;
@@ -379,6 +370,27 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
 
                 for (const error of analyzer.errors) {
                     accept(error);
+                }
+            } else if (node.expression != undefined) {
+                const expressionType = this.inference.inferType(node.expression);
+                if (Array.isArray(expressionType)) {
+                    return;
+                }
+                if (!this.typir.factory.CustomValues.isCustomValueType(expressionType)) {
+                    accept({
+                        languageNode: node.expression,
+                        message: "Lambda expression must return a value type.",
+                        severity: "error"
+                    });
+                    return;
+                }
+
+                if (!this.typir.Assignability.isAssignable(expressionType, expectedReturnType)) {
+                    accept({
+                        languageNode: node.expression,
+                        message: `Return type '${expressionType.getName()}' is not assignable to expected return type '${expectedReturnType.getName()}'.`,
+                        severity: "error"
+                    });
                 }
             }
         });
