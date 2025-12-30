@@ -1,6 +1,7 @@
-import type { AstPath, Doc } from "prettier";
-import type { Builders, PrintContext } from "./astSerializer.js";
+import type { Doc } from "prettier";
+import type { Builders, PrintContext } from "./types.js";
 import type { AstNode } from "langium";
+import { printDanglingComments } from "./comments.js";
 
 /**
  * Prints a list of newline separated entries, preserving blank lines from the original source
@@ -12,10 +13,11 @@ import type { AstNode } from "langium";
  * @returns the serialized entries
  */
 export function serializeNewlineSep<T extends AstNode, P extends ArrayProperties<T>>(
-    { path, document, print }: PrintContext<T>,
+    context: PrintContext<T>,
     sections: P[],
     builders: Builders
-): Doc {
+): Doc[] {
+    const { path, document, print } = context;
     let lastLine = Number.MAX_SAFE_INTEGER;
 
     const result = sections.flatMap((section) => {
@@ -35,8 +37,12 @@ export function serializeNewlineSep<T extends AstNode, P extends ArrayProperties
             return docs;
         }, section as any);
     });
-    result.at(-1)?.pop();
-    return result;
+    if (result.every((entry) => entry.length === 0)) {
+        return printDanglingComments(context, builders);
+    } else {
+        result.at(-1)!.pop();
+        return result;
+    }
 }
 
 /**

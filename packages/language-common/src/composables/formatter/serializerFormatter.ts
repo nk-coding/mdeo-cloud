@@ -8,7 +8,6 @@ import {
     type DocumentRangeFormattingParams,
     type DocumentOnTypeFormattingParams,
     type DocumentOnTypeFormattingOptions,
-    type FormattingOptions,
     Range,
     uinteger
 } from "vscode-languageserver-protocol";

@@ -1,7 +1,7 @@
 import type { Doc, doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext, PluginContext } from "@mdeo/language-common";
-import { ID, INT, serializeNewlineSep } from "@mdeo/language-common";
+import { ID, INT, printDanglingComments, serializeNewlineSep } from "@mdeo/language-common";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -66,7 +66,6 @@ export function registerMetamodelSerializers(
  */
 function printPrimitiveType(context: PrintContext<PrimitiveTypeType>, builders: typeof doc.builders): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
-    // comment handling
     return printPrimitive(getPrimitive(ctx, "name"), ID);
 }
 
@@ -112,7 +111,6 @@ function printRangeMultiplicity(context: PrintContext<RangeMultiplicityType>, bu
  */
 function printProperty(context: PrintContext<PropertyType>, builders: typeof doc.builders): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
-    // comment handling
     const name = printPrimitive(getPrimitive(ctx, "name"), ID);
     const type = path.call(print, "type");
     const docs: Doc[] = [name, ": ", type];
@@ -136,7 +134,6 @@ function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof d
     const { join, indent, group, hardline } = builders;
     const docs: Doc[] = [];
 
-    // comment handling
     if (ctx.isAbstract) {
         docs.push("abstract ");
     }
@@ -152,11 +149,9 @@ function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof d
 
     docs.push(" {");
 
-    if (ctx.properties.length > 0) {
-        docs.push(indent([hardline, serializeNewlineSep(context, ["properties"], builders)]));
-        docs.push(hardline);
-    } else {
-        // comment handling
+    const content = serializeNewlineSep(context, ["properties"], builders);
+    if (content.length > 0) {
+        docs.push(indent([hardline, content]), hardline);
     }
 
     docs.push("}");
@@ -173,7 +168,6 @@ function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof d
  */
 function printAssociationEnd(context: PrintContext<AssociationEndType>, builders: typeof doc.builders): Doc {
     const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    // comment handling
     const docs: Doc[] = [path.call(print, "class", "ref")];
 
     if (ctx.property != undefined) {
@@ -197,7 +191,6 @@ function printAssociationEnd(context: PrintContext<AssociationEndType>, builders
  */
 function printAssociation(context: PrintContext<AssociationType>, builders: typeof doc.builders): Doc {
     const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    // comment handling
     const start = path.call(print, "start");
     const operator = printPrimitive(getPrimitive(ctx, "operator"), ID);
     const target = path.call(print, "target");
@@ -215,7 +208,6 @@ function printAssociation(context: PrintContext<AssociationType>, builders: type
 function printMetaClassFileImport(context: PrintContext<any>, builders: typeof doc.builders): Doc {
     const { ctx, path, print, printPrimitive, getPrimitive } = context;
     const { join } = builders;
-    // comment handling
     const docs: Doc[] = ["import "];
 
     if (ctx.imports && ctx.imports.length > 0) {
@@ -240,5 +232,5 @@ function printMetaClassFileImport(context: PrintContext<any>, builders: typeof d
  * @returns The formatted metamodel
  */
 function printMetaModel(context: PrintContext<MetaModelType>, builders: typeof doc.builders): Doc {
-    return serializeNewlineSep(context, ["imports", "classesAndAssociations"], builders);
+    return serializeNewlineSep(context, ["imports", "classesAndAssociations"], builders)
 }

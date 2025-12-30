@@ -1,9 +1,12 @@
-import type { AstNode, CstNode, LangiumCoreServices, LangiumDocument } from "langium";
+import type { AstNode, AstReflection, CstNode, LangiumCoreServices, LangiumDocument } from "langium";
 import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
 import type { Interface } from "../../grammar/type/interface/types.js";
-import type { AstPath, doc, Doc, Parser, ParserOptions, Plugin } from "prettier";
+import type { Doc, Plugin } from "prettier";
 import type { PluginContext } from "../../plugin/pluginContext.js";
 import type { FormattingOptions } from "vscode-languageserver-types";
+import type { PrintContext, PrimitiveValue, Comment, WithComments } from "./types.js";
+import { printComment } from "./comments.js";
+import { ML_COMMENT, SL_COMMENT } from "../../language/defaultTokens.js";
 
 /**
  * Service for serializing AST nodes to formatted text using Prettier.
@@ -47,81 +50,6 @@ export interface AstSerializerAdditionalServices {
 }
 
 /**
- * Function type for printing a node at a given path to a Prettier Doc.
- */
-export type Print = (path: AstPath) => Doc;
-
-/**
- * Type alias for Prettier's document builders
- */
-export type Builders = typeof doc.builders;
-
-/**
- * Represents a primitive value along with its optional CST node.
- *
- * @template T The type of the primitive value
- */
-interface PrimitiveValue<T> {
-    /**
-     * The actual primitive value
-     */
-    value: T;
-    /**
-     * Optional CST node associated with this value
-     */
-    cstNode?: CstNode;
-}
-
-/**
- * Context passed to all printer functions.
- *
- * Provides utilities for navigating the AST, accessing primitives, and formatting nested nodes.
- *
- * @template T The type of the root context node
- */
-export interface PrintContext<T extends AstNode = AstNode> {
-    /**
-     * The current AST node being printed
-     */
-    ctx: T;
-    /**
-     * he path to the current node in the AST
-     */
-    path: AstPath<T>;
-    /**
-     * Prettier parser options for formatting
-     */
-    options: ParserOptions<T>;
-    /**
-     * The Langium document containing the AST being printed
-     */
-    document: LangiumDocument;
-    /**
-     * Function to recursively print child nodes
-     */
-    print: Print;
-    /**
-     * Prints a primitive value using its registered serializer.
-     *
-     * @template T The type of the primitive value
-     * @param value The primitive value to print
-     * @param rule The terminal rule associated with this primitive
-     * @returns Prettier Doc representation of the primitive
-     */
-    printPrimitive<T>(value: PrimitiveValue<T>, rule: TerminalRule<T>): Doc;
-    /**
-     * Retrieves a primitive property value along with its CST node.
-     *
-     * @template T The AST node type
-     * @template V The property key type
-     * @param node The AST node to get the property from
-     * @param property The name of the property to retrieve
-     * @returns The primitive value and its associated CST node
-     */
-    getPrimitive<T extends AstNode, V extends keyof T & string>(node: T, property: V): PrimitiveValue<T[V]>;
-}
-
-/**
  * Generates the default AST serializer service provider.
  *
  * Creates a Prettier-based serializer that uses registered node and primitive serializers
@@ -142,54 +70,77 @@ export function generateDefaultAstSerializer(context: PluginContext): {
         return { value, cstNode };
     }
 
-    class PrettierAstSerializer implements AstSerializer {
-        private readonly nodePrinters = new Map<string, (context: PrintContext) => Doc>();
-        private readonly primitiveSerializers = new Map<string, (primitive: any) => Doc>();
+    /**
+     * Helper class for generating Prettier plugins with proper offset normalization.
+     * Handles the conversion between original text offsets and Prettier's normalized text.
+     */
+    class PrettierPluginGenerator {
+        private readonly crPositions: number[];
 
-        constructor(protected readonly services: LangiumCoreServices) {}
-
-        async serializeNode(node: AstNode, document: LangiumDocument, options: FormattingOptions): Promise<string> {
-            const plugin = this.generatePlugin(node, document);
-            return prettier.format("unused", {
-                parser: "custom",
-                plugins: [plugin],
-                useTabs: !options.insertSpaces,
-                tabWidth: options.tabSize
-            });
+        constructor(text: string) {
+            this.crPositions = this.buildCrPositionsLookup(text);
         }
 
-        registerNodeSerializer<T extends AstNode>(
-            type: Interface<T>,
-            printer: (context: PrintContext<T>) => Doc
-        ): void {
-            this.nodePrinters.set(type.name, printer as unknown as (context: PrintContext) => Doc);
-        }
-
-        registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => Doc): void {
-            this.primitiveSerializers.set(rule.name, serializer as (primitive: PrimitiveValue<any>) => Doc);
-        }
-
-        private printPrimitive<T>(value: PrimitiveValue<T>, rule: TerminalRule<T>): Doc {
-            const serializer = this.primitiveSerializers.get(rule.name);
-            if (serializer == undefined) {
-                throw new Error(`No primitive serializer registered for rule: ${rule.name}`);
+        /**
+         * Builds a lookup of all \r positions (that are followed by \n).
+         * Prettier replaces \r\n with \n, so we need to adjust offsets accordingly.
+         */
+        private buildCrPositionsLookup(text: string): number[] {
+            const positions: number[] = [];
+            for (let i = 0; i < text.length - 1; i++) {
+                if (text[i] === "\r" && text[i + 1] === "\n") {
+                    positions.push(i);
+                }
             }
-            return serializer(value);
+            return positions;
         }
 
-        private generatePlugin(node: AstNode, document: LangiumDocument): Plugin<AstNode> {
+        /**
+         * Normalizes an offset from original text to Prettier's normalized text.
+         * Uses binary search to find how many \r characters were removed before this offset.
+         */
+        private normalizeOffset(offset: number): number {
+            let left = 0;
+            let right = this.crPositions.length;
+            while (left < right) {
+                const mid = Math.floor((left + right) / 2);
+                if (this.crPositions[mid] < offset) {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
+            }
+            return offset - left;
+        }
+
+        /**
+         * Generates a Prettier plugin for serializing AST nodes.
+         */
+        generate(
+            node: AstNode,
+            document: LangiumDocument,
+            nodePrinters: Map<string, (context: PrintContext) => Doc>,
+            primitiveSerializers: Map<string, (primitive: any) => Doc>,
+            astReflection: AstReflection
+        ): Plugin<AstNode> {
             return {
                 parsers: {
                     custom: {
-                        parse: () => {
-                            return this.copyAstNode(node);
+                        parse: (text) => {
+                            const copy: WithComments<AstNode> = this.copyAstNode(node);
+                            copy.comments = this.getComments(node);
+                            return copy;
                         },
                         astFormat: "custom",
-                        locStart: (node: AstNode) => {
-                            return (node.$cstNode?.offset ?? -1) + 1;
+                        locStart: (node: AstNode | Comment) => {
+                            const offset = langium.isAstNode(node)
+                                ? (node.$cstNode?.offset ?? 0)
+                                : (node.node.offset ?? 0);
+                            return this.normalizeOffset(offset);
                         },
-                        locEnd: (node: AstNode) => {
-                            return (node.$cstNode?.end ?? -1) + 1;
+                        locEnd: (node: AstNode | Comment) => {
+                            const offset = langium.isAstNode(node) ? (node.$cstNode?.end ?? 0) : (node.node.end ?? 0);
+                            return this.normalizeOffset(offset);
                         }
                     }
                 },
@@ -197,7 +148,7 @@ export function generateDefaultAstSerializer(context: PluginContext): {
                     custom: {
                         print: (path, options, print) => {
                             const node = path.node;
-                            const printer = this.nodePrinters.get(node.$type);
+                            const printer = nodePrinters.get(node.$type);
                             if (printer == undefined) {
                                 throw new Error(`No printer registered for node type: ${node.$type}`);
                             }
@@ -208,11 +159,27 @@ export function generateDefaultAstSerializer(context: PluginContext): {
                                 document,
                                 print,
                                 printPrimitive: <T>(value: PrimitiveValue<T>, rule: TerminalRule<T>): Doc => {
-                                    return this.printPrimitive(value, rule);
+                                    const serializer = primitiveSerializers.get(rule.name);
+                                    if (serializer == undefined) {
+                                        throw new Error(`No primitive serializer registered for rule: ${rule.name}`);
+                                    }
+                                    return serializer(value);
                                 },
                                 getPrimitive
                             };
                             return printer(context);
+                        },
+                        printComment: (commentPath, options) => {
+                            return printComment(commentPath.node as unknown as Comment, options, prettier.doc.builders);
+                        },
+                        canAttachComment: (node) => {
+                            return langium.isAstNode(node);
+                        },
+                        isBlockComment: (comment) => {
+                            return (comment as unknown as Comment).node.tokenType.name === ML_COMMENT.name;
+                        },
+                        getVisitorKeys: (node) => {
+                            return Object.keys(astReflection.getTypeMetaData(node.$type).properties);
                         }
                     }
                 }
@@ -222,9 +189,6 @@ export function generateDefaultAstSerializer(context: PluginContext): {
         /**
          * Copies an AST node recursively.
          * Does NOT copy references
-         *
-         * @param node The AST node to copy
-         * @returns The copied AST node
          */
         private copyAstNode(node: AstNode): AstNode {
             const copy: Record<string, any> = {};
@@ -246,6 +210,84 @@ export function generateDefaultAstSerializer(context: PluginContext): {
                 }
             }
             return copy as AstNode;
+        }
+
+        /**
+         * Gets all comments associated with an AST node.
+         */
+        private getComments(node: AstNode): Comment[] {
+            const comments: Comment[] = [];
+            const cstNode = node.$cstNode;
+            if (cstNode != undefined) {
+                this.getCommentsRecursive(cstNode, comments);
+            }
+            return comments;
+        }
+
+        /**
+         * Recursively collects comments from a CST node.
+         */
+        private getCommentsRecursive(node: CstNode, comments: Comment[]): void {
+            if (langium.isCompositeCstNode(node)) {
+                for (const child of node.content) {
+                    this.getCommentsRecursive(child, comments);
+                }
+            } else if (langium.isLeafCstNode(node)) {
+                if (node.tokenType.name === ML_COMMENT.name || node.tokenType.name === SL_COMMENT.name) {
+                    comments.push({
+                        node,
+                        value: node.text
+                    });
+                }
+            }
+        }
+    }
+
+    class PrettierAstSerializer implements AstSerializer {
+        /**
+         * Map of AST node type names to their registered printer functions.
+         */
+        private readonly nodePrinters = new Map<string, (context: PrintContext) => Doc>();
+        /**
+         * Map of terminal rule names to their registered primitive serializer functions.
+         */
+        private readonly primitiveSerializers = new Map<string, (primitive: any) => Doc>();
+        /**
+         * Reflection utilities for AST nodes.
+         */
+        private readonly astReflection: AstReflection;
+
+        constructor(protected readonly services: LangiumCoreServices) {
+            this.astReflection = services.shared.AstReflection;
+        }
+
+        async serializeNode(node: AstNode, document: LangiumDocument, options: FormattingOptions): Promise<string> {
+            const text = document.textDocument.getText();
+            const pluginGenerator = new PrettierPluginGenerator(text);
+            const plugin = pluginGenerator.generate(
+                node,
+                document,
+                this.nodePrinters,
+                this.primitiveSerializers,
+                this.astReflection
+            );
+            return prettier.format(text, {
+                parser: "custom",
+                plugins: [plugin],
+                useTabs: !options.insertSpaces,
+                tabWidth: options.tabSize
+            });
+        }
+
+        registerNodeSerializer<T extends AstNode>(
+            type: Interface<T>,
+            printer: (context: PrintContext<T>) => Doc
+        ): void {
+            this.nodePrinters.set(type.name, printer as unknown as (context: PrintContext) => Doc);
+        }
+
+        registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => Doc): void {
+            this.primitiveSerializers.set(rule.name, serializer as (primitive: PrimitiveValue<any>) => Doc);
         }
     }
 
