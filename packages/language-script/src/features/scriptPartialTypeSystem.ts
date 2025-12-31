@@ -108,7 +108,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 returnType = this.typir.factory.CustomVoid.getOrCreate();
             }
 
-            const parameters = node.parameters.map((param) => {
+            const parameters = node.parameterList.parameters.map((param) => {
                 const inferredParamType = this.inference.inferType(param.type);
                 const paramType = this.typir.factory.CustomValues.isCustomValueType(inferredParamType)
                     ? inferredParamType
@@ -196,7 +196,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
         this.registerValidationRule(Function, (node, accept) => {
             const functionNode = node as FunctionType;
             const parameterNames = new Set<string>();
-            for (const param of functionNode.parameters) {
+            for (const param of functionNode.parameterList.parameters) {
                 if (parameterNames.has(param.name)) {
                     accept({
                         languageNode: param,
@@ -316,7 +316,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
             const lambdaTypeInference = scope.lambdaTypeInference;
 
             const parameterNames = new Set<string>();
-            for (const param of node.parameters) {
+            for (const param of node.parameterList.parameters) {
                 if (parameterNames.has(param.name)) {
                     accept({
                         languageNode: param,
@@ -336,10 +336,10 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                     ? lambdaTypeInference.type.details.parameterTypes.length
                     : lambdaTypeInference.parameterTypes.length;
 
-            if (node.parameters.length > expectedParamCount) {
+            if (node.parameterList.parameters.length > expectedParamCount) {
                 accept({
                     languageNode: node,
-                    message: `Lambda has too many parameters. Expected ${expectedParamCount}, got ${node.parameters.length}.`,
+                    message: `Lambda has too many parameters. Expected ${expectedParamCount}, got ${node.parameterList.parameters.length}.`,
                     severity: "error"
                 });
             }

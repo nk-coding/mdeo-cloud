@@ -25,6 +25,8 @@ export class TypeConfig {
     /**
      * The name for the LambdaType type.
      */
+    readonly lambdaTypeParametersTypeName: string;
+    readonly lambdaTypeParametersRuleName: string;
     readonly lambdaTypeTypeName: string;
 
     /**
@@ -62,6 +64,8 @@ export class TypeConfig {
         this.typeRuleName = prefix + "TypeRule";
         this.classTypeTypeName = prefix + "ClassType";
         this.classTypeRuleName = prefix + "ClassTypeRule";
+        this.lambdaTypeParametersTypeName = prefix + "LambdaTypeParameters";
+        this.lambdaTypeParametersRuleName = prefix + "LambdaTypeParametersRule";
         this.lambdaTypeTypeName = prefix + "LambdaType";
         this.lambdaTypeRuleName = prefix + "LambdaTypeRule";
         this.voidTypeTypeName = prefix + "VoidType";

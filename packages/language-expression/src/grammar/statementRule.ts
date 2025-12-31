@@ -1,4 +1,5 @@
 import {
+    action,
     createRule,
     group,
     ID,
@@ -115,11 +116,11 @@ export function generateStatementRules(
 
     const breakStatementRule = createRule(config.breakStatementRuleName)
         .returns(types.breakStatementType)
-        .as(() => ["break"]);
+        .as(() => [action(types.breakStatementType, () => ["break"])]);
 
     const continueStatementRule = createRule(config.continueStatementRuleName)
         .returns(types.continueStatementType)
-        .as(() => ["continue"]);
+        .as(() => [action(types.continueStatementType, () => ["continue"])]);
 
     const statementRule = createRule(config.statementRuleName)
         .returns(types.baseStatementType)

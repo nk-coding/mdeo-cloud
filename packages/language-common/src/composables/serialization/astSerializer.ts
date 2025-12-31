@@ -126,7 +126,7 @@ export function generateDefaultAstSerializer(context: PluginContext): {
             return {
                 parsers: {
                     custom: {
-                        parse: (text) => {
+                        parse: () => {
                             const copy: WithComments<AstNode> = this.copyAstNode(node);
                             copy.comments = this.getComments(node);
                             return copy;

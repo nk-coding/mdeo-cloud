@@ -142,14 +142,74 @@ export type ExpressionTypes = ReturnType<typeof generateExpressionTypes>;
 export type BaseExpressionType = ASTType<ExpressionTypes["baseExpressionType"]>;
 
 /**
- * Type representing the member access expression
+ * Type representing the unary expression type.
  */
-export type MemberAccessExpressionType = ASTType<ExpressionTypes["memberAccessExpressionType"]>;
+export type UnaryExpressionType = ASTType<ExpressionTypes["unaryExpressionType"]>;
+
+/**
+ * Type representing the binary expression type.
+ */
+export type BinaryExpressionType = ASTType<ExpressionTypes["binaryExpressionType"]>;
+
+/**
+ * Type representing the ternary expression type.
+ */
+export type TernaryExpressionType = ASTType<ExpressionTypes["ternaryExpressionType"]>;
+
+/**
+ * Type representing the call expression generic args type.
+ */
+export type CallExpressionGenericArgsType = ASTType<ExpressionTypes["callExpressionGenericArgsType"]>;
 
 /**
  * Type representing the call expression
  */
 export type CallExpressionType = ASTType<ExpressionTypes["callExpressionType"]>;
+
+/**
+ * Type representing the member access expression
+ */
+export type MemberAccessExpressionType = ASTType<ExpressionTypes["memberAccessExpressionType"]>;
+
+/**
+ * Type representing the identifier expression type.
+ */
+export type IdentifierExpressionType = ASTType<ExpressionTypes["identifierExpressionType"]>;
+
+/**
+ * Type representing the string literal expression type.
+ */
+export type StringLiteralExpressionType = ASTType<ExpressionTypes["stringLiteralExpressionType"]>;
+
+/**
+ * Type representing the int literal expression type.
+ */
+export type IntLiteralExpressionType = ASTType<ExpressionTypes["intLiteralExpressionType"]>;
+
+/**
+ * Type representing the long literal expression type.
+ */
+export type LongLiteralExpressionType = ASTType<ExpressionTypes["longLiteralExpressionType"]>;
+
+/**
+ * Type representing the float literal expression type.
+ */
+export type FloatLiteralExpressionType = ASTType<ExpressionTypes["floatLiteralExpressionType"]>;
+
+/**
+ * Type representing the double literal expression type.
+ */
+export type DoubleLiteralExpressionType = ASTType<ExpressionTypes["doubleLiteralExpressionType"]>;
+
+/**
+ * Type representing the boolean literal expression type.
+ */
+export type BooleanLiteralExpressionType = ASTType<ExpressionTypes["booleanLiteralExpressionType"]>;
+
+/**
+ * Type representing the null literal expression type.
+ */
+export type NullLiteralExpressionType = ASTType<ExpressionTypes["nullLiteralExpressionType"]>;
 
 /**
  * Type representing the assignable expression

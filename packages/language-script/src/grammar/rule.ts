@@ -19,13 +19,15 @@ import {
     statementTypes,
     Script,
     FunctionParameter,
+    FunctionParameters,
     Function,
     FunctionImport,
     FunctionFileImport,
     scriptFileScopingConfig,
     ReturnStatement,
     LambdaExpression,
-    LambdaParameter
+    LambdaParameter,
+    LambdaParameters
 } from "./types.js";
 
 const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);
@@ -38,14 +40,19 @@ const LambdaParameterRule = createRule("ScriptLambdaParameterRule")
     .as(({ set }) => [set("name", ID)]);
 
 /**
+ * Lambda parameters rule (with round brackets).
+ */
+const LambdaParametersRule = createRule("ScriptLambdaParametersRule")
+    .returns(LambdaParameters)
+    .as(({ add }) => ["(", ...manySep(add("parameters", LambdaParameterRule), ",", LeadingTrailing.TRAILING), ")"]);
+
+/**
  * Lambda expression rule.
  */
 const LambdaExpressionRule = createRule("ScriptLambdaExpressionRule")
     .returns(LambdaExpression)
-    .as(({ add, set }) => [
-        "(",
-        ...manySep(add("parameters", LambdaParameterRule), ",", LeadingTrailing.TRAILING),
-        ")",
+    .as(({ set }) => [
+        set("parameterList", LambdaParametersRule),
         "=>",
         or(set("expression", ExpressionRule), set("body", StatementsScopeRule))
     ]);
@@ -87,16 +94,21 @@ const FunctionParameterRule = createRule("ScriptFunctionParameterRule")
     .as(({ set }) => [set("name", ID), optional(":", set("type", TypeRule))]);
 
 /**
+ * Function parameters rule (with round brackets).
+ */
+const FunctionParametersRule = createRule("ScriptFunctionParametersRule")
+    .returns(FunctionParameters)
+    .as(({ add }) => ["(", ...manySep(add("parameters", FunctionParameterRule), ",", LeadingTrailing.TRAILING), ")"]);
+
+/**
  * Function rule.
  */
 const FunctionRule = createRule("ScriptFunctionRule")
     .returns(Function)
-    .as(({ set, add }) => [
+    .as(({ set }) => [
         "fun",
         set("name", ID),
-        "(",
-        ...manySep(add("parameters", FunctionParameterRule), ",", LeadingTrailing.TRAILING),
-        ")",
+        set("parameterList", FunctionParametersRule),
         optional(":", set("returnType", ReturnTypeRule)),
         set("body", StatementsScopeRule)
     ]);

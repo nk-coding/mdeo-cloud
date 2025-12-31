@@ -108,6 +108,21 @@ export type BaseStatementType = ASTType<StatementTypes["baseStatementType"]>;
 export type StatementsScopeType = ASTType<StatementTypes["statementsScopeType"]>;
 
 /**
+ * Type representing the else-if clause type.
+ */
+export type ElseIfClauseType = ASTType<StatementTypes["elseIfClauseType"]>;
+
+/**
+ * Type representing the if statement type.
+ */
+export type IfStatementType = ASTType<StatementTypes["ifStatementType"]>;
+
+/**
+ * Type representing the while statement type.
+ */
+export type WhileStatementType = ASTType<StatementTypes["whileStatementType"]>;
+
+/**
  * Type representing the for statement type.
  */
 export type ForStatementType = ASTType<StatementTypes["forStatementType"]>;
@@ -126,3 +141,18 @@ export type VariableDeclarationStatementType = ASTType<StatementTypes["variableD
  * Type representing the assignment statement type.
  */
 export type AssignmentStatementType = ASTType<StatementTypes["assignmentStatementType"]>;
+
+/**
+ * Type representing the expression statement type.
+ */
+export type ExpressionStatementType = ASTType<StatementTypes["expressionStatementType"]>;
+
+/**
+ * Type representing the break statement type.
+ */
+export type BreakStatementType = ASTType<StatementTypes["breakStatementType"]>;
+
+/**
+ * Type representing the continue statement type.
+ */
+export type ContinueStatementType = ASTType<StatementTypes["continueStatementType"]>;

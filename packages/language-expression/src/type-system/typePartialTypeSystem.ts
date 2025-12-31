@@ -152,8 +152,8 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
         this.registerInferenceRule(this.types.lambdaTypeType, (node) => {
             const parameterTypes: CustomValueType[] = [];
 
-            for (let i = 0; i < node.parameters.length; i++) {
-                const param = node.parameters[i];
+            for (let i = 0; i < node.parameterList.parameters.length; i++) {
+                const param = node.parameterList.parameters[i];
                 const inferredType = this.inference.inferType(param);
                 if (Array.isArray(inferredType)) {
                     return {
@@ -217,7 +217,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
      */
     private registerLambdaTypeValidationRule(): void {
         this.registerValidationRule(this.types.lambdaTypeType, (node, accept) => {
-            for (const param of node.parameters) {
+            for (const param of node.parameterList.parameters) {
                 const inferredType = this.inference.inferType(param);
                 if (Array.isArray(inferredType)) {
                     accept({

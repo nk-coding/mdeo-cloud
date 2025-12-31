@@ -22,19 +22,22 @@ export function generateTypeTypes(config: TypeConfig) {
             isNullable: Boolean
         });
 
-    const lambdaTypeType = createInterface(config.lambdaTypeTypeName)
-        .extends(baseTypeType)
-        .attrs({
-            parameters: [baseTypeType],
-            returnType: returnTypeType,
-            isNullable: Boolean
-        });
+    const lambdaTypeParametersType = createInterface(config.lambdaTypeParametersTypeName).attrs({
+        parameters: [baseTypeType]
+    });
+
+    const lambdaTypeType = createInterface(config.lambdaTypeTypeName).extends(baseTypeType).attrs({
+        parameterList: lambdaTypeParametersType,
+        returnType: returnTypeType,
+        isNullable: Boolean
+    });
 
     return {
         baseTypeType,
         voidTypeType,
         returnTypeType,
         classTypeType,
+        lambdaTypeParametersType,
         lambdaTypeType
     };
 }
@@ -48,3 +51,23 @@ export type TypeTypes = ReturnType<typeof generateTypeTypes>;
  * Type representing the base type type.
  */
 export type BaseTypeType = ASTType<TypeTypes["baseTypeType"]>;
+
+/**
+ * Type representing the void type.
+ */
+export type VoidTypeType = ASTType<TypeTypes["voidTypeType"]>;
+
+/**
+ * Type representing the class type.
+ */
+export type ClassTypeType = ASTType<TypeTypes["classTypeType"]>;
+
+/**
+ * Type representing the lambda type parameters.
+ */
+export type LambdaTypeParametersType = ASTType<TypeTypes["lambdaTypeParametersType"]>;
+
+/**
+ * Type representing the lambda type.
+ */
+export type LambdaTypeType = ASTType<TypeTypes["lambdaTypeType"]>;

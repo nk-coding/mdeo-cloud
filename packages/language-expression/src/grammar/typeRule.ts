@@ -1,4 +1,4 @@
-import { createRule, group, ID, LeadingTrailing, manySep, optional, or, type ParserRule } from "@mdeo/language-common";
+import { action, createRule, group, ID, LeadingTrailing, manySep, optional, or } from "@mdeo/language-common";
 import type { TypeConfig } from "./typeConfig.js";
 import type { TypeTypes } from "./typeTypes.js";
 
@@ -10,7 +10,7 @@ import type { TypeTypes } from "./typeTypes.js";
  * @returns Object containing all generated type parser rules
  */
 export function generateTypeRules(config: TypeConfig, types: TypeTypes) {
-    const classTypeRule: ParserRule<any> = createRule(config.classTypeRuleName)
+    const classTypeRule = createRule(config.classTypeRuleName)
         .returns(types.classTypeType)
         .as(({ set, add, flag }) => [
             set("name", ID),
@@ -28,26 +28,28 @@ export function generateTypeRules(config: TypeConfig, types: TypeTypes) {
 
     const voidTypeRule = createRule(config.voidTypeRuleName)
         .returns(types.voidTypeType)
-        .as(() => ["void"]);
+        .as(() => [action(types.voidTypeType, () => ["void"])]);
 
     const returnTypeRule = createRule(config.returnTypeRuleName)
         .returns(types.returnTypeType)
         .as(() => [or(classTypeRule, voidTypeRule)]);
 
+    const lambdaTypeParametersRule = createRule(config.lambdaTypeParametersRuleName)
+        .returns(types.lambdaTypeParametersType)
+        .as(({ add }) => [
+            "(",
+            ...manySep(
+                add("parameters", () => classTypeRule),
+                ",",
+                LeadingTrailing.TRAILING
+            ),
+            ")"
+        ]);
+
     const lambdaTypeRule = createRule(config.lambdaTypeRuleName)
         .returns(types.lambdaTypeType)
-        .as(({ set, add, flag }) => {
-            const inner = [
-                "(",
-                ...manySep(
-                    add("parameters", () => classTypeRule),
-                    ",",
-                    LeadingTrailing.TRAILING
-                ),
-                ")",
-                "=>",
-                set("returnType", returnTypeRule)
-            ];
+        .as(({ set, flag }) => {
+            const inner = [set("parameterList", lambdaTypeParametersRule), "=>", set("returnType", returnTypeRule)];
             return [or(group(...inner), flag("isNullable", group("(", ...inner, ")", "?")))];
         });
 

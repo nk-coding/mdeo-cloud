@@ -90,12 +90,19 @@ export const LambdaParameter = createInterface("ScriptLambdaParameter").attrs({
 });
 
 /**
+ * Lambda parameters list (with round brackets).
+ */
+export const LambdaParameters = createInterface("ScriptLambdaParameters").attrs({
+    parameters: [LambdaParameter]
+});
+
+/**
  * Lambda expression type for Script.
  */
 export const LambdaExpression = createInterface("ScriptLambdaExpression")
     .extends(BaseExpression)
     .attrs({
-        parameters: [LambdaParameter],
+        parameterList: LambdaParameters,
         expression: Optional(BaseExpression),
         body: Optional(StatementsScope)
     });
@@ -111,6 +118,11 @@ export type LambdaExpressionType = ASTType<typeof LambdaExpression>;
 export type LambdaParameterType = ASTType<typeof LambdaParameter>;
 
 /**
+ * Type representing a LambdaParameters AST node.
+ */
+export type LambdaParametersType = ASTType<typeof LambdaParameters>;
+
+/**
  * Type representing the base type annotation.
  */
 export const ScriptBaseType = typeTypes.baseTypeType;
@@ -124,11 +136,18 @@ export const FunctionParameter = createInterface("ScriptFunctionParameter").attr
 });
 
 /**
+ * Function parameters list (with round brackets).
+ */
+export const FunctionParameters = createInterface("ScriptFunctionParameters").attrs({
+    parameters: [FunctionParameter]
+});
+
+/**
  * Function type.
  */
 export const Function = createInterface("ScriptFunction").attrs({
     name: String,
-    parameters: [FunctionParameter],
+    parameterList: FunctionParameters,
     returnType: Optional(typeTypes.returnTypeType),
     body: StatementsScope
 });
@@ -137,6 +156,11 @@ export const Function = createInterface("ScriptFunction").attrs({
  * Type representing a Function AST node.
  */
 export type FunctionType = ASTType<typeof Function>;
+
+/**
+ * Type representing a FunctionParameters AST node.
+ */
+export type FunctionParametersType = ASTType<typeof FunctionParameters>;
 
 /**
  * File scoping configuration for functions.

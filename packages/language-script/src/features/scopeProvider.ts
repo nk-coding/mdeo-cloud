@@ -70,7 +70,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             parentScope,
             (scope) => this.getFunctionScopeEntries(node, scope),
             () => [],
-            node.parameters.map((param) => ({
+            node.parameterList.parameters.map((param) => ({
                 name: param.name,
                 position: -1
             })),
@@ -90,7 +90,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
         node: FunctionType,
         scope: Scope<ScriptTypirSpecifics>
     ): ScopeEntry<ScriptTypirSpecifics>[] {
-        return node.parameters.map((param) => ({
+        return node.parameterList.parameters.map((param) => ({
             name: param.name,
             position: -1,
             languageNode: param,
@@ -168,7 +168,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             parentScope,
             (scope) => this.getLambdaScopeEntries(node, scope, lambdaTypeInference),
             () => [],
-            node.parameters.map((param) => ({
+            node.parameterList.parameters.map((param) => ({
                 name: param.name,
                 position: -1
             })),
@@ -193,7 +193,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
         lambdaTypeInference: LambdaTypeInferenceResult<ScriptTypirSpecifics>
     ): ScopeEntry<ScriptTypirSpecifics>[] {
         if (Array.isArray(lambdaTypeInference)) {
-            return node.parameters.map((param) => ({
+            return node.parameterList.parameters.map((param) => ({
                 name: param.name,
                 position: -1,
                 languageNode: param,
@@ -207,7 +207,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
                 ? lambdaTypeInference.type.details.parameterTypes
                 : lambdaTypeInference.parameterTypes;
 
-        return node.parameters.map((param, index) => ({
+        return node.parameterList.parameters.map((param, index) => ({
             name: param.name,
             position: -1,
             languageNode: param,
