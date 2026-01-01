@@ -22,6 +22,9 @@
         },
         {
             "path": "packages/language-script"
+        },
+        {
+            "path": "packages/editor-common"
         }
     ]
 }

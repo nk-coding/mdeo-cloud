@@ -13,6 +13,7 @@
             @dblclick="tab.temporary = false"
             @click.middle="handleClose"
         >
+            <FileTypeIcon :model-value="languagePluginByExtension.get(tab.file.extension)" class="w-4 h-4"/>
             <span class="truncate max-w-64" :class="{ italic: tab.temporary }">{{ fileName }}</span>
             <span
                 @click.stop="handleClose"
@@ -29,17 +30,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import { TabsTrigger } from "reka-ui";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { X } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
+import FileTypeIcon from "../FileTypeIcon.vue";
+import { workbenchStateKey } from "../workbench/util";
 
 interface Props {
     tab: EditorTab;
 }
 
 const props = defineProps<Props>();
+
+const { languagePluginByExtension } = inject(workbenchStateKey)!;
+
 const emit = defineEmits<{
     close: [tab: EditorTab];
 }>();

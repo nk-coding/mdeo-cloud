@@ -1,10 +1,8 @@
 import * as monaco from "monaco-editor";
-import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig } from "monaco-languageclient/vscodeApiWrapper";
+import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig, getEnhancedMonacoEnvironment } from "monaco-languageclient/vscodeApiWrapper";
 import { LogLevel } from "vscode";
 import { type Plugin, type InjectionKey, watch } from "vue";
 import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";
-import { useWorkerFactory } from "monaco-languageclient/workerFactory";
-import monacoEditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useColorMode } from "@vueuse/core";
 import {
     getService,
@@ -67,11 +65,17 @@ async function setupMonaco(): Promise<MonacoApi> {
             ...getSearchServiceOverride()
         },
         monacoWorkerFactory: () => {
-            useWorkerFactory({
-                workerLoaders: {
-                    TextEditorWorker: () => new monacoEditorWorker()
+            const envEnhanced = getEnhancedMonacoEnvironment();
+            envEnhanced.getWorker = (workerId, label) => {
+                if (label === "editorWorkerService") {
+                    return new Worker(
+                        new URL("@codingame/monaco-vscode-editor-api/esm/vs/editor/editor.worker.js", import.meta.url),
+                        { type: "module" }
+                    );
+                } else {
+                    throw new Error(`Unknown worker label: ${label}`);
                 }
-            });
+            };
         }
     };
     const vscodeApi = new MonacoVscodeApiWrapper(vscodeApiConfig);

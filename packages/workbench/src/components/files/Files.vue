@@ -28,9 +28,12 @@
                     :key="fileType.id"
                     @click="() => handleCreateFileOfType(fileType)"
                 >
+                    <FileTypeIcon :model-value="fileType" />
                     <span>Create New {{ fileType.name }}</span>
                 </ContextMenuItem>
+                <ContextMenuSeparator />
                 <ContextMenuItem @click="handleCreateFolderFromContext">
+                    <FolderIcon/>
                     <span>Create New Folder</span>
                 </ContextMenuItem>
             </ContextMenuContent>
@@ -41,7 +44,13 @@
 <script setup lang="ts">
 import { ref, inject, watch, nextTick, useTemplateRef } from "vue";
 import Tree from "@/components/tree/Tree.vue";
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
+import {
+    ContextMenu,
+    ContextMenuTrigger,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator
+} from "@/components/ui/context-menu";
 import type { FileSystemNode } from "@/data/filesystem/file";
 import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
@@ -52,6 +61,8 @@ import { workbenchStateKey } from "../workbench/util";
 import { Uri } from "vscode";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 import { findFileInTree } from "@/data/filesystem/util";
+import { FolderIcon } from "lucide-vue-next";
+import FileTypeIcon from "../FileTypeIcon.vue";
 
 const workbenchState = inject(workbenchStateKey)!;
 const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins: fileTypePlugins, tabs } = workbenchState;

@@ -1,4 +1,4 @@
-import type { MonacoApi } from "@/plugins/monacoPlugin";
+import type { MonacoApi } from "@/lib/monacoPlugin";
 import { reactive, watch, markRaw } from "vue";
 import type { Folder, FileSystemNode, File } from "./file";
 import type { Project } from "../project/project";
@@ -90,7 +90,8 @@ async function loadChildren(monacoApi: MonacoApi, uri: Uri, parent: Folder): Pro
                     name: entry.name,
                     type: FileType.File,
                     id: childUri,
-                    parent
+                    parent,
+                    extension: getFileExtension(entry.name)
                 })
             );
         }
@@ -181,7 +182,8 @@ async function handleCreate(
                 name,
                 type: FileType.File,
                 id: childUri,
-                parent
+                parent,
+                extension: getFileExtension(name)
             })
         );
     }
@@ -381,4 +383,15 @@ function getResourceName(resource: Uri): string {
     const path = resource.path;
     const segments = path.split("/").filter((s) => s.length > 0);
     return segments[segments.length - 1] || "";
+}
+
+/**
+ * Extracts the file extension from a file name.
+ * 
+ * @param fileName The full file name
+ * @returns The file extension including the dot
+ */
+function getFileExtension(fileName: string): string {
+    const parts = fileName.split(".");
+    return parts.length > 1 ? "." + parts.pop()! : "";
 }

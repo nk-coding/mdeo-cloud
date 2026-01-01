@@ -1,28 +1,14 @@
 import type { Plugin } from "@/data/plugin/plugin";
+import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
+import { Code } from "lucide";
 
-export const examplePlugin: Plugin = {
-    id: "example-plugin",
-    languagePlugins: [
-        {
-            id: "metamodel",
-            extension: ".mm",
-            name: "Metamodel",
-            serverPlugin: {
-                import: "/modules/metamodelPlugin.js"
-            },
-            languageConfiguration: defaultLanguageConfiguration,
-            monarchTokensProvider: {
-                ...defaultMonarchTokenProvider,
-                keywords: ["class", "extends", "abstract", "import", "from"]
-            }
-        }
-    ],
-    serverContributionPlugins: []
-};
-
-export const examplePlugin2: Plugin = {
-    id: "example-plugin-2",
+/**
+ * Plugin for script language support (.fn files).
+ * Provides syntax highlighting, language configuration, and LSP integration for script files.
+ */
+export const scriptPlugin: Plugin = {
+    id: "script-plugin",
     languagePlugins: [
         {
             id: "script",
@@ -50,8 +36,9 @@ export const examplePlugin2: Plugin = {
                     "from",
                     "as"
                 ]
-            }
+            },
+            icon: convertIcon(Code)
         }
     ],
-    serverContributionPlugins: []
+    serverContributionPlugins: [],
 };

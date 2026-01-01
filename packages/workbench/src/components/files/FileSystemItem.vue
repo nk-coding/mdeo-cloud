@@ -14,7 +14,11 @@
                 @keydown.delete="handleDelete"
             >
                 <template #content>
-                    <FileIcon v-if="entry.type === FileType.File" :is="FolderIcon" class="w-4 h-4" />
+                    <FileTypeIcon
+                        v-if="entry.type === FileType.File"
+                        :model-value="languagePluginByExtension.get(entry.extension)"
+                        class="w-4 h-4"
+                    />
                     <span v-if="isRenaming" class="flex flex-1">
                         <TreeItemInput
                             :model-value="getFileNameWithoutExtension(entry.name)"
@@ -45,16 +49,21 @@
                 :key="fileType.id"
                 @click="() => handleCreateFileOfType(fileType)"
             >
+                <FileTypeIcon :model-value="fileType" />
                 <span>Create New {{ fileType.name }}</span>
             </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem @click="handleCreateFolder">
+                <FolderIcon/>
                 <span>Create New Folder</span>
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem @click="handleRename">
+                <EditIcon/>
                 <span>Rename</span>
             </ContextMenuItem>
-            <ContextMenuItem @click="handleDelete" class="text-red-600">
+            <ContextMenuItem @click="handleDelete">
+                <Trash2Icon/>
                 <span>Delete</span>
             </ContextMenuItem>
         </ContextMenuContent>
@@ -63,7 +72,7 @@
 
 <script setup lang="ts">
 import { ref, inject } from "vue";
-import { Folder as FolderIcon, File as FileIcon } from "lucide-vue-next";
+import { FolderIcon, EditIcon, Trash2Icon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
 import FileSystemItemList from "./FileSystemItemList.vue";
@@ -81,12 +90,13 @@ import { workbenchStateKey } from "@/components/workbench/util";
 import { treeContextKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 import { Uri } from "vscode";
+import FileTypeIcon from "../FileTypeIcon.vue";
 
 const props = defineProps<{
     entry: FileSystemNode;
 }>();
 
-const { monacoApi, languagePlugins, activeTab } = inject(workbenchStateKey)!;
+const { monacoApi, languagePlugins, activeTab, languagePluginByExtension } = inject(workbenchStateKey)!;
 const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{

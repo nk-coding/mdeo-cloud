@@ -2,7 +2,7 @@ import { computed, ref, watch, type Reactive } from "vue";
 import { type EditorTab } from "./tab/editorTab";
 import type { Plugin } from "./plugin/plugin";
 import type { BackendApi } from "./api/backendApi";
-import type { MonacoApi } from "@/plugins/monacoPlugin";
+import type { MonacoApi } from "@/lib/monacoPlugin";
 import type { Project } from "./project/project";
 import type { Folder } from "./filesystem/file";
 import { useFileTree } from "./filesystem/useFileTree";
@@ -86,6 +86,20 @@ export class WorkbenchState {
                 ...langPlugin,
                 serverContributionPlugins: contributionPluginsByLanguage.get(langPlugin.id) ?? []
             }));
+    });
+
+    /**
+     * Map of language plugins by their file extension
+     */
+    readonly languagePluginByExtension = computed<Map<string, ResolvedLanguagePlugin>>(() => {
+        const map = new Map<string, ResolvedLanguagePlugin>();
+        for (const langPlugin of this.languagePlugins.value) {
+            if (map.has(langPlugin.extension)) {
+                throw new Error(`Multiple language plugins registered for extension ${langPlugin.extension}`);
+            }
+            map.set(langPlugin.extension, langPlugin);
+        }
+        return map;
     });
 
     /**

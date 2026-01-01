@@ -1,5 +1,5 @@
 import type { WorkbenchState } from "@/data/workbenchState";
-import type { MonacoApi } from "@/plugins/monacoPlugin";
+import type { MonacoApi } from "@/lib/monacoPlugin";
 import type { InjectionKey } from "vue";
 
 export const monacoApiKey: InjectionKey<MonacoApi> = Symbol("monacoApi");

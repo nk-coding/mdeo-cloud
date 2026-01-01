@@ -1,5 +1,6 @@
 import type { languages } from "monaco-editor";
 import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin.js";
+import type { IconNode } from "lucide-vue-next";
 
 /**
  * A plugin for a language handled by the workbench
@@ -33,6 +34,10 @@ export interface LanguagePlugin {
      * Monarch tokens provider for syntax highlighting in the editor
      */
     monarchTokensProvider: languages.IMonarchLanguage;
+    /**
+     * Icon representing the language
+     */
+    icon: IconNode;
 }
 
 /**

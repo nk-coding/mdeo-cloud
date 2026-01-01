@@ -1,7 +1,7 @@
 <template>
     <TreeItem :data="temporaryItem" :mode="'edit'" :is-folder="itemType === 'folder'" :has-children="false" @click.stop>
         <template #content>
-            <FileIcon v-if="itemType === 'file'" :is="FileIcon" class="w-4 h-4" />
+            <FileTypeIcon v-if="itemType === 'file'" :model-value="fileType" class="w-4 h-4" />
             <span class="flex flex-1">
                 <TreeItemInput
                     :model-value="fileName"
@@ -17,12 +17,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { File as FileIcon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
 import type { Folder } from "@/data/filesystem/file";
 import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
 import { Uri } from "vscode";
+import FileTypeIcon from "../FileTypeIcon.vue";
 
 const props = defineProps<{
     itemType: "file" | "folder";

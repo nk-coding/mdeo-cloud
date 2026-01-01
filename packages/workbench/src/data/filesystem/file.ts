@@ -31,6 +31,10 @@ export interface File extends FileMetadata {
      * Always FILE for file nodes
      */
     type: FileType.File;
+    /**
+     * File extension including the dot
+     */
+    extension: string;
 }
 
 /**

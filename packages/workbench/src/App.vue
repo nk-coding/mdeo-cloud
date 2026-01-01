@@ -4,11 +4,15 @@
 </template>
 <script setup lang="ts">
 import { inject, onMounted, shallowRef } from "vue";
-import { monacoApiProviderKey } from "./plugins/monacoPlugin";
+import { monacoApiProviderKey } from "./lib/monacoPlugin";
 import { BrowserBackendApi } from "./data/api/browserBackendApi";
 import { WorkbenchState } from "./data/workbenchState";
 import Workbench from "./components/workbench/Workbench.vue";
-import { examplePlugin, examplePlugin2 } from "./testing/examplePlugin";
+import { metamodelPlugin } from "./plugins/metamodelPlugin";
+import { scriptPlugin } from "./plugins/scriptPlugin";
+import { modelPlugin } from "./plugins/modelPlugin";
+import { modelTransformationPlugin } from "./plugins/modelTransformationPlugin";
+import { configPlugin } from "./plugins/configPlugin";
 import { useColorMode } from "@vueuse/core";
 
 const monaco = inject(monacoApiProviderKey)!;
@@ -21,8 +25,11 @@ onMounted(async () => {
     const monacoApi = await monaco;
     const backendApi = new BrowserBackendApi();
     workspaceState.value = new WorkbenchState(monacoApi, backendApi);
-    workspaceState.value.plugins.value.set(examplePlugin.id, examplePlugin);
-    workspaceState.value.plugins.value.set(examplePlugin2.id, examplePlugin2);
+    workspaceState.value.plugins.value.set(metamodelPlugin.id, metamodelPlugin);
+    workspaceState.value.plugins.value.set(scriptPlugin.id, scriptPlugin);
+    workspaceState.value.plugins.value.set(modelPlugin.id, modelPlugin);
+    workspaceState.value.plugins.value.set(modelTransformationPlugin.id, modelTransformationPlugin);
+    workspaceState.value.plugins.value.set(configPlugin.id, configPlugin);
 
     const path = window.location.pathname;
     if (path !== "/") {
