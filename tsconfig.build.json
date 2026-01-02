@@ -25,6 +25,9 @@
         },
         {
             "path": "packages/editor-common"
+        },
+        {
+            "path": "packages/editor-metamodel"
         }
     ]
 }

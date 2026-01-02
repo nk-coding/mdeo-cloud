@@ -1,3 +1,4 @@
+export * from "./composables/diagram-server/protocol.js";
 export * from "./composables/extended-parser/extendedParser.js";
 export * from "./composables/extended-parser/type.js";
 export * from "./composables/file-scoping/config.js";

@@ -11,6 +11,8 @@ import * as typirLangium from "typir-langium";
 import * as typir from "typir";
 import * as prettier from "prettier";
 import * as glspServer from "@eclipse-glsp/server";
+import * as glspProtocol from "@eclipse-glsp/protocol";
+import * as inversify from "inversify";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
@@ -61,7 +63,9 @@ const pluginContext: PluginContext = {
     "typir-langium": typirLangium,
     typir,
     prettier,
-    "@eclipse-glsp/server": glspServer
+    "@eclipse-glsp/server": glspServer,
+    "@eclipse-glsp/protocol": glspProtocol,
+    inversify
 };
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(

@@ -1,10 +1,10 @@
-import type { LanguagePlugin } from "./languagePlugin";
+import type { WorkbenchLanguagePlugin } from "./languagePlugin";
 import type { ServerContributionPlugin } from "./serverPlugin";
 
 /**
  * Plugin interface for the workbench
  */
-export interface Plugin {
+export interface WorkbenchPlugin {
     /**
      * The id of the plugin
      */
@@ -12,7 +12,7 @@ export interface Plugin {
     /**
      * Language plugins provided by the plugin
      */
-    languagePlugins: LanguagePlugin[];
+    languagePlugins: WorkbenchLanguagePlugin[];
     /**
      * Server contribution plugins provided by the plugin
      */

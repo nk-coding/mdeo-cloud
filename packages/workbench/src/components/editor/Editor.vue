@@ -1,12 +1,12 @@
 <template>
-    <ResizablePanelGroup v-show="languageId != undefined" direction="horizontal">
+    <ResizablePanelGroup v-show="languagePlugin != undefined" direction="horizontal">
         <ResizablePanel>
             <div ref="editorElement" class="h-full w-full"></div>
         </ResizablePanel>
-        <template v-if="true">
-            <ResizableHandle />
-            <ResizablePanel> <div class="m-4">Graphical editor TODO</div> </ResizablePanel>
-        </template>
+        <ResizableHandle :class="{ hidden: !hasEditor }" />
+        <ResizablePanel :class="{ hidden: !hasEditor }">
+            <GraphicalEditor v-for="tab in tabs" :key="tab.file.id.toString()" :tab="tab" />
+        </ResizablePanel>
     </ResizablePanelGroup>
 </template>
 <script setup lang="ts">
@@ -19,8 +19,9 @@ import type { EditorTab } from "@/data/tab/editorTab";
 import { EditorState } from "./util";
 import type { File } from "@/data/filesystem/file";
 import { findFileInTree } from "@/data/filesystem/util";
+import GraphicalEditor from "./GraphicalEditor.vue";
 
-const { tabs, activeTab, languagePlugins: fileTypePlugins, monacoApi, fileTree } = inject(workbenchStateKey)!;
+const { tabs, activeTab, languagePluginByExtension, monacoApi, fileTree } = inject(workbenchStateKey)!;
 const editorElement = useTemplateRef("editorElement");
 const editor = shallowRef<monacoType.editor.IStandaloneCodeEditor>();
 
@@ -46,13 +47,22 @@ const activeTabUri = computed(() => {
     return activeTab.value?.file.id;
 });
 
-const languageId = computed(() => {
+const languagePlugin = computed(() => {
     const tab = activeTab.value;
     if (tab == undefined) {
         return undefined;
     }
-    const extension = `.${tab.file.id.path.split(".").pop()}`;
-    return fileTypePlugins.value.find((plugin) => plugin.extension === extension)?.id;
+    return languagePluginByExtension.value.get(tab.file.extension);
+});
+
+const languageId = computed(() => {
+    const plugin = languagePlugin.value;
+    return plugin?.id;
+});
+
+const hasEditor = computed(() => {
+    const plugin = languagePlugin.value;
+    return plugin?.editorPlugin != undefined;
 });
 
 watch(

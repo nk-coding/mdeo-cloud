@@ -1,11 +1,12 @@
 import type { languages } from "monaco-editor";
 import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin.js";
 import type { IconNode } from "lucide-vue-next";
+import type { EditorPlugin } from "@mdeo/editor-common";
 
 /**
  * A plugin for a language handled by the workbench
  */
-export interface LanguagePlugin {
+export interface WorkbenchLanguagePlugin {
     /**
      * Unique identifier for the language
      */
@@ -27,6 +28,10 @@ export interface LanguagePlugin {
      */
     serverPlugin: Omit<ServerLanguagePlugin, "type" | "languageId" | "extension">;
     /**
+     * Editor plugin for the language, if undefined no graphical editor will be provided
+     */
+    editorPlugin: EditorPlugin | undefined;
+    /**
      * Configuration for the language in the editor
      */
     languageConfiguration: languages.LanguageConfiguration;
@@ -43,7 +48,7 @@ export interface LanguagePlugin {
 /**
  * A language plugin that has been resolved with its associated server contribution plugins
  */
-export interface ResolvedLanguagePlugin extends LanguagePlugin {
+export interface ResolvedLanguagePlugin extends WorkbenchLanguagePlugin {
     /**
      * The server contribution plugins associated with this language plugin
      */

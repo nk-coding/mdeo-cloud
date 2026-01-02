@@ -7,8 +7,8 @@
     <FileIcon v-else />
 </template>
 <script setup lang="ts">
-import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
+import type { WorkbenchLanguagePlugin } from "@/data/plugin/languagePlugin";
 import { Icon, FileIcon } from "lucide-vue-next";
 
-defineModel<LanguagePlugin | undefined>();
+defineModel<WorkbenchLanguagePlugin | undefined>();
 </script>

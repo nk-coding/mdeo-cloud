@@ -1,6 +1,6 @@
-import { computed, ref, watch, type Reactive } from "vue";
+import { computed, nextTick, ref, shallowRef, watch, type Reactive } from "vue";
 import { type EditorTab } from "./tab/editorTab";
-import type { Plugin } from "./plugin/plugin";
+import type { WorkbenchPlugin } from "./plugin/plugin";
 import type { BackendApi } from "./api/backendApi";
 import type { MonacoApi } from "@/lib/monacoPlugin";
 import type { Project } from "./project/project";
@@ -61,7 +61,19 @@ export class WorkbenchState {
     /**
      * Plugins loaded in the workbench
      */
-    readonly plugins = ref<Map<string, Plugin>>(new Map());
+    readonly plugins = ref<Map<string, WorkbenchPlugin>>(new Map());
+
+    /**
+     * The current language client if existing
+     * should be disposed before a new one is created
+     */
+    readonly languageClient = shallowRef<MonacoLanguageClient>();
+
+    /**
+     * Counter for language client restarts
+     * Can be used as vue key to force re-creation of components
+     */
+    readonly clientVersionCounter = ref(0);
 
     /**
      * File type plugins provided by any plugin
@@ -147,12 +159,6 @@ export class WorkbenchState {
             }
         }
     });
-
-    /**
-     * The current language client if existing
-     * should be disposed before a new one is created
-     */
-    private languageClient: MonacoLanguageClient | undefined;
 
     /**
      * The current language server worker
@@ -241,25 +247,23 @@ export class WorkbenchState {
      * @param serverPlugins The list of server plugins to initialize
      */
     private async recreateLanguageServer(newProject: Project | undefined, serverPlugins: ServerPlugin[]) {
-        await this.cleanupLanguageClient();
+        const languageClient = this.languageClient.value;
+        this.languageClient.value = undefined;
+        await nextTick();
+        if (languageClient != undefined) {
+            try {
+                await languageClient.stop();
+                await languageClient.dispose();
+            } catch {
+                // ignore errors during disposal
+            }
+        }
         this.terminateWorker();
 
-        if (newProject != undefined && serverPlugins.length > 0) {
+        if (newProject != undefined) {
+            this.clientVersionCounter.value += 1;
             this.createWorkerAndSetupHandlers(newProject, serverPlugins);
         }
-    }
-
-    /**
-     * Cleans up the existing language client
-     */
-    private async cleanupLanguageClient() {
-        try {
-            await this.languageClient?.stop();
-            await this.languageClient?.dispose();
-        } catch {
-            // ignore errors during disposal
-        }
-        this.languageClient = undefined;
     }
 
     /**
@@ -343,7 +347,7 @@ export class WorkbenchState {
             },
             messageTransports: { reader, writer }
         });
-        this.languageClient = languageClient;
+        this.languageClient.value = languageClient;
 
         // Register file system request handlers
         this.registerFileSystemHandlers(languageClient);
@@ -351,7 +355,7 @@ export class WorkbenchState {
         languageClient.start();
 
         setTimeout(async () => {
-            if (this.languageClient?.state === State.Starting) {
+            if (this.languageClient.value?.state === State.Starting) {
                 await this.recreateLanguageServer(project, this.serverPlugins.value);
             }
         }, 1000);

@@ -1,11 +1,11 @@
-import type { Plugin } from "@/data/plugin/plugin";
+import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 
 /**
  * Plugin for model transformation language support (.mt files).
  * Provides syntax highlighting, language configuration, and LSP integration for model transformation files.
  */
-export const modelTransformationPlugin: Plugin = {
+export const modelTransformationPlugin: WorkbenchPlugin = {
     id: "model-transformation-plugin",
     languagePlugins: [
         {
@@ -15,6 +15,7 @@ export const modelTransformationPlugin: Plugin = {
             serverPlugin: {
                 import: "/modules/metamodelPlugin.js"
             },
+            editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: {
                 ...defaultMonarchTokenProvider,

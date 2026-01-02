@@ -85,7 +85,7 @@ import {
 } from "@/components/ui/context-menu";
 import { type FileSystemNode } from "@/data/filesystem/file";
 import type { NewItemState } from "./FileSystemItemList.vue";
-import type { LanguagePlugin } from "@/data/plugin/languagePlugin";
+import type { WorkbenchLanguagePlugin } from "@/data/plugin/languagePlugin";
 import { workbenchStateKey } from "@/components/workbench/util";
 import { treeContextKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
@@ -101,12 +101,12 @@ const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [uri: Uri, fileType: LanguagePlugin];
+    createFile: [uri: Uri, fileType: WorkbenchLanguagePlugin];
     createFolder: [uri: Uri];
     rename: [oldUri: Uri, newUri: Uri];
     delete: [uri: Uri];
     move: [itemUri: Uri, targetFolderUri: Uri];
-    delegateCreateFile: [fileType: LanguagePlugin];
+    delegateCreateFile: [fileType: WorkbenchLanguagePlugin];
     delegateCreateFolder: [];
 }>();
 
@@ -134,7 +134,7 @@ async function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
     emit("select", props.entry);
 }
 
-function handleCreateFileOfType(fileType: LanguagePlugin) {
+function handleCreateFileOfType(fileType: WorkbenchLanguagePlugin) {
     if (props.entry.type === FileType.Directory) {
         newItem.value = {
             type: "file",
@@ -176,7 +176,7 @@ function handleRenameSubmit(newName: string) {
     isRenaming.value = false;
 }
 
-function handleCreateFileFromChild(uri: Uri, fileType: LanguagePlugin) {
+function handleCreateFileFromChild(uri: Uri, fileType: WorkbenchLanguagePlugin) {
     emit("createFile", uri, fileType);
 }
 

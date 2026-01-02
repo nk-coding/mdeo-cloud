@@ -1,4 +1,4 @@
-import type { Plugin } from "@/data/plugin/plugin";
+import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Network } from "lucide";
@@ -7,7 +7,7 @@ import { Network } from "lucide";
  * Plugin for model language support (.m files).
  * Provides syntax highlighting, language configuration, and LSP integration for model files.
  */
-export const modelPlugin: Plugin = {
+export const modelPlugin: WorkbenchPlugin = {
     id: "model-plugin",
     languagePlugins: [
         {
@@ -17,6 +17,7 @@ export const modelPlugin: Plugin = {
             serverPlugin: {
                 import: "/modules/metamodelPlugin.js"
             },
+            editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: {
                 ...defaultMonarchTokenProvider,

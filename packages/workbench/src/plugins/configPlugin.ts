@@ -1,4 +1,4 @@
-import type { Plugin } from "@/data/plugin/plugin";
+import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Settings2 } from "lucide";
@@ -7,7 +7,7 @@ import { Settings2 } from "lucide";
  * Plugin for configuration language support (.config files).
  * Provides syntax highlighting, language configuration, and LSP integration for configuration files.
  */
-export const configPlugin: Plugin = {
+export const configPlugin: WorkbenchPlugin = {
     id: "config-plugin",
     languagePlugins: [
         {
@@ -17,6 +17,7 @@ export const configPlugin: Plugin = {
             serverPlugin: {
                 import: "/modules/metamodelPlugin.js"
             },
+            editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: {
                 ...defaultMonarchTokenProvider,

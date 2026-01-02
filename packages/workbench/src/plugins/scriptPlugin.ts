@@ -1,4 +1,4 @@
-import type { Plugin } from "@/data/plugin/plugin";
+import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Code } from "lucide";
@@ -7,7 +7,7 @@ import { Code } from "lucide";
  * Plugin for script language support (.fn files).
  * Provides syntax highlighting, language configuration, and LSP integration for script files.
  */
-export const scriptPlugin: Plugin = {
+export const scriptPlugin: WorkbenchPlugin = {
     id: "script-plugin",
     languagePlugins: [
         {
@@ -17,6 +17,7 @@ export const scriptPlugin: Plugin = {
             serverPlugin: {
                 import: "/modules/scriptPlugin.js"
             },
+            editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: {
                 ...defaultMonarchTokenProvider,

@@ -46,7 +46,6 @@ export const MetamodelScopeProvider: MetamodelServiceProvider<ScopeProvider> = (
             const document = context.langium.AstUtils.getDocument(referenceInfo.container);
             const model = document.parseResult.value as MetaModelType;
 
-            // Handle import references (the entity being imported)
             if (isImportReference(referenceInfo, metamodelFileScopingConfig)) {
                 return getExportedEntitiesFromGlobalScope(
                     context,
@@ -55,9 +54,7 @@ export const MetamodelScopeProvider: MetamodelServiceProvider<ScopeProvider> = (
                     metamodelFileScopingConfig,
                     this.indexManager
                 );
-            }
-            // Handle references to metaclasses (local or imported)
-            else if (isReferenceToImport(referenceInfo, MetaClassOrImport, this.reflection)) {
+            } else if (isReferenceToImport(referenceInfo, MetaClassOrImport, this.reflection)) {
                 const importScope = getImportedEntitiesFromCurrentFile(
                     context,
                     model.imports,
