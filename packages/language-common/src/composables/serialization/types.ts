@@ -1,4 +1,4 @@
-import type { CstNode, AstNode, LangiumDocument, LeafCstNode } from "langium";
+import type { CstNode, AstNode, LangiumDocument, LeafCstNode, Reference } from "langium";
 import type { AstPath, Doc, doc, ParserOptions } from "prettier";
 import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
 
@@ -82,6 +82,15 @@ export interface PrintContext<T extends AstNode = AstNode> {
      * @returns The primitive value and its associated CST node
      */
     getPrimitive<T extends AstNode, V extends keyof T & string>(node: T, property: V): PrimitiveValue<T[V]>;
+    /**
+     * Prints a reference value using the registered serializer for the terminal
+     *
+     * @template T The AstNode type being referenced
+     * @param value The reference value to print
+     * @param rule The terminal rule associated with this reference
+     * @returns Prettier Doc representation of the reference
+     */
+    printReference<T extends AstNode>(value: AstPath<Reference<T>>, rule: TerminalRule<string>): Doc;
 }
 
 /**

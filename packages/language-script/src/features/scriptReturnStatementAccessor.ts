@@ -6,9 +6,9 @@ import { ReturnStatement, statementTypes } from "../grammar/types.js";
 /**
  * Provides access to return statements in the Script language for return type analysis.
  */
-export class ScriptReturnStatementAccessor<Specifics extends TypirLangiumSpecifics = TypirLangiumSpecifics>
-    implements ReturnStatementAccessor<Specifics>
-{
+export class ScriptReturnStatementAccessor<
+    Specifics extends TypirLangiumSpecifics = TypirLangiumSpecifics
+> implements ReturnStatementAccessor<Specifics> {
     constructor(private readonly typir: ExpressionTypirServices<Specifics>) {}
 
     isReturnStatement(node: AstNode): boolean {

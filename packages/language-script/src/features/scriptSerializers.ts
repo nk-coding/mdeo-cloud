@@ -86,20 +86,19 @@ function printLambdaParameter(context: PrintContext<LambdaParameterType>): Doc {
  */
 function printLambdaParameters(context: PrintContext<LambdaParametersType>, builders: typeof doc.builders): Doc {
     const { ctx, path, print } = context;
-    const { join, line } = builders;
-    const docs: Doc[] = ["("];
+    const { join, line, group, softline, indent } = builders;
+    const docs: Doc[] = [];
 
-    if (ctx.parameters && ctx.parameters.length > 0) {
-        const parameters = path.map(print, "parameters");
-        docs.push(join(", ", parameters));
+    if (ctx.parameters.length > 0) {
+        docs.push(group(["(", indent([softline, join([",", line], path.map(print, "parameters"))]), softline, ")"]));
     } else {
+        docs.push("(");
         const danglingComments = printDanglingComments(context, builders);
         if (danglingComments.length > 0) {
             docs.push(line, danglingComments, line);
         }
+        docs.push(")");
     }
-
-    docs.push(")");
     return docs;
 }
 
@@ -148,20 +147,20 @@ function printFunctionParameter(context: PrintContext<any>): Doc {
  */
 function printFunctionParameters(context: PrintContext<FunctionParametersType>, builders: typeof doc.builders): Doc {
     const { ctx, path, print } = context;
-    const { join, line } = builders;
-    const docs: Doc[] = ["("];
+    const { join, line, softline, indent, group } = builders;
+    const docs: Doc[] = [];
 
     if (ctx.parameters && ctx.parameters.length > 0) {
-        const parameters = path.map(print, "parameters");
-        docs.push(join(", ", parameters));
+        docs.push(group(["(", indent([softline, join([",", line], path.map(print, "parameters"))]), softline, ")"]));
     } else {
+        docs.push("(");
         const danglingComments = printDanglingComments(context, builders);
         if (danglingComments.length > 0) {
             docs.push(line, danglingComments, line);
         }
+        docs.push(")");
     }
 
-    docs.push(")");
     return docs;
 }
 

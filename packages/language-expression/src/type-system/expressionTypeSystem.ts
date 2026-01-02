@@ -35,9 +35,9 @@ enum ConversionMode {
  *
  * @template Specifics The language-specific type system configuration extending TypirLangiumSpecifics
  */
-export class ExpressionTypeSystem<Specifics extends TypirLangiumSpecifics>
-    implements ExtendedTypeSystemDefinition<Specifics>
-{
+export class ExpressionTypeSystem<
+    Specifics extends TypirLangiumSpecifics
+> implements ExtendedTypeSystemDefinition<Specifics> {
     /**
      * Non-nullable primitive types (int, long, float, double, string, boolean, Any).
      */

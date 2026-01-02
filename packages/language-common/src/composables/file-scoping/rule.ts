@@ -1,7 +1,7 @@
 import type { AstNode } from "langium";
 import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
 import { createRule, many, optional, ref } from "../../grammar/rule/parser/factory.js";
-import { ID, STRING } from "../../language/defaultTokens.js";
+import { ID, NEWLINE, STRING } from "../../language/defaultTokens.js";
 import type { FileImportType, ImportType } from "./types.js";
 import type { FileScopingConfig } from "./config.js";
 
@@ -18,14 +18,17 @@ import type { FileScopingConfig } from "./config.js";
  * @param importType The interface type for a single import (typically from generateImportTypes)
  * @param fileImportType The interface type for a file import statement (typically from generateImportTypes)
  * @param terminal Optional terminal rule to use for entity references (if not provided, uses default cross-reference)
+ * @param newlineAwareMode Whether to make the rules newline-aware (default: true)
  * @returns An object containing the importRule and fileImportRule
  */
 export function generateImportRules<T extends AstNode>(
     config: FileScopingConfig<T>,
     importType: ImportType<T>,
     fileImportType: FileImportType<T>,
-    terminal?: TerminalRule<any>
+    terminal?: TerminalRule<any>,
+    newlineAwareMode: boolean = true
 ) {
+    const newlineTokens = newlineAwareMode ? [many(NEWLINE)] : [];
     const importRule = createRule(config.importRuleName)
         .returns(importType)
         .as(({ set }) => [set("entity", ref(config.type, terminal)), optional("as", set("name", ID))]);
@@ -34,8 +37,10 @@ export function generateImportRules<T extends AstNode>(
         .as(({ set, add }) => [
             "import",
             "{",
+            ...newlineTokens,
             add("imports", importRule),
-            many(",", add("imports", importRule)),
+            many(...newlineTokens, ",", add("imports", importRule)),
+            ...newlineTokens,
             "}",
             "from",
             set("file", STRING)

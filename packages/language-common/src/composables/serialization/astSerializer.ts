@@ -1,7 +1,7 @@
-import type { AstNode, AstReflection, CstNode, LangiumCoreServices, LangiumDocument } from "langium";
+import type { AstNode, AstReflection, CstNode, LangiumCoreServices, LangiumDocument, Reference } from "langium";
 import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
 import type { Interface } from "../../grammar/type/interface/types.js";
-import type { Doc, Plugin } from "prettier";
+import type { AstPath, Doc, Plugin } from "prettier";
 import type { PluginContext } from "../../plugin/pluginContext.js";
 import type { FormattingOptions } from "vscode-languageserver-types";
 import type { PrintContext, PrimitiveValue, Comment, WithComments } from "./types.js";
@@ -165,7 +165,20 @@ export function generateDefaultAstSerializer(context: PluginContext): {
                                     }
                                     return serializer(value);
                                 },
-                                getPrimitive
+                                getPrimitive,
+                                printReference: <T extends AstNode>(
+                                    value: AstPath<Reference<T>>,
+                                    rule: TerminalRule<string>
+                                ): Doc => {
+                                    const serializer = primitiveSerializers.get(rule.name);
+                                    if (serializer == undefined) {
+                                        throw new Error(`No primitive serializer registered for rule: ${rule.name}`);
+                                    }
+                                    return serializer({
+                                        value: value.node.$refText,
+                                        cstNode: value.node.$refNode
+                                    } satisfies PrimitiveValue<string>);
+                                }
                             };
                             return printer(context);
                         },

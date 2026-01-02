@@ -387,7 +387,7 @@ function getResourceName(resource: Uri): string {
 
 /**
  * Extracts the file extension from a file name.
- * 
+ *
  * @param fileName The full file name
  * @returns The file extension including the dot
  */

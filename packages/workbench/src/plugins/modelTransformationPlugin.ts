@@ -1,7 +1,5 @@
 import type { Plugin } from "@/data/plugin/plugin";
-import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
-import { Network } from "lucide";
 
 /**
  * Plugin for model transformation language support (.mt files).

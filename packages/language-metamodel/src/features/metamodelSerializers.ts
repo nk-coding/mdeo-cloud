@@ -1,7 +1,7 @@
 import type { Doc, doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext, PluginContext } from "@mdeo/language-common";
-import { ID, INT, serializeNewlineSep } from "@mdeo/language-common";
+import { ID, INT, serializeNewlineSep, registerImportSerializers } from "@mdeo/language-common";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -11,6 +11,7 @@ import {
     AssociationEnd,
     Association,
     MetaModel,
+    MetaClassImport,
     MetaClassFileImport,
     type PrimitiveTypeType,
     type SingleMultiplicityType,
@@ -53,7 +54,7 @@ export function registerMetamodelSerializers(
     AstSerializer.registerNodeSerializer(MetaClass, (ctx) => printMetaClass(ctx, builders));
     AstSerializer.registerNodeSerializer(AssociationEnd, (ctx) => printAssociationEnd(ctx));
     AstSerializer.registerNodeSerializer(Association, (ctx) => printAssociation(ctx));
-    AstSerializer.registerNodeSerializer(MetaClassFileImport, (ctx) => printMetaClassFileImport(ctx, builders));
+    registerImportSerializers(services, builders, MetaClassImport, MetaClassFileImport);
     AstSerializer.registerNodeSerializer(MetaModel, (ctx) => printMetaModel(ctx, builders));
 }
 
@@ -126,7 +127,7 @@ function printProperty(context: PrintContext<PropertyType>): Doc {
  * @returns The formatted metaclass
  */
 function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof doc.builders): Doc {
-    const { ctx, printPrimitive, getPrimitive, path, print } = context;
+    const { ctx, printPrimitive, printReference, getPrimitive, path } = context;
     const { join, indent, group, hardline } = builders;
     const docs: Doc[] = [];
 
@@ -139,7 +140,7 @@ function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof d
 
     if (ctx.extends.length > 0) {
         docs.push(" extends ");
-        const extendsRefs = path.map(print, "extends");
+        const extendsRefs = path.map((ref) => printReference(ref, ID), "extends");
         docs.push(join(", ", extendsRefs));
     }
 
@@ -190,32 +191,6 @@ function printAssociation(context: PrintContext<AssociationType>): Doc {
     const target = path.call(print, "target");
 
     return [start, " ", operator, " ", target];
-}
-
-/**
- * Prints a metaclass file import node.
- *
- * @param context The print context
- * @param builders Prettier doc builders
- * @returns The formatted file import
- */
-function printMetaClassFileImport(context: PrintContext<any>, builders: typeof doc.builders): Doc {
-    const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    const { join } = builders;
-    const docs: Doc[] = ["import "];
-
-    if (ctx.imports && ctx.imports.length > 0) {
-        docs.push("{");
-        const imports = path.map(print, "imports");
-        docs.push(join(", ", imports));
-        docs.push("} from ");
-    } else {
-        docs.push("* from ");
-    }
-
-    docs.push(printPrimitive(getPrimitive(ctx, "uri"), ID));
-
-    return docs;
 }
 
 /**

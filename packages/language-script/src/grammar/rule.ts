@@ -5,9 +5,9 @@ import {
     LeadingTrailing,
     optional,
     generateImportRules,
-    newlineSep,
-    NewlineSepSectionCardinality,
-    or
+    or,
+    NEWLINE,
+    many
 } from "@mdeo/language-common";
 import { generateExpressionRules, generateStatementRules, generateTypeRules } from "@mdeo/language-expression";
 import {
@@ -128,15 +128,4 @@ const { importRule: FunctionImportRule, fileImportRule: FunctionFileImportRule }
  */
 export const ScriptRule = createRule("ScriptRule")
     .returns(Script)
-    .as(({ add }) => [
-        newlineSep([
-            {
-                entry: add("imports", FunctionFileImportRule),
-                cardinality: NewlineSepSectionCardinality.MANY
-            },
-            {
-                entry: add("functions", FunctionRule),
-                cardinality: NewlineSepSectionCardinality.MANY
-            }
-        ])
-    ]);
+    .as(({ add }) => [many(or(add("imports", FunctionFileImportRule), add("functions", FunctionRule), NEWLINE))]);

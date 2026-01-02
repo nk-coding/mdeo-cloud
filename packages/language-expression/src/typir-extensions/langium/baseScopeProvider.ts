@@ -17,8 +17,7 @@ import type { ExtendedTypeSystemDefinition } from "./typeSystemDefinition.js";
 export abstract class BaseScopeProvider<
     Specifics extends TypirLangiumSpecifics,
     S extends ExtendedTypirLangiumServices<Specifics>
-> implements ScopeProvider<Specifics>
-{
+> implements ScopeProvider<Specifics> {
     /**
      * Caching mechanism for storing and retrieving scopes associated with language nodes.
      */

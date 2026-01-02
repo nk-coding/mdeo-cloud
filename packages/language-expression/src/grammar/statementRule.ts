@@ -1,15 +1,4 @@
-import {
-    action,
-    createRule,
-    group,
-    ID,
-    many,
-    newlineSep,
-    NewlineSepSectionCardinality,
-    optional,
-    or,
-    type ParserRule
-} from "@mdeo/language-common";
+import { action, createRule, group, ID, many, NEWLINE, optional, or, type ParserRule } from "@mdeo/language-common";
 import type { StatementConfig } from "./statementConfig.js";
 import type { BaseStatementType, StatementTypes } from "./statementTypes.js";
 import type { AssingableExpressionType, BaseExpressionType } from "./expressionTypes.js";
@@ -43,12 +32,12 @@ export function generateStatementRules(
         .returns(types.statementsScopeType)
         .as(({ add }) => [
             "{",
-            newlineSep([
-                {
-                    entry: add("statements", () => statementRule),
-                    cardinality: NewlineSepSectionCardinality.MANY
-                }
-            ]),
+            many(
+                or(
+                    add("statements", () => statementRule),
+                    NEWLINE
+                )
+            ),
             "}"
         ]);
 

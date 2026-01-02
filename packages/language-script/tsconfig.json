@@ -12,10 +12,6 @@
             "path": "../language-expression"
         }
     ],
-    "include": [
-        "src/**/*.ts",
-        "../language-expression/src/grammar/expressionTypes.ts",
-        "../language-expression/src/grammar/expressionConfig.ts"
-    ],
+    "include": ["src/**/*.ts"],
     "exclude": ["dist", "node_modules"]
 }

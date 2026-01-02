@@ -1,7 +1,14 @@
-import type { Doc } from "prettier";
-import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, PluginContext, Builders } from "@mdeo/language-common";
+import type { AstPath, Doc } from "prettier";
+import type { CstNode, CstUtils, LangiumCoreServices, isCompositeCstNode, isLeafCstNode } from "langium";
+import type {
+    AstSerializerAdditionalServices,
+    PrintContext,
+    PluginContext,
+    Builders,
+    Print
+} from "@mdeo/language-common";
 import { ID } from "@mdeo/language-common";
+import { getExpressionPrecedence, Precedence } from "./precedenceHelper.js";
 import type {
     ExpressionTypes,
     UnaryExpressionType,
@@ -16,7 +23,8 @@ import type {
     LongLiteralExpressionType,
     FloatLiteralExpressionType,
     DoubleLiteralExpressionType,
-    BooleanLiteralExpressionType
+    BooleanLiteralExpressionType,
+    BaseExpressionType
 } from "../grammar/expressionTypes.js";
 
 /**
@@ -27,21 +35,37 @@ import type {
  * @param types The generated expression types
  */
 export function registerExpressionSerializers(
-    { prettier }: PluginContext,
+    { prettier, langium }: PluginContext,
     services: LangiumCoreServices & AstSerializerAdditionalServices,
     types: ExpressionTypes
 ): void {
     const { AstSerializer } = services;
     const builders = prettier.doc.builders;
+    const precedenceContext: PrecedenceContext = {
+        types,
+        builders,
+        isLeafCstNode: langium.isLeafCstNode,
+        isCompositeCstNode: langium.isCompositeCstNode
+    };
 
-    AstSerializer.registerNodeSerializer(types.unaryExpressionType, (ctx) => printUnaryExpression(ctx));
-    AstSerializer.registerNodeSerializer(types.binaryExpressionType, (ctx) => printBinaryExpression(ctx, builders));
-    AstSerializer.registerNodeSerializer(types.ternaryExpressionType, (ctx) => printTernaryExpression(ctx, builders));
+    AstSerializer.registerNodeSerializer(types.unaryExpressionType, (ctx) =>
+        printUnaryExpression(ctx, precedenceContext)
+    );
+    AstSerializer.registerNodeSerializer(types.binaryExpressionType, (ctx) =>
+        printBinaryExpression(ctx, precedenceContext)
+    );
+    AstSerializer.registerNodeSerializer(types.ternaryExpressionType, (ctx) =>
+        printTernaryExpression(ctx, precedenceContext)
+    );
     AstSerializer.registerNodeSerializer(types.callExpressionGenericArgsType, (ctx) =>
         printCallExpressionGenericArgs(ctx, builders)
     );
-    AstSerializer.registerNodeSerializer(types.callExpressionType, (ctx) => printCallExpression(ctx, builders));
-    AstSerializer.registerNodeSerializer(types.memberAccessExpressionType, (ctx) => printMemberAccessExpression(ctx));
+    AstSerializer.registerNodeSerializer(types.callExpressionType, (ctx) =>
+        printCallExpression(ctx, precedenceContext)
+    );
+    AstSerializer.registerNodeSerializer(types.memberAccessExpressionType, (ctx) =>
+        printMemberAccessExpression(ctx, precedenceContext)
+    );
     AstSerializer.registerNodeSerializer(types.identifierExpressionType, (ctx) => printIdentifierExpression(ctx));
     AstSerializer.registerNodeSerializer(types.stringLiteralExpressionType, (ctx) => printStringLiteralExpression(ctx));
     AstSerializer.registerNodeSerializer(types.intLiteralExpressionType, (ctx) => printIntLiteralExpression(ctx));
@@ -55,15 +79,91 @@ export function registerExpressionSerializers(
 }
 
 /**
+ * Context object containing dependencies needed for precedence-aware expression printing.
+ */
+interface PrecedenceContext {
+    /**
+     * The generated expression types
+     */
+    types: ExpressionTypes;
+    /**
+     * Prettier doc builders for formatting
+     */
+    builders: Builders;
+    /**
+     * Function to check if a CST node is a leaf node
+     */
+    isLeafCstNode: typeof isLeafCstNode;
+    /**
+     * Function to check if a CST node is a composite node
+     */
+    isCompositeCstNode: typeof isCompositeCstNode;
+}
+
+/**
+ * Helper function to print an expression with precedence awareness.
+ * Wraps the expression in parentheses if needed based on precedence comparison.
+ *
+ * @param path The AST path to print
+ * @param parentPrecedence The precedence of the parent expression
+ * @param print The print function
+ * @param context The precedence context containing types, builders, and CST utilities
+ * @returns The formatted expression, potentially wrapped in parentheses
+ */
+function printWithPrec<T extends BaseExpressionType>(
+    path: AstPath<T>,
+    parentPrecedence: Precedence,
+    print: Print,
+    context: PrecedenceContext
+): Doc {
+    const { types, builders } = context;
+    const { group, indent, softline } = builders;
+    const childPrecedence = getExpressionPrecedence(path.node, types);
+    const cstNode = path.node.$cstNode;
+
+    const needsParens =
+        childPrecedence > parentPrecedence ||
+        (childPrecedence > Precedence.PRIMARY && cstNode != undefined && isBracketedExpression(cstNode, context));
+
+    const printed = print(path);
+    return needsParens ? group(["(", indent([softline, printed]), softline, ")"]) : printed;
+}
+
+function isBracketedExpression(node: CstNode, { isLeafCstNode, isCompositeCstNode }: PrecedenceContext): boolean {
+    if (!isCompositeCstNode(node)) {
+        return false;
+    }
+    let content = node.content;
+    while (true) {
+        const visibleContent = content.filter((node) => !node.hidden);
+        if (visibleContent.length === 1 && isCompositeCstNode(visibleContent[0])) {
+            content = visibleContent[0].content;
+        } else if (visibleContent.length === 3) {
+            const [first, middle, last] = visibleContent;
+            return (
+                isLeafCstNode(first) &&
+                first.text === "(" &&
+                isLeafCstNode(last) &&
+                last.text === ")" &&
+                isCompositeCstNode(middle)
+            );
+        } else {
+            return false;
+        }
+    }
+}
+
+/**
  * Prints a unary expression node.
  *
  * @param context The print context
+ * @param precedenceContext The precedence context
  * @returns The formatted unary expression
  */
-function printUnaryExpression(context: PrintContext<UnaryExpressionType>): Doc {
+function printUnaryExpression(context: PrintContext<UnaryExpressionType>, precedenceContext: PrecedenceContext): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
     const operator = printPrimitive(getPrimitive(ctx, "operator"), ID);
-    const expression = path.call(print, "expression");
+    const expression = path.call((p) => printWithPrec(p, Precedence.UNARY, print, precedenceContext), "expression");
     return [operator, expression];
 }
 
@@ -71,15 +171,19 @@ function printUnaryExpression(context: PrintContext<UnaryExpressionType>): Doc {
  * Prints a binary expression node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
+ * @param precedenceContext The precedence context
  * @returns The formatted binary expression
  */
-function printBinaryExpression(context: PrintContext<BinaryExpressionType>, builders: Builders): Doc {
+function printBinaryExpression(context: PrintContext<BinaryExpressionType>, precedenceContext: PrecedenceContext): Doc {
     const { ctx, path, print } = context;
-    const { group } = builders;
-    const left = path.call(print, "left");
+    const { group } = precedenceContext.builders;
+
+    const precedence = getExpressionPrecedence(ctx, precedenceContext.types);
+
+    const left = path.call((p) => printWithPrec(p, precedence, print, precedenceContext), "left");
     const operator = ctx.operator;
-    const right = path.call(print, "right");
+    const right = path.call((p) => printWithPrec(p, precedence - 1, print, precedenceContext), "right");
+
     return group([left, " ", operator, " ", right]);
 }
 
@@ -87,15 +191,26 @@ function printBinaryExpression(context: PrintContext<BinaryExpressionType>, buil
  * Prints a ternary expression node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
+ * @param precedenceContext The precedence context
  * @returns The formatted ternary expression
  */
-function printTernaryExpression(context: PrintContext<TernaryExpressionType>, builders: Builders): Doc {
+function printTernaryExpression(
+    context: PrintContext<TernaryExpressionType>,
+    precedenceContext: PrecedenceContext
+): Doc {
     const { path, print } = context;
-    const { group } = builders;
-    const condition = path.call(print, "condition");
-    const trueExpression = path.call(print, "trueExpression");
-    const falseExpression = path.call(print, "falseExpression");
+    const { group } = precedenceContext.builders;
+
+    const condition = path.call((p) => printWithPrec(p, Precedence.TERNARY, print, precedenceContext), "condition");
+    const trueExpression = path.call(
+        (p) => printWithPrec(p, Precedence.TERNARY, print, precedenceContext),
+        "trueExpression"
+    );
+    const falseExpression = path.call(
+        (p) => printWithPrec(p, Precedence.TERNARY, print, precedenceContext),
+        "falseExpression"
+    );
+
     return group([condition, " ? ", trueExpression, " : ", falseExpression]);
 }
 
@@ -125,24 +240,22 @@ function printCallExpressionGenericArgs(context: PrintContext<CallExpressionGene
  * Prints a call expression node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
+ * @param precedenceContext The precedence context
  * @returns The formatted call expression
  */
-function printCallExpression(context: PrintContext<CallExpressionType>, builders: Builders): Doc {
+function printCallExpression(context: PrintContext<CallExpressionType>, precedenceContext: PrecedenceContext): Doc {
     const { ctx, path, print } = context;
-    const { join, group } = builders;
-    const docs: Doc[] = [path.call(print, "expression")];
+    const { join, group, line, softline, indent } = precedenceContext.builders;
+
+    const docs: Doc[] = [
+        path.call((p) => printWithPrec(p, Precedence.MEMBER_CALL, print, precedenceContext), "expression")
+    ];
 
     if (ctx.genericArgs != undefined) {
         docs.push(path.call(print, "genericArgs"));
     }
 
-    docs.push("(");
-    if (ctx.arguments && ctx.arguments.length > 0) {
-        const args = path.map(print, "arguments");
-        docs.push(join(", ", args));
-    }
-    docs.push(")");
+    docs.push(group(["(", indent([softline, join([",", line], path.map(print, "arguments"))]), softline, ")"]));
 
     return group(docs);
 }
@@ -151,11 +264,19 @@ function printCallExpression(context: PrintContext<CallExpressionType>, builders
  * Prints a member access expression node.
  *
  * @param context The print context
+ * @param precedenceContext The precedence context
  * @returns The formatted member access expression
  */
-function printMemberAccessExpression(context: PrintContext<MemberAccessExpressionType>): Doc {
+function printMemberAccessExpression(
+    context: PrintContext<MemberAccessExpressionType>,
+    precedenceContext: PrecedenceContext
+): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
-    const expression = path.call(print, "expression");
+
+    const expression = path.call(
+        (p) => printWithPrec(p, Precedence.MEMBER_CALL, print, precedenceContext),
+        "expression"
+    );
     const operator = ctx.isNullChaining ? "?." : ".";
     const member = printPrimitive(getPrimitive(ctx, "member"), ID);
     return [expression, operator, member];

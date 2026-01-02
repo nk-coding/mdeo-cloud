@@ -115,8 +115,8 @@ export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (se
      * @template T The specific type details extending CustomValueTypeDetail
      */
     class CustomValueTypeImplementation<
-            T extends CustomValueTypeDetail<TypirSpecifics> = CustomValueTypeDetail<TypirSpecifics>
-        >
+        T extends CustomValueTypeDetail<TypirSpecifics> = CustomValueTypeDetail<TypirSpecifics>
+    >
         extends Type
         implements CustomValueType<T>
     {

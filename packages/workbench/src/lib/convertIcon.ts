@@ -4,7 +4,7 @@ import type { IconNode as VueIconNode } from "lucide-vue-next";
 /**
  * Converts a Lucide IconNode to a lucide-vue-next IconNode by ensuring all attribute values are strings.
  * Most likely not necessary, but safer this way.
- * 
+ *
  * @param icon The Lucide IconNode to convert
  * @returns The converted lucide-vue-next IconNode
  */

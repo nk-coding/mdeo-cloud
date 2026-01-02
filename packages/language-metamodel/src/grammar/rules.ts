@@ -1,15 +1,4 @@
-import {
-    createRule,
-    or,
-    optional,
-    many,
-    ref,
-    ID,
-    INT,
-    generateImportRules,
-    newlineSep,
-    NewlineSepSectionCardinality
-} from "@mdeo/language-common";
+import { createRule, or, optional, many, ref, ID, INT, generateImportRules, NEWLINE } from "@mdeo/language-common";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -82,12 +71,7 @@ export const MetaClassRule = createRule("MetaClassRule")
             many(",", add("extends", ref(MetaClassOrImport, ID)))
         ),
         "{",
-        newlineSep([
-            {
-                entry: add("properties", PropertyRule),
-                cardinality: NewlineSepSectionCardinality.MANY
-            }
-        ]),
+        many(or(add("properties", PropertyRule), NEWLINE)),
         "}"
     ]);
 
@@ -206,14 +190,12 @@ export const { importRule: MetaClassImportRule, fileImportRule: MetaClassFileImp
 export const MetaModelRule = createRule("MetaModelRule")
     .returns(MetaModel)
     .as(({ add }) => [
-        newlineSep([
-            {
-                entry: add("imports", MetaClassFileImportRule),
-                cardinality: NewlineSepSectionCardinality.MANY
-            },
-            {
-                entry: or(add("classesAndAssociations", MetaClassRule), add("classesAndAssociations", AssociationRule)),
-                cardinality: NewlineSepSectionCardinality.MANY
-            }
-        ])
+        many(
+            or(
+                add("imports", MetaClassFileImportRule),
+                add("classesAndAssociations", MetaClassRule),
+                add("classesAndAssociations", AssociationRule),
+                NEWLINE
+            )
+        )
     ]);

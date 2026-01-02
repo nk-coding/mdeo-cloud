@@ -40,5 +40,5 @@ export const scriptPlugin: Plugin = {
             icon: convertIcon(Code)
         }
     ],
-    serverContributionPlugins: [],
+    serverContributionPlugins: []
 };
