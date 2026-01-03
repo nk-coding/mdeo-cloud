@@ -2,15 +2,24 @@ import type { InferenceProblem, Type, TypeAssignability, TypeEquality, TypirProb
 import { isSubTypeEdge, isConversionEdge } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
+import { isCustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import type { CustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
+import { isCustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
+import { isCustomValueType } from "../kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../kinds/custom-void/custom-void-type.js";
+import { isCustomVoidType } from "../kinds/custom-void/custom-void-type.js";
+import { isCustomNullType } from "../kinds/custom-null/custom-null-type.js";
+import { isCustomClassType } from "../kinds/custom-class/custom-class-type.js";
 import type { FunctionSignature, ValueType, FunctionType, ReturnType } from "../config/type.js";
 import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../config/type.js";
 import type { TypeDefinitionService } from "../service/type-definition-service.js";
 import { findCommonParentType, findSuperTypeWithTypeArgs } from "./commonParentType.js";
 import { getClassTypeIdentifier } from "./util.js";
 import { assertUnreachable } from "@mdeo/language-common";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
 
 /**
  * Result of validating a function signature against provided arguments.
@@ -55,17 +64,16 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      */
     get genericArgumentTypes(): (CustomValueType | InferenceProblem<Specifics>[])[] {
         if (this.cachedGenericArgumentTypes == undefined) {
-            const { InferenceProblem } = this.services.context.typir;
             this.cachedGenericArgumentTypes = this.genericArgumentsNodes.map((node) => {
                 const inferredType = this.services.Inference.inferType(node);
-                if (this.services.factory.CustomValues.isCustomValueType(inferredType)) {
+                if (isCustomValueType(inferredType)) {
                     return inferredType;
                 } else if (Array.isArray(inferredType)) {
                     return inferredType;
                 } else {
                     return [
                         {
-                            $problem: InferenceProblem,
+                            $problem: InferenceProblemConstant,
                             languageNode: node,
                             location: `Type '${inferredType.getName()}' is not a valid generic argument.`,
                             subProblems: []
@@ -107,9 +115,9 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
         private readonly isInferenceMode: boolean
     ) {
         const functionReferenceType = services.Inference.inferType(functionReferenceNode);
-        if (services.factory.CustomFunctions.isCustomFunctionType(functionReferenceType)) {
+        if (isCustomFunctionType(functionReferenceType)) {
             this.validateFunction(functionReferenceType);
-        } else if (services.factory.CustomLambdas.isCustomLambdaType(functionReferenceType)) {
+        } else if (isCustomLambdaType(functionReferenceType)) {
             this.validateLambda(functionReferenceType);
         } else if (Array.isArray(functionReferenceType)) {
             if (isInferenceMode) {
@@ -240,7 +248,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
 
         for (let i = 0; i < args.length; i++) {
             const argType = args[i];
-            if (Array.isArray(argType) || !this.services.factory.CustomValues.isCustomValueType(argType)) {
+            if (Array.isArray(argType) || !isCustomValueType(argType)) {
                 continue;
             }
 
@@ -289,7 +297,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             const argType = args[i];
             if (Array.isArray(argType)) {
                 errors.push(this.createError(this.argumentNodes[i], `Argument type could not be determined.`, argType));
-            } else if (!this.services.factory.CustomValues.isCustomValueType(argType)) {
+            } else if (!isCustomValueType(argType)) {
                 errors.push(this.createError(this.argumentNodes[i], `Argument type is not a valid type.`));
             } else if (i >= signature.parameters.length && signature.isVarArgs !== true) {
                 errors.push(this.createError(this.argumentNodes[i], `Too many arguments provided for function call.`));
@@ -444,7 +452,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
                 this.errors.push(
                     this.createError(this.argumentNodes[i], `Argument type could not be determined.`, argType)
                 );
-            } else if (!this.services.factory.CustomValues.isCustomValueType(argType)) {
+            } else if (!isCustomValueType(argType)) {
                 this.errors.push(this.createError(this.argumentNodes[i], `Argument type is not a valid type.`));
             } else if (i >= type.details.parameterTypes.length) {
                 this.errors.push(
@@ -675,7 +683,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @returns true if the types are compatible
      */
     private checkAndUpdateType(declaredType: ValueType, actualType: CustomValueType, allowSubtypes: boolean): boolean {
-        if (!allowSubtypes && this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (!allowSubtypes && isCustomNullType(actualType)) {
             throw new Error("Null type cannot be used in invariant position.");
         }
         if (GenericTypeRef.is(declaredType)) {
@@ -704,10 +712,10 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         if (actualType.isNullable && !declaredType.isNullable) {
             return false;
         }
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             return declaredType.isNullable === true;
         }
-        if (!this.callValidator.services.factory.CustomClasses.isCustomClassType(actualType)) {
+        if (!isCustomClassType(actualType)) {
             return false;
         }
 
@@ -744,10 +752,10 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @returns true if the types are compatible
      */
     private checkAndUpdateLambdaType(declaredType: LambdaType, actualType: CustomValueType): boolean {
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             return declaredType.isNullable === true;
         }
-        if (!this.callValidator.services.factory.CustomLambdas.isCustomLambdaType(actualType)) {
+        if (!isCustomLambdaType(actualType)) {
             return false;
         }
         if (actualType.isNullable && !declaredType.isNullable) {
@@ -759,8 +767,8 @@ class GenericResolver<Specifics extends TypirSpecifics> {
 
         let returnTypeValid: boolean;
         if (VoidType.is(declaredReturnType)) {
-            returnTypeValid = this.callValidator.services.factory.CustomVoid.isCustomVoidType(actualReturnType);
-        } else if (this.callValidator.services.factory.CustomVoid.isCustomVoidType(actualReturnType)) {
+            returnTypeValid = isCustomVoidType(actualReturnType);
+        } else if (isCustomVoidType(actualReturnType)) {
             returnTypeValid = VoidType.is(declaredReturnType);
         } else {
             returnTypeValid = this.checkAndUpdateType(
@@ -840,7 +848,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         isNullable: boolean,
         allowSubtypes: boolean
     ): boolean {
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             if (isNullable) {
                 return true;
             }
@@ -868,7 +876,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         actualType: CustomValueType,
         allowSubtypes: boolean
     ): boolean {
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             return true;
         }
         if (!allowSubtypes && !actualType.isNullable) {
@@ -948,7 +956,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return false;
         }
 
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             if (!(isNullable || current.isNullable)) {
                 this.callResolvedGenericArgumentStates.set(genericName, TypeResolutionState.Conflict);
                 return false;
@@ -989,7 +997,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return false;
         }
 
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             if (!(isNullable || current.isNullable)) {
                 return false;
             }
@@ -1045,7 +1053,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         isNullable: boolean,
         current: CustomValueType
     ): boolean {
-        if (this.callValidator.services.factory.CustomNull.isCustomNullType(actualType)) {
+        if (isCustomNullType(actualType)) {
             if (!(isNullable || current.isNullable)) {
                 this.callResolvedGenericArguments.set(genericName, current.asNullable);
             }

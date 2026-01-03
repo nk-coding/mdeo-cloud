@@ -1,17 +1,19 @@
 import {
-    generateIdValueConverter,
-    generateNewlineAwareTokenBuilder,
     HIDDEN_NEWLINE,
     ML_COMMENT,
     SL_COMMENT,
     WS,
-    type LanguagePluginProvider,
-    type ServiceProvider,
-    type AstSerializerAdditionalServices,
-    generateDefaultAstSerializer,
-    generateSerializerFormatter,
-    registerDefaultTokenSerializers
+    type LanguagePlugin
 } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices } from "@mdeo/language-shared";
+import {
+    IdValueConverter,
+    NewlineAwareTokenBuilder,
+    DefaultAstSerializer,
+    SerializerFormatter,
+    registerDefaultTokenSerializers,
+    sharedImport
+} from "@mdeo/language-shared";
 import { ScriptRule } from "./grammar/rule.js";
 import {
     defaultExtendedTypirServices,
@@ -27,6 +29,9 @@ import { ScriptScopeProvider } from "./features/scopeProvider.js";
 import { registerScriptSerializers } from "./features/scriptSerializers.js";
 import { expressionTypes, statementTypes, typeTypes } from "./grammar/types.js";
 
+const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
+    sharedImport("typir-langium");
+
 /**
  * The Typir specifics for the Script language.
  */
@@ -40,49 +45,41 @@ export type ScriptServices = {
 } & AstSerializerAdditionalServices;
 
 /**
- * The service provider for the Script language.
- * Used for the plugin architecture.
+ * The plugin for the Script language.
  */
-export type ScriptServiceProvider<T> = ServiceProvider<ScriptServices, T>;
-
-/**
- * The plugin provider for the Script language.
- */
-export const scriptPluginProvider: LanguagePluginProvider<ScriptServices> = {
-    generate: (context) => ({
-        rootRule: ScriptRule,
-        additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
-        module: {
-            parser: {
-                ...generateNewlineAwareTokenBuilder(context, new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
-                ...generateIdValueConverter(context)
-            },
-            typir: (services) =>
-                context["typir-langium"].createTypirLangiumServicesWithAdditionalServices<
-                    ScriptTypirSpecifics,
-                    AdditionalTypirServices<ScriptTypirSpecifics>
-                >(
-                    services.shared as any,
-                    services.shared.AstReflection as any,
-                    new ScriptTypeSystem(),
-                    defaultExtendedTypirServices<ScriptTypirSpecifics>(context),
-                    {
-                        ScopeProvider: (services) =>
-                            new ScriptScopeProvider(services as ExpressionTypirServices<ScriptTypirSpecifics>)
-                    }
-                ) as ExpressionTypirServices<ScriptTypirSpecifics>,
-            lsp: {
-                ...generateSerializerFormatter(context)
-            },
-            ...generateDefaultAstSerializer(context)
+export const scriptPlugin: LanguagePlugin<ScriptServices> = {
+    rootRule: ScriptRule,
+    additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
+    module: {
+        parser: {
+            TokenBuilder: () => new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
+            ValueConverter: () => new IdValueConverter()
         },
-        postCreate(services) {
-            context["typir-langium"].initializeLangiumTypirServices(services as any, services.typir);
-            registerDefaultTokenSerializers(context, services);
-            registerTypeSerializers(context, services, typeTypes);
-            registerExpressionSerializers(context, services, expressionTypes);
-            registerStatementSerializers(context, services, statementTypes);
-            registerScriptSerializers(context, services);
-        }
-    })
+        typir: (services) =>
+            createTypirLangiumServicesWithAdditionalServices<
+                ScriptTypirSpecifics,
+                AdditionalTypirServices<ScriptTypirSpecifics>
+            >(
+                services.shared as any,
+                services.shared.AstReflection as any,
+                new ScriptTypeSystem(),
+                defaultExtendedTypirServices<ScriptTypirSpecifics>(),
+                {
+                    ScopeProvider: (services) =>
+                        new ScriptScopeProvider(services as ExpressionTypirServices<ScriptTypirSpecifics>)
+                }
+            ) as ExpressionTypirServices<ScriptTypirSpecifics>,
+        lsp: {
+            Formatter: (services) => new SerializerFormatter(services)
+        },
+        AstSerializer: (services) => new DefaultAstSerializer(services)
+    },
+    postCreate(services) {
+        initializeLangiumTypirServices(services as any, services.typir);
+        registerDefaultTokenSerializers(services);
+        registerTypeSerializers(services, typeTypes);
+        registerExpressionSerializers(services, expressionTypes);
+        registerStatementSerializers(services, statementTypes);
+        registerScriptSerializers(services);
+    }
 };

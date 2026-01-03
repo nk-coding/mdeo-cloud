@@ -1,7 +1,8 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, PluginContext, Builders } from "@mdeo/language-common";
-import { ID, serializeNewlineSep } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices, PrintContext, Builders } from "@mdeo/language-shared";
+import { ID } from "@mdeo/language-common";
+import { serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
 import type {
     StatementTypes,
     StatementsScopeType,
@@ -15,20 +16,20 @@ import type {
     ExpressionStatementType
 } from "../grammar/statementTypes.js";
 
+const { doc: prettierDoc } = sharedImport("prettier");
+
 /**
  * Registers all statement serializers for pretty-printing statement AST nodes.
  *
- * @param context The plugin context
  * @param services The Langium core services with AST serializer
  * @param types The generated statement types
  */
 export function registerStatementSerializers(
-    { prettier }: PluginContext,
     services: LangiumCoreServices & AstSerializerAdditionalServices,
     types: StatementTypes
 ): void {
     const { AstSerializer } = services;
-    const builders = prettier.doc.builders;
+    const builders = prettierDoc.builders;
 
     AstSerializer.registerNodeSerializer(types.statementsScopeType, (ctx) => printStatementsScope(ctx, builders));
     AstSerializer.registerNodeSerializer(types.elseIfClauseType, (ctx) => printElseIfClause(ctx));

@@ -2,9 +2,9 @@ import type { Kind } from "typir";
 import type { TypirSpecifics, TypeDetails } from "typir";
 import type { FunctionType } from "../../config/type.js";
 import {
-    CustomFunctionTypeProvider,
-    type CustomFunctionType,
-    type CustomFunctionTypeConstructor
+    CustomFunctionTypeImplementation,
+    isCustomFunctionType,
+    type CustomFunctionType
 } from "./custom-function-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
@@ -38,11 +38,6 @@ export interface CustomFunctionDetails<Specifics extends TypirSpecifics> extends
  */
 export interface CustomFunctionFactoryService<Specifics extends TypirSpecifics> {
     /**
-     * The custom function type constructor
-     */
-    CustomFunctionType: CustomFunctionTypeConstructor;
-
-    /**
      * Get an existing custom function type or create a new one.
      * Uses caching to ensure type identity.
      *
@@ -50,14 +45,6 @@ export interface CustomFunctionFactoryService<Specifics extends TypirSpecifics> 
      * @returns The custom function type instance
      */
     create(details: CustomFunctionDetails<Specifics>): CustomFunctionType;
-
-    /**
-     * Type guard to check if a value is a CustomFunctionType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomFunctionType
-     */
-    isCustomFunctionType(type: unknown): type is CustomFunctionType;
 }
 
 /**
@@ -76,8 +63,6 @@ export class CustomFunctionKind<Specifics extends TypirSpecifics>
 {
     readonly $name: string = CustomFunctionKindName;
 
-    readonly CustomFunctionType: CustomFunctionTypeConstructor;
-
     /**
      * Creates a new custom function kind.
      * Automatically registers itself with the kind registry.
@@ -86,7 +71,6 @@ export class CustomFunctionKind<Specifics extends TypirSpecifics>
      */
     constructor(readonly services: ExtendedTypirServices<Specifics>) {
         services.infrastructure.Kinds.register(this);
-        this.CustomFunctionType = CustomFunctionTypeProvider(services);
     }
 
     /**
@@ -97,16 +81,6 @@ export class CustomFunctionKind<Specifics extends TypirSpecifics>
      * @returns The custom function type instance
      */
     create(details: CustomFunctionDetails<Specifics>): CustomFunctionType {
-        return new this.CustomFunctionType(this as unknown as CustomFunctionKind<TypirSpecifics>, details);
-    }
-
-    /**
-     * Type guard to check if a value is a CustomFunctionType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomFunctionType
-     */
-    isCustomFunctionType(type: unknown): type is CustomFunctionType {
-        return type instanceof this.CustomFunctionType;
+        return new CustomFunctionTypeImplementation(this as unknown as CustomFunctionKind<TypirSpecifics>, details);
     }
 }

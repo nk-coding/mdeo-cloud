@@ -1,8 +1,6 @@
 import {
     createInterface,
     type ASTType,
-    FileScopingConfig,
-    generateImportTypes,
     Optional,
     createType
 } from "@mdeo/language-common";
@@ -14,6 +12,7 @@ import {
     StatementConfig,
     generateStatementTypes
 } from "@mdeo/language-expression";
+import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
 
 /**
  * Configuration for the Script language types.

@@ -7,6 +7,9 @@
     "references": [
         {
             "path": "../language-common"
+        },
+        {
+            "path": "../language-shared"
         }
     ],
     "include": ["src/**/*.ts"],

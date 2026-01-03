@@ -9,9 +9,11 @@ import type {
     Scope
 } from "langium";
 import type { FileScopingConfig } from "./config.js";
-import type { ASTType, BaseType } from "../../grammar/type/types.js";
+import type { ASTType, BaseType } from "@mdeo/language-common";
 import type { FileImportType } from "./types.js";
-import type { PluginContext } from "../../plugin/pluginContext.js";
+import { sharedImport } from "../sharedImport.js";
+
+const { UriUtils, StreamScope, stream } = sharedImport("langium");
 
 /**
  * Determines if the given reference info represents an import statement.
@@ -45,8 +47,6 @@ export function isReferenceToImport(
  * Retrieves exported entities from the global scope based on file imports.
  *
  * @template T - The AST node type of the entities being imported
- * @param context - The plugin context containing Langium utilities
- * @param context.langium - Langium services including UriUtils and StreamScope
  * @param document - The current document where the import statement appears
  * @param referenceInfo - Information about the reference, including the import container
  * @param config - File scoping configuration specifying the entity type and import structure
@@ -55,7 +55,6 @@ export function isReferenceToImport(
  * ```
  */
 export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
-    { langium }: PluginContext,
     document: LangiumDocument,
     referenceInfo: ReferenceInfo,
     config: FileScopingConfig<T>,
@@ -63,11 +62,11 @@ export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
 ): Scope {
     const currentUri = document.uri;
     const uris = new Set<string>();
-    const dirname = langium.UriUtils.dirname(currentUri);
+    const dirname = UriUtils.dirname(currentUri);
     const fileImport = referenceInfo.container.$container as ASTType<FileImportType<T>>;
-    uris.add(langium.UriUtils.joinPath(dirname, fileImport.file).toString());
+    uris.add(UriUtils.joinPath(dirname, fileImport.file).toString());
     const astNodeDescriptions = indexManager.allElements(config.type.name, uris).toArray();
-    return new langium.StreamScope(langium.stream(astNodeDescriptions));
+    return new StreamScope(stream(astNodeDescriptions));
 }
 
 /**
@@ -75,8 +74,6 @@ export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
  * Does NOT handle locally defined entities; use createLocalScope for that.
  *
  * @template T - The AST node type of the entities being imported
- * @param context - The plugin context containing Langium utilities
- * @param context.langium - Langium services including StreamScope and stream utilities
  * @param fileImports - Array of all import statements in the current file
  * @param nameProvider - Service for retrieving the canonical name of AST nodes
  * @param descriptions - Provider for creating AST node descriptions
@@ -84,7 +81,6 @@ export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
  * @returns A scope containing descriptions of all imported entities accessible in the current file
  */
 export function getImportedEntitiesFromCurrentFile<T extends AstNode>(
-    { langium }: PluginContext,
     fileImports: ASTType<FileImportType<T>>[],
     nameProvider: NameProvider,
     descriptions: AstNodeDescriptionProvider
@@ -106,5 +102,5 @@ export function getImportedEntitiesFromCurrentFile<T extends AstNode>(
         )
         .filter((description) => description != undefined);
 
-    return new langium.StreamScope(langium.stream(importDescriptions));
+    return new StreamScope(stream(importDescriptions));
 }

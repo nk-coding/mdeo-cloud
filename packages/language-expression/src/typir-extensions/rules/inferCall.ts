@@ -3,6 +3,9 @@ import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js
 import type { CustomVoidType } from "../kinds/custom-void/custom-void-type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import { CallValidationHelper } from "./callValidationHelper.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
 
 /**
  * Infer the return type of a function or lambda call.
@@ -50,9 +53,8 @@ class InferenceCallValidator<Specifics extends TypirSpecifics> extends CallValid
         message: string,
         subProblems?: TypirProblem[]
     ): InferenceProblem<Specifics> {
-        const { InferenceProblem } = this.services.context.typir;
         return {
-            $problem: InferenceProblem,
+            $problem: InferenceProblemConstant,
             languageNode,
             location: message,
             subProblems: subProblems ?? []

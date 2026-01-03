@@ -1,5 +1,9 @@
 import type { ValidationProblem, TypirSpecifics } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
+import { isCustomClassType } from "../kinds/custom-class/custom-class-type.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { ValidationProblem: ValidationProblemConstant } = sharedImport("typir");
 
 /**
  * Validate a member access expression.
@@ -22,16 +26,15 @@ export function validateMemberAccess<Specifics extends TypirSpecifics>(
     services: ExtendedTypirServices<Specifics>
 ): ValidationProblem<Specifics>[] {
     const errors: ValidationProblem<Specifics>[] = [];
-    const { ValidationProblem } = services.context.typir;
 
     const ownerType = services.Inference.inferType(owner);
     if (Array.isArray(ownerType)) {
         return [];
     }
 
-    if (!services.factory.CustomClasses.isCustomClassType(ownerType)) {
+    if (!isCustomClassType(ownerType)) {
         errors.push({
-            $problem: ValidationProblem,
+            $problem: ValidationProblemConstant,
             languageNode,
             severity: "error",
             message: `Type '${ownerType.getName()}' does not support member access.`,
@@ -42,7 +45,7 @@ export function validateMemberAccess<Specifics extends TypirSpecifics>(
 
     if (!isNullChaining && ownerType.isNullable) {
         errors.push({
-            $problem: ValidationProblem,
+            $problem: ValidationProblemConstant,
             languageNode,
             severity: "error",
             message: `Cannot access member '${name}' on nullable type '${ownerType.getName()}' without null chaining.`,
@@ -53,7 +56,7 @@ export function validateMemberAccess<Specifics extends TypirSpecifics>(
 
     if (ownerType.getMember(name) == undefined) {
         errors.push({
-            $problem: ValidationProblem,
+            $problem: ValidationProblemConstant,
             languageNode,
             severity: "error",
             message: `Member '${name}' does not exist on type '${ownerType.getName()}'.`,

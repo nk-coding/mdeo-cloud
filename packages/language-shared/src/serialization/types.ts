@@ -1,6 +1,6 @@
 import type { CstNode, AstNode, LangiumDocument, LeafCstNode, Reference } from "langium";
 import type { AstPath, Doc, doc, ParserOptions } from "prettier";
-import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
+import type { TerminalRule } from "@mdeo/language-common";
 
 /**
  * Function type for printing a node at a given path to a Prettier Doc.

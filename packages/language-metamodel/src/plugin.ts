@@ -1,18 +1,19 @@
 import { MetaModelRule } from "./grammar/rules.js";
 import {
-    type LanguagePluginProvider,
+    type LanguagePlugin,
     WS,
     ML_COMMENT,
     SL_COMMENT,
-    type ServiceProvider,
-    HIDDEN_NEWLINE,
-    generateIdValueConverter,
-    generateNewlineAwareTokenBuilder,
-    type AstSerializerAdditionalServices,
-    generateDefaultAstSerializer,
-    generateSerializerFormatter,
-    registerDefaultTokenSerializers
+    HIDDEN_NEWLINE
 } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices } from "@mdeo/language-shared";
+import {
+    IdValueConverter,
+    NewlineAwareTokenBuilder,
+    DefaultAstSerializer,
+    SerializerFormatter,
+    registerDefaultTokenSerializers
+} from "@mdeo/language-shared";
 import { MetamodelScopeProvider } from "./features/scopeProvider.js";
 import { registerMetamodelSerializers } from "./features/metamodelSerializers.js";
 
@@ -22,35 +23,27 @@ import { registerMetamodelSerializers } from "./features/metamodelSerializers.js
 export type MetamodelServices = AstSerializerAdditionalServices;
 
 /**
- * The service provider for the Metamodel language.
- * Used for the plugin architecture.
- */
-export type MetamodelServiceProvider<T> = ServiceProvider<MetamodelServices, T>;
-
-/**
- * The plugin provider for the Metamodel language.
+ * The plugin for the Metamodel language.
  * Configures the language with newline-aware lexing and custom parsing behavior.
  */
-export const metamodelPluginProvider: LanguagePluginProvider<MetamodelServices> = {
-    generate: (context) => ({
-        rootRule: MetaModelRule,
-        additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
-        module: {
-            parser: {
-                ...generateNewlineAwareTokenBuilder(context, new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
-                ...generateIdValueConverter(context)
-            },
-            references: {
-                ScopeProvider: MetamodelScopeProvider(context)
-            },
-            lsp: {
-                ...generateSerializerFormatter(context)
-            },
-            ...generateDefaultAstSerializer(context)
+export const metamodelPlugin: LanguagePlugin<MetamodelServices> = {
+    rootRule: MetaModelRule,
+    additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
+    module: {
+        parser: {
+            TokenBuilder: () => new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
+            ValueConverter: () => new IdValueConverter()
         },
-        postCreate(services) {
-            registerDefaultTokenSerializers(context, services);
-            registerMetamodelSerializers(context, services);
-        }
-    })
+        references: {
+            ScopeProvider: (services) => new MetamodelScopeProvider(services)
+        },
+        lsp: {
+            Formatter: (services) => new SerializerFormatter(services)
+        },
+        AstSerializer: (services) => new DefaultAstSerializer(services)
+    },
+    postCreate(services) {
+        registerDefaultTokenSerializers(services);
+        registerMetamodelSerializers(services);
+    }
 };

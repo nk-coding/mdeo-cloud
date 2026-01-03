@@ -6,7 +6,6 @@ import type { CustomValueFactoryService } from "../kinds/custom-value/custom-val
 import type { CustomVoidFactoryService } from "../kinds/custom-void/custom-void-kind.js";
 import type { CustomNullFactoryService } from "../kinds/custom-null/custom-null-kind.js";
 import type { TypeDefinitionService } from "./type-definition-service.js";
-import type { PluginContext } from "@mdeo/language-common";
 import type { ScopeProviderCaching } from "../scope/scopeProviderCache.js";
 import type { ScopeProvider } from "../scope/scopeProvider.js";
 import type { TypirLangiumAddedServices, TypirLangiumSpecifics } from "typir-langium";
@@ -72,11 +71,6 @@ export interface AdditionalTypirServices<Specifics extends TypirSpecifics> {
      * Scope provider service for resolving scopes of language nodes
      */
     readonly ScopeProvider: ScopeProvider<Specifics>;
-
-    /**
-     * Plugin context providing access to shared dependencies
-     */
-    readonly context: PluginContext;
 }
 
 /**
@@ -93,10 +87,3 @@ export type ExtendedTypirServices<Specifics extends TypirSpecifics> = TypirServi
  */
 export type ExtendedTypirLangiumServices<Specifics extends TypirLangiumSpecifics> = ExtendedTypirServices<Specifics> &
     TypirLangiumAddedServices<Specifics>;
-
-/**
- * Type for a function which when provided Extended Typir services returns an entity of type T.
- *
- * @template T The type of the provided entity
- */
-export type Provider<T> = <Specifics extends TypirSpecifics>(services: ExtendedTypirServices<Specifics>) => T;

@@ -9,7 +9,9 @@ import type {
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { CustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
+import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
 import type { CustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
+import { isCustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
 import {
     GenericTypeRef,
     LambdaType,
@@ -18,6 +20,9 @@ import {
     VoidType
 } from "../typir-extensions/config/type.js";
 import type { ExpressionTypirServices } from "../type-system/services.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
 
 /**
  * Result of lambda type inference containing complete lambda type information.
@@ -116,7 +121,7 @@ function inferFromAssignment<Specifics extends TypirLangiumSpecifics>(
         return createInferenceProblem(services, lambdaNode, "Cannot infer type of assignment target.", leftType);
     }
 
-    if (!services.factory.CustomLambdas.isCustomLambdaType(leftType)) {
+    if (!isCustomLambdaType(leftType)) {
         return createInferenceProblem(
             services,
             lambdaNode,
@@ -154,7 +159,7 @@ function inferFromVariableDeclaration<Specifics extends TypirLangiumSpecifics>(
         return createInferenceProblem(services, lambdaNode, "Cannot infer declared type of variable.", declaredType);
     }
 
-    if (!services.factory.CustomLambdas.isCustomLambdaType(declaredType)) {
+    if (!isCustomLambdaType(declaredType)) {
         return createInferenceProblem(
             services,
             lambdaNode,
@@ -192,11 +197,11 @@ function inferFromCallExpression<Specifics extends TypirLangiumSpecifics>(
         return createInferenceProblem(services, lambdaNode, "Cannot infer type of call target.", targetType);
     }
 
-    if (services.factory.CustomLambdas.isCustomLambdaType(targetType)) {
+    if (isCustomLambdaType(targetType)) {
         return inferFromLambdaTarget(lambdaNode, argumentIndex, targetType, services);
     }
 
-    if (services.factory.CustomFunctions.isCustomFunctionType(targetType)) {
+    if (isCustomFunctionType(targetType)) {
         return inferFromFunctionTarget(lambdaNode, argumentIndex, targetType, services);
     }
 
@@ -232,7 +237,7 @@ function inferFromLambdaTarget<Specifics extends TypirLangiumSpecifics>(
 
     const parameterType = targetType.details.parameterTypes[argumentIndex]!;
 
-    if (!services.factory.CustomLambdas.isCustomLambdaType(parameterType)) {
+    if (!isCustomLambdaType(parameterType)) {
         return createInferenceProblem(
             services,
             lambdaNode,
@@ -543,10 +548,9 @@ function createInferenceProblem<Specifics extends TypirLangiumSpecifics>(
     message: string,
     subProblems?: InferenceProblem<Specifics>[]
 ): InferenceProblem<Specifics>[] {
-    const { InferenceProblem } = services.context.typir;
     return [
         {
-            $problem: InferenceProblem,
+            $problem: InferenceProblemConstant,
             languageNode,
             location: message,
             subProblems: subProblems ?? []

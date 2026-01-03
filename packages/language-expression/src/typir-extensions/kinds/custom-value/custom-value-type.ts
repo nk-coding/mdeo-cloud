@@ -1,7 +1,9 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics } from "typir";
+import { Type } from "typir";
 import type { CustomClassType } from "../custom-class/custom-class-type.js";
-import type { ExtendedTypirServices, Provider } from "../../service/extendedTypirServices.js";
+import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { BaseClassTypeRef, Member, ValueType } from "../../config/type.js";
+import { sharedImport } from "@mdeo/language-shared";
 
 /**
  * Type details for custom value types.
@@ -106,130 +108,135 @@ export interface CustomValueType<
     registerSubtypesAndConversion(): void;
 }
 
-export const CustomValueTypeProvider: Provider<CustomValueTypeConstructor> = (services) => {
-    const { Type } = services.context.typir;
+/**
+ * Abstract base class for custom value types (classes and lambdas).
+ *
+ * @template T The specific type details extending CustomValueTypeDetail
+ */
+export class CustomValueTypeImplementation<
+    T extends CustomValueTypeDetail<TypirSpecifics> = CustomValueTypeDetail<TypirSpecifics>
+>
+    extends Type
+    implements CustomValueType<T>
+{
+    readonly superClasses: CustomClassType[];
+
+    private _allSuperClasses: CustomClassType[] | undefined = undefined;
+
+    get allSuperClasses(): CustomClassType[] {
+        if (this._allSuperClasses == undefined) {
+            const allSupers = new Set<CustomClassType>();
+            for (const superClass of this.superClasses) {
+                allSupers.add(superClass);
+                superClass.allSuperClasses.forEach((indirectSuperClass) => allSupers.add(indirectSuperClass));
+            }
+            this._allSuperClasses = [...allSupers];
+        }
+        return this._allSuperClasses;
+    }
+
+    private readonly cachedMembers: Map<string, Member> = new Map();
+
+    get asNullable(): CustomValueType {
+        throw new Error("Method not implemented.");
+    }
+
+    get asNonNullable(): CustomValueType {
+        throw new Error("Method not implemented.");
+    }
+
+    get isNullable(): boolean {
+        throw new Error("Method not implemented.");
+    }
+
+    get definition(): ValueType {
+        throw new Error("Method not implemented.");
+    }
 
     /**
-     * Abstract base class for custom value types (classes and lambdas).
+     * Creates a new custom value type.
      *
-     * @template T The specific type details extending CustomValueTypeDetail
+     * @param identifier The unique identifier for this type
+     * @param details The type details including type arguments and super types
+     * @param services Extended Typir services for type operations
+     * @param isNullable Whether this type is nullable
+     * @param superTypes Resolved super class types
      */
-    class CustomValueTypeImplementation<
-        T extends CustomValueTypeDetail<TypirSpecifics> = CustomValueTypeDetail<TypirSpecifics>
-    >
-        extends Type
-        implements CustomValueType<T>
-    {
-        readonly superClasses: CustomClassType[];
+    constructor(
+        identifier: string,
+        readonly details: T,
+        readonly services: ExtendedTypirServices<TypirSpecifics>,
+        isNullable: boolean,
+        superTypes: BaseClassTypeRef[]
+    ) {
+        super(identifier, details);
+        this.superClasses = (superTypes || []).map(
+            (superTypeRef) =>
+                services.TypeDefinitions.resolveCustomClassOrLambdaType(
+                    {
+                        ...superTypeRef,
+                        isNullable
+                    },
+                    details.typeArgs
+                ) as CustomClassType
+        );
+    }
 
-        private _allSuperClasses: CustomClassType[] | undefined = undefined;
+    getLocalMember(_memberName: string): Member | undefined {
+        throw new Error("Method not implemented.");
+    }
 
-        get allSuperClasses(): CustomClassType[] {
-            if (this._allSuperClasses == undefined) {
-                const allSupers = new Set<CustomClassType>();
-                for (const superClass of this.superClasses) {
-                    allSupers.add(superClass);
-                    superClass.allSuperClasses.forEach((indirectSuperClass) => allSupers.add(indirectSuperClass));
-                }
-                this._allSuperClasses = [...allSupers];
-            }
-            return this._allSuperClasses;
+    registerSubtypesAndConversion() {
+        for (const superClass of this.superClasses) {
+            this.services.Subtype.markAsSubType(this, superClass);
         }
-
-        private readonly cachedMembers: Map<string, Member> = new Map();
-
-        get asNullable(): CustomValueType {
-            throw new Error("Method not implemented.");
+        if (!this.isNullable) {
+            this.services.Subtype.markAsSubType(this, this.asNullable);
         }
-
-        get asNonNullable(): CustomValueType {
-            throw new Error("Method not implemented.");
-        }
-
-        get isNullable(): boolean {
-            throw new Error("Method not implemented.");
-        }
-
-        get definition(): ValueType {
-            throw new Error("Method not implemented.");
-        }
-
-        /**
-         * Creates a new custom value type.
-         *
-         * @param identifier The unique identifier for this type
-         * @param details The type details including type arguments and super types
-         * @param services Extended Typir services for type operations
-         * @param isNullable Whether this type is nullable
-         * @param superTypes Resolved super class types
-         */
-        constructor(
-            identifier: string,
-            readonly details: T,
-            readonly services: ExtendedTypirServices<TypirSpecifics>,
-            isNullable: boolean,
-            superTypes: BaseClassTypeRef[]
-        ) {
-            super(identifier, details);
-            this.superClasses = (superTypes || []).map(
-                (superTypeRef) =>
-                    services.TypeDefinitions.resolveCustomClassOrLambdaType(
-                        {
-                            ...superTypeRef,
-                            isNullable
-                        },
-                        details.typeArgs
-                    ) as CustomClassType
-            );
-        }
-
-        getLocalMember(_memberName: string): Member | undefined {
-            throw new Error("Method not implemented.");
-        }
-
-        registerSubtypesAndConversion() {
-            for (const superClass of this.superClasses) {
-                this.services.Subtype.markAsSubType(this, superClass);
-            }
-            if (!this.isNullable) {
-                this.services.Subtype.markAsSubType(this, this.asNullable);
-            }
-            if (this.isNullable) {
-                const nullType = this.services.factory.CustomNull.getOrCreate();
-                this.services.Conversion.markAsConvertible(nullType, this, "IMPLICIT_EXPLICIT");
-            }
-        }
-
-        getMember(memberName: string): Member | undefined {
-            if (this.cachedMembers.has(memberName)) {
-                return this.cachedMembers.get(memberName);
-            }
-            const member = this.getLocalMember(memberName);
-            if (member == undefined) {
-                for (const superClass of this.superClasses) {
-                    const superMember = superClass.getMember(memberName);
-                    if (superMember != undefined) {
-                        this.cachedMembers.set(memberName, superMember);
-                        return superMember;
-                    }
-                }
-                return undefined;
-            }
-            this.cachedMembers.set(memberName, member);
-            return member;
-        }
-
-        override getName(): string {
-            throw new Error("Method not implemented.");
-        }
-
-        override getUserRepresentation(): string {
-            throw new Error("Method not implemented.");
-        }
-
-        override analyzeTypeEqualityProblems(_otherType: TypirType): TypirProblem[] {
-            throw new Error("Method not implemented.");
+        if (this.isNullable) {
+            const nullType = this.services.factory.CustomNull.getOrCreate();
+            this.services.Conversion.markAsConvertible(nullType, this, "IMPLICIT_EXPLICIT");
         }
     }
-    return CustomValueTypeImplementation;
-};
+
+    getMember(memberName: string): Member | undefined {
+        if (this.cachedMembers.has(memberName)) {
+            return this.cachedMembers.get(memberName);
+        }
+        const member = this.getLocalMember(memberName);
+        if (member == undefined) {
+            for (const superClass of this.superClasses) {
+                const superMember = superClass.getMember(memberName);
+                if (superMember != undefined) {
+                    this.cachedMembers.set(memberName, superMember);
+                    return superMember;
+                }
+            }
+            return undefined;
+        }
+        this.cachedMembers.set(memberName, member);
+        return member;
+    }
+
+    override getName(): string {
+        throw new Error("Method not implemented.");
+    }
+
+    override getUserRepresentation(): string {
+        throw new Error("Method not implemented.");
+    }
+
+    override analyzeTypeEqualityProblems(_otherType: TypirType): TypirProblem[] {
+        throw new Error("Method not implemented.");
+    }
+}
+
+/**
+ * Type guard to check if a value is a CustomValueType.
+ *
+ * @param type The value to check
+ * @returns true if the value is a CustomValueType
+ */
+export function isCustomValueType(type: unknown): type is CustomValueType {
+    return type instanceof CustomValueTypeImplementation;
+}

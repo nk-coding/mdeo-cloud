@@ -1,8 +1,12 @@
 import type { InferenceProblem, TypirSpecifics } from "typir";
+import { sharedImport } from "@mdeo/language-shared";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
+import { isCustomValueType } from "../kinds/custom-value/custom-value-type.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import type { ValueType, FunctionType } from "../config/type.js";
+
+const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
 
 /**
  * Infer the type of a member access expression.
@@ -22,19 +26,18 @@ export function inferMemberAccess<Specifics extends TypirSpecifics>(
     name: string,
     services: ExtendedTypirServices<Specifics>
 ): InferenceProblem<Specifics> | CustomValueType | CustomFunctionType {
-    const { InferenceProblem } = services.context.typir;
     const ownerType = services.Inference.inferType(owner);
-    if (!services.factory.CustomValues.isCustomValueType(ownerType)) {
+    if (!isCustomValueType(ownerType)) {
         if (Array.isArray(ownerType)) {
             return <InferenceProblem<Specifics>>{
-                $problem: InferenceProblem,
+                $problem: InferenceProblemConstant,
                 languageNode,
                 location: `Cannot infer type`,
                 subProblems: ownerType
             };
         }
         return <InferenceProblem<Specifics>>{
-            $problem: InferenceProblem,
+            $problem: InferenceProblemConstant,
             languageNode,
             location: `Type '${ownerType.getName()}' does not support member access.`,
             subProblems: []
@@ -44,7 +47,7 @@ export function inferMemberAccess<Specifics extends TypirSpecifics>(
     const member = ownerType.getMember(name);
     if (member == undefined) {
         return <InferenceProblem<Specifics>>{
-            $problem: InferenceProblem,
+            $problem: InferenceProblemConstant,
             languageNode,
             location: `Member '${name}' does not exist on type '${ownerType.getName()}'.`,
             subProblems: []

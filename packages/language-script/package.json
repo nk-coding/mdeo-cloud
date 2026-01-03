@@ -10,7 +10,8 @@
     ],
     "dependencies": {
         "@mdeo/language-common": "^0.1.0",
-        "@mdeo/language-expression": "^0.1.0"
+        "@mdeo/language-expression": "^0.1.0",
+        "@mdeo/language-shared": "^0.1.0"
     },
     "devDependencies": {
         "langium": "^4.1.3",

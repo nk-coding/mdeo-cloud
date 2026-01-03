@@ -10,6 +10,9 @@
         },
         {
             "path": "../language-expression"
+        },
+        {
+            "path": "../language-shared"
         }
     ],
     "include": ["src/**/*.ts"],

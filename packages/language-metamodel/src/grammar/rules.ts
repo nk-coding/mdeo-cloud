@@ -1,4 +1,5 @@
-import { createRule, or, optional, many, ref, ID, INT, generateImportRules, NEWLINE } from "@mdeo/language-common";
+import { createRule, or, optional, many, ref, ID, INT, NEWLINE } from "@mdeo/language-common";
+import { generateImportRules } from "@mdeo/language-shared";
 import {
     PrimitiveType,
     SingleMultiplicity,

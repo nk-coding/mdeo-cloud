@@ -1,8 +1,14 @@
 import type { TypirProblem, TypirSpecifics, Type as TypirType, TypeEqualityProblem } from "typir";
-import type { CustomValueType, CustomValueTypeDetail } from "../custom-value/custom-value-type.js";
+import {
+    CustomValueTypeImplementation,
+    type CustomValueType,
+    type CustomValueTypeDetail
+} from "../custom-value/custom-value-type.js";
 import type { CustomNullKind } from "./custom-null-kind.js";
-import type { Provider } from "../../service/extendedTypirServices.js";
 import type { ClassTypeRef, Member } from "../../config/type.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { TypeEqualityProblem: TypeEqualityProblemConstant, createKindConflict } = sharedImport("typir");
 
 /**
  * Type details for the null type.
@@ -33,77 +39,79 @@ export interface CustomNullType extends CustomValueType<CustomNullDetails<TypirS
     readonly kind: CustomNullKind<TypirSpecifics>;
 }
 
-export const CustomNullTypeProvider: Provider<CustomNullTypeConstructor> = (services) => {
-    const CustomValueTypeClass = services.factory.CustomValues.CustomValueType;
-    const { TypeEqualityProblem: TEP } = services.context.typir;
-    const { createKindConflict } = services.context.typir;
+/**
+ * Custom null type implementation.
+ * Represents the null type as a singleton.
+ */
+export class CustomNullTypeImplementation
+    extends CustomValueTypeImplementation<CustomNullDetails<TypirSpecifics>>
+    implements CustomNullType
+{
+    declare readonly kind: CustomNullKind<TypirSpecifics>;
 
     /**
-     * Custom null type implementation.
-     * Represents the null type as a singleton.
+     * Creates the null type.
+     * This should only be called once to create the singleton instance.
+     *
+     * @param kind The kind that created this type
+     * @param details The null type details
      */
-    class CustomNullTypeImplementation
-        extends CustomValueTypeClass<CustomNullDetails<TypirSpecifics>>
-        implements CustomNullType
-    {
-        declare readonly kind: CustomNullKind<TypirSpecifics>;
+    constructor(kind: CustomNullKind<TypirSpecifics>, details: CustomNullDetails<TypirSpecifics>) {
+        super("null", details, kind.services, true, []);
+        this.kind = kind;
+        this.defineTheInitializationProcessOfThisType({});
+    }
 
-        /**
-         * Creates the null type.
-         * This should only be called once to create the singleton instance.
-         *
-         * @param kind The kind that created this type
-         * @param details The null type details
-         */
-        constructor(kind: CustomNullKind<TypirSpecifics>, details: CustomNullDetails<TypirSpecifics>) {
-            super("null", details, kind.services, true, []);
-            this.kind = kind;
-            this.defineTheInitializationProcessOfThisType({});
-        }
+    override get isNullable(): boolean {
+        return true;
+    }
 
-        override get isNullable(): boolean {
-            return true;
-        }
+    override get asNullable(): CustomNullType {
+        return this;
+    }
 
-        override get asNullable(): CustomNullType {
-            return this;
-        }
+    override get asNonNullable(): CustomNullType {
+        return this;
+    }
 
-        override get asNonNullable(): CustomNullType {
-            return this;
-        }
+    override get definition(): ClassTypeRef {
+        throw new Error("Definition not supported for null type.");
+    }
 
-        override get definition(): ClassTypeRef {
-            throw new Error("Definition not supported for null type.");
-        }
+    override getName(): string {
+        return "null";
+    }
 
-        override getName(): string {
-            return "null";
-        }
+    override getUserRepresentation(): string {
+        return "null";
+    }
 
-        override getUserRepresentation(): string {
-            return "null";
-        }
-
-        override analyzeTypeEqualityProblems(otherType: TypirType): TypirProblem[] {
-            if (this.kind.services.factory.CustomNull.isCustomNullType(otherType)) {
-                return [];
-            } else {
-                return [
-                    <TypeEqualityProblem>{
-                        $problem: TEP,
-                        type1: this,
-                        type2: otherType,
-                        subProblems: [createKindConflict(otherType, this)]
-                    }
-                ];
-            }
-        }
-
-        override getLocalMember(): Member | undefined {
-            return undefined;
+    override analyzeTypeEqualityProblems(otherType: TypirType): TypirProblem[] {
+        if (isCustomNullType(otherType)) {
+            return [];
+        } else {
+            return [
+                <TypeEqualityProblem>{
+                    $problem: TypeEqualityProblemConstant,
+                    type1: this,
+                    type2: otherType,
+                    subProblems: [createKindConflict(otherType, this)]
+                }
+            ];
         }
     }
 
-    return CustomNullTypeImplementation;
-};
+    override getLocalMember(): Member | undefined {
+        return undefined;
+    }
+}
+
+/**
+ * Type guard to check if a value is a CustomNullType.
+ *
+ * @param type The value to check
+ * @returns true if the value is a CustomNullType
+ */
+export function isCustomNullType(type: unknown): type is CustomNullType {
+    return type instanceof CustomNullTypeImplementation;
+}

@@ -1,6 +1,6 @@
 import type { AstNode } from "langium";
-import { createInterface } from "../../grammar/type/interface/factory.js";
-import { Ref, Optional } from "../../grammar/type/interface/helpers.js";
+import { createInterface } from "@mdeo/language-common";
+import { Ref, Optional } from "@mdeo/language-common";
 import type { FileScopingConfig } from "./config.js";
 
 /**

@@ -1,23 +1,24 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, PluginContext, Builders } from "@mdeo/language-common";
-import { ID, printDanglingComments } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices, PrintContext, Builders } from "@mdeo/language-shared";
+import { ID } from "@mdeo/language-common";
+import { printDanglingComments, sharedImport } from "@mdeo/language-shared";
 import type { TypeTypes, ClassTypeType, LambdaTypeType, LambdaTypeParametersType } from "../grammar/typeTypes.js";
+
+const { doc: prettierDoc } = sharedImport("prettier");
 
 /**
  * Registers all type serializers for pretty-printing type AST nodes.
  *
- * @param context The plugin context
  * @param services The Langium core services with AST serializer
  * @param types The generated type types
  */
 export function registerTypeSerializers(
-    { prettier }: PluginContext,
     services: LangiumCoreServices & AstSerializerAdditionalServices,
     types: TypeTypes
 ): void {
     const { AstSerializer } = services;
-    const builders = prettier.doc.builders;
+    const builders = prettierDoc.builders;
 
     AstSerializer.registerNodeSerializer(types.classTypeType, (ctx) => printClassType(ctx, builders));
     AstSerializer.registerNodeSerializer(types.voidTypeType, () => printVoidType());

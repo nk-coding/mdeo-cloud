@@ -2,9 +2,9 @@ import type { Kind } from "typir";
 import type { TypirSpecifics } from "typir";
 import {
     buildCustomLambdaIdentifier,
-    CustomLambdaTypeProvider,
-    type CustomLambdaType,
-    type CustomLambdaTypeConstructor
+    CustomLambdaTypeImplementation,
+    isCustomLambdaType,
+    type CustomLambdaType
 } from "./custom-lambda-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomValueType, CustomValueTypeDetail } from "../custom-value/custom-value-type.js";
@@ -39,11 +39,6 @@ export interface CustomLambdaDetails<Specifics extends TypirSpecifics> extends C
  */
 export interface CustomLambdaFactoryService<Specifics extends TypirSpecifics> {
     /**
-     * The custom lambda type constructor
-     */
-    CustomLambdaType: CustomLambdaTypeConstructor;
-
-    /**
      * Get an existing custom lambda type or create a new one.
      * Uses caching to ensure type identity.
      *
@@ -51,14 +46,6 @@ export interface CustomLambdaFactoryService<Specifics extends TypirSpecifics> {
      * @returns The custom lambda type instance
      */
     getOrCreate(details: CustomLambdaDetails<Specifics>): CustomLambdaType;
-
-    /**
-     * Type guard to check if a value is a CustomLambdaType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomLambdaType
-     */
-    isCustomLambdaType(type: unknown): type is CustomLambdaType;
 }
 
 /**
@@ -75,8 +62,6 @@ export const CustomLambdaKindName = "CustomLambda";
 export class CustomLambdaKind<Specifics extends TypirSpecifics> implements Kind, CustomLambdaFactoryService<Specifics> {
     readonly $name: string = CustomLambdaKindName;
 
-    readonly CustomLambdaType: CustomLambdaTypeConstructor;
-
     /**
      * Creates a new custom lambda kind.
      * Automatically registers itself with the kind registry.
@@ -85,7 +70,6 @@ export class CustomLambdaKind<Specifics extends TypirSpecifics> implements Kind,
      */
     constructor(readonly services: ExtendedTypirServices<Specifics>) {
         services.infrastructure.Kinds.register(this);
-        this.CustomLambdaType = CustomLambdaTypeProvider(services);
     }
 
     /**
@@ -101,20 +85,13 @@ export class CustomLambdaKind<Specifics extends TypirSpecifics> implements Kind,
         if (existingType != undefined) {
             return existingType as CustomLambdaType;
         } else {
-            const newType = new this.CustomLambdaType(this as unknown as CustomLambdaKind<TypirSpecifics>, details);
+            const newType = new CustomLambdaTypeImplementation(
+                this as unknown as CustomLambdaKind<TypirSpecifics>,
+                details
+            );
             this.services.infrastructure.Graph.addNode(newType);
             return newType;
         }
-    }
-
-    /**
-     * Type guard to check if a value is a CustomLambdaType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomLambdaType
-     */
-    isCustomLambdaType(type: unknown): type is CustomLambdaType {
-        return type instanceof this.CustomLambdaType;
     }
 
     /**

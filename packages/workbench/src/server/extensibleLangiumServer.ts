@@ -12,10 +12,11 @@ import * as typir from "typir";
 import * as prettier from "prettier";
 import * as glspServer from "@eclipse-glsp/server";
 import * as glspProtocol from "@eclipse-glsp/protocol";
+import * as glspGraph from "@eclipse-glsp/graph";
 import * as inversify from "inversify";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
-import { createModule, type LanguagePluginProvider, type PluginContext } from "@mdeo/language-common";
+import { createModule, initializePluginContext, type LanguagePlugin } from "@mdeo/language-common";
 import { type ResolvedServerLanguagePlugin } from "./types";
 import { GetPluginsRequest, ServerReadyNotification } from "./protocol";
 import type {
@@ -30,6 +31,19 @@ import { lspFileSystem } from "./lspFileSystem";
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
+
+initializePluginContext({
+    langium,
+    "langium/lsp": langiumLsp,
+    "langium/grammar": langiumGrammar,
+    "typir-langium": typirLangium,
+    typir,
+    prettier,
+    "@eclipse-glsp/server": glspServer,
+    "@eclipse-glsp/protocol": glspProtocol,
+    "@eclipse-glsp/graph": glspGraph,
+    inversify
+});
 
 const plugins = await requestPluginsFromClient();
 
@@ -56,18 +70,6 @@ async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
     });
 }
 
-const pluginContext: PluginContext = {
-    langium,
-    "langium/lsp": langiumLsp,
-    "langium/grammar": langiumGrammar,
-    "typir-langium": typirLangium,
-    typir,
-    prettier,
-    "@eclipse-glsp/server": glspServer,
-    "@eclipse-glsp/protocol": glspProtocol,
-    inversify
-};
-
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
     plugins
         .filter((plugin) => plugin.type === "language")
@@ -75,7 +77,7 @@ const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
             const module = await import(/* @vite-ignore */ plugin.import);
             return {
                 ...plugin,
-                languagePlugin: (module.default as LanguagePluginProvider<any>).generate(pluginContext)
+                languagePlugin: module.default as LanguagePlugin<any>
             };
         })
 );
@@ -83,10 +85,7 @@ const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
 const connection = createConnection(messageReader, messageWriter);
 
 function createLanguageServices(context: DefaultSharedModuleContext) {
-    const languageModule = createModule(
-        pluginContext,
-        resolvedPlugins.map((plugin) => plugin.languagePlugin)
-    );
+    const languageModule = createModule(resolvedPlugins.map((plugin) => plugin.languagePlugin));
 
     const generatedSharedModule: Module<LangiumSharedCoreServices, LangiumGeneratedSharedCoreServices> = {
         AstReflection: () => languageModule.reflection

@@ -23,12 +23,12 @@ export interface MonacoGLSPClientOptions {
      * The Monaco Language Client to use for communication
      */
     client: MonacoLanguageClient;
-    
+
     /**
      * The text document URI
      */
     uri: string;
-    
+
     /**
      * Optional client ID
      */
@@ -39,7 +39,7 @@ export interface MonacoGLSPClientOptions {
  * A GLSP client implementation that uses MonacoLanguageClient for communication.
  * This client assumes the connection is already initialized and does not handle
  * server lifecycle management (start/stop/dispose).
- * 
+ *
  * Based on BaseJsonrpcGLSPClient from @eclipse-glsp/sprotty but adapted for workbench usage.
  */
 export class MonacoGLSPClient implements GLSPClient {
@@ -84,16 +84,19 @@ export class MonacoGLSPClient implements GLSPClient {
         this.textDocument = { uri: options.uri };
         this.id = options.id;
         this._state = ClientState.Initial;
-        
+
         // Register for action message notifications
         this.setupNotificationHandlers();
     }
 
     protected setupNotificationHandlers(): void {
         // Listen for action message notifications from the server
-        this.client.onNotification(JsonrpcGLSPClient.ActionMessageNotification.method, (msg: ActionMessage & { textDocument: TextDocumentIdentifier }) => {
-            this.onActionMessageNotificationEmitter.fire(msg);
-        });
+        this.client.onNotification(
+            JsonrpcGLSPClient.ActionMessageNotification.method,
+            (msg: ActionMessage & { textDocument: TextDocumentIdentifier }) => {
+                this.onActionMessageNotificationEmitter.fire(msg);
+            }
+        );
     }
 
     async start(): Promise<void> {
@@ -110,14 +113,14 @@ export class MonacoGLSPClient implements GLSPClient {
                 });
             });
         }
-        
+
         this.state = ClientState.Starting;
         // Client is assumed to be already started
         this.state = ClientState.Running;
     }
 
     async initializeServer(params: InitializeParameters): Promise<InitializeResult> {
-        console.log(params)
+        console.log(params);
         if (this.initializeResult) {
             return this.initializeResult;
         } else if (this.pendingServerInitialize) {
@@ -125,10 +128,10 @@ export class MonacoGLSPClient implements GLSPClient {
         }
 
         try {
-            this.pendingServerInitialize = this.client.sendRequest(
-                JsonrpcGLSPClient.InitializeRequest,
-                { ...params, textDocument: this.textDocument }
-            );
+            this.pendingServerInitialize = this.client.sendRequest(JsonrpcGLSPClient.InitializeRequest, {
+                ...params,
+                textDocument: this.textDocument
+            });
             this._initializeResult = await this.pendingServerInitialize;
             this.onServerInitializedEmitter.fire(this._initializeResult);
             this.pendingServerInitialize = undefined;
@@ -137,26 +140,26 @@ export class MonacoGLSPClient implements GLSPClient {
             this.pendingServerInitialize = undefined;
             throw error;
         }
-        
+
         return this._initializeResult;
     }
 
     initializeClientSession(params: InitializeClientSessionParameters): Promise<void> {
-        return this.client.sendRequest(
-            JsonrpcGLSPClient.InitializeClientSessionRequest,
-            { ...params, textDocument: this.textDocument }
-        );
+        return this.client.sendRequest(JsonrpcGLSPClient.InitializeClientSessionRequest, {
+            ...params,
+            textDocument: this.textDocument
+        });
     }
 
     disposeClientSession(params: DisposeClientSessionParameters): Promise<void> {
-        return this.client.sendRequest(
-            JsonrpcGLSPClient.DisposeClientSessionRequest,
-            { ...params, textDocument: this.textDocument }
-        );
+        return this.client.sendRequest(JsonrpcGLSPClient.DisposeClientSessionRequest, {
+            ...params,
+            textDocument: this.textDocument
+        });
     }
 
     onActionMessage(handler: ActionMessageHandler, clientId?: string): Disposable {
-        return this.onActionMessageNotification(msg => {
+        return this.onActionMessageNotification((msg) => {
             if (!clientId || msg.clientId === clientId) {
                 handler(msg);
             }
@@ -164,10 +167,10 @@ export class MonacoGLSPClient implements GLSPClient {
     }
 
     sendActionMessage(message: ActionMessage): void {
-        this.client.sendNotification(
-            JsonrpcGLSPClient.ActionMessageNotification,
-            { ...message, textDocument: this.textDocument }
-        );
+        this.client.sendNotification(JsonrpcGLSPClient.ActionMessageNotification, {
+            ...message,
+            textDocument: this.textDocument
+        });
     }
 
     shutdownServer(): void {

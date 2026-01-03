@@ -3,7 +3,9 @@ import { PartialTypeSystem } from "./partialTypeSystem.js";
 import type { TypeTypes } from "../grammar/typeTypes.js";
 import type { ExpressionTypirServices } from "./services.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
+import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
+import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
 
 /**
@@ -61,7 +63,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                 const inferredType = this.inference.inferType(typeArg);
                 if (Array.isArray(inferredType)) {
                     inferredTypeArgs.push(this.nullableAny);
-                } else if (this.typir.factory.CustomValues.isCustomValueType(inferredType)) {
+                } else if (isCustomValueType(inferredType)) {
                     inferredTypeArgs.push(inferredType);
                 } else {
                     inferredTypeArgs.push(this.nullableAny);
@@ -163,7 +165,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                         subProblems: []
                     };
                 }
-                if (!this.typir.factory.CustomValues.isCustomValueType(inferredType)) {
+                if (!isCustomValueType(inferredType)) {
                     return {
                         $problem: this.inferenceProblem,
                         languageNode: node,
@@ -188,10 +190,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
             let returnType: CustomValueType | CustomVoidType;
 
-            if (
-                this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType) ||
-                this.typir.factory.CustomValues.isCustomValueType(inferredReturnType)
-            ) {
+            if (isCustomVoidType(inferredReturnType) || isCustomValueType(inferredReturnType)) {
                 returnType = inferredReturnType;
             } else {
                 return {

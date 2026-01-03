@@ -1,7 +1,7 @@
 import type { AstNode } from "langium";
-import type { TerminalRule } from "../../grammar/rule/terminal/types.js";
-import { createRule, many, optional, ref } from "../../grammar/rule/parser/factory.js";
-import { ID, NEWLINE, STRING } from "../../language/defaultTokens.js";
+import type { TerminalRule } from "@mdeo/language-common";
+import { createRule, many, optional, ref } from "@mdeo/language-common";
+import { ID, NEWLINE, STRING } from "@mdeo/language-common";
 import type { FileImportType, ImportType } from "./types.js";
 import type { FileScopingConfig } from "./config.js";
 

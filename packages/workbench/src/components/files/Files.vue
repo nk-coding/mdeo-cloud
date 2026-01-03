@@ -33,7 +33,7 @@
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem @click="handleCreateFolderFromContext">
-                    <FolderIcon/>
+                    <FolderIcon />
                     <span>Create New Folder</span>
                 </ContextMenuItem>
             </ContextMenuContent>

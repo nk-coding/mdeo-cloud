@@ -1,5 +1,5 @@
 import type { Kind, TypirSpecifics } from "typir";
-import { CustomVoidTypeProvider, type CustomVoidType, type CustomVoidTypeConstructor } from "./custom-void-type.js";
+import { CustomVoidTypeImplementation, isCustomVoidType, type CustomVoidType } from "./custom-void-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomVoidDetails } from "./custom-void-type.js";
 
@@ -10,25 +10,12 @@ import type { CustomVoidDetails } from "./custom-void-type.js";
  */
 export interface CustomVoidFactoryService {
     /**
-     * The custom void type constructor
-     */
-    CustomVoidType: CustomVoidTypeConstructor;
-
-    /**
      * Get the void type singleton.
      * Always returns the same instance.
      *
      * @returns The void type singleton instance
      */
     getOrCreate(): CustomVoidType;
-
-    /**
-     * Type guard to check if a value is a CustomVoidType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomVoidType
-     */
-    isCustomVoidType(type: unknown): type is CustomVoidType;
 }
 
 /**
@@ -45,8 +32,6 @@ export const CustomVoidKindName = "CustomVoid";
 export class CustomVoidKind<Specifics extends TypirSpecifics> implements Kind, CustomVoidFactoryService {
     readonly $name: string = CustomVoidKindName;
 
-    readonly CustomVoidType: CustomVoidTypeConstructor;
-
     /**
      * Cached singleton instance of the void type
      */
@@ -60,7 +45,6 @@ export class CustomVoidKind<Specifics extends TypirSpecifics> implements Kind, C
      */
     constructor(readonly services: ExtendedTypirServices<Specifics>) {
         services.infrastructure.Kinds.register(this);
-        this.CustomVoidType = CustomVoidTypeProvider(services);
     }
 
     /**
@@ -81,19 +65,9 @@ export class CustomVoidKind<Specifics extends TypirSpecifics> implements Kind, C
         }
 
         const details: CustomVoidDetails<Specifics> = {} as CustomVoidDetails<Specifics>;
-        const newType = new this.CustomVoidType(this as unknown as CustomVoidKind<TypirSpecifics>, details);
+        const newType = new CustomVoidTypeImplementation(this as unknown as CustomVoidKind<TypirSpecifics>, details);
         this.services.infrastructure.Graph.addNode(newType);
         this.voidTypeInstance = newType;
         return newType;
-    }
-
-    /**
-     * Type guard to check if a value is a CustomVoidType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomVoidType
-     */
-    isCustomVoidType(type: unknown): type is CustomVoidType {
-        return type instanceof this.CustomVoidType;
     }
 }

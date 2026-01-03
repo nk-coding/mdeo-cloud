@@ -1,5 +1,7 @@
 import type { CustomClassType } from "../kinds/custom-class/custom-class-type.js";
+import { isCustomClassType } from "../kinds/custom-class/custom-class-type.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
+import { isCustomNullType } from "../kinds/custom-null/custom-null-type.js";
 import type { ClassType, ValueType } from "../config/type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { TypirSpecifics } from "typir";
@@ -19,14 +21,11 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
     typeB: CustomValueType,
     services: ExtendedTypirServices<Specifics>
 ): CustomValueType | undefined {
-    if (services.factory.CustomNull.isCustomNullType(typeA)) {
+    if (isCustomNullType(typeA)) {
         return typeB.asNullable;
-    } else if (services.factory.CustomNull.isCustomNullType(typeB)) {
+    } else if (isCustomNullType(typeB)) {
         return typeA.asNullable;
-    } else if (
-        !services.factory.CustomClasses.isCustomClassType(typeA) ||
-        !services.factory.CustomClasses.isCustomClassType(typeB)
-    ) {
+    } else if (!isCustomClassType(typeA) || !isCustomClassType(typeB)) {
         return undefined;
     }
     const superTypesA = findSuperTypesWithDistance(typeA, services);
@@ -94,7 +93,7 @@ export function findSuperTypeWithTypeArgs<Specifics extends TypirSpecifics>(
                     isNullable: false
                 } as ValueType);
 
-                if (services.factory.CustomClasses.isCustomClassType(superType)) {
+                if (isCustomClassType(superType)) {
                     const superIdentifier = getClassTypeIdentifier(superType.details.definition);
                     const newDistance = current.distance + 1;
 
@@ -151,7 +150,7 @@ export function findSuperTypesWithDistance<Specifics extends TypirSpecifics>(
                     isNullable: false
                 } as ValueType);
 
-                if (services.factory.CustomClasses.isCustomClassType(superType)) {
+                if (isCustomClassType(superType)) {
                     const superIdentifier = getClassTypeIdentifier(superType.details.definition);
                     const newDistance = current.distance + 1;
 

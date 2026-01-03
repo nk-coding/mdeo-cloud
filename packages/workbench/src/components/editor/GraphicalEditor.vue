@@ -42,7 +42,7 @@ onMounted(async () => {
         sourceUri: props.tab.file.id.toString()
     });
 
-    const diagramLoader = container.get(DiagramLoader)
-    await diagramLoader.load()
+    const diagramLoader = container.get(DiagramLoader);
+    await diagramLoader.load();
 });
 </script>

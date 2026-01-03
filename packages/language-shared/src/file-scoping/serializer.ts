@@ -3,9 +3,9 @@ import type { LangiumCoreServices } from "langium";
 import type { AstNode } from "langium";
 import type { PrintContext, Builders } from "../serialization/types.js";
 import type { AstSerializerAdditionalServices } from "../serialization/astSerializer.js";
-import { ID, STRING } from "../../language/defaultTokens.js";
+import { ID, STRING } from "@mdeo/language-common";
 import type { ImportType, FileImportType } from "./types.js";
-import type { ASTType } from "../../grammar/type/types.js";
+import type { ASTType } from "@mdeo/language-common";
 
 /**
  * Registers import serializers for pretty-printing import AST nodes.

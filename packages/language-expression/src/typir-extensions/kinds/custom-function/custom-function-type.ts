@@ -1,10 +1,17 @@
 import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProblem } from "typir";
+import { Type } from "typir";
 import type { CustomFunctionDetails, CustomFunctionKind } from "./custom-function-kind.js";
 import type { FunctionSignature, ReturnType } from "../../config/type.js";
 import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../../config/type.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
-import type { Provider } from "../../service/extendedTypirServices.js";
 import { assertUnreachable } from "@mdeo/language-common";
+import { sharedImport } from "@mdeo/language-shared";
+
+const {
+    checkValueForConflict,
+    TypeEqualityProblem: TypeEqualityProblemConstant,
+    createKindConflict
+} = sharedImport("typir");
 
 /**
  * Constructor interface for custom function types.
@@ -30,59 +37,62 @@ export interface CustomFunctionType extends TypirType {
     readonly details: CustomFunctionDetails<TypirSpecifics>;
 }
 
-export const CustomFunctionTypeProvider: Provider<CustomFunctionTypeConstructor> = (services) => {
-    const { Type } = services.context.typir;
-    const { checkValueForConflict, createKindConflict, TypeEqualityProblem } = services.context.typir;
+/**
+ * Custom function type implementation.
+ * Represents a named function with one or more signatures (overloads).
+ */
+export class CustomFunctionTypeImplementation extends Type implements CustomFunctionType {
+    declare readonly kind: CustomFunctionKind<TypirSpecifics>;
 
     /**
-     * Custom function type implementation.
-     * Represents a named function with one or more signatures (overloads).
+     * Creates a new custom function type.
+     * Automatically initializes the type.
+     *
+     * @param kind The kind that created this type
+     * @param details The function type details
      */
-    class CustomFunctionTypeImplementation extends Type implements CustomFunctionType {
-        declare readonly kind: CustomFunctionKind<TypirSpecifics>;
-
-        /**
-         * Creates a new custom function type.
-         * Automatically initializes the type.
-         *
-         * @param kind The kind that created this type
-         * @param details The function type details
-         */
-        constructor(
-            kind: CustomFunctionKind<TypirSpecifics>,
-            readonly details: CustomFunctionDetails<TypirSpecifics>
-        ) {
-            super(buildCustomFunctionIdentifier(details), details);
-            this.kind = kind;
-            this.defineTheInitializationProcessOfThisType({});
-        }
-
-        override getName(): string {
-            return buildCustomFunctionName(this.details);
-        }
-
-        override getUserRepresentation(): string {
-            return buildCustomFunctionName(this.details);
-        }
-
-        override analyzeTypeEqualityProblems(otherType: TypirType): TypirProblem[] {
-            if (this.kind.services.factory.CustomFunctions.isCustomFunctionType(otherType)) {
-                return checkValueForConflict(this.getIdentifier(), otherType.getIdentifier(), "name");
-            } else {
-                return [
-                    <TypeEqualityProblem>{
-                        $problem: TypeEqualityProblem,
-                        type1: this,
-                        type2: otherType,
-                        subProblems: [createKindConflict(otherType, this)]
-                    }
-                ];
-            }
-        }
+    constructor(
+        kind: CustomFunctionKind<TypirSpecifics>,
+        readonly details: CustomFunctionDetails<TypirSpecifics>
+    ) {
+        super(buildCustomFunctionIdentifier(details), details);
+        this.kind = kind;
+        this.defineTheInitializationProcessOfThisType({});
     }
 
-    return CustomFunctionTypeImplementation;
-};
+    override getName(): string {
+        return buildCustomFunctionName(this.details);
+    }
+
+    override getUserRepresentation(): string {
+        return buildCustomFunctionName(this.details);
+    }
+
+    override analyzeTypeEqualityProblems(otherType: TypirType): TypirProblem[] {
+        if (isCustomFunctionType(otherType)) {
+            return checkValueForConflict(this.getIdentifier(), otherType.getIdentifier(), "name");
+        } else {
+            return [
+                <TypeEqualityProblem>{
+                    $problem: TypeEqualityProblemConstant,
+                    type1: this,
+                    type2: otherType,
+                    subProblems: [createKindConflict(otherType, this)]
+                }
+            ];
+        }
+    }
+}
+
+/**
+ * Type guard to check if a value is a CustomFunctionType.
+ *
+ * @param type The value to check
+ * @returns true if the value is a CustomFunctionType
+ */
+export function isCustomFunctionType(type: unknown): type is CustomFunctionType {
+    return type instanceof CustomFunctionTypeImplementation;
+}
 
 /**
  * Counter for generating unique function type identifiers.

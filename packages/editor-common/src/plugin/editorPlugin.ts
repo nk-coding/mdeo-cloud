@@ -7,7 +7,7 @@ import type { PluginContext } from "./pluginContext.js";
 export interface EditorPlugin {
     /**
      * Called when the GLSP module is being configured
-     * 
+     *
      * @param context the plugin context used to access shared dependencies
      * @return an array of container configurations to be applied
      */

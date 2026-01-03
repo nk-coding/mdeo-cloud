@@ -1,9 +1,5 @@
 <template>
-    <Icon
-        v-if="modelValue != undefined"
-        :iconNode="modelValue?.icon"
-        name="FileIcon"
-    />
+    <Icon v-if="modelValue != undefined" :iconNode="modelValue?.icon" name="FileIcon" />
     <FileIcon v-else />
 </template>
 <script setup lang="ts">

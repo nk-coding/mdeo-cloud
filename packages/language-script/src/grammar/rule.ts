@@ -1,10 +1,7 @@
 import {
     createRule,
     ID,
-    manySep,
-    LeadingTrailing,
     optional,
-    generateImportRules,
     or,
     NEWLINE,
     many
@@ -29,6 +26,7 @@ import {
     LambdaParameter,
     LambdaParameters
 } from "./types.js";
+import { generateImportRules, LeadingTrailing, manySep } from "@mdeo/language-shared";
 
 const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);
 

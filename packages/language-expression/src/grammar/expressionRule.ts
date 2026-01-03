@@ -1,20 +1,18 @@
 import {
     action,
-    atLeastOneSep,
     createInfixRule,
     createRule,
     createTerminal,
     group,
     ID,
-    LeadingTrailing,
     many,
-    manySep,
     optional,
     or,
     STRING,
     treeRewriteAction,
     type ParserRule
 } from "@mdeo/language-common";
+import { LeadingTrailing, manySep } from "@mdeo/language-shared";
 import type { ExpressionConfig } from "./expressionConfig.js";
 import type { BaseExpressionType, ExpressionTypes } from "./expressionTypes.js";
 import type { BaseTypeType } from "./typeTypes.js";
@@ -151,7 +149,7 @@ export function generateExpressionRules(
     const callExpressionGenericArgsRule = createRule(config.callExpressionGenericArgsRuleName)
         .returns(types.callExpressionGenericArgsType)
         .as(({ add }) => [
-            optional("<", ...atLeastOneSep(add("typeArguments", typeRule), ",", LeadingTrailing.TRAILING), ">")
+            optional("<", ...manySep(add("typeArguments", typeRule), ",", LeadingTrailing.TRAILING), ">")
         ]);
 
     const unaryExpressionRule = createRule(config.unaryExpressionRuleName)

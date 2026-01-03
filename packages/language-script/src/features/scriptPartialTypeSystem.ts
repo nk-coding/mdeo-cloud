@@ -5,7 +5,10 @@ import {
     type CustomValueType,
     type CustomVoidType,
     type ExpressionTypirServices,
-    type PrimitiveTypes
+    type PrimitiveTypes,
+    isCustomValueType,
+    isCustomVoidType,
+    isCustomLambdaType
 } from "@mdeo/language-expression";
 import { Function, LambdaExpression, Script, type FunctionType, type ScriptType } from "../grammar/types.js";
 import { ScriptReturnStatementAccessor } from "./scriptReturnStatementAccessor.js";
@@ -96,10 +99,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
             let returnType: CustomValueType | CustomVoidType;
             if (node.returnType != undefined) {
                 const inferredReturnType = this.inference.inferType(node.returnType);
-                if (
-                    this.typir.factory.CustomValues.isCustomValueType(inferredReturnType) ||
-                    this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType)
-                ) {
+                if (isCustomValueType(inferredReturnType) || isCustomVoidType(inferredReturnType)) {
                     returnType = inferredReturnType;
                 } else {
                     returnType = this.primitives.Any.asNullable;
@@ -110,7 +110,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
 
             const parameters = node.parameterList.parameters.map((param) => {
                 const inferredParamType = this.inference.inferType(param.type);
-                const paramType = this.typir.factory.CustomValues.isCustomValueType(inferredParamType)
+                const paramType = isCustomValueType(inferredParamType)
                     ? inferredParamType
                     : this.primitives.Any.asNullable;
                 return {
@@ -156,10 +156,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 if (Array.isArray(inferredReturnType)) {
                     return;
                 }
-                if (
-                    !this.typir.factory.CustomValues.isCustomValueType(inferredReturnType) &&
-                    !this.typir.factory.CustomVoid.isCustomVoidType(inferredReturnType)
-                ) {
+                if (!isCustomValueType(inferredReturnType) && !isCustomVoidType(inferredReturnType)) {
                     accept({
                         languageNode: functionNode.returnType,
                         message: "Return type must be a valid value or void type.",
@@ -246,7 +243,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 if (Array.isArray(expressionType)) {
                     return expressionType[0];
                 }
-                if (!this.typir.factory.CustomValues.isCustomValueType(expressionType)) {
+                if (!isCustomValueType(expressionType)) {
                     return {
                         $problem: this.inferenceProblem,
                         languageNode: node.expression,
@@ -348,7 +345,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
             if (Array.isArray(inferredLambdaType)) {
                 return;
             }
-            if (!this.typir.factory.CustomLambdas.isCustomLambdaType(inferredLambdaType)) {
+            if (!isCustomLambdaType(inferredLambdaType)) {
                 return;
             }
 
@@ -376,7 +373,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 if (Array.isArray(expressionType)) {
                     return;
                 }
-                if (!this.typir.factory.CustomValues.isCustomValueType(expressionType)) {
+                if (!isCustomValueType(expressionType)) {
                     accept({
                         languageNode: node.expression,
                         message: "Lambda expression must return a value type.",

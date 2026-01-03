@@ -7,7 +7,9 @@ import type {
     Scope,
     Stream
 } from "langium";
-import type { PluginContext } from "../../plugin/pluginContext.js";
+import { sharedImport } from "../sharedImport.js";
+
+const { EMPTY_SCOPE, StreamScope } = sharedImport("langium");
 
 /**
  * Creates a local scope for resolving references within the current document.
@@ -17,7 +19,6 @@ import type { PluginContext } from "../../plugin/pluginContext.js";
  * The resulting scope respects lexical scoping rules where inner scopes can shadow outer scopes.
  * Adapüted from Langium's DefaultScopeProvider implementation.
  *
- * @param context The plugin context containing Langium utilities
  * @param referenceInfo Information about the reference being resolved, including the container node and property
  * @param document The Langium document containing local symbol information
  * @param astReflection AST reflection service for type checking and subtype relationships
@@ -26,7 +27,6 @@ import type { PluginContext } from "../../plugin/pluginContext.js";
  *          Returns EMPTY_SCOPE if no local symbols are available in the document.
  */
 export function createLocalScope(
-    { langium }: PluginContext,
     referenceInfo: ReferenceInfo,
     document: LangiumDocument,
     astReflection: AstReflection,
@@ -34,7 +34,7 @@ export function createLocalScope(
 ): Scope {
     const localSymbols = document.localSymbols;
     if (localSymbols == undefined) {
-        return langium.EMPTY_SCOPE;
+        return EMPTY_SCOPE;
     }
 
     const referenceType = astReflection.getReferenceType(referenceInfo);
@@ -50,13 +50,13 @@ export function createLocalScope(
     } while (currentNode);
 
     if (scopes.length === 0) {
-        return langium.EMPTY_SCOPE;
+        return EMPTY_SCOPE;
     }
 
-    let result: Scope = outerScope ?? langium.EMPTY_SCOPE;
+    let result: Scope = outerScope ?? EMPTY_SCOPE;
 
     for (let i = scopes.length - 1; i >= 0; i--) {
-        result = new langium.StreamScope(scopes[i], result);
+        result = new StreamScope(scopes[i], result);
     }
     return result;
 }

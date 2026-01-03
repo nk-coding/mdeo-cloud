@@ -1,13 +1,12 @@
 import {
     createInterface,
     createType,
-    FileScopingConfig,
-    generateImportTypes,
     Optional,
     Ref,
     Union
 } from "@mdeo/language-common";
 import type { ASTType, BaseType } from "@mdeo/language-common";
+import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 
 /**

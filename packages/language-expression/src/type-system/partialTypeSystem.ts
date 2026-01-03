@@ -1,16 +1,25 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
 import type { ExpressionTypirServices } from "./services.js";
-import { type Interface, type AstReflection } from "@mdeo/language-common";
+import type { Interface, AstReflection } from "@mdeo/language-common";
+import { sharedImport } from "@mdeo/language-shared";
 import { type AstNode } from "langium";
 import {
     type TypeAssignability,
     type TypeInferenceCollector,
     type TypeInferenceRuleWithoutInferringChildren,
     type ValidationCollector,
-    type ValidationRuleFunctional
+    type ValidationRuleFunctional,
+    type ValidationProblem,
+    type InferenceProblem as InferenceProblemType
 } from "typir";
 import type { TypeSystemConfig } from "./typeSystemConfig.js";
+
+const {
+    ValidationProblem: ValidationProblemConstant,
+    InferenceProblem: InferenceProblemConstant,
+    InferenceRuleNotApplicable
+} = sharedImport("typir");
 
 /**
  * Represents a mapping of primitive type names to their corresponding CustomClassType instances.
@@ -43,12 +52,12 @@ export abstract class PartialTypeSystem<Specifics extends TypirLangiumSpecifics,
     /**
      * Validation problem type for creating validation errors.
      */
-    protected readonly validationProblem: ExpressionTypirServices<Specifics>["context"]["typir"]["ValidationProblem"];
+    protected readonly validationProblem: typeof ValidationProblem;
 
     /**
      * Inference problem type for creating type inference errors.
      */
-    protected readonly inferenceProblem: ExpressionTypirServices<Specifics>["context"]["typir"]["InferenceProblem"];
+    protected readonly inferenceProblem: typeof InferenceProblemType;
 
     /**
      * Assignability service for checking type assignability.
@@ -72,8 +81,8 @@ export abstract class PartialTypeSystem<Specifics extends TypirLangiumSpecifics,
     ) {
         this.astReflection = typir.langium.LangiumServices.AstReflection;
         this.inference = typir.Inference;
-        this.validationProblem = typir.context.typir.ValidationProblem;
-        this.inferenceProblem = typir.context.typir.InferenceProblem;
+        this.validationProblem = ValidationProblemConstant;
+        this.inferenceProblem = InferenceProblemConstant;
         this.assignability = typir.Assignability;
         this.validationCollector = typir.validation.Collector;
     }
@@ -97,7 +106,7 @@ export abstract class PartialTypeSystem<Specifics extends TypirLangiumSpecifics,
     ): void {
         this.inference.addInferenceRule((node) => {
             if (!this.astReflection.isInstance(node, type)) {
-                return this.typir.context.typir.InferenceRuleNotApplicable;
+                return InferenceRuleNotApplicable;
             }
             return rule(node as T, this.typir);
         });

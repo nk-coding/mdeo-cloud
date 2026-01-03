@@ -6,21 +6,6 @@ import type { DefaultSharedModuleContext } from "langium/lsp";
 import type { ExtendedLangiumServices, PartialExtendedLangiumServices } from "../grammar/module/extendedServices.js";
 
 /**
- * Provider for a language plugin, which provides support for one language for a langium-based language server.
- *
- * @template T The type of the language's additional services
- */
-export interface LanguagePluginProvider<T> {
-    /**
-     * Generates the language plugin using the provided context.
-     *
-     * @param context context with shared dependencies
-     * @returns The language plugin instance
-     */
-    generate: (context: PluginContext) => LanguagePlugin<T>;
-}
-
-/**
  * Language plugin, which provides support for one language for a langium-based language server.
  *
  * @template T The type of the language's additional services

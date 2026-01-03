@@ -54,16 +54,16 @@
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem @click="handleCreateFolder">
-                <FolderIcon/>
+                <FolderIcon />
                 <span>Create New Folder</span>
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem @click="handleRename">
-                <EditIcon/>
+                <EditIcon />
                 <span>Rename</span>
             </ContextMenuItem>
             <ContextMenuItem @click="handleDelete">
-                <Trash2Icon/>
+                <Trash2Icon />
                 <span>Delete</span>
             </ContextMenuItem>
         </ContextMenuContent>

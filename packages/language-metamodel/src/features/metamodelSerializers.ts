@@ -1,7 +1,10 @@
 import type { Doc, doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, PluginContext } from "@mdeo/language-common";
-import { ID, INT, serializeNewlineSep, registerImportSerializers } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
+import { ID, INT } from "@mdeo/language-common";
+import { serializeNewlineSep, registerImportSerializers, sharedImport } from "@mdeo/language-shared";
+
+const { doc: prettierDoc } = sharedImport("prettier");
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -26,15 +29,11 @@ import {
 /**
  * Registers all metamodel serializers for pretty-printing metamodel AST nodes.
  *
- * @param context The plugin context
  * @param services The Langium core services with AST serializer
  */
-export function registerMetamodelSerializers(
-    { prettier }: PluginContext,
-    services: LangiumCoreServices & AstSerializerAdditionalServices
-): void {
+export function registerMetamodelSerializers(services: LangiumCoreServices & AstSerializerAdditionalServices): void {
     const { AstSerializer } = services;
-    const builders = prettier.doc.builders;
+    const builders = prettierDoc.builders;
 
     AstSerializer.registerPrimitiveSerializer(ID, ({ value, cstNode }) => {
         if (cstNode != undefined) {

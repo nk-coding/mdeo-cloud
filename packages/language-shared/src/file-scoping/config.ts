@@ -1,4 +1,4 @@
-import type { BaseType } from "../../grammar/type/types.js";
+import type { BaseType } from "@mdeo/language-common";
 import type { AstNode } from "langium";
 
 /**

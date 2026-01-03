@@ -1,4 +1,5 @@
-import { action, createRule, group, ID, LeadingTrailing, manySep, optional, or } from "@mdeo/language-common";
+import { action, createRule, group, ID, optional, or } from "@mdeo/language-common";
+import { LeadingTrailing, manySep } from "@mdeo/language-shared";
 import type { TypeConfig } from "./typeConfig.js";
 import type { TypeTypes } from "./typeTypes.js";
 

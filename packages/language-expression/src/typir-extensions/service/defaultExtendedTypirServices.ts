@@ -1,7 +1,6 @@
 import type { DeepPartial, Module } from "typir";
 import type { AdditionalTypirServices, ExtendedTypirLangiumServices } from "./extendedTypirServices.js";
 import { DefaultTypeDefinitionService } from "./type-definition-service.js";
-import type { PluginContext } from "@mdeo/language-common";
 import { CustomClassKind, CustomClassKindName } from "../kinds/custom-class/custom-class-kind.js";
 import { CustomLambdaKind, CustomLambdaKindName } from "../kinds/custom-lambda/custom-lambda-kind.js";
 import { CustomFunctionKind, CustomFunctionKindName } from "../kinds/custom-function/custom-function-kind.js";
@@ -16,12 +15,9 @@ import { DefaultScopeProvider } from "../scope/scopeProvider.js";
 /**
  * Provides the default implementation for the additional typir services
  *
- * @param context The plugin context
  * @returns The module with the default extended typir services
  */
-export function defaultExtendedTypirServices<Specifics extends TypirLangiumSpecifics>(
-    context: PluginContext
-): Module<
+export function defaultExtendedTypirServices<Specifics extends TypirLangiumSpecifics>(): Module<
     ExtendedTypirLangiumServices<Specifics>,
     AdditionalTypirServices<Specifics> & DeepPartial<TypirLangiumAddedServices<Specifics>>
 > {
@@ -59,13 +55,12 @@ export function defaultExtendedTypirServices<Specifics extends TypirLangiumSpeci
                 )
         },
         caching: {
-            ...generateScopeProviderCache<Specifics>(context)
+            ...generateScopeProviderCache<Specifics>()
         },
         langium: {
-            ...generateTypeCreator<Specifics>(context)
+            ...generateTypeCreator<Specifics>()
         },
         TypeDefinitions: (services) => new DefaultTypeDefinitionService(services),
-        ScopeProvider: () => new DefaultScopeProvider<Specifics>(),
-        context: () => context
+        ScopeProvider: () => new DefaultScopeProvider<Specifics>()
     };
 }

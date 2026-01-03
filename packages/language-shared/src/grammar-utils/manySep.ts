@@ -1,5 +1,5 @@
-import { many, optional } from "../../grammar/rule/parser/factory.js";
-import type { RuleEntry } from "../../grammar/rule/parser/types.js";
+import { many, optional } from "@mdeo/language-common";
+import type { RuleEntry } from "@mdeo/language-common";
 
 /**
  * Options for leading and trailing separators.

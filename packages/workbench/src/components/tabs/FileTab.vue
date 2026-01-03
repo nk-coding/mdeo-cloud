@@ -13,7 +13,7 @@
             @dblclick="tab.temporary = false"
             @click.middle="handleClose"
         >
-            <FileTypeIcon :model-value="languagePluginByExtension.get(tab.file.extension)" class="w-4 h-4"/>
+            <FileTypeIcon :model-value="languagePluginByExtension.get(tab.file.extension)" class="w-4 h-4" />
             <span class="truncate max-w-64" :class="{ italic: tab.temporary }">{{ fileName }}</span>
             <span
                 @click.stop="handleClose"

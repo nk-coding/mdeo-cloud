@@ -1,5 +1,6 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
 import { PartialTypeSystem, type PrimitiveTypes } from "./partialTypeSystem.js";
+import { sharedImport } from "@mdeo/language-shared";
 import type {
     ForStatementType,
     ForStatementVariableDeclarationType,
@@ -7,11 +8,17 @@ import type {
 } from "../grammar/statementTypes.js";
 import type { ExpressionTypirServices } from "./services.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
+import { isCustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
+import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
+import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { InferenceProblem, TypeInferenceResultWithoutInferringChildren, ValidationProblemAcceptor } from "typir";
 import type { BaseExpressionType, ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
 import { type AstNode } from "langium";
+
+const { AstUtils } = sharedImport("langium");
+const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
 
 /**
  * Partial type syste m implementation for statement-related AST nodes.
@@ -120,7 +127,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                 }
             } else {
                 const expressionType = this.inference.inferType(node.left.expression);
-                if (this.typir.factory.CustomValues.isCustomValueType(expressionType)) {
+                if (isCustomValueType(expressionType)) {
                     const member = expressionType.getMember(node.left.member);
                     if (member != undefined && member.readonly === true) {
                         isReadonly = true;
@@ -180,12 +187,11 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
     private inferForStatementVariableDeclarationType(
         node: ForStatementVariableDeclarationType
     ): TypeInferenceResultWithoutInferringChildren<Specifics> {
-        const { InferenceProblem } = this.typir.context.typir;
         const container = node.$container;
 
         if (!this.astReflection.isInstance(container, this.types.forStatementType)) {
             return <InferenceProblem<Specifics>>{
-                $problem: InferenceProblem,
+                $problem: InferenceProblemConstant,
                 languageNode: node,
                 location: "For statement variable declaration must be within a for statement.",
                 subProblems: []
@@ -216,21 +222,20 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         node: ForStatementVariableDeclarationType,
         container: ForStatementType
     ): CustomClassType | InferenceProblem<Specifics> {
-        const { InferenceProblem } = this.typir.context.typir;
         const iterableType = this.inference.inferType(container.iterable);
 
         if (Array.isArray(iterableType)) {
             return <InferenceProblem<Specifics>>{
-                $problem: InferenceProblem,
+                $problem: InferenceProblemConstant,
                 languageNode: node,
                 location: "Cannot infer type of iterable expression.",
                 subProblems: iterableType
             };
         }
 
-        if (!this.typir.factory.CustomClasses.isCustomClassType(iterableType)) {
+        if (!isCustomClassType(iterableType)) {
             return <InferenceProblem<Specifics>>{
-                $problem: InferenceProblem,
+                $problem: InferenceProblemConstant,
                 languageNode: node,
                 location: `Type '${iterableType.getName()}' is not iterable.`,
                 subProblems: []
@@ -251,8 +256,6 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         node: ForStatementVariableDeclarationType,
         iterableType: CustomClassType
     ): CustomClassType | InferenceProblem<Specifics> {
-        const { InferenceProblem } = this.typir.context.typir;
-
         if (iterableType.details.definition === this.iterableType) {
             return iterableType;
         }
@@ -264,7 +267,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         }
 
         return <InferenceProblem<Specifics>>{
-            $problem: InferenceProblem,
+            $problem: InferenceProblemConstant,
             languageNode: node,
             location: `Type '${iterableType.getName()}' is not iterable.`,
             subProblems: []
@@ -321,9 +324,9 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
      */
     private validateInsideLoop(node: AstNode, accept: ValidationProblemAcceptor<Specifics>, message: string): void {
         const isInsideLoop =
-            this.typir.context.langium.AstUtils.getContainerOfType(
+            AstUtils.getContainerOfType(
                 node,
-                (n): n is AstNode =>
+                (n: AstNode): n is AstNode =>
                     this.astReflection.isInstance(n, this.types.forStatementType) ||
                     this.astReflection.isInstance(n, this.types.whileStatementType)
             ) !== undefined;
@@ -352,8 +355,8 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                 return;
             }
 
-            const isVoid = this.typir.factory.CustomVoid.isCustomVoidType(expressionType);
-            const isCustomValue = this.typir.factory.CustomValues.isCustomValueType(expressionType);
+            const isVoid = isCustomVoidType(expressionType);
+            const isCustomValue = isCustomValueType(expressionType);
 
             if (!isVoid && !isCustomValue) {
                 accept({

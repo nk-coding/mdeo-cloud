@@ -1,6 +1,9 @@
 import type { TypirProblem, TypirSpecifics, ValidationProblem } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import { CallValidationHelper } from "./callValidationHelper.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { ValidationProblem: ValidationProblemConstant } = sharedImport("typir");
 
 /**
  * Validate a function or lambda call.
@@ -47,9 +50,8 @@ class InferenceCallValidator<Specifics extends TypirSpecifics> extends CallValid
         message: string,
         subProblems?: TypirProblem[]
     ): ValidationProblem<Specifics> {
-        const { ValidationProblem } = this.services.context.typir;
         return {
-            $problem: ValidationProblem,
+            $problem: ValidationProblemConstant,
             languageNode,
             severity: "error",
             message,

@@ -6,6 +6,9 @@
             "path": "packages/language-common"
         },
         {
+            "path": "packages/language-shared"
+        },
+        {
             "path": "packages/language-metamodel"
         },
         {

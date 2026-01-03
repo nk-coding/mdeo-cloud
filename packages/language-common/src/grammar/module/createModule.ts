@@ -1,51 +1,43 @@
 import type { AstNode, PropertyMetaData, TypeMetaData } from "langium";
+import { AbstractAstReflection, loadGrammarFromJson } from "langium";
+import { collectAst, isAstType, collectTypeHierarchy, mergeTypesAndInterfaces, findReferenceTypes } from "langium/grammar";
 import { GrammarSerializer } from "../serialization/grammarSerializer.js";
 import type { AstTypes, Property } from "langium/grammar";
 import type { LanguagePlugin } from "../../plugin/languagePlugin.js";
-import type { PluginContext } from "../../plugin/pluginContext.js";
 import type { LanguageModule } from "./module.js";
 import type { Interface } from "../type/interface/types.js";
 
 /**
  * Creates a complete language module from a parser rule and additional terminal rules.
  *
- * @param context The plugin context providing access to Langium modules
  * @param plugins Array of language plugins to include in the module
  * @returns A complete language module ready for use with Langium services
  */
-export function createModule(
-    { "langium/grammar": langiumGrammar, langium }: PluginContext,
-    plugins: LanguagePlugin<any>[]
-): LanguageModule {
+export function createModule(plugins: LanguagePlugin<any>[]): LanguageModule {
     const serializedGrammars = new Map<LanguagePlugin<any>, string>();
     for (const plugin of plugins) {
         const serializableGrammar = new GrammarSerializer(plugin.rootRule, plugin.additionalTerminals).grammar;
         const serializedGrammar = JSON.stringify(serializableGrammar);
         serializedGrammars.set(plugin, serializedGrammar);
     }
-    const astTypes = langiumGrammar.collectAst(
-        [...serializedGrammars.values()].map((serializedGrammar) => langium.loadGrammarFromJson(serializedGrammar))
+    const astTypes = collectAst(
+        [...serializedGrammars.values()].map((serializedGrammar) => loadGrammarFromJson(serializedGrammar))
     );
     const astTypesFiltered: AstTypes = {
         interfaces: [...astTypes.interfaces],
-        unions: astTypes.unions.filter((e) => langiumGrammar.isAstType(e.type))
+        unions: astTypes.unions.filter((e) => isAstType(e.type))
     };
-    const typeHierarchy = langiumGrammar.collectTypeHierarchy(langiumGrammar.mergeTypesAndInterfaces(astTypesFiltered));
+    const typeHierarchy = collectTypeHierarchy(mergeTypesAndInterfaces(astTypesFiltered));
 
-    class AstReflection extends langium.AbstractAstReflection {
+    class AstReflection extends AbstractAstReflection {
         override readonly types = Object.fromEntries([
             ...astTypesFiltered.interfaces.map((iface) => [
                 iface.name,
-                buildTypeMetaData(
-                    iface.name,
-                    iface.properties,
-                    typeHierarchy.superTypes.get(iface.name),
-                    langiumGrammar
-                )
+                buildTypeMetaData(iface.name, iface.properties, typeHierarchy.superTypes.get(iface.name))
             ]),
             ...astTypesFiltered.unions.map((union) => [
                 union.name,
-                buildTypeMetaData(union.name, [], typeHierarchy.superTypes.get(union.name), langiumGrammar)
+                buildTypeMetaData(union.name, [], typeHierarchy.superTypes.get(union.name))
             ])
         ]);
 
@@ -63,7 +55,7 @@ export function createModule(
         grammars: new Map(
             [...serializedGrammars.entries()].map(([plugin, serializedGrammar]) => [
                 plugin,
-                langium.loadGrammarFromJson(serializedGrammar)
+                loadGrammarFromJson(serializedGrammar)
             ])
         ),
         reflection: new AstReflection()
@@ -78,17 +70,10 @@ export function createModule(
  * @param superTypes Array of parent type names this type extends from
  * @returns Complete type metadata for the AST node type
  */
-function buildTypeMetaData(
-    name: string,
-    props: Property[],
-    superTypes: readonly string[] | undefined,
-    langiumGrammar: PluginContext["langium/grammar"]
-): TypeMetaData {
+function buildTypeMetaData(name: string, props: Property[], superTypes: readonly string[] | undefined): TypeMetaData {
     return {
         name,
-        properties: Object.fromEntries(
-            props.map((property) => [property.name, buildPropertyMetaData(property, langiumGrammar)])
-        ),
+        properties: Object.fromEntries(props.map((property) => [property.name, buildPropertyMetaData(property)])),
         superTypes: [...(superTypes ?? [])]
     };
 }
@@ -97,11 +82,10 @@ function buildTypeMetaData(
  * Builds property metadata for a specific property of an AST node.
  *
  * @param property The property definition to build metadata for
- * @param langiumGrammar The langium grammar module for type resolution
  * @returns Complete property metadata including reference type information
  */
-function buildPropertyMetaData(property: Property, langiumGrammar: PluginContext["langium/grammar"]): PropertyMetaData {
-    const refTypes = langiumGrammar.findReferenceTypes(property.type);
+function buildPropertyMetaData(property: Property): PropertyMetaData {
+    const refTypes = findReferenceTypes(property.type);
     const refType = refTypes.length > 0 ? refTypes[0] : undefined;
     return {
         name: property.name,

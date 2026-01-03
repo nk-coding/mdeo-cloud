@@ -1,5 +1,5 @@
 import type { Kind, TypirSpecifics } from "typir";
-import { CustomNullTypeProvider, type CustomNullType, type CustomNullTypeConstructor } from "./custom-null-type.js";
+import { CustomNullTypeImplementation, isCustomNullType, type CustomNullType } from "./custom-null-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomNullDetails } from "./custom-null-type.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
@@ -11,25 +11,12 @@ import type { CustomValueType } from "../custom-value/custom-value-type.js";
  */
 export interface CustomNullFactoryService {
     /**
-     * The custom null type constructor
-     */
-    CustomNullType: CustomNullTypeConstructor;
-
-    /**
      * Get the null type singleton.
      * Always returns the same instance.
      *
      * @returns The null type singleton instance
      */
     getOrCreate(): CustomNullType;
-
-    /**
-     * Type guard to check if a value is a CustomNullType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomNullType
-     */
-    isCustomNullType(type: unknown): type is CustomNullType;
 }
 
 /**
@@ -46,8 +33,6 @@ export const CustomNullKindName = "CustomNull";
 export class CustomNullKind<Specifics extends TypirSpecifics> implements Kind, CustomNullFactoryService {
     readonly $name: string = CustomNullKindName;
 
-    readonly CustomNullType: CustomNullTypeConstructor;
-
     /**
      * Cached singleton instance of the null type
      */
@@ -61,7 +46,6 @@ export class CustomNullKind<Specifics extends TypirSpecifics> implements Kind, C
      */
     constructor(readonly services: ExtendedTypirServices<Specifics>) {
         services.infrastructure.Kinds.register(this);
-        this.CustomNullType = CustomNullTypeProvider(services);
     }
 
     /**
@@ -85,19 +69,9 @@ export class CustomNullKind<Specifics extends TypirSpecifics> implements Kind, C
             typeArgs: new Map<string, CustomValueType>(),
             superTypes: []
         };
-        const newType = new this.CustomNullType(this as unknown as CustomNullKind<TypirSpecifics>, details);
+        const newType = new CustomNullTypeImplementation(this as unknown as CustomNullKind<TypirSpecifics>, details);
         this.services.infrastructure.Graph.addNode(newType);
         this.nullTypeInstance = newType;
         return newType;
-    }
-
-    /**
-     * Type guard to check if a value is a CustomNullType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomNullType
-     */
-    isCustomNullType(type: unknown): type is CustomNullType {
-        return type instanceof this.CustomNullType;
     }
 }

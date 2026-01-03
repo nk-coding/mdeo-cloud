@@ -1,42 +1,37 @@
-import type { PluginContext } from "@mdeo/language-common";
+import { sharedImport } from "@mdeo/language-shared";
 import type { TypirLangiumServices, TypirLangiumSpecifics } from "typir-langium";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { ScopeProviderCaching } from "../scope/scopeProviderCache.js";
 import type { Scope } from "../scope/scope.js";
-import type { DocumentCache } from "langium";
+import type { DocumentCache as DocumentCacheType } from "langium";
+
+const { DocumentCache, DocumentState } = sharedImport("langium");
+const { getDocumentKey } = sharedImport("typir-langium");
 
 /**
  * Generates a ScopeProviderCache class that uses Langium's DocumentCache
  * to cache scope providers for language nodes.
  *
- * @param context The plugin context providing access to shared dependencies
  * @returns An object containing the ScopeProviderCache class provider
  */
-export function generateScopeProviderCache<Specifics extends TypirLangiumSpecifics>(
-    context: PluginContext
-): {
+export function generateScopeProviderCache<Specifics extends TypirLangiumSpecifics>(): {
     ScopeProvider: (
         services: ExtendedTypirServices<Specifics> & TypirLangiumServices<Specifics>
     ) => ScopeProviderCaching<Specifics>;
 } {
-    const { langium, ["typir-langium"]: typirLangium } = context;
-
     class LangiumScopeProviderCache implements ScopeProviderCaching<Specifics> {
-        protected readonly cache: DocumentCache<unknown, Scope<Specifics>>;
+        protected readonly cache: DocumentCacheType<unknown, Scope<Specifics>>;
 
         constructor(services: ExtendedTypirServices<Specifics> & TypirLangiumServices<Specifics>) {
-            this.cache = new langium.DocumentCache(
-                services.langium.LangiumServices as any,
-                langium.DocumentState.IndexedReferences
-            );
+            this.cache = new DocumentCache(services.langium.LangiumServices as any, DocumentState.IndexedReferences);
         }
 
         cacheSet(languageNode: Specifics["LanguageType"], scope: Scope<Specifics>): void {
-            this.cache.set(typirLangium.getDocumentKey(languageNode), languageNode, scope);
+            this.cache.set(getDocumentKey(languageNode), languageNode, scope);
         }
 
         cacheGet(languageNode: Specifics["LanguageType"]): Scope<Specifics> | undefined {
-            return this.cache.get(typirLangium.getDocumentKey(languageNode), languageNode);
+            return this.cache.get(getDocumentKey(languageNode), languageNode);
         }
 
         cacheClear(): void {

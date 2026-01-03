@@ -1,9 +1,15 @@
 import type { InferenceProblem, Type, TypirProblem, TypirSpecifics, ValidationProblem } from "typir";
 import type { ExtendedTypirServices } from "../typir-extensions/service/extendedTypirServices.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
+import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
+import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { BoundScope, Scope } from "../typir-extensions/scope/scope.js";
 import { findCommonParentType } from "../typir-extensions/rules/commonParentType.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { InferenceProblem: InferenceProblemConstant, ValidationProblem: ValidationProblemConstant } =
+    sharedImport("typir");
 
 /**
  * Interface for accessing return statement information from language nodes.
@@ -209,10 +215,10 @@ export class ReturnInferenceAnalyzer<Specifics extends TypirSpecifics> extends R
             this.errors.push(
                 this.createError(returnExpr, `Return expression type could not be determined.`, inferredType)
             );
-        } else if (this.services.factory.CustomValues.isCustomValueType(inferredType)) {
+        } else if (isCustomValueType(inferredType)) {
             if (this.returnType == undefined) {
                 this.returnType = inferredType;
-            } else if (this.services.factory.CustomValues.isCustomValueType(this.returnType)) {
+            } else if (isCustomValueType(this.returnType)) {
                 this.returnType = findCommonParentType(this.returnType, inferredType, this.services);
             }
         } else {
@@ -233,9 +239,8 @@ export class ReturnInferenceAnalyzer<Specifics extends TypirSpecifics> extends R
         message: string,
         subProblems?: TypirProblem[]
     ): InferenceProblem<Specifics> {
-        const { InferenceProblem } = this.services.context.typir;
         return {
-            $problem: InferenceProblem,
+            $problem: InferenceProblemConstant,
             languageNode,
             location: message,
             subProblems: subProblems ?? []
@@ -290,12 +295,7 @@ export class ReturnValidationAnalyzer<Specifics extends TypirSpecifics> extends 
         if (Array.isArray(inferredType)) {
             return;
         }
-        if (
-            !(
-                this.services.factory.CustomValues.isCustomValueType(inferredType) ||
-                this.services.factory.CustomVoid.isCustomVoidType(inferredType)
-            )
-        ) {
+        if (!(isCustomValueType(inferredType) || isCustomVoidType(inferredType))) {
             this.errors.push(this.createError(statement, `Return expression type is not a valid value type.`));
             return;
         }
@@ -324,9 +324,8 @@ export class ReturnValidationAnalyzer<Specifics extends TypirSpecifics> extends 
         message: string,
         subProblems?: TypirProblem[]
     ): ValidationProblem<Specifics> {
-        const { ValidationProblem } = this.services.context.typir;
         return {
-            $problem: ValidationProblem,
+            $problem: ValidationProblemConstant,
             languageNode,
             severity: "error",
             message,
@@ -338,7 +337,7 @@ export class ReturnValidationAnalyzer<Specifics extends TypirSpecifics> extends 
      * Validates that all paths return a value if the expected return type is not void.
      */
     private validateAllPathsReturn(): void {
-        const isVoidReturn = this.services.factory.CustomVoid.isCustomVoidType(this.expectedReturnType);
+        const isVoidReturn = isCustomVoidType(this.expectedReturnType);
 
         if (!isVoidReturn && !this.allPathsReturn) {
             this.errors.push(

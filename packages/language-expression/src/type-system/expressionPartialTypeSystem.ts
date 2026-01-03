@@ -1,6 +1,7 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
+import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { PartialTypeSystem, type PrimitiveTypes } from "./partialTypeSystem.js";
 import { inferMemberAccess } from "../typir-extensions/rules/inferMemberAccess.js";
 import { inferCall } from "../typir-extensions/rules/inferCall.js";
@@ -115,7 +116,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
     private registerMemberAccessRules(): void {
         this.registerInferenceRule(this.types.memberAccessExpressionType, (node) => {
             const inferResult = inferMemberAccess(node, node.expression, node.member, this.typir);
-            if (node.isNullChaining && this.typir.factory.CustomValues.isCustomValueType(inferResult)) {
+            if (node.isNullChaining && isCustomValueType(inferResult)) {
                 return inferResult.asNullable;
             }
             return inferResult;
@@ -139,7 +140,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                 node.arguments,
                 this.typir
             );
-            if (this.typir.factory.CustomValues.isCustomValueType(inferResult)) {
+            if (isCustomValueType(inferResult)) {
                 const expression = node.expression;
                 if (this.astReflection.isInstance(expression, this.types.memberAccessExpressionType)) {
                     if (expression.isNullChaining) {
@@ -234,10 +235,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                 return rightType[0];
             }
 
-            if (
-                !this.typir.factory.CustomValues.isCustomValueType(leftType) ||
-                !this.typir.factory.CustomValues.isCustomValueType(rightType)
-            ) {
+            if (!isCustomValueType(leftType) || !isCustomValueType(rightType)) {
                 return {
                     $problem: this.inferenceProblem,
                     languageNode: node,
@@ -333,10 +331,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         this.registerInferenceRule(this.types.ternaryExpressionType, (node) => {
             const trueType = this.inference.inferType(node.trueExpression);
             const falseType = this.inference.inferType(node.falseExpression);
-            if (
-                !this.typir.factory.CustomValues.isCustomValueType(trueType) ||
-                !this.typir.factory.CustomValues.isCustomValueType(falseType)
-            ) {
+            if (!isCustomValueType(trueType) || !isCustomValueType(falseType)) {
                 return this.primitiveTypes.Any;
             }
             const commonType = findCommonParentType(trueType, falseType, this.typir);

@@ -1,13 +1,8 @@
 import type { AstPath, Doc } from "prettier";
-import type { CstNode, CstUtils, LangiumCoreServices, isCompositeCstNode, isLeafCstNode } from "langium";
-import type {
-    AstSerializerAdditionalServices,
-    PrintContext,
-    PluginContext,
-    Builders,
-    Print
-} from "@mdeo/language-common";
+import type { CstNode, CstUtils, LangiumCoreServices } from "langium";
+import type { AstSerializerAdditionalServices, PrintContext, Builders, Print } from "@mdeo/language-shared";
 import { ID } from "@mdeo/language-common";
+import { sharedImport } from "@mdeo/language-shared";
 import { getExpressionPrecedence, Precedence } from "./precedenceHelper.js";
 import type {
     ExpressionTypes,
@@ -27,25 +22,26 @@ import type {
     BaseExpressionType
 } from "../grammar/expressionTypes.js";
 
+const { doc: prettierDoc } = sharedImport("prettier");
+const { isLeafCstNode, isCompositeCstNode } = sharedImport("langium");
+
 /**
  * Registers all expression serializers for pretty-printing expression AST nodes.
  *
- * @param context The plugin context
  * @param services The Langium core services with AST serializer
  * @param types The generated expression types
  */
 export function registerExpressionSerializers(
-    { prettier, langium }: PluginContext,
     services: LangiumCoreServices & AstSerializerAdditionalServices,
     types: ExpressionTypes
 ): void {
     const { AstSerializer } = services;
-    const builders = prettier.doc.builders;
+    const builders = prettierDoc.builders;
     const precedenceContext: PrecedenceContext = {
         types,
         builders,
-        isLeafCstNode: langium.isLeafCstNode,
-        isCompositeCstNode: langium.isCompositeCstNode
+        isLeafCstNode: isLeafCstNode,
+        isCompositeCstNode: isCompositeCstNode
     };
 
     AstSerializer.registerNodeSerializer(types.unaryExpressionType, (ctx) =>

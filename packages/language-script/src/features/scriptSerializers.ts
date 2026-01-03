@@ -1,7 +1,10 @@
 import type { Doc, doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, PluginContext } from "@mdeo/language-common";
-import { ID, serializeNewlineSep, printDanglingComments } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
+import { ID } from "@mdeo/language-common";
+import { serializeNewlineSep, printDanglingComments, sharedImport } from "@mdeo/language-shared";
+
+const { doc: prettierDoc } = sharedImport("prettier");
 import type {
     ReturnStatementType,
     LambdaExpressionType,
@@ -27,15 +30,11 @@ import {
 /**
  * Registers all script serializers for pretty-printing script AST nodes.
  *
- * @param context The plugin context
  * @param services The Langium core services with AST serializer
  */
-export function registerScriptSerializers(
-    { prettier }: PluginContext,
-    services: LangiumCoreServices & AstSerializerAdditionalServices
-): void {
+export function registerScriptSerializers(services: LangiumCoreServices & AstSerializerAdditionalServices): void {
     const { AstSerializer } = services;
-    const builders = prettier.doc.builders;
+    const builders = prettierDoc.builders;
 
     AstSerializer.registerNodeSerializer(ReturnStatement, (ctx) => printReturnStatement(ctx));
     AstSerializer.registerNodeSerializer(LambdaParameter, (ctx) => printLambdaParameter(ctx));

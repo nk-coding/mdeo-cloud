@@ -2,9 +2,9 @@ import type { Kind } from "typir";
 import type { TypirSpecifics } from "typir";
 import {
     buildCustomClassIdentifier,
-    CustomClassTypeProvider,
-    type CustomClassType,
-    type CustomClassTypeConstructor
+    CustomClassTypeImplementation,
+    isCustomClassType,
+    type CustomClassType
 } from "./custom-class-type.js";
 import type { ClassType } from "../../config/type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
@@ -34,11 +34,6 @@ export interface CustomClassDetails<Specifics extends TypirSpecifics> extends Cu
  */
 export interface CustomClassFactoryService<Specifics extends TypirSpecifics> {
     /**
-     * The custom class type constructor
-     */
-    CustomClassType: CustomClassTypeConstructor;
-
-    /**
      * Get an existing custom class type or create a new one.
      * Uses caching to ensure type identity.
      *
@@ -46,14 +41,6 @@ export interface CustomClassFactoryService<Specifics extends TypirSpecifics> {
      * @returns The custom class type instance
      */
     getOrCreate(details: CustomClassDetails<Specifics>): CustomClassType;
-
-    /**
-     * Type guard to check if a value is a CustomClassType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomClassType
-     */
-    isCustomClassType(type: unknown): type is CustomClassType;
 }
 
 /**
@@ -70,8 +57,6 @@ export const CustomClassKindName = "CustomClass";
 export class CustomClassKind<Specifics extends TypirSpecifics> implements Kind, CustomClassFactoryService<Specifics> {
     readonly $name: string = CustomClassKindName;
 
-    readonly CustomClassType: CustomClassTypeConstructor;
-
     /**
      * Creates a new custom class kind.
      * Automatically registers itself with the kind registry.
@@ -80,7 +65,6 @@ export class CustomClassKind<Specifics extends TypirSpecifics> implements Kind, 
      */
     constructor(readonly services: ExtendedTypirServices<Specifics>) {
         services.infrastructure.Kinds.register(this);
-        this.CustomClassType = CustomClassTypeProvider(services);
     }
 
     /**
@@ -96,19 +80,12 @@ export class CustomClassKind<Specifics extends TypirSpecifics> implements Kind, 
         if (existingType != undefined) {
             return existingType as CustomClassType;
         } else {
-            const newType = new this.CustomClassType(this as unknown as CustomClassKind<TypirSpecifics>, details);
+            const newType = new CustomClassTypeImplementation(
+                this as unknown as CustomClassKind<TypirSpecifics>,
+                details
+            );
             this.services.infrastructure.Graph.addNode(newType);
             return newType;
         }
-    }
-
-    /**
-     * Type guard to check if a value is a CustomClassType.
-     *
-     * @param type The value to check
-     * @returns true if the value is a CustomClassType
-     */
-    isCustomClassType(type: unknown): type is CustomClassType {
-        return type instanceof this.CustomClassType;
     }
 }

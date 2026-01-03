@@ -6,6 +6,6 @@ import type { EditorPlugin, PluginContext } from "@mdeo/editor-common";
  */
 export const metamodelEditorPlugin: EditorPlugin = {
     configure: function (context: PluginContext): ContainerConfiguration {
-        return []
+        return [];
     }
 };
