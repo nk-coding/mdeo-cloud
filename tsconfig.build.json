@@ -30,6 +30,9 @@
             "path": "packages/editor-common"
         },
         {
+            "path": "packages/editor-shared"
+        },
+        {
             "path": "packages/editor-metamodel"
         }
     ]

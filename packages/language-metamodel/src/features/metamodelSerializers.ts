@@ -1,10 +1,8 @@
-import type { Doc, doc } from "prettier";
+import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
 import { ID, INT } from "@mdeo/language-common";
 import { serializeNewlineSep, registerImportSerializers, sharedImport } from "@mdeo/language-shared";
-
-const { doc: prettierDoc } = sharedImport("prettier");
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -26,6 +24,9 @@ import {
     type MetaModelType
 } from "../grammar/types.js";
 
+const { doc } = sharedImport("prettier");
+const { indent, hardline, group, join } = doc.builders;
+
 /**
  * Registers all metamodel serializers for pretty-printing metamodel AST nodes.
  *
@@ -33,7 +34,6 @@ import {
  */
 export function registerMetamodelSerializers(services: LangiumCoreServices & AstSerializerAdditionalServices): void {
     const { AstSerializer } = services;
-    const builders = prettierDoc.builders;
 
     AstSerializer.registerPrimitiveSerializer(ID, ({ value, cstNode }) => {
         if (cstNode != undefined) {
@@ -50,11 +50,11 @@ export function registerMetamodelSerializers(services: LangiumCoreServices & Ast
     AstSerializer.registerNodeSerializer(SingleMultiplicity, (ctx) => printSingleMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(RangeMultiplicity, (ctx) => printRangeMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(Property, (ctx) => printProperty(ctx));
-    AstSerializer.registerNodeSerializer(MetaClass, (ctx) => printMetaClass(ctx, builders));
+    AstSerializer.registerNodeSerializer(MetaClass, (ctx) => printMetaClass(ctx));
     AstSerializer.registerNodeSerializer(AssociationEnd, (ctx) => printAssociationEnd(ctx));
     AstSerializer.registerNodeSerializer(Association, (ctx) => printAssociation(ctx));
-    registerImportSerializers(services, builders, MetaClassImport, MetaClassFileImport);
-    AstSerializer.registerNodeSerializer(MetaModel, (ctx) => printMetaModel(ctx, builders));
+    registerImportSerializers(services, doc.builders, MetaClassImport, MetaClassFileImport);
+    AstSerializer.registerNodeSerializer(MetaModel, (ctx) => printMetaModel(ctx));
 }
 
 /**
@@ -122,12 +122,10 @@ function printProperty(context: PrintContext<PropertyType>): Doc {
  * Prints a metaclass node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted metaclass
  */
-function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof doc.builders): Doc {
+function printMetaClass(context: PrintContext<MetaClassType>): Doc {
     const { ctx, printPrimitive, printReference, getPrimitive, path } = context;
-    const { join, indent, group, hardline } = builders;
     const docs: Doc[] = [];
 
     if (ctx.isAbstract) {
@@ -145,7 +143,7 @@ function printMetaClass(context: PrintContext<MetaClassType>, builders: typeof d
 
     docs.push(" {");
 
-    const content = serializeNewlineSep(context, ["properties"], builders);
+    const content = serializeNewlineSep(context, ["properties"], doc.builders);
     if (content.length > 0) {
         docs.push(indent([hardline, content]), hardline);
     }
@@ -196,9 +194,8 @@ function printAssociation(context: PrintContext<AssociationType>): Doc {
  * Prints the root metamodel node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted metamodel
  */
-function printMetaModel(context: PrintContext<MetaModelType>, builders: typeof doc.builders): Doc {
-    return serializeNewlineSep(context, ["imports", "classesAndAssociations"], builders);
+function printMetaModel(context: PrintContext<MetaModelType>): Doc {
+    return serializeNewlineSep(context, ["imports", "classesAndAssociations"], doc.builders);
 }

@@ -1,13 +1,11 @@
 import type { GModelFactory } from "@eclipse-glsp/server";
-import type { PluginContext } from "@mdeo/language-common";
+import { sharedImport } from "@mdeo/language-shared";
 
-export function generateGModelFactory(context: PluginContext) {
-    const { inversify, ["@eclipse-glsp/server"]: glspServer } = context;
+const { injectable } = sharedImport("inversify");
 
-    @inversify.injectable()
-    class MetamodelGModelFactory implements GModelFactory {
-        createModel(): void {
-            throw new Error("Method not implemented.");
-        }
+@injectable()
+export class MetamodelGModelFactory implements GModelFactory {
+    createModel(): void {
+        throw new Error("Method not implemented.");
     }
 }

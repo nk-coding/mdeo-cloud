@@ -1,5 +1,5 @@
 {
-    "name": "@mdeo/editor-metamodel",
+    "name": "@mdeo/editor-shared",
     "version": "0.1.0",
     "type": "module",
     "main": "dist/index.js",
@@ -9,9 +9,7 @@
         "src"
     ],
     "dependencies": {
-        "@mdeo/editor-shared": "^0.1.0"
-    },
-    "devDependencies": {
+        "@mdeo/editor-common": "^0.1.0",
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
         "inversify": "^6.2.2"

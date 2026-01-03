@@ -1,4 +1,3 @@
-import { Type } from "typir";
 import type { TypirProblem, TypirSpecifics, Type as TypirType, TypeEqualityProblem } from "typir";
 import { sharedImport } from "@mdeo/language-shared";
 import { CustomValueTypeImplementation } from "../custom-value/custom-value-type.js";

@@ -1,11 +1,7 @@
 import type { Kind } from "typir";
 import type { TypirSpecifics, TypeDetails } from "typir";
 import type { FunctionType } from "../../config/type.js";
-import {
-    CustomFunctionTypeImplementation,
-    isCustomFunctionType,
-    type CustomFunctionType
-} from "./custom-function-type.js";
+import { CustomFunctionTypeImplementation, type CustomFunctionType } from "./custom-function-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
 

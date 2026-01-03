@@ -3,7 +3,6 @@ import type { TypirSpecifics } from "typir";
 import {
     buildCustomClassIdentifier,
     CustomClassTypeImplementation,
-    isCustomClassType,
     type CustomClassType
 } from "./custom-class-type.js";
 import type { ClassType } from "../../config/type.js";

@@ -21,11 +21,15 @@ import {
     ReadFileRequest,
     StatRequest,
     ReadDirectoryRequest,
+    ReadMetadataRequest,
+    WriteMetadataRequest,
     type ReadFileParams,
     type StatParams,
     type StatResponse,
     type ReadDirectoryParams,
-    type FileSystemNode
+    type FileSystemNode,
+    type ReadMetadataParams,
+    type WriteMetadataParams
 } from "@/server/protocol";
 import type { ResolvedLanguagePlugin } from "./plugin/languagePlugin";
 
@@ -362,6 +366,17 @@ export class WorkbenchState {
     }
 
     /**
+     * Extracts the path from a URI.
+     * Expected format: schema://projectId/path
+     */
+    private extractPath(uri: Uri): string {
+        const fullPath = uri.path;
+        const parts = fullPath.substring(1).split("/");
+        const path = "/" + parts.slice(1).join("/");
+        return path;
+    }
+
+    /**
      * Registers file system request handlers on the language client
      *
      * @param client The language client to register handlers on
@@ -394,6 +409,27 @@ export class WorkbenchState {
                 isDirectory: child.isDirectory,
                 uri: child.resource.toString()
             }));
+        });
+
+        client.onRequest(ReadMetadataRequest.type, async (params: ReadMetadataParams): Promise<object> => {
+            const uri = Uri.parse(params.uri);
+            const result = await this.backend.readMetadata(this.activeProject.value!.id, this.extractPath(uri));
+            if (result.ok) {
+                return result.value;
+            }
+            throw new Error("Failed to read metadata");
+        });
+
+        client.onRequest(WriteMetadataRequest.type, async (params: WriteMetadataParams): Promise<void> => {
+            const uri = Uri.parse(params.uri);
+            const result = await this.backend.writeMetadata(
+                this.activeProject.value!.id,
+                this.extractPath(uri),
+                params.metadata
+            );
+            if (!result.ok) {
+                throw new Error("Failed to write metadata");
+            }
         });
     }
 }

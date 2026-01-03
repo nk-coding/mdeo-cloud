@@ -1,5 +1,5 @@
 import type { Kind, TypirSpecifics } from "typir";
-import { CustomNullTypeImplementation, isCustomNullType, type CustomNullType } from "./custom-null-type.js";
+import { CustomNullTypeImplementation, type CustomNullType } from "./custom-null-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomNullDetails } from "./custom-null-type.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";

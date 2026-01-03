@@ -136,3 +136,47 @@ export namespace ReadDirectoryRequest {
      */
     export const type = new RequestType<ReadDirectoryParams, FileSystemNode[], any>("fs/readDirectory");
 }
+
+/**
+ * Request parameters for reading file metadata
+ */
+export interface ReadMetadataParams {
+    /**
+     * The URI of the file to read metadata for
+     */
+    uri: string;
+}
+
+/**
+ * Namespace for the read metadata request
+ */
+export namespace ReadMetadataRequest {
+    /**
+     * Request type for reading file metadata
+     */
+    export const type = new RequestType<ReadMetadataParams, object, any>("fs/readMetadata");
+}
+
+/**
+ * Request parameters for writing file metadata
+ */
+export interface WriteMetadataParams {
+    /**
+     * The URI of the file to write metadata for
+     */
+    uri: string;
+    /**
+     * The metadata object to write
+     */
+    metadata: object;
+}
+
+/**
+ * Namespace for the write metadata request
+ */
+export namespace WriteMetadataRequest {
+    /**
+     * Request type for writing file metadata
+     */
+    export const type = new RequestType<WriteMetadataParams, void, any>("fs/writeMetadata");
+}

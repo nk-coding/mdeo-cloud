@@ -1,4 +1,3 @@
-import type { AstNode } from "langium";
 import type { ExpressionTypes, BinaryExpressionType, BaseExpressionType } from "../grammar/expressionTypes.js";
 
 /**

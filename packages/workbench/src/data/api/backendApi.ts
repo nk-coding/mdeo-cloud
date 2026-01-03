@@ -139,4 +139,26 @@ export interface BackendApi {
      *          Possible errors: Unavailable, Unknown
      */
     deleteProject(projectId: string): Promise<ApiResult<void, ProjectError>>;
+
+    /**
+     * Reads metadata for a file.
+     *
+     * @param projectId The ID of the project containing the file
+     * @param path The path to the file relative to the project root
+     * @returns A promise that resolves to an ApiResult containing the metadata object
+     *          If no metadata exists, returns an empty object
+     *          Possible errors: FileNotFound, Unavailable, Unknown
+     */
+    readMetadata(projectId: string, path: string): Promise<ApiResult<object, FileSystemError>>;
+
+    /**
+     * Writes metadata for a file.
+     *
+     * @param projectId The ID of the project containing the file
+     * @param path The path to the file relative to the project root
+     * @param metadata The metadata object to write
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: FileNotFound, Unavailable, Unknown
+     */
+    writeMetadata(projectId: string, path: string, metadata: object): Promise<ApiResult<void, FileSystemError>>;
 }

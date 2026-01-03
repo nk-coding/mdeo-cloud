@@ -3,7 +3,7 @@
 </template>
 <script setup lang="ts">
 import "reflect-metadata";
-import { createContainer } from "@mdeo/editor-common";
+import { createContainer } from "@mdeo/editor-shared";
 import { computed, inject, onMounted, useId } from "vue";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { workbenchStateKey } from "../workbench/util";

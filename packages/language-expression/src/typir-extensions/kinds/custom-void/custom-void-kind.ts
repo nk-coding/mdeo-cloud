@@ -1,5 +1,5 @@
 import type { Kind, TypirSpecifics } from "typir";
-import { CustomVoidTypeImplementation, isCustomVoidType, type CustomVoidType } from "./custom-void-type.js";
+import { CustomVoidTypeImplementation, type CustomVoidType } from "./custom-void-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { CustomVoidDetails } from "./custom-void-type.js";
 

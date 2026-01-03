@@ -1,10 +1,4 @@
-import {
-    HIDDEN_NEWLINE,
-    ML_COMMENT,
-    SL_COMMENT,
-    WS,
-    type LanguagePlugin
-} from "@mdeo/language-common";
+import { HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT, WS, type LanguagePlugin } from "@mdeo/language-common";
 import type { AstSerializerAdditionalServices } from "@mdeo/language-shared";
 import {
     IdValueConverter,

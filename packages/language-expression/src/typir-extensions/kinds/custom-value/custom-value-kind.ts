@@ -1,7 +1,7 @@
 import type { Kind, TypirSpecifics } from "typir";
-import { CustomValueTypeImplementation, type CustomValueType } from "./custom-value-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface CustomValueFactoryService {}
 
 export const CustomValueKindName = "CustomValue";

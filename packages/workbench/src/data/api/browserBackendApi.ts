@@ -33,7 +33,7 @@ interface ProjectData {
  */
 export class BrowserBackendApi implements BackendApi {
     private dbName = "mdeo-workbench";
-    private dbVersion = 1;
+    private dbVersion = 2;
     private db: IDBDatabase | null = null;
 
     constructor() {
@@ -66,6 +66,12 @@ export class BrowserBackendApi implements BackendApi {
                 if (!db.objectStoreNames.contains("files")) {
                     const fileStore = db.createObjectStore("files");
                     fileStore.createIndex("projectId", "projectId", { unique: false });
+                }
+
+                // Store for file metadata
+                // Key format: "projectId/path"
+                if (!db.objectStoreNames.contains("metadata")) {
+                    db.createObjectStore("metadata");
                 }
             };
         });
@@ -364,6 +370,12 @@ export class BrowserBackendApi implements BackendApi {
         }
 
         await this.deleteFileEntry(projectId, path);
+
+        // Delete metadata if it exists
+        await this.deleteMetadata(projectId, path).catch(() => {
+            // Ignore errors if metadata doesn't exist
+        });
+
         return success(undefined);
     }
 
@@ -417,6 +429,13 @@ export class BrowserBackendApi implements BackendApi {
         } else {
             // Move file
             await this.setFileEntry(projectId, to, fromEntry);
+
+            // Move metadata if it exists
+            const metadata = await this.getMetadata(projectId, from);
+            if (metadata !== null) {
+                await this.setMetadata(projectId, to, metadata);
+                await this.deleteMetadata(projectId, from);
+            }
 
             // Add to new parent directory
             const toParentPath = this.getParentPath(to);
@@ -558,9 +577,10 @@ export class BrowserBackendApi implements BackendApi {
         const db = await this.ensureDB();
 
         return new Promise((resolve) => {
-            const transaction = db.transaction(["projects", "files"], "readwrite");
+            const transaction = db.transaction(["projects", "files", "metadata"], "readwrite");
             const projectStore = transaction.objectStore("projects");
             const fileStore = transaction.objectStore("files");
+            const metadataStore = transaction.objectStore("metadata");
 
             // Delete project
             const deleteProjectRequest = projectStore.delete(projectId);
@@ -573,6 +593,9 @@ export class BrowserBackendApi implements BackendApi {
                 );
             };
 
+            // Collect all keys to delete
+            const keysToDelete: IDBValidKey[] = [];
+
             // Delete all files for this project
             const index = fileStore.index("projectId");
             const range = IDBKeyRange.only(projectId);
@@ -581,8 +604,15 @@ export class BrowserBackendApi implements BackendApi {
             cursorRequest.onsuccess = (event) => {
                 const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
                 if (cursor) {
-                    fileStore.delete(cursor.primaryKey);
+                    const key = cursor.primaryKey;
+                    keysToDelete.push(key);
+                    fileStore.delete(key);
                     cursor.continue();
+                } else {
+                    // After all files are collected, delete metadata with matching keys
+                    for (const key of keysToDelete) {
+                        metadataStore.delete(key);
+                    }
                 }
             };
 
@@ -605,5 +635,78 @@ export class BrowserBackendApi implements BackendApi {
                 );
             };
         });
+    }
+
+    /**
+     * Gets metadata from the database.
+     */
+    private async getMetadata(projectId: string, path: string): Promise<object | null> {
+        const db = await this.ensureDB();
+        const key = this.makeFileKey(projectId, path);
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(["metadata"], "readonly");
+            const store = transaction.objectStore("metadata");
+            const request = store.get(key);
+
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Sets metadata in the database.
+     */
+    private async setMetadata(projectId: string, path: string, metadata: object): Promise<void> {
+        const db = await this.ensureDB();
+        const key = this.makeFileKey(projectId, path);
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(["metadata"], "readwrite");
+            const store = transaction.objectStore("metadata");
+            const request = store.put(metadata, key);
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Deletes metadata from the database.
+     */
+    private async deleteMetadata(projectId: string, path: string): Promise<void> {
+        const db = await this.ensureDB();
+        const key = this.makeFileKey(projectId, path);
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(["metadata"], "readwrite");
+            const store = transaction.objectStore("metadata");
+            const request = store.delete(key);
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async readMetadata(projectId: string, path: string): Promise<ApiResult<object, FileSystemError>> {
+        const entry = await this.getFileEntry(projectId, path);
+
+        if (!entry) {
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File not found: ${path}`);
+        }
+
+        const metadata = await this.getMetadata(projectId, path);
+        return success(metadata || {});
+    }
+
+    async writeMetadata(projectId: string, path: string, metadata: object): Promise<ApiResult<void, FileSystemError>> {
+        const entry = await this.getFileEntry(projectId, path);
+
+        if (!entry) {
+            return fileSystemFailure(FileSystemErrorCode.FileNotFound, `File not found: ${path}`);
+        }
+
+        await this.setMetadata(projectId, path, metadata);
+        return success(undefined);
     }
 }

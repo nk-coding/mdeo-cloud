@@ -1,6 +1,12 @@
 import type { AstNode, PropertyMetaData, TypeMetaData } from "langium";
 import { AbstractAstReflection, loadGrammarFromJson } from "langium";
-import { collectAst, isAstType, collectTypeHierarchy, mergeTypesAndInterfaces, findReferenceTypes } from "langium/grammar";
+import {
+    collectAst,
+    isAstType,
+    collectTypeHierarchy,
+    mergeTypesAndInterfaces,
+    findReferenceTypes
+} from "langium/grammar";
 import { GrammarSerializer } from "../serialization/grammarSerializer.js";
 import type { AstTypes, Property } from "langium/grammar";
 import type { LanguagePlugin } from "../../plugin/languagePlugin.js";

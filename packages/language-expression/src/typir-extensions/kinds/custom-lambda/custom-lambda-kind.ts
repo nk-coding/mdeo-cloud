@@ -3,7 +3,6 @@ import type { TypirSpecifics } from "typir";
 import {
     buildCustomLambdaIdentifier,
     CustomLambdaTypeImplementation,
-    isCustomLambdaType,
     type CustomLambdaType
 } from "./custom-lambda-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";

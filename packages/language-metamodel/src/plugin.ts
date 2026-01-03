@@ -1,11 +1,5 @@
 import { MetaModelRule } from "./grammar/rules.js";
-import {
-    type LanguagePlugin,
-    WS,
-    ML_COMMENT,
-    SL_COMMENT,
-    HIDDEN_NEWLINE
-} from "@mdeo/language-common";
+import { type LanguagePlugin, WS, ML_COMMENT, SL_COMMENT, HIDDEN_NEWLINE } from "@mdeo/language-common";
 import type { AstSerializerAdditionalServices } from "@mdeo/language-shared";
 import {
     IdValueConverter,

@@ -1,11 +1,4 @@
-import {
-    createRule,
-    ID,
-    optional,
-    or,
-    NEWLINE,
-    many
-} from "@mdeo/language-common";
+import { createRule, ID, optional, or, NEWLINE, many } from "@mdeo/language-common";
 import { generateExpressionRules, generateStatementRules, generateTypeRules } from "@mdeo/language-expression";
 import {
     expressionConfig,

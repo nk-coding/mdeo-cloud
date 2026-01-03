@@ -1,10 +1,8 @@
-import type { Doc, doc } from "prettier";
+import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
 import { ID } from "@mdeo/language-common";
 import { serializeNewlineSep, printDanglingComments, sharedImport } from "@mdeo/language-shared";
-
-const { doc: prettierDoc } = sharedImport("prettier");
 import type {
     ReturnStatementType,
     LambdaExpressionType,
@@ -27,6 +25,9 @@ import {
     Script
 } from "../grammar/types.js";
 
+const { doc } = sharedImport("prettier");
+const { join, line, group, softline, indent } = doc.builders;
+
 /**
  * Registers all script serializers for pretty-printing script AST nodes.
  *
@@ -34,18 +35,17 @@ import {
  */
 export function registerScriptSerializers(services: LangiumCoreServices & AstSerializerAdditionalServices): void {
     const { AstSerializer } = services;
-    const builders = prettierDoc.builders;
 
     AstSerializer.registerNodeSerializer(ReturnStatement, (ctx) => printReturnStatement(ctx));
     AstSerializer.registerNodeSerializer(LambdaParameter, (ctx) => printLambdaParameter(ctx));
-    AstSerializer.registerNodeSerializer(LambdaParameters, (ctx) => printLambdaParameters(ctx, builders));
+    AstSerializer.registerNodeSerializer(LambdaParameters, (ctx) => printLambdaParameters(ctx));
     AstSerializer.registerNodeSerializer(LambdaExpression, (ctx) => printLambdaExpression(ctx));
     AstSerializer.registerNodeSerializer(FunctionParameter, (ctx) => printFunctionParameter(ctx));
-    AstSerializer.registerNodeSerializer(FunctionParameters, (ctx) => printFunctionParameters(ctx, builders));
-    AstSerializer.registerNodeSerializer(Function, (ctx) => printFunction(ctx, builders));
+    AstSerializer.registerNodeSerializer(FunctionParameters, (ctx) => printFunctionParameters(ctx));
+    AstSerializer.registerNodeSerializer(Function, (ctx) => printFunction(ctx));
     AstSerializer.registerNodeSerializer(FunctionImport, (ctx) => printFunctionImport(ctx));
-    AstSerializer.registerNodeSerializer(FunctionFileImport, (ctx) => printFunctionFileImport(ctx, builders));
-    AstSerializer.registerNodeSerializer(Script, (ctx) => printScript(ctx, builders));
+    AstSerializer.registerNodeSerializer(FunctionFileImport, (ctx) => printFunctionFileImport(ctx));
+    AstSerializer.registerNodeSerializer(Script, (ctx) => printScript(ctx));
 }
 
 /**
@@ -80,19 +80,17 @@ function printLambdaParameter(context: PrintContext<LambdaParameterType>): Doc {
  * Prints lambda parameters node (with round brackets).
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted lambda parameters
  */
-function printLambdaParameters(context: PrintContext<LambdaParametersType>, builders: typeof doc.builders): Doc {
+function printLambdaParameters(context: PrintContext<LambdaParametersType>): Doc {
     const { ctx, path, print } = context;
-    const { join, line, group, softline, indent } = builders;
     const docs: Doc[] = [];
 
     if (ctx.parameters.length > 0) {
         docs.push(group(["(", indent([softline, join([",", line], path.map(print, "parameters"))]), softline, ")"]));
     } else {
         docs.push("(");
-        const danglingComments = printDanglingComments(context, builders);
+        const danglingComments = printDanglingComments(context, doc.builders);
         if (danglingComments.length > 0) {
             docs.push(line, danglingComments, line);
         }
@@ -141,19 +139,17 @@ function printFunctionParameter(context: PrintContext<any>): Doc {
  * Prints function parameters node (with round brackets).
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted function parameters
  */
-function printFunctionParameters(context: PrintContext<FunctionParametersType>, builders: typeof doc.builders): Doc {
+function printFunctionParameters(context: PrintContext<FunctionParametersType>): Doc {
     const { ctx, path, print } = context;
-    const { join, line, softline, indent, group } = builders;
     const docs: Doc[] = [];
 
     if (ctx.parameters && ctx.parameters.length > 0) {
         docs.push(group(["(", indent([softline, join([",", line], path.map(print, "parameters"))]), softline, ")"]));
     } else {
         docs.push("(");
-        const danglingComments = printDanglingComments(context, builders);
+        const danglingComments = printDanglingComments(context, doc.builders);
         if (danglingComments.length > 0) {
             docs.push(line, danglingComments, line);
         }
@@ -167,12 +163,10 @@ function printFunctionParameters(context: PrintContext<FunctionParametersType>, 
  * Prints a function node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted function
  */
-function printFunction(context: PrintContext<FunctionType>, builders: typeof doc.builders): Doc {
+function printFunction(context: PrintContext<FunctionType>): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
-    const { group } = builders;
     const docs: Doc[] = ["fun ", printPrimitive(getPrimitive(ctx, "name"), ID), path.call(print, "parameterList")];
 
     if (ctx.returnType != undefined) {
@@ -199,12 +193,10 @@ function printFunctionImport(context: PrintContext<any>): Doc {
  * Prints a function file import node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted function file import
  */
-function printFunctionFileImport(context: PrintContext<any>, builders: typeof doc.builders): Doc {
+function printFunctionFileImport(context: PrintContext<any>): Doc {
     const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    const { join } = builders;
     const docs: Doc[] = ["import "];
 
     if (ctx.imports && ctx.imports.length > 0) {
@@ -225,9 +217,8 @@ function printFunctionFileImport(context: PrintContext<any>, builders: typeof do
  * Prints the root script node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted script
  */
-function printScript(context: PrintContext<ScriptType>, builders: typeof doc.builders): Doc {
-    return serializeNewlineSep(context, ["imports", "functions"], builders);
+function printScript(context: PrintContext<ScriptType>): Doc {
+    return serializeNewlineSep(context, ["imports", "functions"], doc.builders);
 }

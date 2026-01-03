@@ -3,7 +3,6 @@ import { Type } from "typir";
 import type { CustomClassType } from "../custom-class/custom-class-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { BaseClassTypeRef, Member, ValueType } from "../../config/type.js";
-import { sharedImport } from "@mdeo/language-shared";
 
 /**
  * Type details for custom value types.

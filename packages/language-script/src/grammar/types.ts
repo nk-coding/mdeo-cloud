@@ -1,9 +1,4 @@
-import {
-    createInterface,
-    type ASTType,
-    Optional,
-    createType
-} from "@mdeo/language-common";
+import { createInterface, type ASTType, Optional, createType } from "@mdeo/language-common";
 import {
     ExpressionConfig,
     generateExpressionTypes,

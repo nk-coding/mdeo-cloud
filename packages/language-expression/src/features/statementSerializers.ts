@@ -1,6 +1,6 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, Builders } from "@mdeo/language-shared";
+import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
 import { ID } from "@mdeo/language-common";
 import { serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
 import type {
@@ -16,7 +16,8 @@ import type {
     ExpressionStatementType
 } from "../grammar/statementTypes.js";
 
-const { doc: prettierDoc } = sharedImport("prettier");
+const { doc } = sharedImport("prettier");
+const { indent, hardline } = doc.builders;
 
 /**
  * Registers all statement serializers for pretty-printing statement AST nodes.
@@ -29,9 +30,8 @@ export function registerStatementSerializers(
     types: StatementTypes
 ): void {
     const { AstSerializer } = services;
-    const builders = prettierDoc.builders;
 
-    AstSerializer.registerNodeSerializer(types.statementsScopeType, (ctx) => printStatementsScope(ctx, builders));
+    AstSerializer.registerNodeSerializer(types.statementsScopeType, (ctx) => printStatementsScope(ctx));
     AstSerializer.registerNodeSerializer(types.elseIfClauseType, (ctx) => printElseIfClause(ctx));
     AstSerializer.registerNodeSerializer(types.ifStatementType, (ctx) => printIfStatement(ctx));
     AstSerializer.registerNodeSerializer(types.whileStatementType, (ctx) => printWhileStatement(ctx));
@@ -52,14 +52,12 @@ export function registerStatementSerializers(
  * Prints a statements scope node.
  *
  * @param context The print context
- * @param builders Prettier doc builders
  * @returns The formatted statements scope
  */
-function printStatementsScope(context: PrintContext<StatementsScopeType>, builders: Builders): Doc {
-    const { indent, hardline } = builders;
+function printStatementsScope(context: PrintContext<StatementsScopeType>): Doc {
     const docs: Doc[] = ["{"];
 
-    const content = serializeNewlineSep(context, ["statements"], builders);
+    const content = serializeNewlineSep(context, ["statements"], doc.builders);
     if (content.length > 0) {
         docs.push(indent([hardline, content]), hardline);
     }

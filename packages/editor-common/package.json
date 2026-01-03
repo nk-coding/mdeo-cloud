@@ -8,7 +8,8 @@
         "dist",
         "src"
     ],
-    "dependencies": {
+    "dependencies": {},
+    "devDependencies": {
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
         "inversify": "^6.2.2"

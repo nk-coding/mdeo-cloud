@@ -1,8 +1,15 @@
 import type { DefaultSharedCoreModuleContext } from "langium";
 import type { Connection } from "vscode-languageserver";
 import { URI } from "vscode-uri";
-import type { FileSystemNode, FileSystemProvider } from "langium";
-import { ReadFileRequest, StatRequest, ReadDirectoryRequest } from "./protocol";
+import type { FileSystemNode } from "langium";
+import type { MetadataFileSystemProvider } from "@mdeo/language-common";
+import {
+    ReadFileRequest,
+    StatRequest,
+    ReadDirectoryRequest,
+    ReadMetadataRequest,
+    WriteMetadataRequest
+} from "./protocol";
 
 /**
  * Creates a file system provider that communicates with the client via LSP connection.
@@ -16,7 +23,7 @@ import { ReadFileRequest, StatRequest, ReadDirectoryRequest } from "./protocol";
  */
 export function lspFileSystem(connection: Connection): DefaultSharedCoreModuleContext {
     return {
-        fileSystemProvider: (): FileSystemProvider => ({
+        fileSystemProvider: (): MetadataFileSystemProvider => ({
             readFile: async (uri: URI): Promise<string> => {
                 const result = await connection.sendRequest(ReadFileRequest.type, { uri: uri.toString() });
                 return result;
@@ -66,6 +73,15 @@ export function lspFileSystem(connection: Connection): DefaultSharedCoreModuleCo
 
             existsSync: (): boolean => {
                 throw new Error("Not implemented");
+            },
+
+            readMetadata: async (uri: URI): Promise<object> => {
+                const result = await connection.sendRequest(ReadMetadataRequest.type, { uri: uri.toString() });
+                return result;
+            },
+
+            writeMetadata: async (uri: URI, metadata: object): Promise<void> => {
+                await connection.sendRequest(WriteMetadataRequest.type, { uri: uri.toString(), metadata });
             }
         })
     };

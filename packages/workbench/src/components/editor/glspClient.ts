@@ -1,4 +1,5 @@
 import type { MonacoLanguageClient } from "monaco-languageclient";
+import type { Event, Disposable } from "@eclipse-glsp/protocol";
 import {
     type GLSPClient,
     type InitializeParameters,
@@ -8,9 +9,7 @@ import {
     type ActionMessage,
     type ActionMessageHandler,
     ClientState,
-    Emitter,
-    Event,
-    Disposable
+    Emitter
 } from "@eclipse-glsp/protocol";
 import type { TextDocumentIdentifier } from "vscode-languageserver-types";
 import { JsonrpcGLSPClient } from "@mdeo/language-common";
@@ -120,7 +119,6 @@ export class MonacoGLSPClient implements GLSPClient {
     }
 
     async initializeServer(params: InitializeParameters): Promise<InitializeResult> {
-        console.log(params);
         if (this.initializeResult) {
             return this.initializeResult;
         } else if (this.pendingServerInitialize) {
