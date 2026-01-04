@@ -3,7 +3,7 @@
  * Aligned with NetworkX's MultiGraph structure
  */
 
-export type NodeId = number | string;
+export type NodeId = string;
 export type EdgeKey = string | number;
 export type NodeAttributes = Record<string, unknown>;
 export type EdgeAttributes = Record<string, unknown>;
