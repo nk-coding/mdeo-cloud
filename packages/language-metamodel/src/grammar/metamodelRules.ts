@@ -13,8 +13,8 @@ import {
     MetaClassOrImport,
     MetaClassImport,
     MetaClassFileImport
-} from "./types.js";
-import { metamodelFileScopingConfig } from "./types.js";
+} from "./metamodelTypes.js";
+import { metamodelFileScopingConfig } from "./metamodelTypes.js";
 
 /**
  * Primitive type rule.

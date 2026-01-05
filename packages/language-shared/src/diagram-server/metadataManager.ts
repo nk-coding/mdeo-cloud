@@ -1,10 +1,10 @@
-import type { GEdge, GGraph, GNode } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import { LangiumServices } from "./langiumServices.js";
 import type { EdgeMetadata, GraphMetadata, NodeMetadata } from "./metadata.js";
 import { MultiGraph, type NodeAttributes, type EdgeAttributes } from "./graph-edit-distance/multiGraph.js";
 import { optimizeEditPaths, type NodeEditPath, type EdgeEditPath } from "./graph-edit-distance/graphEditDistance.js";
 import { linearSumAssignment } from "./graph-edit-distance/hungarian.js";
+import type { AstNode } from "langium";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -12,8 +12,14 @@ export interface NodeAttributesWithLoops extends NodeAttributes {
     loops: Record<string, EdgeMetadata>;
 }
 
+/**
+ * Abstract base class for managing metadata validation and synchronization.
+ * Works with domain-specific source models to extract and validate graph metadata.
+ *
+ * @template T - The type of the source model, must extend AstNode
+ */
 @injectable()
-export abstract class ModelMetadataManager {
+export abstract class MetadataManager<T extends AstNode = AstNode> {
     @inject(LangiumServices)
     protected langiumServices!: LangiumServices;
 
@@ -52,33 +58,26 @@ export abstract class ModelMetadataManager {
     protected abstract calculateEdgeCost(edge1: EdgeAttributes | undefined, edge2: EdgeAttributes | undefined): number;
 
     /**
-     * Extracts the graph metadata from the given GGraph.
+     * Extracts the graph metadata from the given source model.
+     * Implementations should traverse the source model and generate metadata
+     * for all nodes and edges that will be visualized.
      *
-     * @param graph the graph to compute metadata for
-     * @return the computed graph metadata
+     * @param sourceModel - The source model to extract metadata from
+     * @returns The computed graph metadata
      */
-    protected abstract extractGraphMetadata(graph: GGraph): GraphMetadata;
+    protected abstract extractGraphMetadata(sourceModel: T): GraphMetadata;
 
     /**
-     * Validates the metadata of the given graph against the current metadata.
+     * Validates the metadata against the current metadata based on the source model.
      * If discrepancies are found, returns the updated metadata.
      * If the metadata is valid, returns undefined.
      *
-     * @param graph the graph to validate metadata for
-     * @param currentMetadata the current graph metadata
-     * @return updated metadata or undefined if valid
+     * @param sourceModel - The source model to validate metadata for
+     * @param currentMetadata - The current graph metadata
+     * @returns Updated metadata or undefined if valid
      */
-    /**
-     * Validates the metadata of the given graph against the current metadata.
-     * If discrepancies are found, returns the updated metadata.
-     * If the metadata is valid, returns undefined.
-     *
-     * @param graph the graph to validate metadata for
-     * @param currentMetadata the current graph metadata
-     * @return updated metadata or undefined if valid
-     */
-    validateGraphMetadata(graph: GGraph, currentMetadata: GraphMetadata): GraphMetadata | undefined {
-        const newMetadata = this.extractGraphMetadata(graph);
+    validateMetadata(sourceModel: T, currentMetadata: GraphMetadata): GraphMetadata | undefined {
+        const newMetadata = this.extractGraphMetadata(sourceModel);
 
         if (this.isMetadataValid(newMetadata, currentMetadata)) {
             return this.getCleanMetadata(newMetadata, currentMetadata);
@@ -143,24 +142,17 @@ export abstract class ModelMetadataManager {
      * @param currentMetadata The current metadata.
      * @returns The cleaned metadata or undefined.
      */
-    private getCleanMetadata(
-        newMetadata: GraphMetadata,
-        currentMetadata: GraphMetadata
-    ): GraphMetadata | undefined {
+    private getCleanMetadata(newMetadata: GraphMetadata, currentMetadata: GraphMetadata): GraphMetadata | undefined {
         if (
             Object.keys(newMetadata.nodes).length === Object.keys(currentMetadata.nodes).length &&
             Object.keys(newMetadata.edges).length === Object.keys(currentMetadata.edges).length
         ) {
             return undefined;
         }
-        
+
         return {
-            nodes: Object.fromEntries(
-                Object.entries(currentMetadata.nodes).filter(([id]) => id in newMetadata.nodes)
-            ),
-            edges: Object.fromEntries(
-                Object.entries(currentMetadata.edges).filter(([id]) => id in newMetadata.edges)
-            )
+            nodes: Object.fromEntries(Object.entries(currentMetadata.nodes).filter(([id]) => id in newMetadata.nodes)),
+            edges: Object.fromEntries(Object.entries(currentMetadata.edges).filter(([id]) => id in newMetadata.edges))
         };
     }
 
@@ -234,8 +226,7 @@ export abstract class ModelMetadataManager {
                 };
                 resultNodes[v] = finalNodeMeta;
 
-                const oldNodeAttrs =
-                    u !== null ? (currentGraph.getNodeData(u) as NodeAttributesWithLoops) : undefined;
+                const oldNodeAttrs = u !== null ? (currentGraph.getNodeData(u) as NodeAttributesWithLoops) : undefined;
                 const newNodeAttrs = newGraph.getNodeData(v) as NodeAttributesWithLoops;
 
                 const oldLoopsMap = oldNodeAttrs?.loops || {};

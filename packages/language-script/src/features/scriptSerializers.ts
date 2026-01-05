@@ -11,7 +11,7 @@ import type {
     FunctionParametersType,
     FunctionType,
     ScriptType
-} from "../grammar/types.js";
+} from "../grammar/scriptTypes.js";
 import {
     ReturnStatement,
     LambdaExpression,
@@ -23,7 +23,7 @@ import {
     FunctionImport,
     FunctionFileImport,
     Script
-} from "../grammar/types.js";
+} from "../grammar/scriptTypes.js";
 
 const { doc } = sharedImport("prettier");
 const { join, line, group, softline, indent } = doc.builders;

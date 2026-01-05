@@ -4,6 +4,6 @@ export * from "./features/scriptPartialTypeSystem.js";
 export * from "./features/scriptReturnStatementAccessor.js";
 export * from "./features/scriptSerializers.js";
 export * from "./features/typeSystem.js";
-export * from "./grammar/rule.js";
-export * from "./grammar/types.js";
+export * from "./grammar/scriptRules.js";
+export * from "./grammar/scriptTypes.js";
 export * from "./plugin.js";

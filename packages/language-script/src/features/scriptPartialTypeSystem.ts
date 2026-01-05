@@ -10,7 +10,7 @@ import {
     isCustomVoidType,
     isCustomLambdaType
 } from "@mdeo/language-expression";
-import { Function, LambdaExpression, Script, type FunctionType, type ScriptType } from "../grammar/types.js";
+import { Function, LambdaExpression, Script, type FunctionType, type ScriptType } from "../grammar/scriptTypes.js";
 import { ScriptReturnStatementAccessor } from "./scriptReturnStatementAccessor.js";
 import { LambdaScope } from "./lambdaScope.js";
 import type { ScriptTypirSpecifics } from "../plugin.js";

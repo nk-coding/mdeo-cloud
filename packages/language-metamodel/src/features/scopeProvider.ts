@@ -7,7 +7,7 @@ import {
     createLocalScope
 } from "@mdeo/language-shared";
 import type { ReferenceInfo, Scope } from "langium";
-import { MetaClassOrImport, metamodelFileScopingConfig, type MetaModelType } from "../grammar/types.js";
+import { MetaClassOrImport, metamodelFileScopingConfig, type MetaModelType } from "../grammar/metamodelTypes.js";
 
 const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE } = sharedImport("langium");
 

@@ -18,7 +18,7 @@ import {
     LambdaExpression,
     LambdaParameter,
     LambdaParameters
-} from "./types.js";
+} from "./scriptTypes.js";
 import { generateImportRules, LeadingTrailing, manySep } from "@mdeo/language-shared";
 
 const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);

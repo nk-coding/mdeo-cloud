@@ -22,7 +22,7 @@ import {
     type AssociationEndType,
     type AssociationType,
     type MetaModelType
-} from "../grammar/types.js";
+} from "../grammar/metamodelTypes.js";
 
 const { doc } = sharedImport("prettier");
 const { indent, hardline, group, join } = doc.builders;

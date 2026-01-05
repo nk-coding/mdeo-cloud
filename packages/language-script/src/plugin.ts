@@ -8,7 +8,7 @@ import {
     registerDefaultTokenSerializers,
     sharedImport
 } from "@mdeo/language-shared";
-import { ScriptRule } from "./grammar/rule.js";
+import { ScriptRule } from "./grammar/scriptRules.js";
 import {
     defaultExtendedTypirServices,
     type AdditionalTypirServices,
@@ -21,7 +21,7 @@ import { type TypirLangiumSpecifics } from "typir-langium";
 import { ScriptTypeSystem } from "./features/typeSystem.js";
 import { ScriptScopeProvider } from "./features/scopeProvider.js";
 import { registerScriptSerializers } from "./features/scriptSerializers.js";
-import { expressionTypes, statementTypes, typeTypes } from "./grammar/types.js";
+import { expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");

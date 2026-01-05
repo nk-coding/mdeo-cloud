@@ -9,7 +9,7 @@ import munkres from "munkres";
  * Returns [rowIndices, colIndices] where rowIndices[i] is assigned to colIndices[i]
  *
  * This is a wrapper around the munkres library.
- * 
+ *
  * @param costMatrix The n x n cost matrix
  * @returns A tuple of two arrays: row indices and corresponding column indices
  */

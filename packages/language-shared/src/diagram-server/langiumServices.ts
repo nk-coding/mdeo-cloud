@@ -9,4 +9,4 @@ export const LangiumServices = Symbol("LangiumServices");
 /**
  * Langium services injected into the GLSP server.
  */
-export type LangiumServices = LangiumCoreServices & MetadataFileSystemProviderAdditionalServices 
+export type LangiumServices = LangiumCoreServices & MetadataFileSystemProviderAdditionalServices;

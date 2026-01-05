@@ -12,6 +12,6 @@
             "path": "../language-shared"
         }
     ],
-    "include": ["src/**/*.ts"],
+    "include": ["src/**/*.ts", "src/plugin.ts"],
     "exclude": ["dist", "node_modules"]
 }

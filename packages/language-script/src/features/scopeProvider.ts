@@ -19,7 +19,7 @@ import {
     type FunctionType,
     type LambdaExpressionType,
     type ScriptType
-} from "../grammar/types.js";
+} from "../grammar/scriptTypes.js";
 import { LambdaScope } from "./lambdaScope.js";
 
 /**
