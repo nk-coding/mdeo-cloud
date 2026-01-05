@@ -8,11 +8,6 @@ import { monacoApiProviderKey } from "./lib/monacoPlugin";
 import { BrowserBackendApi } from "./data/api/browserBackendApi";
 import { WorkbenchState } from "./data/workbenchState";
 import Workbench from "./components/workbench/Workbench.vue";
-import { metamodelPlugin } from "./plugins/metamodelPlugin";
-import { scriptPlugin } from "./plugins/scriptPlugin";
-import { modelPlugin } from "./plugins/modelPlugin";
-import { modelTransformationPlugin } from "./plugins/modelTransformationPlugin";
-import { configPlugin } from "./plugins/configPlugin";
 import { useColorMode } from "@vueuse/core";
 
 const monaco = inject(monacoApiProviderKey)!;
@@ -25,6 +20,22 @@ onMounted(async () => {
     const monacoApi = await monaco;
     const backendApi = new BrowserBackendApi();
     workspaceState.value = new WorkbenchState(monacoApi, backendApi);
+    
+    // Load plugins dynamically
+    const [
+        { metamodelPlugin },
+        { scriptPlugin },
+        { modelPlugin },
+        { modelTransformationPlugin },
+        { configPlugin }
+    ] = await Promise.all([
+        import("./plugins/metamodelPlugin"),
+        import("./plugins/scriptPlugin"),
+        import("./plugins/modelPlugin"),
+        import("./plugins/modelTransformationPlugin"),
+        import("./plugins/configPlugin")
+    ]);
+    
     workspaceState.value.plugins.value.set(metamodelPlugin.id, metamodelPlugin);
     workspaceState.value.plugins.value.set(scriptPlugin.id, scriptPlugin);
     workspaceState.value.plugins.value.set(modelPlugin.id, modelPlugin);

@@ -15,7 +15,7 @@ export const modelPlugin: WorkbenchPlugin = {
             extension: ".m",
             name: "Model",
             serverPlugin: {
-                import: "/modules/metamodelPlugin.js"
+                import: "/modules/modelPlugin.js"
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,

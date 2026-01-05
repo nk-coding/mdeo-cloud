@@ -1,3 +1,6 @@
+export * from "./glsp/configureGLSPServer.js";
+export * from "./glsp/customLauncher.js";
+export * from "./glsp/glspModule.js";
 export * from "./grammar/module/createModule.js";
 export * from "./grammar/module/extendedServices.js";
 export * from "./grammar/module/module.js";

@@ -11,12 +11,19 @@ import * as typirLangium from "typir-langium";
 import * as typir from "typir";
 import * as prettier from "prettier";
 import * as glspServer from "@eclipse-glsp/server";
+import * as glspServerBrowser from "@eclipse-glsp/server/browser.js";
 import * as glspProtocol from "@eclipse-glsp/protocol";
 import * as glspGraph from "@eclipse-glsp/graph";
 import * as inversify from "inversify";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
-import { createModule, initializePluginContext, type LanguagePlugin } from "@mdeo/language-common";
+import {
+    configureGLSPServer,
+    createGLSPModule,
+    createModule,
+    initializePluginContext,
+    type LanguagePlugin
+} from "@mdeo/language-common";
 import { type ResolvedServerLanguagePlugin } from "./types";
 import { GetPluginsRequest, ServerReadyNotification } from "./protocol";
 import type {
@@ -32,7 +39,7 @@ import { lspFileSystem } from "./lspFileSystem";
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
 
-initializePluginContext({
+const pluginContext = {
     langium,
     "langium/lsp": langiumLsp,
     "langium/grammar": langiumGrammar,
@@ -40,15 +47,21 @@ initializePluginContext({
     typir,
     prettier,
     "@eclipse-glsp/server": glspServer,
+    "@eclipse-glsp/server/browser.js": glspServerBrowser,
     "@eclipse-glsp/protocol": glspProtocol,
     "@eclipse-glsp/graph": glspGraph,
     inversify
-});
+};
+
+initializePluginContext(pluginContext);
 
 const plugins = await requestPluginsFromClient();
 
 /**
- * Requests the plugin configuration from the client using temporary message listening
+ * Requests the plugin configuration from the client using temporary message listening.
+ * Sends a GetPluginsRequest and waits for the response.
+ *
+ * @returns Promise resolving to the array of server plugins
  */
 async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
     return new Promise((resolve) => {
@@ -84,14 +97,25 @@ const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
 
 const connection = createConnection(messageReader, messageWriter);
 
+/**
+ * Creates and configures Langium language services for all loaded plugins.
+ * Initializes the shared services module with GLSP integration, registers all language
+ * plugins, and invokes their postCreate hooks.
+ *
+ * @param context The default shared module context with connection and file system
+ * @returns The configured Langium shared services
+ */
 function createLanguageServices(context: DefaultSharedModuleContext) {
-    const languageModule = createModule(resolvedPlugins.map((plugin) => plugin.languagePlugin));
-
+    const languageModule = createModule(
+        resolvedPlugins.map((plugin) => plugin.languagePlugin),
+        pluginContext
+    );
     const generatedSharedModule: Module<LangiumSharedCoreServices, LangiumGeneratedSharedCoreServices> = {
         AstReflection: () => languageModule.reflection
     };
+    const glspModule = createGLSPModule(pluginContext);
 
-    const shared = langium.inject(langiumLsp.createDefaultSharedModule(context), generatedSharedModule);
+    const shared = langium.inject(langiumLsp.createDefaultSharedModule(context), generatedSharedModule, glspModule);
 
     for (const plugin of resolvedPlugins) {
         const grammar = languageModule.grammars.get(plugin.languagePlugin)!;
@@ -129,4 +153,5 @@ const shared = createLanguageServices({ connection, ...lspFileSystem(connection)
 
 connection.sendNotification(ServerReadyNotification.method, {});
 
+configureGLSPServer(shared);
 langiumLsp.startLanguageServer(shared);

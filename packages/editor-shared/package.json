@@ -9,7 +9,9 @@
         "src"
     ],
     "dependencies": {
-        "@mdeo/editor-common": "^0.1.0",
+        "@mdeo/editor-common": "^0.1.0"
+    },
+    "devDependencies": {
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
         "inversify": "^6.2.2"

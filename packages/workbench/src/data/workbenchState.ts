@@ -413,7 +413,7 @@ export class WorkbenchState {
 
         client.onRequest(ReadMetadataRequest.type, async (params: ReadMetadataParams): Promise<object> => {
             const uri = Uri.parse(params.uri);
-            const result = await this.backend.readMetadata(this.activeProject.value!.id, this.extractPath(uri));
+            const result = await this.backendApi.readMetadata(this.project.value!.id, this.extractPath(uri));
             if (result.ok) {
                 return result.value;
             }
@@ -422,8 +422,8 @@ export class WorkbenchState {
 
         client.onRequest(WriteMetadataRequest.type, async (params: WriteMetadataParams): Promise<void> => {
             const uri = Uri.parse(params.uri);
-            const result = await this.backend.writeMetadata(
-                this.activeProject.value!.id,
+            const result = await this.backendApi.writeMetadata(
+                this.project.value!.id,
                 this.extractPath(uri),
                 params.metadata
             );

@@ -5,6 +5,7 @@ import type * as typirLangium from "typir-langium";
 import type * as typir from "typir";
 import type * as prettier from "prettier";
 import type * as glspServer from "@eclipse-glsp/server";
+import type * as glspServerBrowser from "@eclipse-glsp/server/browser.js";
 import type * as glspProtocol from "@eclipse-glsp/protocol";
 import type * as glspGraph from "@eclipse-glsp/graph";
 import type * as inversify from "inversify";
@@ -20,6 +21,7 @@ export interface PluginContext {
     typir: typeof typir;
     prettier: typeof prettier;
     "@eclipse-glsp/server": typeof glspServer;
+    "@eclipse-glsp/server/browser.js": typeof glspServerBrowser;
     "@eclipse-glsp/graph": typeof glspGraph;
     "@eclipse-glsp/protocol": typeof glspProtocol;
     inversify: typeof inversify;

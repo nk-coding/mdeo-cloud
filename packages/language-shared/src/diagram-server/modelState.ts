@@ -11,7 +11,7 @@ const { DefaultModelState } = sharedImport("@eclipse-glsp/server");
  * The source model represents the domain-specific AST, while the graphical model
  * is the GLSP representation for rendering.
  *
- * @template T - The type of the source model, must extend AstNode
+ * @template T The type of the source model, must extend AstNode
  */
 @injectable()
 export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
@@ -58,7 +58,7 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
      * This method can be overridden to perform additional operations
      * when the source model changes, such as validation or notifications.
      *
-     * @param sourceModel - The new source model to set
+     * @param sourceModel The new source model to set
      */
     async updateSourceModel(sourceModel: T | undefined): Promise<void> {
         this._sourceModel = sourceModel;

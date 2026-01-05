@@ -1,10 +1,11 @@
 import { sharedImport } from "../sharedImport.js";
-import { LangiumServices } from "./langiumServices.js";
 import type { EdgeMetadata, GraphMetadata, NodeMetadata } from "./metadata.js";
 import { MultiGraph, type NodeAttributes, type EdgeAttributes } from "./graph-edit-distance/multiGraph.js";
 import { optimizeEditPaths, type NodeEditPath, type EdgeEditPath } from "./graph-edit-distance/graphEditDistance.js";
 import { linearSumAssignment } from "./graph-edit-distance/hungarian.js";
 import type { AstNode } from "langium";
+import { LanguageServicesKey } from "./langiumServices.js";
+import type { LanguageServices } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -20,8 +21,8 @@ export interface NodeAttributesWithLoops extends NodeAttributes {
  */
 @injectable()
 export abstract class MetadataManager<T extends AstNode = AstNode> {
-    @inject(LangiumServices)
-    protected langiumServices!: LangiumServices;
+    @inject(LanguageServicesKey)
+    protected languageServices!: LanguageServices;
 
     /**
      * Verifies the metadata for a given model element.

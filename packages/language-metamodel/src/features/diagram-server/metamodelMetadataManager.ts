@@ -14,7 +14,7 @@ import {
 import type {
     NodeAttributes,
     EdgeAttributes
-} from "@mdeo/language-shared/dist/diagram-server/graph-edit-distance/multiGraph.js";
+} from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import type { MetaModelType, MetaClassType, AssociationType } from "../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "./metamodelModelExtensions.js";

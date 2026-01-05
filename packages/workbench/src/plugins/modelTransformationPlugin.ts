@@ -13,7 +13,7 @@ export const modelTransformationPlugin: WorkbenchPlugin = {
             extension: ".mt",
             name: "Model Transformation",
             serverPlugin: {
-                import: "/modules/metamodelPlugin.js"
+                import: "/modules/modelTransformationPlugin.js"
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,

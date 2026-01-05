@@ -22,7 +22,7 @@ import {
 import type { Reference } from "langium";
 
 const { injectable, inject } = sharedImport("inversify");
-const { GGraph } = sharedImport("@eclipse-glsp/server");
+const { GGraph, ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
 
 type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
 
@@ -33,7 +33,7 @@ type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
  */
 @injectable()
 export class MetamodelGModelFactory implements GModelFactory {
-    @inject(ModelState)
+    @inject(ModelStateKey)
     protected modelState!: ModelState<MetaModelType>;
 
     /**

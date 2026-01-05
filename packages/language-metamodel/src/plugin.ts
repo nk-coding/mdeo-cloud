@@ -10,6 +10,7 @@ import {
 } from "@mdeo/language-shared";
 import { MetamodelScopeProvider } from "./features/scopeProvider.js";
 import { registerMetamodelSerializers } from "./features/metamodelSerializers.js";
+import { MetamodelDiagramModule } from "./features/diagram-server/metamodelDiagramModule.js";
 
 /**
  * The additional services for the Metamodel language.
@@ -39,5 +40,6 @@ export const metamodelPlugin: LanguagePlugin<MetamodelServices> = {
     postCreate(services) {
         registerDefaultTokenSerializers(services);
         registerMetamodelSerializers(services);
+        services.shared.glsp.serverModule.configureDiagramModule(new MetamodelDiagramModule(services));
     }
 };

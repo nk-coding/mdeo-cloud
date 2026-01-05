@@ -15,7 +15,7 @@ export const configPlugin: WorkbenchPlugin = {
             extension: ".config",
             name: "Config",
             serverPlugin: {
-                import: "/modules/metamodelPlugin.js"
+                import: "/modules/configPlugin.js"
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,
