@@ -2,8 +2,8 @@ import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, Shap
 import { sharedImport } from "@mdeo/language-shared";
 import {
     MetamodelElementType,
-    MetaClassNode,
-    MetaClassLabel,
+    ClassNode,
+    ClassLabel,
     PropertyLabel,
     AssociationEndLabel,
     InheritanceEdge,
@@ -22,11 +22,12 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
     readonly layoutKind = ServerLayoutKind.MANUAL;
     readonly animatedUpdate = true;
     readonly needsClientLayout = true;
+    readonly needsServerLayout = false;
 
     get typeMapping(): Map<string, GModelElementConstructor> {
         const mapping = getDefaultMapping();
-        mapping.set(MetamodelElementType.NODE_METACLASS, MetaClassNode);
-        mapping.set(MetamodelElementType.LABEL_METACLASS_NAME, MetaClassLabel);
+        mapping.set(MetamodelElementType.NODE_CLASS, ClassNode);
+        mapping.set(MetamodelElementType.LABEL_CLASS_NAME, ClassLabel);
         mapping.set(MetamodelElementType.LABEL_PROPERTY, PropertyLabel);
         mapping.set(MetamodelElementType.LABEL_ASSOCIATION_END, AssociationEndLabel);
         mapping.set(MetamodelElementType.EDGE_INHERITANCE, InheritanceEdge);
@@ -37,7 +38,7 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
     get shapeTypeHints(): ShapeTypeHint[] {
         return [
             {
-                elementTypeId: MetamodelElementType.NODE_METACLASS,
+                elementTypeId: MetamodelElementType.NODE_CLASS,
                 repositionable: true,
                 deletable: true,
                 resizable: true,
@@ -53,16 +54,16 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
                 repositionable: true,
                 deletable: true,
                 routable: true,
-                sourceElementTypeIds: [MetamodelElementType.NODE_METACLASS],
-                targetElementTypeIds: [MetamodelElementType.NODE_METACLASS]
+                sourceElementTypeIds: [MetamodelElementType.NODE_CLASS],
+                targetElementTypeIds: [MetamodelElementType.NODE_CLASS]
             },
             {
                 elementTypeId: MetamodelElementType.EDGE_ASSOCIATION,
                 repositionable: true,
                 deletable: true,
                 routable: true,
-                sourceElementTypeIds: [MetamodelElementType.NODE_METACLASS],
-                targetElementTypeIds: [MetamodelElementType.NODE_METACLASS]
+                sourceElementTypeIds: [MetamodelElementType.NODE_CLASS],
+                targetElementTypeIds: [MetamodelElementType.NODE_CLASS]
             }
         ];
     }

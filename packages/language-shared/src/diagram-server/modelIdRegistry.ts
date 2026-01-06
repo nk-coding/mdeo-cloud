@@ -14,8 +14,8 @@ export class ModelIdRegistry {
     /**
      * Creates a new ModelIdRegistry by traversing the model and generating IDs.
      *
-     * @param rootNode - The root AST node of the model
-     * @param idProvider - The ID provider to use for generating base IDs
+     * @param rootNode The root AST node of the model
+     * @param idProvider The ID provider to use for generating base IDs
      */
     constructor(
         rootNode: AstNode,
@@ -27,7 +27,7 @@ export class ModelIdRegistry {
     /**
      * Retrieves the ID for the given AST node.
      *
-     * @param node - The AST node to get the ID for
+     * @param node The AST node to get the ID for
      * @returns The ID or undefined if not found
      */
     getId(node: AstNode): string | undefined {
@@ -37,7 +37,7 @@ export class ModelIdRegistry {
     /**
      * Checks if an ID has been assigned to the given node.
      *
-     * @param node - The AST node to check
+     * @param node The AST node to check
      * @returns True if the node has an ID
      */
     hasId(node: AstNode): boolean {
@@ -47,7 +47,7 @@ export class ModelIdRegistry {
     /**
      * Generates IDs for all nodes in the model tree.
      *
-     * @param rootNode - The root node to start traversal from
+     * @param rootNode The root node to start traversal from
      */
     private generateIds(rootNode: AstNode): void {
         const stream = AstUtils.streamAllContents(rootNode);
@@ -65,7 +65,7 @@ export class ModelIdRegistry {
     /**
      * Ensures the given ID is unique by appending a counter if necessary.
      *
-     * @param baseId - The base ID to make unique
+     * @param baseId The base ID to make unique
      * @returns A unique ID
      */
     private ensureUnique(baseId: string): string {

@@ -23,6 +23,6 @@
     "dependencies": {
         "@mdeo/language-common": "^0.1.0",
         "munkres": "^2.0.4",
-        "vscode-jsonrpc": "^8.2.0"
+        "vscode-jsonrpc": "8.2.0"
     }
 }

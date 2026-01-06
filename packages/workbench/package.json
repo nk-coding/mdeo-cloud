@@ -49,6 +49,7 @@
         "typir": "^0.3.1",
         "typir-langium": "^0.3.1",
         "vscode": "npm:@codingame/monaco-vscode-extension-api@^24.2.0",
+        "vscode-jsonrpc": "8.2.0",
         "vscode-languageclient": "^9.0.1",
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-protocol": "^3.17.5",

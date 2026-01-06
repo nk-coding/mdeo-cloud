@@ -1,5 +1,6 @@
 import { createApp } from "vue";
 import "./index.css";
+import "./sprotty.css";
 import { monacoPlugin } from "./lib/monacoPlugin";
 import { editorPlugin } from "./lib/editorPlugin";
 

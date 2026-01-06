@@ -15,7 +15,7 @@ export interface ModelIdProvider {
      * Generates a unique ID for the given AST node.
      * The ID should be based on semantic information and be deterministic.
      *
-     * @param node - The AST node to generate an ID for
+     * @param node The AST node to generate an ID for
      * @returns The generated ID or undefined if the node type is not supported
      */
     getId(node: AstNode): string | undefined;

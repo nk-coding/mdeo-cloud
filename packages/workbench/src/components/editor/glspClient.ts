@@ -11,7 +11,6 @@ import {
     ClientState,
     Emitter
 } from "@eclipse-glsp/protocol";
-import type { TextDocumentIdentifier } from "vscode-languageserver-types";
 import { JsonrpcGLSPClient } from "@mdeo/language-common";
 
 /**
@@ -22,11 +21,6 @@ export interface MonacoGLSPClientOptions {
      * The Monaco Language Client to use for communication
      */
     client: MonacoLanguageClient;
-
-    /**
-     * The text document URI
-     */
-    uri: string;
 
     /**
      * Optional client ID
@@ -46,17 +40,12 @@ export class MonacoGLSPClient implements GLSPClient {
      * The unique identifier for this GLSP client.
      */
     readonly id: string;
-    
+
     /**
      * The Monaco Language Client used for JSON-RPC communication.
      */
     protected readonly client: MonacoLanguageClient;
-    
-    /**
-     * The text document identifier associated with this client.
-     */
-    protected readonly textDocument: TextDocumentIdentifier;
-    
+
     /**
      * Pending server initialization promise to avoid duplicate initialization.
      */
@@ -66,7 +55,7 @@ export class MonacoGLSPClient implements GLSPClient {
      * Emitter for server initialization events.
      */
     protected onServerInitializedEmitter = new Emitter<InitializeResult>();
-    
+
     /**
      * Event fired when the server has been initialized.
      */
@@ -78,7 +67,7 @@ export class MonacoGLSPClient implements GLSPClient {
      * Emitter for action message notifications from the server.
      */
     protected onActionMessageNotificationEmitter = new Emitter<ActionMessage>();
-    
+
     /**
      * Event fired when an action message is received from the server.
      */
@@ -90,7 +79,7 @@ export class MonacoGLSPClient implements GLSPClient {
      * Emitter for client state changes.
      */
     protected onCurrentStateChangedEmitter = new Emitter<ClientState>();
-    
+
     /**
      * Event fired when the client state changes.
      */
@@ -102,7 +91,7 @@ export class MonacoGLSPClient implements GLSPClient {
      * Internal client state tracking.
      */
     protected _state: ClientState = ClientState.Initial;
-    
+
     /**
      * Sets the client state and fires state change event if changed.
      */
@@ -112,7 +101,7 @@ export class MonacoGLSPClient implements GLSPClient {
             this.onCurrentStateChangedEmitter.fire(state);
         }
     }
-    
+
     /**
      * Gets the current client state.
      */
@@ -124,7 +113,7 @@ export class MonacoGLSPClient implements GLSPClient {
      * Cached server initialization result.
      */
     protected _initializeResult?: InitializeResult;
-    
+
     /**
      * Gets the server initialization result if available.
      */
@@ -139,7 +128,6 @@ export class MonacoGLSPClient implements GLSPClient {
      */
     constructor(options: MonacoGLSPClientOptions) {
         this.client = options.client;
-        this.textDocument = { uri: options.uri };
         this.id = options.id;
         this._state = ClientState.Initial;
 
@@ -151,11 +139,8 @@ export class MonacoGLSPClient implements GLSPClient {
      * Registers listeners for action messages sent by the server.
      */
     protected setupNotificationHandlers(): void {
-        this.client.onNotification(
-            JsonrpcGLSPClient.ActionMessageNotification.method,
-            (msg: ActionMessage & { textDocument: TextDocumentIdentifier }) => {
-                this.onActionMessageNotificationEmitter.fire(msg);
-            }
+        this.client.onNotification(JsonrpcGLSPClient.ActionMessageNotification, (msg) =>
+            this.onActionMessageNotificationEmitter.fire(msg)
         );
     }
 

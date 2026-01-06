@@ -6,8 +6,8 @@ const { GNode, GNodeBuilder, GEdge, GEdgeBuilder, GLabel, GLabelBuilder } = shar
  * Type constants for metamodel diagram elements.
  */
 export enum MetamodelElementType {
-    NODE_METACLASS = "node:metaclass",
-    LABEL_METACLASS_NAME = "label:metaclass-name",
+    NODE_CLASS = "node:class",
+    LABEL_CLASS_NAME = "label:class-name",
     LABEL_PROPERTY = "label:property",
     LABEL_ASSOCIATION_END = "label:association-end",
     EDGE_INHERITANCE = "edge:inheritance",
@@ -15,18 +15,18 @@ export enum MetamodelElementType {
 }
 
 /**
- * Node representing a MetaClass in the diagram.
+ * Node representing a Class in the diagram.
  */
-export class MetaClassNode extends GNode {
+export class ClassNode extends GNode {
     name?: string;
     isAbstract?: boolean;
 
-    static override builder(): MetaClassNodeBuilder {
-        return new MetaClassNodeBuilder(MetaClassNode).type(MetamodelElementType.NODE_METACLASS);
+    static override builder(): ClassNodeBuilder {
+        return new ClassNodeBuilder(ClassNode).type(MetamodelElementType.NODE_CLASS);
     }
 }
 
-export class MetaClassNodeBuilder<T extends MetaClassNode = MetaClassNode> extends GNodeBuilder<T> {
+export class ClassNodeBuilder<T extends ClassNode = ClassNode> extends GNodeBuilder<T> {
     name(name: string): this {
         this.proxy.name = name;
         return this;
@@ -39,15 +39,15 @@ export class MetaClassNodeBuilder<T extends MetaClassNode = MetaClassNode> exten
 }
 
 /**
- * Label for the MetaClass name.
+ * Label for the Class name.
  */
-export class MetaClassLabel extends GLabel {
-    static override builder(): MetaClassLabelBuilder {
-        return new MetaClassLabelBuilder(MetaClassLabel).type(MetamodelElementType.LABEL_METACLASS_NAME);
+export class ClassLabel extends GLabel {
+    static override builder(): ClassLabelBuilder {
+        return new ClassLabelBuilder(ClassLabel).type(MetamodelElementType.LABEL_CLASS_NAME);
     }
 }
 
-export class MetaClassLabelBuilder<T extends MetaClassLabel = MetaClassLabel> extends GLabelBuilder<T> {}
+export class ClassLabelBuilder<T extends ClassLabel = ClassLabel> extends GLabelBuilder<T> {}
 
 /**
  * Label for property names and types.

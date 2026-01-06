@@ -21,6 +21,6 @@
         "vscode-languageserver-types": "^3.17.5"
     },
     "dependencies": {
-        "vscode-jsonrpc": "^8.2.0"
+        "vscode-jsonrpc": "8.2.0"
     }
 }

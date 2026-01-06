@@ -1,5 +1,7 @@
 <template>
-    <div v-if="editorPlugin != undefined" :id="id"></div>
+    <div class="sprotty-wrapper w-full h-full relative">
+        <div v-if="editorPlugin != undefined" :id="id"></div>
+    </div>
 </template>
 <script setup lang="ts">
 import "reflect-metadata";
@@ -30,7 +32,6 @@ onMounted(async () => {
     const client = new MonacoGLSPClient({
         client: languageClient.value!,
         id: id,
-        uri: props.tab.file.id.toString()
     });
 
     const plugin = editorPlugin.value;

@@ -1,4 +1,4 @@
-import type { BindingTarget } from "@eclipse-glsp/server";
+import type { BindingContext, BindingTarget } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import { ModelState } from "./modelState.js";
 import { GModelIndex } from "./modelIndex.js";
@@ -6,9 +6,10 @@ import { SourceModelStorage } from "./sourceModelStorage.js";
 import type { LanguageServices } from "@mdeo/language-common";
 import type { interfaces } from "inversify";
 import { LanguageServicesKey } from "./langiumServices.js";
+import { ModelIdProvider } from "./modelIdProvider.js";
 
 const { injectable } = sharedImport("inversify");
-const { DiagramModule, bindOrRebind } = sharedImport("@eclipse-glsp/server");
+const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Abstract base class for diagram modules that integrate Langium services.
@@ -30,6 +31,17 @@ export abstract class BaseDiagramModule extends DiagramModule {
         super.configure(bind, unbind, isBound, rebind);
         const context = { bind, unbind, isBound, rebind };
         bindOrRebind(context, LanguageServicesKey).toConstantValue(this.services);
+        applyBindingTarget(context, ModelIdProvider, this.bindModelIdProvider()).inSingletonScope();
+        this.configureAdditional(context);
+    }
+    
+    /**
+     * Configures additional bindings in the GLSP container.
+     * 
+     * @param context The binding context
+     */
+    protected configureAdditional(context: BindingContext): void {
+        
     }
 
     protected override bindModelState(): BindingTarget<ModelState> {
@@ -43,4 +55,11 @@ export abstract class BaseDiagramModule extends DiagramModule {
     protected override bindSourceModelStorage(): BindingTarget<SourceModelStorage> {
         return SourceModelStorage;
     }
+
+    /**
+     * Binds the model ID provider for generating unique IDs in the diagram.
+     * 
+     * @returns The binding target for the ModelIdProvider
+     */
+    protected abstract bindModelIdProvider(): BindingTarget<ModelIdProvider>;
 }

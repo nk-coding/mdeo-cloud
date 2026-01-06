@@ -16,7 +16,7 @@ import type {
     EdgeAttributes
 } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
-import type { MetaModelType, MetaClassType, AssociationType } from "../../grammar/metamodelTypes.js";
+import type { MetaModelType, ClassType, AssociationType } from "../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "./metamodelModelExtensions.js";
 
 const { injectable, inject } = sharedImport("inversify");
@@ -35,7 +35,7 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Corrects invalid metadata or returns undefined if valid.
      */
     protected verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
-        if (model.type === MetamodelElementType.NODE_METACLASS) {
+        if (model.type === MetamodelElementType.NODE_CLASS) {
             return NodeLayoutMetadata.verify(model.meta, 0, 0);
         }
 
@@ -71,8 +71,8 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
             return 2;
         }
 
-        if (type1 === MetamodelElementType.NODE_METACLASS) {
-            const similarity = this.calculateMetaClassSimilarity(node1, node2);
+        if (type1 === MetamodelElementType.NODE_CLASS) {
+            const similarity = this.calculateClassSimilarity(node1, node2);
             return 1 + (1 - similarity);
         }
 
@@ -122,7 +122,7 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
         const idRegistry = new ModelIdRegistry(sourceModel, this.modelIdProvider);
         const { classes, associations } = this.extractClassesAndAssociations(sourceModel);
 
-        this.extractMetaClassMetadata(classes, idRegistry, nodes);
+        this.extractClassMetadata(classes, idRegistry, nodes);
         this.extractInheritanceMetadata(classes, idRegistry, edges);
         this.extractAssociationMetadata(associations, idRegistry, nodes, edges);
 
@@ -130,19 +130,19 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     }
 
     /**
-     * Extracts metadata for all metaclasses.
+     * Extracts metadata for all classes.
      */
-    private extractMetaClassMetadata(
-        classes: MetaClassType[],
+    private extractClassMetadata(
+        classes: ClassType[],
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>
     ): void {
-        for (const metaClass of classes) {
-            const nodeId = idRegistry.getId(metaClass);
+        for (const cls of classes) {
+            const nodeId = idRegistry.getId(cls);
             if (nodeId) {
                 nodes[nodeId] = {
-                    type: MetamodelElementType.NODE_METACLASS,
-                    attrs: this.createMetaClassAttributes(metaClass)
+                    type: MetamodelElementType.NODE_CLASS,
+                    attrs: this.createClassAttributes(cls)
                 };
             }
         }
@@ -152,18 +152,18 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Extracts metadata for all inheritance relationships.
      */
     private extractInheritanceMetadata(
-        classes: MetaClassType[],
+        classes: ClassType[],
         idRegistry: ModelIdRegistry,
         edges: Record<string, EdgeMetadata>
     ): void {
         let inheritanceIndex = 0;
 
-        for (const metaClass of classes) {
-            for (const superClassRef of metaClass.extends) {
+        for (const cls of classes) {
+            for (const superClassRef of cls.extends) {
                 const superClass = superClassRef.ref;
-                if (superClass && superClass.$type === "MetaClass") {
-                    const sourceId = idRegistry.getId(metaClass);
-                    const targetId = idRegistry.getId(superClass as MetaClassType);
+                if (superClass && superClass.$type === "Class") {
+                    const sourceId = idRegistry.getId(cls);
+                    const targetId = idRegistry.getId(superClass as ClassType);
 
                     if (sourceId && targetId) {
                         const edgeId = `inheritance_${inheritanceIndex++}`;
@@ -240,15 +240,15 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Extracts classes and associations from the metamodel.
      */
     private extractClassesAndAssociations(metamodel: MetaModelType): {
-        classes: MetaClassType[];
+        classes: ClassType[];
         associations: AssociationType[];
     } {
-        const classes: MetaClassType[] = [];
+        const classes: ClassType[] = [];
         const associations: AssociationType[] = [];
 
         for (const item of metamodel.classesAndAssociations) {
-            if (item.$type === "MetaClass") {
-                classes.push(item as MetaClassType);
+            if (item.$type === "Class") {
+                classes.push(item as ClassType);
             } else if (item.$type === "Association") {
                 associations.push(item as AssociationType);
             }
@@ -258,14 +258,14 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     }
 
     /**
-     * Gets the ID for a class (handles both MetaClass and MetaClassImport).
+     * Gets the ID for a class (handles both Class and ClassImport).
      */
     private getClassId(classNode: AstNode, idRegistry: ModelIdRegistry): string | undefined {
-        if (classNode.$type === "MetaClass") {
+        if (classNode.$type === "Class") {
             return idRegistry.getId(classNode);
         }
 
-        if (classNode.$type === "MetaClassImport") {
+        if (classNode.$type === "ClassImport") {
             const importNode = classNode as any;
             const referencedClass = importNode.element?.ref;
             if (referencedClass) {
@@ -277,15 +277,15 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     }
 
     /**
-     * Creates node attributes for a metaclass.
+     * Creates node attributes for a class.
      * Includes property names for similarity comparison.
      */
-    private createMetaClassAttributes(metaClass: MetaClassType): NodeAttributes {
+    private createClassAttributes(cls: ClassType): NodeAttributes {
         return {
-            type: MetamodelElementType.NODE_METACLASS,
-            name: metaClass.name,
-            isAbstract: metaClass.isAbstract,
-            properties: metaClass.properties.map((p) => p.name)
+            type: MetamodelElementType.NODE_CLASS,
+            name: cls.name,
+            isAbstract: cls.isAbstract,
+            properties: cls.properties.map((p) => p.name)
         };
     }
 
@@ -303,11 +303,11 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     }
 
     /**
-     * Calculates similarity between two metaclasses based on shared properties.
+     * Calculates similarity between two classes based on shared properties.
      * Returns a value between 0 (no similarity) and 1 (identical).
      * This function is symmetric.
      */
-    private calculateMetaClassSimilarity(node1: NodeAttributes, node2: NodeAttributes): number {
+    private calculateClassSimilarity(node1: NodeAttributes, node2: NodeAttributes): number {
         const props1 = (node1.properties as string[]) || [];
         const props2 = (node2.properties as string[]) || [];
 

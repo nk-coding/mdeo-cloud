@@ -8,17 +8,17 @@ import {
     SingleMultiplicity,
     RangeMultiplicity,
     Property,
-    MetaClass,
+    Class,
     AssociationEnd,
     Association,
     MetaModel,
-    MetaClassImport,
-    MetaClassFileImport,
+    ClassImport,
+    ClassFileImport,
     type PrimitiveTypeType,
     type SingleMultiplicityType,
     type RangeMultiplicityType,
     type PropertyType,
-    type MetaClassType,
+    type ClassType,
     type AssociationEndType,
     type AssociationType,
     type MetaModelType
@@ -50,10 +50,10 @@ export function registerMetamodelSerializers(services: LangiumCoreServices & Ast
     AstSerializer.registerNodeSerializer(SingleMultiplicity, (ctx) => printSingleMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(RangeMultiplicity, (ctx) => printRangeMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(Property, (ctx) => printProperty(ctx));
-    AstSerializer.registerNodeSerializer(MetaClass, (ctx) => printMetaClass(ctx));
+    AstSerializer.registerNodeSerializer(Class, (ctx) => printClass(ctx));
     AstSerializer.registerNodeSerializer(AssociationEnd, (ctx) => printAssociationEnd(ctx));
     AstSerializer.registerNodeSerializer(Association, (ctx) => printAssociation(ctx));
-    registerImportSerializers(services, doc.builders, MetaClassImport, MetaClassFileImport);
+    registerImportSerializers(services, doc.builders, ClassImport, ClassFileImport);
     AstSerializer.registerNodeSerializer(MetaModel, (ctx) => printMetaModel(ctx));
 }
 
@@ -119,12 +119,12 @@ function printProperty(context: PrintContext<PropertyType>): Doc {
 }
 
 /**
- * Prints a metaclass node.
+ * Prints a class node.
  *
  * @param context The print context
- * @returns The formatted metaclass
+ * @returns The formatted class
  */
-function printMetaClass(context: PrintContext<MetaClassType>): Doc {
+function printClass(context: PrintContext<ClassType>): Doc {
     const { ctx, printPrimitive, printReference, getPrimitive, path } = context;
     const docs: Doc[] = [];
 

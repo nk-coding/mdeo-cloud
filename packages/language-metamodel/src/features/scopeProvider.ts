@@ -7,14 +7,14 @@ import {
     createLocalScope
 } from "@mdeo/language-shared";
 import type { ReferenceInfo, Scope } from "langium";
-import { MetaClassOrImport, metamodelFileScopingConfig, type MetaModelType } from "../grammar/metamodelTypes.js";
+import { ClassOrImport, metamodelFileScopingConfig, type MetaModelType } from "../grammar/metamodelTypes.js";
 
 const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE } = sharedImport("langium");
 
 /**
  * The scope provider for the Metamodel language.
  *
- * This scope provider handles resolution of references to metaclasses, supporting both:
+ * This scope provider handles resolution of references to classes, supporting both:
  * - Local references to classes defined in the same file
  * - Cross-file references via imports
  *
@@ -32,7 +32,7 @@ export class MetamodelScopeProvider extends DefaultScopeProvider {
      * 1. For import references (in import statements): Returns global scope with all
      *    exportable entities from all files in the workspace.
      *
-     * 2. For references to metaclasses in the model: Returns a combined scope of
+     * 2. For references to classes in the model: Returns a combined scope of
      *    locally defined classes and imported classes.
      *
      * @param referenceInfo Information about the reference to resolve, including
@@ -50,7 +50,7 @@ export class MetamodelScopeProvider extends DefaultScopeProvider {
                 metamodelFileScopingConfig,
                 this.indexManager
             );
-        } else if (isReferenceToImport(referenceInfo, MetaClassOrImport, this.reflection)) {
+        } else if (isReferenceToImport(referenceInfo, ClassOrImport, this.reflection)) {
             const importScope = getImportedEntitiesFromCurrentFile(model.imports, this.nameProvider, this.descriptions);
             return createLocalScope(referenceInfo, document, this.reflection, importScope);
         }

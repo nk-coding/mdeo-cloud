@@ -1,10 +1,11 @@
-import type { JsonRpcServerInstance, MaybePromise, ServerModule } from "@eclipse-glsp/server";
+import type { ActionMessage, JsonRpcServerInstance, MaybePromise, ServerModule } from "@eclipse-glsp/server";
 import type { PluginContext } from "../plugin/pluginContext.js";
-import type { Container } from "inversify";
+import type { Container, ContainerModule } from "inversify";
 import type { CustomGLSPServerLauncher, CustomGLSPServerLauncherOptions } from "./customLauncher.js";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { Module } from "langium";
 import { JsonrpcGLSPClient } from "../protocol/glsp.js";
+import type { MessageConnection } from "vscode-jsonrpc";
 
 /**
  * Additional services provided by GLSP integration in Langium shared services.
@@ -100,9 +101,18 @@ function createLauncher(
     services: LangiumSharedGLSPServices,
     { "@eclipse-glsp/server": glspServer, inversify }: PluginContext
 ): CustomGLSPServerLauncher {
-    const { JsonRpcGLSPServerLauncher } = glspServer;
-    const { injectable } = inversify;
+    const { JsonRpcGLSPServerLauncher, GLSPClientProxy, JsonrpcClientProxy } = glspServer;
+    const { injectable, ContainerModule } = inversify;
     const { container, serverModule } = services.glsp;
+
+    /**
+     * Custom JSON-RPC client proxy to handle action messages.
+     */
+    class CustomJsonRPCClientProxy extends JsonrpcClientProxy {
+        override process(message: ActionMessage): void {
+            this.clientConnection?.sendNotification(JsonrpcGLSPClient.ActionMessageNotification, message);
+        }
+    }
 
     /**
      * Custom launcher implementation for GLSP server.
@@ -142,9 +152,20 @@ function createLauncher(
             clientConnection.onRequest(JsonrpcGLSPClient.DisposeClientSessionRequest, (params) =>
                 server.disposeClientSession(params)
             );
-            clientConnection.onNotification(JsonrpcGLSPClient.ActionMessageNotification, (message) =>
-                server.process(message)
-            );
+            clientConnection.onNotification(JsonrpcGLSPClient.ActionMessageNotification, (message) => {
+                console.log("notification: ", message.action);
+                server.process(message);
+            });
+        }
+
+        protected override createJsonRpcModule(clientConnection: MessageConnection): ContainerModule {
+            return new ContainerModule((bind) => {
+                bind(GLSPClientProxy).toDynamicValue((ctx) => {
+                    const proxy = ctx.container.resolve(CustomJsonRPCClientProxy);
+                    proxy.initialize(clientConnection);
+                    return proxy;
+                });
+            });
         }
     }
 

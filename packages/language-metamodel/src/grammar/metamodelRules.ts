@@ -6,13 +6,13 @@ import {
     RangeMultiplicity,
     Multiplicity,
     Property,
-    MetaClass,
+    Class,
     AssociationEnd,
     Association,
     MetaModel,
-    MetaClassOrImport,
-    MetaClassImport,
-    MetaClassFileImport
+    ClassOrImport,
+    ClassImport,
+    ClassFileImport
 } from "./metamodelTypes.js";
 import { metamodelFileScopingConfig } from "./metamodelTypes.js";
 
@@ -57,19 +57,19 @@ export const PropertyRule = createRule("PropertyRule")
     .as(({ set }) => [set("name", ID), ":", set("type", PrimitiveTypeRule), optional("[", MultiplicityRule, "]")]);
 
 /**
- * MetaClass rule.
+ * Class rule.
  * Matches a class definition with optional abstract modifier, name, inheritance, and properties.
  */
-export const MetaClassRule = createRule("MetaClassRule")
-    .returns(MetaClass)
+export const ClassRule = createRule("ClassRule")
+    .returns(Class)
     .as(({ set, add, flag }) => [
         optional(flag("isAbstract", "abstract")),
         "class",
         set("name", ID),
         optional(
             "extends",
-            add("extends", ref(MetaClassOrImport, ID)),
-            many(",", add("extends", ref(MetaClassOrImport, ID)))
+            add("extends", ref(ClassOrImport, ID)),
+            many(",", add("extends", ref(ClassOrImport, ID)))
         ),
         "{",
         many(or(add("properties", PropertyRule), NEWLINE)),
@@ -83,7 +83,7 @@ export const MetaClassRule = createRule("MetaClassRule")
 export const AssociationEndWithPropertyRule = createRule("AssociationEndWithPropertyRule")
     .returns(AssociationEnd)
     .as(({ set }) => [
-        set("class", ref(MetaClassOrImport, ID)),
+        set("class", ref(ClassOrImport, ID)),
         ".",
         set("property", ID),
         optional(set("multiplicity", MultiplicityRule))
@@ -95,7 +95,7 @@ export const AssociationEndWithPropertyRule = createRule("AssociationEndWithProp
  */
 export const AssociationEndWithoutPropertyRule = createRule("AssociationEndWithoutPropertyRule")
     .returns(AssociationEnd)
-    .as(({ set }) => [set("class", ref(MetaClassOrImport, ID)), optional(set("multiplicity", MultiplicityRule))]);
+    .as(({ set }) => [set("class", ref(ClassOrImport, ID)), optional(set("multiplicity", MultiplicityRule))]);
 
 /**
  * Association end rule.
@@ -112,7 +112,7 @@ export const AssociationEndRule = createRule("AssociationEndRule")
 export const CompositionEndRule = createRule("CompositionEndRule")
     .returns(AssociationEnd)
     .as(({ set }) => [
-        set("class", ref(MetaClassOrImport, ID)),
+        set("class", ref(ClassOrImport, ID)),
         ".",
         set("property", ID),
         optional(set("multiplicity", MultiplicityRule))
@@ -175,12 +175,12 @@ export const AssociationRule = createRule("AssociationRule")
     .as(() => [or(RegularAssociationRule, CompositionFromStartRule, CompositionFromTargetRule)]);
 
 /**
- * Import rules for metaclasses.
+ * Import rules for classes.
  */
-export const { importRule: MetaClassImportRule, fileImportRule: MetaClassFileImportRule } = generateImportRules(
+export const { importRule: ClassImportRule, fileImportRule: ClassFileImportRule } = generateImportRules(
     metamodelFileScopingConfig,
-    MetaClassImport,
-    MetaClassFileImport,
+    ClassImport,
+    ClassFileImport,
     ID
 );
 
@@ -193,8 +193,8 @@ export const MetaModelRule = createRule("MetaModelRule")
     .as(({ add }) => [
         many(
             or(
-                add("imports", MetaClassFileImportRule),
-                add("classesAndAssociations", MetaClassRule),
+                add("imports", ClassFileImportRule),
+                add("classesAndAssociations", ClassRule),
                 add("classesAndAssociations", AssociationRule),
                 NEWLINE
             )

@@ -72,51 +72,51 @@ export const Property = createInterface("Property").attrs({
 export type PropertyType = ASTType<typeof Property>;
 
 /**
- * MetaClass definition.
+ * Class definition.
  * Represents a class in the metamodel with properties and inheritance relationships.
  */
-export const MetaClass = createInterface("MetaClass").attrs({
+export const Class = createInterface("Class").attrs({
     name: String,
     isAbstract: Boolean,
-    extends: [Ref(() => MetaClassOrImport)],
+    extends: [Ref(() => ClassOrImport)],
     properties: [Property]
 });
 
 /**
- * Type representing a MetaClass AST node.
+ * Type representing a Class AST node.
  */
-export type MetaClassType = ASTType<typeof MetaClass>;
+export type ClassType = ASTType<typeof Class>;
 
 /**
- * File scoping configuration for metaclasses.
- * Enables cross-file references and imports for metaclasses.
+ * File scoping configuration for classes.
+ * Enables cross-file references and imports for classes.
  */
-export const metamodelFileScopingConfig = new FileScopingConfig<MetaClassType>("MetaClass", MetaClass);
+export const metamodelFileScopingConfig = new FileScopingConfig<ClassType>("Class", Class);
 
 /**
- * Import types for metaclasses.
- * Generated types for importing metaclasses from other files.
+ * Import types for classes.
+ * Generated types for importing classes from other files.
  */
-export const { importType: MetaClassImport, fileImportType: MetaClassFileImport } =
+export const { importType: ClassImport, fileImportType: ClassFileImport } =
     generateImportTypes(metamodelFileScopingConfig);
 
 /**
- * Union type for MetaClass or MetaClassImport.
- * Used for references that can point to either a locally defined or imported metaclass.
+ * Union type for Class or ClassImport.
+ * Used for references that can point to either a locally defined or imported class.
  */
-export const MetaClassOrImport: BaseType<AstNode> = createType("MetaClassOrImport").types(MetaClass, MetaClassImport);
+export const ClassOrImport: BaseType<AstNode> = createType("ClassOrImport").types(Class, ClassImport);
 
 /**
- * Type representing MetaClassOrImport AST node.
+ * Type representing ClassOrImport AST node.
  */
-export type MetaClassOrImportType = ASTType<typeof MetaClassOrImport>;
+export type ClassOrImportType = ASTType<typeof ClassOrImport>;
 
 /**
  * Association end definition.
  * Represents one end of an association or composition relationship.
  */
 export const AssociationEnd = createInterface("AssociationEnd").attrs({
-    class: Ref(() => MetaClassOrImport),
+    class: Ref(() => ClassOrImport),
     property: Optional(String),
     multiplicity: Optional(Multiplicity)
 });
@@ -128,7 +128,7 @@ export type AssociationEndType = ASTType<typeof AssociationEnd>;
 
 /**
  * Association definition.
- * Represents a relationship between two metaclasses.
+ * Represents a relationship between two classes.
  * Can be a regular association (--), composition from start (*--), or composition from target (--*).
  */
 export const Association = createInterface("Association").attrs({
@@ -143,16 +143,16 @@ export const Association = createInterface("Association").attrs({
 export type AssociationType = ASTType<typeof Association>;
 
 /**
- * Union type for MetaClass or Association.
+ * Union type for Class or Association.
  */
-export const ClassOrAssociation = createType("ClassOrAssociation").types(MetaClass, Association);
+export const ClassOrAssociation = createType("ClassOrAssociation").types(Class, Association);
 
 /**
  * The root MetaModel type.
  * Contains imports, class definitions, and associations.
  */
 export const MetaModel = createInterface("MetaModel").attrs({
-    imports: [MetaClassFileImport],
+    imports: [ClassFileImport],
     classesAndAssociations: [ClassOrAssociation]
 });
 

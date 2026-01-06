@@ -1,7 +1,7 @@
 import { sharedImport, type ModelIdProvider } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import type {
-    MetaClassType,
+    ClassType,
     PropertyType,
     AssociationType,
     AssociationEndType,
@@ -16,20 +16,15 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class MetamodelModelIdProvider implements ModelIdProvider {
-    /**
-     * Generates a unique ID for the given metamodel AST node.
-     *
-     * @param node - The AST node to generate an ID for
-     * @returns The generated ID or undefined if the node type is not supported
-     */
+    
     getId(node: AstNode): string | undefined {
         const nodeType = node.$type;
 
         switch (nodeType) {
             case "MetaModel":
                 return this.getMetaModelId(node as MetaModelType);
-            case "MetaClass":
-                return this.getMetaClassId(node as MetaClassType);
+            case "Class":
+                return this.getClassId(node as ClassType);
             case "Property":
                 return this.getPropertyId(node as PropertyType);
             case "Association":
@@ -37,7 +32,7 @@ export class MetamodelModelIdProvider implements ModelIdProvider {
             case "AssociationEnd":
                 return this.getAssociationEndId(node as AssociationEndType);
             default:
-                return undefined;
+                return undefined
         }
     }
 
@@ -49,10 +44,10 @@ export class MetamodelModelIdProvider implements ModelIdProvider {
     }
 
     /**
-     * Generates ID for MetaClass node based on class name.
+     * Generates ID for Class node based on class name.
      */
-    private getMetaClassId(node: MetaClassType): string {
-        return `metaclass_${node.name}`;
+    private getClassId(node: ClassType): string {
+        return `class_${node.name}`;
     }
 
     /**
@@ -60,9 +55,9 @@ export class MetamodelModelIdProvider implements ModelIdProvider {
      */
     private getPropertyId(node: PropertyType): string {
         const parent = node.$container;
-        if (parent && parent.$type === "MetaClass") {
-            const parentClass = parent as MetaClassType;
-            return `${this.getMetaClassId(parentClass)}_prop_${node.name}`;
+        if (parent && parent.$type === "Class") {
+            const parentClass = parent as ClassType;
+            return `${this.getClassId(parentClass)}_prop_${node.name}`;
         }
         return `property_${node.name}`;
     }
@@ -77,7 +72,6 @@ export class MetamodelModelIdProvider implements ModelIdProvider {
         const startProperty = node.start.property || "";
         const targetProperty = node.target.property || "";
 
-        // Create semantic ID from association endpoints
         return `association_${startClassName}_${startProperty}_${node.operator}_${targetClassName}_${targetProperty}`;
     }
 
@@ -99,11 +93,11 @@ export class MetamodelModelIdProvider implements ModelIdProvider {
             return "unresolved";
         }
 
-        if (resolved.$type === "MetaClass") {
-            return (resolved as MetaClassType).name;
+        if (resolved.$type === "Class") {
+            return (resolved as ClassType).name;
         }
 
-        if (resolved.$type === "MetaClassImport") {
+        if (resolved.$type === "ClassImport") {
             const importNode = resolved as any;
             return importNode.name || importNode.element?.ref?.name || "imported";
         }

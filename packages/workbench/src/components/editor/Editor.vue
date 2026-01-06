@@ -5,7 +5,7 @@
         </ResizablePanel>
         <ResizableHandle :class="{ hidden: !hasEditor }" />
         <ResizablePanel :class="{ hidden: !hasEditor }">
-            <GraphicalEditor v-for="tab in tabs" :key="tab.file.id.toString()" :tab="tab" />
+            <GraphicalEditor v-for="tab in tabs" :key="tab.file.id.toString()" v-show="tab === activeTab" :tab="tab" />
         </ResizablePanel>
     </ResizablePanelGroup>
 </template>
