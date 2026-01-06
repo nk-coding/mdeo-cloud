@@ -1,6 +1,6 @@
 import type { GModelFactory } from "@eclipse-glsp/server";
-import { sharedImport, ModelState, ModelIdProvider, ModelIdRegistry } from "@mdeo/language-shared";
-import type { GraphMetadata } from "@mdeo/language-shared";
+import { sharedImport, ModelIdProvider, ModelIdRegistry } from "@mdeo/language-shared";
+import type { GraphMetadata, ModelState } from "@mdeo/language-shared";
 import { NodeLayoutMetadata, EdgeVisualMetadata, EdgePlacementMetadata } from "@mdeo/language-shared";
 import type {
     MetaModelType,
@@ -99,18 +99,14 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @param idRegistry The ID registry for AST node ID generation
      * @returns A map from node ID to created node
      */
-    private createClassNodes(
-        graph: GGraphType,
-        classes: ClassType[],
-        idRegistry: ModelIdRegistry
-    ): void {
+    private createClassNodes(graph: GGraphType, classes: ClassType[], idRegistry: ModelIdRegistry): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const cls of classes) {
             const nodeId = idRegistry.getId(cls);
             if (!nodeId) {
                 continue;
-            };
+            }
             const metadata = validatedMetadata.nodes[nodeId];
 
             const node = ClassNode.builder()
@@ -125,7 +121,6 @@ export class MetamodelGModelFactory implements GModelFactory {
 
             graph.children.push(node);
         }
-
     }
 
     /**

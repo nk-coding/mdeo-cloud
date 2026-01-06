@@ -2,14 +2,24 @@
     "name": "@mdeo/editor-shared",
     "version": "0.1.0",
     "type": "module",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./styles/base.css": {
+            "style": "./src/styles/base.css",
+            "import": "./src/styles/base.css",
+            "default": "./src/styles/base.css"
+        }
+    },
     "files": [
         "dist",
         "src"
     ],
     "dependencies": {
-        "@mdeo/editor-common": "^0.1.0"
+        "@mdeo/editor-common": "^0.1.0",
+        "@mdeo/language-shared": "^0.1.0"
     },
     "devDependencies": {
         "@eclipse-glsp/client": "^2.5.0",

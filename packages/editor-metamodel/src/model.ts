@@ -1,8 +1,4 @@
-import type {
-    EditableLabel,
-    GChildElement,
-    GModelElement
-} from "@eclipse-glsp/sprotty";
+import type { EditableLabel, GChildElement, GModelElement } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "@mdeo/editor-shared";
 
 const {
@@ -59,9 +55,7 @@ export class ClassNode extends RectangularNode {
     isAbstract?: boolean;
 
     get editableLabel(): (GChildElement & EditableLabel) | undefined {
-        const label = this.children.find(
-            (element) => element.type === MetamodelElementType.LABEL_CLASS_NAME
-        );
+        const label = this.children.find((element) => element.type === MetamodelElementType.LABEL_CLASS_NAME);
         if (label && isEditableLabel(label)) {
             return label;
         }

@@ -2,6 +2,7 @@ import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Settings2 } from "lucide";
+import configServerPluginUrl from "../modules/configPlugin.js?url";
 
 /**
  * Plugin for configuration language support (.config files).
@@ -15,7 +16,7 @@ export const configPlugin: WorkbenchPlugin = {
             extension: ".config",
             name: "Config",
             serverPlugin: {
-                import: "/modules/configPlugin.js"
+                import: configServerPluginUrl
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,

@@ -12,7 +12,7 @@ import {
 
 const { FeatureModule, configureModelElement, GLabelView, RectangularNodeView, PolylineEdgeView, editLabelFeature } =
     sharedImport("@eclipse-glsp/sprotty");
-    const { configureDefaultModelElements, DefaultTypes  } = sharedImport("@eclipse-glsp/client");
+const { configureDefaultModelElements, DefaultTypes } = sharedImport("@eclipse-glsp/client");
 
 /**
  * Feature module for the metamodel editor.

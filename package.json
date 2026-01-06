@@ -6,7 +6,10 @@
         "packages/*"
     ],
     "scripts": {
-        "build": "tsc -b tsconfig.build.json",
+        "build": "npm run build:packages && npm run build:css && npm run build:workbench",
+        "build:packages": "tsc -b tsconfig.build.json",
+        "build:workbench": "npm run -w @mdeo/workbench build",
+        "build:css": "npm run -w @mdeo/editor-metamodel build:css",
         "watch": "tsc -b tsconfig.build.json --watch",
         "dev": "npm run -w @mdeo/workbench dev",
         "format": "prettier --write .",
@@ -32,13 +35,13 @@
         ]
     },
     "devDependencies": {
-        "@typescript-eslint/eslint-plugin": "^8.51.0",
-        "@typescript-eslint/parser": "^8.51.0",
+        "@typescript-eslint/eslint-plugin": "^8.52.0",
+        "@typescript-eslint/parser": "^8.52.0",
         "eslint": "^9.39.2",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.4",
         "prettier": "^3.7.4",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.51.0"
+        "typescript-eslint": "^8.52.0"
     }
 }

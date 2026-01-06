@@ -17,13 +17,13 @@ export namespace JsonrpcGLSPClient {
      * Used to process diagram actions and updates.
      */
     export const ActionMessageNotification = new NotificationType<ActionMessage>("glsp/process");
-    
+
     /**
      * Request type for initializing the GLSP server.
      * Returns server capabilities and configuration.
      */
     export const InitializeRequest = new RequestType<InitializeParameters, InitializeResult, void>("glsp/initialize");
-    
+
     /**
      * Request type for initializing a client session.
      * Sets up a new diagram editing session for a specific client.
@@ -31,7 +31,7 @@ export namespace JsonrpcGLSPClient {
     export const InitializeClientSessionRequest = new RequestType<InitializeClientSessionParameters, void, void>(
         "glsp/initializeClientSession"
     );
-    
+
     /**
      * Request type for disposing a client session.
      * Cleans up resources associated with a diagram editing session.

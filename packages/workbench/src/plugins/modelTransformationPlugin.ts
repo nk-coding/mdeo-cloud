@@ -1,5 +1,6 @@
 import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
+import modelTransformationServerPluginUrl from "../modules/modelTransformationPlugin.js?url";
 
 /**
  * Plugin for model transformation language support (.mt files).
@@ -13,7 +14,7 @@ export const modelTransformationPlugin: WorkbenchPlugin = {
             extension: ".mt",
             name: "Model Transformation",
             serverPlugin: {
-                import: "/modules/modelTransformationPlugin.js"
+                import: modelTransformationServerPluginUrl
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,

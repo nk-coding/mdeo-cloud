@@ -1,0 +1,7 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme inline {
+    --color-diagram-foreground: var(--editor-diagram-foreground);
+    --color-primary: var(--editor-primary);
+}

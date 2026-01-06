@@ -2,6 +2,7 @@ import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Network } from "lucide";
+import modelServerPluginUrl from "../modules/modelPlugin.js?url";
 
 /**
  * Plugin for model language support (.m files).
@@ -15,7 +16,7 @@ export const modelPlugin: WorkbenchPlugin = {
             extension: ".m",
             name: "Model",
             serverPlugin: {
-                import: "/modules/modelPlugin.js"
+                import: modelServerPluginUrl
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,

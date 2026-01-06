@@ -2,18 +2,32 @@
     "name": "@mdeo/editor-metamodel",
     "version": "0.1.0",
     "type": "module",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./styles": {
+            "style": "./dist/styles.css",
+            "import": "./dist/styles.css",
+            "default": "./dist/styles.css"
+        }
+    },
     "files": [
         "dist",
         "src"
     ],
+    "scripts": {
+        "build:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --minify"
+    },
     "dependencies": {
         "@mdeo/editor-shared": "^0.1.0"
     },
     "devDependencies": {
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
-        "inversify": "^6.2.2"
+        "@tailwindcss/cli": "^4.1.18",
+        "inversify": "^6.2.2",
+        "tailwindcss": "^4.1.18"
     }
 }

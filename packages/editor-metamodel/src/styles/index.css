@@ -1,0 +1,3 @@
+@import "@mdeo/editor-shared/styles/base.css";
+
+@config "../../tailwind.config.ts";

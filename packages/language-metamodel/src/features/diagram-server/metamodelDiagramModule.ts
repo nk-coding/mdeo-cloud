@@ -1,5 +1,6 @@
 import { type BindingTarget, type DiagramConfiguration, type GModelFactory } from "@eclipse-glsp/server";
-import { BaseDiagramModule, ModelIdProvider, sharedImport } from "@mdeo/language-shared";
+import type { ModelIdProvider } from "@mdeo/language-shared";
+import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
 import { MetamodelGModelFactory } from "./metamodelGModelFactory.js";
 import { MetamodelDiagramConfiguration } from "./metamodelDiagramConfiguration.js";
 import { MetamodelModelIdProvider } from "./metamodelModelIdProvider.js";

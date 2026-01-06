@@ -17,32 +17,34 @@ const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclip
  */
 @injectable()
 export abstract class BaseDiagramModule extends DiagramModule {
-
     /**
      * Creates a new diagram module with the given language services.
      *
      * @param services The language services to bind into the GLSP container
      */
     constructor(private readonly services: LanguageServices) {
-        super()
+        super();
     }
 
-    protected override configure(bind: interfaces.Bind, unbind: interfaces.Unbind, isBound: interfaces.IsBound, rebind: interfaces.Rebind): void {
+    protected override configure(
+        bind: interfaces.Bind,
+        unbind: interfaces.Unbind,
+        isBound: interfaces.IsBound,
+        rebind: interfaces.Rebind
+    ): void {
         super.configure(bind, unbind, isBound, rebind);
         const context = { bind, unbind, isBound, rebind };
         bindOrRebind(context, LanguageServicesKey).toConstantValue(this.services);
         applyBindingTarget(context, ModelIdProvider, this.bindModelIdProvider()).inSingletonScope();
         this.configureAdditional(context);
     }
-    
+
     /**
      * Configures additional bindings in the GLSP container.
-     * 
+     *
      * @param context The binding context
      */
-    protected configureAdditional(context: BindingContext): void {
-        
-    }
+    protected configureAdditional(context: BindingContext): void {}
 
     protected override bindModelState(): BindingTarget<ModelState> {
         return ModelState;
@@ -58,7 +60,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
 
     /**
      * Binds the model ID provider for generating unique IDs in the diagram.
-     * 
+     *
      * @returns The binding target for the ModelIdProvider
      */
     protected abstract bindModelIdProvider(): BindingTarget<ModelIdProvider>;

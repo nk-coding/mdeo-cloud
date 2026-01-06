@@ -66,11 +66,7 @@ export const ClassRule = createRule("ClassRule")
         optional(flag("isAbstract", "abstract")),
         "class",
         set("name", ID),
-        optional(
-            "extends",
-            add("extends", ref(ClassOrImport, ID)),
-            many(",", add("extends", ref(ClassOrImport, ID)))
-        ),
+        optional("extends", add("extends", ref(ClassOrImport, ID)), many(",", add("extends", ref(ClassOrImport, ID)))),
         "{",
         many(or(add("properties", PropertyRule), NEWLINE)),
         "}"

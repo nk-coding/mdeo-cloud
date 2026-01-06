@@ -1,7 +1,7 @@
 import type { languages } from "monaco-editor";
 import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin.js";
 import type { IconNode } from "lucide-vue-next";
-import type { EditorPlugin } from "@mdeo/editor-shared";
+import type { EditorPlugin } from "@mdeo/editor-common";
 
 /**
  * A plugin for a language handled by the workbench

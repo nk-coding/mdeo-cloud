@@ -16,7 +16,6 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class MetamodelModelIdProvider implements ModelIdProvider {
-    
     getId(node: AstNode): string | undefined {
         const nodeType = node.$type;
 
@@ -32,7 +31,7 @@ export class MetamodelModelIdProvider implements ModelIdProvider {
             case "AssociationEnd":
                 return this.getAssociationEndId(node as AssociationEndType);
             default:
-                return undefined
+                return undefined;
         }
     }
 

@@ -38,7 +38,7 @@ onMounted(async () => {
     if (plugin == undefined) {
         return undefined;
     }
-    const container = createContainer(editorContext, plugin, {
+    const container = createContainer(editorContext, plugin.containerConfiguration, {
         clientId: id,
         diagramType: languagePlugin.value.id,
         glspClientProvider: async () => client,

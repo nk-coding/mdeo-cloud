@@ -2,6 +2,7 @@ import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { convertIcon } from "@/lib/convertIcon";
 import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Code } from "lucide";
+import scriptServerPluginUrl from "../modules/scriptPlugin.js?url";
 
 /**
  * Plugin for script language support (.fn files).
@@ -15,7 +16,7 @@ export const scriptPlugin: WorkbenchPlugin = {
             extension: ".fn",
             name: "Script",
             serverPlugin: {
-                import: "/modules/scriptPlugin.js"
+                import: scriptServerPluginUrl
             },
             editorPlugin: undefined,
             languageConfiguration: defaultLanguageConfiguration,

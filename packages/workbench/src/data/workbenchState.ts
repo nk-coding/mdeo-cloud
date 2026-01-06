@@ -414,7 +414,7 @@ export class WorkbenchState {
         client.onRequest(ReadMetadataRequest.type, async (params: ReadMetadataParams): Promise<object> => {
             const uri = Uri.parse(params.uri);
             const result = await this.backendApi.readMetadata(this.project.value!.id, this.extractPath(uri));
-            if (result.ok) {
+            if (result.success) {
                 return result.value;
             }
             throw new Error("Failed to read metadata");
@@ -427,7 +427,7 @@ export class WorkbenchState {
                 this.extractPath(uri),
                 params.metadata
             );
-            if (!result.ok) {
+            if (!result.success) {
                 throw new Error("Failed to write metadata");
             }
         });

@@ -10,7 +10,8 @@ import type { MetadataFileSystemProviderAdditionalServices } from "../protocol/m
 /**
  * Combined language services including GLSP shared additional services
  */
-export type LanguageServices = ExtendedLangiumServices & MetadataFileSystemProviderAdditionalServices & { shared: GLSPSharedAdditionalServices };
+export type LanguageServices = ExtendedLangiumServices &
+    MetadataFileSystemProviderAdditionalServices & { shared: GLSPSharedAdditionalServices };
 
 /**
  * Partial type for language services including GLSP shared additional services
