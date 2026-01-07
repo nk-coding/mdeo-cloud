@@ -92,7 +92,7 @@ import { inject, ref, shallowRef, onActivated, onMounted, onDeactivated, compute
 import { Input } from "../ui/input";
 import { Toggle } from "../ui/toggle";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { throttledWatch } from "@vueuse/core";
+import { watchThrottled } from "@vueuse/core";
 import type { ITextSearchMatch } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
 import { Uri } from "vscode";
 import { workbenchStateKey } from "../workbench/util";
@@ -124,12 +124,12 @@ const activeElement = ref<SearchMatch | FileSearchResult>();
 const expandedItems = ref<Set<SearchMatch | FileSearchResult>>(new Set());
 const isSearchActive = ref(true);
 
-const shouldPerformSerach = computed(
+const shouldPerformSearch = computed(
     () => isSearchActive.value && searchText.value.trim() !== "" && project.value != undefined
 );
 
 async function searchSingleFile(uri: Uri): Promise<FileSearchResult | null> {
-    if (!shouldPerformSerach.value) {
+    if (!shouldPerformSearch.value) {
         return null;
     }
 
@@ -156,7 +156,7 @@ async function searchSingleFile(uri: Uri): Promise<FileSearchResult | null> {
 }
 
 async function performSearch() {
-    if (!shouldPerformSerach.value) {
+    if (!shouldPerformSearch.value) {
         searchResults.value = [];
         expandedItems.value.clear();
         return;
@@ -183,7 +183,7 @@ async function performSearch() {
 }
 
 async function updateFileSearchResults(changedUris: Uri[]) {
-    if (!shouldPerformSerach.value) {
+    if (!shouldPerformSearch.value) {
         return;
     }
 
@@ -223,7 +223,7 @@ async function updateFileSearchResults(changedUris: Uri[]) {
     }
 }
 
-throttledWatch([searchText, isCaseSensitive, isWholeWord, isRegex], performSearch, {
+watchThrottled([searchText, isCaseSensitive, isWholeWord, isRegex], performSearch, {
     throttle: 300,
     leading: true,
     trailing: true
@@ -231,14 +231,14 @@ throttledWatch([searchText, isCaseSensitive, isWholeWord, isRegex], performSearc
 
 onMounted(() => {
     monacoApi.fileService.onDidRunOperation(() => {
-        if (!shouldPerformSerach.value) {
+        if (!shouldPerformSearch.value) {
             return;
         }
         performSearch();
     });
 
     monacoApi.fileService.onDidFilesChange((event) => {
-        if (!shouldPerformSerach.value) {
+        if (!shouldPerformSearch.value) {
             return;
         }
 

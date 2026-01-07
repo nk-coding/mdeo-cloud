@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-62 -62 124 124">
+    <defs>
+        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color: #0078d4; stop-opacity: 1" />
+            <stop offset="100%" style="stop-color: #00b4d8; stop-opacity: 1" />
+        </linearGradient>
+        <mask id="mask">
+            <g transform="translate(-26, 0) rotate(0)">
+                <rect stroke="none" fill="white" x="-15" y="-11.5" width="30" height="23" rx="5" />
+            </g>
+            <g transform="translate(0, -26) rotate(0)">
+                <rect stroke="none" fill="white" x="-15" y="-11.5" width="30" height="23" rx="5" />
+            </g>
+            <g transform="translate(26, 0) rotate(0)">
+                <rect stroke="none" fill="white" x="-15" y="-11.5" width="30" height="23" rx="5" />
+            </g>
+            <g transform="translate(0, 26) rotate(0)">
+                <rect stroke="none" fill="white" x="-15" y="-11.5" width="30" height="23" rx="5" />
+            </g>
+            <g transform="translate(0, 0) rotate(0)">
+                <path
+                    stroke="white"
+                    stroke-width="5"
+                    stroke-linecap="butt"
+                    stroke-linejoin="miter"
+                    stroke-miterlimit="4"
+                    fill="none"
+                    d="M0 14.75L8.1125 14.75 14.75 8.1125 14.75 0 14.75 8.1125 21.3875 14.75 29.5 14.75 21.3875 14.75 14.75 21.3875 14.75 29.5 14.75 21.3875 8.1125 14.75Z"
+                    transform="translate(-14.75, -14.75)"
+                />
+            </g>
+            <g transform="translate(0, 0) rotate(0)">
+                <path
+                    stroke="white"
+                    stroke-width="5"
+                    stroke-linecap="butt"
+                    stroke-linejoin="miter"
+                    stroke-miterlimit="4"
+                    fill="none"
+                    d="M43.227000000000004 2.5L43.487 2.5 54.5 13.513 54.5 17.26M54.5 39.739999999999995L54.5 43.487 43.487 54.5 43.227000000000004 54.5M13.773 54.5L13.513 54.5 2.5 43.487 2.5 39.739999999999995M2.5 17.26L2.5 13.513 13.513 2.5 13.773 2.5"
+                    transform="translate(-28.5, -28.5)"
+                />
+            </g>
+            <g transform="translate(0, 0) rotate(0)">
+                <path
+                    stroke="white"
+                    stroke-width="10"
+                    stroke-linecap="butt"
+                    stroke-linejoin="round"
+                    stroke-miterlimit="4"
+                    fill="none"
+                    d="M 51.625 12.773874705820468L 59 0L 29.49999999999996 -51.0954988232819L -3.197442310920451e-14 -51.095498823281886C -26.000000000000032 -51.095498823281886 -44.250000000000014 -49.54774941164093 -44.250000000000014 -25.54774941164093L -44.250000000000014 -25.34774941164093"
+                    transform="translate(0, 0)"
+                />
+            </g>
+            <g transform="translate(-44.250000000000014, -14.547749411640929) rotate(90)">
+                <path
+                    stroke="white"
+                    stroke-width="2"
+                    stroke-linecap="butt"
+                    stroke-linejoin="round"
+                    stroke-miterlimit="4"
+                    fill="white"
+                    d="M1 1L10 8.75 1 16.5Z"
+                    transform="translate(-11, -8.75)"
+                />
+            </g>
+            <g transform="translate(0, 0) rotate(0)">
+                <path
+                    stroke="white"
+                    stroke-width="10"
+                    stroke-linecap="butt"
+                    stroke-linejoin="round"
+                    stroke-miterlimit="4"
+                    fill="none"
+                    d="M -51.62500000000001 -12.773874705820461L -59 7.225416114969383e-15L -29.499999999999986 51.095498823281886L 1.0658141036401503e-14 51.095498823281886C 26.00000000000001 51.095498823281886 44.25 49.547749411640936 44.25 25.54774941164094L 44.25 25.34774941164094"
+                    transform="translate(0, 0)"
+                />
+            </g>
+            <g transform="translate(44.25, 14.54774941164094) rotate(-90)">
+                <path
+                    stroke="white"
+                    stroke-width="2"
+                    stroke-linecap="butt"
+                    stroke-linejoin="round"
+                    stroke-miterlimit="4"
+                    fill="white"
+                    d="M1 1L10 8.75 1 16.5Z"
+                    transform="translate(-11, -8.75)"
+                />
+            </g>
+        </mask>
+    </defs>
+    <rect
+        x="-62"
+        y="-62"
+        width="124"
+        height="124"
+        fill="url(#gradient)"
+        mask="url(#mask)"
+    />
+</svg>

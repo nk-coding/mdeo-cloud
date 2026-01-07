@@ -16,7 +16,9 @@ import {
     AssociationEdge,
     ClassLabel,
     PropertyLabel,
-    AssociationEndLabel
+    AssociationEndLabel,
+    ClassCompartment,
+    ClassDivider
 } from "./metamodelModelExtensions.js";
 
 const { injectable, inject } = sharedImport("inversify");
@@ -149,18 +151,34 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @param idRegistry The ID registry for AST node ID generation
      */
     private addNodeLabels(node: ClassNode, nodeId: string, cls: ClassType, idRegistry: ModelIdRegistry): void {
+        // Create title compartment with class name
+        const titleCompartment = ClassCompartment.builder().id(`${nodeId}#title-compartment`).build();
+
         const nameLabel = ClassLabel.builder().id(`${nodeId}#name`).text(cls.name).build();
-        node.children.push(nameLabel);
+        titleCompartment.children.push(nameLabel);
+        node.children.push(titleCompartment);
 
-        for (const prop of cls.properties) {
-            const propId = idRegistry.getId(prop);
-            if (!propId) continue;
+        // Add divider and properties compartment only if there are properties
+        if (cls.properties.length > 0) {
+            // Add divider
+            const divider = ClassDivider.builder().id(`${nodeId}#divider`).build();
+            node.children.push(divider);
 
-            const multiplicityStr = this.formatMultiplicity(prop.multiplicity);
-            const propText = `${prop.name}: ${prop.type.name}${multiplicityStr}`;
+            // Create properties compartment
+            const propertiesCompartment = ClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
 
-            const propLabel = PropertyLabel.builder().id(`${propId}#label`).text(propText).build();
-            node.children.push(propLabel);
+            for (const prop of cls.properties) {
+                const propId = idRegistry.getId(prop);
+                if (!propId) continue;
+
+                const multiplicityStr = this.formatMultiplicity(prop.multiplicity);
+                const propText = `${prop.name}: ${prop.type.name}${multiplicityStr}`;
+
+                const propLabel = PropertyLabel.builder().id(`${propId}#label`).text(propText).build();
+                propertiesCompartment.children.push(propLabel);
+            }
+
+            node.children.push(propertiesCompartment);
         }
     }
 

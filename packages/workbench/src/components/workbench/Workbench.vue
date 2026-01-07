@@ -31,9 +31,12 @@
             </ResizablePanelGroup>
         </div>
     </div>
+    <Teleport to="head">
+        <link v-for="styleUrl in pluginStylesUrls" rel="stylesheet" :href="styleUrl" as="style" />
+    </Teleport>
 </template>
 <script setup lang="ts">
-import { computed, provide, ref, useTemplateRef, watch } from "vue";
+import { computed, provide, ref, Teleport, useTemplateRef, watch } from "vue";
 import Tabs from "../tabs/Tabs.vue";
 import { ResizablePanelGroup, ResizableHandle } from "../ui/resizable";
 import Sidebar from "../sidebar/Sidebar.vue";
@@ -92,5 +95,11 @@ watch(
         }
     },
     { immediate: true }
+);
+
+const pluginStylesUrls = computed(() =>
+    props.workbenchState.languagePlugins.value
+        .map((plugin) => plugin.editorPlugin?.stylesUrl)
+        .filter((url) => url != undefined)
 );
 </script>

@@ -18,7 +18,8 @@
         "src"
     ],
     "scripts": {
-        "build:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --minify"
+        "build:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --minify",
+        "watch:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --watch"
     },
     "dependencies": {
         "@mdeo/editor-shared": "^0.1.0"
@@ -28,6 +29,7 @@
         "@eclipse-glsp/sprotty": "^2.5.0",
         "@tailwindcss/cli": "^4.1.18",
         "inversify": "^6.2.2",
+        "snabbdom": "~3.5.1",
         "tailwindcss": "^4.1.18"
     }
 }

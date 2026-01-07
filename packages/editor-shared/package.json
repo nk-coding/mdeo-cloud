@@ -24,6 +24,7 @@
     "devDependencies": {
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
-        "inversify": "^6.2.2"
+        "inversify": "^6.2.2",
+        "snabbdom": "~3.5.1"
     }
 }

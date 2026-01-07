@@ -2,6 +2,11 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme inline {
-    --color-diagram-foreground: var(--editor-diagram-foreground);
+    --color-foreground: var(--editor-foreground);
     --color-primary: var(--editor-primary);
+    --color-background: var(--editor-background);
+}
+
+@utility non-scaling-stroke {
+    vector-effect: non-scaling-stroke;
 }

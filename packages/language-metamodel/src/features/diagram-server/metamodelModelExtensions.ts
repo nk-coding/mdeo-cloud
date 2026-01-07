@@ -1,6 +1,17 @@
 import { sharedImport } from "@mdeo/language-shared";
 
-const { GNode, GNodeBuilder, GEdge, GEdgeBuilder, GLabel, GLabelBuilder } = sharedImport("@eclipse-glsp/server");
+const {
+    GNode,
+    GNodeBuilder,
+    GEdge,
+    GEdgeBuilder,
+    GLabel,
+    GLabelBuilder,
+    GCompartment,
+    GCompartmentBuilder,
+    GShapeElement,
+    GShapeElementBuilder
+} = sharedImport("@eclipse-glsp/server");
 
 /**
  * Type constants for metamodel diagram elements.
@@ -11,7 +22,9 @@ export enum MetamodelElementType {
     LABEL_PROPERTY = "label:property",
     LABEL_ASSOCIATION_END = "label:association-end",
     EDGE_INHERITANCE = "edge:inheritance",
-    EDGE_ASSOCIATION = "edge:association"
+    EDGE_ASSOCIATION = "edge:association",
+    COMPARTMENT = "comp:compartment",
+    DIVIDER = "divider:horizontal"
 }
 
 /**
@@ -99,3 +112,25 @@ export class AssociationEdgeBuilder<E extends AssociationEdge = AssociationEdge>
         return this;
     }
 }
+
+/**
+ * Compartment for grouping labels within a class node.
+ */
+export class ClassCompartment extends GCompartment {
+    static override builder(): ClassCompartmentBuilder {
+        return new ClassCompartmentBuilder(ClassCompartment).type(MetamodelElementType.COMPARTMENT).layout("vbox");
+    }
+}
+
+export class ClassCompartmentBuilder<T extends ClassCompartment = ClassCompartment> extends GCompartmentBuilder<T> {}
+
+/**
+ * Divider for separating compartments.
+ */
+export class ClassDivider extends GShapeElement {
+    static builder(): ClassDividerBuilder {
+        return new ClassDividerBuilder(ClassDivider).type(MetamodelElementType.DIVIDER);
+    }
+}
+
+export class ClassDividerBuilder<T extends ClassDivider = ClassDivider> extends GShapeElementBuilder<T> {}
