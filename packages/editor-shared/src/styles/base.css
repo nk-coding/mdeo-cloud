@@ -13,3 +13,7 @@
 @utility non-scaling-stroke {
     vector-effect: non-scaling-stroke;
 }
+
+@utility stroke-linecap-square {
+    stroke-linecap: square;
+}

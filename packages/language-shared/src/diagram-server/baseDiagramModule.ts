@@ -1,4 +1,4 @@
-import type { BindingContext, BindingTarget } from "@eclipse-glsp/server";
+import type { BindingContext, BindingTarget, InstanceMultiBinding, OperationHandlerConstructor } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import { ModelState } from "./modelState.js";
 import { GModelIndex } from "./modelIndex.js";
@@ -7,6 +7,7 @@ import type { LanguageServices } from "@mdeo/language-common";
 import type { interfaces } from "inversify";
 import { LanguageServicesKey } from "./langiumServices.js";
 import { ModelIdProvider } from "./modelIdProvider.js";
+import { ChangeBoundsOperationHandler } from "./handler/changeBoundsOperationHandler.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclipse-glsp/server");
@@ -44,7 +45,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
      *
      * @param context The binding context
      */
-    protected configureAdditional(context: BindingContext): void {}
+    protected configureAdditional(context: BindingContext): void { }
 
     protected override bindModelState(): BindingTarget<ModelState> {
         return ModelState;
@@ -56,6 +57,11 @@ export abstract class BaseDiagramModule extends DiagramModule {
 
     protected override bindSourceModelStorage(): BindingTarget<SourceModelStorage> {
         return SourceModelStorage;
+    }
+
+    protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
+        super.configureOperationHandlers(binding);
+        binding.add(ChangeBoundsOperationHandler);
     }
 
     /**

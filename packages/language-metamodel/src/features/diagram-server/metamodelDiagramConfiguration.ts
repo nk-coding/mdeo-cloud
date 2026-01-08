@@ -1,14 +1,12 @@
 import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, ShapeTypeHint } from "@eclipse-glsp/server";
 import { sharedImport } from "@mdeo/language-shared";
-import {
-    MetamodelElementType,
-    ClassNode,
-    ClassLabel,
-    PropertyLabel,
-    AssociationEndLabel,
-    InheritanceEdge,
-    AssociationEdge
-} from "./metamodelModelExtensions.js";
+import { MetamodelElementType } from "./model/elementTypes.js";
+import { ClassNode } from "./model/classNode.js";
+import { ClassLabel } from "./model/classLabel.js";
+import { PropertyLabel } from "./model/propertyLabel.js";
+import { AssociationEndLabel } from "./model/associationEndLabel.js";
+import { InheritanceEdge } from "./model/inheritanceEdge.js";
+import { AssociationEdge } from "./model/associationEdge.js";
 
 const { injectable } = sharedImport("inversify");
 const { ServerLayoutKind, getDefaultMapping } = sharedImport("@eclipse-glsp/server");

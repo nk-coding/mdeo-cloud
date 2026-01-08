@@ -1,5 +1,5 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
-import type { VNode } from "snabbdom";
+import type { VNode, VNodeStyle } from "snabbdom";
 import { sharedImport } from "../sharedImport.js";
 import { GHtmlNodeView } from "./htmlNodeView.js";
 import type { GRectangularNode } from "../model/rectangularNode.js";
@@ -14,6 +14,13 @@ export abstract class GRectangularNodeView extends GHtmlNodeView {
         context: RenderingContext,
         args?: {}
     ): VNode {
+        const style: VNodeStyle = {};
+        if (model.meta?.prefWidth != undefined) {
+            style.width = `${model.meta.prefWidth}px`;
+        }
+        if (model.meta?.prefHeight != undefined) {
+            style["min-height"] = `${model.meta.prefHeight}px`;
+        }
         return html(
             "div",
             {
@@ -22,7 +29,8 @@ export abstract class GRectangularNodeView extends GHtmlNodeView {
                 },
                 attrs: {
                     [ATTR_BBOX_ELEMENT]: true
-                }
+                },
+                style
             },
             ...this.renderNodeContent(model, context, args)
         );

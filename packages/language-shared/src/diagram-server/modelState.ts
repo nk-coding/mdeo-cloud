@@ -59,9 +59,11 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
      * when the source model changes, such as validation or notifications.
      *
      * @param sourceModel The new source model to set
+     * @param metadata The new graph metadata to set
      */
-    async updateSourceModel(sourceModel: T | undefined): Promise<void> {
+    async updateSourceModel(sourceModel: T | undefined, metadata: GraphMetadata): Promise<void> {
         this._sourceModel = sourceModel;
+        this._metadata = metadata;
     }
 
     /**

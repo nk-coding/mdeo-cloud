@@ -10,16 +10,14 @@ import type {
     SingleMultiplicityType,
     RangeMultiplicityType
 } from "../../grammar/metamodelTypes.js";
-import {
-    ClassNode,
-    InheritanceEdge,
-    AssociationEdge,
-    ClassLabel,
-    PropertyLabel,
-    AssociationEndLabel,
-    ClassCompartment,
-    ClassDivider
-} from "./metamodelModelExtensions.js";
+import { ClassNode } from "./model/classNode.js";
+import { InheritanceEdge } from "./model/inheritanceEdge.js";
+import { AssociationEdge } from "./model/associationEdge.js";
+import { ClassLabel } from "./model/classLabel.js";
+import { PropertyLabel } from "./model/propertyLabel.js";
+import { AssociationEndLabel } from "./model/associationEndLabel.js";
+import { ClassCompartment } from "./model/classCompartment.js";
+import { ClassDivider } from "./model/classDivider.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { GGraph, ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
@@ -115,7 +113,6 @@ export class MetamodelGModelFactory implements GModelFactory {
                 .id(nodeId)
                 .name(cls.name)
                 .isAbstract(cls.isAbstract)
-                .layout("vbox")
                 .build();
 
             this.applyNodePosition(node, metadata);
@@ -133,12 +130,7 @@ export class MetamodelGModelFactory implements GModelFactory {
      */
     private applyNodePosition(node: ClassNode, metadata: { meta?: object } | undefined): void {
         if (metadata?.meta && NodeLayoutMetadata.isValid(metadata.meta)) {
-            node.position = metadata.meta.position;
-            if (metadata.meta.preferredWidth !== undefined) {
-                node.size = { width: metadata.meta.preferredWidth, height: node.size?.height ?? 0 };
-            }
-        } else {
-            node.position = { x: 0, y: 0 };
+            node.meta = metadata.meta;
         }
     }
 
@@ -151,20 +143,16 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @param idRegistry The ID registry for AST node ID generation
      */
     private addNodeLabels(node: ClassNode, nodeId: string, cls: ClassType, idRegistry: ModelIdRegistry): void {
-        // Create title compartment with class name
         const titleCompartment = ClassCompartment.builder().id(`${nodeId}#title-compartment`).build();
 
         const nameLabel = ClassLabel.builder().id(`${nodeId}#name`).text(cls.name).build();
         titleCompartment.children.push(nameLabel);
         node.children.push(titleCompartment);
 
-        // Add divider and properties compartment only if there are properties
         if (cls.properties.length > 0) {
-            // Add divider
             const divider = ClassDivider.builder().id(`${nodeId}#divider`).build();
             node.children.push(divider);
 
-            // Create properties compartment
             const propertiesCompartment = ClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
 
             for (const prop of cls.properties) {

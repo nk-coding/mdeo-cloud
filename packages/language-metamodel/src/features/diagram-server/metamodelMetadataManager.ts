@@ -14,7 +14,7 @@ import {
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import type { MetaModelType, ClassType, AssociationType } from "../../grammar/metamodelTypes.js";
-import { MetamodelElementType } from "./metamodelModelExtensions.js";
+import { MetamodelElementType } from "./model/elementTypes.js";
 
 const { injectable, inject } = sharedImport("inversify");
 

@@ -1,8 +1,9 @@
 import type { GModelElement } from "@eclipse-glsp/sprotty";
-import { GRectangularNode, sharedImport } from "@mdeo/editor-shared";
+import { GRectangularNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
 
 const { connectableFeature, deletableFeature, selectFeature, boundsFeature, moveFeature, fadeFeature } =
     sharedImport("@eclipse-glsp/sprotty");
+const { resizeFeature } = sharedImport("@eclipse-glsp/client");
 
 /**
  * Client-side model for a Class node.
@@ -15,7 +16,9 @@ export class GClassNode extends GRectangularNode {
         selectFeature,
         boundsFeature,
         moveFeature,
-        fadeFeature
+        fadeFeature,
+        resizeFeature,
+        nodeLayoutMetadataFeature,
     ];
 
     name?: string;

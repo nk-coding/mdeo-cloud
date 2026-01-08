@@ -8,6 +8,7 @@ import { sharedImport } from "../sharedImport.js";
 import type { ModelState } from "./modelState.js";
 import { LanguageServicesKey } from "./langiumServices.js";
 import type { LanguageServices } from "@mdeo/language-common";
+import type { GraphMetadata } from "./metadata.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { SOURCE_URI_ARG, ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
@@ -27,11 +28,17 @@ export class SourceModelStorage implements BaseSourceModelStorage {
         if (typeof sourceUri !== "string") {
             throw new Error("Source URI is missing in the request action.");
         }
-        const langiumDocument = await this.languageServices.shared.workspace.LangiumDocumentFactory.fromUri(
-            URI.parse(sourceUri)
-        );
+        const uri = URI.parse(sourceUri);
+        const langiumDocument = await this.languageServices.shared.workspace.LangiumDocumentFactory.fromUri(uri);
         const root = langiumDocument.parseResult.value;
-        await this.modelState.updateSourceModel(root);
+        const metadata = (await this.languageServices.shared.workspace.FileSystemProvider.readMetadata(
+            uri
+        )) as Partial<GraphMetadata>;
+
+        await this.modelState.updateSourceModel(root, {
+            nodes: typeof metadata.nodes === "object" ? metadata.nodes : {},
+            edges: typeof metadata.edges === "object" ? metadata.edges : {}
+        });
     }
 
     saveSourceModel(action: SaveModelAction): MaybePromise<void> {

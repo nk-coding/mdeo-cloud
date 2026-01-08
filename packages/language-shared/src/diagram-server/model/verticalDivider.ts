@@ -1,4 +1,4 @@
-import { sharedImport } from "../sharedImport.js";
+import { sharedImport } from "../../sharedImport.js";
 
 const { GModelElement, GModelElementBuilder } = sharedImport("@eclipse-glsp/server");
 

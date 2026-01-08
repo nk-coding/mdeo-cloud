@@ -17,7 +17,7 @@ export interface NodeAttributesWithLoops extends NodeAttributes {
  * Abstract base class for managing metadata validation and synchronization.
  * Works with domain-specific source models to extract and validate graph metadata.
  *
- * @template T - The type of the source model, must extend AstNode
+ * @template T The type of the source model, must extend AstNode
  */
 @injectable()
 export abstract class MetadataManager<T extends AstNode = AstNode> {
@@ -63,7 +63,7 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
      * Implementations should traverse the source model and generate metadata
      * for all nodes and edges that will be visualized.
      *
-     * @param sourceModel - The source model to extract metadata from
+     * @param sourceModel The source model to extract metadata from
      * @returns The computed graph metadata
      */
     protected abstract extractGraphMetadata(sourceModel: T): GraphMetadata;
@@ -73,8 +73,8 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
      * If discrepancies are found, returns the updated metadata.
      * If the metadata is valid, returns undefined.
      *
-     * @param sourceModel - The source model to validate metadata for
-     * @param currentMetadata - The current graph metadata
+     * @param sourceModel The source model to validate metadata for
+     * @param currentMetadata The current graph metadata
      * @returns Updated metadata or undefined if valid
      */
     validateMetadata(sourceModel: T, currentMetadata: GraphMetadata): GraphMetadata | undefined {

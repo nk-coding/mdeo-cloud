@@ -83,7 +83,12 @@ export interface NodeLayoutMetadata extends NodePositionMetadata {
      * The preferred width of the node.
      * If not specified, the node will be sized automatically.
      */
-    preferredWidth?: number;
+    prefWidth?: number;
+    /**
+     * The preferred height of the node.
+     * If not specified, the node will be sized autonatically
+     */
+    prefHeight?: number;
 }
 
 /**
@@ -102,7 +107,10 @@ export namespace NodeLayoutMetadata {
         }
 
         const meta = obj as Partial<NodeLayoutMetadata>;
-        return meta.preferredWidth === undefined || typeof meta.preferredWidth === "number";
+        return (
+            (meta.prefWidth === undefined || typeof meta.prefWidth === "number") &&
+            (meta.prefHeight === undefined || typeof meta.prefHeight === "number")
+        );
     }
 
     /**
@@ -118,7 +126,7 @@ export namespace NodeLayoutMetadata {
             position: { x, y }
         };
         if (preferredWidth !== undefined) {
-            metadata.preferredWidth = preferredWidth;
+            metadata.prefWidth = preferredWidth;
         }
         return metadata;
     }
@@ -138,11 +146,11 @@ export namespace NodeLayoutMetadata {
 
         const meta = (typeof obj === "object" && obj !== null ? obj : {}) as Partial<NodeLayoutMetadata>;
         const position = meta.position && isValidPoint(meta.position) ? meta.position : { x: defaultX, y: defaultY };
-        const preferredWidth = typeof meta.preferredWidth === "number" ? meta.preferredWidth : undefined;
+        const preferredWidth = typeof meta.prefWidth === "number" ? meta.prefWidth : undefined;
 
         const result: NodeLayoutMetadata = { position };
         if (preferredWidth !== undefined) {
-            result.preferredWidth = preferredWidth;
+            result.prefWidth = preferredWidth;
         }
         return result;
     }

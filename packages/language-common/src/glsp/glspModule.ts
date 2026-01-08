@@ -153,7 +153,6 @@ function createLauncher(
                 server.disposeClientSession(params)
             );
             clientConnection.onNotification(JsonrpcGLSPClient.ActionMessageNotification, (message) => {
-                console.log("notification: ", message.action);
                 server.process(message);
             });
         }

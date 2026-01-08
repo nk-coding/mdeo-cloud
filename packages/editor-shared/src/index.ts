@@ -15,3 +15,7 @@ export * from "./views/nodeView.js";
 export * from "./views/rectangularNodeView.js";
 export * from "./views/verticalDividerView.js";
 export * from "./sharedImport.js";
+export * from "./features/bounds/featureModule.js";
+export * from "./features/bounds/hiddenBoundsUpdater.js";
+export * from "./features/defaultModules.js";
+export * from "./features/metadata/nodeMetadata.js";

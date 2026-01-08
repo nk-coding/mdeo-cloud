@@ -1,7 +1,6 @@
 import type { Container, ContainerModule } from "inversify";
 import type { PluginContext } from "../plugin/pluginContext.js";
 import type { ContainerConfiguration, IDiagramOptions } from "@eclipse-glsp/client";
-import { createBoundsModule } from "../features/bounds/featureModule.js";
 
 /**
  * Creates a glsp client container module from the given editor plugin
@@ -23,7 +22,6 @@ export function createContainer(
         new Container() as any,
         glspClient.createDiagramOptionsModule(options),
         createDefaultContainerModule(context),
-        createBoundsModule(context),
         glspClient.standaloneDefaultModule,
         glspClient.gridModule,
         ...plugin
