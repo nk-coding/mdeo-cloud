@@ -107,7 +107,7 @@ const FunctionRule = createRule("ScriptFunctionRule")
 /**
  * Import rules for functions.
  */
-const { importRule: FunctionImportRule, fileImportRule: FunctionFileImportRule } = generateImportRules(
+const { fileImportRule: FunctionFileImportRule } = generateImportRules(
     scriptFileScopingConfig,
     FunctionImport,
     FunctionFileImport,

@@ -1,5 +1,9 @@
 import { sharedImport } from "../sharedImport.js";
 
-const { GCompartment: SCompartmentImpl } = sharedImport("@eclipse-glsp/sprotty");
+const { GChildElement } = sharedImport("@eclipse-glsp/sprotty");
 
-export class GCompartment extends SCompartmentImpl {}
+/**
+ * Client-side model for compartment elements.
+ * Compartments are used to group and organize child elements within a node.
+ */
+export class GCompartment extends GChildElement {}

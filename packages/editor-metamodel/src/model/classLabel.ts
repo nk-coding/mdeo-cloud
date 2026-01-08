@@ -1,6 +1,4 @@
-import { sharedImport } from "@mdeo/editor-shared";
-
-const { GLabel } = sharedImport("@eclipse-glsp/sprotty");
+import { GLabel } from "@mdeo/editor-shared";
 
 /**
  * Client-side model for the Class name label.

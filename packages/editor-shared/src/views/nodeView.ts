@@ -8,7 +8,7 @@ const { injectable } = sharedImport("inversify");
 const { svg, ShapeView } = sharedImport("@eclipse-glsp/sprotty");
 
 @injectable()
-export abstract class NodeView extends ShapeView {
+export abstract class GNodeView extends ShapeView {
     /**
      * The offset of the selection rectangle
      */
@@ -41,8 +41,8 @@ export abstract class NodeView extends ShapeView {
                 },
                 attrs: {
                     ...this.generatePoint(model, zoom, 0),
-                    width: model.bounds.width + (NodeView.SELECTION_OFFSET * 2) / zoom,
-                    height: model.bounds.height + (NodeView.SELECTION_OFFSET * 2) / zoom
+                    width: model.bounds.width + (GNodeView.SELECTION_OFFSET * 2) / zoom,
+                    height: model.bounds.height + (GNodeView.SELECTION_OFFSET * 2) / zoom
                 }
             }),
             ...[0, 1, 2, 3].map((pos) => this.renderSelectedOutlineCorner(model, zoom, pos))
@@ -69,11 +69,11 @@ export abstract class NodeView extends ShapeView {
                 "non-scaling-stroke": true
             },
             attrs: {
-                x: point.x - NodeView.INNER_POINT_SIZE / 2 / zoom,
-                y: point.y - NodeView.INNER_POINT_SIZE / 2 / zoom,
-                width: NodeView.INNER_POINT_SIZE / zoom,
-                height: NodeView.INNER_POINT_SIZE / zoom,
-                rx: NodeView.INNER_POINT_SIZE / 4 / zoom
+                x: point.x - GNodeView.INNER_POINT_SIZE / 2 / zoom,
+                y: point.y - GNodeView.INNER_POINT_SIZE / 2 / zoom,
+                width: GNodeView.INNER_POINT_SIZE / zoom,
+                height: GNodeView.INNER_POINT_SIZE / zoom,
+                rx: GNodeView.INNER_POINT_SIZE / 4 / zoom
             }
         });
     }
@@ -89,7 +89,7 @@ export abstract class NodeView extends ShapeView {
      */
     private generatePoint(model: Readonly<GNode>, zoom: number, pos: number): Point {
         pos = pos % 4;
-        const scaledOffset = NodeView.SELECTION_OFFSET / zoom;
+        const scaledOffset = GNodeView.SELECTION_OFFSET / zoom;
         const x = pos === 1 || pos === 2 ? model.bounds.width + scaledOffset : -scaledOffset;
         const y = pos < 2 ? -scaledOffset : model.bounds.height + scaledOffset;
         return { x, y };

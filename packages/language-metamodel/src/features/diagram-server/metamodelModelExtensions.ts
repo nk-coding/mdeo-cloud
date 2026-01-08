@@ -9,8 +9,8 @@ const {
     GLabelBuilder,
     GCompartment,
     GCompartmentBuilder,
-    GShapeElement,
-    GShapeElementBuilder
+    GModelElement,
+    GModelElementBuilder
 } = sharedImport("@eclipse-glsp/server");
 
 /**
@@ -127,10 +127,10 @@ export class ClassCompartmentBuilder<T extends ClassCompartment = ClassCompartme
 /**
  * Divider for separating compartments.
  */
-export class ClassDivider extends GShapeElement {
+export class ClassDivider extends GModelElement {
     static builder(): ClassDividerBuilder {
         return new ClassDividerBuilder(ClassDivider).type(MetamodelElementType.DIVIDER);
     }
 }
 
-export class ClassDividerBuilder<T extends ClassDivider = ClassDivider> extends GShapeElementBuilder<T> {}
+export class ClassDividerBuilder<T extends ClassDivider = ClassDivider> extends GModelElementBuilder<T> {}

@@ -131,13 +131,19 @@ export interface TypeDefinitionService {
  * Manages a registry of class types and notifies listeners of changes.
  */
 export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> implements TypeDefinitionService {
-    /** Map of type identifiers to class type definitions */
+    /**
+     * Map of type identifiers to class type definitions
+     */
     private readonly typeMap = new Map<string, ClassType>();
 
-    /** List of registered listeners */
+    /**
+     * List of registered listeners
+     */
     private readonly listeners: TypeDefinitionListener[] = [];
 
-    /** Super types that apply to all lambda types */
+    /**
+     * Super types that apply to all lambda types
+     */
     private lambdaSuperTypes: BaseClassTypeRef[] = [];
 
     constructor(private readonly services: ExtendedTypirServices<Specifics>) {}

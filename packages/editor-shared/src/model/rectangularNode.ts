@@ -1,16 +1,8 @@
-import type { LayoutContainer } from "@eclipse-glsp/sprotty";
-import { GNode } from "./node.js";
+import { GHtmlNode } from "./htmlNode.js";
 
-export class GRectangularNode extends GNode implements LayoutContainer {
-    override layout = "vbox";
-
-    override layoutOptions = {
-        paddingTop: 2,
-        paddingLeft: 2,
-        paddingBottom: 2,
-        paddingRight: 2,
-        hGrab: true,
-        vGrab: true,
-        vGap: 0
-    };
-}
+/**
+ * Client-side model for rectangular HTML nodes with vertical box layout.
+ * Provides a bordered container with configurable padding and layout options.
+ * Uses vertical box layout by default to stack child elements vertically.
+ */
+export class GRectangularNode extends GHtmlNode {}

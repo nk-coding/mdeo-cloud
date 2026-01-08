@@ -23,6 +23,7 @@ export * from "./grammar-utils/manySep.js";
 export * from "./id-value-converter/idValueConverter.js";
 export * from "./model/compartment.js";
 export * from "./model/horizontalDivider.js";
+export * from "./model/label.js";
 export * from "./model/node.js";
 export * from "./model/rectangularNode.js";
 export * from "./model/verticalDivider.js";

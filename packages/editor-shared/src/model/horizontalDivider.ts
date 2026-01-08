@@ -1,13 +1,10 @@
-import type { ModelLayoutOptions } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 
-const { GShapeElement, layoutableChildFeature, boundsFeature } = sharedImport("@eclipse-glsp/sprotty");
+const { GChildElement } = sharedImport("@eclipse-glsp/sprotty");
 
-export class GHorizontalDivider extends GShapeElement {
-    static readonly DEFAULT_FEATURES = [layoutableChildFeature, boundsFeature];
-
-    override layoutOptions: ModelLayoutOptions = {
-        vGrab: false,
-        hGrab: true
-    };
-}
+/**
+ * Client-side model for horizontal divider elements.
+ * Used to visually separate content horizontally within a container.
+ * Configured to grab horizontal space but not vertical space.
+ */
+export class GHorizontalDivider extends GChildElement {}

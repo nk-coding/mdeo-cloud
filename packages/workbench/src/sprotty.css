@@ -1,16 +1,19 @@
-.sprotty-wrapper .sprotty {
+.sprotty {
     width: 100%;
     height: 100%;
 
     --editor-primary: var(--sidebar-primary);
     --editor-background: var(--background);
     --editor-foreground: var(--foreground);
+    --editor-grid: oklch(from var(--ring) l c h / 60%);
+    --editor-spacing: var(--spacing);
+    --editor-font-weight-bold: 700;
 }
 
 .sprotty-wrapper svg {
     width: 100%;
     height: 100%;
-    border: none;
+    border: none !important;
     outline: none;
 }
 

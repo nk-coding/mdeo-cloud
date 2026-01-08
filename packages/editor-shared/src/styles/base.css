@@ -5,6 +5,9 @@
     --color-foreground: var(--editor-foreground);
     --color-primary: var(--editor-primary);
     --color-background: var(--editor-background);
+    --color-grid: var(--editor-grid);
+    --spacing: var(--editor-spacing);
+    --font-weight-bold: var(--editor-font-weight-bold);
 }
 
 @utility non-scaling-stroke {

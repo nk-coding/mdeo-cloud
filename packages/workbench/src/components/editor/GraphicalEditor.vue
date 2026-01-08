@@ -1,5 +1,5 @@
 <template>
-    <div class="sprotty-wrapper w-full h-full relative" :class="{[`editor-${languagePlugin.id}`]: true}">
+    <div class="sprotty-wrapper w-full h-full relative">
         <div v-if="editorPlugin != undefined" :id="id"></div>
     </div>
 </template>

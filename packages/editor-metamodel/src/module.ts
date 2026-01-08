@@ -1,18 +1,25 @@
 import type { BindingContext } from "@eclipse-glsp/sprotty";
-import { sharedImport, CompartmentView, HorizontalDividerView, GHorizontalDivider } from "@mdeo/editor-shared";
+import {
+    sharedImport,
+    GCompartmentView,
+    GHorizontalDividerView,
+    GHorizontalDivider,
+    GLabelView,
+    configureDefaultModelElements
+} from "@mdeo/editor-shared";
 import { GClassLabel } from "./model/classLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";
 import { GAssociationEndLabel } from "./model/associationEndLabel.js";
 import { GInheritanceEdge } from "./model/inheritanceEdge.js";
 import { GAssociationEdge } from "./model/associationEdge.js";
 import { GClassCompartment } from "./model/classCompartment.js";
-import { ClassNodeView } from "./views/classNodeView.js";
+import { GClassNodeView } from "./views/classNodeView.js";
+import { GClassLabelView } from "./views/classLabelView.js";
 import { MetamodelElementType } from "./model/elementTypes.js";
 import { GClassNode } from "./model/classNode.js";
 
-const { FeatureModule, configureModelElement, GLabelView, PolylineEdgeView, editLabelFeature } =
+const { FeatureModule, configureModelElement, PolylineEdgeView, editLabelFeature } =
     sharedImport("@eclipse-glsp/sprotty");
-const { configureDefaultModelElements } = sharedImport("@eclipse-glsp/client");
 
 /**
  * Feature module for the metamodel editor.
@@ -24,9 +31,9 @@ export const metamodelDiagramModule = new FeatureModule(
 
         configureDefaultModelElements(context);
 
-        configureModelElement(context, MetamodelElementType.NODE_CLASS, GClassNode, ClassNodeView);
+        configureModelElement(context, MetamodelElementType.NODE_CLASS, GClassNode, GClassNodeView);
 
-        configureModelElement(context, MetamodelElementType.LABEL_CLASS_NAME, GClassLabel, GLabelView, {
+        configureModelElement(context, MetamodelElementType.LABEL_CLASS_NAME, GClassLabel, GClassLabelView, {
             enable: [editLabelFeature]
         });
         configureModelElement(context, MetamodelElementType.LABEL_PROPERTY, GPropertyLabel, GLabelView);
@@ -35,8 +42,8 @@ export const metamodelDiagramModule = new FeatureModule(
         configureModelElement(context, MetamodelElementType.EDGE_INHERITANCE, GInheritanceEdge, PolylineEdgeView);
         configureModelElement(context, MetamodelElementType.EDGE_ASSOCIATION, GAssociationEdge, PolylineEdgeView);
 
-        configureModelElement(context, MetamodelElementType.COMPARTMENT, GClassCompartment, CompartmentView);
-        configureModelElement(context, MetamodelElementType.DIVIDER, GHorizontalDivider, HorizontalDividerView);
+        configureModelElement(context, MetamodelElementType.COMPARTMENT, GClassCompartment, GCompartmentView);
+        configureModelElement(context, MetamodelElementType.DIVIDER, GHorizontalDivider, GHorizontalDividerView);
     },
     { featureId: Symbol("metamodelDiagram") }
 );

@@ -1,12 +1,12 @@
 import { sharedImport } from "../sharedImport.js";
 
-const { GShapeElement, GShapeElementBuilder } = sharedImport("@eclipse-glsp/server");
+const { GModelElement, GModelElementBuilder } = sharedImport("@eclipse-glsp/server");
 
 /**
  * A horizontal divider element for separating sections.
  */
-export class GHorizontalDivider extends GShapeElement {}
+export class GHorizontalDivider extends GModelElement {}
 
 export class GHorizontalDividerBuilder<
     T extends GHorizontalDivider = GHorizontalDivider
-> extends GShapeElementBuilder<T> {}
+> extends GModelElementBuilder<T> {}

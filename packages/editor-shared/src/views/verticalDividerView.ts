@@ -4,21 +4,30 @@ import type { VNode } from "snabbdom";
 import type { GVerticalDivider } from "../model/verticalDivider.js";
 
 const { injectable } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
+const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 @injectable()
-export class VerticalDividerView implements IView {
+export class GVerticalDividerView implements IView {
     render(model: Readonly<GVerticalDivider>, context: RenderingContext, args?: {} | undefined): VNode | undefined {
-        return svg("rect", {
+        return html("div", {
             class: {
-                "fill-foreground": true
-            },
-            attrs: {
-                width: 2,
-                height: Math.max(0, model.size.height),
-                x: 0,
-                y: 0
+                ...this.getClasses(model)
             }
         });
+    }
+
+    /**
+     * Returns the CSS classes to be applied to the vertical divider's main visual element.
+     * Subclasses can override this method to customize or extend the default classes.
+     *
+     * @param _model - The vertical divider model being rendered
+     * @returns An object mapping class names to boolean values
+     */
+    protected getClasses(_model: Readonly<GVerticalDivider>): Record<string, boolean> {
+        return {
+            "h-full": true,
+            "border-r-2": true,
+            "border-current": true
+        };
     }
 }

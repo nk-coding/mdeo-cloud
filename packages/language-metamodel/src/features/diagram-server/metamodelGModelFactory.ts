@@ -58,7 +58,7 @@ export class MetamodelGModelFactory implements GModelFactory {
 
         const idRegistry = new ModelIdRegistry(metamodel, this.modelIdProvider);
 
-        const graph = GGraph.builder().id("metamodel-graph").build();
+        const graph = GGraph.builder().id("metamodel-graph").addCssClass("editor-metamodel").build();
 
         const { classes, associations } = this.extractClassesAndAssociations(metamodel);
         this.createClassNodes(graph, classes, idRegistry);
