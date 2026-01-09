@@ -1,4 +1,4 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
+import type { IView } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { VNode } from "snabbdom";
 import type { GHorizontalDivider } from "../model/horizontalDivider.js";
@@ -6,9 +6,12 @@ import type { GHorizontalDivider } from "../model/horizontalDivider.js";
 const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
+/**
+ * View for rendering horizontal divider elements.
+ */
 @injectable()
 export class GHorizontalDividerView implements IView {
-    render(model: Readonly<GHorizontalDivider>, context: RenderingContext, args?: {} | undefined): VNode | undefined {
+    render(model: Readonly<GHorizontalDivider>): VNode | undefined {
         return html("div", {
             class: {
                 ...this.getClasses(model)

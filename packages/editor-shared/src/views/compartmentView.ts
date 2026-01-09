@@ -12,15 +12,7 @@ const { html } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export class GCompartmentView {
-    /**
-     * Renders the compartment as a vertical flex container with margin and gap.
-     *
-     * @param model - The compartment model being rendered
-     * @param context - The rendering context
-     * @param args - Optional additional arguments
-     * @returns A VNode representing the compartment
-     */
-    render(model: Readonly<GCompartment>, context: RenderingContext, args?: {}): VNode | undefined {
+    render(model: Readonly<GCompartment>, context: RenderingContext): VNode | undefined {
         return html(
             "div",
             {

@@ -10,7 +10,7 @@ export class AssociationEdge extends GEdge {
 
     /**
      * Creates a builder for AssociationEdge instances.
-     * 
+     *
      * @returns A new AssociationEdgeBuilder
      */
     static override builder(): AssociationEdgeBuilder {
@@ -25,7 +25,7 @@ export class AssociationEdge extends GEdge {
 export class AssociationEdgeBuilder<E extends AssociationEdge = AssociationEdge> extends GEdgeBuilder<E> {
     /**
      * Sets the association operator.
-     * 
+     *
      * @param operator The operator type (e.g., composition, aggregation)
      * @returns This builder for chaining
      */

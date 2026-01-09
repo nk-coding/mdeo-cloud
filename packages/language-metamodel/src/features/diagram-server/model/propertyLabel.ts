@@ -7,7 +7,7 @@ import { MetamodelElementType } from "./elementTypes.js";
 export class PropertyLabel extends GLabel {
     /**
      * Creates a builder for PropertyLabel instances.
-     * 
+     *
      * @returns A new PropertyLabelBuilder
      */
     static builder(): PropertyLabelBuilder {

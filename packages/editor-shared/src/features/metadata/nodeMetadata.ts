@@ -33,7 +33,7 @@ export const nodeLayoutMetadataFeature = Symbol("nodeLayoutMetadataFeature");
 
 /**
  * Checks if the given element has layout metadata.
- * 
+ *
  * @param element The model element to check
  * @returns True if the element has layout metadata, false otherwise
  */

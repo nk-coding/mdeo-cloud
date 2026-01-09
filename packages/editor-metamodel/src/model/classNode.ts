@@ -18,7 +18,7 @@ export class GClassNode extends GRectangularNode {
         moveFeature,
         fadeFeature,
         resizeFeature,
-        nodeLayoutMetadataFeature,
+        nodeLayoutMetadataFeature
     ];
 
     name?: string;

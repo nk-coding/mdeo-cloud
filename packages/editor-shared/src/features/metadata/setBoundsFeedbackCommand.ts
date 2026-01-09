@@ -1,7 +1,7 @@
 import type { CommandExecutionContext, CommandReturn, IActionDispatcher } from "@eclipse-glsp/sprotty";
 import type { FeedbackCommand } from "@eclipse-glsp/client";
 import { sharedImport } from "../../sharedImport.js";
-import { hasNodeLayoutMetadata } from "../metadata/nodeMetadata.js";
+import { hasNodeLayoutMetadata } from "./nodeMetadata.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { SetBoundsCommand, TYPES } = sharedImport("@eclipse-glsp/sprotty");
@@ -24,7 +24,7 @@ export class SetBoundsFeedbackCommand extends SetBoundsCommand implements Feedba
     /**
      * Executes the set bounds feedback command.
      * Updates the metadata of elements with their new preferred size and requests bounds update.
-     * 
+     *
      * @param context The command execution context
      * @returns The command return value with local bounds request
      */

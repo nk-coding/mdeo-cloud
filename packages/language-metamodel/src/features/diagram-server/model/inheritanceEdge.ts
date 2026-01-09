@@ -7,7 +7,7 @@ import { MetamodelElementType } from "./elementTypes.js";
 export class InheritanceEdge extends GEdge {
     /**
      * Creates a builder for InheritanceEdge instances.
-     * 
+     *
      * @returns A new InheritanceEdgeBuilder
      */
     static override builder(): InheritanceEdgeBuilder {

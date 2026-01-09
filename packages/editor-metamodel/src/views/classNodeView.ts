@@ -14,12 +14,12 @@ export class GClassNodeView extends GRectangularNodeView {
     /**
      * Renders the content inside the class node by rendering all child elements.
      *
-     * @param model - The class node model being rendered
-     * @param context - The rendering context
-     * @param args - Optional additional arguments
+     * @param model The class node model being rendered
+     * @param context The rendering context
+     * @param args Optional additional arguments
      * @returns An array of VNodes representing the node's children
      */
-    protected renderNodeContent(model: Readonly<GClassNode>, context: RenderingContext, args?: {}): VNode[] {
+    protected renderNodeContent(model: Readonly<GClassNode>, context: RenderingContext): VNode[] {
         return context.renderChildren(model);
     }
 }

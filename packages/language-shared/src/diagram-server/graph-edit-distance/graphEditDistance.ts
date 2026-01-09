@@ -204,7 +204,9 @@ function reduceInd(ind: number[], iSet: Set<number>): number[] {
         if (!iSet.has(k)) {
             let newK = k;
             for (const i of iSet) {
-                if (i < k) newK--;
+                if (i < k) {
+                    newK--;
+                }
             }
             result.push(newK);
         }
@@ -436,7 +438,9 @@ export function* optimizeEditPaths(
                 // Edge incident to previously matched nodes
                 let found = false;
                 for (const [p, _q] of matchedUv) {
-                    if (p === null) continue;
+                    if (p === null) {
+                        continue;
+                    }
                     if ((gs === p && gt === u) || (gs === u && gt === p) || (gs === p && gt === p)) {
                         found = true;
                         break;
@@ -462,7 +466,9 @@ export function* optimizeEditPaths(
                 // Edge incident to previously matched nodes
                 let found = false;
                 for (const [_p, q] of matchedUv) {
-                    if (q === null) continue;
+                    if (q === null) {
+                        continue;
+                    }
                     if ((hs === q && ht === v) || (hs === v && ht === q) || (hs === q && ht === q)) {
                         found = true;
                         break;
@@ -502,7 +508,9 @@ export function* optimizeEditPaths(
                     // Check condition 1: structural match between edge endpoints
                     let cond1 = false;
                     for (const [p, q] of matchedUv) {
-                        if (p === null || q === null) continue;
+                        if (p === null || q === null) {
+                            continue;
+                        }
                         // g in ((p, u), (u, p)) and h in ((q, v), (v, q))
                         const gMatches = (gs === p && gt === u) || (gs === u && gt === p);
                         const hMatches = (hs === q && ht === v) || (hs === v && ht === q);
@@ -631,7 +639,9 @@ export function* optimizeEditPaths(
             }
         }
 
-        if (bestIdx === -1) return;
+        if (bestIdx === -1) {
+            return;
+        }
 
         const i = CvMatrix.lsaRowInd[bestIdx];
         const j = CvMatrix.lsaColInd[bestIdx];

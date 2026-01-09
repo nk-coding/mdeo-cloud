@@ -57,10 +57,7 @@ export abstract class GNodeView extends ShapeView {
             return [];
         }
         const zoom = findViewportZoom(model);
-        return [
-            ...this.renderSelectedRect(model, zoom),
-            ...this.renderResizeHandles(model, zoom)
-        ];
+        return [...this.renderSelectedRect(model, zoom), ...this.renderResizeHandles(model, zoom)];
     }
 
     /**
@@ -130,9 +127,7 @@ export abstract class GNodeView extends ShapeView {
      * @returns The resize handles
      */
     private renderResizeHandles(model: Readonly<GNode>, zoom: number): VNode[] {
-        return GNodeView.RESIZE_HANDLES.map((config) =>
-            this.renderResizeHandle(model, zoom, config)
-        );
+        return GNodeView.RESIZE_HANDLES.map((config) => this.renderResizeHandle(model, zoom, config));
     }
 
     /**
@@ -143,11 +138,7 @@ export abstract class GNodeView extends ShapeView {
      * @param config the resize handle configuration
      * @returns the generated resize handle line
      */
-    private renderResizeHandle(
-        model: Readonly<GNode>,
-        zoom: number,
-        config: ResizeHandleConfig
-    ): VNode {
+    private renderResizeHandle(model: Readonly<GNode>, zoom: number, config: ResizeHandleConfig): VNode {
         const start = this.generatePoint(model, zoom, config.startPos);
         const end = this.generatePoint(model, zoom, config.endPos);
         const isCorner = config.startPos === config.endPos;

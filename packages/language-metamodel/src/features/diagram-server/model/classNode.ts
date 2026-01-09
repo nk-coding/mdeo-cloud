@@ -12,10 +12,10 @@ export class ClassNode extends GNode {
 
     /**
      * Creates a builder for ClassNode instances.
-     * 
+     *
      * @returns A new ClassNodeBuilder
      */
-    static override builder(): ClassNodeBuilder {
+    static builder(): ClassNodeBuilder {
         return new ClassNodeBuilder(ClassNode).type(MetamodelElementType.NODE_CLASS);
     }
 }
@@ -27,7 +27,7 @@ export class ClassNode extends GNode {
 export class ClassNodeBuilder<T extends ClassNode = ClassNode> extends GNodeBuilder<T> {
     /**
      * Sets the name of the class.
-     * 
+     *
      * @param name The class name
      * @returns This builder for chaining
      */
@@ -38,7 +38,7 @@ export class ClassNodeBuilder<T extends ClassNode = ClassNode> extends GNodeBuil
 
     /**
      * Sets whether the class is abstract.
-     * 
+     *
      * @param isAbstract True if the class is abstract
      * @returns This builder for chaining
      */

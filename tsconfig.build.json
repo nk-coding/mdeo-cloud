@@ -27,6 +27,9 @@
             "path": "packages/language-script"
         },
         {
+            "path": "packages/editor-protocol"
+        },
+        {
             "path": "packages/editor-common"
         },
         {

@@ -158,10 +158,14 @@ export class MultiGraph {
      */
     hasEdge(source: NodeId, target: NodeId, key?: EdgeKey): boolean {
         const sourceAdj = this._adj.get(source);
-        if (!sourceAdj) return false;
+        if (!sourceAdj) {
+            return false;
+        }
 
         const edgeMap = sourceAdj.get(target);
-        if (!edgeMap) return false;
+        if (!edgeMap) {
+            return false;
+        }
 
         if (key === undefined) {
             return edgeMap.size > 0;

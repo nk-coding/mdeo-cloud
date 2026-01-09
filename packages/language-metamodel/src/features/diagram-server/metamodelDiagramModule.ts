@@ -1,9 +1,10 @@
 import { type BindingTarget, type DiagramConfiguration, type GModelFactory } from "@eclipse-glsp/server";
-import type { ModelIdProvider } from "@mdeo/language-shared";
+import type { MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
 import { MetamodelGModelFactory } from "./metamodelGModelFactory.js";
 import { MetamodelDiagramConfiguration } from "./metamodelDiagramConfiguration.js";
 import { MetamodelModelIdProvider } from "./metamodelModelIdProvider.js";
+import { MetamodelMetadataManager } from "./metamodelMetadataManager.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -25,5 +26,9 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
 
     protected override bindModelIdProvider(): BindingTarget<ModelIdProvider> {
         return MetamodelModelIdProvider;
+    }
+
+    protected override bindMetadataManager(): BindingTarget<MetadataManager> {
+        return MetamodelMetadataManager;
     }
 }

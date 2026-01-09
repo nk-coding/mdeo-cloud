@@ -7,13 +7,12 @@ import type { GRectangularNode } from "../model/rectangularNode.js";
 const { injectable } = sharedImport("inversify");
 const { html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 
+/**
+ * Abstract view for rendering rectangular node elements.
+ */
 @injectable()
 export abstract class GRectangularNodeView extends GHtmlNodeView {
-    protected override renderForeignElement(
-        model: Readonly<GRectangularNode>,
-        context: RenderingContext,
-        args?: {}
-    ): VNode {
+    protected override renderForeignElement(model: Readonly<GRectangularNode>, context: RenderingContext): VNode {
         const style: VNodeStyle = {};
         if (model.meta?.prefWidth != undefined) {
             style.width = `${model.meta.prefWidth}px`;
@@ -32,7 +31,7 @@ export abstract class GRectangularNodeView extends GHtmlNodeView {
                 },
                 style
             },
-            ...this.renderNodeContent(model, context, args)
+            ...this.renderNodeContent(model, context)
         );
     }
 
@@ -58,10 +57,10 @@ export abstract class GRectangularNodeView extends GHtmlNodeView {
 
     /**
      * Abstract method to render the content inside the rectangular node
+     *
+     * @param model The rectangular node model being rendered
+     * @param context The rendering context
+     * @returns An array of VNodes representing the content of the node
      */
-    protected abstract renderNodeContent(
-        model: Readonly<GRectangularNode>,
-        context: RenderingContext,
-        args?: {}
-    ): VNode[];
+    protected abstract renderNodeContent(model: Readonly<GRectangularNode>, context: RenderingContext): VNode[];
 }

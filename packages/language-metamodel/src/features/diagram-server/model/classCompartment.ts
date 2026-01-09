@@ -7,11 +7,11 @@ import { MetamodelElementType } from "./elementTypes.js";
 export class ClassCompartment extends GCompartment {
     /**
      * Creates a builder for ClassCompartment instances.
-     * 
+     *
      * @returns A new ClassCompartmentBuilder with vertical box layout
      */
-    static override builder(): ClassCompartmentBuilder {
-        return new ClassCompartmentBuilder(ClassCompartment).type(MetamodelElementType.COMPARTMENT).layout("vbox");
+    static builder(): ClassCompartmentBuilder {
+        return new ClassCompartmentBuilder(ClassCompartment).type(MetamodelElementType.COMPARTMENT);
     }
 }
 

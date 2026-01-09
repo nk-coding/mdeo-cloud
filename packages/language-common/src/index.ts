@@ -36,3 +36,4 @@ export * from "./plugin/sharedImport.js";
 export * from "./protocol/glsp.js";
 export * from "./protocol/metadataFileSystemProvider.js";
 export * from "./util/assertUnreachable.js";
+export * from "./util/partialAstNode.js";

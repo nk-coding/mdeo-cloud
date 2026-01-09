@@ -1,4 +1,4 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
+import type { IView } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { VNode } from "snabbdom";
 import type { GLabel } from "../model/label.js";
@@ -6,9 +6,12 @@ import type { GLabel } from "../model/label.js";
 const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
+/**
+ * View for rendering label elements.
+ */
 @injectable()
 export class GLabelView implements IView {
-    render(model: Readonly<GLabel>, context: RenderingContext, args?: {}): VNode | undefined {
+    render(model: Readonly<GLabel>): VNode | undefined {
         return html(
             "span",
             {

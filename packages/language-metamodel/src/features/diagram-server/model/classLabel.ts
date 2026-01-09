@@ -7,7 +7,7 @@ import { MetamodelElementType } from "./elementTypes.js";
 export class ClassLabel extends GLabel {
     /**
      * Creates a builder for ClassLabel instances.
-     * 
+     *
      * @returns A new ClassLabelBuilder
      */
     static builder(): ClassLabelBuilder {

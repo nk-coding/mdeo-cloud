@@ -1,10 +1,12 @@
 import { sharedImport } from "../sharedImport.js";
 import type { GraphMetadata } from "./metadata.js";
-import type { AstNode } from "langium";
+import type { AstNode, URI } from "langium";
 import { MetadataManager } from "./metadataManager.js";
+import { LanguageServicesKey } from "./langiumServices.js";
+import { type LanguageServices } from "@mdeo/language-common";
 
-const { injectable, inject, optional } = sharedImport("inversify");
-const { DefaultModelState } = sharedImport("@eclipse-glsp/server");
+const { injectable, inject } = sharedImport("inversify");
+const { DefaultModelState, SOURCE_URI_ARG } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Extended model state that manages both the graphical model and the source model.
@@ -15,9 +17,8 @@ const { DefaultModelState } = sharedImport("@eclipse-glsp/server");
  */
 @injectable()
 export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
-    @inject(MetadataManager)
-    @optional()
-    protected metadataManager?: MetadataManager<T>;
+    @inject(MetadataManager) protected metadataManager!: MetadataManager<T>;
+    @inject(LanguageServicesKey) languageServices!: LanguageServices;
 
     /**
      * Metadata for graph elements including visual properties like positions and routing points.
@@ -26,6 +27,11 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
         nodes: {},
         edges: {}
     };
+
+    /**
+     * Flag indicating whether the metadata has been validated against the source model.
+     */
+    private isMetadataValidated: boolean = false;
 
     /**
      * The source model representing the domain-specific AST.
@@ -44,6 +50,7 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
      */
     set metadata(value: GraphMetadata) {
         this._metadata = value;
+        this.isMetadataValidated = false;
     }
 
     /**
@@ -54,16 +61,27 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
     }
 
     /**
+     * Sets the source model.
+     */
+    set sourceModel(value: T) {
+        this._sourceModel = value;
+        this.isMetadataValidated = false;
+    }
+
+    /**
      * Asynchronously updates the source model.
      * This method can be overridden to perform additional operations
      * when the source model changes, such as validation or notifications.
      *
+     * @param uri The URI of the source model
      * @param sourceModel The new source model to set
      * @param metadata The new graph metadata to set
      */
-    async updateSourceModel(sourceModel: T | undefined, metadata: GraphMetadata): Promise<void> {
+    async updateSourceModel(uri: URI, sourceModel: T | undefined, metadata: GraphMetadata): Promise<void> {
+        this.set(SOURCE_URI_ARG, uri.toString());
         this._sourceModel = sourceModel;
         this._metadata = metadata;
+        this.isMetadataValidated = false;
     }
 
     /**
@@ -76,12 +94,17 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
      * @returns The validated graph metadata
      */
     getValidatedMetadata(): GraphMetadata {
-        if (this.metadataManager && this._sourceModel) {
-            const validatedMetadata = this.metadataManager.validateMetadata(this._sourceModel, this._metadata);
-            if (validatedMetadata) {
-                this._metadata = validatedMetadata;
-            }
+        if (this.sourceModel == undefined) {
+            throw new Error("Cannot validate metadata.");
         }
+        if (this.isMetadataValidated) {
+            return this._metadata;
+        }
+        const validatedMetadata = this.metadataManager.validateMetadata(this._sourceModel!, this._metadata);
+        if (validatedMetadata) {
+            this._metadata = validatedMetadata;
+        }
+        this.isMetadataValidated = true;
         return this._metadata;
     }
 }

@@ -1,4 +1,4 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
+import type { IView } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { VNode } from "snabbdom";
 import type { GVerticalDivider } from "../model/verticalDivider.js";
@@ -6,9 +6,12 @@ import type { GVerticalDivider } from "../model/verticalDivider.js";
 const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
+/**
+ * View for rendering vertical divider elements.
+ */
 @injectable()
 export class GVerticalDividerView implements IView {
-    render(model: Readonly<GVerticalDivider>, context: RenderingContext, args?: {} | undefined): VNode | undefined {
+    render(model: Readonly<GVerticalDivider>): VNode | undefined {
         return html("div", {
             class: {
                 ...this.getClasses(model)

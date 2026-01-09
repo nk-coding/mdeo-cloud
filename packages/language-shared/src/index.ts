@@ -5,7 +5,6 @@ export * from "./diagram-server/baseDiagramModule.js";
 export * from "./diagram-server/langiumServices.js";
 export * from "./diagram-server/metadata.js";
 export * from "./diagram-server/metadataManager.js";
-export * from "./diagram-server/metadataTypes.js";
 export * from "./diagram-server/modelIdProvider.js";
 export * from "./diagram-server/modelIdRegistry.js";
 export * from "./diagram-server/modelIndex.js";

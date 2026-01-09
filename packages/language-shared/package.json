@@ -30,6 +30,7 @@
         "vscode-languageserver-types": "^3.17.5"
     },
     "dependencies": {
+        "@mdeo/editor-protocol": "^0.1.0",
         "@mdeo/language-common": "^0.1.0",
         "munkres": "^2.0.4",
         "vscode-jsonrpc": "8.2.0"

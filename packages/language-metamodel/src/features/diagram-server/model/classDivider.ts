@@ -7,7 +7,7 @@ import { MetamodelElementType } from "./elementTypes.js";
 export class ClassDivider extends GModelElement {
     /**
      * Creates a builder for ClassDivider instances.
-     * 
+     *
      * @returns A new ClassDividerBuilder
      */
     static builder(): ClassDividerBuilder {

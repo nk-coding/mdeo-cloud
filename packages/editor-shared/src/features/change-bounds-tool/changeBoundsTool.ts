@@ -1,13 +1,22 @@
-import type { ISelectionListener, ResizeHandleLocation, TrackedResize } from "@eclipse-glsp/client";
-import type { GModelElement, MouseListener } from "@eclipse-glsp/sprotty";
+import type {
+    ISelectionListener,
+    ResizeHandleLocation as ResizeHandleLocationType,
+    GResizeHandle as GResizeHandleType,
+    SelectableBoundsAware
+} from "@eclipse-glsp/client";
+import type { Action, GModelElement, MouseListener, Operation } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
+import { PartialChangeBoundsOperation, type PartialElementAndBounds } from "@mdeo/editor-protocol";
 
 const { injectable } = sharedImport("inversify");
 const {
     ChangeBoundsTool: GLSPChangeBoundsTool,
     ChangeBoundsListener: GLSPChangeBoundsListener,
     GResizeHandle,
-    FeedbackMoveMouseListener: GLSPFeedbackMoveMouseListener
+    FeedbackMoveMouseListener: GLSPFeedbackMoveMouseListener,
+    Point,
+    Dimension,
+    ResizeHandleLocation
 } = sharedImport("@eclipse-glsp/client");
 
 /**
@@ -18,7 +27,7 @@ const {
 export class ChangeBoundsTool extends GLSPChangeBoundsTool {
     /**
      * Creates a custom change bounds listener that handles resize operations.
-     * 
+     *
      * @returns The change bounds listener
      */
     protected override createChangeBoundsListener(): MouseListener & ISelectionListener {
@@ -27,7 +36,7 @@ export class ChangeBoundsTool extends GLSPChangeBoundsTool {
 
     /**
      * Creates a custom move mouse listener that handles move operations.
-     * 
+     *
      * @returns The move mouse listener
      */
     protected override createMoveMouseListener(): MouseListener {
@@ -43,7 +52,7 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
     /**
      * Updates the resize element by extracting resize handle location from SVG data attributes.
      * Creates a virtual GResizeHandle when a resize handle location is detected in the event target.
-     * 
+     *
      * @param target The target element to resize
      * @param event The mouse event that triggered the resize
      * @returns True if the resize element was updated successfully
@@ -54,7 +63,7 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
         if (eventTarget instanceof SVGElement) {
             const location = eventTarget.dataset["resizeHandleLocation"];
             if (typeof location === "string") {
-                const resizeHandle = new GResizeHandle(location as ResizeHandleLocation);
+                const resizeHandle = new GResizeHandle(location as ResizeHandleLocationType);
                 // @ts-expect-error not readonly
                 resizeHandle.parent = target;
                 actualTarget = resizeHandle;
@@ -63,15 +72,50 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
         return super.updateResizeElement(actualTarget, event);
     }
 
-    /**
-     * Adds resize feedback to the diagram during a resize operation.
-     * 
-     * @param resize The tracked resize information
-     * @param target The target element being resized
-     * @param event The mouse event
-     */
-    protected override addResizeFeedback(resize: TrackedResize, target: GModelElement, event: MouseEvent): void {
-        super.addResizeFeedback(resize, target, event);
+    protected override handleResizeOnServer(activeResizeHandle: GResizeHandleType): Action[] {
+        const resizedElement = activeResizeHandle.parent;
+        if (this.initialBounds && this.isValidResize(resizedElement)) {
+            const location = activeResizeHandle.location;
+            const elementAndBounds: PartialElementAndBounds = {
+                elementId: resizedElement.id,
+                newPosition: {
+                    x: resizedElement.bounds.x,
+                    y: resizedElement.bounds.y
+                },
+                newSize: {
+                    width:
+                        location !== ResizeHandleLocation.Top && location !== ResizeHandleLocation.Bottom
+                            ? resizedElement.bounds.width
+                            : undefined,
+                    height:
+                        location !== ResizeHandleLocation.Left && location !== ResizeHandleLocation.Right
+                            ? resizedElement.bounds.height
+                            : undefined
+                }
+            };
+            if (!this.initialBounds.newPosition || !elementAndBounds.newPosition) {
+                return [];
+            }
+            if (
+                !Point.equals(this.initialBounds.newPosition, elementAndBounds.newPosition) ||
+                !Dimension.equals(this.initialBounds.newSize, resizedElement.bounds)
+            ) {
+                this.initialBounds = undefined;
+                return [PartialChangeBoundsOperation.create([elementAndBounds])];
+            }
+        }
+        return [];
+    }
+
+    protected override handleMoveElementsOnServer(elementsToMove: SelectableBoundsAware[]): Operation[] {
+        const newBounds = elementsToMove.map((element) => ({
+            elementId: element.id,
+            newPosition: {
+                x: element.bounds.x,
+                y: element.bounds.y
+            }
+        }));
+        return newBounds.length > 0 ? [PartialChangeBoundsOperation.create(newBounds)] : [];
     }
 }
 
@@ -80,11 +124,10 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
  * This ensures that resize handles don't trigger move operations.
  */
 export class FeedbackMoveMouseListener extends GLSPFeedbackMoveMouseListener {
-
     /**
      * Initializes a move operation, but skips initialization if the event target is a resize handle.
      * This prevents conflicts between move and resize operations.
-     * 
+     *
      * @param target The target element to move
      * @param event The mouse event that triggered the move
      */
@@ -98,5 +141,4 @@ export class FeedbackMoveMouseListener extends GLSPFeedbackMoveMouseListener {
         }
         super.initializeMove(target, event);
     }
-
 }

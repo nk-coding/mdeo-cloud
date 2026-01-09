@@ -11,7 +11,7 @@ export class AssociationEndLabel extends GLabel {
 
     /**
      * Creates a builder for AssociationEndLabel instances.
-     * 
+     *
      * @returns A new AssociationEndLabelBuilder
      */
     static builder(): AssociationEndLabelBuilder {

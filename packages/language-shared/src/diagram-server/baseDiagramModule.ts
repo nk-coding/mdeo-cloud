@@ -1,4 +1,9 @@
-import type { BindingContext, BindingTarget, InstanceMultiBinding, OperationHandlerConstructor } from "@eclipse-glsp/server";
+import type {
+    BindingContext,
+    BindingTarget,
+    InstanceMultiBinding,
+    OperationHandlerConstructor
+} from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import { ModelState } from "./modelState.js";
 import { GModelIndex } from "./modelIndex.js";
@@ -8,6 +13,9 @@ import type { interfaces } from "inversify";
 import { LanguageServicesKey } from "./langiumServices.js";
 import { ModelIdProvider } from "./modelIdProvider.js";
 import { ChangeBoundsOperationHandler } from "./handler/changeBoundsOperationHandler.js";
+import { PartialChangeBoundsOperationHandler } from "./handler/partialChangeBoundsOperationHandler.js";
+import { MetadataManager } from "./metadataManager.js";
+import { UpdateClientOperationHandler } from "./handler/updateClientHandler.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclipse-glsp/server");
@@ -37,15 +45,16 @@ export abstract class BaseDiagramModule extends DiagramModule {
         const context = { bind, unbind, isBound, rebind };
         bindOrRebind(context, LanguageServicesKey).toConstantValue(this.services);
         applyBindingTarget(context, ModelIdProvider, this.bindModelIdProvider()).inSingletonScope();
+        applyBindingTarget(context, MetadataManager, this.bindMetadataManager()).inSingletonScope();
         this.configureAdditional(context);
     }
 
     /**
      * Configures additional bindings in the GLSP container.
      *
-     * @param context The binding context
+     * @param _context The binding context
      */
-    protected configureAdditional(context: BindingContext): void { }
+    protected configureAdditional(_context: BindingContext): void {}
 
     protected override bindModelState(): BindingTarget<ModelState> {
         return ModelState;
@@ -61,7 +70,9 @@ export abstract class BaseDiagramModule extends DiagramModule {
 
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         super.configureOperationHandlers(binding);
+        binding.add(UpdateClientOperationHandler);
         binding.add(ChangeBoundsOperationHandler);
+        binding.add(PartialChangeBoundsOperationHandler);
     }
 
     /**
@@ -70,4 +81,11 @@ export abstract class BaseDiagramModule extends DiagramModule {
      * @returns The binding target for the ModelIdProvider
      */
     protected abstract bindModelIdProvider(): BindingTarget<ModelIdProvider>;
+
+    /**
+     * Binds the metadata manager for handling graph metadata.
+     *
+     * @returns The binding target for the MetadataManager
+     */
+    protected abstract bindMetadataManager(): BindingTarget<MetadataManager>;
 }

@@ -17,7 +17,7 @@ export class GLabel extends GModelElement {
 export class GLabelBuilder<T extends GLabel = GLabel> extends GModelElementBuilder<T> {
     /**
      * Sets the text content of the label.
-     * 
+     *
      * @param text The text to display
      * @returns This builder for chaining
      */

@@ -7,6 +7,9 @@ import { GNodeView } from "./nodeView.js";
 const { injectable } = sharedImport("inversify");
 const { svg, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 
+/**
+ * Abstract view for rendering HTML node elements within an SVG context.
+ */
 @injectable()
 export abstract class GHtmlNodeView extends GNodeView {
     override render(model: Readonly<GHtmlNode>, context: RenderingContext, args?: {}): VNode | undefined {
@@ -27,8 +30,7 @@ export abstract class GHtmlNodeView extends GNodeView {
             },
             this.renderForeignElement(model, context, args)
         );
-
-        return svg("g", {}, foreignObjectVNode, ...this.renderControlElements(model));
+        return svg("g", null, foreignObjectVNode, ...this.renderControlElements(model));
     }
 
     /**

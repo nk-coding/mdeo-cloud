@@ -22,7 +22,7 @@ export interface NodePositionMetadata {
     /**
      * The position of the node in the diagram.
      */
-    position: Point;
+    position?: Point;
 }
 
 /**
@@ -41,7 +41,7 @@ export namespace NodePositionMetadata {
         }
 
         const meta = obj as Partial<NodePositionMetadata>;
-        return meta.position !== undefined && isValidPoint(meta.position);
+        return meta.position === undefined || isValidPoint(meta.position);
     }
 
     /**

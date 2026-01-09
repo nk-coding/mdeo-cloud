@@ -9,7 +9,6 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class GClassLabelView extends GLabelView {
-    
     protected override getClasses(model: Readonly<GLabel>): Record<string, boolean> {
         return {
             ...super.getClasses(model),

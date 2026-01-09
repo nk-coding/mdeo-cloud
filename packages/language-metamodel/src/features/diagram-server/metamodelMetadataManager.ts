@@ -4,13 +4,11 @@ import {
     type GraphMetadata,
     type NodeMetadata,
     type EdgeMetadata,
-    NodeLayoutMetadata,
-    EdgeVisualMetadata,
-    EdgePlacementMetadata,
     ModelIdRegistry,
     ModelIdProvider,
     type ModelIdProvider as ModelIdProviderType
 } from "@mdeo/language-shared";
+import { NodeLayoutMetadata, EdgeVisualMetadata, EdgePlacementMetadata } from "@mdeo/editor-protocol";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import type { MetaModelType, ClassType, AssociationType } from "../../grammar/metamodelTypes.js";

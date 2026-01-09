@@ -1,4 +1,9 @@
-import type { IView, RenderingContext, EdgeRouterRegistry as EdgeRouterRegistryType, ViewerOptions } from "@eclipse-glsp/sprotty";
+import type {
+    IView,
+    RenderingContext,
+    EdgeRouterRegistry as EdgeRouterRegistryType,
+    ViewerOptions
+} from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { VNode } from "snabbdom";
 import type { GGraph } from "@eclipse-glsp/client";
@@ -8,16 +13,15 @@ const { svg, EdgeRouterRegistry, TYPES } = sharedImport("@eclipse-glsp/sprotty")
 
 @injectable()
 export class GGraphView implements IView {
-
     @inject(EdgeRouterRegistry) protected edgeRouterRegistry!: EdgeRouterRegistryType;
-     @inject(TYPES.ViewerOptions) protected options!: ViewerOptions;
+    @inject(TYPES.ViewerOptions) protected options!: ViewerOptions;
 
     get backgroundPatternId(): string {
         return this.options.baseDiv + "-background-pattern";
     }
 
-    render(model: Readonly<GGraph>, context: RenderingContext, args?: {} | undefined): VNode | undefined {
-         const edgeRouting = this.edgeRouterRegistry.routeAllChildren(model);
+    render(model: Readonly<GGraph>, context: RenderingContext): VNode | undefined {
+        const edgeRouting = this.edgeRouterRegistry.routeAllChildren(model);
         const transform = `scale(${model.zoom}) translate(${-model.scroll.x},${-model.scroll.y})`;
         return svg(
             "svg",
@@ -34,10 +38,10 @@ export class GGraphView implements IView {
                 {
                     attrs: {
                         transform
-                    },
+                    }
                 },
                 ...context.renderChildren(model, { edgeRouting })
-            ),
+            )
         );
     }
 
