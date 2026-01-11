@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: mdeo
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d mdeo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/docker/backend/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      SESSION_MAX_IDLE_SECONDS: ${SESSION_MAX_IDLE_SECONDS}
+      SESSION_MAX_ABSOLUTE_SECONDS: ${SESSION_MAX_ABSOLUTE_SECONDS}
+      CSRF_ROTATION_SECONDS: ${CSRF_ROTATION_SECONDS}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE}
+      CORS_ALLOWED_HOSTS: ${CORS_ALLOWED_HOSTS}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PLUGIN_CACHE_TTL_SECONDS: ${PLUGIN_CACHE_TTL_SECONDS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  workbench:
+    build:
+      context: ..
+      dockerfile: infra/docker/workbench/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

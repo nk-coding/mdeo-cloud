@@ -2,7 +2,7 @@
     "name": "Node.js",
     "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
     "forwardPorts": [4242],
-    "postCreateCommand": "npm ci",
+    "postCreateCommand": "cd app && npm ci",
     "customizations": {
         "vscode": {
             "extensions": ["esbenp.prettier-vscode", "Vue.volar", "bradlc.vscode-tailwindcss"]

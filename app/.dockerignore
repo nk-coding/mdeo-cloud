@@ -1,0 +1,82 @@
+# Build outputs
+**/build/
+**/dist/
+*.tsbuildinfo
+
+# Dependencies
+**/node_modules/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files
+*.test.ts
+*.spec.ts
+*.test.js
+*.spec.js
+**/__tests__/
+**/__mocks__/
+**/coverage/
+
+# Documentation
+*.md
+!packages/*/README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Docker
+**/Dockerfile
+**/.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# Source maps (if not needed)
+**/*.map
+
+# TypeScript
+*.tsbuildinfo
+
+# ESLint cache
+.eslintcache
+
+# Keep only what's needed for the build
+!package.json
+!package-lock.json
+!tsconfig*.json
+!vite.config.ts
+!tailwind.config.ts
+!postcss.config.js
+!eslint.config.mjs
+!components.json
+!public/
+!src/
+!packages/

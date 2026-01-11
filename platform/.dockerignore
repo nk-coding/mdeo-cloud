@@ -1,0 +1,86 @@
+# Build outputs
+build/
+dist/
+**/build/
+**/dist/
+*.jar
+*.class
+
+# Gradle
+.gradle/
+**/.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Dependencies (will be fetched during build)
+**/node_modules/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files
+*.test.ts
+*.spec.ts
+*.test.js
+*.spec.js
+**/__tests__/
+**/__mocks__/
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+*.md
+!app/packages/*/README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+docker-compose*.yaml
+Dockerfile
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Coverage
+coverage/
+.nyc_output/
+*.lcov
