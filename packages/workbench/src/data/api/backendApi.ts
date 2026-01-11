@@ -5,7 +5,8 @@ import type {
     FileType
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { Project } from "../project/project";
-import type { ApiResult, FileSystemError, ProjectError } from "./apiResult";
+import type { ApiResult, FileSystemError, ProjectError, PluginError } from "./apiResult";
+import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
 
 /**
  * Backend API interface for managing projects and file system operations.
@@ -161,4 +162,69 @@ export interface BackendApi {
      *          Possible errors: FileNotFound, Unavailable, Unknown
      */
     writeMetadata(projectId: string, path: string, metadata: object): Promise<ApiResult<void, FileSystemError>>;
+
+    /**
+     * Creates a new plugin.
+     *
+     * @param url The URL where the plugin is hosted
+     * @returns A promise that resolves to an ApiResult containing the ID of the created plugin
+     *          Possible errors: PluginAlreadyExists, Unavailable, Unknown
+     */
+    createPlugin(url: string): Promise<ApiResult<string, PluginError>>;
+
+    /**
+     * Deletes a plugin.
+     *
+     * @param pluginId The ID of the plugin to delete
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: PluginNotFound, Unavailable, Unknown
+     */
+    deletePlugin(pluginId: string): Promise<ApiResult<void, PluginError>>;
+
+    /**
+     * Gets all plugins.
+     *
+     * @returns A promise that resolves to an ApiResult containing an array of plugins
+     *          Possible errors: Unavailable, Unknown
+     */
+    getPlugins(): Promise<ApiResult<BackendPlugin[], PluginError>>;
+
+    /**
+     * Gets all plugins associated with a project.
+     *
+     * @param projectId The ID of the project
+     * @returns A promise that resolves to an ApiResult containing an array of plugins
+     *          Possible errors: ProjectNotFound, Unavailable, Unknown
+     */
+    getProjectPlugins(projectId: string): Promise<ApiResult<BackendPlugin[], PluginError>>;
+
+    /**
+     * Adds a plugin to a project.
+     *
+     * @param projectId The ID of the project
+     * @param pluginId The ID of the plugin to add
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: ProjectNotFound, PluginNotFound, PluginAlreadyAddedToProject, Unavailable, Unknown
+     */
+    addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>>;
+
+    /**
+     * Removes a plugin from a project.
+     *
+     * @param projectId The ID of the project
+     * @param pluginId The ID of the plugin to remove
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: ProjectNotFound, PluginNotFound, PluginNotAddedToProject, Unavailable, Unknown
+     */
+    removePluginFromProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>>;
+
+    /**
+     * Resolves a plugin to its implementation.
+     * This will return a more detailed interface in the future.
+     *
+     * @param pluginId The ID of the plugin to resolve
+     * @returns A promise that resolves to an ApiResult containing the resolved plugin
+     *          Possible errors: PluginNotFound, Unavailable, Unknown
+     */
+    resolvePlugin(pluginId: string): Promise<ApiResult<ResolvedPlugin, PluginError>>;
 }

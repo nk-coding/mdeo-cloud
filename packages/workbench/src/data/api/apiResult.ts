@@ -30,9 +30,19 @@ export enum ProjectErrorCode {
 }
 
 /**
+ * Error codes specific to plugin operations.
+ */
+export enum PluginErrorCode {
+    PluginNotFound = "PluginNotFound",
+    PluginAlreadyExists = "PluginAlreadyExists",
+    PluginAlreadyAddedToProject = "PluginAlreadyAddedToProject",
+    PluginNotAddedToProject = "PluginNotAddedToProject"
+}
+
+/**
  * Union of all possible error codes.
  */
-export type ApiErrorCode = CommonErrorCode | FileSystemErrorCode | ProjectErrorCode;
+export type ApiErrorCode = CommonErrorCode | FileSystemErrorCode | ProjectErrorCode | PluginErrorCode;
 
 /**
  * Base interface for API errors.
@@ -62,6 +72,11 @@ export type FileSystemError = ApiError<FileSystemErrorCode | CommonErrorCode>;
  * Error type for project operations.
  */
 export type ProjectError = ApiError<ProjectErrorCode | CommonErrorCode>;
+
+/**
+ * Error type for plugin operations.
+ */
+export type PluginError = ApiError<PluginErrorCode | CommonErrorCode>;
 
 /**
  * Creates a successful API result.
@@ -105,5 +120,18 @@ export function projectFailure<T>(
     code: ProjectErrorCode | CommonErrorCode,
     message: string
 ): ApiResult<T, ProjectError> {
+    return { success: false, error: { code, message } };
+}
+
+/**
+ * Creates a failed API result with a plugin error.
+ * @param code The plugin or common error code indicating the type of failure.
+ * @param message A descriptive error message explaining the failure.
+ * @returns A failed API result containing the plugin error information.
+ */
+export function pluginFailure<T>(
+    code: PluginErrorCode | CommonErrorCode,
+    message: string
+): ApiResult<T, PluginError> {
     return { success: false, error: { code, message } };
 }

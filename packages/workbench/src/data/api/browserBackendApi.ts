@@ -7,15 +7,19 @@ import type {
 import { FileType as VSCodeFileType } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { BackendApi } from "./backendApi";
 import type { Project } from "../project/project";
-import type { ApiResult, FileSystemError, ProjectError } from "./apiResult";
+import type { ApiResult, FileSystemError, ProjectError, PluginError } from "./apiResult";
+import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
 import {
     success,
     fileSystemFailure,
     projectFailure,
+    pluginFailure,
     FileSystemErrorCode,
     ProjectErrorCode,
+    PluginErrorCode,
     CommonErrorCode
 } from "./apiResult";
+import { Puzzle } from "lucide";
 
 interface FileEntry {
     type: FileType;
@@ -26,6 +30,10 @@ interface FileEntry {
 interface ProjectData {
     id: string;
     name: string;
+    pluginIds?: string[];
+}
+
+interface PluginData extends BackendPlugin {
 }
 
 /**
@@ -33,7 +41,7 @@ interface ProjectData {
  */
 export class BrowserBackendApi implements BackendApi {
     private dbName = "mdeo-workbench";
-    private dbVersion = 2;
+    private dbVersion = 3;
     private db: IDBDatabase | null = null;
 
     constructor() {
@@ -72,6 +80,11 @@ export class BrowserBackendApi implements BackendApi {
                 // Key format: "projectId/path"
                 if (!db.objectStoreNames.contains("metadata")) {
                     db.createObjectStore("metadata");
+                }
+
+                // Store for plugins
+                if (!db.objectStoreNames.contains("plugins")) {
+                    db.createObjectStore("plugins", { keyPath: "id" });
                 }
             };
         });
@@ -708,5 +721,296 @@ export class BrowserBackendApi implements BackendApi {
 
         await this.setMetadata(projectId, path, metadata);
         return success(undefined);
+    }
+
+    // Plugin operations
+
+    async createPlugin(url: string): Promise<ApiResult<string, PluginError>> {
+        try {
+            const db = await this.ensureDB();
+            const pluginId = `plugin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Create plugin with dummy data
+            const plugin: PluginData = {
+                id: pluginId,
+                url,
+                name: `Plugin from ${new URL(url).hostname}`,
+                description: "Plugin description will be loaded from plugin metadata",
+                icon: Puzzle
+            };
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["plugins"], "readwrite");
+                const store = transaction.objectStore("plugins");
+                const request = store.add(plugin);
+
+                request.onsuccess = () => resolve(success(pluginId));
+                request.onerror = () => {
+                    resolve(pluginFailure(PluginErrorCode.PluginAlreadyExists, `Plugin already exists`));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to create plugin: ${error}`);
+        }
+    }
+
+    async deletePlugin(pluginId: string): Promise<ApiResult<void, PluginError>> {
+        try {
+            const db = await this.ensureDB();
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["plugins"], "readwrite");
+                const store = transaction.objectStore("plugins");
+                
+                // Check if plugin exists
+                const getRequest = store.get(pluginId);
+                
+                getRequest.onsuccess = () => {
+                    if (!getRequest.result) {
+                        resolve(pluginFailure(PluginErrorCode.PluginNotFound, `Plugin not found: ${pluginId}`));
+                        return;
+                    }
+                    
+                    const deleteRequest = store.delete(pluginId);
+                    deleteRequest.onsuccess = () => resolve(success(undefined));
+                    deleteRequest.onerror = () => {
+                        resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to delete plugin: ${pluginId}`));
+                    };
+                };
+                
+                getRequest.onerror = () => {
+                    resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to check plugin existence: ${pluginId}`));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to delete plugin: ${error}`);
+        }
+    }
+
+    async getPlugins(): Promise<ApiResult<BackendPlugin[], PluginError>> {
+        try {
+            const db = await this.ensureDB();
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["plugins"], "readonly");
+                const store = transaction.objectStore("plugins");
+                const request = store.getAll();
+
+                request.onsuccess = () => resolve(success(request.result));
+                request.onerror = () => {
+                    resolve(pluginFailure(CommonErrorCode.Unknown, "Failed to get plugins"));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to get plugins: ${error}`);
+        }
+    }
+
+    async getProjectPlugins(projectId: string): Promise<ApiResult<BackendPlugin[], PluginError>> {
+        try {
+            const db = await this.ensureDB();
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["projects", "plugins"], "readonly");
+                const projectStore = transaction.objectStore("projects");
+                const pluginStore = transaction.objectStore("plugins");
+                
+                const projectRequest = projectStore.get(projectId);
+                
+                projectRequest.onsuccess = () => {
+                    const project = projectRequest.result as ProjectData | undefined;
+                    
+                    if (!project) {
+                        resolve(pluginFailure(CommonErrorCode.Unknown, `Project not found: ${projectId}`));
+                        return;
+                    }
+                    
+                    const pluginIds = project.pluginIds || [];
+                    
+                    if (pluginIds.length === 0) {
+                        resolve(success([]));
+                        return;
+                    }
+                    
+                    const plugins: BackendPlugin[] = [];
+                    let processed = 0;
+                    
+                    pluginIds.forEach((pluginId) => {
+                        const pluginRequest = pluginStore.get(pluginId);
+                        
+                        pluginRequest.onsuccess = () => {
+                            if (pluginRequest.result) {
+                                plugins.push(pluginRequest.result);
+                            }
+                            processed++;
+                            
+                            if (processed === pluginIds.length) {
+                                resolve(success(plugins));
+                            }
+                        };
+                        
+                        pluginRequest.onerror = () => {
+                            processed++;
+                            if (processed === pluginIds.length) {
+                                resolve(success(plugins));
+                            }
+                        };
+                    });
+                };
+                
+                projectRequest.onerror = () => {
+                    resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to get project: ${projectId}`));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to get project plugins: ${error}`);
+        }
+    }
+
+    async addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>> {
+        try {
+            const db = await this.ensureDB();
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["projects", "plugins"], "readwrite");
+                const projectStore = transaction.objectStore("projects");
+                const pluginStore = transaction.objectStore("plugins");
+                
+                // Check if plugin exists
+                const pluginRequest = pluginStore.get(pluginId);
+                
+                pluginRequest.onsuccess = () => {
+                    if (!pluginRequest.result) {
+                        resolve(pluginFailure(PluginErrorCode.PluginNotFound, `Plugin not found: ${pluginId}`));
+                        return;
+                    }
+                    
+                    // Get project
+                    const projectRequest = projectStore.get(projectId);
+                    
+                    projectRequest.onsuccess = () => {
+                        const project = projectRequest.result as ProjectData | undefined;
+                        
+                        if (!project) {
+                            resolve(pluginFailure(CommonErrorCode.Unknown, `Project not found: ${projectId}`));
+                            return;
+                        }
+                        
+                        if (!project.pluginIds) {
+                            project.pluginIds = [];
+                        }
+                        
+                        if (project.pluginIds.includes(pluginId)) {
+                            resolve(pluginFailure(PluginErrorCode.PluginAlreadyAddedToProject, `Plugin already added to project`));
+                            return;
+                        }
+                        
+                        project.pluginIds.push(pluginId);
+                        
+                        const updateRequest = projectStore.put(project);
+                        updateRequest.onsuccess = () => resolve(success(undefined));
+                        updateRequest.onerror = () => {
+                            resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to update project`));
+                        };
+                    };
+                    
+                    projectRequest.onerror = () => {
+                        resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to get project: ${projectId}`));
+                    };
+                };
+                
+                pluginRequest.onerror = () => {
+                    resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to check plugin existence: ${pluginId}`));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to add plugin to project: ${error}`);
+        }
+    }
+
+    async removePluginFromProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>> {
+        try {
+            const db = await this.ensureDB();
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["projects", "plugins"], "readwrite");
+                const projectStore = transaction.objectStore("projects");
+                const pluginStore = transaction.objectStore("plugins");
+                
+                // Check if plugin exists
+                const pluginRequest = pluginStore.get(pluginId);
+                
+                pluginRequest.onsuccess = () => {
+                    if (!pluginRequest.result) {
+                        resolve(pluginFailure(PluginErrorCode.PluginNotFound, `Plugin not found: ${pluginId}`));
+                        return;
+                    }
+                    
+                    // Get project
+                    const projectRequest = projectStore.get(projectId);
+                    
+                    projectRequest.onsuccess = () => {
+                        const project = projectRequest.result as ProjectData | undefined;
+                        
+                        if (!project) {
+                            resolve(pluginFailure(CommonErrorCode.Unknown, `Project not found: ${projectId}`));
+                            return;
+                        }
+                        
+                        if (!project.pluginIds || !project.pluginIds.includes(pluginId)) {
+                            resolve(pluginFailure(PluginErrorCode.PluginNotAddedToProject, `Plugin not added to project`));
+                            return;
+                        }
+                        
+                        project.pluginIds = project.pluginIds.filter(id => id !== pluginId);
+                        
+                        const updateRequest = projectStore.put(project);
+                        updateRequest.onsuccess = () => resolve(success(undefined));
+                        updateRequest.onerror = () => {
+                            resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to update project`));
+                        };
+                    };
+                    
+                    projectRequest.onerror = () => {
+                        resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to get project: ${projectId}`));
+                    };
+                };
+                
+                pluginRequest.onerror = () => {
+                    resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to check plugin existence: ${pluginId}`));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to remove plugin from project: ${error}`);
+        }
+    }
+
+    async resolvePlugin(pluginId: string): Promise<ApiResult<ResolvedPlugin, PluginError>> {
+        try {
+            const db = await this.ensureDB();
+
+            return new Promise((resolve) => {
+                const transaction = db.transaction(["plugins"], "readonly");
+                const store = transaction.objectStore("plugins");
+                const request = store.get(pluginId);
+
+                request.onsuccess = () => {
+                    if (!request.result) {
+                        resolve(pluginFailure(PluginErrorCode.PluginNotFound, `Plugin not found: ${pluginId}`));
+                        return;
+                    }
+                    
+                    // Return empty resolved plugin for now
+                    const resolvedPlugin: ResolvedPlugin = {};
+                    resolve(success(resolvedPlugin));
+                };
+                
+                request.onerror = () => {
+                    resolve(pluginFailure(CommonErrorCode.Unknown, `Failed to resolve plugin: ${pluginId}`));
+                };
+            });
+        } catch (error) {
+            return pluginFailure(CommonErrorCode.Unknown, `Failed to resolve plugin: ${error}`);
+        }
     }
 }
