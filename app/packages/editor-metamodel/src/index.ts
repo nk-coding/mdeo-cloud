@@ -6,6 +6,7 @@ export * from "./model/classNode.js";
 export * from "./model/elementTypes.js";
 export * from "./model/inheritanceEdge.js";
 export * from "./model/propertyLabel.js";
+export * from "./views/classLabelView.js";
 export * from "./views/classNodeView.js";
 export * from "./module.js";
 export * from "./plugin.js";

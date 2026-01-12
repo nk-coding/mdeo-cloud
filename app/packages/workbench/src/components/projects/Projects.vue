@@ -1,116 +1,129 @@
 <template>
-    <div class="flex flex-col h-full">
-        <div class="px-3 pt-3 pb-2">
-            <Button @click="openNewProjectDialog" class="w-full mb-2">
-                <Plus class="w-4 h-4 mr-2" />New Project
-            </Button>
-            <Input v-model="searchText" placeholder="Search projects..." />
-        </div>
-        <ScrollArea class="flex-1 min-h-0 w-full">
-            <Tree class="flex-1 w-full p-2" :active-element="activeProject" :expanded-items="expandedItems">
-                <TreeItem
-                    v-for="project in filteredProjects"
-                    :key="project.id"
-                    :data="project"
-                    :is-folder="false"
-                    :has-children="false"
-                    @click="handleSelectProject(project)"
-                >
-                    <template #content>
-                        <Folder class="w-4 h-4 mr-2" />
-                        <span>{{ project.name }}</span>
-                    </template>
-                </TreeItem>
-            </Tree>
-        </ScrollArea>
-
-        <Dialog v-model:open="isNewProjectDialogOpen">
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Create New Project</DialogTitle>
-                    <DialogDescription> Enter a name for your new project. </DialogDescription>
-                </DialogHeader>
-                <div class="py-4">
-                    <Input v-model="newProjectName" placeholder="Project name" @keydown.enter="handleCreateProject" />
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" @click="isNewProjectDialogOpen = false"> Cancel </Button>
-                    <Button @click="handleCreateProject" :disabled="!newProjectName.trim()"> Create </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    </div>
+    <ProjectsList
+        v-if="showProjectsList || project == undefined"
+        :projects="projects"
+        @create-project="handleCreateProject"
+        @close="handleCloseToDetails"
+    />
+    <ProjectDetails
+        v-else
+        :plugins="projectPlugins"
+        :users="projectUsers"
+        @update-name="handleUpdateProjectName"
+        @plugins-updated="handlePluginsUpdated"
+        @users-updated="handleUsersUpdated"
+        @delete-project="handleDeleteProject"
+        @open-projects="handleOpenProjects"
+    />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onActivated } from "vue";
-import Tree from "@/components/tree/Tree.vue";
-import TreeItem from "@/components/tree/TreeItem.vue";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import ScrollArea from "@/components/ui/scroll-area/ScrollArea.vue";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
-} from "@/components/ui/dialog";
+import { ref, inject, onActivated, watch } from "vue";
 import { workbenchStateKey } from "@/components/workbench/util";
 import type { Project } from "@/data/project/project";
-import { Folder, Plus } from "lucide-vue-next";
+import type { BackendPlugin } from "@/data/api/pluginTypes";
+import type { UserInfo } from "@/data/api/backendApi";
+import ProjectsList from "./ProjectsList.vue";
+import ProjectDetails from "./ProjectDetails.vue";
 
 const { backendApi, project } = inject(workbenchStateKey)!;
 
 const projects = ref<Project[]>([]);
-const searchText = ref("");
-const activeProject = computed(() => project.value);
-const expandedItems = ref<Set<any>>(new Set());
+const showProjectsList = ref(false);
 
-const isNewProjectDialogOpen = ref(false);
-const newProjectName = ref("");
-
-const filteredProjects = computed(() => {
-    if (!searchText.value.trim()) {
-        return projects.value;
-    }
-    const search = searchText.value.toLowerCase();
-    return projects.value.filter((p) => p.name.toLowerCase().includes(search));
-});
+const projectPlugins = ref<BackendPlugin[]>([]);
+const projectUsers = ref<UserInfo[]>([]);
 
 async function loadProjects() {
     const result = await backendApi.getProjects();
-    console.log(result)
     if (result.success) {
         projects.value = result.value;
     }
 }
 
-function handleSelectProject(selectedProject: Project) {
-    project.value = selectedProject;
-}
-
-function openNewProjectDialog() {
-    newProjectName.value = "";
-    isNewProjectDialogOpen.value = true;
-}
-
-async function handleCreateProject() {
-    const name = newProjectName.value.trim();
-    if (!name) {
+async function loadProjectDetails() {
+    if (!project.value) {
         return;
     }
 
+    const [pluginsResult, usersResult] = await Promise.all([
+        backendApi.getProjectPlugins(project.value.id),
+        backendApi.getProjectOwners(project.value.id)
+    ]);
+
+    if (pluginsResult.success) {
+        projectPlugins.value = pluginsResult.value;
+    }
+    if (usersResult.success) {
+        projectUsers.value = usersResult.value;
+    }
+}
+
+function handleOpenProjects() {
+    showProjectsList.value = true;
+}
+
+function handleCloseToDetails() {
+    if (project.value) {
+        showProjectsList.value = false;
+    }
+}
+
+async function handleCreateProject(name: string) {
     const result = await backendApi.createProject(name);
     if (result.success) {
+        const created = result.value;
+        project.value = created;
         await loadProjects();
-        isNewProjectDialogOpen.value = false;
-        newProjectName.value = "";
+    }
+}
+
+async function handleUpdateProjectName(name: string) {
+    if (!project.value) {
+        return;
+    }
+
+    const result = await backendApi.updateProject(project.value.id, { name });
+    if (result.success) {
+        const updated = result.value;
+        await loadProjects();
+        if (project.value?.id === updated.id) {
+            project.value = updated;
+        }
+    }
+}
+
+function handlePluginsUpdated() {
+    loadProjectDetails();
+}
+
+function handleUsersUpdated() {
+    loadProjectDetails();
+}
+
+async function handleDeleteProject() {
+    if (project.value == undefined) {
+        return;
+    }
+
+    const result = await backendApi.deleteProject(project.value.id);
+    if (result.success) {
+        await loadProjects();
+        project.value = undefined;
     }
 }
 
 onActivated(async () => {
     await loadProjects();
+    if (project.value) {
+        await loadProjectDetails();
+    }
+});
+
+watch(project, async (newProject) => {
+    if (newProject != undefined) {
+        await loadProjectDetails();
+    }
+    showProjectsList.value = false;
 });
 </script>

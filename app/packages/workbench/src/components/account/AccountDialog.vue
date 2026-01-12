@@ -29,10 +29,9 @@
                                 <Field>
                                     <FieldLabel for="current-password">Current password</FieldLabel>
                                     <FieldContent>
-                                        <Input
+                                        <PasswordField
                                             id="current-password"
                                             v-model="currentPassword"
-                                            type="password"
                                             autocomplete="current-password"
                                             placeholder="••••••••"
                                         />
@@ -42,12 +41,10 @@
                                 <Field>
                                     <FieldLabel for="new-password">New password</FieldLabel>
                                     <FieldContent>
-                                        <Input
+                                        <PasswordField
                                             id="new-password"
                                             v-model="newPassword"
-                                            type="password"
                                             autocomplete="new-password"
-                                            placeholder="Choose something secure"
                                         />
                                     </FieldContent>
                                 </Field>
@@ -55,10 +52,9 @@
                                 <Field>
                                     <FieldLabel for="confirm-password">Confirm new password</FieldLabel>
                                     <FieldContent>
-                                        <Input
+                                        <PasswordField
                                             id="confirm-password"
                                             v-model="confirmPassword"
-                                            type="password"
                                             autocomplete="new-password"
                                             placeholder="Repeat new password"
                                         />
@@ -71,7 +67,9 @@
 
                                 <Field v-if="passwordSuccess">
                                     <FieldContent>
-                                        <div class="rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-500">
+                                        <div
+                                            class="rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-500"
+                                        >
                                             {{ passwordSuccess }}
                                         </div>
                                     </FieldContent>
@@ -91,7 +89,13 @@
                 </Collapsible>
 
                 <div class="flex flex-wrap justify-between gap-3">
-                    <Button type="button" variant="destructive" class="flex-1" @click="handleLogout" :disabled="isLoggingOut">
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        class="flex-1"
+                        @click="handleLogout"
+                        :disabled="isLoggingOut"
+                    >
                         <LogOut class="h-4 w-4" />
                         <span>{{ isLoggingOut ? "Logging out…" : "Log out" }}</span>
                     </Button>
@@ -109,7 +113,7 @@ import { computed, inject, ref } from "vue";
 import { UserRound, LogOut, ChevronDown, ChevronUp } from "lucide-vue-next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import PasswordField from "@/components/auth/PasswordField.vue";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { authStateKey } from "../workbench/util";

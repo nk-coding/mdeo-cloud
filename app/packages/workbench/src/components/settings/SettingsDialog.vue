@@ -7,7 +7,9 @@
 
             <Tabs v-model="activeTab" class="flex-1 flex flex-col min-h-0">
                 <div class="flex items-center gap-3 pb-3">
-                    <div class="flex items-center justify-center h-9 w-9 rounded-full bg-muted/30 text-muted-foreground">
+                    <div
+                        class="flex items-center justify-center h-9 w-9 rounded-full bg-muted/30 text-muted-foreground"
+                    >
                         <Settings class="w-4 h-4" />
                     </div>
                     <TabsList class="inline-flex h-9 items-center gap-1 rounded-full bg-muted/30 p-1">
@@ -23,7 +25,7 @@
                 </div>
 
                 <TabsContent value="users" class="flex-1 min-h-0">
-                    <UserManagement />
+                    <UserManagement :backend-api="backendApi" />
                 </TabsContent>
 
                 <TabsContent value="plugins" class="flex-1 min-h-0 overflow-hidden">

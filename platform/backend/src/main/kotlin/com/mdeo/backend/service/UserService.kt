@@ -214,6 +214,54 @@ class UserService {
         }
     }
     
+    /**
+     * Retrieves all users in the system.
+     *
+     * @return List of all users
+     */
+    fun getAllUsers(): List<UserInfo> {
+        return transaction {
+            UsersTable.selectAll()
+                .map { 
+                    UserInfo(
+                        id = it[UsersTable.id].toString(),
+                        username = it[UsersTable.username],
+                        isAdmin = it[UsersTable.roles].contains(UserRoles.ADMIN)
+                    )
+                }
+        }
+    }
+    
+    /**
+     * Updates a user's admin status by adding or removing the admin role.
+     *
+     * @param userId The UUID of the user to update
+     * @param isAdmin Whether the user should have admin privileges
+     * @return true if the user was updated, false if user not found
+     */
+    fun updateUserAdmin(userId: UUID, isAdmin: Boolean): Boolean {
+        return transaction {
+            val row = UsersTable.selectAll()
+                .where { UsersTable.id eq userId }
+                .firstOrNull() ?: return@transaction false
+            
+            val currentRoles = row[UsersTable.roles].split(",").filter { it.isNotBlank() }.toMutableSet()
+            
+            if (isAdmin) {
+                currentRoles.add(UserRoles.ADMIN)
+            } else {
+                currentRoles.remove(UserRoles.ADMIN)
+            }
+            
+            UsersTable.update({ UsersTable.id eq userId }) {
+                it[roles] = currentRoles.joinToString(",")
+                it[updatedAt] = Instant.now()
+            }
+            
+            true
+        }
+    }
+    
     private fun hashPassword(password: String): String {
         return BCrypt.withDefaults().hashToString(12, password.toCharArray())
     }

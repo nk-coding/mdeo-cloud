@@ -159,6 +159,7 @@ export class WorkbenchState {
                         id: newProject.id,
                         uri: Uri.parse(`file:///${newProject.id}`)
                     });
+                    this.backendApi.precache(newProject);
                 }
             }
         }

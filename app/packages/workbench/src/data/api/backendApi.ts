@@ -133,24 +133,24 @@ export interface BackendApi {
     getProjects(): Promise<ApiResult<Project[], ProjectError>>;
 
     /**
-     * Creates a new project.
+     * Creates a new project and returns the created project.
      *
      * @param name The name of the project
      * @param metadata Optional metadata for the project
-     * @returns A promise that resolves to an ApiResult containing the ID of the created project
+     * @returns A promise that resolves to an ApiResult containing the created project
      *          Possible errors: Unavailable, Unknown
      */
-    createProject(name: string): Promise<ApiResult<string, ProjectError>>;
+    createProject(name: string): Promise<ApiResult<Project, ProjectError>>;
 
     /**
      * Updates an existing project's metadata.
      *
-     * @param projectId The ID of the project to update
+     * @param projectId The ID of the project to update.
      * @param updates The fields to update (e.g., name, metadata)
-     * @returns A promise that resolves to an ApiResult indicating success or failure
+     * @returns A promise that resolves to an ApiResult containing the updated project on success
      *          Possible errors: ProjectNotFound, Unavailable, Unknown
      */
-    updateProject(projectId: string, updates: { name?: string }): Promise<ApiResult<void, ProjectError>>;
+    updateProject(projectId: string, updates: { name?: string }): Promise<ApiResult<Project, ProjectError>>;
 
     /**
      * Deletes a project and all its associated files.
@@ -262,27 +262,27 @@ export interface BackendApi {
      * Register a new user account
      */
     register(username: string, password: string): Promise<ApiResult<User, CommonError>>;
-    
+
     /**
      * Logout the current user
      */
     logout(): Promise<void>;
-    
+
     /**
      * Change the current user's password
      */
     changePassword(currentPassword: string, newPassword: string): Promise<ApiResult<void, CommonError>>;
-    
+
     /**
      * Get project owners
      */
     getProjectOwners(projectId: string): Promise<ApiResult<UserInfo[], ProjectError>>;
-    
+
     /**
      * Add an owner to a project
      */
     addProjectOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>>;
-    
+
     /**
      * Remove an owner from a project
      */
@@ -291,8 +291,35 @@ export interface BackendApi {
     /**
      * Precache file tree for a project to optimize subsequent file operations.
      * When called with a different project, the previous cache is dropped.
-     * 
+     *
      * @param project The project to precache
      */
     precache(project: Project): Promise<void>;
+
+    /**
+     * Get all users in the system
+     *
+     * @returns A promise that resolves to an ApiResult containing an array of users
+     *          Possible errors: Unavailable, Unknown
+     */
+    getAllUsers(): Promise<ApiResult<User[], CommonError>>;
+
+    /**
+     * Get projects that a user owns
+     *
+     * @param userId The ID of the user
+     * @returns A promise that resolves to an ApiResult containing an array of projects
+     *          Possible errors: Unavailable, Unknown
+     */
+    getUserProjects(userId: string): Promise<ApiResult<Project[], ProjectError>>;
+
+    /**
+     * Update a user's admin status
+     *
+     * @param userId The ID of the user to update
+     * @param isAdmin The new admin status
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: Unavailable, Unknown
+     */
+    updateUserAdmin(userId: string, isAdmin: boolean): Promise<ApiResult<void, CommonError>>;
 }

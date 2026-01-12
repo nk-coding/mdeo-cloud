@@ -140,10 +140,3 @@ export namespace ApiResult {
         return { success: false, error: { code, message } };
     }
 }
-
-// Re-export helper functions at top-level for backward compatibility
-export const success = ApiResult.success;
-export const commonFailure = ApiResult.commonFailure;
-export const fileSystemFailure = ApiResult.fileSystemFailure;
-export const projectFailure = ApiResult.projectFailure;
-export const pluginFailure = ApiResult.pluginFailure;

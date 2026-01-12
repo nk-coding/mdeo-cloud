@@ -28,10 +28,64 @@ class PluginService(config: PluginConfig) {
         .maximumSize(100)
         .build<String, ResolvedPlugin>()
     
-    private val mockIcons = listOf(
-        "Puzzle", "Package", "Boxes", "Component", "Layers",
-        "Grid", "Layout", "Workflow", "GitBranch", "Code"
-    )
+    // Use a single mock Lucide-style icon node for all plugins in the backend.
+    // This is a JsonArray of icon children (tag + attributes) that the frontend
+    // expects and will convert via `convertIcon`.
+    private val mockIconNode = buildJsonArray {
+        addJsonArray {
+            add("path")
+            addJsonObject { put("d", "M 19 15 L 22 18") }
+        }
+        addJsonArray {
+            add("path")
+            addJsonObject { put("d", "M 22 18 L 19 21") }
+        }
+        addJsonArray {
+            add("path")
+            addJsonObject { put("d", "M2 18h20") }
+        }
+        addJsonArray {
+            add("path")
+            addJsonObject { put("d", "M4.8 10.4V8.6a.6.6 0 0 1 .6-.6h7.2a.6.6 0 0 1 .6.6v1.8") }
+        }
+        addJsonArray {
+            add("path")
+            addJsonObject { put("d", "M9 8V5.6") }
+        }
+        addJsonArray {
+            add("rect")
+            addJsonObject {
+                put("x", "11.4")
+                put("y", "10.4")
+                put("width", "3.6")
+                put("height", "3.6")
+                put("rx", ".6")
+                put("fill", "currentColor")
+            }
+        }
+        addJsonArray {
+            add("rect")
+            addJsonObject {
+                put("x", "3")
+                put("y", "10.4")
+                put("width", "3.6")
+                put("height", "3.6")
+                put("rx", ".6")
+                put("fill", "currentColor")
+            }
+        }
+        addJsonArray {
+            add("rect")
+            addJsonObject {
+                put("x", "7.2")
+                put("y", "2")
+                put("width", "3.6")
+                put("height", "3.6")
+                put("rx", ".6")
+                put("fill", "currentColor")
+            }
+        }
+    }
     
     /**
      * Retrieves all registered plugins.
@@ -278,12 +332,7 @@ class PluginService(config: PluginConfig) {
      * @return A JsonArray representing the icon node in Lucide format
      */
     private fun createIconNode(url: String): JsonArray {
-        val iconIndex = Math.abs(url.hashCode()) % mockIcons.size
-        val iconName = mockIcons[iconIndex]
-        
-        return buildJsonArray {
-            add(iconName)
-            addJsonObject { }
-        }
+        // For now return the fixed mock icon node defined above.
+        return mockIconNode
     }
 }

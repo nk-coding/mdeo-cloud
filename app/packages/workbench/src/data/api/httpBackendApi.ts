@@ -1,25 +1,28 @@
-import type {
-    IFileDeleteOptions,
-    IFileOverwriteOptions,
-    IFileWriteOptions,
+import {
+    type IFileDeleteOptions,
+    type IFileOverwriteOptions,
+    type IFileWriteOptions,
     FileType
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { BackendApi, User, UserInfo } from "./backendApi";
 import type { Project } from "../project/project";
-import type { ApiResult, FileSystemError, ProjectError, PluginError, CommonError } from "./apiResult";
-import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
 import {
-    success,
-    fileSystemFailure,
-    commonFailure,
-    CommonErrorCode
+    ApiResult,
+    type FileSystemError,
+    type ProjectError,
+    type PluginError,
+    type CommonError,
+    FileSystemErrorCode
 } from "./apiResult";
+import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
+import { CommonErrorCode } from "./apiResult";
 
 /**
  * Information cached about a file or directory
  */
 interface CachedFileInfo {
-    type: FileType;
+    exists: boolean;
+    type?: FileType;
     content?: Uint8Array;
     metadata?: object;
     dirEntries?: [string, FileType][];
@@ -32,33 +35,32 @@ export class HttpBackendApi implements BackendApi {
     private baseUrl: string;
     private cachedProjectId: string | null = null;
     private fileTreeCache: Map<string, CachedFileInfo> = new Map();
-    
+
     constructor(baseUrl: string = "/api") {
         this.baseUrl = baseUrl;
     }
-    
-    
+
     async getCurrentUser(): Promise<ApiResult<User, CommonError>> {
         try {
             const response = await fetch(`${this.baseUrl}/auth/me`, {
                 method: "GET",
                 credentials: "include"
             });
-            
+
             if (!response.ok) {
                 if (response.status === 401) {
-                    return commonFailure(CommonErrorCode.Unknown, "Not authenticated");
+                    return ApiResult.commonFailure(CommonErrorCode.Unknown, "Not authenticated");
                 }
-                return commonFailure(CommonErrorCode.Unavailable, "Failed to get current user");
+                return ApiResult.commonFailure(CommonErrorCode.Unavailable, "Failed to get current user");
             }
-            
+
             const data = await response.json();
-            return success(data.value);
+            return ApiResult.success(data.value);
         } catch (error) {
-            return commonFailure(CommonErrorCode.Unavailable, String(error));
+            return ApiResult.commonFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
-    
+
     async login(username: string, password: string): Promise<ApiResult<User, CommonError>> {
         try {
             const response = await fetch(`${this.baseUrl}/auth/login`, {
@@ -69,18 +71,18 @@ export class HttpBackendApi implements BackendApi {
                 credentials: "include",
                 body: JSON.stringify({ username, password })
             });
-            
+
             if (!response.ok) {
                 if (response.status === 401) {
-                    return commonFailure(CommonErrorCode.Unknown, "Invalid credentials");
+                    return ApiResult.commonFailure(CommonErrorCode.Unknown, "Invalid credentials");
                 }
-                return commonFailure(CommonErrorCode.Unavailable, "Login failed");
+                return ApiResult.commonFailure(CommonErrorCode.Unavailable, "Login failed");
             }
-            
+
             const data = await response.json();
-            return success(data.user);
+            return ApiResult.success(data.user);
         } catch (error) {
-            return commonFailure(CommonErrorCode.Unavailable, String(error));
+            return ApiResult.commonFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
 
@@ -97,25 +99,25 @@ export class HttpBackendApi implements BackendApi {
 
             if (!response.ok) {
                 if (response.status === 409) {
-                    return commonFailure(CommonErrorCode.Unknown, "Username already exists");
+                    return ApiResult.commonFailure(CommonErrorCode.Unknown, "Username already exists");
                 }
-                return commonFailure(CommonErrorCode.Unavailable, "Registration failed");
+                return ApiResult.commonFailure(CommonErrorCode.Unavailable, "Registration failed");
             }
 
             const data = await response.json();
-            return success(data.user);
+            return ApiResult.success(data.user);
         } catch (error) {
-            return commonFailure(CommonErrorCode.Unavailable, String(error));
+            return ApiResult.commonFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
-    
+
     async logout(): Promise<void> {
         await fetch(`${this.baseUrl}/auth/logout`, {
             method: "POST",
             credentials: "include"
         });
     }
-    
+
     async changePassword(currentPassword: string, newPassword: string): Promise<ApiResult<void, CommonError>> {
         try {
             const response = await fetch(`${this.baseUrl}/auth/password`, {
@@ -126,101 +128,131 @@ export class HttpBackendApi implements BackendApi {
                 credentials: "include",
                 body: JSON.stringify({ currentPassword, newPassword })
             });
-            
+
             if (!response.ok) {
                 if (response.status === 400) {
-                    return commonFailure(CommonErrorCode.Unknown, "Current password is incorrect");
+                    return ApiResult.commonFailure(CommonErrorCode.Unknown, "Current password is incorrect");
                 }
-                return commonFailure(CommonErrorCode.Unavailable, "Failed to change password");
+                return ApiResult.commonFailure(CommonErrorCode.Unavailable, "Failed to change password");
             }
-            
-            return success(undefined);
+
+            return ApiResult.success(undefined);
         } catch (error) {
-            return commonFailure(CommonErrorCode.Unavailable, String(error));
+            return ApiResult.commonFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
-    
-    
+
     async getProjects(): Promise<ApiResult<Project[], ProjectError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects`);
     }
-    
-    async createProject(name: string): Promise<ApiResult<string, ProjectError>> {
-        return this.fetchApiResult(`${this.baseUrl}/projects`, {
+
+    async createProject(name: string): Promise<ApiResult<Project, ProjectError>> {
+        return this.fetchApiResult<Project>(`${this.baseUrl}/projects`, {
             method: "POST",
             headers: {
-
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ name })
         });
     }
-    
-    async updateProject(projectId: string, updates: { name?: string }): Promise<ApiResult<void, ProjectError>> {
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}`, {
+
+    async updateProject(projectId: string, updates: { name?: string }): Promise<ApiResult<Project, ProjectError>> {
+        return this.fetchApiResult<Project>(`${this.baseUrl}/projects/${projectId}`, {
             method: "PUT",
             headers: {
-
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(updates)
         });
     }
-    
+
     async deleteProject(projectId: string): Promise<ApiResult<void, ProjectError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}`, {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
-    
-    
+
     async getProjectOwners(projectId: string): Promise<ApiResult<UserInfo[], ProjectError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/owners`);
     }
-    
+
     async addProjectOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/owners`, {
             method: "POST",
             headers: {
-
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ userId })
         });
     }
-    
+
     async removeProjectOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/owners/${userId}`, {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
-    
-    
+
     async readFile(projectId: string, path: string): Promise<ApiResult<Uint8Array, FileSystemError>> {
+        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
         if (this.cachedProjectId === projectId) {
-            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
             const cached = this.fileTreeCache.get(normalizedPath);
-            if (cached?.content !== undefined) {
-                return success(cached.content);
+            if (cached !== undefined) {
+                if (!cached.exists) {
+                    return ApiResult.fileSystemFailure(FileSystemErrorCode.FileNotFound, "File not found");
+                }
+                if (cached.type !== FileType.File) {
+                    return ApiResult.fileSystemFailure(
+                        FileSystemErrorCode.FileIsADirectory,
+                        "Cannot read file: path is a directory"
+                    );
+                }
+                if (cached.content !== undefined) {
+                    return ApiResult.success(cached.content);
+                }
             }
         }
-        
+
         try {
             const response = await fetch(`${this.baseUrl}/projects/${projectId}/files/${this.encodePath(path)}`, {
                 credentials: "include"
             });
-            
+
             if (!response.ok) {
-                return this.parseErrorResponse(response);
+                const errorResult = await this.parseErrorResponse<FileSystemError>(response);
+
+                if (
+                    this.cachedProjectId === projectId &&
+                    !errorResult.success &&
+                    errorResult.error.code === FileSystemErrorCode.FileNotFound
+                ) {
+                    this.fileTreeCache.set(normalizedPath, {
+                        exists: false
+                    });
+                }
+
+                return errorResult;
             }
-            
+
             const buffer = await response.arrayBuffer();
-            return success(new Uint8Array(buffer));
+            const content = new Uint8Array(buffer);
+
+            if (this.cachedProjectId === projectId) {
+                const existing = this.fileTreeCache.get(normalizedPath);
+                this.fileTreeCache.set(normalizedPath, {
+                    exists: true,
+                    type: FileType.File,
+                    content,
+                    metadata: existing?.metadata
+                });
+            }
+
+            return ApiResult.success(content);
         } catch (error) {
-            return fileSystemFailure(CommonErrorCode.Unavailable, String(error));
+            return ApiResult.fileSystemFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
-    
+
     async writeFile(
         projectId: string,
         path: string,
@@ -230,32 +262,74 @@ export class HttpBackendApi implements BackendApi {
         const params = new URLSearchParams();
         if (opts.create !== undefined) params.set("create", String(opts.create));
         if (opts.overwrite !== undefined) params.set("overwrite", String(opts.overwrite));
-        
-        return this.fetchApiResult(
+
+        const result = await this.fetchApiResult<void>(
             `${this.baseUrl}/projects/${projectId}/files/${this.encodePath(path)}?${params}`,
             {
                 method: "POST",
                 headers: {
-
                     "Content-Type": "application/octet-stream"
                 },
                 body: content as unknown as BodyInit
             }
         );
-    }
-    
-    async mkdir(projectId: string, path: string): Promise<ApiResult<void, FileSystemError>> {
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/dirs/${this.encodePath(path)}`, {
-            method: "POST",
-        });
-    }
-    
-    async readdir(projectId: string, path: string): Promise<ApiResult<[string, FileType][], FileSystemError>> {
-        if (this.cachedProjectId === projectId) {
+
+        if (result.success && this.cachedProjectId === projectId) {
             const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+            const existing = this.fileTreeCache.get(normalizedPath);
+            this.fileTreeCache.set(normalizedPath, {
+                exists: true,
+                type: FileType.File,
+                content: undefined,
+                metadata: existing?.metadata
+            });
+
+            this.invalidateParentDirCache(normalizedPath);
+        }
+
+        return result;
+    }
+
+    async mkdir(projectId: string, path: string): Promise<ApiResult<void, FileSystemError>> {
+        const result = await this.fetchApiResult<void>(
+            `${this.baseUrl}/projects/${projectId}/dirs/${this.encodePath(path)}`,
+            {
+                method: "POST"
+            }
+        );
+
+        if (result.success && this.cachedProjectId === projectId) {
+            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+            this.fileTreeCache.set(normalizedPath, {
+                exists: true,
+                type: FileType.Directory,
+                dirEntries: []
+            });
+
+            this.invalidateParentDirCache(normalizedPath);
+        }
+
+        return result;
+    }
+
+    async readdir(projectId: string, path: string): Promise<ApiResult<[string, FileType][], FileSystemError>> {
+        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
+        if (this.cachedProjectId === projectId) {
             const cached = this.fileTreeCache.get(normalizedPath);
-            if (cached?.dirEntries !== undefined) {
-                return success(cached.dirEntries);
+            if (cached !== undefined) {
+                if (!cached.exists) {
+                    return ApiResult.fileSystemFailure(FileSystemErrorCode.FileNotFound, "Directory not found");
+                }
+                if (cached.type !== FileType.Directory) {
+                    return ApiResult.fileSystemFailure(
+                        FileSystemErrorCode.FileNotADirectory,
+                        "Cannot read directory: path is a file"
+                    );
+                }
+                if (cached.dirEntries !== undefined) {
+                    return ApiResult.success(cached.dirEntries);
+                }
             }
         }
 
@@ -264,43 +338,109 @@ export class HttpBackendApi implements BackendApi {
                 `${this.baseUrl}/projects/${projectId}/dirs/${this.encodePath(path)}`,
                 {}
             );
-            
+
             if (!result.success) {
+                if (this.cachedProjectId === projectId && result.error.code === FileSystemErrorCode.FileNotFound) {
+                    this.fileTreeCache.set(normalizedPath, {
+                        exists: false
+                    });
+                }
                 return result;
             }
-            
-            const entries: [string, FileType][] = result.value.map(e => [e.name, e.type]);
-            return success(entries);
+
+            const entries: [string, FileType][] = result.value.map((e) => [e.name, e.type]);
+
+            if (this.cachedProjectId === projectId) {
+                const existing = this.fileTreeCache.get(normalizedPath);
+                this.fileTreeCache.set(normalizedPath, {
+                    exists: true,
+                    type: FileType.Directory,
+                    dirEntries: entries,
+                    metadata: existing?.metadata
+                });
+            }
+
+            return ApiResult.success(entries);
         } catch (error) {
-            return fileSystemFailure(CommonErrorCode.Unavailable, String(error));
+            return ApiResult.fileSystemFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
-    
+
     async stat(projectId: string, path: string): Promise<ApiResult<FileType, FileSystemError>> {
+        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
         if (this.cachedProjectId === projectId) {
-            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
             const cached = this.fileTreeCache.get(normalizedPath);
             if (cached !== undefined) {
-                return success(cached.type);
+                if (!cached.exists) {
+                    return ApiResult.fileSystemFailure(FileSystemErrorCode.FileNotFound, "File or directory not found");
+                }
+                if (cached.type !== undefined) {
+                    return ApiResult.success(cached.type);
+                }
             }
         }
-        
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/stat/${this.encodePath(path)}`, {
-        });
+
+        const result = await this.fetchApiResult<FileType>(
+            `${this.baseUrl}/projects/${projectId}/stat/${this.encodePath(path)}`,
+            {}
+        );
+
+        if (this.cachedProjectId === projectId) {
+            if (result.success) {
+                const existing = this.fileTreeCache.get(normalizedPath);
+                this.fileTreeCache.set(normalizedPath, {
+                    exists: true,
+                    type: result.value,
+                    content: existing?.content,
+                    metadata: existing?.metadata,
+                    dirEntries: existing?.dirEntries
+                });
+            } else if (result.error.code === FileSystemErrorCode.FileNotFound) {
+                this.fileTreeCache.set(normalizedPath, {
+                    exists: false
+                });
+            }
+        }
+
+        return result;
     }
-    
+
     async delete(projectId: string, path: string, opts: IFileDeleteOptions): Promise<ApiResult<void, FileSystemError>> {
         const params = new URLSearchParams();
         if (opts.recursive !== undefined) params.set("recursive", String(opts.recursive));
-        
-        return this.fetchApiResult(
+
+        const result = await this.fetchApiResult<void>(
             `${this.baseUrl}/projects/${projectId}/files/${this.encodePath(path)}?${params}`,
             {
-                method: "DELETE",
+                method: "DELETE"
             }
         );
+
+        if (result.success && this.cachedProjectId === projectId) {
+            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
+            this.fileTreeCache.set(normalizedPath, {
+                exists: false
+            });
+
+            if (opts.recursive) {
+                const pathPrefix = normalizedPath ? normalizedPath + "/" : "";
+                for (const [cachedPath] of this.fileTreeCache) {
+                    if (cachedPath.startsWith(pathPrefix)) {
+                        this.fileTreeCache.set(cachedPath, {
+                            exists: false
+                        });
+                    }
+                }
+            }
+
+            this.invalidateParentDirCache(normalizedPath);
+        }
+
+        return result;
     }
-    
+
     async rename(
         projectId: string,
         from: string,
@@ -311,175 +451,224 @@ export class HttpBackendApi implements BackendApi {
         params.set("from", from);
         params.set("to", to);
         if (opts.overwrite !== undefined) params.set("overwrite", String(opts.overwrite));
-        
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/rename?${params}`, {
-            method: "POST",
+
+        const result = await this.fetchApiResult<void>(`${this.baseUrl}/projects/${projectId}/rename?${params}`, {
+            method: "POST"
         });
+
+        if (result.success && this.cachedProjectId === projectId) {
+            const normalizedFrom = from.startsWith("/") ? from.slice(1) : from;
+            const normalizedTo = to.startsWith("/") ? to.slice(1) : to;
+
+            const fromEntry = this.fileTreeCache.get(normalizedFrom);
+
+            if (fromEntry && fromEntry.exists) {
+                this.fileTreeCache.set(normalizedTo, fromEntry);
+
+                if (fromEntry.type === FileType.Directory) {
+                    const fromPrefix = normalizedFrom ? normalizedFrom + "/" : "";
+                    const toPrefix = normalizedTo ? normalizedTo + "/" : "";
+
+                    for (const [cachedPath, entry] of this.fileTreeCache) {
+                        if (cachedPath.startsWith(fromPrefix)) {
+                            const relativePath = cachedPath.slice(fromPrefix.length);
+                            const newPath = toPrefix + relativePath;
+                            this.fileTreeCache.set(newPath, entry);
+                            this.fileTreeCache.set(cachedPath, { exists: false });
+                        }
+                    }
+                }
+            }
+
+            this.fileTreeCache.set(normalizedFrom, {
+                exists: false
+            });
+
+            this.invalidateParentDirCache(normalizedFrom);
+            this.invalidateParentDirCache(normalizedTo);
+        }
+
+        return result;
     }
-    
-    
+
     async readMetadata(projectId: string, path: string): Promise<ApiResult<object, FileSystemError>> {
+        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+
         if (this.cachedProjectId === projectId) {
-            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
             const cached = this.fileTreeCache.get(normalizedPath);
-            if (cached?.metadata !== undefined) {
-                return success(cached.metadata);
+            if (cached !== undefined) {
+                if (!cached.exists) {
+                    return ApiResult.fileSystemFailure(FileSystemErrorCode.FileNotFound, "File not found");
+                }
+                if (cached.metadata !== undefined) {
+                    return ApiResult.success(cached.metadata);
+                }
             }
         }
-        
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/metadata/${this.encodePath(path)}`, {
-        });
+
+        const result = await this.fetchApiResult<object>(
+            `${this.baseUrl}/projects/${projectId}/metadata/${this.encodePath(path)}`,
+            {}
+        );
+
+        if (this.cachedProjectId === projectId) {
+            if (result.success) {
+                const existing = this.fileTreeCache.get(normalizedPath);
+                this.fileTreeCache.set(normalizedPath, {
+                    exists: true,
+                    type: existing?.type ?? FileType.File,
+                    content: existing?.content,
+                    metadata: result.value,
+                    dirEntries: existing?.dirEntries
+                });
+            } else if (result.error.code === FileSystemErrorCode.FileNotFound) {
+                this.fileTreeCache.set(normalizedPath, {
+                    exists: false
+                });
+            }
+        }
+
+        return result;
     }
-    
+
     async writeMetadata(projectId: string, path: string, metadata: object): Promise<ApiResult<void, FileSystemError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/metadata/${this.encodePath(path)}`, {
             method: "PUT",
             headers: {
-
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(metadata)
         });
     }
-    
-    
+
     async createPlugin(url: string): Promise<ApiResult<string, PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/plugins`, {
             method: "POST",
             headers: {
-
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ url })
         });
     }
-    
+
     async deletePlugin(pluginId: string): Promise<ApiResult<void, PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/plugins/${pluginId}`, {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
-    
+
     async getPlugins(): Promise<ApiResult<BackendPlugin[], PluginError>> {
-        return this.fetchApiResult(`${this.baseUrl}/plugins`, {
-        });
+        return this.fetchApiResult(`${this.baseUrl}/plugins`, {});
     }
-    
+
     async getProjectPlugins(projectId: string): Promise<ApiResult<BackendPlugin[], PluginError>> {
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins`, {
-        });
+        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins`, {});
     }
-    
+
     async addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins`, {
             method: "POST",
             headers: {
-
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ pluginId })
         });
     }
-    
+
     async removePluginFromProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins/${pluginId}`, {
-            method: "DELETE",
+            method: "DELETE"
         });
     }
-    
+
     async resolvePlugin(pluginId: string): Promise<ApiResult<ResolvedPlugin, PluginError>> {
-        return this.fetchApiResult(`${this.baseUrl}/plugins/${pluginId}/resolve`, {
-        });
+        return this.fetchApiResult(`${this.baseUrl}/plugins/${pluginId}/resolve`, {});
     }
-    
+
     async precache(project: Project): Promise<void> {
         if (this.cachedProjectId !== project.id) {
             this.fileTreeCache.clear();
             this.cachedProjectId = project.id;
         }
-        
-        await this.cacheDirectory(project.id, "");
+
+        await this.walkDirectory(project.id, "");
     }
-    
+
+    async getAllUsers(): Promise<ApiResult<User[], CommonError>> {
+        return this.fetchApiResult(`${this.baseUrl}/users`, {
+            method: "GET"
+        });
+    }
+
+    async getUserProjects(userId: string): Promise<ApiResult<Project[], ProjectError>> {
+        return this.fetchApiResult(`${this.baseUrl}/users/${userId}/projects`, {
+            method: "GET"
+        });
+    }
+
+    async updateUserAdmin(userId: string, isAdmin: boolean): Promise<ApiResult<void, CommonError>> {
+        return this.fetchApiResult(`${this.baseUrl}/users/${userId}/admin`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isAdmin })
+        });
+    }
+
     /**
-     * Recursively caches a directory and all its contents.
-     * @param projectId The ID of the project
-     * @param path The path to the directory to cache
+     * Invalidates the directory entries cache for the parent directory of a given path.
+     * This should be called when a file or directory is created, deleted, or renamed.
+     * @param path The path whose parent directory cache should be invalidated
      */
-    private async cacheDirectory(projectId: string, path: string): Promise<void> {
-        const result = await this.fetchApiResult<Array<{ name: string; type: FileType }>>(
-            `${this.baseUrl}/projects/${projectId}/dirs/${this.encodePath(path)}`,
-            { credentials: "include" }
-        );
-        
-        if (!result.success) {
+    private invalidateParentDirCache(path: string): void {
+        const lastSlashIndex = path.lastIndexOf("/");
+        if (lastSlashIndex === -1) {
+            const rootCache = this.fileTreeCache.get("");
+            if (rootCache && rootCache.exists && rootCache.type === FileType.Directory) {
+                this.fileTreeCache.set("", {
+                    exists: true,
+                    type: FileType.Directory,
+                    dirEntries: undefined,
+                    metadata: rootCache.metadata
+                });
+            }
+        } else {
+            const parentPath = path.slice(0, lastSlashIndex);
+            const parentCache = this.fileTreeCache.get(parentPath);
+            if (parentCache && parentCache.exists && parentCache.type === FileType.Directory) {
+                this.fileTreeCache.set(parentPath, {
+                    exists: true,
+                    type: FileType.Directory,
+                    dirEntries: undefined,
+                    metadata: parentCache.metadata
+                });
+            }
+        }
+    }
+
+    /**
+     * Recursively walks a directory and caches all files and subdirectories.
+     * Uses regular API methods which handle caching automatically.
+     * @param projectId The ID of the project
+     * @param path The path to the directory to walk
+     */
+    private async walkDirectory(projectId: string, path: string): Promise<void> {
+        const dirResult = await this.readdir(projectId, path);
+
+        if (!dirResult.success) {
             return;
         }
-        
-        const entries: [string, FileType][] = result.value.map(e => [e.name, e.type]);
-        
-        this.fileTreeCache.set(path, {
-            type: 1,
-            dirEntries: entries
-        });
-        
-        // Cache all children
-        for (const [name, type] of entries) {
+
+        for (const [name, type] of dirResult.value) {
             const fullPath = path ? `${path}/${name}` : name;
-            
-            if (type === 1) {
-                await this.cacheDirectory(projectId, fullPath);
+
+            if (type === FileType.Directory) {
+                await this.walkDirectory(projectId, fullPath);
             } else {
-                await this.cacheFile(projectId, fullPath);
+                await Promise.all([this.readFile(projectId, fullPath), this.readMetadata(projectId, fullPath)]);
             }
         }
     }
-    
-    /**
-     * Caches a file's content and metadata.
-     * @param projectId The ID of the project
-     * @param path The path to the file to cache
-     */
-    private async cacheFile(projectId: string, path: string): Promise<void> {
-        // Load file content
-        const contentPromise = fetch(`${this.baseUrl}/projects/${projectId}/files/${this.encodePath(path)}`, {
-            credentials: "include"
-        });
-        
-        // Load metadata
-        const metadataPromise = fetch(`${this.baseUrl}/projects/${projectId}/metadata/${this.encodePath(path)}`, {
-            credentials: "include"
-        });
-        
-        const [contentResponse, metadataResponse] = await Promise.all([contentPromise, metadataPromise]);
-        
-        let content: Uint8Array | undefined;
-        let metadata: object | undefined;
-        
-        if (contentResponse.ok) {
-            const buffer = await contentResponse.arrayBuffer();
-            content = new Uint8Array(buffer);
-        }
-        
-        if (metadataResponse.ok) {
-            try {
-                const data = await metadataResponse.json();
-                if (typeof data === "object" && "value" in data) {
-                    metadata = data.value;
-                } else {
-                    metadata = data;
-                }
-            } catch {
-            }
-        }
-        
-        this.fileTreeCache.set(path, {
-            type: 0,
-            content,
-            metadata
-        });
-    }
-    
+
     /**
      * Makes an API request and parses the result.
      * @param url The URL to fetch
@@ -492,40 +681,43 @@ export class HttpBackendApi implements BackendApi {
                 ...init,
                 credentials: "include"
             });
-            
+
             if (!response.ok) {
                 if (response.status === 401) {
-                    return { success: false, error: { code: CommonErrorCode.Unavailable, message: "Not authenticated" } };
+                    return {
+                        success: false,
+                        error: { code: CommonErrorCode.Unavailable, message: "Not authenticated" }
+                    };
                 }
                 if (response.status === 403) {
                     return { success: false, error: { code: CommonErrorCode.Unavailable, message: "Access denied" } };
                 }
                 return this.parseErrorResponse(response);
             }
-            
+
             const contentType = response.headers.get("Content-Type");
             if (!contentType || response.status === 204) {
-                return success(undefined as T);
+                return ApiResult.success(undefined as T);
             }
-            
+
             const data = await response.json();
             if (typeof data === "object") {
                 if ("value" in data) {
-                    return success(data.value as T)
+                    return ApiResult.success(data.value as T);
                 } else if ("error" in data) {
                     return {
                         success: false,
                         error: data.error
-                    }
+                    };
                 }
             }
-            
-            return success(data as T);
+
+            return ApiResult.success(data as T);
         } catch (error) {
-            return { success: false, error: { code: CommonErrorCode.Unavailable, message: String(error) } };
+            return ApiResult.fileSystemFailure(CommonErrorCode.Unavailable, String(error));
         }
     }
-    
+
     /**
      * Parses an error response from the backend.
      * @param response The HTTP response to parse
@@ -545,7 +737,7 @@ export class HttpBackendApi implements BackendApi {
             return { success: false, error: { code: CommonErrorCode.Unknown, message: response.statusText } as E };
         }
     }
-    
+
     /**
      * Encodes a file path for use in URLs.
      * @param path The path to encode

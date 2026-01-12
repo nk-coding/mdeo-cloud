@@ -164,6 +164,25 @@ fun Route.fileRoutes(fileService: FileService) {
         }
     }
     
+    route("/api/projects/{projectId}/version") {
+        /**
+         * Gets the version of a file.
+         *
+         * @param projectId Path parameter for project UUID
+         * @param path Variable path segments for file path
+         * @return ApiResult with file version or failure
+         */
+        get("{path...}") {
+            val (projectId, _) = call.validateProjectAccess() ?: return@get
+            
+            val pathParts = call.parameters.getAll("path") ?: emptyList()
+            val path = pathParts.joinToString("/")
+            
+            val result = fileService.getFileVersion(projectId, path)
+            call.respond(result)
+        }
+    }
+    
     route("/api/projects/{projectId}/rename") {
         /**
          * Renames or moves a file or directory.

@@ -1,6 +1,7 @@
 <template>
     <div class="flex flex-col h-full">
-        <div class="px-3 pt-2 pb-2">
+        <SidebarPanelHeader label="Search" />
+        <div class="px-3 pb-2">
             <div class="relative">
                 <Input v-model="searchText" placeholder="Search..." class="pr-23" />
                 <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
@@ -97,6 +98,7 @@ import type { ITextSearchMatch } from "@codingame/monaco-vscode-api/vscode/vs/wo
 import { Uri } from "vscode";
 import { workbenchStateKey } from "../workbench/util";
 import Tree from "@/components/tree/Tree.vue";
+import SidebarPanelHeader from "@/components/sidebar/SidebarPanelHeader.vue";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { File, CaseSensitive, WholeWord, Regex } from "lucide-vue-next";

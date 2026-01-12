@@ -134,13 +134,19 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 
                 val request = call.receive<UpdateProjectRequest>()
                 val updated = projectService.updateProject(projectId, request)
-                
+
                 if (!updated) {
                     call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
                     return@put
                 }
-                
-                call.respond(ApiResult.Success(Unit))
+
+                val updatedProject = projectService.getProject(projectId)
+                if (updatedProject == null) {
+                    call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                    return@put
+                }
+
+                call.respond(ApiResult.Success(updatedProject))
             }
             
             /**

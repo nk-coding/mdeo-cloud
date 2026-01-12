@@ -86,6 +86,7 @@ fun Application.module(config: AppConfig) {
             metadataRoutes(metadataService)
             pluginRoutes(pluginService, projectService)
             adminRoutes(userService)
+            userRoutes(userService, projectService)
         }
     }
 }

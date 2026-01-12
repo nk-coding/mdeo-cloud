@@ -51,7 +51,7 @@ export class AuthState {
             if (result.success) {
                 this.user.value = result.value;
             }
-        } catch (error) {
+        } catch {
             // Ignore, user not authenticated
         }
     }

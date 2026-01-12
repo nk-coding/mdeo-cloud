@@ -48,6 +48,7 @@ object FilesTable : Table("files") {
     val fileType = integer("file_type")
     val content = binary("content").nullable()
     val children = text("children").nullable()
+    val version = integer("version").default(1)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     

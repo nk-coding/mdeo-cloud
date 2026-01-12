@@ -22,3 +22,7 @@
     left: 0;
     pointer-events: none;
 }
+
+.sprotty.sprotty-hidden * {
+    pointer-events: none !important;
+}

@@ -1,49 +1,53 @@
 <template>
-    <ScrollArea class="files-container flex-1 min-h-0 w-full">
-        <ContextMenu>
-            <ContextMenuTrigger as-child>
-                <Tree
-                    ref="treeRef"
-                    class="flex-1 w-full p-2"
-                    :active-element="activeEntry"
-                    :enable-drag-and-drop="true"
-                    :drag-and-drop-callbacks="dragAndDropCallbacks"
-                    :expanded-items="expandedItems"
-                >
-                    <FileSystemItemList
-                        v-if="rootFolder"
-                        :parent="rootFolder"
-                        v-model:new-item="newItem"
-                        @select="handleSelect"
-                        @create-file="handleCreateFile"
-                        @create-folder="handleCreateFolder"
-                        @rename="handleRename"
-                        @delete="handleDelete"
-                    />
-                </Tree>
-            </ContextMenuTrigger>
-            <ContextMenuContent @close-auto-focus="$event.preventDefault()">
-                <ContextMenuItem
-                    v-for="fileType in fileTypePlugins"
-                    :key="fileType.id"
-                    @click="() => handleCreateFileOfType(fileType)"
-                >
-                    <FileTypeIcon :model-value="fileType" />
-                    <span>Create New {{ fileType.name }}</span>
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem @click="handleCreateFolderFromContext">
-                    <FolderIcon />
-                    <span>Create New Folder</span>
-                </ContextMenuItem>
-            </ContextMenuContent>
-        </ContextMenu>
-    </ScrollArea>
+    <div class="flex flex-col h-full">
+        <SidebarPanelHeader label="Files" />
+        <ScrollArea class="files-container flex-1 min-h-0 w-full">
+            <ContextMenu>
+                <ContextMenuTrigger as-child>
+                    <Tree
+                        ref="treeRef"
+                        class="flex-1 w-full p-2"
+                        :active-element="activeEntry"
+                        :enable-drag-and-drop="true"
+                        :drag-and-drop-callbacks="dragAndDropCallbacks"
+                        :expanded-items="expandedItems"
+                    >
+                        <FileSystemItemList
+                            v-if="rootFolder"
+                            :parent="rootFolder"
+                            v-model:new-item="newItem"
+                            @select="handleSelect"
+                            @create-file="handleCreateFile"
+                            @create-folder="handleCreateFolder"
+                            @rename="handleRename"
+                            @delete="handleDelete"
+                        />
+                    </Tree>
+                </ContextMenuTrigger>
+                <ContextMenuContent @close-auto-focus="$event.preventDefault()">
+                    <ContextMenuItem
+                        v-for="fileType in fileTypePlugins"
+                        :key="fileType.id"
+                        @click="() => handleCreateFileOfType(fileType)"
+                    >
+                        <FileTypeIcon :model-value="fileType" />
+                        <span>Create New {{ fileType.name }}</span>
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem @click="handleCreateFolderFromContext">
+                        <FolderIcon />
+                        <span>Create New Folder</span>
+                    </ContextMenuItem>
+                </ContextMenuContent>
+            </ContextMenu>
+        </ScrollArea>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { ref, inject, watch, nextTick, useTemplateRef } from "vue";
 import Tree from "@/components/tree/Tree.vue";
+import SidebarPanelHeader from "@/components/sidebar/SidebarPanelHeader.vue";
 import {
     ContextMenu,
     ContextMenuTrigger,

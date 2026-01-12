@@ -1,7 +1,7 @@
 <template>
     <div v-if="activeSidebar != undefined" class="h-full flex">
         <Separator orientation="vertical" />
-        <SidebarPanel :label="sidebarEntries[activeSidebar].name" class="flex-1">
+        <SidebarPanel class="flex-1">
             <KeepAlive>
                 <component :is="sidebarComponent" />
             </KeepAlive>
@@ -18,18 +18,6 @@ import { Separator } from "../ui/separator";
 import { workbenchStateKey } from "../workbench/util";
 
 const { activeSidebar } = inject(workbenchStateKey)!;
-
-const sidebarEntries = {
-    projects: {
-        name: "Projects"
-    },
-    files: {
-        name: "Files"
-    },
-    search: {
-        name: "Search"
-    }
-};
 
 const sidebarComponent = computed(() => {
     if (activeSidebar.value === "files") {

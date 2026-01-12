@@ -74,8 +74,10 @@ class FileService {
                     return@transaction fileSystemFailure(ErrorCodes.FILE_EXISTS, "File already exists: $path")
                 }
                 
+                val currentVersion = existing[FilesTable.version]
                 FilesTable.update({ (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }) {
                     it[FilesTable.content] = content
+                    it[version] = currentVersion + 1
                     it[updatedAt] = now
                 }
             } else {
@@ -96,6 +98,7 @@ class FileService {
                     it[fileType] = FileType.FILE
                     it[FilesTable.content] = content
                     it[children] = null
+                    it[version] = 1
                     it[createdAt] = now
                     it[updatedAt] = now
                 }
@@ -210,6 +213,33 @@ class FileService {
             }
             
             success(row[FilesTable.fileType])
+        }
+    }
+    
+    /**
+     * Gets the version of a file.
+     *
+     * @param projectId The UUID of the project
+     * @param path The path to the file
+     * @return ApiResult containing the file version as an integer, or an error
+     */
+    fun getFileVersion(projectId: UUID, path: String): ApiResult<Int> {
+        val normalizedPath = normalizePath(path)
+        
+        return transaction {
+            val row = FilesTable.selectAll()
+                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .firstOrNull()
+            
+            if (row == null) {
+                return@transaction fileSystemFailure(ErrorCodes.FILE_NOT_FOUND, "File not found: $path")
+            }
+            
+            if (row[FilesTable.fileType] == FileType.DIRECTORY) {
+                return@transaction fileSystemFailure(ErrorCodes.FILE_IS_A_DIRECTORY, "Is a directory: $path")
+            }
+            
+            success(row[FilesTable.version])
         }
     }
     

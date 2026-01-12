@@ -1,18 +1,11 @@
 <template>
-    <Workbench
-        v-if="workspaceState != undefined"
-        :workbenchState="workspaceState"
-        :auth-state="authState"
-    />
+    <Workbench v-if="workspaceState != undefined" :workbenchState="workspaceState" :auth-state="authState" />
     <div v-else-if="!isCheckingAuth" class="flex h-screen w-screen">
         <div class="flex h-full border-r border-border/60">
             <BaseSidebarRail />
         </div>
         <div class="flex flex-1 items-center justify-center px-4 py-10">
-            <LoginCard
-                :auth-state="authState"
-                @success="handleAuthSuccess"
-            />
+            <LoginCard :auth-state="authState" @success="handleAuthSuccess" />
         </div>
     </div>
 </template>
@@ -35,7 +28,7 @@ const authState = new AuthState(backendApi, () => {
     workspaceState.value = undefined;
 });
 
-const isCheckingAuth = ref(true)
+const isCheckingAuth = ref(true);
 
 useColorMode();
 
@@ -61,19 +54,14 @@ async function initializeWorkbench() {
 }
 
 async function loadPlugins(state: WorkbenchState) {
-    const [
-        { metamodelPlugin },
-        { scriptPlugin },
-        { modelPlugin },
-        { modelTransformationPlugin },
-        { configPlugin }
-    ] = await Promise.all([
-        import("./plugins/metamodelPlugin"),
-        import("./plugins/scriptPlugin"),
-        import("./plugins/modelPlugin"),
-        import("./plugins/modelTransformationPlugin"),
-        import("./plugins/configPlugin")
-    ]);
+    const [{ metamodelPlugin }, { scriptPlugin }, { modelPlugin }, { modelTransformationPlugin }, { configPlugin }] =
+        await Promise.all([
+            import("./plugins/metamodelPlugin"),
+            import("./plugins/scriptPlugin"),
+            import("./plugins/modelPlugin"),
+            import("./plugins/modelTransformationPlugin"),
+            import("./plugins/configPlugin")
+        ]);
 
     state.plugins.value.set(metamodelPlugin.id, metamodelPlugin);
     state.plugins.value.set(scriptPlugin.id, scriptPlugin);

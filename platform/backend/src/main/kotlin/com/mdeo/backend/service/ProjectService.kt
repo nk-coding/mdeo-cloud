@@ -36,6 +36,21 @@ class ProjectService {
     }
     
     /**
+     * Retrieves all projects owned by a specific user.
+     *
+     * @param userId The UUID of the user
+     * @return List of projects owned by the user
+     */
+    fun getProjectsByUserId(userId: UUID): List<Project> {
+        return transaction {
+            (ProjectsTable innerJoin ProjectOwnersTable)
+                .selectAll()
+                .where { ProjectOwnersTable.userId eq userId }
+                .map { it.toProject() }
+        }
+    }
+    
+    /**
      * Retrieves a specific project by its ID.
      *
      * @param projectId The UUID of the project

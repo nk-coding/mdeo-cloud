@@ -31,7 +31,7 @@ const editorPlugin = computed(() => {
 onMounted(async () => {
     const client = new MonacoGLSPClient({
         client: languageClient.value!,
-        id: id,
+        id: id
     });
 
     const plugin = editorPlugin.value;
