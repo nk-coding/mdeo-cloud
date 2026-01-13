@@ -19,6 +19,8 @@ import Workbench from "./components/workbench/Workbench.vue";
 import LoginCard from "./components/auth/LoginCard.vue";
 import BaseSidebarRail from "./components/sidebar/BaseSidebarRail.vue";
 import { useColorMode } from "@vueuse/core";
+import { convertIcon } from "./lib/convertIcon";
+import { Plug } from "lucide";
 
 const monaco = inject(monacoApiProviderKey)!;
 const backendApi = new HttpBackendApi();
@@ -62,12 +64,18 @@ async function loadPlugins(state: WorkbenchState) {
             import("./plugins/modelTransformationPlugin"),
             import("./plugins/configPlugin")
         ]);
-
-    state.plugins.value.set(metamodelPlugin.id, metamodelPlugin);
-    state.plugins.value.set(scriptPlugin.id, scriptPlugin);
-    state.plugins.value.set(modelPlugin.id, modelPlugin);
-    state.plugins.value.set(modelTransformationPlugin.id, modelTransformationPlugin);
-    state.plugins.value.set(configPlugin.id, configPlugin);
+    const plugins = [metamodelPlugin, scriptPlugin, modelPlugin, modelTransformationPlugin, configPlugin];
+    for (const plugin of plugins) {
+        state.plugins.value.set(plugin.id, {
+            id: plugin.id,
+            languagePlugins: [plugin],
+            contributionPlugins: [],
+            name: plugin.id,
+            description: "",
+            url: "",
+            icon: convertIcon(Plug)
+        });
+    }
 }
 
 async function syncProjectFromPath(state: WorkbenchState) {

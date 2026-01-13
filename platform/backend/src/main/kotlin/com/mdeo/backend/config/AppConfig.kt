@@ -18,7 +18,9 @@ data class AppConfig(
     val session: SessionConfig,
     val cors: CorsConfig,
     val defaultAdmin: DefaultAdminConfig,
-    val plugin: PluginConfig
+    val plugin: PluginConfig,
+    val jwt: JwtConfig,
+    val fileData: FileDataConfig
 ) {
     companion object {
         /**
@@ -54,7 +56,6 @@ data class AppConfig(
                             ?.map { it.trim() }
                             ?: listOf("localhost:4242", "localhost:5173", "127.0.0.1:4242", "127.0.0.1:5173")
                         
-                        // Validate CORS configuration in production
                         if (isProduction) {
                             val hasLocalhostOrigins = corsHosts.any { host ->
                                 host.contains("localhost") || host.contains("127.0.0.1")
@@ -74,6 +75,17 @@ data class AppConfig(
                 ),
                 plugin = PluginConfig(
                     cacheTtlSeconds = System.getenv("PLUGIN_CACHE_TTL_SECONDS")?.toLongOrNull()
+                        ?: TimeUnit.MINUTES.toSeconds(5)
+                ),
+                jwt = JwtConfig(
+                    expirationSeconds = System.getenv("JWT_EXPIRATION_SECONDS")?.toLongOrNull()
+                        ?: TimeUnit.HOURS.toSeconds(1),
+                    issuer = System.getenv("JWT_ISSUER") ?: "mdeo-backend",
+                    privateKey = System.getenv("JWT_PRIVATE_KEY"),
+                    publicKey = System.getenv("JWT_PUBLIC_KEY")
+                ),
+                fileData = FileDataConfig(
+                    computationTimeoutSeconds = System.getenv("FILE_DATA_COMPUTATION_TIMEOUT_SECONDS")?.toLongOrNull()
                         ?: TimeUnit.MINUTES.toSeconds(5)
                 )
             )
@@ -138,4 +150,28 @@ data class DefaultAdminConfig(
  */
 data class PluginConfig(
     val cacheTtlSeconds: Long
+)
+
+/**
+ * JWT configuration for plugin authentication.
+ *
+ * @property expirationSeconds JWT token expiration time in seconds (default 1 hour)
+ * @property issuer JWT issuer identifier
+ * @property privateKey Base64-encoded RSA private key (PKCS8 format), optional - will be generated if not provided
+ * @property publicKey Base64-encoded RSA public key (X.509 format), optional - will be generated if not provided
+ */
+data class JwtConfig(
+    val expirationSeconds: Long,
+    val issuer: String,
+    val privateKey: String? = null,
+    val publicKey: String? = null
+)
+
+/**
+ * File data computation configuration.
+ *
+ * @property computationTimeoutSeconds Timeout in seconds before a computation is considered stale (default 5 minutes)
+ */
+data class FileDataConfig(
+    val computationTimeoutSeconds: Long
 )

@@ -1,4 +1,4 @@
-import { HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT, WS, type LanguagePlugin } from "@mdeo/language-common";
+import { HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT, WS, type LangiumLanguagePlugin, type LangiumLanguagePluginProvider } from "@mdeo/language-common";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
@@ -40,7 +40,7 @@ export type ScriptServices = {
 /**
  * The plugin for the Script language.
  */
-export const scriptPlugin: LanguagePlugin<ScriptServices> = {
+const scriptPlugin: LangiumLanguagePlugin<ScriptServices> = {
     rootRule: ScriptRule,
     additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
     module: {
@@ -74,5 +74,14 @@ export const scriptPlugin: LanguagePlugin<ScriptServices> = {
         registerExpressionSerializers(services, expressionTypes);
         registerStatementSerializers(services, statementTypes);
         registerScriptSerializers(services);
+    }
+};
+
+/**
+ * Provider for the Script language plugin.
+ */
+export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices> = {
+    create(): LangiumLanguagePlugin<ScriptServices> {
+        return scriptPlugin;
     }
 };

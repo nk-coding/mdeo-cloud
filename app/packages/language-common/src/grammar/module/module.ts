@@ -1,5 +1,5 @@
 import type { AstNode, Grammar, AstReflection as LangiumAstReflection } from "langium";
-import type { LanguagePlugin } from "../../plugin/languagePlugin.js";
+import type { LangiumLanguagePlugin } from "../../plugin/languagePlugin.js";
 import type { Interface } from "../type/interface/types.js";
 
 /**
@@ -12,7 +12,7 @@ export interface LanguageModule {
      * The compiled Langium grammar that defines the language syntax and parsing rules.
      * This grammar can be used to create parsers and other language services.
      */
-    grammars: Map<LanguagePlugin<any>, Grammar>;
+    grammars: Map<LangiumLanguagePlugin<any>, Grammar>;
 
     /**
      * AST reflection metadata that provides runtime type information about

@@ -5,8 +5,16 @@ import type {
     FileType
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { Project } from "../project/project";
-import type { ApiResult, FileSystemError, ProjectError, PluginError, CommonError } from "./apiResult";
+import type { ApiResult, FileSystemError, ProjectError, PluginError, CommonError, FileDataError } from "./apiResult";
 import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
+
+/**
+ * Response from reading a file, including content and version
+ */
+export interface FileReadResult {
+    content: Uint8Array;
+    version: number;
+}
 
 /**
  * User information returned from login
@@ -40,14 +48,14 @@ export interface UserInfo {
  */
 export interface BackendApi {
     /**
-     * Reads the contents of a file.
+     * Reads the contents of a file along with its version.
      *
      * @param projectId The ID of the project containing the file
      * @param path The path to the file relative to the project root
-     * @returns A promise that resolves to an ApiResult containing the file contents as a Uint8Array
+     * @returns A promise that resolves to an ApiResult containing the file contents and version
      *          Possible errors: FileNotFound, FileIsADirectory, Unavailable, Unknown
      */
-    readFile(projectId: string, path: string): Promise<ApiResult<Uint8Array, FileSystemError>>;
+    readFile(projectId: string, path: string): Promise<ApiResult<FileReadResult, FileSystemError>>;
 
     /**
      * Writes content to a file.
@@ -322,4 +330,19 @@ export interface BackendApi {
      *          Possible errors: Unavailable, Unknown
      */
     updateUserAdmin(userId: string, isAdmin: boolean): Promise<ApiResult<void, CommonError>>;
+
+    /**
+     * Get computed file data (e.g., AST) for a file
+     *
+     * @param projectId The ID of the project
+     * @param path The path to the file within the project
+     * @param key The type of data to compute (e.g., "ast")
+     * @returns A promise that resolves to an ApiResult containing the computed data as a string
+     *          Possible errors: NotFound, NoPlugin, CycleDetected, PluginError, Unavailable, Unknown
+     */
+    getFileData(
+        projectId: string,
+        path: string,
+        key: string,
+    ): Promise<ApiResult<string, FileDataError>>;
 }

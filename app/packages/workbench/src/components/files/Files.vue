@@ -58,7 +58,7 @@ import {
 import type { FileSystemNode } from "@/data/filesystem/file";
 import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
-import type { WorkbenchLanguagePlugin } from "@/data/plugin/languagePlugin";
+import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { VSBuffer } from "@codingame/monaco-vscode-api/vscode/vs/base/common/buffer";
 import { workbenchStateKey } from "../workbench/util";
@@ -111,7 +111,7 @@ function handleSelect(entry: FileSystemNode) {
     activeEntry.value = entry;
 }
 
-async function handleCreateFile(uri: Uri, fileType: WorkbenchLanguagePlugin) {
+async function handleCreateFile(uri: Uri, fileType: ResolvedWorkbenchLanguagePlugin) {
     const fileService = monacoApi.fileService;
     await fileService.createFile(uri, VSBuffer.fromString(fileType.defaultContent ?? ""));
     await nextTick();
@@ -157,7 +157,7 @@ async function handleMove(itemUri: Uri, targetFolderUri: Uri) {
     await fileService.move(itemUri, newUri, false);
 }
 
-function handleCreateFileOfType(fileType: WorkbenchLanguagePlugin) {
+function handleCreateFileOfType(fileType: ResolvedWorkbenchLanguagePlugin) {
     newItem.value = {
         type: "file",
         fileType

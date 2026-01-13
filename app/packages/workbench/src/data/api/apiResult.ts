@@ -40,9 +40,23 @@ export enum PluginErrorCode {
 }
 
 /**
+ * Error codes specific to file data computation operations.
+ */
+export enum FileDataErrorCode {
+    FileDataCircularDependency = "FileDataCircularDependency",
+    FileDataComputationFailed = "FileDataComputationFailed",
+    FileDataNoPluginFound = "FileDataNoPluginFound"
+}
+
+/**
  * Union of all possible error codes.
  */
-export type ApiErrorCode = CommonErrorCode | FileSystemErrorCode | ProjectErrorCode | PluginErrorCode;
+export type ApiErrorCode =
+    | CommonErrorCode
+    | FileSystemErrorCode
+    | ProjectErrorCode
+    | PluginErrorCode
+    | FileDataErrorCode;
 
 /**
  * Base interface for API errors.
@@ -77,6 +91,11 @@ export type ProjectError = ApiError<ProjectErrorCode | CommonErrorCode>;
  * Error type for plugin operations.
  */
 export type PluginError = ApiError<PluginErrorCode | CommonErrorCode>;
+
+/**
+ * Error type for file data computation operations.
+ */
+export type FileDataError = ApiError<FileDataErrorCode | FileSystemErrorCode | CommonErrorCode>;
 
 /**
  * Namespace containing helper functions for creating ApiResult instances
@@ -137,6 +156,19 @@ export namespace ApiResult {
         code: PluginErrorCode | CommonErrorCode,
         message: string
     ): ApiResult<T, PluginError> {
+        return { success: false, error: { code, message } };
+    }
+
+    /**
+     * Creates a failed API result with a file data error.
+     * @param code The file data, file system, or common error code indicating the type of failure.
+     * @param message A descriptive error message explaining the failure.
+     * @returns A failed API result containing the file data error information.
+     */
+    export function fileDataFailure<T>(
+        code: FileDataErrorCode | FileSystemErrorCode | CommonErrorCode,
+        message: string
+    ): ApiResult<T, FileDataError> {
         return { success: false, error: { code, message } };
     }
 }

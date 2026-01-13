@@ -1,12 +1,10 @@
-import type { languages } from "monaco-editor";
-import type { ServerContributionPlugin, ServerLanguagePlugin } from "./serverPlugin.js";
 import type { IconNode } from "lucide-vue-next";
-import type { EditorPlugin } from "@mdeo/editor-common";
+import type { languages } from "monaco-editor";
 
 /**
- * A plugin for a language handled by the workbench
+ * Plugin configuration for a language.
  */
-export interface WorkbenchLanguagePlugin {
+export interface LanguagePlugin {
     /**
      * Unique identifier for the language
      */
@@ -26,11 +24,11 @@ export interface WorkbenchLanguagePlugin {
     /**
      * Server plugin for the language
      */
-    serverPlugin: Omit<ServerLanguagePlugin, "type" | "languageId" | "extension">;
+    serverPlugin: LanguageServerPlugin;
     /**
      * Editor plugin for the language, if undefined no graphical editor will be provided
      */
-    editorPlugin: EditorPlugin | undefined;
+    editorPlugin: LanguageEditorPlugin | undefined;
     /**
      * Configuration for the language in the editor
      */
@@ -46,11 +44,27 @@ export interface WorkbenchLanguagePlugin {
 }
 
 /**
- * A language plugin that has been resolved with its associated server contribution plugins
+ * Plugin configuration for a graphical editor.
  */
-export interface ResolvedLanguagePlugin extends WorkbenchLanguagePlugin {
+export interface LanguageEditorPlugin {
     /**
-     * The server contribution plugins associated with this language plugin
+     * Import which resolves to the container configuration for the GLSP/Sprotty container.
      */
-    serverContributionPlugins: ServerContributionPlugin[];
+    import: string;
+
+    /**
+     * URL to the CSS styles for this editor.
+     * This should be a URL that can be loaded by the browser.
+     */
+    stylesUrl: string;
+}
+
+/**
+ * Server plugin configuration for a language.
+ */
+export interface LanguageServerPlugin {
+    /**
+     * Import which resolves to the server plugin module.
+     */
+    import: string;
 }

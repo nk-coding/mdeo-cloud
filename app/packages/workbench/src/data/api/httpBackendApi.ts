@@ -4,7 +4,7 @@ import {
     type IFileWriteOptions,
     FileType
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
-import type { BackendApi, User, UserInfo } from "./backendApi";
+import type { BackendApi, User, UserInfo, FileReadResult } from "./backendApi";
 import type { Project } from "../project/project";
 import {
     ApiResult,
@@ -12,6 +12,7 @@ import {
     type ProjectError,
     type PluginError,
     type CommonError,
+    type FileDataError,
     FileSystemErrorCode
 } from "./apiResult";
 import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
@@ -24,6 +25,7 @@ interface CachedFileInfo {
     exists: boolean;
     type?: FileType;
     content?: Uint8Array;
+    version?: number;
     metadata?: object;
     dirEntries?: [string, FileType][];
 }
@@ -192,7 +194,7 @@ export class HttpBackendApi implements BackendApi {
         });
     }
 
-    async readFile(projectId: string, path: string): Promise<ApiResult<Uint8Array, FileSystemError>> {
+    async readFile(projectId: string, path: string): Promise<ApiResult<FileReadResult, FileSystemError>> {
         const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
 
         if (this.cachedProjectId === projectId) {
@@ -207,8 +209,8 @@ export class HttpBackendApi implements BackendApi {
                         "Cannot read file: path is a directory"
                     );
                 }
-                if (cached.content !== undefined) {
-                    return ApiResult.success(cached.content);
+                if (cached.content !== undefined && cached.version !== undefined) {
+                    return ApiResult.success({ content: cached.content, version: cached.version });
                 }
             }
         }
@@ -234,8 +236,9 @@ export class HttpBackendApi implements BackendApi {
                 return errorResult;
             }
 
-            const buffer = await response.arrayBuffer();
-            const content = new Uint8Array(buffer);
+            const json = (await response.json()) as { content: string; version: number };
+            const content = new TextEncoder().encode(json.content);
+            const version = json.version;
 
             if (this.cachedProjectId === projectId) {
                 const existing = this.fileTreeCache.get(normalizedPath);
@@ -243,11 +246,12 @@ export class HttpBackendApi implements BackendApi {
                     exists: true,
                     type: FileType.File,
                     content,
+                    version,
                     metadata: existing?.metadata
                 });
             }
 
-            return ApiResult.success(content);
+            return ApiResult.success({ content, version });
         } catch (error) {
             return ApiResult.fileSystemFailure(CommonErrorCode.Unavailable, String(error));
         }
@@ -746,5 +750,12 @@ export class HttpBackendApi implements BackendApi {
     private encodePath(path: string): string {
         const normalized = path.startsWith("/") ? path.slice(1) : path;
         return normalized.split("/").map(encodeURIComponent).join("/");
+    }
+
+    async getFileData(projectId: string, path: string, key: string): Promise<ApiResult<string, FileDataError>> {
+        const params = new URLSearchParams({ path });
+        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/file-data/${encodeURIComponent(key)}?${params}`, {
+            method: "GET"
+        });
     }
 }

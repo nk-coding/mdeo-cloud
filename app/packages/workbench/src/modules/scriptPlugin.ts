@@ -1,3 +1,3 @@
-import { scriptPlugin } from "@mdeo/language-script";
+import { scriptPluginProvider } from "@mdeo/language-script";
 
-export default scriptPlugin;
+export default scriptPluginProvider;

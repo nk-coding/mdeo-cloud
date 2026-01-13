@@ -135,18 +135,14 @@ class ProjectService {
     }
     
     /**
-     * Deletes a project and all its related data (files, metadata, plugins, owners).
+     * Deletes a project and all its related data.
+     * Cascading deletes automatically handle files, metadata, plugins, and owners.
      *
      * @param projectId The UUID of the project to delete
      * @return true if the project was deleted, false if not found
      */
     fun deleteProject(projectId: UUID): Boolean {
         return transaction {
-            FilesTable.deleteWhere { FilesTable.projectId eq projectId }
-            FileMetadataTable.deleteWhere { FileMetadataTable.projectId eq projectId }
-            ProjectPluginsTable.deleteWhere { ProjectPluginsTable.projectId eq projectId }
-            ProjectOwnersTable.deleteWhere { ProjectOwnersTable.projectId eq projectId }
-            
             val deleted = ProjectsTable.deleteWhere { ProjectsTable.id eq projectId }
             deleted > 0
         }

@@ -1,19 +1,63 @@
 package com.mdeo.backend.service
 
-import com.github.benmanes.caffeine.cache.Caffeine
 import com.mdeo.backend.config.PluginConfig
+import com.mdeo.backend.database.ContributionPluginsTable
+import com.mdeo.backend.database.LanguagePluginsTable
 import com.mdeo.backend.database.PluginsTable
 import com.mdeo.backend.database.ProjectPluginsTable
 import com.mdeo.common.model.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 import java.time.Instant
 import java.util.*
-import java.util.concurrent.TimeUnit
+
+/**
+ * Plugin manifest returned from plugin's GET / endpoint.
+ */
+@kotlinx.serialization.Serializable
+data class PluginManifest(
+    val id: String,
+    val url: String,
+    val name: String,
+    val description: String,
+    val icon: JsonArray,
+    val languagePlugins: List<ManifestLanguagePlugin> = emptyList(),
+    val contributionPlugins: List<JsonObject> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class ManifestLanguagePlugin(
+    val id: String,
+    val name: String,
+    val extension: String,
+    val defaultContent: String? = null,
+    val serverPlugin: ManifestServerPlugin,
+    val editorPlugin: ManifestEditorPlugin? = null,
+    val languageConfiguration: JsonObject,
+    val monarchTokensProvider: JsonObject,
+    val icon: JsonArray
+)
+
+@kotlinx.serialization.Serializable
+data class ManifestServerPlugin(
+    val import: String
+)
+
+@kotlinx.serialization.Serializable
+data class ManifestEditorPlugin(
+    val import: String,
+    val stylesUrl: String
+)
 
 /**
  * Service for managing plugins and their associations with projects.
@@ -22,70 +66,11 @@ import java.util.concurrent.TimeUnit
  */
 class PluginService(config: PluginConfig) {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
+    private val json = Json { ignoreUnknownKeys = true }
     
-    private val pluginCache = Caffeine.newBuilder()
-        .expireAfterWrite(config.cacheTtlSeconds, TimeUnit.SECONDS)
-        .maximumSize(100)
-        .build<String, ResolvedPlugin>()
-    
-    // Use a single mock Lucide-style icon node for all plugins in the backend.
-    // This is a JsonArray of icon children (tag + attributes) that the frontend
-    // expects and will convert via `convertIcon`.
-    private val mockIconNode = buildJsonArray {
-        addJsonArray {
-            add("path")
-            addJsonObject { put("d", "M 19 15 L 22 18") }
-        }
-        addJsonArray {
-            add("path")
-            addJsonObject { put("d", "M 22 18 L 19 21") }
-        }
-        addJsonArray {
-            add("path")
-            addJsonObject { put("d", "M2 18h20") }
-        }
-        addJsonArray {
-            add("path")
-            addJsonObject { put("d", "M4.8 10.4V8.6a.6.6 0 0 1 .6-.6h7.2a.6.6 0 0 1 .6.6v1.8") }
-        }
-        addJsonArray {
-            add("path")
-            addJsonObject { put("d", "M9 8V5.6") }
-        }
-        addJsonArray {
-            add("rect")
-            addJsonObject {
-                put("x", "11.4")
-                put("y", "10.4")
-                put("width", "3.6")
-                put("height", "3.6")
-                put("rx", ".6")
-                put("fill", "currentColor")
-            }
-        }
-        addJsonArray {
-            add("rect")
-            addJsonObject {
-                put("x", "3")
-                put("y", "10.4")
-                put("width", "3.6")
-                put("height", "3.6")
-                put("rx", ".6")
-                put("fill", "currentColor")
-            }
-        }
-        addJsonArray {
-            add("rect")
-            addJsonObject {
-                put("x", "7.2")
-                put("y", "2")
-                put("width", "3.6")
-                put("height", "3.6")
-                put("rx", ".6")
-                put("fill", "currentColor")
-            }
-        }
-    }
+    private val httpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(10))
+        .build()
     
     /**
      * Retrieves all registered plugins.
@@ -96,9 +81,12 @@ class PluginService(config: PluginConfig) {
         return transaction {
             PluginsTable.selectAll()
                 .map { row -> 
-                    val id = row[PluginsTable.id].toString()
+                    val id = row[PluginsTable.id]
                     val url = row[PluginsTable.url]
-                    createBackendPlugin(id, url)
+                    val name = row[PluginsTable.name]
+                    val description = row[PluginsTable.description]
+                    val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
+                    createBackendPlugin(id, url, name, description, icon)
                 }
         }
     }
@@ -115,63 +103,220 @@ class PluginService(config: PluginConfig) {
                 .selectAll()
                 .where { ProjectPluginsTable.projectId eq projectId }
                 .map { row ->
-                    val id = row[PluginsTable.id].toString()
+                    val id = row[PluginsTable.id]
                     val url = row[PluginsTable.url]
-                    createBackendPlugin(id, url)
+                    val name = row[PluginsTable.name]
+                    val description = row[PluginsTable.description]
+                    val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
+                    createBackendPlugin(id, url, name, description, icon)
                 }
         }
     }
     
     /**
+     * Retrieves a specific plugin by ID.
+     *
+     * @param pluginId The UUID of the plugin
+     * @return ApiResult containing the plugin information, or an error
+     */
+    fun getPlugin(pluginId: UUID): ApiResult<BackendPlugin> {
+        return transaction {
+            val row = PluginsTable.selectAll()
+                .where { PluginsTable.id eq pluginId }
+                .firstOrNull()
+            
+            if (row == null) {
+                return@transaction pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
+            }
+            
+            val url = row[PluginsTable.url]
+            val name = row[PluginsTable.name]
+            val description = row[PluginsTable.description]
+            val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
+            
+            success(createBackendPlugin(pluginId, url, name, description, icon))
+        }
+    }
+    
+    /**
      * Creates a new plugin with the specified URL.
+     * Fetches the plugin manifest and stores language plugins.
      *
      * @param url The URL of the plugin
      * @return ApiResult containing the plugin ID if successful, or an error
      */
-    fun createPlugin(url: String): ApiResult<String> {
-        return transaction {
-            val existing = PluginsTable.selectAll()
+    suspend fun createPlugin(url: String): ApiResult<String> {
+        val existingCheck = transaction {
+            PluginsTable.selectAll()
                 .where { PluginsTable.url eq url }
                 .firstOrNull()
-            
-            if (existing != null) {
-                return@transaction pluginFailure(
-                    ErrorCodes.PLUGIN_ALREADY_EXISTS, 
-                    "Plugin with URL already exists: $url"
-                )
-            }
-            
+        }
+        
+        if (existingCheck != null) {
+            return pluginFailure(
+                ErrorCodes.PLUGIN_ALREADY_EXISTS, 
+                "Plugin with URL already exists: $url"
+            )
+        }
+        
+        val manifest = try {
+            fetchPluginManifest(url)
+        } catch (e: Exception) {
+            logger.error("Failed to fetch plugin manifest from $url", e)
+            return pluginFailure(
+                ErrorCodes.PLUGIN_NOT_FOUND, 
+                "Failed to fetch plugin manifest: ${e.message}"
+            )
+        }
+        
+        return transaction {
             val pluginId = UUID.randomUUID()
             val now = Instant.now()
             
             PluginsTable.insert {
                 it[id] = pluginId
                 it[PluginsTable.url] = url
+                it[name] = manifest.name
+                it[description] = manifest.description
+                it[icon] = manifest.icon.toString()
                 it[createdAt] = now
                 it[updatedAt] = now
             }
+            
+            storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
+            
+            storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
             
             success(pluginId.toString())
         }
     }
     
     /**
+     * Refreshes plugin data by re-fetching the manifest and updating stored language plugins.
+     *
+     * @param pluginId The UUID of the plugin to refresh
+     * @return ApiResult indicating success or containing an error
+     */
+    suspend fun refreshPluginData(pluginId: UUID): ApiResult<Unit> {
+        val url = transaction {
+            PluginsTable.selectAll()
+                .where { PluginsTable.id eq pluginId }
+                .firstOrNull()
+                ?.get(PluginsTable.url)
+        } ?: return pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
+        
+        val manifest = try {
+            fetchPluginManifest(url)
+        } catch (e: Exception) {
+            logger.error("Failed to fetch plugin manifest from $url", e)
+            return pluginFailure(
+                ErrorCodes.PLUGIN_NOT_FOUND, 
+                "Failed to fetch plugin manifest: ${e.message}"
+            )
+        }
+        
+        transaction {
+            val now = Instant.now()
+            
+            LanguagePluginsTable.deleteWhere { LanguagePluginsTable.pluginId eq pluginId }
+            
+            ContributionPluginsTable.deleteWhere { ContributionPluginsTable.pluginId eq pluginId }
+            
+            storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
+            
+            storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
+            
+            PluginsTable.update({ PluginsTable.id eq pluginId }) {
+                it[name] = manifest.name
+                it[description] = manifest.description
+                it[icon] = manifest.icon.toString()
+                it[updatedAt] = now
+            }
+        }
+        
+        return success(Unit)
+    }
+    
+    /**
+     * Fetches the plugin manifest from the plugin's GET / endpoint.
+     */
+    private suspend fun fetchPluginManifest(url: String): PluginManifest {
+        return withContext(Dispatchers.IO) {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .timeout(Duration.ofSeconds(30))
+                .build()
+            
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            
+            if (response.statusCode() != 200) {
+                throw RuntimeException("Plugin returned status ${response.statusCode()}")
+            }
+            
+            json.decodeFromString<PluginManifest>(response.body())
+        }
+    }
+    
+    /**
+     * Stores language plugins in the database.
+     */
+    private fun storeLanguagePlugins(pluginId: UUID, languagePlugins: List<ManifestLanguagePlugin>, now: Instant) {
+        for (lp in languagePlugins) {
+            LanguagePluginsTable.insert {
+                it[id] = lp.id
+                it[LanguagePluginsTable.pluginId] = pluginId
+                it[name] = lp.name
+                it[extension] = lp.extension
+                it[defaultContent] = lp.defaultContent
+                it[serverPluginImport] = lp.serverPlugin.import
+                it[editorPluginImport] = lp.editorPlugin?.import
+                it[editorStylesUrl] = lp.editorPlugin?.stylesUrl
+                it[languageConfiguration] = lp.languageConfiguration.toString()
+                it[monarchTokensProvider] = lp.monarchTokensProvider.toString()
+                it[icon] = lp.icon.toString()
+                it[createdAt] = now
+                it[updatedAt] = now
+            }
+        }
+    }
+    
+    /**
+     * Stores contribution plugins in the database.
+     * Contribution plugins provide additional functionality to existing languages.
+     */
+    private fun storeContributionPlugins(pluginId: UUID, contributionPlugins: List<JsonObject>, now: Instant) {
+        for (cp in contributionPlugins) {
+            val languageId = cp["languageId"]?.jsonPrimitive?.content ?: continue
+            val additionalKeywords = cp["additionalKeywords"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            val serverPlugins = cp["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
+            
+            ContributionPluginsTable.insert {
+                it[id] = UUID.randomUUID()
+                it[ContributionPluginsTable.pluginId] = pluginId
+                it[ContributionPluginsTable.languageId] = languageId
+                it[ContributionPluginsTable.additionalKeywords] = Json.encodeToString(additionalKeywords)
+                it[ContributionPluginsTable.serverContributionPlugins] = Json.encodeToString(serverPlugins)
+                it[createdAt] = now
+                it[updatedAt] = now
+            }
+        }
+    }
+    
+    /**
      * Deletes a plugin and removes it from all projects.
+     * Cascading deletes handle language plugins, contribution plugins, and project associations.
      *
      * @param pluginId The UUID of the plugin to delete
      * @return ApiResult indicating success or containing an error
      */
     fun deletePlugin(pluginId: UUID): ApiResult<Unit> {
         return transaction {
-            ProjectPluginsTable.deleteWhere { ProjectPluginsTable.pluginId eq pluginId }
-            
             val deleted = PluginsTable.deleteWhere { PluginsTable.id eq pluginId }
             
             if (deleted == 0) {
                 return@transaction pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
             }
-            
-            pluginCache.invalidate(pluginId.toString())
             
             success(Unit)
         }
@@ -243,38 +388,8 @@ class PluginService(config: PluginConfig) {
     }
     
     /**
-     * Resolves and retrieves detailed information about a plugin.
-     * Results are cached to improve performance.
-     *
-     * @param pluginId The UUID of the plugin
-     * @return ApiResult containing the resolved plugin information, or an error
-     */
-    fun resolvePlugin(pluginId: UUID): ApiResult<ResolvedPlugin> {
-        val cachedPlugin = pluginCache.getIfPresent(pluginId.toString())
-        if (cachedPlugin != null) {
-            return success(cachedPlugin)
-        }
-        
-        return transaction {
-            val row = PluginsTable.selectAll()
-                .where { PluginsTable.id eq pluginId }
-                .firstOrNull()
-            
-            if (row == null) {
-                return@transaction pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
-            }
-            
-            val url = row[PluginsTable.url]
-            val resolved = createResolvedPlugin(pluginId.toString(), url)
-            
-            pluginCache.put(pluginId.toString(), resolved)
-            
-            success(resolved)
-        }
-    }
-    
-    /**
      * Removes all plugin associations for a project.
+     * Cascading deletes handle the associations automatically.
      *
      * @param projectId The UUID of the project
      */
@@ -284,55 +399,167 @@ class PluginService(config: PluginConfig) {
         }
     }
     
-    private fun createBackendPlugin(id: String, url: String): BackendPlugin {
-        return BackendPlugin(
-            id = id,
-            url = url,
-            name = extractPluginName(url),
-            description = "Plugin loaded from $url",
-            icon = createIconNode(url)
-        )
-    }
-    
-    private fun createResolvedPlugin(id: String, url: String): ResolvedPlugin {
-        return ResolvedPlugin(
-            id = id,
-            url = url,
-            name = extractPluginName(url),
-            description = "Plugin loaded from $url",
-            icon = createIconNode(url)
-        )
-    }
-    
     /**
-     * Extracts a readable plugin name from a URL.
+     * Finds the plugin responsible for a file based on its extension.
+     * Only considers plugins that are associated with the project.
      *
-     * @param url The plugin URL
-     * @return The extracted plugin name
+     * @param projectId The UUID of the project
+     * @param path The path to the file
+     * @return The plugin and language plugin responsible for this file, or null if none found
      */
-    private fun extractPluginName(url: String): String {
-        return try {
-            val uri = URI(url)
-            val path = uri.path ?: url
-            val lastSegment = path.split("/").lastOrNull { it.isNotBlank() } ?: "Unknown Plugin"
-            lastSegment
-                .removeSuffix(".js")
-                .removeSuffix(".mjs")
-                .removeSuffix(".json")
-                .replaceFirstChar { it.uppercase() }
-        } catch (e: Exception) {
-            "Unknown Plugin"
+    fun findPluginForFile(projectId: UUID, path: String): Pair<UUID, BackendLanguagePlugin>? {
+        val extension = path.substringAfterLast('.', "")
+        if (extension.isEmpty()) return null
+        
+        val extensionWithDot = ".$extension"
+        
+        return transaction {
+            val projectPluginIds = ProjectPluginsTable.selectAll()
+                .where { ProjectPluginsTable.projectId eq projectId }
+                .map { it[ProjectPluginsTable.pluginId] }
+            
+            if (projectPluginIds.isEmpty()) return@transaction null
+            
+            val result = LanguagePluginsTable.selectAll()
+                .where { 
+                    (LanguagePluginsTable.pluginId inList projectPluginIds) and
+                    (LanguagePluginsTable.extension eq extensionWithDot)
+                }
+                .firstOrNull() ?: return@transaction null
+            
+            val languagePlugin = rowToLanguagePlugin(result)
+            Pair(result[LanguagePluginsTable.pluginId], languagePlugin)
         }
     }
     
     /**
-     * Creates an icon node for a plugin based on its URL.
+     * Gets the URL for a plugin.
      *
-     * @param url The plugin URL
-     * @return A JsonArray representing the icon node in Lucide format
+     * @param pluginId The UUID of the plugin
+     * @return The plugin URL, or null if not found
      */
-    private fun createIconNode(url: String): JsonArray {
-        // For now return the fixed mock icon node defined above.
-        return mockIconNode
+    fun getPluginUrl(pluginId: UUID): String? {
+        return transaction {
+            PluginsTable.selectAll()
+                .where { PluginsTable.id eq pluginId }
+                .firstOrNull()
+                ?.get(PluginsTable.url)
+        }
+    }
+    
+    /**
+     * Gets all server contribution plugins for a specific language across all plugins in a project.
+     * 
+     * @param projectId The UUID of the project
+     * @param languageId The language ID to get contribution plugins for
+     * @return List of server contribution plugins as arbitrary JSON objects
+     */
+    fun getContributionPluginsForLanguage(projectId: UUID, languageId: String): List<JsonObject> {
+        return transaction {
+            val projectPluginIds = ProjectPluginsTable.selectAll()
+                .where { ProjectPluginsTable.projectId eq projectId }
+                .map { it[ProjectPluginsTable.pluginId] }
+            
+            if (projectPluginIds.isEmpty()) return@transaction emptyList()
+            
+            ContributionPluginsTable.selectAll()
+                .where { 
+                    (ContributionPluginsTable.pluginId inList projectPluginIds) and
+                    (ContributionPluginsTable.languageId eq languageId)
+                }
+                .flatMap { row ->
+                    json.decodeFromString<List<JsonObject>>(row[ContributionPluginsTable.serverContributionPlugins])
+                }
+        }
+    }
+    
+    /**
+     * Gets all project IDs that use a specific plugin.
+     *
+     * @param pluginId The UUID of the plugin
+     * @return List of project IDs using this plugin
+     */
+    fun getProjectsUsingPlugin(pluginId: UUID): List<UUID> {
+        return transaction {
+            ProjectPluginsTable.selectAll()
+                .where { ProjectPluginsTable.pluginId eq pluginId }
+                .map { it[ProjectPluginsTable.projectId] }
+        }
+    }
+    
+    /**
+     * Creates a BackendPlugin object with all its language and contribution plugins.
+     *
+     * @param pluginId The UUID of the plugin
+     * @param url The plugin URL
+     * @param name The plugin name
+     * @param description The plugin description
+     * @param icon The plugin icon as JsonArray
+     * @return The constructed BackendPlugin
+     */
+    private fun createBackendPlugin(pluginId: UUID, url: String, name: String, description: String, icon: JsonArray): BackendPlugin {
+        val languagePlugins = transaction {
+            LanguagePluginsTable.selectAll()
+                .where { LanguagePluginsTable.pluginId eq pluginId }
+                .map { rowToLanguagePlugin(it) }
+        }
+        
+        val contributionPlugins = transaction {
+            ContributionPluginsTable.selectAll()
+                .where { ContributionPluginsTable.pluginId eq pluginId }
+                .map { rowToContributionPlugin(it) }
+        }
+        
+        return BackendPlugin(
+            id = pluginId.toString(),
+            url = url,
+            name = name,
+            description = description,
+            icon = icon,
+            languagePlugins = languagePlugins,
+            contributionPlugins = contributionPlugins
+        )
+    }
+    
+    /**
+     * Converts a database row to a BackendContributionPlugin object.
+     *
+     * @param row The database result row
+     * @return The constructed BackendContributionPlugin
+     */
+    private fun rowToContributionPlugin(row: ResultRow): BackendContributionPlugin {
+        return BackendContributionPlugin(
+            id = row[ContributionPluginsTable.id].toString(),
+            languageId = row[ContributionPluginsTable.languageId],
+            additionalKeywords = json.decodeFromString<List<String>>(row[ContributionPluginsTable.additionalKeywords]),
+            serverContributionPlugins = json.decodeFromString<List<JsonObject>>(row[ContributionPluginsTable.serverContributionPlugins])
+        )
+    }
+    
+    /**
+     * Converts a database row to a BackendLanguagePlugin object.
+     *
+     * @param row The database result row
+     * @return The constructed BackendLanguagePlugin
+     */
+    private fun rowToLanguagePlugin(row: ResultRow): BackendLanguagePlugin {
+        return BackendLanguagePlugin(
+            id = row[LanguagePluginsTable.id],
+            name = row[LanguagePluginsTable.name],
+            extension = row[LanguagePluginsTable.extension],
+            defaultContent = row[LanguagePluginsTable.defaultContent],
+            serverPlugin = LanguageServerPlugin(
+                import = row[LanguagePluginsTable.serverPluginImport]
+            ),
+            editorPlugin = row[LanguagePluginsTable.editorPluginImport]?.let { importPath ->
+                LanguageEditorPlugin(
+                    import = importPath,
+                    stylesUrl = row[LanguagePluginsTable.editorStylesUrl] ?: ""
+                )
+            },
+            languageConfiguration = json.parseToJsonElement(row[LanguagePluginsTable.languageConfiguration]).jsonObject,
+            monarchTokensProvider = json.parseToJsonElement(row[LanguagePluginsTable.monarchTokensProvider]).jsonObject,
+            icon = json.parseToJsonElement(row[LanguagePluginsTable.icon]).jsonArray
+        )
     }
 }

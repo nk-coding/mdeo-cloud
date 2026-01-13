@@ -22,7 +22,7 @@ import {
     createGLSPModule,
     createModule,
     initializePluginContext,
-    type LanguagePlugin
+    type LangiumLanguagePluginProvider
 } from "@mdeo/language-common";
 import { type ResolvedServerLanguagePlugin } from "./types";
 import { GetPluginsRequest, ServerReadyNotification } from "./protocol";
@@ -85,12 +85,11 @@ async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
     plugins
-        .filter((plugin) => plugin.type === "language")
         .map(async (plugin) => {
-            const module = await import(/* @vite-ignore */ plugin.import);
+            const module = (await import(/* @vite-ignore */ plugin.import)).default as LangiumLanguagePluginProvider<any>;
             return {
                 ...plugin,
-                languagePlugin: module.default as LanguagePlugin<any>
+                languagePlugin: module.create(plugin.contributionPlugins)
             };
         })
 );
@@ -120,7 +119,7 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
     for (const plugin of resolvedPlugins) {
         const grammar = languageModule.grammars.get(plugin.languagePlugin)!;
         const languageMetaData: LanguageMetaData = {
-            languageId: plugin.languageId,
+            languageId: plugin.id,
             fileExtensions: [plugin.extension],
             caseInsensitive: false,
             mode: "development"

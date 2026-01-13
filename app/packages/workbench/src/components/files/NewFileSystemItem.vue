@@ -20,18 +20,18 @@ import { computed, ref } from "vue";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
 import type { Folder } from "@/data/filesystem/file";
-import type { WorkbenchLanguagePlugin } from "@/data/plugin/languagePlugin";
+import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 import { Uri } from "vscode";
 import FileTypeIcon from "../FileTypeIcon.vue";
 
 const props = defineProps<{
     itemType: "file" | "folder";
     parent: Folder;
-    fileType?: WorkbenchLanguagePlugin;
+    fileType?: ResolvedWorkbenchLanguagePlugin;
 }>();
 
 const emit = defineEmits<{
-    submit: [uri: Uri, fileType?: WorkbenchLanguagePlugin];
+    submit: [uri: Uri, fileType?: ResolvedWorkbenchLanguagePlugin];
     cancel: [];
 }>();
 

@@ -1,3 +1,3 @@
-import { modelPlugin } from "@mdeo/language-model";
+import { modelPluginProvider } from "@mdeo/language-model";
 
-export default modelPlugin;
+export default modelPluginProvider;

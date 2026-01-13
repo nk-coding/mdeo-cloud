@@ -50,12 +50,12 @@ import FileSystemItem from "./FileSystemItem.vue";
 import NewFileSystemItem from "./NewFileSystemItem.vue";
 import type { FileSystemNode, Folder } from "@/data/filesystem/file";
 import { sortFileSystemNodes } from "./util";
-import type { WorkbenchLanguagePlugin } from "@/data/plugin/languagePlugin";
+import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 import type { Uri } from "vscode";
 
 export interface NewItemState {
     type: "file" | "folder";
-    fileType?: WorkbenchLanguagePlugin;
+    fileType?: ResolvedWorkbenchLanguagePlugin;
 }
 
 const props = defineProps<{
@@ -64,7 +64,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     select: [entry: FileSystemNode];
-    createFile: [uri: Uri, fileType: WorkbenchLanguagePlugin];
+    createFile: [uri: Uri, fileType: ResolvedWorkbenchLanguagePlugin];
     createFolder: [uri: Uri];
     rename: [oldUri: Uri, newUri: Uri];
     delete: [uri: Uri];
@@ -78,7 +78,7 @@ const items = computed(() => {
     return sortFileSystemNodes(props.parent.children);
 });
 
-function handleCreateFile(uri: Uri, fileType: WorkbenchLanguagePlugin) {
+function handleCreateFile(uri: Uri, fileType: ResolvedWorkbenchLanguagePlugin) {
     emit("createFile", uri, fileType);
 }
 
@@ -98,7 +98,7 @@ function handleMove(itemUri: Uri, targetFolderUri: Uri) {
     emit("move", itemUri, targetFolderUri);
 }
 
-function handleNewItemSubmit(uri: Uri, fileType?: WorkbenchLanguagePlugin) {
+function handleNewItemSubmit(uri: Uri, fileType?: ResolvedWorkbenchLanguagePlugin) {
     if (fileType) {
         emit("createFile", uri, fileType);
     } else {

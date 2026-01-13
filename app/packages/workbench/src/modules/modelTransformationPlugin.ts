@@ -1,3 +1,3 @@
-import { modelTransformationPlugin } from "@mdeo/language-model-transformation";
+import { modelTransformationPluginProvider } from "@mdeo/language-model-transformation";
 
-export default modelTransformationPlugin;
+export default modelTransformationPluginProvider;

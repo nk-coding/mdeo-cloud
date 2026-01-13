@@ -3,6 +3,9 @@
     "files": [],
     "references": [
         {
+            "path": "packages/plugin"
+        },
+        {
             "path": "packages/language-common"
         },
         {

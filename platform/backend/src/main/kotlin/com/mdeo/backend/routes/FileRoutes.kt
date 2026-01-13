@@ -2,6 +2,8 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.FileService
+import com.mdeo.backend.service.JwtService
+import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,28 +16,32 @@ import java.util.*
  * Configures file and directory management routes.
  *
  * @param fileService Service for file operations
+ * @param projectService Service for project access validation
  */
-fun Route.fileRoutes(fileService: FileService) {
+fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
     route("/api/projects/{projectId}/files") {
         /**
-         * Reads file contents.
+         * Reads file contents with version information.
          *
          * @param projectId Path parameter for project UUID
          * @param path Variable path segments for file path
-         * @return File contents as byte array or ApiResult.Failure on error
+         * @return JSON with text content and version, or ApiResult.Failure on error
          */
         get("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@get
+            val projectId = call.validateProjectAccessWithJwt(projectService) ?: return@get
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
             
-            when (val result = fileService.readFile(projectId, path)) {
-                is ApiResult.Success -> {
-                    call.respondBytes(result.value, ContentType.Application.OctetStream)
-                }
-                is ApiResult.Failure -> {
-                    call.respond(result)
+            val contentResult = fileService.readFile(projectId, path)
+            val versionResult = fileService.getFileVersion(projectId, path)
+            
+            when {
+                contentResult is ApiResult.Failure -> call.respond(contentResult)
+                versionResult is ApiResult.Failure -> call.respond(versionResult)
+                contentResult is ApiResult.Success && versionResult is ApiResult.Success -> {
+                    val textContent = String(contentResult.value, Charsets.UTF_8)
+                    call.respond(FileReadResponse(textContent, versionResult.value))
                 }
             }
         }
@@ -51,7 +57,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult indicating success or failure
          */
         post("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@post
+            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -75,7 +81,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult indicating success or failure
          */
         put("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@put
+            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@put
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -97,7 +103,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult indicating success or failure
          */
         delete("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@delete
+            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@delete
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -118,7 +124,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult indicating success or failure
          */
         post("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@post
+            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -135,7 +141,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult with directory contents or failure
          */
         get("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@get
+            val projectId = call.validateProjectAccessWithJwt(projectService) ?: return@get
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/").ifEmpty { "/" }
@@ -154,7 +160,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult with file stats or failure
          */
         get("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@get
+            val projectId = call.validateProjectAccessWithJwt(projectService) ?: return@get
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -173,7 +179,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult with file version or failure
          */
         get("{path...}") {
-            val (projectId, _) = call.validateProjectAccess() ?: return@get
+            val projectId = call.validateProjectAccessWithJwt(projectService) ?: return@get
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -194,7 +200,7 @@ fun Route.fileRoutes(fileService: FileService) {
          * @return ApiResult indicating success or failure
          */
         post {
-            val (projectId, _) = call.validateProjectAccess() ?: return@post
+            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
             
             val from = call.request.queryParameters["from"]
             val to = call.request.queryParameters["to"]
@@ -212,11 +218,60 @@ fun Route.fileRoutes(fileService: FileService) {
 }
 
 /**
- * Validates project access and extracts project ID from path parameters.
+ * Validates project access using either session or JWT authentication.
+ * JWT tokens must have the files:read scope.
  *
- * @return Pair of project UUID and user ID if validation succeeds, null otherwise
+ * @param projectService Service for project access validation
+ * @return Project UUID if validation succeeds, null otherwise
  */
-private suspend fun ApplicationCall.validateProjectAccess(): Pair<UUID, String>? {
+private suspend fun ApplicationCall.validateProjectAccessWithJwt(projectService: ProjectService): UUID? {
+    val session = getUserSession()
+    val jwtPrincipal = getJwtPrincipal()
+    
+    val projectId = parameters["projectId"]?.let { 
+        try { UUID.fromString(it) } catch (e: Exception) { null }
+    }
+    if (projectId == null) {
+        respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
+        return null
+    }
+    
+    if (session != null) {
+        val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+            respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+            return null
+        }
+        
+        if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+            respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+            return null
+        }
+        
+        return projectId
+    } else if (jwtPrincipal != null) {
+        if (jwtPrincipal.projectId != projectId.toString()) {
+            respond(HttpStatusCode.Forbidden, mapOf("error" to "Token not valid for this project"))
+            return null
+        }
+        if (JwtService.SCOPE_FILES_READ !in jwtPrincipal.scopes) {
+            respond(HttpStatusCode.Forbidden, mapOf("error" to "Token missing required scope"))
+            return null
+        }
+        return projectId
+    }
+    
+    respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
+    return null
+}
+
+/**
+ * Validates project access using session authentication only (no JWT).
+ * Used for write operations that should not be accessible via JWT.
+ *
+ * @param projectService Service for project access validation
+ * @return Project UUID if validation succeeds, null otherwise
+ */
+private suspend fun ApplicationCall.validateProjectAccessSessionOnly(projectService: ProjectService): UUID? {
     val session = getUserSession()
     if (session == null) {
         respond(HttpStatusCode.Unauthorized)
@@ -236,5 +291,10 @@ private suspend fun ApplicationCall.validateProjectAccess(): Pair<UUID, String>?
         return null
     }
     
-    return Pair(projectId, session.userId)
+    if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+        respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+        return null
+    }
+    
+    return projectId
 }

@@ -3,8 +3,8 @@
     <FileIcon v-else />
 </template>
 <script setup lang="ts">
-import type { WorkbenchLanguagePlugin } from "@/data/plugin/languagePlugin";
+import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 import { Icon, FileIcon } from "lucide-vue-next";
 
-defineModel<WorkbenchLanguagePlugin | undefined>();
+defineModel<ResolvedWorkbenchLanguagePlugin | undefined>();
 </script>

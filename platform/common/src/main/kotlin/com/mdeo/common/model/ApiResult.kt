@@ -62,6 +62,10 @@ object ErrorCodes {
     const val LAST_OWNER = "LastOwner"
     const val OWNER_ALREADY_EXISTS = "OwnerAlreadyExists"
     const val OWNER_NOT_FOUND = "OwnerNotFound"
+    
+    const val FILE_DATA_CIRCULAR_DEPENDENCY = "FileDataCircularDependency"
+    const val FILE_DATA_COMPUTATION_FAILED = "FileDataComputationFailed"
+    const val FILE_DATA_NO_PLUGIN_FOUND = "FileDataNoPluginFound"
 }
 
 fun <T> success(value: T): ApiResult<T> = ApiResult.Success(value)
@@ -76,4 +80,7 @@ fun pluginFailure(code: String, message: String): ApiResult<Nothing> =
     ApiResult.Failure(ApiError(code, message))
 
 fun commonFailure(code: String, message: String): ApiResult<Nothing> = 
+    ApiResult.Failure(ApiError(code, message))
+
+fun fileDataFailure(code: String, message: String): ApiResult<Nothing> = 
     ApiResult.Failure(ApiError(code, message))

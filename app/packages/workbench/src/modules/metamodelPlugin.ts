@@ -1,3 +1,3 @@
-import { metamodelPlugin } from "@mdeo/language-metamodel";
+import { metamodelPluginProvider } from "@mdeo/language-metamodel";
 
-export default metamodelPlugin;
+export default metamodelPluginProvider;

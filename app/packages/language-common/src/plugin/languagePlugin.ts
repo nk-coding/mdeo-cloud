@@ -7,6 +7,7 @@ import type { ExtendedLangiumServices } from "../grammar/module/extendedServices
 import type { GLSPSharedAdditionalServices } from "../glsp/glspModule.js";
 import type { MetadataFileSystemProviderAdditionalServices } from "../protocol/metadataFileSystemProvider.js";
 import type { AstSerializerAdditionalServices } from "../protocol/astSerializer.js";
+import type { ServerContributionPlugin } from "@mdeo/plugin";
 
 /**
  * Combined language services including GLSP shared additional services
@@ -26,7 +27,7 @@ export type PartialLanguageServices = DeepPartial<LanguageServices>;
  *
  * @template T The type of the language's additional services
  */
-export interface LanguagePlugin<T> {
+export interface LangiumLanguagePlugin<T> {
     /**
      * The root parser rule that serves as the entry point for parsing
      */
@@ -46,6 +47,15 @@ export interface LanguagePlugin<T> {
      * @param context module context with the LSP connection
      */
     postCreate?: (services: LanguageServices & T, context: DefaultSharedModuleContext) => void;
+}
+
+/**
+ * Provider for a Langium language plugin.
+ *
+ * @template T The type of the language's additional services
+ */
+export interface LangiumLanguagePluginProvider<T> {
+    create(contributionPlugins: ServerContributionPlugin[]): LangiumLanguagePlugin<T>;
 }
 
 /**

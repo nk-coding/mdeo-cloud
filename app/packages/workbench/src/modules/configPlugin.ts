@@ -1,3 +1,3 @@
-import { configPlugin } from "@mdeo/language-config";
+import { configPluginProvider } from "@mdeo/language-config";
 
-export default configPlugin;
+export default configPluginProvider;

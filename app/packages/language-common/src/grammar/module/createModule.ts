@@ -2,7 +2,7 @@ import type { AstNode, PropertyMetaData, TypeMetaData } from "langium";
 import type { PluginContext } from "../../plugin/pluginContext.js";
 import { GrammarSerializer } from "../serialization/grammarSerializer.js";
 import type { AstTypes, Property } from "langium/grammar";
-import type { LanguagePlugin } from "../../plugin/languagePlugin.js";
+import type { LangiumLanguagePlugin } from "../../plugin/languagePlugin.js";
 import type { LanguageModule, AstReflection } from "./module.js";
 import type { Interface } from "../type/interface/types.js";
 
@@ -14,10 +14,10 @@ import type { Interface } from "../type/interface/types.js";
  * @returns A complete language module ready for use with Langium services
  */
 export function createModule(
-    plugins: LanguagePlugin<any>[],
+    plugins: LangiumLanguagePlugin<any>[],
     { "langium/grammar": langiumGrammar, langium }: PluginContext
 ): LanguageModule {
-    const serializedGrammars = new Map<LanguagePlugin<any>, string>();
+    const serializedGrammars = new Map<LangiumLanguagePlugin<any>, string>();
     for (const plugin of plugins) {
         const serializableGrammar = new GrammarSerializer(plugin.rootRule, plugin.additionalTerminals).grammar;
         const serializedGrammar = JSON.stringify(serializableGrammar);

@@ -1,6 +1,5 @@
 import { computed, nextTick, ref, shallowRef, watch, type Reactive } from "vue";
 import { type EditorTab } from "./tab/editorTab";
-import type { WorkbenchPlugin } from "./plugin/plugin";
 import type { BackendApi } from "./api/backendApi";
 import type { MonacoApi } from "@/lib/monacoPlugin";
 import type { Project } from "./project/project";
@@ -8,7 +7,6 @@ import type { Folder } from "./filesystem/file";
 import { useFileTree } from "./filesystem/useFileTree";
 import { BackendFileSystemProvider } from "./filesystem/fileSystemProvider";
 import { registerFileSystemOverlay } from "@codingame/monaco-vscode-files-service-override";
-import type { ServerContributionPlugin, ServerLanguagePlugin, ServerPlugin } from "./plugin/serverPlugin";
 import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserver-protocol/browser";
 import { MonacoLanguageClient } from "monaco-languageclient";
 import { CloseAction, ErrorAction, State, type ResponseMessage } from "vscode-languageclient";
@@ -31,7 +29,9 @@ import {
     type ReadMetadataParams,
     type WriteMetadataParams
 } from "@/server/protocol";
-import type { ResolvedLanguagePlugin } from "./plugin/languagePlugin";
+import type { ResolvedWorkbenchLanguagePlugin, WorkbenchPlugin } from "./plugin/plugin";
+import type { LanguageContributionPlugin } from "@mdeo/plugin";
+import type { ServerPlugin } from "./plugin/serverPlugin";
 
 /**
  * Manager for the overall state of the workbench
@@ -82,11 +82,11 @@ export class WorkbenchState {
     /**
      * File type plugins provided by any plugin
      */
-    readonly languagePlugins = computed<ResolvedLanguagePlugin[]>(() => {
-        const plugins = [...this.plugins.value.values()];
-        const contributionPluginsByLanguage = new Map<string, ServerContributionPlugin[]>();
+    readonly languagePlugins = computed<ResolvedWorkbenchLanguagePlugin[]>(() => {
+        const plugins = [...this.plugins.value.values()] as WorkbenchPlugin[];
+        const contributionPluginsByLanguage = new Map<string, LanguageContributionPlugin[]>();
         for (const plugin of plugins) {
-            for (const contributionPlugin of plugin.serverContributionPlugins) {
+            for (const contributionPlugin of plugin.contributionPlugins) {
                 if (!contributionPluginsByLanguage.has(contributionPlugin.languageId)) {
                     contributionPluginsByLanguage.set(contributionPlugin.languageId, []);
                 }
@@ -95,20 +95,18 @@ export class WorkbenchState {
         }
 
         return plugins
-            .flatMap((plugin) =>
-                plugin.languagePlugins.map((langPlugin) => ({ ...langPlugin }) as ResolvedLanguagePlugin)
-            )
+            .flatMap((plugin) => plugin.languagePlugins.map((langPlugin) => ({ ...langPlugin })))
             .map((langPlugin) => ({
                 ...langPlugin,
-                serverContributionPlugins: contributionPluginsByLanguage.get(langPlugin.id) ?? []
+                contributionPlugins: contributionPluginsByLanguage.get(langPlugin.id) ?? []
             }));
     });
 
     /**
      * Map of language plugins by their file extension
      */
-    readonly languagePluginByExtension = computed<Map<string, ResolvedLanguagePlugin>>(() => {
-        const map = new Map<string, ResolvedLanguagePlugin>();
+    readonly languagePluginByExtension = computed<Map<string, ResolvedWorkbenchLanguagePlugin>>(() => {
+        const map = new Map<string, ResolvedWorkbenchLanguagePlugin>();
         for (const langPlugin of this.languagePlugins.value) {
             if (map.has(langPlugin.extension)) {
                 throw new Error(`Multiple language plugins registered for extension ${langPlugin.extension}`);
@@ -122,15 +120,14 @@ export class WorkbenchState {
      * Server plugins provided by any plugin
      */
     readonly serverPlugins = computed<ServerPlugin[]>(() =>
-        [...this.languagePlugins.value].flatMap((plugin) => [
-            ...plugin.serverContributionPlugins,
-            {
-                ...plugin.serverPlugin,
-                type: "language",
-                languageId: plugin.id,
-                extension: plugin.extension
-            } satisfies ServerLanguagePlugin
-        ])
+        this.languagePlugins.value.map((plugin) => ({
+            id: plugin.id,
+            extension: plugin.extension,
+            contributionPlugins: plugin.contributionPlugins.flatMap(
+                (contribution) => contribution.serverContributionPlugins
+            ),
+            ...plugin.serverPlugin
+        }))
     );
 
     /**
@@ -232,12 +229,12 @@ export class WorkbenchState {
      * @param plugin The resolved language plugin
      * @returns The monarch tokens provider with merged keywords
      */
-    private generateMonarchTokensProvider(plugin: ResolvedLanguagePlugin) {
+    private generateMonarchTokensProvider(plugin: ResolvedWorkbenchLanguagePlugin) {
         return {
             ...plugin.monarchTokensProvider,
             keywords: [
                 ...plugin.monarchTokensProvider.keywords,
-                ...plugin.serverContributionPlugins.flatMap(
+                ...plugin.contributionPlugins.flatMap(
                     (contributionPlugin) => contributionPlugin.additionalKeywords ?? []
                 )
             ]

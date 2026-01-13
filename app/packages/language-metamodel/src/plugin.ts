@@ -1,5 +1,5 @@
 import { MetaModelRule } from "./grammar/metamodelRules.js";
-import { type LanguagePlugin, WS, ML_COMMENT, SL_COMMENT, HIDDEN_NEWLINE } from "@mdeo/language-common";
+import { type LangiumLanguagePlugin, WS, ML_COMMENT, SL_COMMENT, HIDDEN_NEWLINE, type LangiumLanguagePluginProvider } from "@mdeo/language-common";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
@@ -20,7 +20,7 @@ export type MetamodelServices = object;
  * The plugin for the Metamodel language.
  * Configures the language with newline-aware lexing and custom parsing behavior.
  */
-export const metamodelPlugin: LanguagePlugin<MetamodelServices> = {
+const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
     rootRule: MetaModelRule,
     additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
     module: {
@@ -40,5 +40,14 @@ export const metamodelPlugin: LanguagePlugin<MetamodelServices> = {
         registerDefaultTokenSerializers(services);
         registerMetamodelSerializers(services);
         services.shared.glsp.serverModule.configureDiagramModule(new MetamodelDiagramModule(services));
+    }
+};
+
+/**
+ * Provider for the Metamodel language plugin.
+ */
+export const metamodelPluginProvider: LangiumLanguagePluginProvider<MetamodelServices> = {
+    create(): LangiumLanguagePlugin<MetamodelServices> {
+        return metamodelPlugin;
     }
 };

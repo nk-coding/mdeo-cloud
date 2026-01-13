@@ -125,7 +125,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
                 type: FileType.File,
                 mtime: Date.now(),
                 ctime: Date.now(),
-                size: contentResult.value.byteLength
+                size: contentResult.value.content.byteLength
             };
         } else {
             return {
@@ -162,7 +162,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
-        return result.value;
+        return result.value.content;
     }
 
     async writeFile(resource: URI, content: Uint8Array, opts: IFileWriteOptions): Promise<void> {

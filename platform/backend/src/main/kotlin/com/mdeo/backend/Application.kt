@@ -47,6 +47,10 @@ fun Application.module(config: AppConfig) {
     val fileService = FileService()
     val metadataService = MetadataService()
     val pluginService = PluginService(config.plugin)
+    val jwtService = JwtService(config.jwt)
+    val fileDataService = FileDataService(config.fileData, pluginService, fileService, jwtService)
+    
+    jwtService.init()
     
     runBlocking {
         userService.createDefaultAdmin(config.defaultAdmin.username, config.defaultAdmin.password)
@@ -75,16 +79,21 @@ fun Application.module(config: AppConfig) {
     configureSerialization()
     configureCors(config.cors)
     configureStatusPages()
-    configureAuthentication()
+    configureAuthentication(jwtService)
     
     routing {
         authRoutes(userService)
+        publicKeyRoute(jwtService)
+        
+        authenticate(AUTH_SESSION, AUTH_JWT, optional = true) {
+            fileRoutes(fileService, projectService)
+            fileDataRoutes(fileDataService, projectService, jwtService)
+        }
         
         authenticate(AUTH_SESSION) {
             projectRoutes(projectService)
-            fileRoutes(fileService)
             metadataRoutes(metadataService)
-            pluginRoutes(pluginService, projectService)
+            pluginRoutes(pluginService, projectService, fileDataService)
             adminRoutes(userService)
             userRoutes(userService, projectService)
         }

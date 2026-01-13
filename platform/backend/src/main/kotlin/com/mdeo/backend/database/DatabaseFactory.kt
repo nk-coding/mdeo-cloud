@@ -44,7 +44,12 @@ object DatabaseFactory {
                 FilesTable,
                 FileMetadataTable,
                 PluginsTable,
-                ProjectPluginsTable
+                ProjectPluginsTable,
+                LanguagePluginsTable,
+                ContributionPluginsTable,
+                FileDataTable,
+                FileDependenciesTable,
+                DataDependenciesTable
             )
         }
         

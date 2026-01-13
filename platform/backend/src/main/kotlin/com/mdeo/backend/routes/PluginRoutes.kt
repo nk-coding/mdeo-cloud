@@ -1,6 +1,7 @@
 package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
+import com.mdeo.backend.service.FileDataService
 import com.mdeo.backend.service.PluginService
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
@@ -15,8 +16,13 @@ import java.util.*
  *
  * @param pluginService Service for plugin operations
  * @param projectService Service for project access validation
+ * @param fileDataService Service for file data invalidation
  */
-fun Route.pluginRoutes(pluginService: PluginService, projectService: ProjectService) {
+fun Route.pluginRoutes(
+    pluginService: PluginService, 
+    projectService: ProjectService,
+    fileDataService: FileDataService
+) {
     route("/api/plugins") {
         /**
          * Gets all available plugins.
@@ -69,17 +75,48 @@ fun Route.pluginRoutes(pluginService: PluginService, projectService: ProjectServ
                 return@delete
             }
             
+            fileDataService.invalidatePluginData(pluginId)
+            
             val result = pluginService.deletePlugin(pluginId)
             call.respond(result)
         }
         
         /**
-         * Resolves a plugin's manifest and dependencies.
+         * Refreshes a plugin's data by re-fetching its manifest (admin only).
          *
          * @param pluginId Path parameter for plugin UUID
-         * @return ApiResult with resolved plugin information
+         * @return ApiResult indicating success or failure, 403 if not admin
          */
-        get("/{pluginId}/resolve") {
+        post("/{pluginId}/refresh") {
+            if (!call.isAdmin()) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
+                return@post
+            }
+            
+            val pluginId = call.parameters["pluginId"]?.let { 
+                try { UUID.fromString(it) } catch (e: Exception) { null }
+            }
+            if (pluginId == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid plugin ID"))
+                return@post
+            }
+            
+            val result = pluginService.refreshPluginData(pluginId)
+            
+            if (result is ApiResult.Success) {
+                fileDataService.invalidatePluginData(pluginId)
+            }
+            
+            call.respond(result)
+        }
+        
+        /**
+         * Gets a specific plugin by ID.
+         *
+         * @param pluginId Path parameter for plugin UUID
+         * @return ApiResult with plugin information
+         */
+        get("/{pluginId}") {
             val pluginId = call.parameters["pluginId"]?.let { 
                 try { UUID.fromString(it) } catch (e: Exception) { null }
             }
@@ -88,7 +125,7 @@ fun Route.pluginRoutes(pluginService: PluginService, projectService: ProjectServ
                 return@get
             }
             
-            val result = pluginService.resolvePlugin(pluginId)
+            val result = pluginService.getPlugin(pluginId)
             call.respond(result)
         }
     }
@@ -168,6 +205,11 @@ fun Route.pluginRoutes(pluginService: PluginService, projectService: ProjectServ
             }
             
             val result = pluginService.addPluginToProject(projectId, pluginId)
+            
+            if (result is ApiResult.Success) {
+                fileDataService.invalidateProjectData(projectId)
+            }
+            
             call.respond(result)
         }
         
@@ -212,6 +254,11 @@ fun Route.pluginRoutes(pluginService: PluginService, projectService: ProjectServ
             }
             
             val result = pluginService.removePluginFromProject(projectId, pluginId)
+            
+            if (result is ApiResult.Success) {
+                fileDataService.invalidateProjectData(projectId)
+            }
+            
             call.respond(result)
         }
     }
