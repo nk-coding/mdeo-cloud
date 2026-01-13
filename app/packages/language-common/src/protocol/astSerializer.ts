@@ -1,17 +1,72 @@
-import type { CstNode, AstNode, LangiumDocument, LeafCstNode, Reference } from "langium";
-import type { AstPath, Doc, doc, ParserOptions } from "prettier";
-import type { TerminalRule } from "@mdeo/language-common";
+import type { AstNode, CstNode, LangiumDocument, LeafCstNode, Reference } from "langium";
+import type { FormattingOptions } from "vscode-languageserver-types";
+import type { TerminalRule } from "../grammar/rule/terminal/types.js";
+import type { Interface } from "../grammar/type/interface/types.js";
+import type { AstPath, Doc, ParserOptions, doc } from "prettier";
+
+/**
+ * Service for serializing AST nodes to formatted text using Prettier.
+ *
+ * This service allows registering custom serializers for different node types and terminal rules,
+ * then uses Prettier's formatting engine to produce consistently formatted output.
+ */
+export interface AstSerializer {
+    /**
+     * Serializes an AST node to a formatted string.
+     *
+     * @param node The AST node to serialize
+     * @param document The Langium document containing the AST node
+     * @param options Formatting options to guide the serialization
+     * @returns A promise that resolves to the formatted string representation of the node
+     */
+    serializeNode(node: AstNode, document: LangiumDocument, options: FormattingOptions): Promise<string>;
+
+    /**
+     * Serializes a primitive value using the registered serializer for the given terminal rule.
+     *
+     * @template T The TypeScript type of the primitive value
+     * @param primitive the primitive value to serialize
+     * @param rule the terminal rule that matches this primitive type
+     * @returns the string representation of the primitive value
+     */
+    serializePrimitive<T>(primitive: PrimitiveValue<T>, rule: TerminalRule<T>): string;
+
+    /**
+     * Registers a custom printer function for a specific AST node type.
+     *
+     * @template T The type of AST node this printer handles
+     * @param type The interface defining the node type to print
+     * @param printer The function that converts nodes of this type to Prettier Doc format
+     */
+    registerNodeSerializer<T extends AstNode>(type: Interface<T>, printer: (context: PrintContext<T>) => Doc): void;
+
+    /**
+     * Registers a custom serializer function for primitive values matched by a terminal rule.
+     *
+     * @template T The TypeScript type of the primitive value
+     * @param rule The terminal rule that matches this primitive type
+     * @param serializer The function that converts primitive values to a string
+     */
+    registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => string): void;
+}
+
+/**
+ * Additional services that can be injected into Langium services.
+ */
+export interface AstSerializerAdditionalServices {
+    AstSerializer: AstSerializer;
+}
 
 /**
  * Function type for printing a node at a given path to a Prettier Doc.
  */
-
 export type Print = (path: AstPath) => Doc;
+
 /**
  * Type alias for Prettier's document builders
  */
-
 export type Builders = typeof doc.builders;
+
 /**
  * Represents a primitive value along with its optional CST node.
  *

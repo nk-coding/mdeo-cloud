@@ -26,7 +26,7 @@ export class EditorState implements IDisposable {
     /**
      * Creates a new editor state for a given file URI.
      *
-     * @param uri - The URI of the file this editor state represents
+     * @param uri The URI of the file this editor state represents
      */
     constructor(public uri: Uri) {}
 
@@ -36,8 +36,8 @@ export class EditorState implements IDisposable {
      * This method disposes of the existing model reference and creates a new one
      * for the updated URI, setting the appropriate language ID for syntax highlighting.
      *
-     * @param newUri - The new URI to associate with this editor state
-     * @param language - The language ID to set for the new model (e.g., 'typescript', 'javascript')
+     * @param newUri The new URI to associate with this editor state
+     * @param language The language ID to set for the new model (e.g., 'typescript', 'javascript')
      */
     async updateUri(newUri: Uri, language: string) {
         this.uri = newUri;

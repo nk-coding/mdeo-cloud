@@ -1,9 +1,7 @@
 import type { Command, MaybePromise } from "@eclipse-glsp/server";
 import type { EdgeMetadata, GraphMetadata, NodeMetadata } from "../metadata.js";
 import type { ModelState } from "../modelState.js";
-import { sharedImport } from "../../sharedImport.js";
-
-const { URI } = sharedImport("langium");
+import type { WorkspaceEdit } from "vscode-languageserver-types";
 
 /**
  * Command to handle operations that modify the model state,
@@ -13,12 +11,12 @@ export class OperationHandlerCommand implements Command {
     /**
      * Creates a new OperationHandlerCommand
      *
-     * @param textEdits the text edits to apply
+     * @param workspaceEdit the text edits to apply
      * @param metadataEdits the metadata edits to apply
      */
     constructor(
         readonly state: ModelState,
-        readonly textEdits: undefined,
+        readonly workspaceEdit: WorkspaceEdit | undefined,
         readonly metadataEdits:
             | {
                   nodes?: Record<string, Partial<NodeMetadata>>;
@@ -34,11 +32,10 @@ export class OperationHandlerCommand implements Command {
                 nodes: this.mergeMetadata(currentMetadata.nodes, this.metadataEdits.nodes),
                 edges: this.mergeMetadata(currentMetadata.edges, this.metadataEdits.edges)
             };
-            this.state.languageServices.shared.workspace.FileSystemProvider.writeMetadata(
-                URI.parse(this.state.sourceUri!),
-                newMetadata
-            );
             this.state.metadata = newMetadata;
+        }
+        if (this.workspaceEdit != undefined) {
+            await this.state.languageServices.shared.lsp.Connection!.workspace.applyEdit(this.workspaceEdit);
         }
     }
 

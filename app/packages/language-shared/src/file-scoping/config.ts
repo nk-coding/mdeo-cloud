@@ -4,7 +4,7 @@ import type { AstNode } from "langium";
 /**
  * Configuration for file-scoped composition.
  *
- * @template T - The element type that will be scoped by file.
+ * @template T The element type that will be scoped by file.
  */
 export class FileScopingConfig<T extends AstNode> {
     /**

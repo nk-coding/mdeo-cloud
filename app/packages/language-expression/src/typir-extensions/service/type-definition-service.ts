@@ -12,13 +12,13 @@ import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js
 export type TypeDefinitionListener = Partial<{
     /**
      * Called when a new class type is added to the registry
-     * @param classType - The class type that was added
+     * @param classType The class type that was added
      */
     onAddedClassType: (classType: ClassType) => void;
 
     /**
      * Called when a class type is removed from the registry
-     * @param classType - The class type that was removed
+     * @param classType The class type that was removed
      */
     onRemovedClassType: (classType: ClassType) => void;
 }>;
@@ -33,7 +33,7 @@ export interface TypeDefinitionService {
      * Add a single class type to the registry.
      * Throws an error if a type with the same identifier already exists.
      *
-     * @param classType - The class type definition to register
+     * @param classType The class type definition to register
      * @throws Error if a type with the same identifier (package.name) already exists
      */
     addClassType(classType: ClassType): void;
@@ -42,7 +42,7 @@ export interface TypeDefinitionService {
      * Remove a class type from the registry by its identifier.
      * If the type doesn't exist, this method does nothing.
      *
-     * @param identifier - The fully qualified identifier (e.g., "builtin.string")
+     * @param identifier The fully qualified identifier (e.g., "builtin.string")
      */
     removeClassType(classType: ClassType): void;
 
@@ -50,7 +50,7 @@ export interface TypeDefinitionService {
      * Look up a class type by its identifier (package.name).
      * Throws an error if the type is not found.
      *
-     * @param identifier - The fully qualified identifier (e.g., "builtin.string")
+     * @param identifier The fully qualified identifier (e.g., "builtin.string")
      * @returns The class type definition
      * @throws Error if the type is not found
      */
@@ -59,7 +59,7 @@ export interface TypeDefinitionService {
     /**
      * Look up a class type by its identifier (package.name) if it exists.
      *
-     * @param identifier - The fully qualified identifier (e.g., "builtin.string")
+     * @param identifier The fully qualified identifier (e.g., "builtin.string")
      * @returns The class type definition or undefined if not found
      */
     getClassTypeIfExisting(identifier: string): ClassType | undefined;
@@ -75,8 +75,8 @@ export interface TypeDefinitionService {
      * Resolve a ValueType to a CustomClassType or CustomLambdaType.
      * This method handles generic type resolution and creates appropriate Typir custom types.
      *
-     * @param type - The value type to resolve
-     * @param genericTypeArgs - Optional map of generic type arguments for resolution
+     * @param type The value type to resolve
+     * @param genericTypeArgs Optional map of generic type arguments for resolution
      * @returns The resolved custom type
      * @throws Error if a generic type cannot be resolved
      */
@@ -85,9 +85,9 @@ export interface TypeDefinitionService {
     /**
      * Resolve a FunctionType to a CustomFunctionType.
      *
-     * @param type - The function type to resolve
-     * @param name - The name of the function
-     * @param genericTypeArgs - Optional map of generic type arguments for resolution
+     * @param type The function type to resolve
+     * @param name The name of the function
+     * @param genericTypeArgs Optional map of generic type arguments for resolution
      * @returns The resolved custom function type
      */
     resolveCustomFunctionType(
@@ -100,7 +100,7 @@ export interface TypeDefinitionService {
      * Register the super types for lambda types.
      * These super types will be applied to all lambda type instances.
      *
-     * @param superTypes - The super types to register for lambda types
+     * @param superTypes The super types to register for lambda types
      */
     registerLambdaSuperTypes(superTypes: BaseClassTypeRef[]): void;
 
@@ -114,14 +114,14 @@ export interface TypeDefinitionService {
     /**
      * Add a listener to receive notifications about class type changes.
      *
-     * @param listener - The listener to add
+     * @param listener The listener to add
      */
     addListener(listener: TypeDefinitionListener): void;
 
     /**
      * Remove a previously added listener.
      *
-     * @param listener - The listener to remove
+     * @param listener The listener to remove
      */
     removeListener(listener: TypeDefinitionListener): void;
 }

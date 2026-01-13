@@ -1,12 +1,13 @@
 import { sharedImport } from "../sharedImport.js";
 import type { GraphMetadata } from "./metadata.js";
-import type { AstNode, URI } from "langium";
+import type { AstNode, URI as URIType } from "langium";
 import { MetadataManager } from "./metadataManager.js";
 import { LanguageServicesKey } from "./langiumServices.js";
 import { type LanguageServices } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { DefaultModelState, SOURCE_URI_ARG } = sharedImport("@eclipse-glsp/server");
+const { URI } = sharedImport("langium");
 
 /**
  * Extended model state that manages both the graphical model and the source model.
@@ -17,7 +18,14 @@ const { DefaultModelState, SOURCE_URI_ARG } = sharedImport("@eclipse-glsp/server
  */
 @injectable()
 export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
+    /**
+     * Injected metadata manager for validating and managing graph metadata.
+     */
     @inject(MetadataManager) protected metadataManager!: MetadataManager<T>;
+
+    /**
+     * Injected language services for accessing workspace and file system operations.
+     */
     @inject(LanguageServicesKey) languageServices!: LanguageServices;
 
     /**
@@ -51,6 +59,10 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
     set metadata(value: GraphMetadata) {
         this._metadata = value;
         this.isMetadataValidated = false;
+        this.languageServices.shared.workspace.FileSystemProvider.writeMetadata(
+            URI.parse(this.sourceUri!),
+            this._metadata
+        );
     }
 
     /**
@@ -77,7 +89,7 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
      * @param sourceModel The new source model to set
      * @param metadata The new graph metadata to set
      */
-    async updateSourceModel(uri: URI, sourceModel: T | undefined, metadata: GraphMetadata): Promise<void> {
+    async updateSourceModel(uri: URIType, sourceModel: T | undefined, metadata: GraphMetadata): Promise<void> {
         this.set(SOURCE_URI_ARG, uri.toString());
         this._sourceModel = sourceModel;
         this._metadata = metadata;
@@ -101,8 +113,8 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
             return this._metadata;
         }
         const validatedMetadata = this.metadataManager.validateMetadata(this._sourceModel!, this._metadata);
-        if (validatedMetadata) {
-            this._metadata = validatedMetadata;
+        if (validatedMetadata != undefined) {
+            this.metadata = validatedMetadata;
         }
         this.isMetadataValidated = true;
         return this._metadata;

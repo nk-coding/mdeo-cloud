@@ -1,115 +1,140 @@
-import { sharedImport, type ModelIdProvider } from "@mdeo/language-shared";
-import type { AstNode } from "langium";
-import type {
-    ClassType,
-    PropertyType,
-    AssociationType,
-    AssociationEndType,
-    MetaModelType
+import { AstReflectionKey, BaseModelIdProvider, sharedImport } from "@mdeo/language-shared";
+import type { AstNode, Reference } from "langium";
+import {
+    Class,
+    Property,
+    Association,
+    AssociationEnd,
+    MetaModel,
+    ClassImport,
+    ClassExtension
 } from "../../grammar/metamodelTypes.js";
 import type {
     PartialClass,
     PartialProperty,
     PartialAssociation,
     PartialAssociationEnd,
-    PartialMetaModel
+    PartialMetaModel,
+    PartialClassImport,
+    PartialClassExtension
 } from "../../grammar/metamodelPartialTypes.js";
+import type { AstReflection } from "@mdeo/language-common";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 
 /**
  * Provides unique IDs for metamodel AST nodes based on semantic information.
  * IDs are constructed to be deterministic and meaningful.
  */
 @injectable()
-export class MetamodelModelIdProvider implements ModelIdProvider {
-    getId(node: AstNode): string | undefined {
-        const nodeType = node.$type;
+export class MetamodelModelIdProvider extends BaseModelIdProvider {
+    /**
+     * Injected AST reflection service for type checking and model introspection.
+     */
+    @inject(AstReflectionKey)
+    protected reflection!: AstReflection;
 
-        switch (nodeType) {
-            case "MetaModel":
-                return this.getMetaModelId(node as MetaModelType);
-            case "Class":
-                return this.getClassId(node as ClassType);
-            case "Property":
-                return this.getPropertyId(node as PropertyType);
-            case "Association":
-                return this.getAssociationId(node as AssociationType);
-            case "AssociationEnd":
-                return this.getAssociationEndId(node as AssociationEndType);
-            default:
-                return undefined;
+    getName(node: AstNode): string | undefined {
+        if (this.reflection.isInstance(node, MetaModel)) {
+            return this.getMetaModelName(node);
+        } else if (this.reflection.isInstance(node, Class)) {
+            return this.getClassName(node);
+        } else if (this.reflection.isInstance(node, ClassImport)) {
+            return this.getClassImportName(node);
+        } else if (this.reflection.isInstance(node, Property)) {
+            return this.getPropertyName(node);
+        } else if (this.reflection.isInstance(node, Association)) {
+            return this.getAssociationName(node);
+        } else if (this.reflection.isInstance(node, AssociationEnd)) {
+            return this.getAssociationEndName(node);
+        } else if (this.reflection.isInstance(node, ClassExtension)) {
+            return this.getClassExtensionName(node);
         }
+        return undefined;
     }
 
     /**
      * Generates ID for MetaModel root node.
      */
-    private getMetaModelId(_node: PartialMetaModel): string {
+    private getMetaModelName(_node: PartialMetaModel): string {
         return "metamodel-graph";
     }
 
     /**
      * Generates ID for Class node based on class name.
      */
-    private getClassId(node: PartialClass): string {
-        const name = node.name ?? "unnamed";
-        return `class_${name}`;
+    private getClassName(node: PartialClass): string {
+        return node.name ?? "unnamed";
+    }
+
+    /**
+     * Generates ID for ClassImport node based on the imported class name or alias.
+     */
+    private getClassImportName(node: PartialClassImport): string {
+        return node.name ?? node.entity?.ref?.name ?? "unnamed";
     }
 
     /**
      * Generates ID for Property node based on parent class and property name.
      */
-    private getPropertyId(node: PartialProperty): string {
+    private getPropertyName(node: PartialProperty): string {
         const propName = node.name ?? "unnamed";
         const parent = node.$container;
-        if (parent?.$type === "Class") {
+        if (parent != undefined && this.reflection.isInstance(parent, Class)) {
             const parentClass = parent as PartialClass;
-            return `${this.getClassId(parentClass)}_prop_${propName}`;
+            return `${this.getClassName(parentClass)}_prop_${propName}`;
         }
-        return `property_${propName}`;
+        return propName;
     }
 
     /**
      * Generates ID for Association based on start and end classes.
      * Uses class names and properties to create a semantic ID.
      */
-    private getAssociationId(node: PartialAssociation): string {
-        const startClassName = node.start ? this.resolveClassName(node.start) : "unknown";
-        const targetClassName = node.target ? this.resolveClassName(node.target) : "unknown";
+    private getAssociationName(node: PartialAssociation): string {
+        const startClassName = this.resolveClassName(node.start?.class);
+        const targetClassName = this.resolveClassName(node.target?.class);
         const startProperty = node.start?.property ?? "";
         const targetProperty = node.target?.property ?? "";
         const operator = node.operator ?? "--";
 
-        return `association_${startClassName}_${startProperty}_${operator}_${targetClassName}_${targetProperty}`;
+        return `${startClassName}_${startProperty}_${operator}_${targetClassName}_${targetProperty}`;
     }
 
     /**
      * Generates ID for AssociationEnd.
      */
-    private getAssociationEndId(node: PartialAssociationEnd): string {
-        const className = this.resolveClassName(node);
+    private getAssociationEndName(node: PartialAssociationEnd): string {
+        const className = this.resolveClassName(node.class);
         const property = node.property ?? "noProperty";
-        return `assocend_${className}_${property}`;
+        return `${className}_${property}`;
     }
 
     /**
-     * Resolves the class name from an AssociationEnd.
+     * Generates ID for ClassExtension based on parent class and extension name.
      */
-    private resolveClassName(end: PartialAssociationEnd): string {
-        const resolved = end.class?.ref;
-        if (!resolved) {
+    private getClassExtensionName(node: PartialClassExtension): string {
+        const owningClass = node.$container as PartialClass | undefined;
+        const parentClassName = owningClass != undefined ? this.getClassName(owningClass) : "unknownParent";
+        const extensionName = this.resolveClassName(node.class);
+        return `${parentClassName}_${extensionName}`;
+    }
+
+    /**
+     * Resolves the class name from a class reference.
+     */
+    private resolveClassName(clsReference: Reference<AstNode> | undefined): string {
+        if (clsReference === undefined || clsReference.error != undefined) {
             return "unresolved";
         }
+        const resolved = clsReference.ref;
 
-        if (resolved.$type === "Class") {
-            const classNode = resolved as PartialClass;
-            return classNode.name ?? "unnamed";
+        if (this.reflection.isInstance(resolved, Class)) {
+            return this.getClassName(resolved);
         }
 
-        if (resolved.$type === "ClassImport") {
-            const importNode = resolved as any;
-            return importNode.name ?? importNode.element?.ref?.name ?? "imported";
+        if (this.reflection.isInstance(resolved, ClassImport)) {
+            return this.getClassImportName(resolved);
         }
 
         return "unknown";

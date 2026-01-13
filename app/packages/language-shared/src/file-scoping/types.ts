@@ -27,7 +27,7 @@ export function generateImportTypes<T extends AstNode>(config: FileScopingConfig
  * Type representing a single import statement that references an entity.
  * Contains the entity reference and an optional alias name.
  *
- * @template T - The AstNode type being imported
+ * @template T The AstNode type being imported
  */
 export type ImportType<T extends AstNode> = ReturnType<typeof generateImportTypes<T>>["importType"];
 
@@ -35,6 +35,6 @@ export type ImportType<T extends AstNode> = ReturnType<typeof generateImportType
  * Type representing a file import statement that contains multiple entity imports.
  * Follows the pattern: `import { entity1, entity2 as alias } from "file"`
  *
- * @template T - The AstNode type being imported
+ * @template T The AstNode type being imported
  */
 export type FileImportType<T extends AstNode> = ReturnType<typeof generateImportTypes<T>>["fileImportType"];

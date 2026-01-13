@@ -11,8 +11,14 @@ import {
 import { NodeLayoutMetadata, EdgeVisualMetadata, EdgePlacementMetadata } from "@mdeo/editor-protocol";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
-import type { MetaModelType, ClassType, AssociationType } from "../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "./model/elementTypes.js";
+import type {
+    PartialClassImport,
+    PartialMetaModel,
+    PartialClass,
+    PartialAssociation
+} from "../../grammar/metamodelPartialTypes.js";
+import { Association, Class, ClassImport } from "../../grammar/metamodelTypes.js";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -21,7 +27,7 @@ const { injectable, inject } = sharedImport("inversify");
  * Implements cost calculations based on semantic similarity between model elements.
  */
 @injectable()
-export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
+export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> {
     @inject(ModelIdProvider)
     protected modelIdProvider!: ModelIdProviderType;
 
@@ -29,7 +35,7 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Verifies the metadata for a given model element.
      * Corrects invalid metadata or returns undefined if valid.
      */
-    protected verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
+    protected override verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
         if (model.type === MetamodelElementType.NODE_CLASS) {
             return NodeLayoutMetadata.verify(model.meta, 0, 0);
         }
@@ -110,14 +116,15 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     /**
      * Extracts graph metadata from the metamodel source model.
      */
-    protected extractGraphMetadata(sourceModel: MetaModelType): GraphMetadata {
+    protected extractGraphMetadata(sourceModel: PartialMetaModel): GraphMetadata {
         const nodes: Record<string, NodeMetadata> = {};
         const edges: Record<string, EdgeMetadata> = {};
 
         const idRegistry = new ModelIdRegistry(sourceModel, this.modelIdProvider);
-        const { classes, associations } = this.extractClassesAndAssociations(sourceModel);
+        const { classes, associations, imports } = this.extractClassesAndAssociations(sourceModel);
 
         this.extractClassMetadata(classes, idRegistry, nodes);
+        this.extractClassImportMetadata(imports, idRegistry, nodes);
         this.extractInheritanceMetadata(classes, idRegistry, edges);
         this.extractAssociationMetadata(associations, idRegistry, nodes, edges);
 
@@ -128,7 +135,7 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Extracts metadata for all classes.
      */
     private extractClassMetadata(
-        classes: ClassType[],
+        classes: PartialClass[],
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>
     ): void {
@@ -144,24 +151,54 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     }
 
     /**
+     * Extracts metadata for all imported classes.
+     */
+    private extractClassImportMetadata(
+        imports: PartialClassImport[],
+        idRegistry: ModelIdRegistry,
+        nodes: Record<string, NodeMetadata>
+    ): void {
+        for (const classImport of imports) {
+            const importedClass = classImport.entity?.ref;
+            if (!importedClass) {
+                continue;
+            }
+
+            const nodeId = idRegistry.getId(classImport);
+            if (nodeId) {
+                nodes[nodeId] = {
+                    type: MetamodelElementType.NODE_CLASS,
+                    attrs: this.createClassAttributes(importedClass as PartialClass)
+                };
+            }
+        }
+    }
+
+    /**
      * Extracts metadata for all inheritance relationships.
      */
     private extractInheritanceMetadata(
-        classes: ClassType[],
+        classes: PartialClass[],
         idRegistry: ModelIdRegistry,
         edges: Record<string, EdgeMetadata>
     ): void {
-        let inheritanceIndex = 0;
-
         for (const cls of classes) {
-            for (const superClassRef of cls.extends) {
-                const superClass = superClassRef.ref;
-                if (superClass && superClass.$type === "Class") {
+            if (!cls.extends) {
+                continue;
+            }
+
+            for (const extendsDef of cls.extends) {
+                if (!extendsDef?.class?.ref) {
+                    continue;
+                }
+
+                const superClass = extendsDef.class.ref;
+                if (this.reflection.isInstance(superClass, Class)) {
                     const sourceId = idRegistry.getId(cls);
-                    const targetId = idRegistry.getId(superClass as ClassType);
+                    const targetId = idRegistry.getId(superClass as PartialClass);
 
                     if (sourceId && targetId) {
-                        const edgeId = `inheritance_${inheritanceIndex++}`;
+                        const edgeId = idRegistry.getId(extendsDef);
                         edges[edgeId] = {
                             type: MetamodelElementType.EDGE_INHERITANCE,
                             from: sourceId,
@@ -178,23 +215,25 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Extracts metadata for all associations.
      */
     private extractAssociationMetadata(
-        associations: AssociationType[],
+        associations: PartialAssociation[],
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>,
         edges: Record<string, EdgeMetadata>
     ): void {
-        let associationIndex = 0;
-
         for (const assoc of associations) {
-            const startClass = assoc.start.class.ref;
-            const targetClass = assoc.target.class.ref;
+            if (!assoc.start || !assoc.target) {
+                continue;
+            }
+
+            const startClass = assoc.start.class?.ref;
+            const targetClass = assoc.target.class?.ref;
 
             if (startClass && targetClass) {
                 const startId = this.getClassId(startClass, idRegistry);
                 const targetId = this.getClassId(targetClass, idRegistry);
 
                 if (startId && targetId) {
-                    const edgeId = `association_${associationIndex++}`;
+                    const edgeId = idRegistry.getId(assoc);
                     edges[edgeId] = {
                         type: MetamodelElementType.EDGE_ASSOCIATION,
                         from: startId,
@@ -212,18 +251,18 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Extracts metadata for association end labels.
      */
     private extractAssociationLabelMetadata(
-        assoc: AssociationType,
+        assoc: PartialAssociation,
         edgeId: string,
         nodes: Record<string, NodeMetadata>
     ): void {
-        if (assoc.start.property || assoc.start.multiplicity) {
+        if (assoc.start && (assoc.start.property || assoc.start.multiplicity)) {
             nodes[`${edgeId}_start`] = {
                 type: MetamodelElementType.LABEL_ASSOCIATION_END,
                 attrs: {}
             };
         }
 
-        if (assoc.target.property || assoc.target.multiplicity) {
+        if (assoc.target && (assoc.target.property || assoc.target.multiplicity)) {
             nodes[`${edgeId}_target`] = {
                 type: MetamodelElementType.LABEL_ASSOCIATION_END,
                 attrs: {}
@@ -232,37 +271,62 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
     }
 
     /**
-     * Extracts classes and associations from the metamodel.
+     * Extracts classes, associations, and imports from the metamodel.
      */
-    private extractClassesAndAssociations(metamodel: MetaModelType): {
-        classes: ClassType[];
-        associations: AssociationType[];
+    private extractClassesAndAssociations(metamodel: PartialMetaModel): {
+        classes: PartialClass[];
+        associations: PartialAssociation[];
+        imports: PartialClassImport[];
     } {
-        const classes: ClassType[] = [];
-        const associations: AssociationType[] = [];
+        const classes: PartialClass[] = [];
+        const associations: PartialAssociation[] = [];
+        const imports: PartialClassImport[] = [];
+
+        if (!metamodel.classesAndAssociations) {
+            return { classes, associations, imports };
+        }
 
         for (const item of metamodel.classesAndAssociations) {
-            if (item.$type === "Class") {
-                classes.push(item as ClassType);
-            } else if (item.$type === "Association") {
-                associations.push(item as AssociationType);
+            if (!item) {
+                continue;
+            }
+
+            if (this.reflection.isInstance(item, Class)) {
+                classes.push(item);
+            } else if (this.reflection.isInstance(item, Association)) {
+                associations.push(item);
             }
         }
 
-        return { classes, associations };
+        // Extract imports from file imports
+        const fileImports = metamodel.imports ?? [];
+        for (const fileImport of fileImports) {
+            const classImports = fileImport?.imports ?? [];
+            for (const classImport of classImports) {
+                if (classImport) {
+                    imports.push(classImport as PartialClassImport);
+                }
+            }
+        }
+
+        return { classes, associations, imports };
     }
 
     /**
      * Gets the ID for a class (handles both Class and ClassImport).
      */
     private getClassId(classNode: AstNode, idRegistry: ModelIdRegistry): string | undefined {
-        if (classNode.$type === "Class") {
+        if (!classNode) {
+            return undefined;
+        }
+
+        if (this.reflection.isInstance(classNode, Class)) {
             return idRegistry.getId(classNode);
         }
 
-        if (classNode.$type === "ClassImport") {
-            const importNode = classNode as any;
-            const referencedClass = importNode.element?.ref;
+        if (this.reflection.isInstance(classNode, ClassImport)) {
+            const importNode = classNode as PartialClassImport;
+            const referencedClass = importNode.entity?.ref;
             if (referencedClass) {
                 return idRegistry.getId(referencedClass);
             }
@@ -275,12 +339,14 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Creates node attributes for a class.
      * Includes property names for similarity comparison.
      */
-    private createClassAttributes(cls: ClassType): NodeAttributes {
+    private createClassAttributes(cls: PartialClass): NodeAttributes {
+        const properties = cls.properties?.filter((p) => p?.name).map((p) => p.name!) ?? [];
+
         return {
             type: MetamodelElementType.NODE_CLASS,
-            name: cls.name,
-            isAbstract: cls.isAbstract,
-            properties: cls.properties.map((p) => p.name)
+            name: cls.name ?? "",
+            isAbstract: cls.isAbstract ?? false,
+            properties
         };
     }
 
@@ -288,12 +354,12 @@ export class MetamodelMetadataManager extends MetadataManager<MetaModelType> {
      * Creates edge attributes for an association.
      * Includes property names for similarity comparison.
      */
-    private createAssociationAttributes(assoc: AssociationType): EdgeAttributes {
+    private createAssociationAttributes(assoc: PartialAssociation): EdgeAttributes {
         return {
             type: MetamodelElementType.EDGE_ASSOCIATION,
-            operator: assoc.operator,
-            startProperty: assoc.start.property || "",
-            targetProperty: assoc.target.property || ""
+            operator: assoc.operator ?? "",
+            startProperty: assoc.start?.property ?? "",
+            targetProperty: assoc.target?.property ?? ""
         };
     }
 

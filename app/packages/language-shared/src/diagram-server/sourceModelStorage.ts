@@ -40,7 +40,8 @@ export class SourceModelStorage implements BaseSourceModelStorage {
         }
         this.initializeUpdateListener();
         const uri = URI.parse(sourceUri);
-        const langiumDocument = await this.languageServices.shared.workspace.LangiumDocumentFactory.fromUri(uri);
+        const langiumDocument = await this.languageServices.shared.workspace.LangiumDocuments.getOrCreateDocument(uri);
+        await this.languageServices.shared.workspace.DocumentBuilder.waitUntil(DocumentState.Validated, uri);
         const root = langiumDocument.parseResult.value;
         const metadata = (await this.languageServices.shared.workspace.FileSystemProvider.readMetadata(
             uri

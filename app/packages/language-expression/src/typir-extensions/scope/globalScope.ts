@@ -10,7 +10,7 @@ import type { ExtendedTypirServices } from "../service/extendedTypirServices.js"
  * that are accessible throughout the entire program without requiring explicit imports or
  * parent scope lookups.
  *
- * @template Specifics - The type-specific configuration extending TypirSpecifics
+ * @template Specifics The type-specific configuration extending TypirSpecifics
  */
 export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Specifics> {
     /**
@@ -27,8 +27,8 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
      * resolved as custom class or lambda types, while functions are resolved as custom
      * function types.
      *
-     * @param entries - Array of members (functions and properties) to be available in the global scope
-     * @param typir - Extended Typir services for type resolution and management
+     * @param entries Array of members (functions and properties) to be available in the global scope
+     * @param typir Extended Typir services for type resolution and management
      */
     constructor(
         protected readonly entries: Member[],

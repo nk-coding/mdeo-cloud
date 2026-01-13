@@ -11,7 +11,7 @@ export class GNode extends GModelElement {
     /**
      * Layout metadata containing position and preferred dimensions
      */
-    meta?: NodeLayoutMetadata;
+    meta!: NodeLayoutMetadata;
 }
 
 /**

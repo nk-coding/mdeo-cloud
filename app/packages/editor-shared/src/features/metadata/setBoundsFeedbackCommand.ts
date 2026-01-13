@@ -1,5 +1,5 @@
 import type { CommandExecutionContext, CommandReturn, IActionDispatcher } from "@eclipse-glsp/sprotty";
-import type { FeedbackCommand } from "@eclipse-glsp/client";
+import type { FeedbackCommand, SetBoundsFeedbackAction as SetBoundsFeedbackActionType } from "@eclipse-glsp/client";
 import { sharedImport } from "../../sharedImport.js";
 import { hasNodeLayoutMetadata } from "./nodeMetadata.js";
 
@@ -8,17 +8,37 @@ const { SetBoundsCommand, TYPES } = sharedImport("@eclipse-glsp/sprotty");
 const { Ranked, SetBoundsFeedbackAction, LocalRequestBoundsAction } = sharedImport("@eclipse-glsp/client");
 
 /**
+ * Extended SetBoundsFeedbackAction with preferred size information.
+ */
+export interface ExtendedSetBoundsFeedbackAction extends SetBoundsFeedbackActionType {
+    /**
+     * Indicates whether to set the preferred width
+     */
+    setPrefWidth?: boolean;
+    /**
+     * Indicates whether to set the preferred height
+     */
+    setPrefHeight?: boolean;
+}
+
+/**
  * Replacement for the GLSP SetBoundsFeedbackCommand that uses meta for preferred size storage.
  */
 @injectable()
 export class SetBoundsFeedbackCommand extends SetBoundsCommand implements FeedbackCommand {
-    /** The action kind for set bounds feedback */
+    /**
+     * The action kind for set bounds feedback
+     */
     static override readonly KIND: string = SetBoundsFeedbackAction.KIND;
 
-    /** The rank of this feedback command */
+    /**
+     * The rank of this feedback command
+     */
     readonly rank: number = Ranked.DEFAULT_RANK;
 
-    /** The action dispatcher for sending actions */
+    /**
+     * The action dispatcher for sending actions
+     */
     @inject(TYPES.IActionDispatcher) protected actionDispatcher!: IActionDispatcher;
 
     /**
@@ -30,13 +50,18 @@ export class SetBoundsFeedbackCommand extends SetBoundsCommand implements Feedba
      */
     override execute(context: CommandExecutionContext): CommandReturn {
         super.execute(context);
+        const { setPrefWidth, setPrefHeight } = this.action as unknown as ExtendedSetBoundsFeedbackAction;
 
         this.action.bounds.forEach((bounds) => {
             const element = context.root.index.getById(bounds.elementId);
             if (element != undefined && hasNodeLayoutMetadata(element)) {
                 const meta = element.meta ?? {};
-                meta.prefHeight = bounds.newSize.height;
-                meta.prefWidth = bounds.newSize.width;
+                if (setPrefHeight) {
+                    meta.prefHeight = bounds.newSize.height;
+                }
+                if (setPrefWidth) {
+                    meta.prefWidth = bounds.newSize.width;
+                }
                 element.meta = meta;
             }
         });

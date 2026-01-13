@@ -56,7 +56,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 return@post
             }
             val project = projectService.createProject(request.name, userId)
-            call.respond(HttpStatusCode.Created, ApiResult.Success(project.id))
+            call.respond(HttpStatusCode.Created, ApiResult.Success(project))
         }
         
         route("/{projectId}") {

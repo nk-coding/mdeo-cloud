@@ -1,6 +1,6 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
+import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
 import { ID } from "@mdeo/language-common";
 import { printDanglingComments, sharedImport } from "@mdeo/language-shared";
 import type { TypeTypes, ClassTypeType, LambdaTypeType, LambdaTypeParametersType } from "../grammar/typeTypes.js";

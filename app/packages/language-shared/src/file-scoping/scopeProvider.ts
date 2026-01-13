@@ -46,13 +46,12 @@ export function isReferenceToImport(
 /**
  * Retrieves exported entities from the global scope based on file imports.
  *
- * @template T - The AST node type of the entities being imported
- * @param document - The current document where the import statement appears
- * @param referenceInfo - Information about the reference, including the import container
- * @param config - File scoping configuration specifying the entity type and import structure
- * @param indexManager - The index manager used to query exported entities across files
+ * @template T The AST node type of the entities being imported
+ * @param document The current document where the import statement appears
+ * @param referenceInfo Information about the reference, including the import container
+ * @param config File scoping configuration specifying the entity type and import structure
+ * @param indexManager The index manager used to query exported entities across files
  * @returns A scope containing all exported entities from the imported file that match the configured type
- * ```
  */
 export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
     document: LangiumDocument,
@@ -73,10 +72,10 @@ export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
  * Creates a scope containing all entities imported into the current file.
  * Does NOT handle locally defined entities; use createLocalScope for that.
  *
- * @template T - The AST node type of the entities being imported
- * @param fileImports - Array of all import statements in the current file
- * @param nameProvider - Service for retrieving the canonical name of AST nodes
- * @param descriptions - Provider for creating AST node descriptions
+ * @template T The AST node type of the entities being imported
+ * @param fileImports Array of all import statements in the current file
+ * @param nameProvider Service for retrieving the canonical name of AST nodes
+ * @param descriptions Provider for creating AST node descriptions
  *
  * @returns A scope containing descriptions of all imported entities accessible in the current file
  */

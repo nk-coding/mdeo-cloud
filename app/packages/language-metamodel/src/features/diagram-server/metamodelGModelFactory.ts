@@ -1,22 +1,17 @@
-import type { GModelFactory } from "@eclipse-glsp/server";
-import { sharedImport, ModelIdProvider, ModelIdRegistry } from "@mdeo/language-shared";
-import type { GraphMetadata, ModelState } from "@mdeo/language-shared";
+import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
+import { sharedImport, BaseGModelFactory } from "@mdeo/language-shared";
+import type { GraphMetadata, ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 import { EdgeVisualMetadata, EdgePlacementMetadata } from "@mdeo/editor-protocol";
 import type { PartialAstNode } from "@mdeo/language-common";
-import type {
-    MetaModelType,
-    ClassType,
-    AssociationType,
-    MultiplicityType,
-    SingleMultiplicityType,
-    RangeMultiplicityType
-} from "../../grammar/metamodelTypes.js";
+import type { SingleMultiplicityType, RangeMultiplicityType } from "../../grammar/metamodelTypes.js";
 import type {
     PartialMetaModel,
     PartialClass,
     PartialAssociation,
-    PartialMultiplicity
+    PartialMultiplicity,
+    PartialClassImport,
+    PartialClassExtension
 } from "../../grammar/metamodelPartialTypes.js";
 import { ClassNode } from "./model/classNode.js";
 import { InheritanceEdge } from "./model/inheritanceEdge.js";
@@ -27,8 +22,8 @@ import { AssociationEndLabel } from "./model/associationEndLabel.js";
 import { ClassCompartment } from "./model/classCompartment.js";
 import { ClassDivider } from "./model/classDivider.js";
 
-const { injectable, inject } = sharedImport("inversify");
-const { GGraph, ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
+const { injectable } = sharedImport("inversify");
+const { GGraph } = sharedImport("@eclipse-glsp/server");
 
 type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
 
@@ -38,54 +33,33 @@ type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
  * with nodes for classes and edges for relationships.
  */
 @injectable()
-export class MetamodelGModelFactory implements GModelFactory {
-    /**
-     * Injected model state
-     */
-    @inject(ModelStateKey)
-    protected modelState!: ModelState<PartialMetaModel>;
-
-    /**
-     * Injected model ID provider for generating unique IDs
-     */
-    @inject(ModelIdProvider)
-    protected modelIdProvider!: ModelIdProvider;
-
-    /**
-     * Creates the graph model from the current source model in the model state.
-     * This method orchestrates the transformation of the metamodel AST into
-     * a GLSP graph with positioned nodes and edges.
-     */
-    createModel(): void {
-        const metamodel = this.modelState.sourceModel;
-        if (metamodel == undefined) {
-            return;
-        }
-
-        const idRegistry = new ModelIdRegistry(metamodel, this.modelIdProvider);
-
+export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> {
+    override createModelInternal(sourceModel: PartialMetaModel, idRegistry: ModelIdRegistry): GModelRoot {
         const graph = GGraph.builder().id("metamodel-graph").addCssClass("editor-metamodel").build();
 
-        const { classes, associations } = this.extractClassesAndAssociations(metamodel);
+        const { classes, associations, imports } = this.extractClassesAndAssociations(sourceModel);
         this.createClassNodes(graph, classes, idRegistry);
+        this.createClassNodesFromImports(graph, imports, idRegistry);
         this.createInheritanceEdges(graph, classes, idRegistry);
         this.createAssociationEdges(graph, associations, idRegistry);
 
-        this.modelState.updateRoot(graph);
+        return graph;
     }
 
     /**
-     * Extracts and separates classes and associations from the metamodel.
+     * Extracts and separates classes, associations, and imports from the metamodel.
      *
-     * @param metamodel The metamodel containing classes and associations
-     * @returns An object containing separate arrays of classes and associations
+     * @param metamodel The metamodel containing classes, associations, and imports
+     * @returns An object containing separate arrays of classes, associations, and imports
      */
     private extractClassesAndAssociations(metamodel: PartialMetaModel): {
         classes: PartialClass[];
         associations: PartialAssociation[];
+        imports: PartialClassImport[];
     } {
         const classes: PartialClass[] = [];
         const associations: PartialAssociation[] = [];
+        const imports: PartialClassImport[] = [];
 
         const items = metamodel.classesAndAssociations ?? [];
         for (const item of items) {
@@ -96,7 +70,17 @@ export class MetamodelGModelFactory implements GModelFactory {
             }
         }
 
-        return { classes, associations };
+        const fileImports = metamodel.imports ?? [];
+        for (const fileImport of fileImports) {
+            const classImports = fileImport?.imports ?? [];
+            for (const classImport of classImports) {
+                if (classImport != undefined) {
+                    imports.push(classImport as PartialClassImport);
+                }
+            }
+        }
+
+        return { classes, associations, imports };
     }
 
     /**
@@ -106,22 +90,18 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @param graph The graph to add nodes to
      * @param classes Array of classes to create nodes for
      * @param idRegistry The ID registry for AST node ID generation
-     * @returns A map from node ID to created node
      */
     private createClassNodes(graph: GGraphType, classes: PartialClass[], idRegistry: ModelIdRegistry): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const cls of classes) {
-            if (!cls) {
+            if (cls == undefined) {
                 continue;
             }
 
             const nodeId = idRegistry.getId(cls);
-            if (!nodeId) {
-                continue;
-            }
-
             const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
+            const displayName = cls.name ?? "Unnamed";
 
             const node = ClassNode.builder()
                 .id(nodeId)
@@ -130,58 +110,125 @@ export class MetamodelGModelFactory implements GModelFactory {
                 .meta(metadata)
                 .build();
 
-            this.addNodeLabels(node, nodeId, cls, idRegistry);
+            node.children.push(
+                ...this.createClassTitle(nodeId, displayName, false),
+                ...this.createClassProperties(nodeId, cls, idRegistry, false)
+            );
 
             graph.children.push(node);
         }
     }
 
     /**
-     * Adds label children to a class node for the class name and properties.
+     * Creates visual nodes for imported classes.
+     * Similar to createClassNodes but for ClassImport nodes with readonly labels.
      *
-     * @param node The node to add labels to
-     * @param nodeId The ID of the node for creating label IDs
-     * @param cls The class containing the data to display
+     * @param graph The graph to add nodes to
+     * @param imports Array of class imports to create nodes for
      * @param idRegistry The ID registry for AST node ID generation
      */
-    private addNodeLabels(node: ClassNode, nodeId: string, cls: PartialClass, idRegistry: ModelIdRegistry): void {
+    private createClassNodesFromImports(
+        graph: GGraphType,
+        imports: PartialClassImport[],
+        idRegistry: ModelIdRegistry
+    ): void {
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+
+        for (const classImport of imports) {
+            if (classImport == undefined) {
+                continue;
+            }
+
+            const importedClass = classImport.entity?.ref;
+            if (importedClass == undefined) {
+                continue;
+            }
+
+            const nodeId = idRegistry.getId(classImport);
+            const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
+            const displayName = classImport.name ?? importedClass.name ?? "Unnamed";
+
+            const node = ClassNode.builder()
+                .id(nodeId)
+                .name(displayName)
+                .isAbstract(importedClass.isAbstract ?? false)
+                .meta(metadata)
+                .build();
+
+            node.children.push(
+                ...this.createClassTitle(nodeId, displayName, classImport.name == undefined),
+                ...this.createClassProperties(nodeId, importedClass, idRegistry, true)
+            );
+
+            graph.children.push(node);
+        }
+    }
+
+    /**
+     * Creates the title compartment containing the class name label.
+     *
+     * @param nodeId The ID of the class node
+     * @param name The name of the class
+     * @param readonly Whether the label should be readonly
+     * @returns An array with the title compartment GModelElement
+     */
+    private createClassTitle(nodeId: string, name: string | undefined, readonly: boolean): GModelElement[] {
         const titleCompartment = ClassCompartment.builder().id(`${nodeId}#title-compartment`).build();
 
         const nameLabel = ClassLabel.builder()
             .id(`${nodeId}#name`)
-            .text(cls.name ?? "Unnamed")
+            .text(name ?? "Unnamed")
+            .readonly(readonly)
             .build();
+
         titleCompartment.children.push(nameLabel);
-        node.children.push(titleCompartment);
+        return [titleCompartment];
+    }
 
+    /**
+     * Creates the properties compartment (and divider) for a class node.
+     *
+     * @param nodeId The ID of the class node
+     * @param cls The class containing the properties
+     * @param idRegistry The ID registry for AST node ID generation
+     * @param readonly Whether the property labels should be readonly
+     * @returns An array of GModelElements representing the properties compartment
+     */
+    private createClassProperties(
+        nodeId: string,
+        cls: PartialClass,
+        idRegistry: ModelIdRegistry,
+        readonly: boolean
+    ): GModelElement[] {
+        const children: GModelElement[] = [];
         const properties = cls.properties ?? [];
-        if (properties.length > 0) {
-            const divider = ClassDivider.builder().id(`${nodeId}#divider`).build();
-            node.children.push(divider);
+        if (properties.length === 0) {
+            return children;
+        }
 
-            const propertiesCompartment = ClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
+        const divider = ClassDivider.builder().id(`${nodeId}#divider`).build();
+        children.push(divider);
 
-            for (const prop of properties) {
-                if (!prop) {
-                    continue;
-                }
+        const propertiesCompartment = ClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
 
-                const propId = idRegistry.getId(prop);
-                if (!propId) {
-                    continue;
-                }
-
-                const multiplicityStr = this.formatMultiplicity(prop.multiplicity);
-                const propName = prop.name ?? "unnamed";
-                const typeName = prop.type?.name ?? "unknown";
-                const propText = `${propName}: ${typeName}${multiplicityStr}`;
-
-                const propLabel = PropertyLabel.builder().id(`${propId}#label`).text(propText).build();
-                propertiesCompartment.children.push(propLabel);
+        for (const prop of properties) {
+            if (prop == undefined) {
+                continue;
             }
 
-            node.children.push(propertiesCompartment);
+            const propId = readonly ? idRegistry.getIdOrUnresolved(prop) : idRegistry.getId(prop);
+
+            const multiplicityStr = this.formatMultiplicity(prop.multiplicity);
+            const propName = prop.name ?? "unnamed";
+            const typeName = prop.type?.name ?? "unknown";
+            const propText = `${propName}: ${typeName}${multiplicityStr}`;
+
+            const propLabel = PropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(readonly).build();
+            propertiesCompartment.children.push(propLabel);
         }
+
+        children.push(propertiesCompartment);
+        return children;
     }
 
     /**
@@ -195,29 +242,22 @@ export class MetamodelGModelFactory implements GModelFactory {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const cls of classes) {
-            if (!cls) {
+            if (cls == undefined) {
                 continue;
             }
 
             const extendsRefs = cls.extends ?? [];
-            for (const superClass of extendsRefs) {
-                if (!superClass) {
+            for (const extendsDef of extendsRefs) {
+                if (extendsDef == undefined) {
                     continue;
                 }
 
-                const superClassRef = superClass.ref;
-                if (!superClassRef) {
+                const superClassRef = extendsDef.class?.ref;
+                if (superClassRef == undefined) {
                     continue;
                 }
 
-                const sourceId = idRegistry.getId(cls);
-                const targetId = idRegistry.getId(superClassRef);
-                if (!sourceId || !targetId) {
-                    continue;
-                }
-
-                const edgeId = `${sourceId}#extends#${targetId}`;
-                const edge = this.createInheritanceEdge(edgeId, sourceId, targetId, validatedMetadata);
+                const edge = this.createInheritanceEdge(extendsDef, cls, superClassRef, validatedMetadata, idRegistry);
                 graph.children.push(edge);
             }
         }
@@ -226,18 +266,23 @@ export class MetamodelGModelFactory implements GModelFactory {
     /**
      * Creates a single inheritance edge with routing points from metadata.
      *
-     * @param edgeId The ID for the edge
-     * @param sourceId The source node ID
-     * @param targetId The target node ID
+     * @param inheritance The inheritance definition
+     * @param sourceClass The source class AST node
+     * @param targetClass The target class AST node
      * @param validatedMetadata The validated metadata containing edge information
+     * @param idRegistry The ID registry for AST node ID generation
      * @returns The created edge
      */
     private createInheritanceEdge(
-        edgeId: string,
-        sourceId: string,
-        targetId: string,
-        validatedMetadata: GraphMetadata
+        inheritance: PartialClassExtension,
+        sourceClass: PartialClass,
+        targetClass: PartialClass,
+        validatedMetadata: GraphMetadata,
+        idRegistry: ModelIdRegistry
     ): InheritanceEdge {
+        const edgeId = idRegistry.getId(inheritance);
+        const sourceId = idRegistry.getId(sourceClass);
+        const targetId = idRegistry.getId(targetClass);
         const metadata = validatedMetadata.edges[edgeId];
         const edge = InheritanceEdge.builder().id(edgeId).sourceId(sourceId).targetId(targetId).build();
 
@@ -260,29 +305,24 @@ export class MetamodelGModelFactory implements GModelFactory {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const assoc of associations) {
-            if (!assoc || !assoc.start || !assoc.target) {
+            if (assoc == undefined || assoc.start == undefined || assoc.target == undefined) {
                 continue;
             }
 
             const startClassRef = assoc.start.class?.ref;
             const targetClassRef = assoc.target.class?.ref;
 
-            if (!startClassRef || !targetClassRef) {
+            if (startClassRef == undefined || targetClassRef == undefined) {
                 continue;
             }
 
-            const startId = idRegistry.getId(startClassRef);
-            const targetId = idRegistry.getId(targetClassRef);
-            if (!startId || !targetId) {
-                continue;
-            }
-
-            const edgeId = idRegistry.getId(assoc);
-            if (!edgeId) {
-                continue;
-            }
-
-            const edge = this.createAssociationEdge(edgeId, assoc, startId, targetId, validatedMetadata, idRegistry);
+            const edge = this.createAssociationEdge(
+                assoc,
+                startClassRef,
+                targetClassRef,
+                validatedMetadata,
+                idRegistry
+            );
             graph.children.push(edge);
         }
     }
@@ -290,22 +330,23 @@ export class MetamodelGModelFactory implements GModelFactory {
     /**
      * Creates a single association edge with all properties.
      *
-     * @param edgeId The ID for the edge
      * @param assoc The association definition
-     * @param sourceId The source node ID
-     * @param targetId The target node ID
+     * @param sourceClass The source class AST node
+     * @param targetClass The target class AST node
      * @param validatedMetadata The validated metadata containing edge information
      * @param idRegistry The ID registry for AST node ID generation
      * @returns The created edge
      */
     private createAssociationEdge(
-        edgeId: string,
         assoc: PartialAssociation,
-        sourceId: string,
-        targetId: string,
+        sourceClass: PartialClass,
+        targetClass: PartialClass,
         validatedMetadata: GraphMetadata,
         idRegistry: ModelIdRegistry
     ): AssociationEdge {
+        const edgeId = idRegistry.getId(assoc);
+        const sourceId = idRegistry.getId(sourceClass);
+        const targetId = idRegistry.getId(targetClass);
         const metadata = validatedMetadata.edges[edgeId];
         const edge = AssociationEdge.builder()
             .id(edgeId)
@@ -316,30 +357,28 @@ export class MetamodelGModelFactory implements GModelFactory {
 
         this.applyRoutingPoints(edge, metadata);
 
-        if (assoc.start) {
+        if (assoc.start != undefined) {
             const startLabel = this.createAssociationEndLabel(
                 `${edgeId}#start`,
                 assoc.start.property,
                 assoc.start.multiplicity,
                 validatedMetadata,
-                0.2,
-                idRegistry
+                0.2
             );
-            if (startLabel) {
+            if (startLabel != undefined) {
                 edge.children.push(startLabel);
             }
         }
 
-        if (assoc.target) {
+        if (assoc.target != undefined) {
             const targetLabel = this.createAssociationEndLabel(
                 `${edgeId}#target`,
                 assoc.target.property,
                 assoc.target.multiplicity,
                 validatedMetadata,
-                0.8,
-                idRegistry
+                0.8
             );
-            if (targetLabel) {
+            if (targetLabel != undefined) {
                 edge.children.push(targetLabel);
             }
         }
@@ -355,7 +394,6 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @param multiplicity The multiplicity (optional)
      * @param validatedMetadata The validated metadata containing label placement
      * @param defaultPosition Default position along edge if no metadata
-     * @param idRegistry The ID registry for AST node ID generation
      * @returns The created label or undefined if no property or multiplicity
      */
     private createAssociationEndLabel(
@@ -363,12 +401,11 @@ export class MetamodelGModelFactory implements GModelFactory {
         property: string | undefined,
         multiplicity: PartialMultiplicity | undefined,
         validatedMetadata: GraphMetadata,
-        defaultPosition: number,
-        idRegistry: ModelIdRegistry
+        defaultPosition: number
     ): AssociationEndLabel | undefined {
         const multiplicityStr = this.formatMultiplicity(multiplicity);
 
-        if (!property && !multiplicityStr) {
+        if (property == undefined && multiplicityStr === "") {
             return undefined;
         }
 
@@ -377,7 +414,7 @@ export class MetamodelGModelFactory implements GModelFactory {
         const label = AssociationEndLabel.builder().id(labelId).text(text).build();
 
         const labelMeta = validatedMetadata.nodes[labelId];
-        if (labelMeta?.meta && EdgePlacementMetadata.isValid(labelMeta.meta)) {
+        if (labelMeta != undefined && labelMeta.meta != undefined && EdgePlacementMetadata.isValid(labelMeta.meta)) {
             const placement = labelMeta.meta;
             label.edgePlacement = {
                 position: placement.position,
@@ -404,7 +441,7 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @param metadata Metadata containing routing points
      */
     private applyRoutingPoints(edge: InheritanceEdge | AssociationEdge, metadata: { meta?: object } | undefined): void {
-        if (metadata?.meta && EdgeVisualMetadata.isValid(metadata.meta)) {
+        if (metadata != undefined && metadata.meta != undefined && EdgeVisualMetadata.isValid(metadata.meta)) {
             edge.routingPoints = metadata.meta.routingPoints;
         }
     }
@@ -417,13 +454,13 @@ export class MetamodelGModelFactory implements GModelFactory {
      * @returns Formatted string like "[*]", "[1]", "[0..1]", or empty string if no multiplicity
      */
     private formatMultiplicity(multiplicity: PartialMultiplicity | undefined): string {
-        if (!multiplicity) {
+        if (multiplicity == undefined) {
             return "";
         }
 
         if (multiplicity.$type === "SingleMultiplicity") {
             const single = multiplicity as PartialAstNode<SingleMultiplicityType>;
-            if (single.value) {
+            if (single.value != undefined) {
                 return `[${single.value}]`;
             }
             if (single.numericValue !== undefined && single.numericValue !== null) {

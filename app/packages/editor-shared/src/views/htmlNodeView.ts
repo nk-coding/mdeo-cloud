@@ -12,7 +12,7 @@ const { svg, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export abstract class GHtmlNodeView extends GNodeView {
-    override render(model: Readonly<GHtmlNode>, context: RenderingContext, args?: {}): VNode | undefined {
+    override render(model: Readonly<GHtmlNode>, context: RenderingContext): VNode | undefined {
         const foreignObjectVNode = svg(
             "foreignObject",
             {
@@ -28,13 +28,17 @@ export abstract class GHtmlNodeView extends GNodeView {
                     [ATTR_BBOX_ELEMENT]: true
                 }
             },
-            this.renderForeignElement(model, context, args)
+            this.renderForeignElement(model, context)
         );
         return svg("g", null, foreignObjectVNode, ...this.renderControlElements(model));
     }
 
     /**
      * Abstract method to render the content inside the foreign element
+     *
+     * @param model The HTML node model
+     * @param context The rendering context
+     * @returns The VNode representing the foreign element's content
      */
-    protected abstract renderForeignElement(model: Readonly<GHtmlNode>, context: RenderingContext, args?: {}): VNode;
+    protected abstract renderForeignElement(model: Readonly<GHtmlNode>, context: RenderingContext): VNode;
 }

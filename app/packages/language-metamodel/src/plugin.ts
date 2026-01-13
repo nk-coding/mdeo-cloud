@@ -1,6 +1,5 @@
 import { MetaModelRule } from "./grammar/metamodelRules.js";
 import { type LanguagePlugin, WS, ML_COMMENT, SL_COMMENT, HIDDEN_NEWLINE } from "@mdeo/language-common";
-import type { AstSerializerAdditionalServices } from "@mdeo/language-shared";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
@@ -15,7 +14,7 @@ import { MetamodelDiagramModule } from "./features/diagram-server/metamodelDiagr
 /**
  * The additional services for the Metamodel language.
  */
-export type MetamodelServices = AstSerializerAdditionalServices;
+export type MetamodelServices = object;
 
 /**
  * The plugin for the Metamodel language.

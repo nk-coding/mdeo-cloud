@@ -1,56 +1,21 @@
 import type { AstNode, AstReflection, CstNode, LangiumCoreServices, LangiumDocument, Reference } from "langium";
-import type { TerminalRule } from "@mdeo/language-common";
+import type {
+    AstSerializer,
+    Comment,
+    PrimitiveValue,
+    PrintContext,
+    TerminalRule,
+    WithComments
+} from "@mdeo/language-common";
 import type { Interface } from "@mdeo/language-common";
 import type { AstPath, Doc, Plugin } from "prettier";
 import type { FormattingOptions } from "vscode-languageserver-types";
-import type { PrintContext, PrimitiveValue, Comment, WithComments } from "./types.js";
 import { printComment } from "./comments.js";
 import { ML_COMMENT, SL_COMMENT } from "@mdeo/language-common";
 import { sharedImport } from "../sharedImport.js";
 
 const { doc: prettierDoc, format: prettierFormat } = sharedImport("prettier");
 const { GrammarUtils, isAstNode, isCompositeCstNode, isLeafCstNode } = sharedImport("langium");
-
-/**
- * Service for serializing AST nodes to formatted text using Prettier.
- *
- * This service allows registering custom serializers for different node types and terminal rules,
- * then uses Prettier's formatting engine to produce consistently formatted output.
- */
-export interface AstSerializer {
-    /**
-     * Serializes an AST node to a formatted string.
-     *
-     * @param node The AST node to serialize
-     * @param document The Langium document containing the AST node
-     * @param options Formatting options to guide the serialization
-     * @returns A promise that resolves to the formatted string representation of the node
-     */
-    serializeNode(node: AstNode, document: LangiumDocument, options: FormattingOptions): Promise<string>;
-    /**
-     * Registers a custom printer function for a specific AST node type.
-     *
-     * @template T The type of AST node this printer handles
-     * @param type The interface defining the node type to print
-     * @param printer The function that converts nodes of this type to Prettier Doc format
-     */
-    registerNodeSerializer<T extends AstNode>(type: Interface<T>, printer: (context: PrintContext<T>) => Doc): void;
-    /**
-     * Registers a custom serializer function for primitive values matched by a terminal rule.
-     *
-     * @template T The TypeScript type of the primitive value
-     * @param rule The terminal rule that matches this primitive type
-     * @param serializer The function that converts primitive values to Prettier Doc format
-     */
-    registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => Doc): void;
-}
-
-/**
- * Additional services that can be injected into Langium services.
- */
-export interface AstSerializerAdditionalServices {
-    AstSerializer: AstSerializer;
-}
 
 /**
  * Default AST serializer service using Prettier.
@@ -67,7 +32,7 @@ export class DefaultAstSerializer implements AstSerializer {
     /**
      * Map of terminal rule names to their registered primitive serializer functions.
      */
-    private readonly primitiveSerializers = new Map<string, (primitive: any) => Doc>();
+    private readonly primitiveSerializers = new Map<string, (primitive: any) => string>();
     /**
      * Reflection utilities for AST nodes.
      */
@@ -77,6 +42,13 @@ export class DefaultAstSerializer implements AstSerializer {
         this.astReflection = services.shared.AstReflection;
     }
 
+    /**
+     * Helper to get the primitive value and its CST node for a given property of an AST node.
+     *
+     * @param node the AST node
+     * @param property the property name
+     * @returns the primitive value and its CST node
+     */
     private getPrimitive<T extends AstNode, V extends keyof T & string>(node: T, property: V): PrimitiveValue<T[V]> {
         const value = node[property];
         const cstNode = GrammarUtils.findNodeForProperty(node.$cstNode, property);
@@ -283,6 +255,14 @@ export class DefaultAstSerializer implements AstSerializer {
         return new PrettierPluginGenerator(text);
     }
 
+    /**
+     * Serializes an AST node to a formatted string.
+     *
+     * @param node the AST node to serialize
+     * @param document the Langium document containing the AST node
+     * @param options formatting options
+     * @returns a promise that resolves to the formatted string representation of the node
+     */
     async serializeNode(node: AstNode, document: LangiumDocument, options: FormattingOptions): Promise<string> {
         const text = document.textDocument.getText();
         const pluginGenerator = this.createPrettierPluginGenerator(text);
@@ -302,11 +282,41 @@ export class DefaultAstSerializer implements AstSerializer {
         });
     }
 
+    /**
+     * Serializes a primitive value using the registered serializer for the given terminal rule.
+     *
+     * @template T The TypeScript type of the primitive value
+     * @param primitive the primitive value to serialize
+     * @param rule the terminal rule that matches this primitive type
+     * @returns the string representation of the primitive value
+     */
+    serializePrimitive<T>(primitive: PrimitiveValue<T>, rule: TerminalRule<T>): string {
+        const serializer = this.primitiveSerializers.get(rule.name);
+        if (serializer == undefined) {
+            throw new Error(`No primitive serializer registered for rule: ${rule.name}`);
+        }
+        return serializer(primitive);
+    }
+
+    /**
+     * Registers a custom printer function for a specific AST node type.
+     *
+     * @template T The type of AST node this printer handles
+     * @param type The interface defining the node type to print
+     * @param printer The function that converts nodes of this type to Prettier Doc format
+     */
     registerNodeSerializer<T extends AstNode>(type: Interface<T>, printer: (context: PrintContext<T>) => Doc): void {
         this.nodePrinters.set(type.name, printer as unknown as (context: PrintContext) => Doc);
     }
 
-    registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => Doc): void {
-        this.primitiveSerializers.set(rule.name, serializer as (primitive: PrimitiveValue<any>) => Doc);
+    /**
+     * Registers a custom serializer function for primitive values matched by a terminal rule.
+     *
+     * @template T The TypeScript type of the primitive value
+     * @param rule The terminal rule that matches this primitive type
+     * @param serializer The function that converts primitive values to a string
+     */
+    registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => string): void {
+        this.primitiveSerializers.set(rule.name, serializer as (primitive: PrimitiveValue<any>) => string);
     }
 }

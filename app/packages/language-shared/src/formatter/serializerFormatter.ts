@@ -1,5 +1,5 @@
+import type { AstSerializer, AstSerializerAdditionalServices } from "@mdeo/language-common";
 import type { LangiumCoreServices, LangiumDocument, MaybePromise } from "langium";
-import type { AstSerializer, AstSerializerAdditionalServices } from "../serialization/astSerializer.js";
 import type { Formatter } from "langium/lsp";
 import type { CancellationToken } from "vscode-jsonrpc";
 import {

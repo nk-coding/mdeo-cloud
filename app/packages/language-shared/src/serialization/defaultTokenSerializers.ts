@@ -1,6 +1,5 @@
 import type { AstNode, LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices } from "./astSerializer.js";
-import { FLOAT, ID, INT, STRING } from "@mdeo/language-common";
+import { FLOAT, ID, INT, STRING, type AstSerializerAdditionalServices } from "@mdeo/language-common";
 import { sharedImport } from "../sharedImport.js";
 
 const { stream, GrammarUtils, AstUtils } = sharedImport("langium");

@@ -1,3 +1,4 @@
+import type { InstanceMultiBinding, OperationHandlerConstructor } from "@eclipse-glsp/server";
 import { type BindingTarget, type DiagramConfiguration, type GModelFactory } from "@eclipse-glsp/server";
 import type { MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
@@ -5,6 +6,7 @@ import { MetamodelGModelFactory } from "./metamodelGModelFactory.js";
 import { MetamodelDiagramConfiguration } from "./metamodelDiagramConfiguration.js";
 import { MetamodelModelIdProvider } from "./metamodelModelIdProvider.js";
 import { MetamodelMetadataManager } from "./metamodelMetadataManager.js";
+import { ApplyLabelEditOperationHandler } from "./handler/applyLabelEditOperationHandler.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -30,5 +32,10 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
 
     protected override bindMetadataManager(): BindingTarget<MetadataManager> {
         return MetamodelMetadataManager;
+    }
+
+    protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
+        super.configureOperationHandlers(binding);
+        binding.add(ApplyLabelEditOperationHandler);
     }
 }

@@ -10,7 +10,7 @@ import { GModelIndex } from "./modelIndex.js";
 import { SourceModelStorage } from "./sourceModelStorage.js";
 import type { LanguageServices } from "@mdeo/language-common";
 import type { interfaces } from "inversify";
-import { LanguageServicesKey } from "./langiumServices.js";
+import { AstReflectionKey, LanguageServicesKey } from "./langiumServices.js";
 import { ModelIdProvider } from "./modelIdProvider.js";
 import { ChangeBoundsOperationHandler } from "./handler/changeBoundsOperationHandler.js";
 import { PartialChangeBoundsOperationHandler } from "./handler/partialChangeBoundsOperationHandler.js";
@@ -44,6 +44,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         super.configure(bind, unbind, isBound, rebind);
         const context = { bind, unbind, isBound, rebind };
         bindOrRebind(context, LanguageServicesKey).toConstantValue(this.services);
+        bindOrRebind(context, AstReflectionKey).toConstantValue(this.services.shared.AstReflection);
         applyBindingTarget(context, ModelIdProvider, this.bindModelIdProvider()).inSingletonScope();
         applyBindingTarget(context, MetadataManager, this.bindMetadataManager()).inSingletonScope();
         this.configureAdditional(context);

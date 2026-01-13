@@ -1,7 +1,6 @@
 import type { AstPath, Doc, ParserOptions } from "prettier";
-import type { Builders, Comment, PrintContext } from "./types.js";
 import type { AstNode } from "langium";
-import { ML_COMMENT } from "@mdeo/language-common";
+import { ML_COMMENT, type Builders, type Comment, type PrintContext } from "@mdeo/language-common";
 
 /**
  * Prints all dangling comments

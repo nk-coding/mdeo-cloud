@@ -1,6 +1,6 @@
 import type { AstPath, Doc } from "prettier";
 import type { CstNode, LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext, Print } from "@mdeo/language-shared";
+import type { AstSerializerAdditionalServices, PrintContext, Print } from "@mdeo/language-common";
 import { ID } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
 import { getExpressionPrecedence, Precedence } from "./precedenceHelper.js";

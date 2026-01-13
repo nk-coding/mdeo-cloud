@@ -1,6 +1,6 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
-import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-shared";
+import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
 import { ID, INT } from "@mdeo/language-common";
 import { serializeNewlineSep, registerImportSerializers, sharedImport } from "@mdeo/language-shared";
 import {
@@ -137,7 +137,9 @@ function printClass(context: PrintContext<ClassType>): Doc {
 
     if (ctx.extends.length > 0) {
         docs.push(" extends ");
-        const extendsRefs = path.map((ref) => printReference(ref, ID), "extends");
+        const extendsRefs = path.map((extendsDef) => {
+            return extendsDef.call((ref) => printReference(ref, ID), "class");
+        }, "extends");
         docs.push(join(", ", extendsRefs));
     }
 

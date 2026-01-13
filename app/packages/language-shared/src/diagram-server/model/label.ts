@@ -6,8 +6,15 @@ const { GModelElement, GModelElementBuilder } = sharedImport("@eclipse-glsp/serv
  * A label element.
  */
 export class GLabel extends GModelElement {
-    /** The text content of the label */
-    text?: string;
+    /**
+     * The text content of the label
+     */
+    text!: string;
+
+    /**
+     * Indicates if the label is read-only
+     */
+    readonly?: boolean;
 }
 
 /**
@@ -23,6 +30,17 @@ export class GLabelBuilder<T extends GLabel = GLabel> extends GModelElementBuild
      */
     text(text: string): this {
         this.proxy.text = text;
+        return this;
+    }
+
+    /**
+     * Sets whether the label is read-only.
+     *
+     * @param readonly True if the label should be read-only, false otherwise
+     * @returns This builder for chaining
+     */
+    readonly(readonly: boolean): this {
+        this.proxy.readonly = readonly;
         return this;
     }
 }

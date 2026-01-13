@@ -1,5 +1,4 @@
 import { HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT, WS, type LanguagePlugin } from "@mdeo/language-common";
-import type { AstSerializerAdditionalServices } from "@mdeo/language-shared";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
@@ -36,7 +35,7 @@ export type ScriptTypirSpecifics = TypirLangiumSpecifics;
  */
 export type ScriptServices = {
     typir: ExpressionTypirServices<ScriptTypirSpecifics>;
-} & AstSerializerAdditionalServices;
+};
 
 /**
  * The plugin for the Script language.

@@ -1,8 +1,7 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstNode } from "langium";
-import type { PrintContext, Builders } from "../serialization/types.js";
-import type { AstSerializerAdditionalServices } from "../serialization/astSerializer.js";
+import type { PrintContext, Builders, AstSerializerAdditionalServices } from "@mdeo/language-common";
 import { ID, STRING } from "@mdeo/language-common";
 import type { ImportType, FileImportType } from "./types.js";
 import type { ASTType } from "@mdeo/language-common";

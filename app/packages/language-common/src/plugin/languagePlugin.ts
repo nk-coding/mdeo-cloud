@@ -6,12 +6,15 @@ import type { DefaultSharedModuleContext } from "langium/lsp";
 import type { ExtendedLangiumServices } from "../grammar/module/extendedServices.js";
 import type { GLSPSharedAdditionalServices } from "../glsp/glspModule.js";
 import type { MetadataFileSystemProviderAdditionalServices } from "../protocol/metadataFileSystemProvider.js";
+import type { AstSerializerAdditionalServices } from "../protocol/astSerializer.js";
 
 /**
  * Combined language services including GLSP shared additional services
  */
 export type LanguageServices = ExtendedLangiumServices &
-    MetadataFileSystemProviderAdditionalServices & { shared: GLSPSharedAdditionalServices };
+    MetadataFileSystemProviderAdditionalServices & {
+        shared: GLSPSharedAdditionalServices;
+    } & AstSerializerAdditionalServices;
 
 /**
  * Partial type for language services including GLSP shared additional services

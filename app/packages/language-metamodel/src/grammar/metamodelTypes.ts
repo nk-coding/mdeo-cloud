@@ -72,13 +72,26 @@ export const Property = createInterface("Property").attrs({
 export type PropertyType = ASTType<typeof Property>;
 
 /**
+ * Class extension definition.
+ * Represents a reference to a parent class in an inheritance relationship.
+ */
+export const ClassExtension = createInterface("ClassExtension").attrs({
+    class: Ref(() => ClassOrImport)
+});
+
+/**
+ * Type representing a ClassExtension AST node.
+ */
+export type ClassExtensionType = ASTType<typeof ClassExtension>;
+
+/**
  * Class definition.
  * Represents a class in the metamodel with properties and inheritance relationships.
  */
 export const Class = createInterface("Class").attrs({
     name: String,
     isAbstract: Boolean,
-    extends: [Ref(() => ClassOrImport)],
+    extends: [ClassExtension],
     properties: [Property]
 });
 
@@ -105,6 +118,11 @@ export const { importType: ClassImport, fileImportType: ClassFileImport } =
  * Used for references that can point to either a locally defined or imported class.
  */
 export const ClassOrImport: BaseType<AstNode> = createType("ClassOrImport").types(Class, ClassImport);
+
+/**
+ * Type representing ClassImport AST node.
+ */
+export type ClassImportType = ASTType<typeof ClassImport>;
 
 /**
  * Type representing ClassOrImport AST node.

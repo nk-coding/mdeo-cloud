@@ -1,4 +1,4 @@
-import type { Bounds, Point } from "@eclipse-glsp/sprotty";
+import type { Point } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 

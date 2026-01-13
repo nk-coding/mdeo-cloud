@@ -1,0 +1,55 @@
+import type { GModelFactory, GModelRoot } from "@eclipse-glsp/server";
+import { sharedImport } from "../sharedImport.js";
+import type { AstNode } from "langium";
+import { ModelIdRegistry } from "./modelIdRegistry.js";
+import { ModelIdProvider } from "./modelIdProvider.js";
+import type { ModelState } from "./modelState.js";
+import type { GModelIndex } from "./modelIndex.js";
+
+const { injectable, inject } = sharedImport("inversify");
+const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
+
+/**
+ * Base class for graph model factories that create GLSP models from source AST models.
+ * Handles id generation and model index updates
+ */
+@injectable()
+export abstract class BaseGModelFactory<T extends AstNode> implements GModelFactory {
+    /**
+     * Injected model state
+     */
+    @inject(ModelStateKey)
+    protected modelState!: ModelState<T>;
+
+    /**
+     * Injected model ID provider for generating unique IDs
+     */
+    @inject(ModelIdProvider)
+    protected modelIdProvider!: ModelIdProvider;
+
+    /**
+     * Injected model index
+     */
+    @inject(GModelIndexKey)
+    protected modelIndex!: GModelIndex;
+
+    createModel(): void {
+        const sourceModel = this.modelState.sourceModel;
+        if (sourceModel == undefined) {
+            return;
+        }
+        const idRegistry = new ModelIdRegistry(sourceModel, this.modelIdProvider);
+        const gRoot = this.createModelInternal(sourceModel, idRegistry);
+        this.modelIndex.indexSourceModelRoot(sourceModel, idRegistry);
+        this.modelState.updateRoot(gRoot);
+    }
+
+    /**
+     * Creates the graph model from the current source model.
+     *
+     * @param sourceModel the source AST model
+     * @param idRegistry the model ID registry
+     * @returns the created graph model root
+     */
+    abstract createModelInternal(sourceModel: T, idRegistry: ModelIdRegistry): GModelRoot;
+}

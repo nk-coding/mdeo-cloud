@@ -280,7 +280,7 @@ export class HttpBackendApi implements BackendApi {
             this.fileTreeCache.set(normalizedPath, {
                 exists: true,
                 type: FileType.File,
-                content: undefined,
+                content: content,
                 metadata: existing?.metadata
             });
 

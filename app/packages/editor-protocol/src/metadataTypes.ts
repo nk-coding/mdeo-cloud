@@ -3,7 +3,7 @@ import type { Point } from "@eclipse-glsp/protocol";
 /**
  * Helper function to validate if an object is a valid Point.
  *
- * @param obj - The object to validate
+ * @param obj The object to validate
  * @returns True if the object is a valid Point
  */
 function isValidPoint(obj: unknown): obj is Point {
@@ -32,7 +32,7 @@ export namespace NodePositionMetadata {
     /**
      * Checks if the given object is a valid NodePositionMetadata.
      *
-     * @param obj - The object to validate
+     * @param obj The object to validate
      * @returns True if the object is a valid NodePositionMetadata
      */
     export function isValid(obj: unknown): obj is NodePositionMetadata {
@@ -47,8 +47,8 @@ export namespace NodePositionMetadata {
     /**
      * Creates a default NodePositionMetadata with the given position.
      *
-     * @param x - The x coordinate
-     * @param y - The y coordinate
+     * @param x The x coordinate
+     * @param y The y coordinate
      * @returns A new NodePositionMetadata object
      */
     export function create(x: number, y: number): NodePositionMetadata {
@@ -58,9 +58,9 @@ export namespace NodePositionMetadata {
     /**
      * Verifies and corrects invalid metadata.
      *
-     * @param obj - The object to verify
-     * @param defaultX - Default x coordinate if position is invalid
-     * @param defaultY - Default y coordinate if position is invalid
+     * @param obj The object to verify
+     * @param defaultX Default x coordinate if position is invalid
+     * @param defaultY Default y coordinate if position is invalid
      * @returns Corrected metadata if invalid, undefined if valid
      */
     export function verify(obj: unknown, defaultX: number = 0, defaultY: number = 0): NodePositionMetadata | undefined {
@@ -98,7 +98,7 @@ export namespace NodeLayoutMetadata {
     /**
      * Checks if the given object is a valid NodeLayoutMetadata.
      *
-     * @param obj - The object to validate
+     * @param obj The object to validate
      * @returns True if the object is a valid NodeLayoutMetadata
      */
     export function isValid(obj: unknown): obj is NodeLayoutMetadata {
@@ -116,9 +116,9 @@ export namespace NodeLayoutMetadata {
     /**
      * Creates a default NodeLayoutMetadata with the given position.
      *
-     * @param x - The x coordinate
-     * @param y - The y coordinate
-     * @param preferredWidth - Optional preferred width
+     * @param x The x coordinate
+     * @param y The y coordinate
+     * @param preferredWidth Optional preferred width
      * @returns A new NodeLayoutMetadata object
      */
     export function create(x: number, y: number, preferredWidth?: number): NodeLayoutMetadata {
@@ -134,9 +134,9 @@ export namespace NodeLayoutMetadata {
     /**
      * Verifies and corrects invalid metadata.
      *
-     * @param obj - The object to verify
-     * @param defaultX - Default x coordinate if position is invalid
-     * @param defaultY - Default y coordinate if position is invalid
+     * @param obj The object to verify
+     * @param defaultX Default x coordinate if position is invalid
+     * @param defaultY Default y coordinate if position is invalid
      * @returns Corrected metadata if invalid, undefined if valid
      */
     export function verify(obj: unknown, defaultX: number = 0, defaultY: number = 0): NodeLayoutMetadata | undefined {
@@ -175,7 +175,7 @@ export namespace EdgeVisualMetadata {
     /**
      * Checks if the given object is a valid EdgeVisualMetadata.
      *
-     * @param obj - The object to validate
+     * @param obj The object to validate
      * @returns True if the object is a valid EdgeVisualMetadata
      */
     export function isValid(obj: unknown): obj is EdgeVisualMetadata {
@@ -195,7 +195,7 @@ export namespace EdgeVisualMetadata {
     /**
      * Creates a default EdgeVisualMetadata with the given routing points.
      *
-     * @param routingPoints - Array of routing points
+     * @param routingPoints Array of routing points
      * @returns A new EdgeVisualMetadata object
      */
     export function create(routingPoints: Point[] = []): EdgeVisualMetadata {
@@ -205,7 +205,7 @@ export namespace EdgeVisualMetadata {
     /**
      * Verifies and corrects invalid metadata.
      *
-     * @param obj - The object to verify
+     * @param obj The object to verify
      * @returns Corrected metadata if invalid, undefined if valid
      */
     export function verify(obj: unknown): EdgeVisualMetadata | undefined {
@@ -250,7 +250,7 @@ export namespace EdgePlacementMetadata {
     /**
      * Checks if the given object is a valid EdgePlacementMetadata.
      *
-     * @param obj - The object to validate
+     * @param obj The object to validate
      * @returns True if the object is a valid EdgePlacementMetadata
      */
     export function isValid(obj: unknown): obj is EdgePlacementMetadata {
@@ -272,9 +272,9 @@ export namespace EdgePlacementMetadata {
     /**
      * Creates a default EdgePlacementMetadata.
      *
-     * @param position - Position along the edge (0.0 to 1.0)
-     * @param side - Optional side of the edge
-     * @param offset - Optional offset in pixels
+     * @param position Position along the edge (0.0 to 1.0)
+     * @param side Optional side of the edge
+     * @param offset Optional offset in pixels
      * @returns A new EdgePlacementMetadata object
      */
     export function create(
@@ -295,8 +295,8 @@ export namespace EdgePlacementMetadata {
     /**
      * Verifies and corrects invalid metadata.
      *
-     * @param obj - The object to verify
-     * @param defaultPosition - Default position if invalid
+     * @param obj The object to verify
+     * @param defaultPosition Default position if invalid
      * @returns Corrected metadata if invalid, undefined if valid
      */
     export function verify(obj: unknown, defaultPosition: number = 0.5): EdgePlacementMetadata | undefined {

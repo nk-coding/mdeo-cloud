@@ -1,3 +1,4 @@
+export * from "./features/diagram-server/handler/applyLabelEditOperationHandler.js";
 export * from "./features/diagram-server/model/associationEdge.js";
 export * from "./features/diagram-server/model/associationEndLabel.js";
 export * from "./features/diagram-server/model/classCompartment.js";

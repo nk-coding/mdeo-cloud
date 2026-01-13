@@ -6,6 +6,7 @@ import {
     RangeMultiplicity,
     Multiplicity,
     Property,
+    ClassExtension,
     Class,
     AssociationEnd,
     Association,
@@ -57,6 +58,14 @@ export const PropertyRule = createRule("PropertyRule")
     .as(({ set }) => [set("name", ID), ":", set("type", PrimitiveTypeRule), optional("[", MultiplicityRule, "]")]);
 
 /**
+ * Class extension rule.
+ * Matches a reference to a parent class in an extends clause.
+ */
+export const ClassExtensionRule = createRule("ClassExtensionRule")
+    .returns(ClassExtension)
+    .as(({ set }) => [set("class", ref(ClassOrImport, ID))]);
+
+/**
  * Class rule.
  * Matches a class definition with optional abstract modifier, name, inheritance, and properties.
  */
@@ -66,7 +75,7 @@ export const ClassRule = createRule("ClassRule")
         optional(flag("isAbstract", "abstract")),
         "class",
         set("name", ID),
-        optional("extends", add("extends", ref(ClassOrImport, ID)), many(",", add("extends", ref(ClassOrImport, ID)))),
+        optional("extends", add("extends", ClassExtensionRule), many(",", add("extends", ClassExtensionRule))),
         "{",
         many(or(add("properties", PropertyRule), NEWLINE)),
         "}"

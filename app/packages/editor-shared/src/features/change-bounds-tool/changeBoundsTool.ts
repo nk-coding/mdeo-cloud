@@ -2,11 +2,13 @@ import type {
     ISelectionListener,
     ResizeHandleLocation as ResizeHandleLocationType,
     GResizeHandle as GResizeHandleType,
-    SelectableBoundsAware
+    SelectableBoundsAware,
+    TrackedResize
 } from "@eclipse-glsp/client";
 import type { Action, GModelElement, MouseListener, Operation } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 import { PartialChangeBoundsOperation, type PartialElementAndBounds } from "@mdeo/editor-protocol";
+import type { ExtendedSetBoundsFeedbackAction } from "../metadata/setBoundsFeedbackCommand.js";
 
 const { injectable } = sharedImport("inversify");
 const {
@@ -116,6 +118,15 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
             }
         }));
         return newBounds.length > 0 ? [PartialChangeBoundsOperation.create(newBounds)] : [];
+    }
+
+    protected override resizeBoundsAction(resize: TrackedResize): ExtendedSetBoundsFeedbackAction {
+        const location = this.activeResizeHandle?.location;
+        return {
+            ...super.resizeBoundsAction(resize),
+            setPrefWidth: location !== ResizeHandleLocation.Top && location !== ResizeHandleLocation.Bottom,
+            setPrefHeight: location !== ResizeHandleLocation.Left && location !== ResizeHandleLocation.Right
+        };
     }
 }
 

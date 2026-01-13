@@ -1,5 +1,5 @@
 import type { Doc } from "prettier";
-import type { Builders, PrintContext } from "./types.js";
+import type { Builders, PrintContext } from "@mdeo/language-common";
 import type { AstNode } from "langium";
 import { printDanglingComments } from "./comments.js";
 
