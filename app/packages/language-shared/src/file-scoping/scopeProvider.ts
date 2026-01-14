@@ -14,7 +14,7 @@ import type { FileImportType } from "./types.js";
 import { sharedImport } from "../sharedImport.js";
 import { resolveRelativePath } from "./util.js";
 
-const { StreamScope, stream } = sharedImport("langium");
+const { StreamScope, stream, EMPTY_SCOPE } = sharedImport("langium");
 
 /**
  * Determines if the given reference info represents an import statement.
@@ -80,10 +80,13 @@ export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
  */
 export function getExportetEntitiesFromRelativeFile<T extends AstNode>(
     document: LangiumDocument,
-    file: string,
+    file: string | undefined,
     types: BaseType<T>[],
     indexManager: IndexManager
-) {
+): Scope {
+    if (file == undefined) {
+        return EMPTY_SCOPE;
+    }
     const targetUri = resolveRelativePath(document, file).toString();
     const astNodeDescriptions = types.flatMap((type) =>
         indexManager.allElements(type.name, new Set([targetUri])).toArray()

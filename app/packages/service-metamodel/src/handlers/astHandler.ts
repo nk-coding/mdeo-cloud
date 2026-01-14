@@ -8,17 +8,9 @@ import type { FileDataHandler, FileDataContext, FileDataResult } from "@mdeo/ser
  * @returns Promise resolving to the file data result with serialized AST
  */
 export const astHandler: FileDataHandler = async (context: FileDataContext): Promise<FileDataResult> => {
-    const { path, content, services } = context;
+    const { uri, instance, services } = context;
 
-    // Parse the document
-    const { URI } = await import("vscode-uri");
-    const uri = URI.parse(`file://${path}`);
-
-    // Create a temporary document for parsing
-    const document = services.shared.workspace.LangiumDocumentFactory.fromString(content, uri);
-
-    // Build the document (parse, link, validate)
-    await services.shared.workspace.DocumentBuilder.build([document], { validation: true });
+    const document = await instance.buildDocument(uri);
 
     // Get the AST
     const ast = document.parseResult.value;

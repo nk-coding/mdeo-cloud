@@ -10,7 +10,9 @@ export class MetamodelExternalReferenceCollector implements ExternalReferenceCol
     findExternalReferences(docs: LangiumDocument[]): URI[] {
         return docs.flatMap((doc) => {
             const metamodel = doc.parseResult.value as MetaModelType;
-            return metamodel.imports.map((imp) => resolveRelativePath(doc, imp.file));
+            return metamodel.imports
+                .filter((imp) => imp.file != undefined)
+                .map((imp) => resolveRelativePath(doc, imp.file));
         });
     }
 }

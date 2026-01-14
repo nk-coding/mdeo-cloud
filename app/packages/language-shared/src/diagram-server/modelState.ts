@@ -37,6 +37,14 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
     };
 
     /**
+     * Last validated metadata for a error-free source model.
+     */
+    protected lastValidMetadata: GraphMetadata = {
+        nodes: {},
+        edges: {}
+    };
+
+    /**
      * Flag indicating whether the metadata has been validated against the source model.
      */
     private isMetadataValidated: boolean = false;
@@ -112,9 +120,17 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
         if (this.isMetadataValidated) {
             return this._metadata;
         }
-        const validatedMetadata = this.metadataManager.validateMetadata(this._sourceModel!, this._metadata);
+        const validatedMetadata = this.metadataManager.validateMetadata(
+            this._sourceModel!,
+            this._metadata,
+            this.lastValidMetadata
+        );
         if (validatedMetadata != undefined) {
             this.metadata = validatedMetadata;
+        }
+        const document = this.sourceModel.$document!;
+        if (document.parseResult.lexerErrors.length === 0 && document.parseResult.parserErrors.length === 0) {
+            this.lastValidMetadata = this._metadata;
         }
         this.isMetadataValidated = true;
         return this._metadata;

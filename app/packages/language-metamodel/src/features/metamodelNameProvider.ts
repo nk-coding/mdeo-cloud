@@ -23,7 +23,7 @@ export class MetamodelNameProvider extends DefaultNameProvider {
             return name;
         }
         if (this.reflection.isInstance(node, ClassImport)) {
-            return node.name ?? node.entity.ref?.name;
+            return node.name ?? node.entity.$refText;
         }
         return undefined;
     }

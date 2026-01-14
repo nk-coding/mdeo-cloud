@@ -188,7 +188,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             }
 
             for (const extendsDef of cls.extends) {
-                if (!extendsDef?.class?.ref) {
+                if (extendsDef?.class?.ref == undefined) {
                     continue;
                 }
 

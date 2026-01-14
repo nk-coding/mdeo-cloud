@@ -53,6 +53,16 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
         return undefined;
     }
 
+    override getAdditional(node: AstNode): AstNode[] {
+        if (this.reflection.isInstance(node, ClassImport)) {
+            const importedClass = node.entity?.ref;
+            if (importedClass != undefined) {
+                return [importedClass];
+            }
+        }
+        return [];
+    }
+
     /**
      * Generates ID for MetaModel root node.
      */

@@ -84,16 +84,24 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
      *
      * @param sourceModel The source model to validate metadata for
      * @param currentMetadata The current graph metadata
+     * @param lastValidMetadata The last valid graph metadata for an error-free model
      * @returns Updated metadata or undefined if valid
      */
-    validateMetadata(sourceModel: T, currentMetadata: GraphMetadata): GraphMetadata | undefined {
+    validateMetadata(
+        sourceModel: T,
+        currentMetadata: GraphMetadata,
+        lastValidMetadata: GraphMetadata
+    ): GraphMetadata | undefined {
         const newMetadata = this.extractGraphMetadata(sourceModel);
+        this.checkMetadataConsistency(newMetadata);
 
         if (this.isMetadataValid(newMetadata, currentMetadata)) {
             return this.getCleanMetadata(newMetadata, currentMetadata);
         }
 
-        const currentGraph = this.convertToMultiGraph(currentMetadata);
+        const mergedMetadata = this.mergeMetadata(currentMetadata, lastValidMetadata);
+
+        const currentGraph = this.convertToMultiGraph(mergedMetadata);
         const newGraph = this.convertToMultiGraph(newMetadata);
 
         const lastResult = this.computeGED(currentGraph, newGraph);
@@ -106,11 +114,11 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
         const { nodes: resultNodes, loopEdges } = this.processNodePaths(
             nodePath,
             newMetadata,
-            currentMetadata,
+            mergedMetadata,
             currentGraph,
             newGraph
         );
-        const resultEdges = this.processEdgePaths(edgePath, newMetadata, currentMetadata);
+        const resultEdges = this.processEdgePaths(edgePath, newMetadata, mergedMetadata);
 
         Object.assign(resultEdges, loopEdges);
 
@@ -118,6 +126,39 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
             nodes: resultNodes,
             edges: resultEdges
         };
+    }
+
+    /**
+     * Merges two graph metadata objects, with the first having precedence.
+     *
+     * @param first the primary metadata
+     * @param second the secondary metadata
+     * @returns the merged metadata
+     */
+    private mergeMetadata(first: GraphMetadata, second: GraphMetadata): GraphMetadata {
+        return {
+            nodes: { ...second.nodes, ...first.nodes },
+            edges: { ...second.edges, ...first.edges }
+        };
+    }
+
+    /**
+     * Checks the consistency of the metadata.
+     * Checks that all edges reference existing nodes.
+     * Inconsistent metadata can cause errors down the line.
+     *
+     * @param metadata The graph metadata to check
+     * @throws Error if inconsistencies are found
+     */
+    private checkMetadataConsistency(metadata: GraphMetadata) {
+        for (const edge of Object.values(metadata.edges)) {
+            if (!(edge.from in metadata.nodes)) {
+                throw new Error(`Edge ${edge} has invalid 'from' reference to non-existent node ${edge.from}`);
+            }
+            if (!(edge.to in metadata.nodes)) {
+                throw new Error(`Edge ${edge} has invalid 'to' reference to non-existent node ${edge.to}`);
+            }
+        }
     }
 
     /**
@@ -213,13 +254,12 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
     ): { nodes: Record<string, NodeMetadata>; loopEdges: Record<string, EdgeMetadata> } {
         const resultNodes: Record<string, NodeMetadata> = {};
         const loopEdges: Record<string, EdgeMetadata> = {};
-
         for (const [u, v] of nodePath) {
-            if (v !== null) {
+            if (v != null) {
                 const newNodeMeta = newMetadata.nodes[v];
                 let candidateMeta: NodeMetadata;
 
-                if (u !== null) {
+                if (u != null) {
                     const oldNodeMeta = currentMetadata.nodes[u];
                     candidateMeta = {
                         ...newNodeMeta,
@@ -236,7 +276,7 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
                 };
                 resultNodes[v] = finalNodeMeta;
 
-                const oldNodeAttrs = u !== null ? (currentGraph.getNodeData(u) as NodeAttributesWithLoops) : undefined;
+                const oldNodeAttrs = u != null ? (currentGraph.getNodeData(u) as NodeAttributesWithLoops) : undefined;
                 const newNodeAttrs = newGraph.getNodeData(v) as NodeAttributesWithLoops;
 
                 const oldLoopsMap = oldNodeAttrs?.loops || {};
@@ -264,12 +304,12 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
     ): Record<string, EdgeMetadata> {
         const resultEdges: Record<string, EdgeMetadata> = {};
         for (const [e1, e2] of edgePath) {
-            if (e2 !== null) {
+            if (e2 != null) {
                 const [, , id2] = e2;
                 const newEdgeMeta = newMetadata.edges[id2 as string];
 
                 let candidateMeta: EdgeMetadata;
-                if (e1 !== null) {
+                if (e1 != null) {
                     const [, , id1] = e1;
                     const oldEdgeMeta = currentMetadata.edges[id1 as string];
                     candidateMeta = {

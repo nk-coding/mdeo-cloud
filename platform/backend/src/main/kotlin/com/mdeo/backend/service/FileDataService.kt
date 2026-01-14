@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -43,6 +44,7 @@ class FileDataService(
     
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
+        .version(if (pluginService.config.forceHttp1) HttpClient.Version.HTTP_1_1 else HttpClient.Version.HTTP_2)
         .build()
     
     /**
@@ -52,9 +54,9 @@ class FileDataService(
      * @param projectId The UUID of the project
      * @param path The path to the file
      * @param key The data key (e.g., "ast")
-     * @return ApiResult containing the computed data or an error
+     * @return ApiResult containing the computed data with version or an error
      */
-    suspend fun getFileData(projectId: UUID, path: String, key: String): ApiResult<String> {
+    suspend fun getFileData(projectId: UUID, path: String, key: String): ApiResult<FileDataResponse> {
         val computingCheck = transaction {
             FileDataTable.selectAll()
                 .where { 
@@ -65,23 +67,14 @@ class FileDataService(
                 .firstOrNull()
         }
         
-        if (computingCheck != null) {
-            val computingAt = computingCheck[FileDataTable.computingAt]
-            if (computingAt != null) {
-                val elapsed = Duration.between(computingAt, Instant.now()).seconds
-                if (elapsed < config.computationTimeoutSeconds) {
-                    return fileDataFailure(
-                        ErrorCodes.FILE_DATA_CIRCULAR_DEPENDENCY,
-                        "Circular dependency detected: computation already in progress for $path:$key"
-                    )
-                }
-                logger.warn("Clearing stale computation flag for $path:$key (elapsed: ${elapsed}s)")
-                clearComputingFlag(projectId, path, key)
-            }
-        }
-        
         if (computingCheck != null && isDataCurrent(projectId, computingCheck)) {
-            return success(String(computingCheck[FileDataTable.data]))
+            val cachedJson: JsonElement = computingCheck[FileDataTable.data]
+            return success(
+                FileDataResponse(
+                    data = cachedJson,
+                    version = computingCheck[FileDataTable.sourceVersion]
+                )
+            )
         }
         
         val pluginInfo = pluginService.findPluginForFile(projectId, path)
@@ -114,7 +107,7 @@ class FileDataService(
         try {
             val token = jwtService.generateProjectToken(projectId)
             
-            val computedData = computeFromPlugin(pluginUrl, key, path, fileVersion, fileContent, token, contributionPlugins)
+            val computedData = computeFromPlugin(pluginUrl, key, path, projectId,  fileVersion, fileContent, token, contributionPlugins)
             
             storeFileData(projectId, path, key, computedData, fileVersion)
             
@@ -133,7 +126,12 @@ class FileDataService(
                 )
             }
             
-            return success(computedData.data)
+            return success(
+                FileDataResponse(
+                    data = computedData.data,
+                    version = fileVersion
+                )
+            )
         } catch (e: Exception) {
             logger.error("Failed to compute file data for $path:$key", e)
             return fileDataFailure(
@@ -235,6 +233,7 @@ class FileDataService(
         pluginUrl: String,
         key: String,
         path: String,
+        project: UUID,
         version: Int,
         content: ByteArray,
         token: String,
@@ -244,20 +243,17 @@ class FileDataService(
             val requestBody = json.encodeToString(
                 FileDataComputeRequest(
                     path = path,
+                    project = project.toString(),
                     version = version,
                     content = String(content, Charsets.UTF_8),
                     contributionPlugins = contributionPlugins
                 )
             )
             
-            val dataUrl = if (pluginUrl.endsWith("/")) {
-                "${pluginUrl}data/$key"
-            } else {
-                "$pluginUrl/data/$key"
-            }
+            val dataUrl = URI.create(pluginUrl).resolve("data/$key")
             
             val request = HttpRequest.newBuilder()
-                .uri(URI.create(dataUrl))
+                .uri(dataUrl)
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer $token")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -308,21 +304,20 @@ class FileDataService(
             FileDataTable.insert {
                 it[FileDataTable.projectId] = projectId
                 it[FileDataTable.path] = path
-                it[dataKey] = key
-                it[data] = response.data.toByteArray()
+                it[FileDataTable.dataKey] = key
+                it[FileDataTable.data] = response.data
                 it[FileDataTable.sourceVersion] = sourceVersion
-                it[computingAt] = null
-                it[createdAt] = now
-                it[updatedAt] = now
+                it[FileDataTable.createdAt] = now
+                it[FileDataTable.updatedAt] = now
             }
             
             for (fileDep in response.fileDependencies) {
                 FileDependenciesTable.insert {
                     it[FileDependenciesTable.projectId] = projectId
                     it[FileDependenciesTable.path] = path
-                    it[dataKey] = key
-                    it[dependencyPath] = fileDep.path
-                    it[dependencyVersion] = fileDep.version
+                    it[FileDependenciesTable.dataKey] = key
+                    it[FileDependenciesTable.dependencyPath] = fileDep.path
+                    it[FileDependenciesTable.dependencyVersion] = fileDep.version
                 }
             }
             
@@ -330,10 +325,10 @@ class FileDataService(
                 DataDependenciesTable.insert {
                     it[DataDependenciesTable.projectId] = projectId
                     it[DataDependenciesTable.path] = path
-                    it[dataKey] = key
-                    it[dependencyPath] = dataDep.path
-                    it[dependencyKey] = dataDep.key
-                    it[dependencyVersion] = dataDep.version
+                    it[DataDependenciesTable.dataKey] = key
+                    it[DataDependenciesTable.dependencyPath] = dataDep.path
+                    it[DataDependenciesTable.dependencyKey] = dataDep.key
+                    it[DataDependenciesTable.dependencyVersion] = dataDep.version
                 }
             }
         }
@@ -359,19 +354,17 @@ class FileDataService(
                     (FileDataTable.path eq path) and 
                     (FileDataTable.dataKey eq key)
                 }) {
-                    it[computingAt] = now
                     it[updatedAt] = now
                 }
             } else {
                 FileDataTable.insert {
                     it[FileDataTable.projectId] = projectId
                     it[FileDataTable.path] = path
-                    it[dataKey] = key
-                    it[data] = ByteArray(0)
-                    it[sourceVersion] = 0
-                    it[computingAt] = now
-                    it[createdAt] = now
-                    it[updatedAt] = now
+                    it[FileDataTable.dataKey] = key
+                    it[FileDataTable.data] = JsonObject(emptyMap())
+                    it[FileDataTable.sourceVersion] = 0
+                    it[FileDataTable.createdAt] = now
+                    it[FileDataTable.updatedAt] = now
                 }
             }
         }
@@ -387,7 +380,6 @@ class FileDataService(
                 (FileDataTable.path eq path) and 
                 (FileDataTable.dataKey eq key)
             }) {
-                it[computingAt] = null
                 it[updatedAt] = Instant.now()
             }
         }

@@ -27,17 +27,17 @@ class MetadataService {
         
         return transaction {
             val row = FileMetadataTable.selectAll()
-                .where { 
-                    (FileMetadataTable.projectId eq projectId) and 
-                    (FileMetadataTable.path eq normalizedPath) 
+                .where {
+                    (FileMetadataTable.projectId eq projectId) and
+                    (FileMetadataTable.path eq normalizedPath)
                 }
                 .firstOrNull()
-            
+
             if (row == null) {
                 return@transaction success(JsonObject(emptyMap()))
             }
-            
-            val metadata: JsonObject = Json.decodeFromString(row[FileMetadataTable.metadata])
+
+            val metadata: JsonObject = row[FileMetadataTable.metadata]
             success(metadata)
         }
     }
@@ -53,8 +53,6 @@ class MetadataService {
     fun writeMetadata(projectId: UUID, path: String, metadata: JsonObject): ApiResult<Unit> {
         val normalizedPath = normalizePath(path)
         val now = Instant.now()
-        val metadataJson = Json.encodeToString(JsonObject.serializer(), metadata)
-        
         return transaction {
             val existing = FileMetadataTable.selectAll()
                 .where { 
@@ -64,18 +62,18 @@ class MetadataService {
                 .firstOrNull()
             
             if (existing != null) {
-                FileMetadataTable.update({ 
-                    (FileMetadataTable.projectId eq projectId) and 
-                    (FileMetadataTable.path eq normalizedPath) 
+                FileMetadataTable.update({
+                    (FileMetadataTable.projectId eq projectId) and
+                    (FileMetadataTable.path eq normalizedPath)
                 }) {
-                    it[FileMetadataTable.metadata] = metadataJson
+                    it[FileMetadataTable.metadata] = metadata
                     it[updatedAt] = now
                 }
             } else {
                 FileMetadataTable.insert {
                     it[FileMetadataTable.projectId] = projectId
                     it[FileMetadataTable.path] = normalizedPath
-                    it[FileMetadataTable.metadata] = metadataJson
+                    it[FileMetadataTable.metadata] = metadata
                     it[createdAt] = now
                     it[updatedAt] = now
                 }

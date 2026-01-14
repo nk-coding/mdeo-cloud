@@ -8,6 +8,7 @@ export * from "./features/diagram-server/model/classNode.js";
 export * from "./features/diagram-server/model/elementTypes.js";
 export * from "./features/diagram-server/model/inheritanceEdge.js";
 export * from "./features/diagram-server/model/propertyLabel.js";
+export * from "./features/diagram-server/metadataTypes.js";
 export * from "./features/diagram-server/metamodelDiagramConfiguration.js";
 export * from "./features/diagram-server/metamodelDiagramModule.js";
 export * from "./features/diagram-server/metamodelGModelFactory.js";

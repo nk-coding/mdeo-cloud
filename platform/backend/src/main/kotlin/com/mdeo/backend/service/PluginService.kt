@@ -64,7 +64,7 @@ data class ManifestEditorPlugin(
  *
  * @param config The plugin configuration settings
  */
-class PluginService(config: PluginConfig) {
+class PluginService(val config: PluginConfig) {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
     private val pluginBaseUrl = config.baseUrl
@@ -148,23 +148,24 @@ class PluginService(config: PluginConfig) {
      * @return ApiResult containing the plugin ID if successful, or an error
      */
     suspend fun createPlugin(url: String): ApiResult<String> {
+        val normalizedUrl = url.trimEnd('/') + "/"
         val existingCheck = transaction {
             PluginsTable.selectAll()
-                .where { PluginsTable.url eq url }
+                .where { PluginsTable.url eq normalizedUrl }
                 .firstOrNull()
         }
         
         if (existingCheck != null) {
             return pluginFailure(
                 ErrorCodes.PLUGIN_ALREADY_EXISTS, 
-                "Plugin with URL already exists: $url"
+                "Plugin with URL already exists: $normalizedUrl"
             )
         }
         
         val manifest = try {
-            fetchPluginManifest(url)
+            fetchPluginManifest(normalizedUrl)
         } catch (e: Exception) {
-            logger.error("Failed to fetch plugin manifest from $url", e)
+            logger.error("Failed to fetch plugin manifest from $normalizedUrl", e)
             return pluginFailure(
                 ErrorCodes.PLUGIN_NOT_FOUND, 
                 "Failed to fetch plugin manifest: ${e.message}"
@@ -177,7 +178,7 @@ class PluginService(config: PluginConfig) {
             
             PluginsTable.insert {
                 it[id] = pluginId
-                it[PluginsTable.url] = url
+                it[PluginsTable.url] = normalizedUrl
                 it[name] = manifest.name
                 it[description] = manifest.description
                 it[icon] = manifest.icon.toString()
@@ -249,7 +250,6 @@ class PluginService(config: PluginConfig) {
                 .GET()
                 .timeout(Duration.ofSeconds(30))
                 .build()
-            println("Fetching plugin manifest from '${request.uri()}'")
             
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             

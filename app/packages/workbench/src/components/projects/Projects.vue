@@ -26,7 +26,7 @@ import type { UserInfo } from "@/data/api/backendApi";
 import ProjectsList from "./ProjectsList.vue";
 import ProjectDetails from "./ProjectDetails.vue";
 
-const { backendApi, project } = inject(workbenchStateKey)!;
+const { backendApi, project, activeSidebar } = inject(workbenchStateKey)!;
 
 const projects = ref<Project[]>([]);
 const showProjectsList = ref(false);
@@ -122,7 +122,10 @@ onActivated(async () => {
 
 watch(project, async (newProject) => {
     if (newProject != undefined) {
+        activeSidebar.value = "files";
         await loadProjectDetails();
+    } else {
+        activeSidebar.value = "projects";
     }
     showProjectsList.value = false;
 });

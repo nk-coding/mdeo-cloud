@@ -82,7 +82,7 @@ fun Route.fileDataRoutes(
             val result = fileDataService.getFileData(projectId, path, key)
             
             when (result) {
-                is ApiResult.Success -> call.respond(FileDataResponse(result.value))
+                is ApiResult.Success -> call.respond(result.value)
                 is ApiResult.Failure -> call.respond(result)
             }
         }

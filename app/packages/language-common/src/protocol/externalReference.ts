@@ -40,6 +40,7 @@ export interface ExternalReferenceResolver {
      * Loads an external document by its URI.
      *
      * @param uri The URI of the external document to load.
+     * @return a promise that indicates whether some document was loaded
      */
     loadExternalDocument(uri: URI): Promise<void>;
 }

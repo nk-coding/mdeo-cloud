@@ -2,6 +2,10 @@ package com.mdeo.backend.database
 
 import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.json.json
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 /**
@@ -62,7 +66,7 @@ object FilesTable : Table("files") {
 object FileMetadataTable : Table("file_metadata") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val path = varchar("path", 1024)
-    val metadata = text("metadata")
+    val metadata = json<JsonObject>("metadata", Json)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     
@@ -139,9 +143,8 @@ object FileDataTable : Table("file_data") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val path = varchar("path", 1024)
     val dataKey = varchar("data_key", 255)
-    val data = binary("data")
+    val data = json<JsonElement>("data", Json)
     val sourceVersion = integer("source_version")
-    val computingAt = timestamp("computing_at").nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     

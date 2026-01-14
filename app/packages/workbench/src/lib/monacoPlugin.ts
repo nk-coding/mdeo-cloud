@@ -1,5 +1,9 @@
 import * as monaco from "monaco-editor";
-import { MonacoVscodeApiWrapper, type MonacoVscodeApiConfig, getEnhancedMonacoEnvironment } from "monaco-languageclient/vscodeApiWrapper";
+import {
+    MonacoVscodeApiWrapper,
+    type MonacoVscodeApiConfig,
+    getEnhancedMonacoEnvironment
+} from "monaco-languageclient/vscodeApiWrapper";
 import { LogLevel } from "vscode";
 import { type Plugin, type InjectionKey, watch } from "vue";
 import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";

@@ -19,6 +19,15 @@ export interface ModelIdProvider {
      * @returns The generated ID or undefined if the node type is not supported
      */
     getId(node: AstNode): string | undefined;
+
+    /**
+     * Gets additional AST nodes that should be assigned the same ID as the given node.
+     * This should be used when multiple AST nodes semantically represent the same entity.
+     *
+     * @param node The AST node to get additional nodes for
+     * @returns An array of additional AST nodes
+     */
+    getAdditional(node: AstNode): AstNode[];
 }
 
 /**
@@ -42,4 +51,8 @@ export abstract class BaseModelIdProvider implements ModelIdProvider {
      * @returns The name string or undefined if not applicable
      */
     abstract getName(node: AstNode): string | undefined;
+
+    getAdditional(node: AstNode): AstNode[] {
+        return [];
+    }
 }

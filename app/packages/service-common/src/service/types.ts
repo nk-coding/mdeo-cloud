@@ -1,6 +1,9 @@
-import type { LangiumLanguagePlugin, LanguageServices } from "@mdeo/language-common";
+import type { LangiumLanguagePluginProvider, LanguageServices } from "@mdeo/language-common";
 import type { Plugin, LanguagePlugin } from "@mdeo/plugin";
 import type { FastifyInstance } from "fastify";
+import type { ServerApi } from "./serverApi.js";
+import type { URI } from "vscode-uri";
+import type { LangiumInstance } from "../langium/langiumInstance.js";
 
 /**
  * Plugin definition for the service.
@@ -30,9 +33,9 @@ export type FileDataHandler<T = unknown> = (context: FileDataContext) => Promise
  */
 export interface FileDataContext {
     /**
-     * The path of the file being processed
+     * The URI of the file, already registered in the Langium workspace
      */
-    path: string;
+    uri: URI;
 
     /**
      * The version of the file
@@ -40,9 +43,9 @@ export interface FileDataContext {
     version: number;
 
     /**
-     * The content of the file
+     * The Langium instance to use for processing
      */
-    content: string;
+    instance: LangiumInstance;
 
     /**
      * The Langium services for this language
@@ -61,7 +64,7 @@ export interface FileDataContext {
  */
 export interface FileDataResult<T = unknown> {
     /**
-     * The computed data (will be JSON stringified)
+    * The computed data (JSON value)
      */
     data: T;
 
@@ -104,7 +107,7 @@ export interface DataDependency {
 export interface AdditionalFileData {
     path: string;
     key: string;
-    data: string;
+    data: any;
     sourceVersion: number;
     fileDependencies?: FileDependency[];
     dataDependencies?: DataDependency[];
@@ -142,7 +145,7 @@ export interface ServiceConfig {
     /**
      * Langium language plugin provider
      */
-    languagePlugin: LangiumLanguagePlugin<any>;
+    languagePluginProvider: LangiumLanguagePluginProvider<any>;
 
     /**
      * File data handlers keyed by data key (e.g., "ast", "diagram")
@@ -161,40 +164,6 @@ export interface ServiceConfig {
 }
 
 /**
- * Interface for the server API injected into Langium services
- */
-export interface ServerApi {
-    /**
-     * Reads a file from the backend
-     * @param path The path of the file to read
-     * @returns The file content and version
-     */
-    readFile(path: string): Promise<{ content: string; version: number }>;
-
-    /**
-     * Gets file data from the backend
-     * @param path The path of the file
-     * @param key The data key
-     * @returns The computed file data
-     */
-    getFileData(path: string, key: string): Promise<string>;
-
-    /**
-     * Lists files in a directory
-     * @param path The directory path
-     * @returns Array of file/directory entries
-     */
-    listDirectory(path: string): Promise<DirectoryEntry[]>;
-
-    /**
-     * Checks if a file exists
-     * @param path The path to check
-     * @returns True if the file exists
-     */
-    fileExists(path: string): Promise<boolean>;
-}
-
-/**
  * Directory entry returned by listDirectory
  */
 export interface DirectoryEntry {
@@ -208,6 +177,7 @@ export interface DirectoryEntry {
  */
 export interface FileDataComputeRequest {
     path: string;
+    project: string;
     version: number;
     content: string;
     contributionPlugins?: object[];
@@ -217,7 +187,7 @@ export interface FileDataComputeRequest {
  * Response body for file data computation
  */
 export interface FileDataComputeResponse {
-    data: string;
+    data: any;
     fileDependencies: FileDependency[];
     dataDependencies: DataDependency[];
     additionalFileData: AdditionalFileData[];

@@ -46,7 +46,7 @@ export class ModelIdRegistry {
     getId(node: AstNode): string {
         const id = this.idMap.get(node);
         if (id == undefined) {
-            throw new Error(`No ID assigned for node: ${node}`);
+            throw new Error(`No ID assigned for node: ${node.$type}`);
         }
         return id;
     }
@@ -94,6 +94,9 @@ export class ModelIdRegistry {
             if (baseId !== undefined) {
                 const uniqueId = this.ensureUnique(baseId);
                 this.idMap.set(node, uniqueId);
+                for (const additionalNode of this.idProvider.getAdditional(node)) {
+                    this.idMap.set(additionalNode, uniqueId);
+                }
                 this.usedIds.add(uniqueId);
             }
         }

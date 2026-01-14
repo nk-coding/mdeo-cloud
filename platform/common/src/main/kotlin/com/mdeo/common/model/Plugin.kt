@@ -2,6 +2,7 @@ package com.mdeo.common.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -150,6 +151,7 @@ data class FileReadResponse(
  * Request payload for computing file data.
  *
  * @property path Path to the file
+ * @property project Project ID the file belongs to
  * @property version Current version of the file
  * @property content Text file content
  * @property contributionPlugins Server contribution plugins associated with this language
@@ -157,6 +159,7 @@ data class FileReadResponse(
 @Serializable
 data class FileDataComputeRequest(
     val path: String,
+    val project: String,
     val version: Int,
     val content: String,
     val contributionPlugins: List<JsonObject> = emptyList()
@@ -172,7 +175,7 @@ data class FileDataComputeRequest(
  */
 @Serializable
 data class FileDataComputeResponse(
-    val data: String,
+    val data: JsonElement,
     val fileDependencies: List<FileDependency> = emptyList(),
     val dataDependencies: List<DataDependency> = emptyList(),
     val additionalFileData: List<AdditionalFileData> = emptyList()
@@ -218,7 +221,7 @@ data class DataDependency(
 data class AdditionalFileData(
     val path: String,
     val key: String,
-    val data: String,
+    val data: JsonElement,
     val sourceVersion: Int,
     val fileDependencies: List<FileDependency> = emptyList(),
     val dataDependencies: List<DataDependency> = emptyList()
@@ -228,8 +231,10 @@ data class AdditionalFileData(
  * Response for file data request.
  *
  * @property data The computed file data
+ * @property version The version of the source file used to compute the data
  */
 @Serializable
 data class FileDataResponse(
-    val data: String
+    val data: JsonElement,
+    val version: Int
 )
