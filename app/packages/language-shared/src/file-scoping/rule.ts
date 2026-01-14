@@ -11,7 +11,7 @@ import type { FileScopingConfig } from "./config.js";
  *
  * The generated grammar follows the pattern:
  * - Import: `entityRef [as name]`
- * - FileImport: `import { import1, import2, ... } from "file"`
+ * - FileImport: `import { import1, import2, ... } from "./file"`
  *
  * @template T The AstNode type being imported
  * @param config Configuration for file-scoped composition

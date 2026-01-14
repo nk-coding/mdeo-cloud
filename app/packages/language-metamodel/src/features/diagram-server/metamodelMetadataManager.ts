@@ -8,7 +8,6 @@ import {
     ModelIdProvider,
     type ModelIdProvider as ModelIdProviderType
 } from "@mdeo/language-shared";
-import { NodeLayoutMetadata, EdgeVisualMetadata, EdgePlacementMetadata } from "@mdeo/editor-protocol";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import { MetamodelElementType } from "./model/elementTypes.js";
@@ -19,6 +18,7 @@ import type {
     PartialAssociation
 } from "../../grammar/metamodelPartialTypes.js";
 import { Association, Class, ClassImport } from "../../grammar/metamodelTypes.js";
+import { EdgePlacementMetadataUtil, EdgeVisualMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -37,11 +37,11 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      */
     protected override verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
         if (model.type === MetamodelElementType.NODE_CLASS) {
-            return NodeLayoutMetadata.verify(model.meta, 0, 0);
+            return NodeLayoutMetadataUtil.verify(model.meta, 0, 0);
         }
 
         if (model.type === MetamodelElementType.LABEL_ASSOCIATION_END) {
-            return EdgePlacementMetadata.verify(model.meta, 0.5);
+            return EdgePlacementMetadataUtil.verify(model.meta, 0.5);
         }
 
         if (
@@ -49,7 +49,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             model.type === MetamodelElementType.EDGE_ASSOCIATION
         ) {
             const edgeModel = model as EdgeMetadata;
-            return EdgeVisualMetadata.verify(edgeModel.meta);
+            return EdgeVisualMetadataUtil.verify(edgeModel.meta);
         }
 
         return undefined;

@@ -34,6 +34,7 @@ export * from "./plugin/languagePlugin.js";
 export * from "./plugin/pluginContext.js";
 export * from "./plugin/sharedImport.js";
 export * from "./protocol/astSerializer.js";
+export * from "./protocol/externalReference.js";
 export * from "./protocol/glsp.js";
 export * from "./protocol/metadataFileSystemProvider.js";
 export * from "./util/assertUnreachable.js";

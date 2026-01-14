@@ -4,7 +4,7 @@ import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { NodeMetadata } from "../metadata.js";
-import { PartialChangeBoundsOperation, type NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata, PartialChangeBoundsOperation } from "@mdeo/editor-protocol";
 
 const { injectable } = sharedImport("inversify");
 
@@ -18,7 +18,7 @@ export class PartialChangeBoundsOperationHandler extends BaseOperationHandler {
     /**
      * The operation type this handler processes
      */
-    override readonly operationType = PartialChangeBoundsOperation.KIND;
+    override readonly operationType: PartialChangeBoundsOperation["kind"] = "partialChangeBounds";
 
     /**
      * Creates a command to execute the partial change bounds operation.

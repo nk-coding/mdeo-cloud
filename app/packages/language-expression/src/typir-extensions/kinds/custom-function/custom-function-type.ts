@@ -1,5 +1,4 @@
 import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProblem } from "typir";
-import { Type } from "typir";
 import type { CustomFunctionDetails, CustomFunctionKind } from "./custom-function-kind.js";
 import type { FunctionSignature, ReturnType } from "../../config/type.js";
 import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../../config/type.js";
@@ -10,7 +9,8 @@ import { sharedImport } from "@mdeo/language-shared";
 const {
     checkValueForConflict,
     TypeEqualityProblem: TypeEqualityProblemConstant,
-    createKindConflict
+    createKindConflict,
+    Type
 } = sharedImport("typir");
 
 /**

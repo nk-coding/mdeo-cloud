@@ -123,6 +123,7 @@ object ContributionPluginsTable : Table("contribution_plugins") {
     val id = uuid("id")
     val pluginId = uuid("plugin_id").references(PluginsTable.id, onDelete = ReferenceOption.CASCADE)
     val languageId = varchar("language_id", 255)
+    val description = text("description")
     val additionalKeywords = text("additional_keywords")
     val serverContributionPlugins = text("server_contribution_plugins")
     val createdAt = timestamp("created_at")

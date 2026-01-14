@@ -13,6 +13,7 @@ export * from "./features/diagram-server/metamodelDiagramModule.js";
 export * from "./features/diagram-server/metamodelGModelFactory.js";
 export * from "./features/diagram-server/metamodelMetadataManager.js";
 export * from "./features/diagram-server/metamodelModelIdProvider.js";
+export * from "./features/metamodelExternalReferenceCollector.js";
 export * from "./features/metamodelNameProvider.js";
 export * from "./features/metamodelScopeComputation.js";
 export * from "./features/metamodelScopeProvider.js";

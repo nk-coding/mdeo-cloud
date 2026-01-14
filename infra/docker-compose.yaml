@@ -30,7 +30,7 @@ services:
       CORS_ALLOWED_HOSTS: ${CORS_ALLOWED_HOSTS}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      PLUGIN_CACHE_TTL_SECONDS: ${PLUGIN_CACHE_TTL_SECONDS}
+      PLUGIN_BASE_URL: ${PLUGIN_BASE_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,8 +40,23 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/workbench/Dockerfile
+    environment:
+      PLUGIN_SERVICE_HOST: ${PLUGIN_SERVICE_HOST:-service-metamodel:3000}
     ports:
       - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  service-metamodel:
+    build:
+      context: ..
+      dockerfile: infra/docker/service-metamodel/Dockerfile
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      BACKEND_API_URL: "http://backend:8080"
+      MAX_LANGIUM_INSTANCES: "5"
     depends_on:
       - backend
     restart: unless-stopped

@@ -28,6 +28,47 @@ export interface BackendPlugin {
      * Icon representing the plugin (from Lucide)
      */
     icon: IconNode;
+
+    /**
+     * Language plugins provided by this plugin
+     */
+    languagePlugins: BackendLanguagePlugin[];
+
+    /**
+     * Contribution plugins provided by this plugin
+     */
+    contributionPlugins: BackendContributionPlugin[];
+}
+
+/**
+ * Represents a language plugin configuration from the backend.
+ */
+export interface BackendLanguagePlugin {
+    id: string;
+    name: string;
+    extension: string;
+    defaultContent?: string;
+    serverPlugin: {
+        import: string;
+    };
+    editorPlugin?: {
+        import: string;
+        stylesUrl: string;
+    };
+    languageConfiguration: object;
+    monarchTokensProvider: object;
+    icon: IconNode;
+}
+
+/**
+ * Represents a contribution plugin that extends a language with additional functionality.
+ */
+export interface BackendContributionPlugin {
+    id: string;
+    languageId: string;
+    description: string;
+    additionalKeywords: string[];
+    serverContributionPlugins: object[];
 }
 
 /**

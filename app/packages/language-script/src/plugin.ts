@@ -23,7 +23,7 @@ import {
     registerStatementSerializers,
     registerTypeSerializers
 } from "@mdeo/language-expression";
-import { type TypirLangiumSpecifics } from "typir-langium";
+import type { TypirLangiumSpecifics } from "typir-langium";
 import { ScriptTypeSystem } from "./features/typeSystem.js";
 import { ScriptScopeProvider } from "./features/scopeProvider.js";
 import { registerScriptSerializers } from "./features/scriptSerializers.js";

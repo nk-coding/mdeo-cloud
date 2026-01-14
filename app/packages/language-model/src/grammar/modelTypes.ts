@@ -1,5 +1,4 @@
 import { createInterface, Optional, Ref, type ASTType } from "@mdeo/language-common";
-import type { AstNode } from "langium";
 import { ClassOrImport, Property } from "@mdeo/language-metamodel";
 
 /**

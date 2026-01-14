@@ -18,10 +18,10 @@
         "prettier": "^3.7.4",
         "typir": "^0.3.2",
         "typir-langium": "^0.3.2",
+        "vscode-jsonrpc": "8.2.0",
         "vscode-languageserver-types": "^3.17.5"
     },
     "dependencies": {
-        "@mdeo/plugin": "^0.1.0",
-        "vscode-jsonrpc": "8.2.0"
+        "@mdeo/plugin": "^0.1.0"
     }
 }

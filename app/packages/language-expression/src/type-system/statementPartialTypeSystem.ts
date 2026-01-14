@@ -15,7 +15,7 @@ import type { InferenceProblem, TypeInferenceResultWithoutInferringChildren, Val
 import type { BaseExpressionType, ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
-import { type AstNode } from "langium";
+import type { AstNode } from "langium";
 
 const { AstUtils } = sharedImport("langium");
 const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");

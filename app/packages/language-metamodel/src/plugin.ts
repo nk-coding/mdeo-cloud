@@ -5,25 +5,28 @@ import {
     ML_COMMENT,
     SL_COMMENT,
     HIDDEN_NEWLINE,
-    type LangiumLanguagePluginProvider
+    type LangiumLanguagePluginProvider,
+    type ExternalReferenceAdditionalServices
 } from "@mdeo/language-common";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
     DefaultAstSerializer,
     SerializerFormatter,
-    registerDefaultTokenSerializers
+    registerDefaultTokenSerializers,
+    addExternalReferenceCollectionPhase
 } from "@mdeo/language-shared";
 import { MetamodelScopeProvider } from "./features/metamodelScopeProvider.js";
 import { registerMetamodelSerializers } from "./features/metamodelSerializers.js";
 import { MetamodelDiagramModule } from "./features/diagram-server/metamodelDiagramModule.js";
 import { MetamodelNameProvider } from "./features/metamodelNameProvider.js";
 import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.js";
+import { MetamodelExternalReferenceCollector } from "./features/metamodelExternalReferenceCollector.js";
 
 /**
  * The additional services for the Metamodel language.
  */
-export type MetamodelServices = object;
+export type MetamodelServices = ExternalReferenceAdditionalServices;
 
 /**
  * The plugin for the Metamodel language.
@@ -40,7 +43,8 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
         references: {
             ScopeProvider: (services) => new MetamodelScopeProvider(services),
             NameProvider: (services) => new MetamodelNameProvider(services),
-            ScopeComputation: (services) => new MetamodelScopeComputation(services)
+            ScopeComputation: (services) => new MetamodelScopeComputation(services),
+            ExternalReferenceCollector: () => new MetamodelExternalReferenceCollector()
         },
         lsp: {
             Formatter: (services) => new SerializerFormatter(services)
@@ -51,6 +55,7 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
         registerDefaultTokenSerializers(services);
         registerMetamodelSerializers(services);
         services.shared.glsp.serverModule.configureDiagramModule(new MetamodelDiagramModule(services));
+        addExternalReferenceCollectionPhase(services);
     }
 };
 

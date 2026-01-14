@@ -7,7 +7,7 @@ import type {
 } from "@eclipse-glsp/client";
 import type { Action, GModelElement, MouseListener, Operation } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
-import { PartialChangeBoundsOperation, type PartialElementAndBounds } from "@mdeo/editor-protocol";
+import type { PartialChangeBoundsOperation, PartialElementAndBounds } from "@mdeo/editor-protocol";
 import type { ExtendedSetBoundsFeedbackAction } from "../metadata/setBoundsFeedbackCommand.js";
 
 const { injectable } = sharedImport("inversify");
@@ -103,7 +103,7 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
                 !Dimension.equals(this.initialBounds.newSize, resizedElement.bounds)
             ) {
                 this.initialBounds = undefined;
-                return [PartialChangeBoundsOperation.create([elementAndBounds])];
+                return [this.createPartialChangeBoundsOperation([elementAndBounds])];
             }
         }
         return [];
@@ -117,7 +117,7 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
                 y: element.bounds.y
             }
         }));
-        return newBounds.length > 0 ? [PartialChangeBoundsOperation.create(newBounds)] : [];
+        return newBounds.length > 0 ? [this.createPartialChangeBoundsOperation(newBounds)] : [];
     }
 
     protected override resizeBoundsAction(resize: TrackedResize): ExtendedSetBoundsFeedbackAction {
@@ -126,6 +126,22 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
             ...super.resizeBoundsAction(resize),
             setPrefWidth: location !== ResizeHandleLocation.Top && location !== ResizeHandleLocation.Bottom,
             setPrefHeight: location !== ResizeHandleLocation.Left && location !== ResizeHandleLocation.Right
+        };
+    }
+
+    /**
+     * Creates a PartialChangeBoundsOperation for the given element and bounds.
+     *
+     * @param elementAndBounds The partial element and bounds to include in the operation
+     * @returns The created PartialChangeBoundsOperation
+     */
+    private createPartialChangeBoundsOperation(
+        elementAndBounds: PartialElementAndBounds[]
+    ): PartialChangeBoundsOperation {
+        return {
+            kind: "partialChangeBounds",
+            newBounds: elementAndBounds,
+            isOperation: true
         };
     }
 }

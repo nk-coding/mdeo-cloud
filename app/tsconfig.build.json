@@ -40,6 +40,12 @@
         },
         {
             "path": "packages/editor-metamodel"
+        },
+        {
+            "path": "packages/service-common"
+        },
+        {
+            "path": "packages/service-metamodel"
         }
     ]
 }

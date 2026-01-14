@@ -7,6 +7,10 @@ export interface LanguageContributionPlugin {
      */
     languageId: string;
     /**
+     * Description of what this contribution plugin provides.
+     */
+    description: string;
+    /**
      * Optional array of additional keywords that this contribution plugin introduces.
      */
     additionalKeywords: string[];

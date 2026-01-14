@@ -15,7 +15,7 @@ import type { Interface } from "../type/interface/types.js";
  */
 export function createModule(
     plugins: LangiumLanguagePlugin<any>[],
-    { "langium/grammar": langiumGrammar, langium }: PluginContext
+    { "langium/grammar": langiumGrammar, langium }: Pick<PluginContext, "langium/grammar" | "langium">
 ): LanguageModule {
     const serializedGrammars = new Map<LangiumLanguagePlugin<any>, string>();
     for (const plugin of plugins) {

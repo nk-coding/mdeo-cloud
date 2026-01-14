@@ -1,4 +1,4 @@
-import { type RenderingContext } from "@eclipse-glsp/sprotty";
+import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import { GRectangularNodeView, sharedImport } from "@mdeo/editor-shared";
 import type { VNode } from "snabbdom";
 import type { GClassNode } from "../model/classNode.js";

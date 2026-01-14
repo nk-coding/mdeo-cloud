@@ -1,7 +1,6 @@
 import {
     createRule,
     or,
-    optional,
     many,
     ref,
     ID,

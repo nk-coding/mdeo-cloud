@@ -2,15 +2,16 @@ import type { AstSerializer, AstSerializerAdditionalServices } from "@mdeo/langu
 import type { LangiumCoreServices, LangiumDocument, MaybePromise } from "langium";
 import type { Formatter } from "langium/lsp";
 import type { CancellationToken } from "vscode-jsonrpc";
-import {
-    type DocumentFormattingParams,
-    type DocumentRangeFormattingParams,
-    type DocumentOnTypeFormattingParams,
-    type DocumentOnTypeFormattingOptions,
-    Range,
-    uinteger
+import type {
+    DocumentFormattingParams,
+    DocumentRangeFormattingParams,
+    DocumentOnTypeFormattingParams,
+    DocumentOnTypeFormattingOptions
 } from "vscode-languageserver-protocol";
-import { TextEdit } from "vscode-languageserver-types";
+import type { TextEdit as TextEditType } from "vscode-languageserver-types";
+import { sharedImport } from "../sharedImport.js";
+
+const { TextEdit, Range, uinteger } = sharedImport("vscode-languageserver-types");
 
 /**
  * Serializer formatter for Langium that uses the AstSerializer service.
@@ -26,7 +27,7 @@ export class SerializerFormatter implements Formatter {
         document: LangiumDocument,
         params: DocumentFormattingParams,
         cancelToken?: CancellationToken
-    ): Promise<TextEdit[]> {
+    ): Promise<TextEditType[]> {
         const parseResult = document.parseResult;
         if (parseResult.lexerErrors.length > 0 || parseResult.parserErrors.length > 0) {
             return [];
@@ -39,7 +40,7 @@ export class SerializerFormatter implements Formatter {
         document: LangiumDocument,
         params: DocumentRangeFormattingParams,
         cancelToken?: CancellationToken
-    ): Promise<TextEdit[]> {
+    ): Promise<TextEditType[]> {
         throw new Error("Not implemented.");
     }
 
@@ -47,7 +48,7 @@ export class SerializerFormatter implements Formatter {
         document: LangiumDocument,
         params: DocumentOnTypeFormattingParams,
         cancelToken?: CancellationToken
-    ): MaybePromise<TextEdit[]> {
+    ): MaybePromise<TextEditType[]> {
         throw new Error("Not supported.");
     }
 

@@ -11,7 +11,10 @@ import {
     ClientState,
     Emitter
 } from "@eclipse-glsp/protocol";
-import { JsonrpcGLSPClient } from "@mdeo/language-common";
+import { createJsonrpcGLSPClient } from "@mdeo/language-common";
+import * as vscodeJsonrpc from "vscode-jsonrpc";
+
+const JsonrpcGLSPClient = createJsonrpcGLSPClient(vscodeJsonrpc);
 
 /**
  * Options for creating a MonacoGLSPClient

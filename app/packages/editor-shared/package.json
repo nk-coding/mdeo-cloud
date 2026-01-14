@@ -19,12 +19,12 @@
     ],
     "dependencies": {
         "@mdeo/editor-common": "^0.1.0",
-        "@mdeo/editor-protocol": "^0.1.0",
         "@mdeo/language-shared": "^0.1.0"
     },
     "devDependencies": {
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
+        "@mdeo/editor-protocol": "^0.1.0",
         "inversify": "^6.2.2",
         "snabbdom": "~3.5.1"
     }

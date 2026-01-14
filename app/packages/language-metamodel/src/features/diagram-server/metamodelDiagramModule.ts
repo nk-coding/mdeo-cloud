@@ -1,5 +1,5 @@
 import type { InstanceMultiBinding, OperationHandlerConstructor } from "@eclipse-glsp/server";
-import { type BindingTarget, type DiagramConfiguration, type GModelFactory } from "@eclipse-glsp/server";
+import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
 import type { MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
 import { MetamodelGModelFactory } from "./metamodelGModelFactory.js";

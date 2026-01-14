@@ -4,7 +4,7 @@ import type { Container, ContainerModule } from "inversify";
 import type { CustomGLSPServerLauncher, CustomGLSPServerLauncherOptions } from "./customLauncher.js";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { Module } from "langium";
-import { JsonrpcGLSPClient } from "../protocol/glsp.js";
+import { createJsonrpcGLSPClient } from "../protocol/glsp.js";
 import type { MessageConnection } from "vscode-jsonrpc";
 
 /**
@@ -97,13 +97,14 @@ function createServerModule(
  * @param context The plugin context providing GLSP server and inversify dependencies
  * @returns A configured custom GLSP server launcher
  */
-function createLauncher(
-    services: LangiumSharedGLSPServices,
-    { "@eclipse-glsp/server": glspServer, inversify }: PluginContext
-): CustomGLSPServerLauncher {
+function createLauncher(services: LangiumSharedGLSPServices, context: PluginContext): CustomGLSPServerLauncher {
+    const { "@eclipse-glsp/server": glspServer, inversify } = context;
     const { JsonRpcGLSPServerLauncher, GLSPClientProxy, JsonrpcClientProxy } = glspServer;
     const { injectable, ContainerModule } = inversify;
     const { container, serverModule } = services.glsp;
+
+    // Create the JsonrpcGLSPClient with the context
+    const JsonrpcGLSPClient = createJsonrpcGLSPClient(context["vscode-jsonrpc"]);
 
     /**
      * Custom JSON-RPC client proxy to handle action messages.
@@ -115,7 +116,7 @@ function createLauncher(
     }
 
     /**
-     * Custom launcher implementation for GLSP server.
+     * Launcher implementation for GLSP server.
      * Extends the base JSON-RPC launcher with custom connection configuration.
      */
     @injectable()

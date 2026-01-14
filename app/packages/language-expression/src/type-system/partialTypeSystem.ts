@@ -3,7 +3,7 @@ import type { CustomClassType } from "../typir-extensions/kinds/custom-class/cus
 import type { ExpressionTypirServices } from "./services.js";
 import type { Interface, AstReflection } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
-import { type AstNode } from "langium";
+import type { AstNode } from "langium";
 import {
     type TypeAssignability,
     type TypeInferenceCollector,

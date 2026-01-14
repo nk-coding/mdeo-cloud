@@ -74,8 +74,8 @@ data class AppConfig(
                     password = System.getenv("ADMIN_PASSWORD") ?: "admin"
                 ),
                 plugin = PluginConfig(
-                    cacheTtlSeconds = System.getenv("PLUGIN_CACHE_TTL_SECONDS")?.toLongOrNull()
-                        ?: TimeUnit.MINUTES.toSeconds(5)
+                    baseUrl = System.getenv("PLUGIN_BASE_URL"),
+                    forceHttp1 = System.getenv("PLUGIN_FORCE_HTTP1")?.toBoolean() ?: false
                 ),
                 jwt = JwtConfig(
                     expirationSeconds = System.getenv("JWT_EXPIRATION_SECONDS")?.toLongOrNull()
@@ -146,10 +146,11 @@ data class DefaultAdminConfig(
 /**
  * Plugin system configuration.
  *
- * @property cacheTtlSeconds Cache time-to-live in seconds for plugin data
+ * @property baseUrl Base URL for resolving relative plugin URLs
  */
 data class PluginConfig(
-    val cacheTtlSeconds: Long
+    val baseUrl: String,
+    val forceHttp1: Boolean
 )
 
 /**

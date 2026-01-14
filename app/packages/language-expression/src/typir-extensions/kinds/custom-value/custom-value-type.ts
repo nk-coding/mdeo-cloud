@@ -1,8 +1,10 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics } from "typir";
-import { Type } from "typir";
 import type { CustomClassType } from "../custom-class/custom-class-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
 import type { BaseClassTypeRef, Member, ValueType } from "../../config/type.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { Type } = sharedImport("typir");
 
 /**
  * Type details for custom value types.

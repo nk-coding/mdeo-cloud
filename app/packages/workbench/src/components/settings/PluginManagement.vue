@@ -45,7 +45,7 @@
                 <template #empty>
                     <div>
                         <h2 class="text-2xl font-semibold text-foreground">Add plugin</h2>
-                        <p class="text-sm text-muted-foreground mt-1">
+                        <p class="text-sm text-muted-foreground my-2">
                             Install a new integration by providing the plugin entry URL.
                         </p>
                     </div>
@@ -62,7 +62,7 @@
                         </Button>
                     </div>
                     <p v-if="addError" class="text-sm text-destructive">{{ addError }}</p>
-                    <p class="text-xs text-muted-foreground">
+                    <p class="text-xs text-muted-foreground mt-2">
                         Plugins have full access to your workbench. Only install sources that you trust.
                     </p>
                 </template>

@@ -1,5 +1,4 @@
 import type { InferenceProblem, Type, TypeAssignability, TypeEquality, TypirProblem, TypirSpecifics } from "typir";
-import { isSubTypeEdge, isConversionEdge } from "typir";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import { isCustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
@@ -19,7 +18,7 @@ import { getClassTypeIdentifier } from "./util.js";
 import { assertUnreachable } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
 
-const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
+const { InferenceProblem: InferenceProblemConstant, isSubTypeEdge, isConversionEdge } = sharedImport("typir");
 
 /**
  * Result of validating a function signature against provided arguments.

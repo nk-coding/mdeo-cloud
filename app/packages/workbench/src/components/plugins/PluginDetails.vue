@@ -18,11 +18,60 @@
             <Link class="w-4 h-4" />
             {{ plugin.url }}
         </a>
+
+        <div v-if="plugin.languagePlugins && plugin.languagePlugins.length > 0" class="mt-6">
+            <h3 class="text-lg font-semibold text-foreground mb-3">Language Plugins</h3>
+            <div class="space-y-2">
+                <div
+                    v-for="langPlugin in plugin.languagePlugins"
+                    :key="langPlugin.id"
+                    class="p-3 rounded-md border border-border bg-card"
+                >
+                    <div class="flex items-start gap-3">
+                        <Icon
+                            :iconNode="langPlugin.icon"
+                            name="LanguagePluginIcon"
+                            class="w-5 h-5 text-muted-foreground"
+                        />
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-foreground">
+                                {{ langPlugin.name }}
+                                <span class="text-muted-foreground font-normal">({{ langPlugin.id }})</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-sm text-muted-foreground mt-2">
+                        Extension: <span class="font-mono">{{ langPlugin.extension }}</span>
+                    </div>
+                    <div class="text-sm text-muted-foreground mt-1">
+                        Graphical Editor: {{ langPlugin.editorPlugin ? "Supported" : "Not supported" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="plugin.contributionPlugins && plugin.contributionPlugins.length > 0" class="mt-6">
+            <h3 class="text-lg font-semibold text-foreground mb-3">Language Contribution Plugins</h3>
+            <div class="space-y-2">
+                <div
+                    v-for="contribPlugin in plugin.contributionPlugins"
+                    :key="contribPlugin.id"
+                    class="p-3 rounded-md border border-border bg-card"
+                >
+                    <div class="font-medium text-foreground">
+                        Contributes to: <span class="font-mono">{{ contribPlugin.languageId }}</span>
+                    </div>
+                    <div class="text-sm text-muted-foreground mt-1">
+                        {{ contribPlugin.description || "No description provided." }}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { Link } from "lucide-vue-next";
+import { Link, Icon } from "lucide-vue-next";
 import type { BackendPlugin } from "@/data/api/pluginTypes";
 
 const props = defineProps<{

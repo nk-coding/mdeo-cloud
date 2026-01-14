@@ -1,10 +1,9 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics, TypeEqualityProblem } from "typir";
-import { Type } from "typir";
 import type { CustomVoidKind } from "./custom-void-kind.js";
 import type { VoidType } from "../../config/type.js";
 import { sharedImport } from "@mdeo/language-shared";
 
-const { TypeEqualityProblem: TypeEqualityProblemConstant, createKindConflict } = sharedImport("typir");
+const { TypeEqualityProblem: TypeEqualityProblemConstant, createKindConflict, Type } = sharedImport("typir");
 
 /**
  * Type details for the void type.

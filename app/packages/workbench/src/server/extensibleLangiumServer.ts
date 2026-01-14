@@ -15,6 +15,8 @@ import * as glspServerBrowser from "@eclipse-glsp/server/browser.js";
 import * as glspProtocol from "@eclipse-glsp/protocol";
 import * as glspGraph from "@eclipse-glsp/graph";
 import * as inversify from "inversify";
+import * as vscodeJsonrpc from "vscode-jsonrpc";
+import * as vscodeLanguageserverTypes from "vscode-languageserver-types";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import {
@@ -22,6 +24,7 @@ import {
     createGLSPModule,
     createModule,
     initializePluginContext,
+    type ExternalReferenceSharedAdditionalServices,
     type LangiumLanguagePluginProvider
 } from "@mdeo/language-common";
 import { type ResolvedServerLanguagePlugin } from "./types";
@@ -35,6 +38,7 @@ import type {
     Module
 } from "langium";
 import { lspFileSystem } from "./lspFileSystem";
+import { NoopExternalReferenceResolver } from "./noopExternalReferenceResolver";
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
@@ -50,7 +54,9 @@ const pluginContext = {
     "@eclipse-glsp/server/browser.js": glspServerBrowser,
     "@eclipse-glsp/protocol": glspProtocol,
     "@eclipse-glsp/graph": glspGraph,
-    inversify
+    inversify,
+    "vscode-jsonrpc": vscodeJsonrpc,
+    "vscode-languageserver-types": vscodeLanguageserverTypes
 };
 
 initializePluginContext(pluginContext);
@@ -108,8 +114,14 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
         resolvedPlugins.map((plugin) => plugin.languagePlugin),
         pluginContext
     );
-    const generatedSharedModule: Module<LangiumSharedCoreServices, LangiumGeneratedSharedCoreServices> = {
-        AstReflection: () => languageModule.reflection
+    const generatedSharedModule: Module<
+        LangiumSharedCoreServices,
+        LangiumGeneratedSharedCoreServices & ExternalReferenceSharedAdditionalServices
+    > = {
+        AstReflection: () => languageModule.reflection,
+        references: {
+            ExternalReferenceResolver: () => new NoopExternalReferenceResolver()
+        }
     };
     const glspModule = createGLSPModule(pluginContext);
 

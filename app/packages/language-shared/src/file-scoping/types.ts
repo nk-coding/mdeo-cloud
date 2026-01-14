@@ -33,7 +33,7 @@ export type ImportType<T extends AstNode> = ReturnType<typeof generateImportType
 
 /**
  * Type representing a file import statement that contains multiple entity imports.
- * Follows the pattern: `import { entity1, entity2 as alias } from "file"`
+ * Follows the pattern: `import { entity1, entity2 as alias } from "./file"`
  *
  * @template T The AstNode type being imported
  */

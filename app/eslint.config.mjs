@@ -5,7 +5,7 @@ import eslint from "@eslint/js";
 
 export default tseslint.config(
     {
-        ignores: ["packages/*/dist/"]
+        ignores: ["packages/*/dist/", "packages/*/static/"]
     },
     eslint.configs.recommended,
     prettierRecommended,

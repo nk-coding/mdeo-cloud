@@ -12,8 +12,9 @@ import type { FileScopingConfig } from "./config.js";
 import type { ASTType, BaseType } from "@mdeo/language-common";
 import type { FileImportType } from "./types.js";
 import { sharedImport } from "../sharedImport.js";
+import { resolveRelativePath } from "./util.js";
 
-const { UriUtils, StreamScope, stream } = sharedImport("langium");
+const { StreamScope, stream } = sharedImport("langium");
 
 /**
  * Determines if the given reference info represents an import statement.
@@ -83,9 +84,7 @@ export function getExportetEntitiesFromRelativeFile<T extends AstNode>(
     types: BaseType<T>[],
     indexManager: IndexManager
 ) {
-    const currentUri = document.uri;
-    const dirname = UriUtils.dirname(currentUri);
-    const targetUri = UriUtils.joinPath(dirname, file).toString();
+    const targetUri = resolveRelativePath(document, file).toString();
     const astNodeDescriptions = types.flatMap((type) =>
         indexManager.allElements(type.name, new Set([targetUri])).toArray()
     );

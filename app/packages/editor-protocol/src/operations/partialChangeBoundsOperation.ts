@@ -5,24 +5,12 @@ import type { Operation, Dimension, Point } from "@eclipse-glsp/protocol";
  * Allows changing only size or position, and allows partial size changes as well.
  */
 export interface PartialChangeBoundsOperation extends Operation {
-    kind: typeof PartialChangeBoundsOperation.KIND;
+    kind: "partialChangeBounds";
 
     /**
      * The new partial bounds
      */
     newBounds: PartialElementAndBounds[];
-}
-
-export namespace PartialChangeBoundsOperation {
-    export const KIND = "partialChangeBounds";
-
-    export function create(newBounds: PartialElementAndBounds[]): PartialChangeBoundsOperation {
-        return {
-            kind: KIND,
-            isOperation: true,
-            newBounds
-        };
-    }
 }
 
 /**

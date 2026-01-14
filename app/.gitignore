@@ -1,4 +1,5 @@
 package-lock.json
 packages/**/dist
+packages/**/static
 packages/**/tsconfig.tsbuildinfo
 node_modules

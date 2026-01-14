@@ -53,6 +53,7 @@ data class ResolvedPlugin(
  *
  * @property id Unique identifier for the contribution plugin
  * @property languageId The language ID that this contribution plugin is associated with
+ * @property description Brief description of what this contribution plugin provides
  * @property additionalKeywords Optional array of additional keywords that this contribution plugin introduces
  * @property serverContributionPlugins Server contribution plugins as arbitrary JSON objects
  */
@@ -60,6 +61,7 @@ data class ResolvedPlugin(
 data class BackendContributionPlugin(
     val id: String,
     val languageId: String,
+    val description: String = "",
     val additionalKeywords: List<String> = emptyList(),
     val serverContributionPlugins: List<JsonObject> = emptyList()
 )

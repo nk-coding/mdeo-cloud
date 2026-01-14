@@ -22,6 +22,12 @@ export default defineConfig({
         port: 4242,
         host: "127.0.0.1",
         proxy: {
+            "/plugin/metamodel": {
+                target: "http://localhost:3000",
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/plugin\/metamodel/, "")
+            },
             "/api": {
                 target: "http://localhost:8080",
                 changeOrigin: true,

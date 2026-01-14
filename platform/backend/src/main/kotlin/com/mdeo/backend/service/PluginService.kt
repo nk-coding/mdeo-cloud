@@ -27,7 +27,7 @@ import java.util.*
 @kotlinx.serialization.Serializable
 data class PluginManifest(
     val id: String,
-    val url: String,
+    val url: String? = null,
     val name: String,
     val description: String,
     val icon: JsonArray,
@@ -67,9 +67,11 @@ data class ManifestEditorPlugin(
 class PluginService(config: PluginConfig) {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
+    private val pluginBaseUrl = config.baseUrl
     
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
+        .version(if (config.forceHttp1) HttpClient.Version.HTTP_1_1 else HttpClient.Version.HTTP_2)
         .build()
     
     /**
@@ -86,7 +88,7 @@ class PluginService(config: PluginConfig) {
                     val name = row[PluginsTable.name]
                     val description = row[PluginsTable.description]
                     val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
-                    createBackendPlugin(id, url, name, description, icon)
+                    createBackendPlugin(id, resolvePluginUrl(url), name, description, icon)
                 }
         }
     }
@@ -108,7 +110,7 @@ class PluginService(config: PluginConfig) {
                     val name = row[PluginsTable.name]
                     val description = row[PluginsTable.description]
                     val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
-                    createBackendPlugin(id, url, name, description, icon)
+                    createBackendPlugin(id, resolvePluginUrl(url), name, description, icon)
                 }
         }
     }
@@ -134,7 +136,7 @@ class PluginService(config: PluginConfig) {
             val description = row[PluginsTable.description]
             val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
             
-            success(createBackendPlugin(pluginId, url, name, description, icon))
+            success(createBackendPlugin(pluginId, resolvePluginUrl(url), name, description, icon))
         }
     }
     
@@ -243,10 +245,11 @@ class PluginService(config: PluginConfig) {
     private suspend fun fetchPluginManifest(url: String): PluginManifest {
         return withContext(Dispatchers.IO) {
             val request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+                .uri(URI.create(resolvePluginUrl(url)))
                 .GET()
                 .timeout(Duration.ofSeconds(30))
                 .build()
+            println("Fetching plugin manifest from '${request.uri()}'")
             
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             
@@ -288,6 +291,7 @@ class PluginService(config: PluginConfig) {
     private fun storeContributionPlugins(pluginId: UUID, contributionPlugins: List<JsonObject>, now: Instant) {
         for (cp in contributionPlugins) {
             val languageId = cp["languageId"]?.jsonPrimitive?.content ?: continue
+            val description = cp["description"]?.jsonPrimitive?.content ?: ""
             val additionalKeywords = cp["additionalKeywords"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
             val serverPlugins = cp["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
             
@@ -295,6 +299,7 @@ class PluginService(config: PluginConfig) {
                 it[id] = UUID.randomUUID()
                 it[ContributionPluginsTable.pluginId] = pluginId
                 it[ContributionPluginsTable.languageId] = languageId
+                it[ContributionPluginsTable.description] = description
                 it[ContributionPluginsTable.additionalKeywords] = Json.encodeToString(additionalKeywords)
                 it[ContributionPluginsTable.serverContributionPlugins] = Json.encodeToString(serverPlugins)
                 it[createdAt] = now
@@ -427,8 +432,10 @@ class PluginService(config: PluginConfig) {
                 }
                 .firstOrNull() ?: return@transaction null
             
-            val languagePlugin = rowToLanguagePlugin(result)
-            Pair(result[LanguagePluginsTable.pluginId], languagePlugin)
+            val pluginId = result[LanguagePluginsTable.pluginId]
+            val pluginUrl = getPluginUrl(pluginId) ?: return@transaction null
+            val languagePlugin = rowToLanguagePlugin(result, pluginUrl)
+            Pair(pluginId, languagePlugin)
         }
     }
     
@@ -436,7 +443,7 @@ class PluginService(config: PluginConfig) {
      * Gets the URL for a plugin.
      *
      * @param pluginId The UUID of the plugin
-     * @return The plugin URL, or null if not found
+     * @return The resolved plugin URL, or null if not found
      */
     fun getPluginUrl(pluginId: UUID): String? {
         return transaction {
@@ -444,6 +451,7 @@ class PluginService(config: PluginConfig) {
                 .where { PluginsTable.id eq pluginId }
                 .firstOrNull()
                 ?.get(PluginsTable.url)
+                ?.let { resolvePluginUrl(it) }
         }
     }
     
@@ -501,7 +509,7 @@ class PluginService(config: PluginConfig) {
         val languagePlugins = transaction {
             LanguagePluginsTable.selectAll()
                 .where { LanguagePluginsTable.pluginId eq pluginId }
-                .map { rowToLanguagePlugin(it) }
+                .map { rowToLanguagePlugin(it, url) }
         }
         
         val contributionPlugins = transaction {
@@ -531,6 +539,7 @@ class PluginService(config: PluginConfig) {
         return BackendContributionPlugin(
             id = row[ContributionPluginsTable.id].toString(),
             languageId = row[ContributionPluginsTable.languageId],
+            description = row[ContributionPluginsTable.description],
             additionalKeywords = json.decodeFromString<List<String>>(row[ContributionPluginsTable.additionalKeywords]),
             serverContributionPlugins = json.decodeFromString<List<JsonObject>>(row[ContributionPluginsTable.serverContributionPlugins])
         )
@@ -538,28 +547,62 @@ class PluginService(config: PluginConfig) {
     
     /**
      * Converts a database row to a BackendLanguagePlugin object.
+     * Resolves relative paths in serverPlugin and editorPlugin against the plugin URL.
      *
      * @param row The database result row
+     * @param pluginUrl The base URL of the plugin for resolving relative paths
      * @return The constructed BackendLanguagePlugin
      */
-    private fun rowToLanguagePlugin(row: ResultRow): BackendLanguagePlugin {
+    private fun rowToLanguagePlugin(row: ResultRow, pluginUrl: String): BackendLanguagePlugin {
+        val baseUrl = if (pluginUrl.endsWith("/")) pluginUrl.dropLast(1) else pluginUrl
+        
         return BackendLanguagePlugin(
             id = row[LanguagePluginsTable.id],
             name = row[LanguagePluginsTable.name],
             extension = row[LanguagePluginsTable.extension],
             defaultContent = row[LanguagePluginsTable.defaultContent],
             serverPlugin = LanguageServerPlugin(
-                import = row[LanguagePluginsTable.serverPluginImport]
+                import = resolveUrl(row[LanguagePluginsTable.serverPluginImport], baseUrl)
             ),
             editorPlugin = row[LanguagePluginsTable.editorPluginImport]?.let { importPath ->
                 LanguageEditorPlugin(
-                    import = importPath,
-                    stylesUrl = row[LanguagePluginsTable.editorStylesUrl] ?: ""
+                    import = resolveUrl(importPath, baseUrl),
+                    stylesUrl = resolveUrl(row[LanguagePluginsTable.editorStylesUrl] ?: "", baseUrl)
                 )
             },
             languageConfiguration = json.parseToJsonElement(row[LanguagePluginsTable.languageConfiguration]).jsonObject,
             monarchTokensProvider = json.parseToJsonElement(row[LanguagePluginsTable.monarchTokensProvider]).jsonObject,
             icon = json.parseToJsonElement(row[LanguagePluginsTable.icon]).jsonArray
         )
+    }
+    
+    /**
+     * Resolves a potentially relative URL against a base URL.
+     * If the path starts with "./" or is relative (not starting with http:// or https://),
+     * it is resolved against the base URL.
+     *
+     * @param path The path to resolve (may be relative or absolute)
+     * @param baseUrl The base URL to resolve relative paths against
+     * @return The resolved absolute URL
+     */
+    private fun resolveUrl(path: String, baseUrl: String): String {
+        if (path.isEmpty()) return path
+        
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return path
+        }
+
+        return URI.create(baseUrl).resolve(path).toString()
+    }
+    
+    /**
+     * Resolves a plugin URL against the configured base URL.
+     * This is used to dynamically resolve plugin URLs when returning them to clients.
+     *
+     * @param pluginUrl The stored plugin URL (may be relative or absolute)
+     * @return The resolved absolute plugin URL
+     */
+    private fun resolvePluginUrl(pluginUrl: String): String {
+        return resolveUrl(pluginUrl, pluginBaseUrl)
     }
 }

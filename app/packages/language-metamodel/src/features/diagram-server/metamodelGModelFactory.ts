@@ -2,7 +2,6 @@ import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
 import { sharedImport, BaseGModelFactory } from "@mdeo/language-shared";
 import type { GraphMetadata, ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
-import { EdgeVisualMetadata, EdgePlacementMetadata } from "@mdeo/editor-protocol";
 import type { PartialAstNode } from "@mdeo/language-common";
 import type { SingleMultiplicityType, RangeMultiplicityType } from "../../grammar/metamodelTypes.js";
 import type {
@@ -21,6 +20,7 @@ import { PropertyLabel } from "./model/propertyLabel.js";
 import { AssociationEndLabel } from "./model/associationEndLabel.js";
 import { ClassCompartment } from "./model/classCompartment.js";
 import { ClassDivider } from "./model/classDivider.js";
+import { EdgePlacementMetadataUtil, EdgeVisualMetadataUtil } from "./metadataTypes.js";
 
 const { injectable } = sharedImport("inversify");
 const { GGraph } = sharedImport("@eclipse-glsp/server");
@@ -414,7 +414,11 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         const label = AssociationEndLabel.builder().id(labelId).text(text).build();
 
         const labelMeta = validatedMetadata.nodes[labelId];
-        if (labelMeta != undefined && labelMeta.meta != undefined && EdgePlacementMetadata.isValid(labelMeta.meta)) {
+        if (
+            labelMeta != undefined &&
+            labelMeta.meta != undefined &&
+            EdgePlacementMetadataUtil.isValid(labelMeta.meta)
+        ) {
             const placement = labelMeta.meta;
             label.edgePlacement = {
                 position: placement.position,
@@ -441,7 +445,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param metadata Metadata containing routing points
      */
     private applyRoutingPoints(edge: InheritanceEdge | AssociationEdge, metadata: { meta?: object } | undefined): void {
-        if (metadata != undefined && metadata.meta != undefined && EdgeVisualMetadata.isValid(metadata.meta)) {
+        if (metadata != undefined && metadata.meta != undefined && EdgeVisualMetadataUtil.isValid(metadata.meta)) {
             edge.routingPoints = metadata.meta.routingPoints;
         }
     }
