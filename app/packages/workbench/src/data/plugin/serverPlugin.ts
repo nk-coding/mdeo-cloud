@@ -8,5 +8,5 @@ export interface ServerPlugin extends LanguageServerPlugin, Pick<LanguagePlugin,
     /**
      * Registered contribution plugins for this langauge
      */
-    contributionPlugins: ServerContributionPlugin[]
+    contributionPlugins: ServerContributionPlugin[];
 }

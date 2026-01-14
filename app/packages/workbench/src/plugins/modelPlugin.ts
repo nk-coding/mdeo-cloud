@@ -19,7 +19,7 @@ export const modelPlugin: ResolvedWorkbenchLanguagePlugin = {
     languageConfiguration: defaultLanguageConfiguration,
     monarchTokensProvider: {
         ...defaultMonarchTokenProvider,
-        keywords: []
+        keywords: ["using"]
     },
     icon: convertIcon(Network).map((entry) => {
         if (entry[0] === "rect") {

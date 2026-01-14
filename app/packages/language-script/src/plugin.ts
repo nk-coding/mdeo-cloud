@@ -1,4 +1,11 @@
-import { HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT, WS, type LangiumLanguagePlugin, type LangiumLanguagePluginProvider } from "@mdeo/language-common";
+import {
+    HIDDEN_NEWLINE,
+    ML_COMMENT,
+    SL_COMMENT,
+    WS,
+    type LangiumLanguagePlugin,
+    type LangiumLanguagePluginProvider
+} from "@mdeo/language-common";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,

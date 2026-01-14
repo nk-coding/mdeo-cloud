@@ -754,8 +754,11 @@ export class HttpBackendApi implements BackendApi {
 
     async getFileData(projectId: string, path: string, key: string): Promise<ApiResult<string, FileDataError>> {
         const params = new URLSearchParams({ path });
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/file-data/${encodeURIComponent(key)}?${params}`, {
-            method: "GET"
-        });
+        return this.fetchApiResult(
+            `${this.baseUrl}/projects/${projectId}/file-data/${encodeURIComponent(key)}?${params}`,
+            {
+                method: "GET"
+            }
+        );
     }
 }

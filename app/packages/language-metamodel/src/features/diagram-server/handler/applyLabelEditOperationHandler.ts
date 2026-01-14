@@ -18,7 +18,7 @@ export class ApplyLabelEditOperationHandler extends BaseApplyLabelEditOperationH
             if (nameNode != undefined) {
                 return this.createRenameWorkspaceEdit(nameNode, operation.text);
             }
-        } else if (this.reflection.isInstance(node,  ClassImport)) {
+        } else if (this.reflection.isInstance(node, ClassImport)) {
             const nameNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
             if (nameNode != undefined) {
                 return this.createRenameWorkspaceEdit(nameNode, operation.text);

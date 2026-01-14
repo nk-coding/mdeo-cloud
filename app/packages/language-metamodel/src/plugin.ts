@@ -1,5 +1,12 @@
 import { MetaModelRule } from "./grammar/metamodelRules.js";
-import { type LangiumLanguagePlugin, WS, ML_COMMENT, SL_COMMENT, HIDDEN_NEWLINE, type LangiumLanguagePluginProvider } from "@mdeo/language-common";
+import {
+    type LangiumLanguagePlugin,
+    WS,
+    ML_COMMENT,
+    SL_COMMENT,
+    HIDDEN_NEWLINE,
+    type LangiumLanguagePluginProvider
+} from "@mdeo/language-common";
 import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
@@ -7,9 +14,11 @@ import {
     SerializerFormatter,
     registerDefaultTokenSerializers
 } from "@mdeo/language-shared";
-import { MetamodelScopeProvider } from "./features/scopeProvider.js";
+import { MetamodelScopeProvider } from "./features/metamodelScopeProvider.js";
 import { registerMetamodelSerializers } from "./features/metamodelSerializers.js";
 import { MetamodelDiagramModule } from "./features/diagram-server/metamodelDiagramModule.js";
+import { MetamodelNameProvider } from "./features/metamodelNameProvider.js";
+import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.js";
 
 /**
  * The additional services for the Metamodel language.
@@ -29,7 +38,9 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
             ValueConverter: () => new IdValueConverter()
         },
         references: {
-            ScopeProvider: (services) => new MetamodelScopeProvider(services)
+            ScopeProvider: (services) => new MetamodelScopeProvider(services),
+            NameProvider: (services) => new MetamodelNameProvider(services),
+            ScopeComputation: (services) => new MetamodelScopeComputation(services)
         },
         lsp: {
             Formatter: (services) => new SerializerFormatter(services)

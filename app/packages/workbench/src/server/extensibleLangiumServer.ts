@@ -84,14 +84,13 @@ async function requestPluginsFromClient(): Promise<ServerPlugin[]> {
 }
 
 const resolvedPlugins: ResolvedServerLanguagePlugin[] = await Promise.all(
-    plugins
-        .map(async (plugin) => {
-            const module = (await import(/* @vite-ignore */ plugin.import)).default as LangiumLanguagePluginProvider<any>;
-            return {
-                ...plugin,
-                languagePlugin: module.create(plugin.contributionPlugins)
-            };
-        })
+    plugins.map(async (plugin) => {
+        const module = (await import(/* @vite-ignore */ plugin.import)).default as LangiumLanguagePluginProvider<any>;
+        return {
+            ...plugin,
+            languagePlugin: module.create(plugin.contributionPlugins)
+        };
+    })
 );
 
 const connection = createConnection(messageReader, messageWriter);

@@ -19,12 +19,12 @@ export const metamodelPlugin: ResolvedWorkbenchLanguagePlugin = {
     },
     editorPlugin: {
         containerConfiguration: metamodelEditorPlugin,
-        stylesUrl: editorMetamodelStylesUrl,
+        stylesUrl: editorMetamodelStylesUrl
     },
     languageConfiguration: defaultLanguageConfiguration,
     monarchTokensProvider: {
         ...defaultMonarchTokenProvider,
-        keywords: ["class", "extends", "abstract", "import", "from"]
+        keywords: ["class", "extends", "abstract", "import", "from", "as"]
     },
     icon: convertIcon(Network),
     contributionPlugins: []

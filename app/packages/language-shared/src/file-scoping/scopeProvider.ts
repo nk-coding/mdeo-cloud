@@ -59,12 +59,36 @@ export function getExportedEntitiesFromGlobalScope<T extends AstNode>(
     config: FileScopingConfig<T>,
     indexManager: IndexManager
 ): Scope {
+    return getExportetEntitiesFromRelativeFile(
+        document,
+        (referenceInfo.container.$container as ASTType<FileImportType<T>>).file,
+        [config.type],
+        indexManager
+    );
+}
+
+/**
+ * Retrieves exported entities from a file specified by a relative path.
+ *
+ * @template T The AST node type of the entities being imported
+ * @param document The current document where the import statement appears
+ * @param file The relative file path to import entities from
+ * @param types The base type of the entities to retrieve
+ * @param indexManager The index manager used to query exported entities across files
+ * @returns A scope containing all exported entities from the specified file that match the given type
+ */
+export function getExportetEntitiesFromRelativeFile<T extends AstNode>(
+    document: LangiumDocument,
+    file: string,
+    types: BaseType<T>[],
+    indexManager: IndexManager
+) {
     const currentUri = document.uri;
-    const uris = new Set<string>();
     const dirname = UriUtils.dirname(currentUri);
-    const fileImport = referenceInfo.container.$container as ASTType<FileImportType<T>>;
-    uris.add(UriUtils.joinPath(dirname, fileImport.file).toString());
-    const astNodeDescriptions = indexManager.allElements(config.type.name, uris).toArray();
+    const targetUri = UriUtils.joinPath(dirname, file).toString();
+    const astNodeDescriptions = types.flatMap((type) =>
+        indexManager.allElements(type.name, new Set([targetUri])).toArray()
+    );
     return new StreamScope(stream(astNodeDescriptions));
 }
 

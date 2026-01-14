@@ -63,11 +63,11 @@ export class UpdateLabelEditCommand extends Command {
         );
     }
 
-    override undo(context: CommandExecutionContext): CommandReturn {
+    override undo(): CommandReturn {
         throw new Error("Method not implemented.");
     }
 
-    override redo(context: CommandExecutionContext): CommandReturn {
+    override redo(): CommandReturn {
         throw new Error("Method not implemented.");
     }
 }

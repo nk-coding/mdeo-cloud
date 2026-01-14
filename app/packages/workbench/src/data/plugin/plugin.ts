@@ -15,7 +15,7 @@ export interface WorkbenchPlugin extends Omit<Plugin, "languagePlugins"> {
  * A resolved version of the langauge plugin, where import of the editor plugin is already handled
  */
 export interface WorkbenchLanguagePlugin extends Omit<LanguagePlugin, "editorPlugin"> {
-     /**
+    /**
      * Editor plugin for the language, if undefined no graphical editor will be provided
      */
     editorPlugin: WorkbenchLanguageEditorPlugin | undefined;
@@ -25,7 +25,6 @@ export interface WorkbenchLanguagePlugin extends Omit<LanguagePlugin, "editorPlu
  * An extension to the resolved language plugin with the associated contribution plugins
  */
 export interface ResolvedWorkbenchLanguagePlugin extends WorkbenchLanguagePlugin {
-
     /**
      * Language contribution plugins associated with this language plugin
      */

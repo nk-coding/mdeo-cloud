@@ -340,9 +340,5 @@ export interface BackendApi {
      * @returns A promise that resolves to an ApiResult containing the computed data as a string
      *          Possible errors: NotFound, NoPlugin, CycleDetected, PluginError, Unavailable, Unknown
      */
-    getFileData(
-        projectId: string,
-        path: string,
-        key: string,
-    ): Promise<ApiResult<string, FileDataError>>;
+    getFileData(projectId: string, path: string, key: string): Promise<ApiResult<string, FileDataError>>;
 }
