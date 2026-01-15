@@ -1,8 +1,9 @@
 import type { LangiumCoreServices } from "langium";
 import { sharedImport } from "../sharedImport.js";
-import type {
-    ExternalReferenceAdditionalServices,
-    ExternalReferenceSharedAdditionalServices
+import {
+    type ExternalReferenceAdditionalServices,
+    type ExternalReferences,
+    type ExternalReferenceSharedAdditionalServices
 } from "@mdeo/language-common";
 
 const { DocumentState } = sharedImport("langium");
@@ -25,7 +26,10 @@ export function addExternalReferenceCollectionPhase(
         const references = externalReferenceCollector.findExternalReferences(
             docs.filter((doc) => doc.textDocument.languageId === services.LanguageMetaData.languageId)
         );
-        const missingReferences = references.filter((uri) => !LangiumDocuments.hasDocument(uri));
-        await Promise.all(missingReferences.map((uri) => externalReferenceResolver.loadExternalDocument(uri)));
+        const missingReferences: ExternalReferences = {
+            local: references.local.filter((uri) => !LangiumDocuments.hasDocument(uri)),
+            external: references.external.filter((uri) => !LangiumDocuments.hasDocument(uri))
+        };
+        await externalReferenceResolver.loadExternalDocuments(missingReferences);
     });
 }

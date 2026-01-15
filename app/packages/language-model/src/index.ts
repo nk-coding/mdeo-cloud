@@ -1,3 +1,4 @@
+export * from "./features/modelExternalReferenceCollector.js";
 export * from "./features/modelScopeProvider.js";
 export * from "./grammar/modelRules.js";
 export * from "./grammar/modelTypes.js";

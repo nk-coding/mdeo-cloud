@@ -51,13 +51,28 @@ object FilesTable : Table("files") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val path = varchar("path", 1024)
     val fileType = integer("file_type")
-    val content = binary("content").nullable()
-    val children = text("children").nullable()
+    val content = text("content").nullable()
     val version = integer("version").default(1)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
     
     override val primaryKey = PrimaryKey(projectId, path)
+}
+
+/**
+ * File children table schema for storing directory child relationships.
+ */
+object FileChildrenTable : Table("file_children") {
+    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
+    val parentPath = varchar("parent_path", 1024)
+    val childName = varchar("child_name", 255)
+    val childType = integer("child_type")
+    
+    override val primaryKey = PrimaryKey(projectId, parentPath, childName)
+    
+    init {
+        index(false, projectId, parentPath)
+    }
 }
 
 /**

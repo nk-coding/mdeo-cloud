@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-3">
         <div class="flex items-start justify-between gap-4">
-            <h2 class="text-2xl font-semibold text-foreground">
+            <h2 class="text-2xl font-semibold text-foreground flex-1 truncate">
                 {{ plugin.name }}
             </h2>
             <slot name="actions"></slot>

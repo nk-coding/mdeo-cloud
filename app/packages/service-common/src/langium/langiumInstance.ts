@@ -8,8 +8,10 @@ import type { BackendExternalReferencesResolver } from "./backendExternalReferen
 
 /**
  * A managed Langium instance with its services and state
+ *
+ * @template T Additional services provided by the service layer
  */
-export class LangiumInstance {
+export class LangiumInstance<T> {
     /**
      * Flag if the instance is currently busy processing a request
      */
@@ -22,14 +24,14 @@ export class LangiumInstance {
 
     /**
      * Creates a new Langium instance
-     * 
+     *
      * @param id the unique identifier for the instance
      * @param services The Langium services for this instance
      * @param contributionPluginKey Key identifying the contribution plugin configuration
      */
     constructor(
         readonly id: string,
-        readonly services: LanguageServices & ServiceAdditionalServices,
+        readonly services: LanguageServices & ServiceAdditionalServices & T,
         readonly contributionPluginKey: ContributionPluginKey
     ) {}
 
@@ -37,7 +39,7 @@ export class LangiumInstance {
      * Configures the instance for a new request
      * Must be called before using the instance
      * Cannot be called if the instance is already busy
-     * 
+     *
      * @param jwt the JWT for authentication
      * @param project the project context
      */
@@ -60,6 +62,7 @@ export class LangiumInstance {
             throw new Error(`Langium instance ${this.id} is not busy`);
         }
         this.services.shared.ServerApi.clearContext();
+        this.services.shared.ServerApi.resetTrackedRequests();
         const documents = this.services.shared.workspace.LangiumDocuments.all.toArray();
         for (const doc of documents) {
             this.services.shared.workspace.LangiumDocuments.deleteDocument(doc.uri);
@@ -71,7 +74,7 @@ export class LangiumInstance {
     /**
      * Builds the document at the given URI, ensuring all references are resolved.
      * Handles external references via the BackendExternalReferencesResolver.
-     * 
+     *
      * @param uri The URI of the document to build
      * @returns The built Langium document
      */
@@ -79,12 +82,13 @@ export class LangiumInstance {
         let hasLoadedDocuments = true;
         const builder = this.services.shared.workspace.DocumentBuilder;
         const documents = this.services.shared.workspace.LangiumDocuments;
-        const externalReferenceResolver = this.services.shared.references.ExternalReferenceResolver as BackendExternalReferencesResolver;
+        const externalReferenceResolver = this.services.shared.references
+            .ExternalReferenceResolver as BackendExternalReferencesResolver;
         while (hasLoadedDocuments) {
             const tokenSource = new CancellationTokenSource();
             externalReferenceResolver.setCancellationTokenSource(tokenSource);
             try {
-                await builder.build(documents.all.toArray(), { validation: true}, tokenSource.token);
+                await builder.build(documents.all.toArray(), { validation: true }, tokenSource.token);
             } catch (e) {
                 if (!isOperationCancelled(e)) {
                     throw e;

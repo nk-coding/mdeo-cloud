@@ -29,6 +29,22 @@
                     <div v-if="selectedPlugin != undefined" class="space-y-6">
                         <PluginDetails :plugin="selectedPlugin">
                             <template #actions>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="icon-sm"
+                                            :disabled="refreshingPluginId === selectedPlugin.id"
+                                            @click="handleRefreshPlugin"
+                                        >
+                                            <RefreshCw
+                                                class="w-4 h-4"
+                                                :class="{ 'animate-spin': refreshingPluginId === selectedPlugin.id }"
+                                            />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Refresh plugin</TooltipContent>
+                                </Tooltip>
                                 <Button
                                     variant="destructive"
                                     size="sm"
@@ -90,9 +106,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { PlusCircle, Trash2 } from "lucide-vue-next";
+import { PlusCircle, Trash2, RefreshCw } from "lucide-vue-next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
 import SidebarMenuButtonChild from "@/components/ui/sidebar/SidebarMenuButtonChild.vue";
 import PluginList from "@/components/plugins/PluginList.vue";
@@ -122,6 +139,7 @@ const isAdding = ref(false);
 const addError = ref("");
 const selectedEntry = ref<"add" | string>("add");
 const deletingPluginId = ref<string>();
+const refreshingPluginId = ref<string>();
 const hasLoaded = ref(false);
 
 const selectedPlugin = computed(() => {
@@ -205,6 +223,22 @@ const showDeleteDialog = ref(false);
 
 function openDeleteDialog() {
     showDeleteDialog.value = true;
+}
+
+async function handleRefreshPlugin() {
+    if (selectedPlugin.value == undefined) {
+        return;
+    }
+    const pluginId = selectedPlugin.value.id;
+    refreshingPluginId.value = pluginId;
+    try {
+        const result = await props.backendApi.refreshPlugin(pluginId);
+        if (result.success) {
+            await loadPlugins(pluginId);
+        }
+    } finally {
+        refreshingPluginId.value = undefined;
+    }
 }
 
 async function confirmDelete() {

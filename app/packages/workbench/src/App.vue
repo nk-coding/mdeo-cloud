@@ -1,13 +1,15 @@
 <template>
-    <Workbench v-if="workspaceState != undefined" :workbenchState="workspaceState" :auth-state="authState" />
-    <div v-else-if="!isCheckingAuth" class="flex h-screen w-screen">
-        <div class="flex h-full border-r border-border/60">
-            <BaseSidebarRail />
+    <TooltipProvider>
+        <Workbench v-if="workspaceState != undefined" :workbenchState="workspaceState" :auth-state="authState" />
+        <div v-else-if="!isCheckingAuth" class="flex h-screen w-screen">
+            <div class="flex h-full border-r border-border/60">
+                <BaseSidebarRail />
+            </div>
+            <div class="flex flex-1 items-center justify-center px-4 py-10">
+                <LoginCard :auth-state="authState" @success="handleAuthSuccess" />
+            </div>
         </div>
-        <div class="flex flex-1 items-center justify-center px-4 py-10">
-            <LoginCard :auth-state="authState" @success="handleAuthSuccess" />
-        </div>
-    </div>
+    </TooltipProvider>
 </template>
 <script setup lang="ts">
 import { inject, shallowRef, onMounted, ref } from "vue";
@@ -21,6 +23,7 @@ import BaseSidebarRail from "./components/sidebar/BaseSidebarRail.vue";
 import { useColorMode } from "@vueuse/core";
 import { convertIcon } from "./lib/convertIcon";
 import { Plug } from "lucide";
+import { TooltipProvider } from "./components/ui/tooltip";
 
 const monaco = inject(monacoApiProviderKey)!;
 const backendApi = new HttpBackendApi();

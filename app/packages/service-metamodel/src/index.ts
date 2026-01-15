@@ -6,9 +6,11 @@ import {
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
-    initializePluginContext
+    initializePluginContext,
+    astHandler,
+    AST_HANDLER_KEY
 } from "@mdeo/service-common";
-import { astHandler } from "./handlers/astHandler.js";
+import type { MetamodelServices } from "@mdeo/language-metamodel";
 
 /**
  * Plugin definition for the metamodel service
@@ -46,12 +48,12 @@ const { metamodelPluginProvider } = await import("@mdeo/language-metamodel");
 
 const envConfig = parseServiceConfigFromEnv();
 
-const config: ServiceConfig = {
+const config: ServiceConfig<MetamodelServices> = {
     ...envConfig,
     plugin: metamodelServicePlugin,
     languagePluginProvider: metamodelPluginProvider,
     handlers: {
-        ast: astHandler
+        [AST_HANDLER_KEY]: astHandler
     }
 };
 

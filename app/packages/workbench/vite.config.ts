@@ -28,6 +28,12 @@ export default defineConfig({
                 secure: false,
                 rewrite: (path) => path.replace(/^\/plugin\/metamodel/, "")
             },
+            "/plugin/model": {
+                target: "http://localhost:3001",
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/plugin\/model/, "")
+            },
             "/api": {
                 target: "http://localhost:8080",
                 changeOrigin: true,

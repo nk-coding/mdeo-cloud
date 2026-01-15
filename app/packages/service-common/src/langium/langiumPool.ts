@@ -16,12 +16,11 @@ import type { ContributionPluginKey } from "../service/types.js";
 import { createDefaultModule, createDefaultSharedModule } from "langium/lsp";
 import * as langium from "langium";
 import * as langiumGrammar from "langium/grammar";
-import type {
-    ServiceAdditionalSharedServices,
-    LangiumPoolConfig,
-} from "./types.js";
+import type { ServiceAdditionalSharedServices, LangiumPoolConfig } from "./types.js";
 import { BackendExternalReferencesResolver } from "./backendExternalReferencesResolver.js";
 import { LangiumInstance } from "./langiumInstance.js";
+import { JsonAstSerializer } from "./jsonAstSerializer.js";
+import { ExtendedIndexManager } from "./extendedIndexManager.js";
 
 /**
  * Manages a pool of Langium instances for handling file data requests.
@@ -30,12 +29,11 @@ import { LangiumInstance } from "./langiumInstance.js";
  * Instances are reused when the same configuration is requested, and
  * evicted based on LRU when the pool is full.
  */
-export class LangiumInstancePool {
+export class LangiumInstancePool<T> {
     /**
      * Map of instance IDs to Langium instances
      */
-    private readonly instances: Map<string, LangiumInstance> = new Map();
-
+    private readonly instances: Map<string, LangiumInstance<T>> = new Map();
     /**
      * Counter for generating unique instance IDs
      */
@@ -44,7 +42,7 @@ export class LangiumInstancePool {
     /**
      * Queue of waiters for instances when all are busy
      */
-    private readonly instanceWaitQueue: ((instance: LangiumInstance) => void)[] = [];
+    private readonly instanceWaitQueue: ((instance: LangiumInstance<T>) => void)[] = [];
 
     constructor(private readonly config: LangiumPoolConfig) {
         this.config = config;
@@ -54,7 +52,7 @@ export class LangiumInstancePool {
      * Generates a unique key for a contribution plugin configuration.
      * Uses a stable JSON representation of the sorted plugins.
      *
-     * @param contributionPlugins - Array of contribution plugin configurations
+     * @param contributionPlugins Array of contribution plugin configurations
      * @returns A unique string key identifying this configuration
      */
     private generateContributionKey(contributionPlugins: ServerContributionPlugin[]): ContributionPluginKey {
@@ -69,21 +67,21 @@ export class LangiumInstancePool {
      * Acquires a Langium instance for the given contribution plugins.
      * This method handles instance creation, reuse, and eviction.
      *
-     * @param contributionPlugins - The contribution plugins configuration
-     * @param jwt - The JWT token for this request
-     * @param project - The project context for this request
+     * @param contributionPlugins The contribution plugins configuration
+     * @param jwt The JWT token for this request
+     * @param project The project context for this request
      * @returns Promise resolving to the acquired Langium instance
      */
     async acquire(
         contributionPlugins: ServerContributionPlugin[],
         jwt: string,
         project: string
-    ): Promise<LangiumInstance> {
+    ): Promise<LangiumInstance<T>> {
         const key = this.generateContributionKey(contributionPlugins);
 
-        let instance: LangiumInstance | undefined = undefined;
+        let instance: LangiumInstance<T> | undefined = undefined;
 
-        for (const [instanceId, candidate] of this.instances) {
+        for (const candidate of this.instances.values()) {
             if (candidate.contributionPluginKey === key) {
                 if (!candidate.busy) {
                     instance = candidate;
@@ -112,8 +110,8 @@ export class LangiumInstancePool {
     private async evictOrWait(
         key: ContributionPluginKey,
         contributionPlugins: ServerContributionPlugin[]
-    ): Promise<LangiumInstance> {
-        let oldestAvailable: LangiumInstance | undefined = undefined;
+    ): Promise<LangiumInstance<T>> {
+        let oldestAvailable: LangiumInstance<T> | undefined = undefined;
 
         for (const instance of this.instances.values()) {
             if (instance.contributionPluginKey !== key && !instance.busy) {
@@ -128,7 +126,7 @@ export class LangiumInstancePool {
             return this.createInstance(contributionPlugins, key);
         }
 
-        return new Promise<LangiumInstance>((resolve) => {
+        return new Promise<LangiumInstance<T>>((resolve) => {
             this.instanceWaitQueue.push((availableInstance) => {
                 if (availableInstance.contributionPluginKey === key) {
                     resolve(availableInstance);
@@ -145,10 +143,10 @@ export class LangiumInstancePool {
      * Releases an instance after request handling is complete.
      * Clears the JWT and marks the instance as available.
      *
-     * @param instance - The instance to release
+     * @param instance The instance to release
      */
-    release(instance: LangiumInstance): void {
-        instance.reset()
+    release(instance: LangiumInstance<T>): void {
+        instance.reset();
         if (this.instanceWaitQueue.length > 0) {
             const waiter = this.instanceWaitQueue.shift()!;
             waiter(instance);
@@ -158,14 +156,14 @@ export class LangiumInstancePool {
     /**
      * Creates a new Langium instance with the given configuration.
      *
-     * @param contributionPlugins - The contribution plugins for this instance
-     * @param key - The contribution plugin key
+     * @param contributionPlugins The contribution plugins for this instance
+     * @param key The contribution plugin key
      * @returns Promise resolving to the created Langium instance
      */
     private createInstance(
         contributionPlugins: ServerContributionPlugin[],
         key: ContributionPluginKey
-    ): LangiumInstance {
+    ): LangiumInstance<T> {
         const plugin = this.config.languagePluginProvider.create(contributionPlugins);
 
         const languageModule = createModule([plugin], {
@@ -183,6 +181,12 @@ export class LangiumInstancePool {
             ServerApi: () => new HttpServerApi(this.config.backendUrl),
             references: {
                 ExternalReferenceResolver: (services) => new BackendExternalReferencesResolver(services)
+            },
+            serializer: {
+                JsonAstSerializer: (services) => new JsonAstSerializer(services)
+            },
+            workspace: {
+                IndexManager: (services) => new ExtendedIndexManager(services)
             }
         };
 
@@ -214,7 +218,7 @@ export class LangiumInstancePool {
             createDefaultModule({ shared }),
             generatedModule,
             plugin.module
-        ) as LanguageServices & { shared: ServiceAdditionalSharedServices };
+        ) as LanguageServices & { shared: ServiceAdditionalSharedServices } & T;
 
         shared.ServiceRegistry.register(services);
 
@@ -222,13 +226,8 @@ export class LangiumInstancePool {
             plugin.postCreate(services, { fileSystemProvider: () => fileSystemProvider });
         }
 
-        const newInstance = new LangiumInstance(
-            `instance-${++this.instanceCounter}`,
-            services,
-            key
-        )
+        const newInstance = new LangiumInstance(`instance-${++this.instanceCounter}`, services, key);
         this.instances.set(newInstance.id, newInstance);
         return newInstance;
     }
-
 }

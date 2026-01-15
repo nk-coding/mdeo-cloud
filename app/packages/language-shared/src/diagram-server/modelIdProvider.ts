@@ -52,7 +52,7 @@ export abstract class BaseModelIdProvider implements ModelIdProvider {
      */
     abstract getName(node: AstNode): string | undefined;
 
-    getAdditional(node: AstNode): AstNode[] {
+    getAdditional(_node: AstNode): AstNode[] {
         return [];
     }
 }

@@ -1,12 +1,10 @@
-import type { DirectoryEntry, FileDependency, DataDependency } from "./types.js";
+import type { DirectoryEntry } from "./types.js";
+import type { FileDependency, DataDependency, FileDataResult } from "../handler/types.js";
 
 /**
  * Tracked requests made during a file data computation
  */
-export interface TrackedRequests {
-    fileDependencies: FileDependency[];
-    dataDependencies: DataDependency[];
-}
+export type TrackedRequests = Pick<FileDataResult, "fileDependencies" | "dataDependencies">;
 
 /**
  * Interface for the server API injected into Langium services
@@ -35,11 +33,16 @@ export interface ServerApi {
     listDirectory(path: string): Promise<DirectoryEntry[]>;
 
     /**
-     * Gets the tracked requests made during the current computation and resets the tracking
+     * Gets the tracked requests made during the current computation
+     *
      * @returns The tracked requests
      */
-    getAndResetTrackedRequests(): TrackedRequests;
+    getTrackedRequests(): TrackedRequests;
 
+    /**
+     * Resets the tracked requests
+     */
+    resetTrackedRequests(): void;
 }
 
 /**
@@ -81,7 +84,7 @@ export class HttpServerApi implements ServerApi {
 
     /**
      * Creates a new HttpServerApi instance
-     * 
+     *
      * @param backendUrl The backend base URL
      */
     constructor(backendUrl: string) {
@@ -92,7 +95,7 @@ export class HttpServerApi implements ServerApi {
      * Sets the JWT token for subsequent API calls.
      * This should be called before handling each request.
      *
-     * @param jwt - The JWT token to use for authorization
+     * @param jwt The JWT token to use for authorization
      */
     setContext(jwt: string, project: string): void {
         this.jwt = jwt;
@@ -123,7 +126,7 @@ export class HttpServerApi implements ServerApi {
     /**
      * Reads a file from the backend.
      *
-     * @param path - The path of the file to read
+     * @param path The path of the file to read
      * @returns Promise resolving to the file content and version
      * @throws Error if the file cannot be read or JWT is not set
      */
@@ -155,8 +158,8 @@ export class HttpServerApi implements ServerApi {
     /**
      * Gets computed file data from the backend.
      *
-     * @param path - The path of the file
-     * @param key - The data key (e.g., "ast", "diagram")
+     * @param path The path of the file
+     * @param key The data key (e.g., "ast", "diagram")
      * @returns Promise resolving to the computed file data and version
      * @throws Error if the data cannot be retrieved or JWT is not set
      */
@@ -186,7 +189,7 @@ export class HttpServerApi implements ServerApi {
     /**
      * Lists files in a directory.
      *
-     * @param path - The directory path to list
+     * @param path The directory path to list
      * @returns Promise resolving to array of directory entries
      * @throws Error if the directory cannot be listed or JWT is not set
      */
@@ -209,21 +212,15 @@ export class HttpServerApi implements ServerApi {
         }));
     }
 
-    /**
-     * Gets the tracked requests made during the current computation and resets the tracking.
-     *
-     * @returns The tracked requests (file dependencies and data dependencies)
-     */
-    getAndResetTrackedRequests(): TrackedRequests {
-        const tracked: TrackedRequests = {
+    getTrackedRequests(): TrackedRequests {
+        return {
             fileDependencies: [...this.trackedFileDependencies],
             dataDependencies: [...this.trackedDataDependencies]
         };
-        
-        this.trackedFileDependencies = [];
-        this.trackedDataDependencies = [];
-        
-        return tracked;
     }
 
+    resetTrackedRequests(): void {
+        this.trackedFileDependencies = [];
+        this.trackedDataDependencies = [];
+    }
 }

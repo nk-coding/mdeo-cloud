@@ -86,6 +86,7 @@ import { workbenchStateKey } from "@/components/workbench/util";
 const props = defineProps<{
     open: boolean;
     projectId: string;
+    selectedPluginIdProp?: string;
 }>();
 
 const emit = defineEmits<{
@@ -172,6 +173,9 @@ watch(
     () => props.open,
     async (isOpen) => {
         if (isOpen) {
+            if (props.selectedPluginIdProp) {
+                selectedPluginId.value = props.selectedPluginIdProp;
+            }
             await loadPlugins();
         }
     }

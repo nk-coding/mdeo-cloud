@@ -1,9 +1,7 @@
-import type { LangiumLanguagePluginProvider, LanguageServices } from "@mdeo/language-common";
+import type { LangiumLanguagePluginProvider } from "@mdeo/language-common";
 import type { Plugin, LanguagePlugin } from "@mdeo/plugin";
 import type { FastifyInstance } from "fastify";
-import type { ServerApi } from "./serverApi.js";
-import type { URI } from "vscode-uri";
-import type { LangiumInstance } from "../langium/langiumInstance.js";
+import type { FileDataHandler, FileDataResult } from "../handler/types.js";
 
 /**
  * Plugin definition for the service.
@@ -23,100 +21,11 @@ export interface ServicePluginDefinition extends Omit<ServicePlugin, "languagePl
 }
 
 /**
- * Handler for file data computation requests
- * @template T The return type of the handler
- */
-export type FileDataHandler<T = unknown> = (context: FileDataContext) => Promise<FileDataResult<T>>;
-
-/**
- * Context provided to file data handlers
- */
-export interface FileDataContext {
-    /**
-     * The URI of the file, already registered in the Langium workspace
-     */
-    uri: URI;
-
-    /**
-     * The version of the file
-     */
-    version: number;
-
-    /**
-     * The Langium instance to use for processing
-     */
-    instance: LangiumInstance;
-
-    /**
-     * The Langium services for this language
-     */
-    services: LanguageServices;
-
-    /**
-     * Server API for accessing backend endpoints
-     */
-    serverApi: ServerApi;
-}
-
-/**
- * Result of a file data computation
- * @template T The type of the computed data
- */
-export interface FileDataResult<T = unknown> {
-    /**
-    * The computed data (JSON value)
-     */
-    data: T;
-
-    /**
-     * File dependencies (paths and versions)
-     */
-    fileDependencies?: FileDependency[];
-
-    /**
-     * Data dependencies (other file data computations)
-     */
-    dataDependencies?: DataDependency[];
-
-    /**
-     * Additional file data computed as part of this request
-     */
-    additionalFileData?: AdditionalFileData[];
-}
-
-/**
- * File dependency information
- */
-export interface FileDependency {
-    path: string;
-    version: number;
-}
-
-/**
- * Data dependency information
- */
-export interface DataDependency {
-    path: string;
-    key: string;
-    version: number;
-}
-
-/**
- * Additional file data computed as part of another computation
- */
-export interface AdditionalFileData {
-    path: string;
-    key: string;
-    data: any;
-    sourceVersion: number;
-    fileDependencies?: FileDependency[];
-    dataDependencies?: DataDependency[];
-}
-
-/**
  * Configuration for the language service
+ *
+ * @template T Type of additional services
  */
-export interface ServiceConfig {
+export interface ServiceConfig<T = object> {
     /**
      * Port to run the service on
      */
@@ -145,12 +54,12 @@ export interface ServiceConfig {
     /**
      * Langium language plugin provider
      */
-    languagePluginProvider: LangiumLanguagePluginProvider<any>;
+    languagePluginProvider: LangiumLanguagePluginProvider<T>;
 
     /**
      * File data handlers keyed by data key (e.g., "ast", "diagram")
      */
-    handlers: Record<string, FileDataHandler>;
+    handlers: Record<string, FileDataHandler<unknown, T>>;
 
     /**
      * Whether to serve static files (default: true)
@@ -167,8 +76,17 @@ export interface ServiceConfig {
  * Directory entry returned by listDirectory
  */
 export interface DirectoryEntry {
+    /**
+     * Name of the entry
+     */
     name: string;
+    /**
+     * Whether the entry is a file or directory
+     */
     isFile: boolean;
+    /**
+     * Whether the entry is a directory
+     */
     isDirectory: boolean;
 }
 
@@ -176,22 +94,32 @@ export interface DirectoryEntry {
  * Request body for file data computation
  */
 export interface FileDataComputeRequest {
+    /**
+     * Path to the file
+     */
     path: string;
+    /**
+     * Project identifier for the project the file belongs to
+     */
     project: string;
+    /**
+     * Version of the file
+     */
     version: number;
+    /**
+     * Content of the file
+     */
     content: string;
+    /**
+     * Contribution plugins to apply for this request
+     */
     contributionPlugins?: object[];
 }
 
 /**
  * Response body for file data computation
  */
-export interface FileDataComputeResponse {
-    data: any;
-    fileDependencies: FileDependency[];
-    dataDependencies: DataDependency[];
-    additionalFileData: AdditionalFileData[];
-}
+export type FileDataComputeResponse<T = unknown> = Required<FileDataResult<T>>;
 
 /**
  * Factory function type for creating a language service

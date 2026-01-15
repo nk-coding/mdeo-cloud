@@ -1,5 +1,5 @@
 <template>
-    <Card class="p-0 gap-0 flex-1">
+    <Card class="p-0 gap-0 flex-1 min-w-0">
         <ScrollArea class="h-full **:data-[slot=scroll-area-viewport]:rounded-none">
             <div class="p-6">
                 <div v-if="plugin" class="space-y-6">

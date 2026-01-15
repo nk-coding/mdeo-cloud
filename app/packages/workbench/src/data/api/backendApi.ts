@@ -210,6 +210,15 @@ export interface BackendApi {
     deletePlugin(pluginId: string): Promise<ApiResult<void, PluginError>>;
 
     /**
+     * Refreshes a plugin by re-fetching its manifest.
+     *
+     * @param pluginId The ID of the plugin to refresh
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: PluginNotFound, Unavailable, Unknown
+     */
+    refreshPlugin(pluginId: string): Promise<ApiResult<void, PluginError>>;
+
+    /**
      * Gets all plugins.
      *
      * @returns A promise that resolves to an ApiResult containing an array of plugins

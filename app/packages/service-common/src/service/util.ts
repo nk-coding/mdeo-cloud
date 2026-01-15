@@ -1,10 +1,11 @@
-import type { ServicePluginDefinition, ServicePlugin, FileDependency, DataDependency } from "./types.js";
+import type { ServicePluginDefinition, ServicePlugin } from "./types.js";
+import type { FileDependency, DataDependency } from "../handler/types.js";
 
 /**
  * Builds the plugin manifest for the GET / endpoint.
  * Relative URLs are kept relative - the backend will resolve them.
  *
- * @param plugin - The service plugin definition
+ * @param plugin The service plugin definition
  * @returns The plugin manifest object
  */
 export function buildManifest(plugin: ServicePluginDefinition): ServicePlugin {
@@ -21,8 +22,8 @@ export function buildManifest(plugin: ServicePluginDefinition): ServicePlugin {
 /**
  * Merges tracked file dependencies into existing dependencies, avoiding duplicates.
  *
- * @param existing - Existing file dependencies from handler result
- * @param tracked - Tracked file dependencies from ServerApi
+ * @param existing Existing file dependencies from handler result
+ * @param tracked Tracked file dependencies from ServerApi
  * @returns Merged array of file dependencies
  */
 export function mergeFileDependencies(existing: FileDependency[], tracked: FileDependency[]): FileDependency[] {
@@ -38,8 +39,8 @@ export function mergeFileDependencies(existing: FileDependency[], tracked: FileD
 /**
  * Merges tracked data dependencies into existing dependencies, avoiding duplicates.
  *
- * @param existing - Existing data dependencies from handler result
- * @param tracked - Tracked data dependencies from ServerApi
+ * @param existing Existing data dependencies from handler result
+ * @param tracked Tracked data dependencies from ServerApi
  * @returns Merged array of data dependencies
  */
 export function mergeDataDependencies(existing: DataDependency[], tracked: DataDependency[]): DataDependency[] {

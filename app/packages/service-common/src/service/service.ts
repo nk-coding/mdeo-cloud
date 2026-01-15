@@ -2,19 +2,19 @@ import Fastify, { type FastifyInstance, type FastifyRequest, type FastifyReply }
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { resolve } from "path";
-import type { ServiceConfig, FileDataComputeRequest, FileDataComputeResponse, ServicePlugin } from "./types.js";
+import type { ServiceConfig, FileDataComputeRequest, FileDataComputeResponse } from "./types.js";
 import { LangiumInstancePool } from "../langium/langiumPool.js";
 import type { ServerContributionPlugin } from "@mdeo/plugin";
 import { URI } from "vscode-uri";
-import { buildManifest, mergeDataDependencies, mergeFileDependencies } from "./util.js";
+import { buildManifest } from "./util.js";
 
 /**
  * Creates and configures a Fastify-based language service.
  *
- * @param config - The service configuration including plugin definition and handlers
+ * @param config The service configuration including plugin definition and handlers
  * @returns Promise resolving to a configured Fastify instance ready to be started
  */
-export async function createLanguageService(config: ServiceConfig): Promise<FastifyInstance> {
+export async function createLanguageService<T>(config: ServiceConfig<T>): Promise<FastifyInstance> {
     const fastify = Fastify({
         logger: {
             transport: {
@@ -37,7 +37,7 @@ export async function createLanguageService(config: ServiceConfig): Promise<Fast
         });
     }
 
-    const instancePool = new LangiumInstancePool({
+    const instancePool = new LangiumInstancePool<T>({
         maxInstances: config.maxLangiumInstances ?? 5,
         languagePluginProvider: config.languagePluginProvider,
         languageId: config.plugin.languagePlugin.id,
@@ -46,10 +46,6 @@ export async function createLanguageService(config: ServiceConfig): Promise<Fast
     });
 
     const manifest = buildManifest(config.plugin);
-
-    fastify.decorate("instancePool", instancePool);
-    fastify.decorate("handlers", config.handlers);
-    fastify.decorate("pluginDef", manifest);
 
     fastify.get("/", async (request: FastifyRequest, reply: FastifyReply) => {
         return reply.send(manifest);
@@ -87,21 +83,8 @@ export async function createLanguageService(config: ServiceConfig): Promise<Fast
                 serverApi: instance.services.shared.ServerApi
             });
 
-            const trackedRequests = instance.services.shared.ServerApi.getAndResetTrackedRequests();
-
-            const fileDependencies = mergeFileDependencies(
-                result.fileDependencies ?? [],
-                trackedRequests.fileDependencies
-            );
-            const dataDependencies = mergeDataDependencies(
-                result.dataDependencies ?? [],
-                trackedRequests.dataDependencies
-            );
-
             const response: FileDataComputeResponse = {
-                data: result.data,
-                fileDependencies,
-                dataDependencies,
+                ...result,
                 additionalFileData: result.additionalFileData ?? []
             };
 
@@ -118,10 +101,10 @@ export async function createLanguageService(config: ServiceConfig): Promise<Fast
  * Starts a language service with the given configuration.
  * The service will listen on the configured host and port.
  *
- * @param config - The service configuration
+ * @param config The service configuration
  * @returns Promise that resolves when the service has started
  */
-export async function startLanguageService(config: ServiceConfig): Promise<void> {
+export async function startLanguageService<T>(config: ServiceConfig<T>): Promise<void> {
     const fastify = await createLanguageService(config);
 
     try {
@@ -132,13 +115,5 @@ export async function startLanguageService(config: ServiceConfig): Promise<void>
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
-    }
-}
-
-declare module "fastify" {
-    interface FastifyInstance {
-        instancePool: LangiumInstancePool;
-        handlers: Record<string, unknown>;
-        pluginDef: ServicePlugin;
     }
 }

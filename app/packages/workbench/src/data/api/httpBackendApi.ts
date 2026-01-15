@@ -561,6 +561,12 @@ export class HttpBackendApi implements BackendApi {
         });
     }
 
+    async refreshPlugin(pluginId: string): Promise<ApiResult<void, PluginError>> {
+        return this.fetchApiResult(`${this.baseUrl}/plugins/${pluginId}/refresh`, {
+            method: "POST"
+        });
+    }
+
     async getPlugins(): Promise<ApiResult<BackendPlugin[], PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/plugins`, {});
     }

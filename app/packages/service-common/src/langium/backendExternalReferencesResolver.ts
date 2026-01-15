@@ -1,15 +1,15 @@
-import type { ExternalReferenceResolver } from "@mdeo/language-common";
-import { DocumentState, type LangiumDocuments, type LangiumSharedCoreServices } from "langium";
-import type { URI } from "vscode-uri";
-import type {  ServiceAdditionalSharedServices } from "./types.js";
+import type { ExternalReferenceResolver, ExternalReferences } from "@mdeo/language-common";
+import { URI, type LangiumDocuments, type LangiumSharedCoreServices } from "langium";
+import type { ServiceAdditionalSharedServices } from "./types.js";
 import type { ServerApi } from "../service/serverApi.js";
 import type { CancellationTokenSource } from "vscode-jsonrpc";
+import type { AstData, JsonAstSerializer } from "./jsonAstSerializer.js";
+import { AST_HANDLER_KEY } from "../handler/astHandler.js";
 
 /**
  * External reference resolver that utilizes backend services to resolve references
  */
 export class BackendExternalReferencesResolver implements ExternalReferenceResolver {
-
     /**
      * The server API for backend communication
      */
@@ -27,28 +27,81 @@ export class BackendExternalReferencesResolver implements ExternalReferenceResol
     private cancelationTokenSource: CancellationTokenSource | undefined;
 
     /**
+     * The AST serializer for deserializing AST nodes
+     */
+    protected readonly astSerializer: JsonAstSerializer;
+
+    /**
      * Creates a new backend external references resolver
-     * 
+     *
      * @param services The combined Langium core and service additional services
      */
     constructor(services: LangiumSharedCoreServices & ServiceAdditionalSharedServices) {
         this.serverApi = services.ServerApi;
         this.langiumDocuments = services.workspace.LangiumDocuments;
+        this.astSerializer = services.serializer.JsonAstSerializer;
     }
 
-    async loadExternalDocument(uri: URI): Promise<void> {
-        const source = await this.serverApi.readFile(uri.fsPath)
-        this.langiumDocuments.createDocument(uri, source.content)
-        this.cancelationTokenSource?.cancel();
+    async loadExternalDocuments(externalReferences: ExternalReferences): Promise<void> {
+        await Promise.all(
+            externalReferences.local.map(async (uri) => {
+                const source = await this.serverApi.readFile(uri.path);
+                this.langiumDocuments.createDocument(uri, source.content);
+                this.cancelationTokenSource?.cancel();
+            })
+        );
+
+        let pathsToLoad = this.filterPathsToLoad(externalReferences.external.map((ref) => ref.path));
+        const loadedPaths = new Set<string>();
+        const astDatas: AstData[] = [];
+        while (pathsToLoad.size > 0) {
+            const newAstDatas = await this.loadExternalAsts(pathsToLoad);
+            astDatas.push(...newAstDatas);
+            for (const path of pathsToLoad) {
+                loadedPaths.add(path);
+            }
+            pathsToLoad = this.filterPathsToLoad(
+                newAstDatas.flatMap((data) => data.linkDependencies).filter((path) => !loadedPaths.has(path))
+            );
+        }
+        this.astSerializer.deserializeDocuments(astDatas);
+    }
+
+    /**
+     * Loads external ASTs from the backend for the given paths
+     *
+     * @param paths The set of paths to load
+     * @returns The loaded AST datas
+     */
+    private async loadExternalAsts(paths: Set<string>): Promise<AstData[]> {
+        return await Promise.all(
+            [...paths].map(async (path) => (await this.serverApi.getFileData(path, AST_HANDLER_KEY)).data as AstData)
+        );
+    }
+
+    /**
+     * Filters the given paths to only those that need to be loaded
+     *
+     * @param paths The paths to filter
+     * @returns The set of paths that need to be loaded
+     */
+    private filterPathsToLoad(paths: string[]): Set<string> {
+        const urisToLoad = new Set<string>();
+        for (const path of paths) {
+            const documentUri = URI.file(path);
+            if (!this.langiumDocuments.hasDocument(documentUri)) {
+                urisToLoad.add(path);
+            }
+        }
+        return urisToLoad;
     }
 
     /**
      * Sets the cancellation token source for managing request cancellation
-     * 
+     *
      * @param source The cancellation token source
      */
     setCancellationTokenSource(source: CancellationTokenSource | undefined): void {
         this.cancelationTokenSource = source;
     }
-
 }

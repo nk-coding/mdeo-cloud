@@ -27,9 +27,23 @@ export interface ExternalReferenceCollector {
      * May include any of these documents in the result.
      *
      * @param docs The documents to find external references for.
-     * @return The URIs of the external references.
+     * @return The copllected external references.
      */
-    findExternalReferences(docs: LangiumDocument[]): URI[];
+    findExternalReferences(docs: LangiumDocument[]): ExternalReferences;
+}
+
+/**
+ * The result of collecting external references.
+ */
+export interface ExternalReferences {
+    /**
+     * The URIs of local references (where files should be loaded directly).
+     */
+    local: URI[];
+    /**
+     * The URIs of external references (where exports should be used)
+     */
+    external: URI[];
 }
 
 /**
@@ -39,8 +53,8 @@ export interface ExternalReferenceResolver {
     /**
      * Loads an external document by its URI.
      *
-     * @param uri The URI of the external document to load.
+     * @param externalReferences The external references to load
      * @return a promise that indicates whether some document was loaded
      */
-    loadExternalDocument(uri: URI): Promise<void>;
+    loadExternalDocuments(externalReferences: ExternalReferences): Promise<void>;
 }

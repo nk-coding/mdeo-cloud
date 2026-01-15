@@ -46,6 +46,9 @@
         },
         {
             "path": "packages/service-metamodel"
+        },
+        {
+            "path": "packages/service-model"
         }
     ]
 }

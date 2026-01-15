@@ -41,7 +41,8 @@ services:
       context: ..
       dockerfile: infra/docker/workbench/Dockerfile
     environment:
-      PLUGIN_SERVICE_HOST: ${PLUGIN_SERVICE_HOST:-service-metamodel:3000}
+      PLUGIN_METAMODEL_SERVICE_HOST: ${PLUGIN_METAMODEL_SERVICE_HOST:-service-metamodel:3000}
+      PLUGIN_MODEL_SERVICE_HOST: ${PLUGIN_MODEL_SERVICE_HOST:-service-model:3001}
     ports:
       - "80:80"
     depends_on:
@@ -54,6 +55,19 @@ services:
       dockerfile: infra/docker/service-metamodel/Dockerfile
     environment:
       PORT: "3000"
+      HOST: "0.0.0.0"
+      BACKEND_API_URL: "http://backend:8080"
+      MAX_LANGIUM_INSTANCES: "5"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  service-model:
+    build:
+      context: ..
+      dockerfile: infra/docker/service-model/Dockerfile
+    environment:
+      PORT: "3001"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
       MAX_LANGIUM_INSTANCES: "5"

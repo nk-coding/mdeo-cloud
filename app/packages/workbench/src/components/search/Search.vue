@@ -5,42 +5,38 @@
             <div class="relative">
                 <Input v-model="searchText" placeholder="Search..." class="pr-23" />
                 <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div>
-                                    <Toggle v-model="isCaseSensitive" class="h-7 min-w-7 px-0">
-                                        <CaseSensitive c />
-                                    </Toggle>
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"> Match Case </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div>
-                                    <Toggle v-model="isWholeWord" class="h-7 min-w-7 px-0">
-                                        <WholeWord c />
-                                    </Toggle>
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"> Match Whole Word </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div>
-                                    <Toggle v-model="isRegex" class="h-7 min-w-7 px-0">
-                                        <Regex c />
-                                    </Toggle>
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top"> Use Regular Expression </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div>
+                                <Toggle v-model="isCaseSensitive" class="h-7 min-w-7 px-0">
+                                    <CaseSensitive c />
+                                </Toggle>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top"> Match Case </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div>
+                                <Toggle v-model="isWholeWord" class="h-7 min-w-7 px-0">
+                                    <WholeWord c />
+                                </Toggle>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top"> Match Whole Word </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div>
+                                <Toggle v-model="isRegex" class="h-7 min-w-7 px-0">
+                                    <Regex c />
+                                </Toggle>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top"> Use Regular Expression </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
         </div>
@@ -92,7 +88,7 @@
 import { inject, ref, shallowRef, onActivated, onMounted, onDeactivated, computed } from "vue";
 import { Input } from "../ui/input";
 import { Toggle } from "../ui/toggle";
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { watchThrottled } from "@vueuse/core";
 import type { ITextSearchMatch } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
 import { Uri } from "vscode";

@@ -1,6 +1,7 @@
 package com.mdeo.backend.service
 
 import com.mdeo.backend.database.FilesTable
+import com.mdeo.backend.database.FileChildrenTable
 import com.mdeo.common.model.*
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
@@ -8,6 +9,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 import java.util.*
+import java.util.Base64
 
 /**
  * Service for managing files and directories within projects.
@@ -37,7 +39,9 @@ class FileService {
                 return@transaction fileSystemFailure(ErrorCodes.FILE_IS_A_DIRECTORY, "Is a directory: $path")
             }
             
-            success(row[FilesTable.content] ?: ByteArray(0))
+            val contentText = row[FilesTable.content] ?: ""
+            val contentBytes = if (contentText.isEmpty()) ByteArray(0) else Base64.getDecoder().decode(contentText)
+            success(contentBytes)
         }
     }
     
@@ -75,8 +79,9 @@ class FileService {
                 }
                 
                 val currentVersion = existing[FilesTable.version]
+                val contentText = Base64.getEncoder().encodeToString(content)
                 FilesTable.update({ (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }) {
-                    it[FilesTable.content] = content
+                    it[FilesTable.content] = contentText
                     it[version] = currentVersion + 1
                     it[updatedAt] = now
                 }
@@ -88,16 +93,17 @@ class FileService {
                 ensureParentDirectories(projectId, normalizedPath, now)
                 
                 val parentPath = getParentPath(normalizedPath)
+                val basename = getBasename(normalizedPath)
                 if (parentPath != null) {
-                    addChildToDirectory(projectId, parentPath, getBasename(normalizedPath), now)
+                    addChildToDirectory(projectId, parentPath, basename, FileType.FILE, now)
                 }
                 
+                val contentText = Base64.getEncoder().encodeToString(content)
                 FilesTable.insert {
                     it[FilesTable.projectId] = projectId
                     it[FilesTable.path] = normalizedPath
                     it[fileType] = FileType.FILE
-                    it[FilesTable.content] = content
-                    it[children] = null
+                    it[FilesTable.content] = contentText
                     it[version] = 1
                     it[createdAt] = now
                     it[updatedAt] = now
@@ -134,8 +140,9 @@ class FileService {
             ensureParentDirectories(projectId, normalizedPath, now)
             
             val parentPath = getParentPath(normalizedPath)
+            val basename = getBasename(normalizedPath)
             if (parentPath != null) {
-                addChildToDirectory(projectId, parentPath, getBasename(normalizedPath), now)
+                addChildToDirectory(projectId, parentPath, basename, FileType.DIRECTORY, now)
             }
             
             FilesTable.insert {
@@ -143,7 +150,6 @@ class FileService {
                 it[FilesTable.path] = normalizedPath
                 it[fileType] = FileType.DIRECTORY
                 it[content] = null
-                it[children] = "[]"
                 it[createdAt] = now
                 it[updatedAt] = now
             }
@@ -175,19 +181,11 @@ class FileService {
                 return@transaction fileSystemFailure(ErrorCodes.FILE_NOT_A_DIRECTORY, "Not a directory: $path")
             }
             
-            val childrenJson = row[FilesTable.children] ?: "[]"
-            val childNames: List<String> = Json.decodeFromString(childrenJson)
-            
-            val result = childNames.mapNotNull { childName ->
-                val childPath = if (normalizedPath.isEmpty()) childName else "$normalizedPath/$childName"
-                val childRow = FilesTable.selectAll()
-                    .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq childPath) }
-                    .firstOrNull()
-                
-                childRow?.let {
-                    FileEntry(childName, it[FilesTable.fileType])
+            val result = FileChildrenTable.selectAll()
+                .where { (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq normalizedPath) }
+                .map { childRow ->
+                    FileEntry(childRow[FileChildrenTable.childName], childRow[FileChildrenTable.childType])
                 }
-            }
             
             success(result)
         }
@@ -264,10 +262,11 @@ class FileService {
             }
             
             if (row[FilesTable.fileType] == FileType.DIRECTORY) {
-                val childrenJson = row[FilesTable.children] ?: "[]"
-                val childNames: List<String> = Json.decodeFromString(childrenJson)
+                val childrenCount = FileChildrenTable.selectAll()
+                    .where { (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq normalizedPath) }
+                    .count()
                 
-                if (childNames.isNotEmpty() && !recursive) {
+                if (childrenCount > 0 && !recursive) {
                     return@transaction fileSystemFailure(ErrorCodes.DIRECTORY_NOT_EMPTY, "Directory not empty: $path")
                 }
                 
@@ -335,7 +334,7 @@ class FileService {
                 removeChildFromDirectory(projectId, oldParent, getBasename(normalizedFrom))
             }
             if (newParent != null) {
-                addChildToDirectory(projectId, newParent, getBasename(normalizedTo), now)
+                addChildToDirectory(projectId, newParent, getBasename(normalizedTo), sourceRow[FilesTable.fileType], now)
             }
             
             if (sourceRow[FilesTable.fileType] == FileType.DIRECTORY) {
@@ -360,6 +359,7 @@ class FileService {
      */
     fun deleteAllForProject(projectId: UUID) {
         transaction {
+            FileChildrenTable.deleteWhere { FileChildrenTable.projectId eq projectId }
             FilesTable.deleteWhere { FilesTable.projectId eq projectId }
         }
     }
@@ -401,7 +401,7 @@ class FileService {
             
             val grandparentPath = getParentPath(parentPath)
             if (grandparentPath != null) {
-                addChildToDirectory(projectId, grandparentPath, getBasename(parentPath), now)
+                addChildToDirectory(projectId, grandparentPath, getBasename(parentPath), FileType.DIRECTORY, now)
             }
             
             FilesTable.insert {
@@ -409,7 +409,6 @@ class FileService {
                 it[FilesTable.path] = parentPath
                 it[fileType] = FileType.DIRECTORY
                 it[content] = null
-                it[children] = "[]"
                 it[createdAt] = now
                 it[updatedAt] = now
             }
@@ -422,25 +421,25 @@ class FileService {
      * @param projectId The UUID of the project
      * @param dirPath The path to the directory
      * @param childName The name of the child to add
+     * @param childType The type of the child (file or directory)
      * @param now The timestamp to use for the update
      */
-    private fun addChildToDirectory(projectId: UUID, dirPath: String, childName: String, now: Instant) {
-        val row = FilesTable.selectAll()
-            .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq dirPath) }
-            .firstOrNull() ?: return
+    private fun addChildToDirectory(projectId: UUID, dirPath: String, childName: String, childType: Int, now: Instant) {
+        // Check if child already exists
+        val existingChild = FileChildrenTable.selectAll()
+            .where { 
+                (FileChildrenTable.projectId eq projectId) and 
+                (FileChildrenTable.parentPath eq dirPath) and 
+                (FileChildrenTable.childName eq childName)
+            }
+            .firstOrNull()
         
-        val childrenJson = row[FilesTable.children] ?: "[]"
-        val childNames: MutableList<String> = Json.decodeFromString(childrenJson)
-        
-        if (!childNames.contains(childName)) {
-            childNames.add(childName)
-            val serializedChildren = Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.serializer<String>()), childNames)
-            
-            FilesTable.update({ 
-                (FilesTable.projectId eq projectId) and (FilesTable.path eq dirPath) 
-            }) {
-                it[children] = serializedChildren
-                it[updatedAt] = now
+        if (existingChild == null) {
+            FileChildrenTable.insert {
+                it[FileChildrenTable.projectId] = projectId
+                it[FileChildrenTable.parentPath] = dirPath
+                it[FileChildrenTable.childName] = childName
+                it[FileChildrenTable.childType] = childType
             }
         }
     }
@@ -453,21 +452,10 @@ class FileService {
      * @param childName The name of the child to remove
      */
     private fun removeChildFromDirectory(projectId: UUID, dirPath: String, childName: String) {
-        val row = FilesTable.selectAll()
-            .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq dirPath) }
-            .firstOrNull() ?: return
-        
-        val childrenJson = row[FilesTable.children] ?: "[]"
-        val childNames: MutableList<String> = Json.decodeFromString(childrenJson)
-        
-        if (childNames.remove(childName)) {
-            val serializedChildren = Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.serializer<String>()), childNames)
-            FilesTable.update({ 
-                (FilesTable.projectId eq projectId) and (FilesTable.path eq dirPath) 
-            }) {
-                it[children] = serializedChildren
-                it[updatedAt] = Instant.now()
-            }
+        FileChildrenTable.deleteWhere {
+            (FileChildrenTable.projectId eq projectId) and
+            (FileChildrenTable.parentPath eq dirPath) and
+            (FileChildrenTable.childName eq childName)
         }
     }
     
@@ -483,15 +471,21 @@ class FileService {
             .firstOrNull() ?: return
         
         if (row[FilesTable.fileType] == FileType.DIRECTORY) {
-            val childrenJson = row[FilesTable.children] ?: "[]"
-            val childNames: List<String> = Json.decodeFromString(childrenJson)
+            val children = FileChildrenTable.selectAll()
+                .where { (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq path) }
+                .map { it[FileChildrenTable.childName] }
             
-            for (childName in childNames) {
+            for (childName in children) {
                 val childPath = if (path.isEmpty()) childName else "$path/$childName"
                 deleteRecursive(projectId, childPath)
                 FilesTable.deleteWhere { 
                     (FilesTable.projectId eq projectId) and (FilesTable.path eq childPath) 
                 }
+            }
+            
+            // Delete all children entries for this directory
+            FileChildrenTable.deleteWhere {
+                (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq path)
             }
         }
     }
@@ -507,6 +501,7 @@ class FileService {
         val prefix = if (oldPath.isEmpty()) "" else "$oldPath/"
         val newPrefix = if (newPath.isEmpty()) "" else "$newPath/"
         
+        // Update all file paths
         FilesTable.selectAll()
             .where { 
                 (FilesTable.projectId eq projectId) and 
@@ -521,6 +516,25 @@ class FileService {
                 }) {
                     it[path] = newChildPath
                     it[updatedAt] = Instant.now()
+                }
+            }
+        
+        // Update all parent paths in FileChildrenTable
+        FileChildrenTable.selectAll()
+            .where {
+                (FileChildrenTable.projectId eq projectId) and
+                (FileChildrenTable.parentPath like "$prefix%")
+            }
+            .forEach { row ->
+                val oldParentPath = row[FileChildrenTable.parentPath]
+                val newParentPath = newPrefix + oldParentPath.substring(prefix.length)
+                
+                FileChildrenTable.update({
+                    (FileChildrenTable.projectId eq projectId) and
+                    (FileChildrenTable.parentPath eq oldParentPath) and
+                    (FileChildrenTable.childName eq row[FileChildrenTable.childName])
+                }) {
+                    it[parentPath] = newParentPath
                 }
             }
     }
