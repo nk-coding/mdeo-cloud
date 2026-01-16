@@ -2,6 +2,26 @@ import type { IconNode } from "lucide-vue-next";
 import type { languages } from "monaco-editor";
 
 /**
+ * Represents a serialized regular expression.
+ */
+export interface SerializedRegex {
+    __regex: true;
+    source: string;
+    flags: string;
+}
+
+/**
+ * Utility type that deeply replaces RegExp objects with SerializedRegex objects.
+ */
+export type DeepSerializeRegex<T> = T extends RegExp
+    ? SerializedRegex
+    : T extends Array<infer U>
+      ? Array<DeepSerializeRegex<U>>
+      : T extends object
+        ? { [K in keyof T]: DeepSerializeRegex<T[K]> }
+        : T;
+
+/**
  * Plugin configuration for a language.
  */
 export interface LanguagePlugin {
@@ -36,7 +56,7 @@ export interface LanguagePlugin {
     /**
      * Monarch tokens provider for syntax highlighting in the editor
      */
-    monarchTokensProvider: languages.IMonarchLanguage;
+    monarchTokensProvider: DeepSerializeRegex<languages.IMonarchLanguage>;
     /**
      * Icon representing the language
      */

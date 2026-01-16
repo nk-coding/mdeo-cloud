@@ -48,6 +48,14 @@ export interface AstSerializer {
      * @param serializer The function that converts primitive values to a string
      */
     registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => string): void;
+
+    /**
+     * Guesses formatting options based on the content of the given document.
+     * 
+     * @param document The Langium document to analyze
+     * @returns The guessed formatting options
+     */
+    guessFormattingOptions(document: LangiumDocument): FormattingOptions;
 }
 
 /**

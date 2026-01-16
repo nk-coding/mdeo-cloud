@@ -35,17 +35,6 @@ const { indent, hardline, group, join } = doc.builders;
 export function registerMetamodelSerializers(services: LangiumCoreServices & AstSerializerAdditionalServices): void {
     const { AstSerializer } = services;
 
-    AstSerializer.registerPrimitiveSerializer(ID, ({ value, cstNode }) => {
-        if (cstNode != undefined) {
-            return cstNode.text;
-        }
-        return value;
-    });
-
-    AstSerializer.registerPrimitiveSerializer(INT, ({ value, cstNode }) => {
-        return cstNode?.text ?? value.toString();
-    });
-
     AstSerializer.registerNodeSerializer(PrimitiveType, (ctx) => printPrimitiveType(ctx));
     AstSerializer.registerNodeSerializer(SingleMultiplicity, (ctx) => printSingleMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(RangeMultiplicity, (ctx) => printRangeMultiplicity(ctx));
@@ -76,11 +65,15 @@ function printPrimitiveType(context: PrintContext<PrimitiveTypeType>): Doc {
  */
 function printSingleMultiplicity(context: PrintContext<SingleMultiplicityType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
+
+    const docs: Doc[] = ["["];
     if (ctx.numericValue != undefined) {
-        return printPrimitive(getPrimitive(ctx, "numericValue"), INT);
+        docs.push(printPrimitive(getPrimitive(ctx, "numericValue"), INT));
     } else {
-        return printPrimitive(getPrimitive(ctx, "value"), ID);
+        docs.push(ctx.value!);
     }
+    docs.push("]");
+    return docs;
 }
 
 /**
@@ -91,12 +84,10 @@ function printSingleMultiplicity(context: PrintContext<SingleMultiplicityType>):
  */
 function printRangeMultiplicity(context: PrintContext<RangeMultiplicityType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
+
     const lower = printPrimitive(getPrimitive(ctx, "lower"), INT);
-    const upper =
-        ctx.upper != undefined
-            ? printPrimitive(getPrimitive(ctx, "upper"), ID)
-            : printPrimitive(getPrimitive(ctx, "upperNumeric"), INT);
-    return [lower, "..", upper];
+    const upper = ctx.upper != undefined ? ctx.upper : printPrimitive(getPrimitive(ctx, "upperNumeric"), INT);
+    return ["[", lower, "..", upper, "]"];
 }
 
 /**
@@ -112,7 +103,7 @@ function printProperty(context: PrintContext<PropertyType>): Doc {
     const docs: Doc[] = [name, ": ", type];
 
     if (ctx.multiplicity != undefined) {
-        docs.push("[", path.call(print, "multiplicity"), "]");
+        docs.push(path.call(print, "multiplicity"));
     }
 
     return docs;
@@ -171,7 +162,7 @@ function printAssociationEnd(context: PrintContext<AssociationEndType>): Doc {
     }
 
     if (ctx.multiplicity != undefined) {
-        docs.push("[", path.call(print, "multiplicity"), "]");
+        docs.push(path.call(print, "multiplicity"));
     }
 
     return docs;

@@ -61,8 +61,7 @@ export class LangiumInstance<T> {
         if (!this.busy) {
             throw new Error(`Langium instance ${this.id} is not busy`);
         }
-        this.services.shared.ServerApi.clearContext();
-        this.services.shared.ServerApi.resetTrackedRequests();
+        this.services.shared.ServerApi.reset();
         const documents = this.services.shared.workspace.LangiumDocuments.all.toArray();
         for (const doc of documents) {
             this.services.shared.workspace.LangiumDocuments.deleteDocument(doc.uri);

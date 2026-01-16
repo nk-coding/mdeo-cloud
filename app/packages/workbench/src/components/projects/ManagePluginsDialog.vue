@@ -61,7 +61,6 @@
         </AlertDialogContent>
     </AlertDialog>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, inject, watch } from "vue";
 import { Plus, Trash2, Check } from "lucide-vue-next";
@@ -80,8 +79,9 @@ import {
 import PluginList from "@/components/plugins/PluginList.vue";
 import PluginDetailsContainer from "@/components/plugins/PluginDetailsContainer.vue";
 import PluginDetails from "@/components/plugins/PluginDetails.vue";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
 import { workbenchStateKey } from "@/components/workbench/util";
+import type { Plugin } from "@mdeo/plugin";
+import { resolvePlugin } from "@/data/plugin/resolvePlugin";
 
 const props = defineProps<{
     open: boolean;
@@ -91,16 +91,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     "update:open": [value: boolean];
-    pluginsUpdated: [];
 }>();
 
-const { backendApi } = inject(workbenchStateKey)!;
+const { backendApi, plugins: installedPlugins } = inject(workbenchStateKey)!;
 
 const selectedPluginId = ref<string | null>(null);
 const isProcessing = ref(false);
 const isRemoveDialogOpen = ref(false);
-const allPlugins = ref<BackendPlugin[]>([]);
-const installedPlugins = ref<BackendPlugin[]>([]);
+const allPlugins = ref<Plugin[]>([]);
 
 const selectedPlugin = computed(() => {
     if (selectedPluginId.value == undefined) {
@@ -109,8 +107,8 @@ const selectedPlugin = computed(() => {
     return allPlugins.value.find((p) => p.id === selectedPluginId.value) ?? undefined;
 });
 
-function isPluginInstalled(plugin: BackendPlugin): boolean {
-    return installedPlugins.value.some((p) => p.id === plugin.id);
+function isPluginInstalled(plugin: Plugin): boolean {
+    return installedPlugins.value.has(plugin.id);
 }
 
 function handleSelectPlugin(pluginId: string) {
@@ -122,16 +120,12 @@ function openRemoveDialog() {
 }
 
 async function loadPlugins() {
-    const [allPluginsResult, projectPluginsResult] = await Promise.all([
-        backendApi.getPlugins(),
-        backendApi.getProjectPlugins(props.projectId)
-    ]);
+    const allPluginsResult = await backendApi.getPlugins();
 
     if (allPluginsResult.success) {
-        allPlugins.value = allPluginsResult.value;
-    }
-    if (projectPluginsResult.success) {
-        installedPlugins.value = projectPluginsResult.value;
+        allPlugins.value = allPluginsResult.value.sort((a, b) => {
+            return a.name.localeCompare(b.name);
+        });
     }
 }
 
@@ -144,8 +138,7 @@ async function handleAddPlugin() {
     try {
         const result = await backendApi.addPluginToProject(props.projectId, selectedPlugin.value.id);
         if (result.success) {
-            await loadPlugins();
-            emit("pluginsUpdated");
+            installedPlugins.value.set(selectedPlugin.value.id, await resolvePlugin(result.value));
         }
     } finally {
         isProcessing.value = false;
@@ -161,8 +154,7 @@ async function handleRemovePlugin() {
     try {
         const result = await backendApi.removePluginFromProject(props.projectId, selectedPlugin.value.id);
         if (result.success) {
-            await loadPlugins();
-            emit("pluginsUpdated");
+            installedPlugins.value.delete(selectedPlugin.value.id);
         }
     } finally {
         isProcessing.value = false;

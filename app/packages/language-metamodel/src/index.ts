@@ -1,4 +1,4 @@
-export * from "./features/diagram-server/handler/applyLabelEditOperationHandler.js";
+export * from "./features/diagram-server/handler/metamodelApplyLabelEditOperationHandler.js";
 export * from "./features/diagram-server/model/associationEdge.js";
 export * from "./features/diagram-server/model/associationEndLabel.js";
 export * from "./features/diagram-server/model/classCompartment.js";
@@ -12,6 +12,7 @@ export * from "./features/diagram-server/metadataTypes.js";
 export * from "./features/diagram-server/metamodelDiagramConfiguration.js";
 export * from "./features/diagram-server/metamodelDiagramModule.js";
 export * from "./features/diagram-server/metamodelGModelFactory.js";
+export * from "./features/diagram-server/metamodelLabelEditValidator.js";
 export * from "./features/diagram-server/metamodelMetadataManager.js";
 export * from "./features/diagram-server/metamodelModelIdProvider.js";
 export * from "./features/metamodelExternalReferenceCollector.js";

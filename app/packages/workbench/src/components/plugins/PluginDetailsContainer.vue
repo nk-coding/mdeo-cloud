@@ -16,9 +16,9 @@
 <script setup lang="ts">
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
+import type { Plugin } from "@mdeo/plugin";
 
 defineProps<{
-    plugin?: BackendPlugin | null;
+    plugin?: Plugin;
 }>();
 </script>

@@ -47,4 +47,5 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
             height: bounds.height / zoom
         };
     }
+
 }

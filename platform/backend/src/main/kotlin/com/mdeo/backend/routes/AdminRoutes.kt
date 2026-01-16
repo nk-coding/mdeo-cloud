@@ -41,11 +41,11 @@ fun Route.adminRoutes(userService: UserService) {
             
             val changed = userService.adminChangePassword(userId, request.newPassword)
             if (!changed) {
-                call.respond(ApiResult.Failure(ApiError(ErrorCodes.USER_NOT_FOUND, "User not found")))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
                 return@put
             }
             
-            call.respond(ApiResult.Success(Unit))
+            call.respond(Unit)
         }
     }
     
@@ -82,7 +82,7 @@ fun Route.adminRoutes(userService: UserService) {
                 return@put
             }
             
-            call.respond(ApiResult.Success(Unit))
+            call.respond(Unit)
         }
     }
 }

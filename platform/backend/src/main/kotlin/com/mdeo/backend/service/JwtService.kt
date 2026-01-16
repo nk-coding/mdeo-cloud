@@ -19,7 +19,7 @@ import java.util.*
  *
  * @param config JWT configuration settings
  */
-class JwtService(private val config: JwtConfig) {
+class JwtService(private val config: JwtConfig) : BaseService() {
     private val logger = LoggerFactory.getLogger(JwtService::class.java)
     
     private lateinit var privateKey: RSAPrivateKey

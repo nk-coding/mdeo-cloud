@@ -6,7 +6,7 @@ import type {
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { Project } from "../project/project";
 import type { ApiResult, FileSystemError, ProjectError, PluginError, CommonError, FileDataError } from "./apiResult";
-import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
+import type { Plugin } from "@mdeo/plugin";
 
 /**
  * Response from reading a file, including content and version
@@ -102,7 +102,7 @@ export interface BackendApi {
      * @returns A promise that resolves to an ApiResult containing the FileType
      *          Possible errors: FileNotFound, Unavailable, Unknown
      */
-    stat(projectId: string, path: string): Promise<ApiResult<FileType, FileSystemError>>;
+    stat(projectId: string, path: string): Promise<ApiResult<FileType | undefined, FileSystemError>>;
 
     /**
      * Deletes a file or directory.
@@ -219,12 +219,22 @@ export interface BackendApi {
     refreshPlugin(pluginId: string): Promise<ApiResult<void, PluginError>>;
 
     /**
+     * Updates the default status of a plugin.
+     *
+     * @param pluginId The ID of the plugin to update
+     * @param isDefault Whether the plugin should be added by default to new projects
+     * @returns A promise that resolves to an ApiResult indicating success or failure
+     *          Possible errors: PluginNotFound, Unavailable, Unknown
+     */
+    updatePluginDefault(pluginId: string, isDefault: boolean): Promise<ApiResult<void, PluginError>>;
+
+    /**
      * Gets all plugins.
      *
      * @returns A promise that resolves to an ApiResult containing an array of plugins
      *          Possible errors: Unavailable, Unknown
      */
-    getPlugins(): Promise<ApiResult<BackendPlugin[], PluginError>>;
+    getPlugins(): Promise<ApiResult<Plugin[], PluginError>>;
 
     /**
      * Gets all plugins associated with a project.
@@ -233,7 +243,7 @@ export interface BackendApi {
      * @returns A promise that resolves to an ApiResult containing an array of plugins
      *          Possible errors: ProjectNotFound, Unavailable, Unknown
      */
-    getProjectPlugins(projectId: string): Promise<ApiResult<BackendPlugin[], PluginError>>;
+    getProjectPlugins(projectId: string): Promise<ApiResult<Plugin[], PluginError>>;
 
     /**
      * Adds a plugin to a project.
@@ -243,7 +253,7 @@ export interface BackendApi {
      * @returns A promise that resolves to an ApiResult indicating success or failure
      *          Possible errors: ProjectNotFound, PluginNotFound, PluginAlreadyAddedToProject, Unavailable, Unknown
      */
-    addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>>;
+    addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<Plugin, PluginError>>;
 
     /**
      * Removes a plugin from a project.
@@ -254,16 +264,6 @@ export interface BackendApi {
      *          Possible errors: ProjectNotFound, PluginNotFound, PluginNotAddedToProject, Unavailable, Unknown
      */
     removePluginFromProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>>;
-
-    /**
-     * Resolves a plugin to its implementation.
-     * This will return a more detailed interface in the future.
-     *
-     * @param pluginId The ID of the plugin to resolve
-     * @returns A promise that resolves to an ApiResult containing the resolved plugin
-     *          Possible errors: PluginNotFound, Unavailable, Unknown
-     */
-    resolvePlugin(pluginId: string): Promise<ApiResult<ResolvedPlugin, PluginError>>;
 
     /**
      * Get the current authenticated user

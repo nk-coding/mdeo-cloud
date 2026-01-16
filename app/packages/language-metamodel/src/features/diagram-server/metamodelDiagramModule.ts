@@ -1,4 +1,4 @@
-import type { InstanceMultiBinding, OperationHandlerConstructor } from "@eclipse-glsp/server";
+import type { InstanceMultiBinding, LabelEditValidator, OperationHandlerConstructor } from "@eclipse-glsp/server";
 import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
 import type { MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
@@ -6,7 +6,8 @@ import { MetamodelGModelFactory } from "./metamodelGModelFactory.js";
 import { MetamodelDiagramConfiguration } from "./metamodelDiagramConfiguration.js";
 import { MetamodelModelIdProvider } from "./metamodelModelIdProvider.js";
 import { MetamodelMetadataManager } from "./metamodelMetadataManager.js";
-import { ApplyLabelEditOperationHandler } from "./handler/applyLabelEditOperationHandler.js";
+import { MetamodelApplyLabelEditOperationHandler } from "./handler/metamodelApplyLabelEditOperationHandler.js";
+import { MetamodelLabelEditValidator } from "./metamodelLabelEditValidator.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -16,8 +17,6 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class MetamodelDiagramModule extends BaseDiagramModule {
-    override readonly diagramType = "metamodel";
-
     protected override bindDiagramConfiguration(): BindingTarget<DiagramConfiguration> {
         return MetamodelDiagramConfiguration;
     }
@@ -36,6 +35,10 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
 
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         super.configureOperationHandlers(binding);
-        binding.add(ApplyLabelEditOperationHandler);
+        binding.add(MetamodelApplyLabelEditOperationHandler);
+    }
+
+    protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {
+        return MetamodelLabelEditValidator;
     }
 }

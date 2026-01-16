@@ -14,7 +14,7 @@ import java.util.Base64
 /**
  * Service for managing files and directories within projects.
  */
-class FileService {
+class FileService : BaseService() {
     
     /**
      * Reads the contents of a file.
@@ -196,9 +196,9 @@ class FileService {
      *
      * @param projectId The UUID of the project
      * @param path The path to check
-     * @return ApiResult containing the file type as an integer, or an error
+     * @return ApiResult containing the file type as an integer or null if not found, or an error
      */
-    fun stat(projectId: UUID, path: String): ApiResult<Int> {
+    fun stat(projectId: UUID, path: String): ApiResult<Int?> {
         val normalizedPath = normalizePath(path)
         
         return transaction {
@@ -207,10 +207,10 @@ class FileService {
                 .firstOrNull()
             
             if (row == null) {
-                return@transaction fileSystemFailure(ErrorCodes.FILE_NOT_FOUND, "File or directory not found: $path")
+                success(null)
+            } else {
+                success(row[FilesTable.fileType])
             }
-            
-            success(row[FilesTable.fileType])
         }
     }
     
@@ -362,13 +362,6 @@ class FileService {
             FileChildrenTable.deleteWhere { FileChildrenTable.projectId eq projectId }
             FilesTable.deleteWhere { FilesTable.projectId eq projectId }
         }
-    }
-    
-    private fun normalizePath(path: String): String {
-        var p = path
-        if (p.startsWith("/")) p = p.substring(1)
-        if (p.endsWith("/") && p.length > 1) p = p.substring(0, p.length - 1)
-        return p
     }
     
     private fun getParentPath(path: String): String? {

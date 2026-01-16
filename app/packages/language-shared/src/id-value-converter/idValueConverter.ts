@@ -13,12 +13,22 @@ export class IdValueConverter extends DefaultValueConverterBase {
         cstNode: CstNode
     ): ValueType {
         if (rule.name === "ID") {
-            if (input.charAt(0) === "`") {
-                return input.substring(1, input.length - 1);
-            } else {
-                return input;
-            }
+            return parseIdentifier(input);
         }
         return super.runConverter(rule, input, cstNode);
+    }
+}
+
+/**
+ * Parses an identifier, removing backticks if present.
+ * 
+ * @param identifier the identifier to parse
+ * @returns the parsed identifier without backticks
+ */
+export function parseIdentifier(identifier: string): string {
+    if (identifier.charAt(0) === "`") {
+        return identifier.substring(1, identifier.length - 1);
+    } else {
+        return identifier;
     }
 }

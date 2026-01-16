@@ -38,9 +38,9 @@ function createDefaultContainerModule(context: PluginContext): ContainerModule {
 
     return new ContainerModule((bind, unbind, isBound, rebind) => {
         const bindContext = { bind, unbind, isBound, rebind };
-        glspSprotty
-            .bindOrRebind(bindContext, glspSprotty.TYPES.ILogger)
-            .to(glspSprotty.ConsoleLogger)
-            .inSingletonScope();
+        // glspSprotty
+        //     .bindOrRebind(bindContext, glspSprotty.TYPES.ILogger)
+        //     .to(glspSprotty.ConsoleLogger)
+        //     .inSingletonScope();
     });
 }

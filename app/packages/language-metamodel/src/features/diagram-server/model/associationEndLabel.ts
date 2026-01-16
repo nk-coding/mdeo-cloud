@@ -6,7 +6,9 @@ import type { EdgePlacement } from "@eclipse-glsp/protocol";
  * Label for association endpoint information (property name and multiplicity).
  */
 export class AssociationEndLabel extends GLabel {
-    /** The placement of the label along the edge */
+    /**
+     * The placement of the label along the edge 
+     */
     edgePlacement?: EdgePlacement;
 
     /**

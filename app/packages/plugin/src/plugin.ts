@@ -32,6 +32,11 @@ export interface Plugin {
     icon: IconNode;
 
     /**
+     * Whether this plugin is added by default to new projects
+     */
+    default: boolean;
+
+    /**
      * Language plugins provided by the plugin
      */
     languagePlugins: LanguagePlugin[];

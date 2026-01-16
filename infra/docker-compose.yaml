@@ -31,6 +31,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       PLUGIN_BASE_URL: ${PLUGIN_BASE_URL}
+      DEFAULT_PLUGIN_URLS: ${DEFAULT_PLUGIN_URLS:-http://service-metamodel:3000,http://service-model:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,12 +42,18 @@ services:
       context: ..
       dockerfile: infra/docker/workbench/Dockerfile
     environment:
-      PLUGIN_METAMODEL_SERVICE_HOST: ${PLUGIN_METAMODEL_SERVICE_HOST:-service-metamodel:3000}
-      PLUGIN_MODEL_SERVICE_HOST: ${PLUGIN_MODEL_SERVICE_HOST:-service-model:3001}
+      PLUGIN_METAMODEL_SERVICE: ${PLUGIN_METAMODEL_SERVICE:-http://service-metamodel:3000}
+      PLUGIN_MODEL_SERVICE: ${PLUGIN_MODEL_SERVICE:-http://service-model:3000}
+      BACKEND_SERVICE: ${BACKEND_SERVICE:-http://backend:8080}
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+      service-metamodel:
+        condition: service_healthy
+      service-model:
+        condition: service_healthy
     restart: unless-stopped
 
   service-metamodel:
@@ -58,6 +65,12 @@ services:
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
       MAX_LANGIUM_INSTANCES: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       - backend
     restart: unless-stopped
@@ -67,10 +80,16 @@ services:
       context: ..
       dockerfile: infra/docker/service-model/Dockerfile
     environment:
-      PORT: "3001"
+      PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
       MAX_LANGIUM_INSTANCES: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       - backend
     restart: unless-stopped

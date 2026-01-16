@@ -22,13 +22,17 @@ const editorContext = inject(editorContextKey)!;
 
 const id = useId();
 
-const languagePlugin = computed(() => languagePluginByExtension.value.get(props.tab.file.extension)!);
+const languagePlugin = computed(() => languagePluginByExtension.value.get(props.tab.file.extension));
 
 const editorPlugin = computed(() => {
-    return languagePlugin.value.editorPlugin;
+    return languagePlugin.value?.editorPlugin;
 });
 
 onMounted(async () => {
+    if (languagePlugin.value == undefined) {
+        return;
+    }
+
     const client = new MonacoGLSPClient({
         client: languageClient.value!,
         id: id

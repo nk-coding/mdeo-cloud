@@ -2,7 +2,7 @@ import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
 import { sharedImport, BaseGModelFactory } from "@mdeo/language-shared";
 import type { GraphMetadata, ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
-import type { PartialAstNode } from "@mdeo/language-common";
+import { ID, type PartialAstNode } from "@mdeo/language-common";
 import type { SingleMultiplicityType, RangeMultiplicityType } from "../../grammar/metamodelTypes.js";
 import type {
     PartialMetaModel,
@@ -105,7 +105,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
             const node = ClassNode.builder()
                 .id(nodeId)
-                .name(cls.name ?? "Unnamed")
+                .name(displayName)
                 .isAbstract(cls.isAbstract ?? false)
                 .meta(metadata)
                 .build();
@@ -219,7 +219,11 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const propId = readonly ? idRegistry.getIdOrUnresolved(prop) : idRegistry.getId(prop);
 
             const multiplicityStr = this.formatMultiplicity(prop.multiplicity);
-            const propName = prop.name ?? "unnamed";
+            const propName = this.modelState.languageServices.AstSerializer.serializePrimitive(
+                { value: prop.name ?? "unnamed" },
+                ID
+            );
+
             const typeName = prop.type?.name ?? "unknown";
             const propText = `${propName}: ${typeName}${multiplicityStr}`;
 

@@ -13,7 +13,7 @@ import java.util.*
 /**
  * Service for managing file metadata within projects.
  */
-class MetadataService {
+class MetadataService : BaseService() {
     
     /**
      * Reads metadata for a file or directory.
@@ -94,10 +94,4 @@ class MetadataService {
         }
     }
     
-    private fun normalizePath(path: String): String {
-        var p = path
-        if (p.startsWith("/")) p = p.substring(1)
-        if (p.endsWith("/") && p.length > 1) p = p.substring(0, p.length - 1)
-        return p
-    }
 }

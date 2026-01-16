@@ -13,7 +13,8 @@ import {
     MetaModel,
     ClassOrImport,
     ClassImport,
-    ClassFileImport
+    ClassFileImport,
+    MetamodelPrimitiveTypes
 } from "./metamodelTypes.js";
 import { metamodelFileScopingConfig } from "./metamodelTypes.js";
 
@@ -23,7 +24,17 @@ import { metamodelFileScopingConfig } from "./metamodelTypes.js";
  */
 export const PrimitiveTypeRule = createRule("PrimitiveTypeRule")
     .returns(PrimitiveType)
-    .as(({ set }) => [set("name", "int", "string", "boolean", "long", "double", "float")]);
+    .as(({ set }) => [
+        set(
+            "name",
+            MetamodelPrimitiveTypes.INT,
+            MetamodelPrimitiveTypes.STRING,
+            MetamodelPrimitiveTypes.BOOLEAN,
+            MetamodelPrimitiveTypes.LONG,
+            MetamodelPrimitiveTypes.DOUBLE,
+            MetamodelPrimitiveTypes.FLOAT
+        )
+    ]);
 
 /**
  * Single multiplicity rule.
@@ -55,7 +66,12 @@ export const MultiplicityRule = createRule("MultiplicityRule")
  */
 export const PropertyRule = createRule("PropertyRule")
     .returns(Property)
-    .as(({ set }) => [set("name", ID), ":", set("type", PrimitiveTypeRule), optional("[", MultiplicityRule, "]")]);
+    .as(({ set }) => [
+        set("name", ID),
+        ":",
+        set("type", PrimitiveTypeRule),
+        optional(set("multiplicity", MultiplicityRule))
+    ]);
 
 /**
  * Class extension rule.

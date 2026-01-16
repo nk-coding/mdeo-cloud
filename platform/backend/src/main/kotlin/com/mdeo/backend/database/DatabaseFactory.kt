@@ -29,7 +29,7 @@ object DatabaseFactory {
             password = config.password
             maximumPoolSize = config.maxPoolSize
             isAutoCommit = false
-            transactionIsolation = "TRANSACTION_REPEATABLE_READ"
+            transactionIsolation = "TRANSACTION_READ_COMMITTED"
             validate()
         }
         

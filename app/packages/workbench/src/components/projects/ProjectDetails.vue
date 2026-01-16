@@ -59,19 +59,14 @@
                         </template>
                     </SidebarPanelHeader>
                     <ScrollArea class="flex-1 min-h-0 px-2">
-                        <Tree
-                            v-if="plugins.length > 0"
-                            class="w-full"
-                            :active-element="null"
-                            :expanded-items="expandedItems"
-                        >
+                        <Tree v-if="sortedPlugins.length > 0" class="w-full" :active-element="null" :expanded-items="new Set()">
                             <TreeItem
-                                v-for="plugin in plugins"
+                                v-for="plugin in sortedPlugins"
                                 :key="plugin.id"
                                 :data="plugin"
                                 :is-folder="false"
                                 :has-children="false"
-                                @click="handlePluginClick(plugin)"
+                                @click="handlePluginClick(plugin as WorkbenchPlugin)"
                             >
                                 <template #content>
                                     <Icon :iconNode="plugin.icon" name="PluginIcon" class="w-4 h-4 mr-2" />
@@ -98,12 +93,7 @@
                         </template>
                     </SidebarPanelHeader>
                     <ScrollArea class="flex-1 min-h-0 px-2">
-                        <Tree
-                            v-if="users.length > 0"
-                            class="w-full"
-                            :active-element="null"
-                            :expanded-items="expandedItems"
-                        >
+                        <Tree v-if="users.length > 0" class="w-full" :active-element="null" :expanded-items="new Set()">
                             <ContextMenu v-for="user in users" :key="user.id">
                                 <ContextMenuTrigger>
                                     <TreeItem :data="user" :is-folder="false" :has-children="false">
@@ -142,7 +132,6 @@
             v-model:open="isManagePluginsDialogOpen"
             :project-id="project!.id"
             :selected-plugin-id-prop="selectedPluginIdForDialog"
-            @plugins-updated="handlePluginsUpdated"
         />
 
         <AddUserDialog
@@ -170,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, useTemplateRef, nextTick } from "vue";
+import { ref, inject, useTemplateRef, nextTick, computed } from "vue";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -192,35 +181,35 @@ import {
 } from "@/components/ui/alert-dialog";
 import ManagePluginsDialog from "./ManagePluginsDialog.vue";
 import AddUserDialog from "./AddUserDialog.vue";
-import type { Project } from "@/data/project/project";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
 import type { UserInfo } from "@/data/api/backendApi";
 import { Pencil, Plus, Trash2, FolderOpen, User as UserIcon, Settings2, Icon } from "lucide-vue-next";
 import { workbenchStateKey } from "@/components/workbench/util";
+import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 
 const props = defineProps<{
-    plugins: BackendPlugin[];
     users: UserInfo[];
 }>();
 
 const emit = defineEmits<{
     updateName: [name: string];
-    pluginsUpdated: [];
     usersUpdated: [];
     deleteProject: [];
     openProjects: [];
 }>();
 
-const { backendApi, project } = inject(workbenchStateKey)!;
+const { backendApi, project, plugins } = inject(workbenchStateKey)!;
 
 const isEditingName = ref(false);
 const editedName = ref("");
-const expandedItems = ref<Set<any>>(new Set());
 const isManagePluginsDialogOpen = ref(false);
 const isAddUserDialogOpen = ref(false);
 const isDeleteDialogOpen = ref(false);
 const projectNameInput = useTemplateRef("projectNameInput");
 const selectedPluginIdForDialog = ref<string | undefined>(undefined);
+
+const sortedPlugins = computed(() => {
+    return Array.from(plugins.value.values()).sort((a, b) => a.name.localeCompare(b.name));
+});
 
 function handleEditName() {
     editedName.value = project.value!.name;
@@ -250,10 +239,6 @@ function openDeleteDialog() {
     isDeleteDialogOpen.value = true;
 }
 
-function handlePluginsUpdated() {
-    emit("pluginsUpdated");
-}
-
 function handleUsersUpdated() {
     emit("usersUpdated");
 }
@@ -275,7 +260,7 @@ function handleOpenProjects() {
     emit("openProjects");
 }
 
-function handlePluginClick(plugin: BackendPlugin) {
+function handlePluginClick(plugin: WorkbenchPlugin) {
     selectedPluginIdForDialog.value = plugin.id;
     isManagePluginsDialogOpen.value = true;
 }

@@ -15,7 +15,7 @@ import java.util.*
 /**
  * Service for managing user accounts and authentication.
  */
-class UserService {
+class UserService : BaseService() {
     private val logger = LoggerFactory.getLogger(UserService::class.java)
     
     /**

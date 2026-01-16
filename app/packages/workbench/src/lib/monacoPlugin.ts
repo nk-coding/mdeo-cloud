@@ -7,6 +7,8 @@ import {
 import { LogLevel } from "vscode";
 import { type Plugin, type InjectionKey, watch } from "vue";
 import getSearchServiceOverride from "@codingame/monaco-vscode-search-service-override";
+import getBulkEditServiceOverride from "@codingame/monaco-vscode-bulk-edit-service-override";
+import getWorkingCopyServiceOverride from "@codingame/monaco-vscode-working-copy-service-override";
 import { useColorMode } from "@vueuse/core";
 import {
     getService,
@@ -20,6 +22,7 @@ import {
 import { WorkspaceSearchProvider } from "@codingame/monaco-vscode-search-service-override/service-override/tools/search-providers/workspace-search-provider";
 import { SearchProviderType } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
 import { type OpenEditor } from "@codingame/monaco-vscode-editor-service-override";
+import { ConfigurationModel } from "@codingame/monaco-vscode-api/vscode/vs/platform/configuration/common/configurationModels";
 
 export interface MonacoApi {
     monaco: typeof monaco;
@@ -66,7 +69,9 @@ async function setupMonaco(): Promise<MonacoApi> {
         },
         logLevel: LogLevel.Warning,
         serviceOverrides: {
-            ...getSearchServiceOverride()
+            ...getSearchServiceOverride(),
+            ...getBulkEditServiceOverride(),
+            ...getWorkingCopyServiceOverride()
         },
         monacoWorkerFactory: () => {
             const envEnhanced = getEnhancedMonacoEnvironment();
@@ -91,6 +96,10 @@ async function setupMonaco(): Promise<MonacoApi> {
     const logService = await getService(ILogService);
     const searchService = await getService(ISearchService);
     const editorService = await getService(IEditorService);
+
+    // @ts-expect-error patch to prvent vscode from loading config files
+    workspaceContextService.loadFolderConfigurations = async (folders: any[]) =>
+        folders.map(() => ConfigurationModel.createEmptyModel(logService));
 
     workspaceContextService.onDidChangeWorkspaceFolders(() => {
         const provider = new WorkspaceSearchProvider(

@@ -18,7 +18,7 @@ object UsersTable : Table("users") {
     val roles = text("roles")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -30,7 +30,7 @@ object ProjectsTable : Table("projects") {
     val name = varchar("name", 255)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -40,7 +40,7 @@ object ProjectsTable : Table("projects") {
 object ProjectOwnersTable : Table("project_owners") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val userId = uuid("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE)
-    
+
     override val primaryKey = PrimaryKey(projectId, userId)
 }
 
@@ -55,7 +55,7 @@ object FilesTable : Table("files") {
     val version = integer("version").default(1)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(projectId, path)
 }
 
@@ -67,9 +67,9 @@ object FileChildrenTable : Table("file_children") {
     val parentPath = varchar("parent_path", 1024)
     val childName = varchar("child_name", 255)
     val childType = integer("child_type")
-    
+
     override val primaryKey = PrimaryKey(projectId, parentPath, childName)
-    
+
     init {
         index(false, projectId, parentPath)
     }
@@ -84,7 +84,7 @@ object FileMetadataTable : Table("file_metadata") {
     val metadata = json<JsonObject>("metadata", Json)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(projectId, path)
 }
 
@@ -97,9 +97,10 @@ object PluginsTable : Table("plugins") {
     val name = varchar("name", 255)
     val description = text("description")
     val icon = text("icon")
+    val default = bool("default").default(false)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -109,7 +110,7 @@ object PluginsTable : Table("plugins") {
 object ProjectPluginsTable : Table("project_plugins") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val pluginId = uuid("plugin_id").references(PluginsTable.id, onDelete = ReferenceOption.CASCADE)
-    
+
     override val primaryKey = PrimaryKey(projectId, pluginId)
 }
 
@@ -130,7 +131,7 @@ object LanguagePluginsTable : Table("language_plugins") {
     val icon = text("icon")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(pluginId, id)
 }
 
@@ -147,7 +148,7 @@ object ContributionPluginsTable : Table("contribution_plugins") {
     val serverContributionPlugins = text("server_contribution_plugins")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -162,7 +163,7 @@ object FileDataTable : Table("file_data") {
     val sourceVersion = integer("source_version")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
-    
+
     override val primaryKey = PrimaryKey(projectId, path, dataKey)
 }
 
@@ -170,29 +171,61 @@ object FileDataTable : Table("file_data") {
  * File dependencies table schema for tracking file-to-file dependencies.
  */
 object FileDependenciesTable : Table("file_dependencies") {
-    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
+    val projectId = uuid("project_id")
     val path = varchar("path", 1024)
     val dataKey = varchar("data_key", 255)
+
     val dependencyPath = varchar("dependency_path", 1024)
     val dependencyVersion = integer("dependency_version")
-    
+
     init {
-        index(true, projectId, path, dataKey, dependencyPath)
+        foreignKey(
+            projectId,
+            path,
+            dataKey,
+            target = FileDataTable.primaryKey,
+            onDelete = ReferenceOption.CASCADE
+        )
+
+        index(
+            isUnique = true,
+            projectId,
+            path,
+            dataKey,
+            dependencyPath
+        )
     }
 }
+
 
 /**
  * Data dependencies table schema for tracking file data-to-file data dependencies.
  */
 object DataDependenciesTable : Table("data_dependencies") {
-    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
+    val projectId = uuid("project_id")
     val path = varchar("path", 1024)
     val dataKey = varchar("data_key", 255)
+
     val dependencyPath = varchar("dependency_path", 1024)
     val dependencyKey = varchar("dependency_key", 255)
     val dependencyVersion = integer("dependency_version")
-    
+
     init {
-        index(true, projectId, path, dataKey, dependencyPath, dependencyKey)
+        foreignKey(
+            projectId,
+            path,
+            dataKey,
+            target = FileDataTable.primaryKey,
+            onDelete = ReferenceOption.CASCADE
+        )
+
+        index(
+            isUnique = true,
+            projectId,
+            path,
+            dataKey,
+            dependencyPath,
+            dependencyKey
+        )
     }
 }

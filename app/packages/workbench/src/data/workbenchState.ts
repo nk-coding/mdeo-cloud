@@ -11,7 +11,6 @@ import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserve
 import { MonacoLanguageClient } from "monaco-languageclient";
 import { CloseAction, ErrorAction, State, type ResponseMessage } from "vscode-languageclient";
 import { Uri } from "vscode";
-import { watchArray } from "@vueuse/core";
 import { reinitializeWorkspace } from "@codingame/monaco-vscode-configuration-service-override";
 import {
     GetPluginsRequest,
@@ -32,6 +31,7 @@ import {
 import type { ResolvedWorkbenchLanguagePlugin, WorkbenchPlugin } from "./plugin/plugin";
 import type { LanguageContributionPlugin } from "@mdeo/plugin";
 import type { ServerPlugin } from "./plugin/serverPlugin";
+import { resolvePlugin } from "./plugin/resolvePlugin";
 
 /**
  * Manager for the overall state of the workbench
@@ -189,26 +189,42 @@ export class WorkbenchState {
     }
 
     /**
+     * Reloads all plugins from the backend
+     */
+    private async reloadPlugins() {
+        if (this.project.value == undefined) {
+            this.plugins.value = new Map();
+            return;
+        }
+        const newPlugins: Map<string, WorkbenchPlugin> = new Map();
+        const pluginsResult = await this.backendApi.getProjectPlugins(this.project.value.id);
+        if (!pluginsResult.success) {
+            throw new Error("Failed to load plugins");
+        }
+        for (const plugin of pluginsResult.value) {
+            newPlugins.set(plugin.id, await resolvePlugin(plugin));
+        }
+        this.plugins.value = newPlugins;
+    }
+
+    /**
      * Initializes the languge server and client
      * and sets up watching for project and language changes
      */
     private initiLsp() {
-        watchArray(
+        watch(
             this.languagePlugins,
-            (_new, _old, added) => {
-                for (const plugin of added) {
+            (plugins) => {
+                for (const plugin of plugins) {
                     if (!this.registeredLanguages.has(plugin.id)) {
                         this.monacoApi.monaco.languages.register({ id: plugin.id });
-                        this.monacoApi.monaco.languages.setLanguageConfiguration(
-                            plugin.id,
-                            plugin.languageConfiguration
-                        );
-                        this.monacoApi.monaco.languages.setMonarchTokensProvider(
-                            plugin.id,
-                            this.generateMonarchTokensProvider(plugin)
-                        );
                         this.registeredLanguages.add(plugin.id);
                     }
+                    this.monacoApi.monaco.languages.setLanguageConfiguration(plugin.id, plugin.languageConfiguration);
+                    this.monacoApi.monaco.languages.setMonarchTokensProvider(
+                        plugin.id,
+                        this.generateMonarchTokensProvider(plugin)
+                    );
                 }
             },
             { immediate: true }
@@ -221,6 +237,8 @@ export class WorkbenchState {
             },
             { immediate: true }
         );
+
+        watch(this.project, () => this.reloadPlugins(), { immediate: true });
     }
 
     /**

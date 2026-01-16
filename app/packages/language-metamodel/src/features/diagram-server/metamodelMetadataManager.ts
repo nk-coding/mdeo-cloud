@@ -31,13 +31,9 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     @inject(ModelIdProvider)
     protected modelIdProvider!: ModelIdProviderType;
 
-    /**
-     * Verifies the metadata for a given model element.
-     * Corrects invalid metadata or returns undefined if valid.
-     */
     protected override verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
         if (model.type === MetamodelElementType.NODE_CLASS) {
-            return NodeLayoutMetadataUtil.verify(model.meta, 0, 0);
+            return NodeLayoutMetadataUtil.verify(model.meta, 250);
         }
 
         if (model.type === MetamodelElementType.LABEL_ASSOCIATION_END) {
@@ -59,6 +55,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      * Calculate the cost of transforming one node to another.
      * Insertion/deletion: cost = 1
      * Substitution: cost = 1 + similarity (0-1)
+     * 
+     * @param node1 first NodeAttributes
+     * @param node2 second NodeAttributes
+     * @returns cost of transformation
      */
     protected calculateNodeCost(node1: NodeAttributes | undefined, node2: NodeAttributes | undefined): number {
         if (node1 === undefined || node2 === undefined) {
@@ -88,6 +88,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      * Calculate the cost of transforming one edge to another.
      * Insertion/deletion: cost = 1
      * Substitution: cost = 1 + similarity (0-1)
+     * 
+     * @param edge1 first EdgeAttributes
+     * @param edge2 second EdgeAttributes
+     * @returns cost of transformation
      */
     protected calculateEdgeCost(edge1: EdgeAttributes | undefined, edge2: EdgeAttributes | undefined): number {
         if (edge1 === undefined || edge2 === undefined) {
@@ -115,6 +119,9 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts graph metadata from the metamodel source model.
+     * 
+     * @param sourceModel the metamodel source model
+     * @returns extracted graph metadata
      */
     protected extractGraphMetadata(sourceModel: PartialMetaModel): GraphMetadata {
         const nodes: Record<string, NodeMetadata> = {};
@@ -133,6 +140,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts metadata for all classes.
+     * 
+     * @param classes list of classes in the metamodel
+     * @param idRegistry model ID registry
+     * @param nodes record to populate with node metadata
      */
     private extractClassMetadata(
         classes: PartialClass[],
@@ -152,6 +163,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts metadata for all imported classes.
+     * 
+     * @param imports list of class imports in the metamodel
+     * @param idRegistry model ID registry
+     * @param nodes record to populate with node metadata
      */
     private extractClassImportMetadata(
         imports: PartialClassImport[],
@@ -176,6 +191,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts metadata for all inheritance relationships.
+     * 
+     * @param classes list of classes in the metamodel
+     * @param idRegistry model ID registry
+     * @param edges record to populate with edge metadata
      */
     private extractInheritanceMetadata(
         classes: PartialClass[],
@@ -213,6 +232,11 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts metadata for all associations.
+     * 
+     * @param associations list of associations in the metamodel
+     * @param idRegistry model ID registry
+     * @param nodes record to populate with node metadata
+     * @param edges record to populate with edge metadata
      */
     private extractAssociationMetadata(
         associations: PartialAssociation[],
@@ -249,6 +273,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts metadata for association end labels.
+     * 
+     * @param assoc the association definition
+     * @param edgeId the ID of the association edge
+     * @param nodes record to populate with node metadata
      */
     private extractAssociationLabelMetadata(
         assoc: PartialAssociation,
@@ -272,6 +300,9 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Extracts classes, associations, and imports from the metamodel.
+     * 
+     * @param metamodel the metamodel source model
+     * @returns extracted classes, associations, and imports
      */
     private extractClassesAndAssociations(metamodel: PartialMetaModel): {
         classes: PartialClass[];
@@ -314,6 +345,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Gets the ID for a class (handles both Class and ClassImport).
+     * 
+     * @param classNode the class AST node
+     * @param idRegistry model ID registry
+     * @returns the class ID or undefined
      */
     private getClassId(classNode: AstNode, idRegistry: ModelIdRegistry): string | undefined {
         if (!classNode) {
@@ -338,6 +373,9 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     /**
      * Creates node attributes for a class.
      * Includes property names for similarity comparison.
+     * 
+     * @param cls the class definition
+     * @returns node attributes
      */
     private createClassAttributes(cls: PartialClass): NodeAttributes {
         const properties = cls.properties?.filter((p) => p?.name).map((p) => p.name!) ?? [];
@@ -353,6 +391,9 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     /**
      * Creates edge attributes for an association.
      * Includes property names for similarity comparison.
+     * 
+     * @param assoc the association definition
+     * @returns edge attributes
      */
     private createAssociationAttributes(assoc: PartialAssociation): EdgeAttributes {
         return {
@@ -367,6 +408,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      * Calculates similarity between two classes based on shared properties.
      * Returns a value between 0 (no similarity) and 1 (identical).
      * This function is symmetric.
+     * 
+     * @param node1 first NodeAttributes
+     * @param node2 second NodeAttributes
+     * @returns similarity score
      */
     private calculateClassSimilarity(node1: NodeAttributes, node2: NodeAttributes): number {
         const props1 = (node1.properties as string[]) || [];
@@ -391,6 +436,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      * Calculates similarity between two associations based on property names.
      * Returns a value between 0 (no similarity) and 1 (identical).
      * This function is symmetric.
+     * 
+     * @param edge1 first EdgeAttributes
+     * @param edge2 second EdgeAttributes
+     * @returns similarity score
      */
     private calculateAssociationSimilarity(edge1: EdgeAttributes, edge2: EdgeAttributes): number {
         const start1 = (edge1.startProperty as string) || "";

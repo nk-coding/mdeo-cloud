@@ -115,6 +115,12 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
         if (!fileTypeResult.success) {
             throw apiErrorToVSCodeError(fileTypeResult.error);
         }
+        if (fileTypeResult.value == undefined) {
+            throw createFileSystemProviderError(
+                `File not found: ${resource.toString()}`,
+                FileSystemProviderErrorCode.FileNotFound
+            );
+        }
 
         if (fileTypeResult.value === FileType.File) {
             const contentResult = await this.backendApi.readFile(projectId, path);

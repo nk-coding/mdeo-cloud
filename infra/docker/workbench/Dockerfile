@@ -13,10 +13,8 @@ FROM nginx:alpine AS workbench
 # Copy built assets
 COPY --from=workbench-builder /build/packages/workbench/dist /usr/share/nginx/html
 
-# Copy nginx configuration template
-COPY infra/docker/workbench/nginx.conf /etc/nginx/nginx.conf.template
+# Copy custom nginx configuration
+RUN rm /etc/nginx/conf.d/default.conf
+COPY infra/docker/workbench/nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
-
-# Use environment variable substitution for nginx config
-CMD envsubst '${PLUGIN_SERVICE_HOST}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'

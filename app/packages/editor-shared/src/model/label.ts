@@ -1,3 +1,4 @@
+import type { EditLabelValidationResult } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 
 const { GChildElement, editLabelFeature } = sharedImport("@eclipse-glsp/sprotty");
@@ -33,4 +34,9 @@ export class GLabel extends GChildElement {
      * Temporarily stores the edited text before applying
      */
     tempText?: string;
+
+    /**
+     * Stores the validation result for the current edit
+     */
+    validationResult?: EditLabelValidationResult;
 }

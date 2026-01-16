@@ -15,8 +15,8 @@ import {
     type FileDataError,
     FileSystemErrorCode
 } from "./apiResult";
-import type { BackendPlugin, ResolvedPlugin } from "./pluginTypes";
 import { CommonErrorCode } from "./apiResult";
+import type { Plugin } from "@mdeo/plugin";
 
 /**
  * Information cached about a file or directory
@@ -34,13 +34,21 @@ interface CachedFileInfo {
  * HTTP-based implementation of BackendAPI communicating with the Ktor backend.
  */
 export class HttpBackendApi implements BackendApi {
-    private baseUrl: string;
-    private cachedProjectId: string | null = null;
+    /**
+     * The ID of the currently cached project, or undefined if no project is cached
+     */
+    private cachedProjectId: string | undefined = undefined;
+    /**
+     * Cache mapping file/directory paths to their cached information
+     */
     private fileTreeCache: Map<string, CachedFileInfo> = new Map();
 
-    constructor(baseUrl: string = "/api") {
-        this.baseUrl = baseUrl;
-    }
+    /**
+     * Creates a new HttpBackendApi instance.
+     *
+     * @param baseUrl The base URL of the backend API (default: "/api")
+     */
+    constructor(readonly baseUrl: string = "/api") {}
 
     async getCurrentUser(): Promise<ApiResult<User, CommonError>> {
         try {
@@ -57,7 +65,7 @@ export class HttpBackendApi implements BackendApi {
             }
 
             const data = await response.json();
-            return ApiResult.success(data.value);
+            return ApiResult.success(data);
         } catch (error) {
             return ApiResult.commonFailure(CommonErrorCode.Unavailable, String(error));
         }
@@ -195,7 +203,7 @@ export class HttpBackendApi implements BackendApi {
     }
 
     async readFile(projectId: string, path: string): Promise<ApiResult<FileReadResult, FileSystemError>> {
-        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+        const normalizedPath = this.normalizePath(path);
 
         if (this.cachedProjectId === projectId) {
             const cached = this.fileTreeCache.get(normalizedPath);
@@ -279,7 +287,7 @@ export class HttpBackendApi implements BackendApi {
         );
 
         if (result.success && this.cachedProjectId === projectId) {
-            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+            const normalizedPath = this.normalizePath(path);
             const existing = this.fileTreeCache.get(normalizedPath);
             this.fileTreeCache.set(normalizedPath, {
                 exists: true,
@@ -303,7 +311,7 @@ export class HttpBackendApi implements BackendApi {
         );
 
         if (result.success && this.cachedProjectId === projectId) {
-            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+            const normalizedPath = this.normalizePath(path);
             this.fileTreeCache.set(normalizedPath, {
                 exists: true,
                 type: FileType.Directory,
@@ -317,7 +325,7 @@ export class HttpBackendApi implements BackendApi {
     }
 
     async readdir(projectId: string, path: string): Promise<ApiResult<[string, FileType][], FileSystemError>> {
-        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+        const normalizedPath = this.normalizePath(path);
 
         if (this.cachedProjectId === projectId) {
             const cached = this.fileTreeCache.get(normalizedPath);
@@ -370,8 +378,8 @@ export class HttpBackendApi implements BackendApi {
         }
     }
 
-    async stat(projectId: string, path: string): Promise<ApiResult<FileType, FileSystemError>> {
-        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+    async stat(projectId: string, path: string): Promise<ApiResult<FileType | undefined, FileSystemError>> {
+        const normalizedPath = this.normalizePath(path);
 
         if (this.cachedProjectId === projectId) {
             const cached = this.fileTreeCache.get(normalizedPath);
@@ -385,13 +393,13 @@ export class HttpBackendApi implements BackendApi {
             }
         }
 
-        const result = await this.fetchApiResult<FileType>(
+        const result = await this.fetchApiResult<FileType | undefined>(
             `${this.baseUrl}/projects/${projectId}/stat/${this.encodePath(path)}`,
             {}
         );
 
-        if (this.cachedProjectId === projectId) {
-            if (result.success) {
+        if (this.cachedProjectId === projectId && result.success) {
+            if (result.value != undefined) {
                 const existing = this.fileTreeCache.get(normalizedPath);
                 this.fileTreeCache.set(normalizedPath, {
                     exists: true,
@@ -400,7 +408,7 @@ export class HttpBackendApi implements BackendApi {
                     metadata: existing?.metadata,
                     dirEntries: existing?.dirEntries
                 });
-            } else if (result.error.code === FileSystemErrorCode.FileNotFound) {
+            } else {
                 this.fileTreeCache.set(normalizedPath, {
                     exists: false
                 });
@@ -422,7 +430,7 @@ export class HttpBackendApi implements BackendApi {
         );
 
         if (result.success && this.cachedProjectId === projectId) {
-            const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+            const normalizedPath = this.normalizePath(path);
 
             this.fileTreeCache.set(normalizedPath, {
                 exists: false
@@ -496,7 +504,7 @@ export class HttpBackendApi implements BackendApi {
     }
 
     async readMetadata(projectId: string, path: string): Promise<ApiResult<object, FileSystemError>> {
-        const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+        const normalizedPath = this.normalizePath(path);
 
         if (this.cachedProjectId === projectId) {
             const cached = this.fileTreeCache.get(normalizedPath);
@@ -536,13 +544,28 @@ export class HttpBackendApi implements BackendApi {
     }
 
     async writeMetadata(projectId: string, path: string, metadata: object): Promise<ApiResult<void, FileSystemError>> {
-        return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/metadata/${this.encodePath(path)}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(metadata)
-        });
+        const result = await this.fetchApiResult<void>(
+            `${this.baseUrl}/projects/${projectId}/metadata/${this.encodePath(path)}`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(metadata)
+            }
+        );
+
+        if (result.success && this.cachedProjectId === projectId) {
+            const normalizedPath = this.normalizePath(path);
+            const existing = this.fileTreeCache.get(normalizedPath);
+            if (existing != undefined) {
+                this.fileTreeCache.set(normalizedPath, {
+                    ...existing,
+                    metadata: metadata
+                });
+            }
+        }
+        return result;
     }
 
     async createPlugin(url: string): Promise<ApiResult<string, PluginError>> {
@@ -566,16 +589,24 @@ export class HttpBackendApi implements BackendApi {
             method: "POST"
         });
     }
-
-    async getPlugins(): Promise<ApiResult<BackendPlugin[], PluginError>> {
+    async updatePluginDefault(pluginId: string, isDefault: boolean): Promise<ApiResult<void, PluginError>> {
+        return this.fetchApiResult(`${this.baseUrl}/plugins/${pluginId}/default`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ default: isDefault })
+        });
+    }
+    async getPlugins(): Promise<ApiResult<Plugin[], PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/plugins`, {});
     }
 
-    async getProjectPlugins(projectId: string): Promise<ApiResult<BackendPlugin[], PluginError>> {
+    async getProjectPlugins(projectId: string): Promise<ApiResult<Plugin[], PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins`, {});
     }
 
-    async addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>> {
+    async addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<Plugin, PluginError>> {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins`, {
             method: "POST",
             headers: {
@@ -589,10 +620,6 @@ export class HttpBackendApi implements BackendApi {
         return this.fetchApiResult(`${this.baseUrl}/projects/${projectId}/plugins/${pluginId}`, {
             method: "DELETE"
         });
-    }
-
-    async resolvePlugin(pluginId: string): Promise<ApiResult<ResolvedPlugin, PluginError>> {
-        return this.fetchApiResult(`${this.baseUrl}/plugins/${pluginId}/resolve`, {});
     }
 
     async precache(project: Project): Promise<void> {
@@ -622,6 +649,16 @@ export class HttpBackendApi implements BackendApi {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ isAdmin })
         });
+    }
+
+    async getFileData(projectId: string, path: string, key: string): Promise<ApiResult<string, FileDataError>> {
+        const params = new URLSearchParams({ path });
+        return this.fetchApiResult(
+            `${this.baseUrl}/projects/${projectId}/file-data/${encodeURIComponent(key)}?${params}`,
+            {
+                method: "GET"
+            }
+        );
     }
 
     /**
@@ -711,16 +748,6 @@ export class HttpBackendApi implements BackendApi {
             }
 
             const data = await response.json();
-            if (typeof data === "object") {
-                if ("value" in data) {
-                    return ApiResult.success(data.value as T);
-                } else if ("error" in data) {
-                    return {
-                        success: false,
-                        error: data.error
-                    };
-                }
-            }
 
             return ApiResult.success(data as T);
         } catch (error) {
@@ -758,13 +785,13 @@ export class HttpBackendApi implements BackendApi {
         return normalized.split("/").map(encodeURIComponent).join("/");
     }
 
-    async getFileData(projectId: string, path: string, key: string): Promise<ApiResult<string, FileDataError>> {
-        const params = new URLSearchParams({ path });
-        return this.fetchApiResult(
-            `${this.baseUrl}/projects/${projectId}/file-data/${encodeURIComponent(key)}?${params}`,
-            {
-                method: "GET"
-            }
-        );
+    /**
+     * Normalizes a file path by removing a leading slash if present.
+     *
+     * @param path The path to normalize
+     * @returns The normalized path
+     */
+    private normalizePath(path: string): string {
+        return path.startsWith("/") ? path.slice(1) : path;
     }
 }

@@ -7,6 +7,20 @@ import type { FileDependency, DataDependency, FileDataResult } from "../handler/
 export type TrackedRequests = Pick<FileDataResult, "fileDependencies" | "dataDependencies">;
 
 /**
+ * Interface for file data returned from the server
+ */
+export interface FileData {
+    /**
+     * The version of the file data
+     */
+    version: number;
+    /**
+     * The actual file data
+     */
+    data: unknown;
+}
+
+/**
  * Interface for the server API injected into Langium services
  */
 export interface ServerApi {
@@ -40,9 +54,12 @@ export interface ServerApi {
     getTrackedRequests(): TrackedRequests;
 
     /**
-     * Resets the tracked requests
+     * Gets all fetched file data by key
+     *
+     * @param key The data key
+     * @returns Map of file paths to their corresponding file data
      */
-    resetTrackedRequests(): void;
+    getFileDataByKey(key: string): Map<string, FileData>;
 }
 
 /**
@@ -76,6 +93,11 @@ export class HttpServerApi implements ServerApi {
     private trackedDataDependencies: DataDependency[] = [];
 
     /**
+     * Cache of fetched file data by key
+     */
+    private fileDataCache: Map<string, Map<string, FileData>> = new Map();
+
+    /**
      * The project-specific backend URL
      */
     get projectBackendUrl(): string | undefined {
@@ -104,13 +126,15 @@ export class HttpServerApi implements ServerApi {
 
     /**
      * Clears the JWT token and project context after request handling.
-     * Should be called after the request is complete to prevent token leakage.
+     * Further, it resets tracked requests.
+     * Should be called after the request is complete to prevent token leakage and stale context.
      */
-    clearContext(): void {
+    reset(): void {
         this.jwt = undefined;
         this.project = undefined;
         this.trackedFileDependencies = [];
         this.trackedDataDependencies = [];
+        this.fileDataCache.clear();
     }
 
     private getAuthHeaders(): HeadersInit {
@@ -157,13 +181,21 @@ export class HttpServerApi implements ServerApi {
 
     /**
      * Gets computed file data from the backend.
+     * Uses caching to avoid redundant requests.
      *
      * @param path The path of the file
      * @param key The data key (e.g., "ast", "diagram")
      * @returns Promise resolving to the computed file data and version
      * @throws Error if the data cannot be retrieved or JWT is not set
      */
-    async getFileData(path: string, key: string): Promise<{ data: unknown; version: number }> {
+    async getFileData(path: string, key: string): Promise<FileData> {
+        if (!this.fileDataCache.has(key)) {
+            this.fileDataCache.set(key, new Map());
+        }
+        const keyCache = this.fileDataCache.get(key)!;
+        if (keyCache.has(path)) {
+            return keyCache.get(path)!;
+        }
         const encodedPath = encodeURIComponent(path);
         const encodedKey = encodeURIComponent(key);
         const response = await fetch(`${this.projectBackendUrl}/file-data/${encodedKey}?path=${encodedPath}`, {
@@ -176,6 +208,11 @@ export class HttpServerApi implements ServerApi {
         }
 
         const result = await response.json();
+        const fileData: FileData = {
+            data: result.data,
+            version: result.version
+        };
+        keyCache.set(path, fileData);
 
         this.trackedDataDependencies.push({
             path,
@@ -183,7 +220,7 @@ export class HttpServerApi implements ServerApi {
             version: result.version
         });
 
-        return { data: result.data, version: result.version };
+        return fileData;
     }
 
     /**
@@ -219,8 +256,7 @@ export class HttpServerApi implements ServerApi {
         };
     }
 
-    resetTrackedRequests(): void {
-        this.trackedFileDependencies = [];
-        this.trackedDataDependencies = [];
+    getFileDataByKey(key: string): Map<string, FileData> {
+        return this.fileDataCache.get(key) ?? new Map();
     }
 }

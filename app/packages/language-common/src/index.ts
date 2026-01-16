@@ -30,6 +30,7 @@ export * from "./grammar/type/types.js";
 export * from "./language/defaultLanguageConfiguration.js";
 export * from "./language/defaultMonarchTokenProvider.js";
 export * from "./language/defaultTokens.js";
+export * from "./language/serialization.js";
 export * from "./plugin/languagePlugin.js";
 export * from "./plugin/pluginContext.js";
 export * from "./plugin/sharedImport.js";

@@ -4,11 +4,30 @@ import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 
 /**
+ * Enumeration of primitive types supported in the metamodel.
+ */
+export enum MetamodelPrimitiveTypes {
+    INT = "int",
+    STRING = "string",
+    BOOLEAN = "boolean",
+    LONG = "long",
+    DOUBLE = "double",
+    FLOAT = "float"
+}
+
+/**
  * Primitive type for metamodel properties.
  * Represents basic data types that can be used in metamodel class properties.
  */
 export const PrimitiveType = createInterface("PrimitiveType").attrs({
-    name: Union("int", "string", "boolean", "long", "double", "float")
+    name: Union(
+        MetamodelPrimitiveTypes.INT,
+        MetamodelPrimitiveTypes.STRING,
+        MetamodelPrimitiveTypes.BOOLEAN,
+        MetamodelPrimitiveTypes.LONG,
+        MetamodelPrimitiveTypes.DOUBLE,
+        MetamodelPrimitiveTypes.FLOAT
+    )
 });
 
 /**
@@ -21,7 +40,7 @@ export type PrimitiveTypeType = ASTType<typeof PrimitiveType>;
  * Can be a numeric value or one of the special symbols: * (any), + (one or more), ? (optional).
  */
 export const SingleMultiplicity = createInterface("SingleMultiplicity").attrs({
-    value: Union("*", "+", "?"),
+    value: Optional(Union("*", "+", "?")),
     numericValue: Optional(Number)
 });
 

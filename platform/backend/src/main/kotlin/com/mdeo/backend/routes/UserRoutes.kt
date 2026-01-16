@@ -45,7 +45,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
             }
             
             val users = userService.getAllUsers()
-            call.respond(ApiResult.Success(users))
+            call.respond(users)
         }
         
         route("/{userId}") {
@@ -76,7 +76,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                 }
                 
                 val projects = projectService.getProjectsByUserId(userId)
-                call.respond(ApiResult.Success(projects))
+                call.respond(projects)
             }
             
             /**
@@ -110,11 +110,11 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                 
                 val updated = userService.updateUserAdmin(userId, request.isAdmin)
                 if (!updated) {
-                    call.respond(ApiResult.Failure(ApiError(ErrorCodes.USER_NOT_FOUND, "User not found")))
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
                     return@put
                 }
                 
-                call.respond(ApiResult.Success(Unit))
+                call.respond(Unit)
             }
         }
     }

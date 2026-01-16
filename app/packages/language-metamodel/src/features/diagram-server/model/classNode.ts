@@ -5,9 +5,13 @@ import { MetamodelElementType } from "./elementTypes.js";
  * Node representing a Class in the diagram.
  */
 export class ClassNode extends GNode {
-    /** The name of the class */
-    name?: string;
-    /** Whether this class is abstract */
+    /**
+     * The name of the class
+     */
+    name!: string;
+    /**
+     * Whether this class is abstract
+     */
     isAbstract?: boolean;
 
     /**

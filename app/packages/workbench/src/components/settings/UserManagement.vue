@@ -122,7 +122,9 @@ async function loadUsers(preferredSelection?: string) {
     try {
         const result = await props.backendApi.getAllUsers();
         if (result.success) {
-            users.value = result.value;
+            users.value = result.value.sort((a, b) => {
+                return a.username.localeCompare(b.username);
+            });
             hasLoaded.value = true;
             if (preferredSelection) {
                 selectedUserId.value = preferredSelection;

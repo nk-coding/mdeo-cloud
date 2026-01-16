@@ -10,8 +10,10 @@ import java.util.*
 
 /**
  * Service for managing projects and project ownership.
+ * 
+ * @param pluginService Service for managing plugins
  */
-class ProjectService {
+class ProjectService(val pluginService: PluginService, private val fileService: FileService) : BaseService() {
     
     /**
      * Retrieves all projects accessible by a user.
@@ -88,6 +90,7 @@ class ProjectService {
     
     /**
      * Creates a new project with the creator as the initial owner.
+     * Automatically adds default plugins to the new project.
      *
      * @param name The name of the project
      * @param creatorUserId The UUID of the user creating the project
@@ -96,25 +99,35 @@ class ProjectService {
     fun createProject(name: String, creatorUserId: UUID): Project {
         val projectId = UUID.randomUUID()
         val now = Instant.now()
-        
-        return transaction {
+
+        transaction {
             ProjectsTable.insert {
                 it[id] = projectId
                 it[ProjectsTable.name] = name
                 it[createdAt] = now
                 it[updatedAt] = now
             }
-            
+
             ProjectOwnersTable.insert {
                 it[ProjectOwnersTable.projectId] = projectId
                 it[userId] = creatorUserId
             }
-            
-            Project(
-                id = projectId.toString(),
-                name = name
-            )
+
+            val defaultPlugins = pluginService.getDefaultPlugins()
+            for (pluginId in defaultPlugins) {
+                ProjectPluginsTable.insert {
+                    it[ProjectPluginsTable.projectId] = projectId
+                    it[ProjectPluginsTable.pluginId] = pluginId
+                }
+            }
         }
+
+        fileService.mkdir(projectId, "")
+
+        return Project(
+            id = projectId.toString(),
+            name = name
+        )
     }
     
     /**

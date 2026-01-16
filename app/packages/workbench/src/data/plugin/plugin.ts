@@ -1,5 +1,6 @@
 import type { LanguageContributionPlugin, LanguageEditorPlugin, LanguagePlugin, Plugin } from "@mdeo/plugin";
 import type { ContainerConfiguration } from "@eclipse-glsp/sprotty";
+import type { languages } from "monaco-editor";
 
 /**
  * An extension to the base plugin interface for workbench-specific functionality.
@@ -13,12 +14,18 @@ export interface WorkbenchPlugin extends Omit<Plugin, "languagePlugins"> {
 
 /**
  * A resolved version of the langauge plugin, where import of the editor plugin is already handled
+ * and monarchTokensProvider is deserialized to contain actual RegExp objects.
  */
-export interface WorkbenchLanguagePlugin extends Omit<LanguagePlugin, "editorPlugin"> {
+export interface WorkbenchLanguagePlugin extends Omit<LanguagePlugin, "editorPlugin" | "monarchTokensProvider"> {
     /**
      * Editor plugin for the language, if undefined no graphical editor will be provided
      */
     editorPlugin: WorkbenchLanguageEditorPlugin | undefined;
+
+    /**
+     * Monarch tokens provider for syntax highlighting in the editor (deserialized with RegExp objects)
+     */
+    monarchTokensProvider: languages.IMonarchLanguage;
 }
 
 /**

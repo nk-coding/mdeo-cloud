@@ -1,9 +1,13 @@
 import { URI, type LangiumDocument } from "langium";
 import type { FileDataHandler, FileDataResult } from "./types.js";
+import type { JsonAstSerializer } from "../langium/jsonAstSerializer.js";
 import { type AstData } from "../langium/jsonAstSerializer.js";
-import type { ExternalReferenceAdditionalServices, LanguageServices } from "@mdeo/language-common";
+import type {
+    ExternalReferenceAdditionalServices,
+    ExternalReferenceCollector,
+    ExternalReferences
+} from "@mdeo/language-common";
 import type { TrackedRequests } from "../service/serverApi.js";
-import type { ServiceAdditionalServices } from "../langium/types.js";
 
 /**
  * Key for the AST handler
@@ -39,10 +43,17 @@ export const astHandler: FileDataHandler<AstData, ExternalReferenceAdditionalSer
         .map((dependency) => services.shared.workspace.LangiumDocuments.getDocument(URI.file(dependency.path)))
         .filter((doc) => doc != undefined);
 
+    const dependencyAnalyzer = new DependencyAnalyzer(
+        [document, ...additionalDocuments],
+        services.references.ExternalReferenceCollector,
+        [...serverApi.getFileDataByKey(AST_HANDLER_KEY).values()].map(({ data }) => data as AstData)
+    );
+    const serializer = services.shared.serializer.JsonAstSerializer;
+
     return {
-        ...serializeDocument(document, services, trackedRequestsLookup),
+        ...serializeDocument(document, serializer, trackedRequestsLookup, dependencyAnalyzer),
         additionalFileData: additionalDocuments.map((doc) => ({
-            ...serializeDocument(doc, services, trackedRequestsLookup),
+            ...serializeDocument(doc, serializer, trackedRequestsLookup, dependencyAnalyzer),
             path: doc.uri.path,
             key: AST_HANDLER_KEY,
             sourceVersion: trackedRequestsLookup.fileDependencies.get(doc.uri.path)?.version ?? -1
@@ -54,26 +65,22 @@ export const astHandler: FileDataHandler<AstData, ExternalReferenceAdditionalSer
  * Serializes a Langium document into AST data, including tracking dependencies.
  *
  * @param document the Langium document to serialize
- * @param services the language services
+ * @param serializer the JSON AST serializer
  * @param trackedRequests the tracked requests lookup
+ * @param dependencyAnalyzer the dependency analyzer for error checking
  * @returns the file data result containing the serialized AST and dependencies
  */
 function serializeDocument(
     document: LangiumDocument,
-    services: LanguageServices & ServiceAdditionalServices & ExternalReferenceAdditionalServices,
-    trackedRequests: TrackedRequestsLookup
+    serializer: JsonAstSerializer,
+    trackedRequests: TrackedRequestsLookup,
+    dependencyAnalyzer: DependencyAnalyzer
 ): Omit<FileDataResult<AstData>, "additionalFileData"> {
-    const externalReferenceCollector = services.references.ExternalReferenceCollector;
-    const serializer = services.shared.serializer.JsonAstSerializer;
-
     const serializedAst = serializer.serialize(document);
-    const references = externalReferenceCollector.findExternalReferences([document]);
+    const references = dependencyAnalyzer.getReferences(document.uri);
 
     const astData: AstData = {
-        hasErrors:
-            document.parseResult.lexerErrors.length > 0 ||
-            document.parseResult.parserErrors.length > 0 ||
-            (document.diagnostics != undefined && document.diagnostics.length > 0),
+        ...dependencyAnalyzer.getErrors(document.uri),
         ast: serializedAst,
         path: document.uri.path,
         linkDependencies: [...references.local.map((uri) => uri.path), ...references.external.map((uri) => uri.path)],
@@ -105,6 +112,128 @@ function serializeDocument(
     }
 
     return result;
+}
+
+/**
+ * Checks if the given document has any errors (lexer, parser, or diagnostics).
+ * Also allows to access transitive error information through dependencies.
+ */
+class DependencyAnalyzer {
+    /**
+     * Map of file paths to their error and reference data
+     */
+    private readonly fileData: Map<
+        string,
+        {
+            hasErrors: boolean;
+            externalReferences: ExternalReferences;
+            hasExternalErrors: boolean;
+        }
+    > = new Map();
+
+    /**
+     * Map of file paths to their AST data
+     */
+    private readonly astDataLookup: Map<string, AstData> = new Map();
+
+    /**
+     * Creates a new DependencyAnalyzer.
+     *
+     * @param documents the Langium documents to analyze
+     * @param referenceCollector the external reference collector
+     * @param astDatas the AST data for the documents
+     */
+    constructor(documents: LangiumDocument[], referenceCollector: ExternalReferenceCollector, astDatas: AstData[]) {
+        for (const astData of astDatas) {
+            this.astDataLookup.set(astData.path, astData);
+        }
+        for (const document of documents) {
+            const path = document.uri.path;
+            const references = referenceCollector.findExternalReferences([document]);
+            this.fileData.set(path, {
+                hasErrors: this.hasErrors(document),
+                externalReferences: references,
+                hasExternalErrors: references.external.some(
+                    (refUri) => this.astDataLookup.get(refUri.path)?.hasTransitiveErrors !== false
+                )
+            });
+        }
+    }
+
+    /**
+     * Gets the external references for the given file path.
+     *
+     * @param uri The URI of the file
+     * @returns The external references for the file
+     * @throws Error if no references are found for the given path
+     */
+    getReferences(uri: URI): ExternalReferences {
+        const path = uri.path;
+        const refs = this.fileData.get(path)?.externalReferences;
+        if (refs == undefined) {
+            throw new Error(`No external references found for path: ${path}`);
+        }
+        return refs;
+    }
+
+    /**
+     * Gets whether the given file has errors or transitive errors.
+     *
+     * @param uri The URI of the file
+     * @returns An object indicating if the file has errors and transitive errors
+     * @throws Error if no error information is found for the given path
+     */
+    getErrors(uri: URI): Pick<AstData, "hasErrors" | "hasTransitiveErrors"> {
+        const hasLocalErrors = this.fileData.get(uri.path)?.hasErrors;
+        if (hasLocalErrors == undefined) {
+            throw new Error(`No error information found for path: ${uri.path}`);
+        }
+        if (hasLocalErrors) {
+            return {
+                hasErrors: true,
+                hasTransitiveErrors: true
+            };
+        }
+
+        let hasTransitiveErrors = false;
+        const checkedFiles = new Set<string>([uri.path]);
+        const toCheck = [uri.path];
+        while (toCheck.length > 0) {
+            const currentPath = toCheck.pop()!;
+            const fileData = this.fileData.get(currentPath);
+            if (fileData == undefined) {
+                throw new Error(`No file data found for path: ${currentPath}`);
+            }
+            if (fileData.hasErrors || fileData.hasExternalErrors) {
+                hasTransitiveErrors = true;
+                break;
+            }
+            for (const ref of fileData.externalReferences.local) {
+                if (!checkedFiles.has(ref.path)) {
+                    checkedFiles.add(ref.path);
+                    toCheck.push(ref.path);
+                }
+            }
+        }
+        return {
+            hasErrors: false,
+            hasTransitiveErrors
+        };
+    }
+
+    /**
+     * Checks if the given document has any errors (lexer, parser, or diagnostics).
+     *
+     * @param document The Langium document to check
+     * @returns True if the document has errors, false otherwise
+     */
+    private hasErrors(document: LangiumDocument): boolean {
+        return (
+            document.parseResult.lexerErrors.length > 0 ||
+            document.parseResult.parserErrors.length > 0 ||
+            (document.diagnostics != undefined && document.diagnostics.length > 0)
+        );
+    }
 }
 
 /**

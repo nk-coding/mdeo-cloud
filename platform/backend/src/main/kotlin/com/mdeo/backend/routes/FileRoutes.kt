@@ -37,8 +37,8 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val versionResult = fileService.getFileVersion(projectId, path)
             
             when {
-                contentResult is ApiResult.Failure -> call.respond(contentResult)
-                versionResult is ApiResult.Failure -> call.respond(versionResult)
+                contentResult is ApiResult.Failure -> call.respondApiResult(contentResult as ApiResult<Any>)
+                versionResult is ApiResult.Failure -> call.respondApiResult(versionResult as ApiResult<Any>)
                 contentResult is ApiResult.Success && versionResult is ApiResult.Success -> {
                     val textContent = String(contentResult.value, Charsets.UTF_8)
                     call.respond(FileReadResponse(textContent, versionResult.value))
@@ -67,7 +67,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val overwrite = call.request.queryParameters["overwrite"]?.toBoolean() ?: false
             
             val result = fileService.writeFile(projectId, path, content, create, overwrite)
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -91,7 +91,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val overwrite = call.request.queryParameters["overwrite"]?.toBoolean() ?: true
             
             val result = fileService.writeFile(projectId, path, content, create, overwrite)
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -111,7 +111,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val recursive = call.request.queryParameters["recursive"]?.toBoolean() ?: false
             
             val result = fileService.delete(projectId, path, recursive)
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
     
@@ -130,7 +130,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val path = pathParts.joinToString("/")
             
             val result = fileService.mkdir(projectId, path)
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -147,7 +147,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val path = pathParts.joinToString("/").ifEmpty { "/" }
             
             val result = fileService.readdir(projectId, path)
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
     
@@ -166,7 +166,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val path = pathParts.joinToString("/")
             
             val result = fileService.stat(projectId, path)
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
     
@@ -185,7 +185,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             val path = pathParts.joinToString("/")
             
             val result = fileService.getFileVersion(projectId, path)
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
     
@@ -212,7 +212,7 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
             }
             
             val result = fileService.rename(projectId, from, to, overwrite)
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
 }

@@ -19,6 +19,8 @@
             {{ plugin.url }}
         </a>
 
+        <Separator />
+
         <div v-if="plugin.languagePlugins && plugin.languagePlugins.length > 0" class="mt-6">
             <h3 class="text-lg font-semibold text-foreground mb-3">Language Plugins</h3>
             <div class="space-y-2">
@@ -55,7 +57,7 @@
             <div class="space-y-2">
                 <div
                     v-for="contribPlugin in plugin.contributionPlugins"
-                    :key="contribPlugin.id"
+                    :key="contribPlugin.languageId"
                     class="p-3 rounded-md border border-border bg-card"
                 >
                     <div class="font-medium text-foreground">
@@ -71,10 +73,11 @@
 </template>
 
 <script setup lang="ts">
+import type { Plugin } from "@mdeo/plugin";
 import { Link, Icon } from "lucide-vue-next";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
+import { Separator } from "@/components/ui/separator";
 
 const props = defineProps<{
-    plugin: BackendPlugin;
+    plugin: Plugin;
 }>();
 </script>

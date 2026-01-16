@@ -17,6 +17,7 @@ export * from "./diagram-server/model/rectangularNode.js";
 export * from "./diagram-server/model/verticalDivider.js";
 export * from "./diagram-server/baseDiagramModule.js";
 export * from "./diagram-server/baseGModelFactory.js";
+export * from "./diagram-server/baseLabelEditValidator.js";
 export * from "./diagram-server/langiumServices.js";
 export * from "./diagram-server/metadata.js";
 export * from "./diagram-server/metadataManager.js";

@@ -17,6 +17,9 @@ RUN npm run build
 # Production stage
 FROM node:23-alpine
 
+# Install curl for healthchecks
+RUN apk add --no-cache curl
+
 WORKDIR /workspace
 
 # Copy the entire packages structure with built artifacts and dependencies

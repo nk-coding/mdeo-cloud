@@ -34,7 +34,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
             }
             
             val projects = projectService.getProjectsForUser(userId, session.isAdmin)
-            call.respond(ApiResult.Success(projects))
+            call.respond(projects)
         }
         
         /**
@@ -56,7 +56,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 return@post
             }
             val project = projectService.createProject(request.name, userId)
-            call.respond(HttpStatusCode.Created, ApiResult.Success(project))
+            call.respond(HttpStatusCode.Created, project)
         }
         
         route("/{projectId}") {
@@ -93,11 +93,11 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 
                 val project = projectService.getProject(projectId)
                 if (project == null) {
-                    call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@get
                 }
                 
-                call.respond(ApiResult.Success(project))
+                call.respond(project)
             }
             
             /**
@@ -136,17 +136,17 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 val updated = projectService.updateProject(projectId, request)
 
                 if (!updated) {
-                    call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@put
                 }
 
                 val updatedProject = projectService.getProject(projectId)
                 if (updatedProject == null) {
-                    call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@put
                 }
 
-                call.respond(ApiResult.Success(updatedProject))
+                call.respond(updatedProject)
             }
             
             /**
@@ -183,11 +183,11 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 val deleted = projectService.deleteProject(projectId)
                 
                 if (!deleted) {
-                    call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@delete
                 }
                 
-                call.respond(ApiResult.Success(Unit))
+                call.respond(Unit)
             }
             
             route("/owners") {
@@ -223,7 +223,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                     }
                     
                     val owners = projectService.getProjectOwners(projectId)
-                    call.respond(ApiResult.Success(owners))
+                    call.respond(owners)
                 }
                 
                 /**
@@ -265,13 +265,13 @@ fun Route.projectRoutes(projectService: ProjectService) {
                     }
                     
                     when (projectService.addOwner(projectId, userId)) {
-                        AddOwnerResult.SUCCESS -> call.respond(ApiResult.Success(Unit))
+                        AddOwnerResult.SUCCESS -> call.respond(Unit)
                         AddOwnerResult.PROJECT_NOT_FOUND -> 
-                            call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                         AddOwnerResult.USER_NOT_FOUND -> 
-                            call.respond(ApiResult.Failure(ApiError(ErrorCodes.USER_NOT_FOUND, "User not found")))
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
                         AddOwnerResult.ALREADY_OWNER -> 
-                            call.respond(ApiResult.Failure(ApiError(ErrorCodes.OWNER_ALREADY_EXISTS, "User is already an owner")))
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is already an owner"))
                     }
                 }
                 
@@ -316,13 +316,13 @@ fun Route.projectRoutes(projectService: ProjectService) {
                     }
                     
                     when (projectService.removeOwner(projectId, userId)) {
-                        RemoveOwnerResult.SUCCESS -> call.respond(ApiResult.Success(Unit))
+                        RemoveOwnerResult.SUCCESS -> call.respond(Unit)
                         RemoveOwnerResult.PROJECT_NOT_FOUND -> 
-                            call.respond(ApiResult.Failure(ApiError(ErrorCodes.PROJECT_NOT_FOUND, "Project not found")))
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                         RemoveOwnerResult.NOT_OWNER -> 
-                            call.respond(ApiResult.Failure(ApiError(ErrorCodes.OWNER_NOT_FOUND, "User is not an owner")))
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is not an owner"))
                         RemoveOwnerResult.LAST_OWNER -> 
-                            call.respond(ApiResult.Failure(ApiError(ErrorCodes.LAST_OWNER, "Cannot remove the last owner")))
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cannot remove the last owner"))
                     }
                 }
             }

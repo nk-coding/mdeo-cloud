@@ -1,13 +1,46 @@
 <template>
-    <ResizablePanelGroup v-show="languagePlugin != undefined" direction="horizontal">
-        <ResizablePanel>
-            <div ref="editorElement" class="h-full w-full"></div>
-        </ResizablePanel>
-        <ResizableHandle :class="{ hidden: !hasEditor }" />
-        <ResizablePanel :class="{ hidden: !hasEditor }">
-            <GraphicalEditor v-for="tab in tabs" :key="tab.file.id.toString()" v-show="tab === activeTab" :tab="tab" />
-        </ResizablePanel>
-    </ResizablePanelGroup>
+    <div class="w-full h-full">
+        <ResizablePanelGroup v-show="languagePlugin != undefined" direction="horizontal">
+            <ResizablePanel>
+                <div ref="editorElement" class="h-full w-full"></div>
+            </ResizablePanel>
+            <ResizableHandle :class="{ hidden: !hasEditor }" />
+            <ResizablePanel :class="{ hidden: !hasEditor }">
+                <GraphicalEditor
+                    v-for="tab in tabs"
+                    :key="tab.file.id.toString()"
+                    v-show="tab === activeTab"
+                    :tab="tab"
+                />
+            </ResizablePanel>
+        </ResizablePanelGroup>
+        <div
+            v-show="languagePlugin === undefined && activeTab != undefined"
+            class="h-full flex items-center justify-center p-8"
+        >
+            <div class="flex flex-col items-center gap-4 max-w-md text-center">
+                <AlertCircle class="w-12 h-12 text-muted-foreground" />
+                <div class="space-y-2">
+                    <h3 class="text-lg font-semibold text-foreground">No Language Support Available</h3>
+                    <p class="text-sm text-muted-foreground">
+                        No language support for the file extension
+                        <span class="font-mono font-medium">{{ activeTab?.file.extension }}</span> is currently
+                        available.
+                    </p>
+                </div>
+                <Button @click="openManagePlugins">
+                    <Settings class="w-4 h-4 mr-2" />
+                    Manage Plugins
+                </Button>
+            </div>
+        </div>
+
+        <ManagePluginsDialog
+            v-if="project != undefined"
+            v-model:open="isManagePluginsDialogOpen"
+            :project-id="project.id"
+        />
+    </div>
 </template>
 <script setup lang="ts">
 import { computed, inject, onMounted, shallowRef, useTemplateRef, watch } from "vue";
@@ -20,8 +53,11 @@ import { EditorState } from "./util";
 import type { File } from "@/data/filesystem/file";
 import { findFileInTree } from "@/data/filesystem/util";
 import GraphicalEditor from "./GraphicalEditor.vue";
+import { AlertCircle, Settings } from "lucide-vue-next";
+import { Button } from "@/components/ui/button";
+import ManagePluginsDialog from "../projects/ManagePluginsDialog.vue";
 
-const { tabs, activeTab, languagePluginByExtension, monacoApi, fileTree } = inject(workbenchStateKey)!;
+const { tabs, activeTab, languagePluginByExtension, monacoApi, fileTree, project } = inject(workbenchStateKey)!;
 const editorElement = useTemplateRef("editorElement");
 const editor = shallowRef<monacoType.editor.IStandaloneCodeEditor>();
 
@@ -134,4 +170,13 @@ onMounted(() => {
         return monacoEditor;
     };
 });
+
+const isManagePluginsDialogOpen = shallowRef(false);
+
+function openManagePlugins() {
+    // If user is admin, we could open settings, but for now just open project's manage plugins
+    if (project.value) {
+        isManagePluginsDialogOpen.value = true;
+    }
+}
 </script>

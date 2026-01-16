@@ -35,12 +35,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { SidebarMenu, SidebarMenuItem, SidebarInput } from "@/components/ui/sidebar";
 import SidebarMenuButtonChild from "@/components/ui/sidebar/SidebarMenuButtonChild.vue";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
 import { Icon } from "lucide-vue-next";
+import type { Plugin } from "@mdeo/plugin";
 
 const props = withDefaults(
     defineProps<{
-        plugins: BackendPlugin[];
+        plugins: Plugin[];
         selectedPluginId?: string | null;
         isLoading?: boolean;
         emptyMessage?: string;

@@ -9,9 +9,7 @@
                 :has-children="entry.type === FileType.Directory && (entry.children.length > 0 || newItem != undefined)"
                 @click="openTab(true, $event)"
                 @dblclick="openTab(false, $event)"
-                @keydown.enter="openTab(false, $event)"
-                @keydown.f2="handleRename"
-                @keydown.delete="handleDelete"
+                @keydown="handleKeydown"
             >
                 <template #content>
                     <FileTypeIcon
@@ -157,16 +155,29 @@ function handleCreateFolder() {
     }
 }
 
+function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "F2") {
+        handleRename();
+    } else if (event.key === "Delete") {
+        handleDelete();
+    } else if (event.key === "Enter") {
+        openTab(false, event);
+    }
+    event.stopPropagation();
+}
+
 function handleRename() {
     isRenaming.value = true;
 }
 
 function handleDelete() {
-    emit("delete", props.entry.id);
+    if (!isRenaming.value) {
+        emit("delete", props.entry.id);
+    }
 }
 
 function handleRenameSubmit(newName: string) {
-    if (newName.trim() && newName !== getFileNameWithoutExtension(props.entry.name)) {
+    if (newName.trim() && newName !== getFileNameWithoutExtension(props.entry.name) && isRenaming.value) {
         const extension = getFileExtension(props.entry.name);
         const fullName = `${newName.trim()}${extension}`;
         const parent = props.entry.parent;

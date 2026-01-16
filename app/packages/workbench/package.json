@@ -14,10 +14,12 @@
     },
     "dependencies": {
         "@codingame/monaco-vscode-api": "^25.0.0",
+        "@codingame/monaco-vscode-bulk-edit-service-override": "^25.0.0",
         "@codingame/monaco-vscode-configuration-service-override": "^25.0.0",
         "@codingame/monaco-vscode-editor-service-override": "^25.0.0",
         "@codingame/monaco-vscode-files-service-override": "^25.0.0",
         "@codingame/monaco-vscode-search-service-override": "^25.0.0",
+        "@codingame/monaco-vscode-working-copy-service-override": "^25.0.0",
         "@eclipse-glsp/client": "^2.5.0",
         "@eclipse-glsp/server": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",

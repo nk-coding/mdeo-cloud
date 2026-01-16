@@ -1,6 +1,7 @@
 import type {
     BindingContext,
     BindingTarget,
+    ContextEditValidatorRegistry,
     InstanceMultiBinding,
     OperationHandlerConstructor
 } from "@eclipse-glsp/server";
@@ -16,6 +17,7 @@ import { ChangeBoundsOperationHandler } from "./handler/changeBoundsOperationHan
 import { PartialChangeBoundsOperationHandler } from "./handler/partialChangeBoundsOperationHandler.js";
 import { MetadataManager } from "./metadataManager.js";
 import { UpdateClientOperationHandler } from "./handler/updateClientHandler.js";
+import { ExtendedContextEditValidatorRegistry } from "./contextEditValidationRegistry.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclipse-glsp/server");
@@ -26,12 +28,16 @@ const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclip
  */
 @injectable()
 export abstract class BaseDiagramModule extends DiagramModule {
+    override get diagramType() {
+        return this.services.LanguageMetaData.languageId;
+    }
+
     /**
      * Creates a new diagram module with the given language services.
      *
      * @param services The language services to bind into the GLSP container
      */
-    constructor(private readonly services: LanguageServices) {
+    constructor(protected readonly services: LanguageServices) {
         super();
     }
 
@@ -67,6 +73,10 @@ export abstract class BaseDiagramModule extends DiagramModule {
 
     protected override bindSourceModelStorage(): BindingTarget<SourceModelStorage> {
         return SourceModelStorage;
+    }
+
+    protected override bindContextEditValidatorRegistry(): BindingTarget<ContextEditValidatorRegistry> {
+        return ExtendedContextEditValidatorRegistry;
     }
 
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {

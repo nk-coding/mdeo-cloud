@@ -194,16 +194,46 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
      * @returns The cleaned metadata or undefined.
      */
     private getCleanMetadata(newMetadata: GraphMetadata, currentMetadata: GraphMetadata): GraphMetadata | undefined {
-        if (
-            Object.keys(newMetadata.nodes).length === Object.keys(currentMetadata.nodes).length &&
-            Object.keys(newMetadata.edges).length === Object.keys(currentMetadata.edges).length
-        ) {
+        const modifiedNodes: Record<string, NodeMetadata> = {};
+        const modifiedEdges: Record<string, EdgeMetadata> = {};
+        let hasChanges = false;
+
+        for (const [id, currentNodeMeta] of Object.entries(currentMetadata.nodes)) {
+            if (id in newMetadata.nodes) {
+                const verified = this.verifyMetadata(currentNodeMeta);
+                if (verified != undefined) {
+                    modifiedNodes[id] = {
+                        ...currentNodeMeta,
+                        meta: verified
+                    };
+                    hasChanges = true;
+                } else {
+                    modifiedNodes[id] = currentNodeMeta;
+                }
+            }
+        }
+        for (const [id, currentEdgeMeta] of Object.entries(currentMetadata.edges)) {
+            if (id in newMetadata.edges) {
+                const verified = this.verifyMetadata(currentEdgeMeta);
+                if (verified != undefined) {
+                    modifiedEdges[id] = {
+                        ...currentEdgeMeta,
+                        meta: verified
+                    };
+                    hasChanges = true;
+                } else {
+                    modifiedEdges[id] = currentEdgeMeta;
+                }
+            }
+        }
+
+        if (!hasChanges) {
             return undefined;
         }
 
         return {
-            nodes: Object.fromEntries(Object.entries(currentMetadata.nodes).filter(([id]) => id in newMetadata.nodes)),
-            edges: Object.fromEntries(Object.entries(currentMetadata.edges).filter(([id]) => id in newMetadata.edges))
+            nodes: modifiedNodes,
+            edges: modifiedEdges
         };
     }
 

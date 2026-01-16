@@ -43,10 +43,10 @@ fun Application.module(config: AppConfig) {
     DatabaseFactory.init(config.database)
     
     val userService = UserService()
-    val projectService = ProjectService()
-    val fileService = FileService()
-    val metadataService = MetadataService()
     val pluginService = PluginService(config.plugin)
+    val fileService = FileService()
+    val projectService = ProjectService(pluginService, fileService)
+    val metadataService = MetadataService()
     val jwtService = JwtService(config.jwt)
     val fileDataService = FileDataService(config.fileData, pluginService, fileService, jwtService)
     
@@ -54,6 +54,7 @@ fun Application.module(config: AppConfig) {
     
     runBlocking {
         userService.createDefaultAdmin(config.defaultAdmin.username, config.defaultAdmin.password)
+        pluginService.initializeDefaultPlugins(config.plugin.defaultPluginUrls)
     }
     
     monitor.subscribe(ApplicationStopped) {

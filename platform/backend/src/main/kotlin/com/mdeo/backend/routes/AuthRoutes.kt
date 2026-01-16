@@ -92,13 +92,13 @@ fun Route.authRoutes(userService: UserService) {
         get("/me") {
             val session = call.sessions.get<UserSession>()
             if (session == null) {
-                call.respond(HttpStatusCode.Unauthorized, ApiResult.Failure(ApiError("NOT_AUTHENTICATED", "Not authenticated")))
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Not authenticated"))
             } else {
-                call.respond(ApiResult.Success(UserInfo(
+                call.respond(UserInfo(
                     id = session.userId,
                     username = session.username,
                     isAdmin = session.isAdmin
-                )))
+                ))
             }
         }
     }

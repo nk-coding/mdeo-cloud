@@ -22,6 +22,9 @@
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </template>
+                <template #plugin-indicator="{ plugin }">
+                    <Pin v-if="plugin.default" class="w-4 h-4 ml-auto fill-current" />
+                </template>
             </PluginList>
 
             <PluginDetailsContainer :plugin="selectedPlugin">
@@ -29,6 +32,25 @@
                     <div v-if="selectedPlugin != undefined" class="space-y-6">
                         <PluginDetails :plugin="selectedPlugin">
                             <template #actions>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="icon-sm"
+                                            :disabled="updatingDefaultPluginId === selectedPlugin.id"
+                                            @click="handleDefaultToggle(!selectedPlugin.default)"
+                                        >
+                                            <Pin class="w-4 h-4" :class="{ 'fill-current': selectedPlugin.default }" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        {{
+                                            selectedPlugin.default
+                                                ? "Remove from default plugins"
+                                                : "Add to default plugins: automatically add to new projects"
+                                        }}
+                                    </TooltipContent>
+                                </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
@@ -106,7 +128,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { PlusCircle, Trash2, RefreshCw } from "lucide-vue-next";
+import { PlusCircle, Trash2, RefreshCw, Pin } from "lucide-vue-next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -115,7 +137,6 @@ import SidebarMenuButtonChild from "@/components/ui/sidebar/SidebarMenuButtonChi
 import PluginList from "@/components/plugins/PluginList.vue";
 import PluginDetailsContainer from "@/components/plugins/PluginDetailsContainer.vue";
 import type { BackendApi } from "@/data/api/backendApi";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
 import PluginDetails from "../plugins/PluginDetails.vue";
 import {
     AlertDialog,
@@ -127,12 +148,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import type { Plugin } from "@mdeo/plugin";
 
 const props = defineProps<{
     backendApi: BackendApi;
 }>();
 
-const plugins = ref<BackendPlugin[]>([]);
+const plugins = ref<Plugin[]>([]);
 const newPluginUrl = ref("");
 const isLoading = ref(false);
 const isAdding = ref(false);
@@ -140,13 +162,14 @@ const addError = ref("");
 const selectedEntry = ref<"add" | string>("add");
 const deletingPluginId = ref<string>();
 const refreshingPluginId = ref<string>();
+const updatingDefaultPluginId = ref<string>();
 const hasLoaded = ref(false);
 
 const selectedPlugin = computed(() => {
     if (selectedEntry.value === "add") {
-        return null;
+        return undefined;
     }
-    return plugins.value.find((plugin) => plugin.id === selectedEntry.value) ?? null;
+    return plugins.value.find((plugin) => plugin.id === selectedEntry.value);
 });
 
 watch(plugins, (list) => {
@@ -176,7 +199,9 @@ async function loadPlugins(preferredSelection?: string) {
     try {
         const result = await props.backendApi.getPlugins();
         if (result.success) {
-            plugins.value = result.value;
+            plugins.value = result.value.sort((a, b) => {
+                return a.name.localeCompare(b.name);
+            });
             hasLoaded.value = true;
             if (preferredSelection) {
                 selectedEntry.value = preferredSelection;
@@ -199,7 +224,9 @@ async function loadPlugins(preferredSelection?: string) {
 
 async function handleAddPlugin() {
     const url = newPluginUrl.value.trim();
-    if (!url) return;
+    if (!url) {
+        return;
+    }
 
     isAdding.value = true;
     addError.value = "";
@@ -254,6 +281,22 @@ async function confirmDelete() {
         await loadPlugins();
     }
     deletingPluginId.value = undefined;
+}
+
+async function handleDefaultToggle(isDefault: boolean) {
+    if (selectedPlugin.value == undefined) {
+        return;
+    }
+    const pluginId = selectedPlugin.value.id;
+    updatingDefaultPluginId.value = pluginId;
+    try {
+        const result = await props.backendApi.updatePluginDefault(pluginId, isDefault);
+        if (result.success) {
+            selectedPlugin.value.default = isDefault;
+        }
+    } finally {
+        updatingDefaultPluginId.value = undefined;
+    }
 }
 
 onMounted(async () => {

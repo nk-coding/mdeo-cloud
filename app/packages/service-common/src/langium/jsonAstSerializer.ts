@@ -23,6 +23,10 @@ export interface AstData {
      */
     hasErrors: boolean;
     /**
+     * Indicates whether the AST or any of its dependencies have errors.
+     */
+    hasTransitiveErrors: boolean;
+    /**
      * The serialized AST representation.
      */
     ast: SerializedAst;

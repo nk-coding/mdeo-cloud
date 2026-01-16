@@ -31,7 +31,7 @@ fun Route.pluginRoutes(
          */
         get {
             val plugins = pluginService.getPlugins()
-            call.respond(ApiResult.Success(plugins))
+            call.respond(plugins)
         }
         
         /**
@@ -49,10 +49,7 @@ fun Route.pluginRoutes(
             val request = call.receive<CreatePluginRequest>()
             val result = pluginService.createPlugin(request.url)
             
-            when (result) {
-                is ApiResult.Success -> call.respond(HttpStatusCode.Created, result)
-                is ApiResult.Failure -> call.respond(result)
-            }
+            call.respondApiResult(result)
         }
         
         /**
@@ -78,7 +75,7 @@ fun Route.pluginRoutes(
             fileDataService.invalidatePluginData(pluginId)
             
             val result = pluginService.deletePlugin(pluginId)
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -107,7 +104,7 @@ fun Route.pluginRoutes(
                 fileDataService.invalidatePluginData(pluginId)
             }
             
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -126,7 +123,33 @@ fun Route.pluginRoutes(
             }
             
             val result = pluginService.getPlugin(pluginId)
-            call.respond(result)
+            call.respondApiResult(result)
+        }
+        
+        /**
+         * Updates the default status of a plugin (admin only).
+         *
+         * @param pluginId Path parameter for plugin UUID
+         * @param body UpdatePluginDefaultRequest with default flag
+         * @return ApiResult indicating success or failure, 403 if not admin
+         */
+        patch("/{pluginId}/default") {
+            if (!call.isAdmin()) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
+                return@patch
+            }
+            
+            val pluginId = call.parameters["pluginId"]?.let { 
+                try { UUID.fromString(it) } catch (e: Exception) { null }
+            }
+            if (pluginId == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid plugin ID"))
+                return@patch
+            }
+            
+            val request = call.receive<UpdatePluginDefaultRequest>()
+            val result = pluginService.updatePluginDefault(pluginId, request.default)
+            call.respondApiResult(result)
         }
     }
     
@@ -163,7 +186,7 @@ fun Route.pluginRoutes(
             }
             
             val plugins = pluginService.getProjectPlugins(projectId)
-            call.respond(ApiResult.Success(plugins))
+            call.respond(plugins)
         }
         
         /**
@@ -210,7 +233,7 @@ fun Route.pluginRoutes(
                 fileDataService.invalidateProjectData(projectId)
             }
             
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -259,7 +282,7 @@ fun Route.pluginRoutes(
                 fileDataService.invalidateProjectData(projectId)
             }
             
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
 }

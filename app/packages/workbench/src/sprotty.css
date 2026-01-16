@@ -6,6 +6,8 @@
     --editor-background: var(--background);
     --editor-foreground: var(--foreground);
     --editor-grid: oklch(from var(--ring) l c h / 60%);
+    --editor-destructive: var(--destructive);
+    --editor-ring: var(--ring);
     --editor-spacing: var(--spacing);
     --editor-font-weight-bold: 700;
 }

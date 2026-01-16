@@ -30,7 +30,7 @@ export abstract class GHtmlNodeView extends GNodeView {
             },
             this.renderForeignElement(model, context)
         );
-        return svg("g", null, foreignObjectVNode, ...this.renderControlElements(model));
+        return svg("g", null, ...this.renderControlElements(model), foreignObjectVNode);
     }
 
     /**

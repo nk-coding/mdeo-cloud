@@ -1,4 +1,10 @@
-import type { IView, IActionDispatcher, RenderingContext } from "@eclipse-glsp/sprotty";
+import type {
+    IView,
+    IActionDispatcher,
+    RenderingContext,
+    IEditLabelValidator,
+    EditLabelValidationResult
+} from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { Attrs, VNode, VNodeData } from "snabbdom";
 import type { GLabel } from "../model/label.js";
@@ -10,10 +16,24 @@ const { html, TYPES, ApplyLabelEditOperation } = sharedImport("@eclipse-glsp/spr
 /**
  * View for rendering GLabel elements with inline editing support.
  * Uses a textarea with field-sizing-content for automatic sizing.
+ * Supports validation via IEditLabelValidator and IEditLabelValidationDecorator.
  */
 @injectable()
 export class GLabelView implements IView {
+    /**
+     * Injected action dispatcher for dispatching label update actions.
+     */
     @inject(TYPES.IActionDispatcher) protected actionDispatcher!: IActionDispatcher;
+
+    /**
+     * Injected label validator for validating label edits.
+     */
+    @inject(TYPES.IEditLabelValidator) protected labelValidator!: IEditLabelValidator;
+
+    /**
+     * Timeout ID for debounced validation calls.
+     */
+    protected validationTimeout: number | undefined = undefined;
 
     render(model: Readonly<GLabel>, context: RenderingContext): VNode | undefined {
         if (model.editMode) {
@@ -63,8 +83,8 @@ export class GLabelView implements IView {
             };
             data.on = {
                 keydown: (event: KeyboardEvent) => this.handleKeyDown(event, model),
-                blur: () => this.handleBlur(model),
-                input: (event: Event) => this.updateTempText(event, model),
+                blur: () => this.applyLabelEdit(model),
+                input: (event: Event) => this.handleInput(event, model),
                 click: (event: Event) => event.stopPropagation(),
                 mousedown: (event: Event) => event.stopPropagation(),
                 mouseup: (event: Event) => event.stopPropagation(),
@@ -73,48 +93,105 @@ export class GLabelView implements IView {
             };
         }
 
+        const hasError = model.validationResult && model.validationResult.severity === "error";
+        if (hasError) {
+            attrs["aria-invalid"] = "true";
+        }
+
         const textarea = html("textarea", {
             class: {
-                ...this.getEditControlClasses(),
+                ...this.getEditControlClasses(model),
                 ...this.getClasses(model)
             },
             attrs,
             ...data
         });
-        return html("form", null, textarea);
+
+        return html(
+            "div",
+            { class: { "label-edit-container": true } },
+            textarea,
+            this.renderErrorMessage(model.validationResult!)
+        );
     }
 
     /**
-     * Returns the CSS classes for the edit control.
+     * Renders an error message for validation failures.
+     * Shows a single line with ellipsis by default, expands on hover to show full message.
      *
-     * @returns Record of CSS class names and their enabled state
+     * @param validationResult The validation result to render
+     * @returns The VNode for the error message, or undefined if no error
      */
-    protected getEditControlClasses(): Record<string, boolean> {
-        return {
-            "border-input": true,
-            "placeholder:text-muted-foreground": true,
-            "focus-visible:border-ring": true,
-            "focus-visible:ring-ring/50": true,
-            "dark:bg-input/30": true,
-            "w-full": true,
-            "min-w-0": true,
-            "rounded-md": true,
-            border: true,
-            "bg-transparent": true,
-            "text-base": true,
-            "shadow-xs": true,
-            "transition-[color,box-shadow]": true,
-            "outline-none": true,
-            "focus-visible:ring-[3px]": true,
-            "disabled:cursor-not-allowed": true,
-            "disabled:opacity-50": true,
-            "md:text-sm": true,
-            "field-sizing-content": true,
-            "px-3": true,
-            "py-1": true,
-            "resize-none": true,
-            block: true
+    protected renderErrorMessage(validationResult: EditLabelValidationResult | undefined): VNode | undefined {
+        if (!validationResult?.message) {
+            return undefined;
+        }
+
+        const containerClasses: Record<string, boolean> = {
+            "relative": true,
+            "mt-1.5": true,
+            "group": true
         };
+
+        const collapsedClasses: Record<string, boolean> = {
+            "text-destructive": true,
+            "text-sm": true,
+            "font-normal": true,
+            "truncate": true,
+            "overflow-hidden": true,
+            "whitespace-nowrap": true,
+            "group-hover:invisible": true
+        };
+
+        const expandedClasses: Record<string, boolean> = {
+            "invisible": true,
+            "group-hover:visible": true,
+            "absolute": true,
+            "top-0": true,
+            "left-0": true,
+            "right-0": true,
+            "text-destructive": true,
+            "text-sm": true,
+            "font-normal": true,
+            "bg-popover": true,
+            "text-popover-foreground": true,
+            "rounded-md": true,
+            "border": true,
+            "border-destructive": true,
+            "p-2": true,
+            "shadow-md": true,
+            "z-50": true,
+            "whitespace-normal": true,
+            "break-words": true
+        };
+
+        const collapsed = html(
+            "div",
+            {
+                class: collapsedClasses
+            },
+            validationResult.message
+        );
+
+        const expanded = html(
+            "div",
+            {
+                class: expandedClasses
+            },
+            validationResult.message
+        );
+
+        return html(
+            "div",
+            {
+                class: containerClasses,
+                attrs: {
+                    role: "alert"
+                }
+            },
+            collapsed,
+            expanded
+        );
     }
 
     /**
@@ -136,23 +213,45 @@ export class GLabelView implements IView {
     }
 
     /**
-     * Handles blur events by applying the current label edit.
-     *
-     * @param model The label model being edited
-     */
-    protected handleBlur(model: Readonly<GLabel>): void {
-        this.applyLabelEdit(model);
-    }
-
-    /**
-     * Updates the temporary text value as the user types.
+     * Handles input events and updates the temporary text value.
      *
      * @param event The input event
      * @param model The label model being edited
      */
-    protected updateTempText(event: Event, model: Readonly<GLabel>): void {
-        const target = event.target as HTMLInputElement | HTMLTextAreaElement;
-        this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, true, target.value));
+    protected handleInput(event: Event, model: Readonly<GLabel>): void {
+        const target = event.target as HTMLTextAreaElement;
+        const newText = target.value;
+
+        this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, true, newText));
+        this.performLabelValidation(model, newText);
+    }
+
+    /**
+     * Performs label validation with a debounce.
+     *
+     * @param model The label model being edited
+     * @param value The value to validate
+     */
+    protected performLabelValidation(model: Readonly<GLabel>, value: string): void {
+        if (this.validationTimeout) {
+            window.clearTimeout(this.validationTimeout);
+        }
+        this.validationTimeout = window.setTimeout(() => this.validateLabel(model, value), 200);
+    }
+
+    /**
+     * Validates a label value and updates the model with the result.
+     *
+     * @param model The label model being edited
+     * @param value The value to validate
+     * @returns The validation result
+     */
+    protected async validateLabel(model: Readonly<GLabel>, value: string): Promise<EditLabelValidationResult> {
+        const result = await this.labelValidator.validate(value, model);
+
+        this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, true, value, result));
+
+        return result;
     }
 
     /**
@@ -161,14 +260,21 @@ export class GLabelView implements IView {
      *
      * @param model The label model being edited
      */
-    protected applyLabelEdit(model: Readonly<GLabel>): void {
+    protected async applyLabelEdit(model: Readonly<GLabel>): Promise<void> {
         const tempText = model.tempText ?? model.text;
 
-        if (tempText !== model.text) {
-            this.actionDispatcher.dispatch(ApplyLabelEditOperation.create({ labelId: model.id, text: tempText }));
-        } else {
+        if (tempText === model.text) {
             this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, false));
+            return;
         }
+
+        const isValid = (await this.validateLabel(model, tempText)).severity !== "error";
+        if (!isValid) {
+            this.cancelEdit(model);
+            return;
+        }
+
+        this.actionDispatcher.dispatch(ApplyLabelEditOperation.create({ labelId: model.id, text: tempText }));
     }
 
     /**
@@ -203,5 +309,44 @@ export class GLabelView implements IView {
      */
     protected getClasses(_model: Readonly<GLabel>): Record<string, boolean> {
         return {};
+    }
+
+    /**
+     * Returns the CSS classes for the edit control.
+     *
+     * @param model The label model being edited
+     * @returns Record of CSS class names and their enabled state
+     */
+    protected getEditControlClasses(model: Readonly<GLabel>): Record<string, boolean> {
+        const hasError = !!(model.validationResult && model.validationResult.severity === "error");
+
+        return {
+            "border-input": !hasError,
+            "border-destructive": hasError,
+            "placeholder:text-muted-foreground": true,
+            "focus-visible:border-ring": !hasError,
+            "focus-visible:border-destructive": hasError,
+            "focus-visible:ring-ring/50": !hasError,
+            "focus-visible:ring-destructive/30": hasError,
+            "dark:bg-input/30": true,
+            "w-full": true,
+            "min-w-0": true,
+            "rounded-md": true,
+            border: true,
+            "bg-transparent": true,
+            "text-base": true,
+            "shadow-xs": true,
+            "transition-[color,box-shadow]": true,
+            "outline-none": true,
+            "focus-visible:ring-[3px]": true,
+            "disabled:cursor-not-allowed": true,
+            "disabled:opacity-50": true,
+            "md:text-sm": true,
+            "field-sizing-content": true,
+            "px-3": true,
+            "py-1": true,
+            "resize-none": true,
+            block: true
+        };
     }
 }

@@ -21,7 +21,7 @@ const { TextEdit } = sharedImport("vscode-languageserver-types");
 export abstract class BaseApplyLabelEditOperationHandler extends BaseOperationHandler {
     override readonly operationType = ApplyLabelEditOperation.KIND;
 
-    override createCommand(operation: ApplyLabelEditOperationType): MaybePromise<Command | undefined> {
+    override async createCommand(operation: ApplyLabelEditOperationType): Promise<Command | undefined> {
         const label = this.modelState.index.find(operation.labelId);
         if (label == undefined) {
             throw new Error(`Label with ID ${operation.labelId} not found in model.`);
@@ -31,7 +31,7 @@ export abstract class BaseApplyLabelEditOperationHandler extends BaseOperationHa
         if (sourceElement == undefined) {
             throw new Error(`AST node for label with ID ${operation.labelId} not found.`);
         }
-        return new OperationHandlerCommand(this.modelState, this.createLabelEdit(sourceElement, operation), undefined);
+        return new OperationHandlerCommand(this.modelState, await this.createLabelEdit(sourceElement, operation), undefined);
     }
 
     /**
@@ -40,7 +40,7 @@ export abstract class BaseApplyLabelEditOperationHandler extends BaseOperationHa
      * @param node the AST node corresponding to the label
      * @returns the workspace edit to apply the label change, or undefined if not applicable
      */
-    abstract createLabelEdit(node: AstNode, operation: ApplyLabelEditOperationType): WorkspaceEdit | undefined;
+    abstract createLabelEdit(node: AstNode, operation: ApplyLabelEditOperationType): Promise<WorkspaceEdit | undefined>;
 
     /**
      * Creates a workspace edit for renaming the given leaf node to the new name.

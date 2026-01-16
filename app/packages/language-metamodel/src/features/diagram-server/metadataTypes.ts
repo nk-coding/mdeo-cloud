@@ -88,7 +88,7 @@ export namespace NodeLayoutMetadataUtil {
 
         const meta = obj as Partial<NodeLayoutMetadata>;
         return (
-            (meta.prefWidth === undefined || typeof meta.prefWidth === "number") &&
+            (typeof meta.prefWidth === "number") &&
             (meta.prefHeight === undefined || typeof meta.prefHeight === "number")
         );
     }
@@ -115,24 +115,20 @@ export namespace NodeLayoutMetadataUtil {
      * Verifies and corrects invalid metadata.
      *
      * @param obj The object to verify
-     * @param defaultX Default x coordinate if position is invalid
-     * @param defaultY Default y coordinate if position is invalid
+     * @param defaultPrefWidth Default preferred width if invalid
      * @returns Corrected metadata if invalid, undefined if valid
      */
-    export function verify(obj: unknown, defaultX: number = 0, defaultY: number = 0): NodeLayoutMetadata | undefined {
+    export function verify(obj: unknown, defaultPrefWidth: number): NodeLayoutMetadata | undefined {
         if (isValid(obj)) {
             return undefined;
         }
 
         const meta = (typeof obj === "object" && obj !== null ? obj : {}) as Partial<NodeLayoutMetadata>;
-        const position = meta.position && isValidPoint(meta.position) ? meta.position : { x: defaultX, y: defaultY };
-        const preferredWidth = typeof meta.prefWidth === "number" ? meta.prefWidth : undefined;
+        const position = meta.position && isValidPoint(meta.position) ? meta.position : { x: 0, y: 0 };
+        const prefWidth = typeof meta.prefWidth === "number" ? meta.prefWidth : defaultPrefWidth;
+        const prefHeight = typeof meta.prefHeight === "number" ? meta.prefHeight : undefined;
 
-        const result: NodeLayoutMetadata = { position };
-        if (preferredWidth !== undefined) {
-            result.prefWidth = preferredWidth;
-        }
-        return result;
+        return { position, prefWidth, prefHeight };
     }
 }
 

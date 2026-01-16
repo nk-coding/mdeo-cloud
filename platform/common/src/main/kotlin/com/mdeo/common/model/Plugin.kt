@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
  * @property name Display name of the plugin
  * @property description Brief description of the plugin's functionality
  * @property icon Icon data in Lucide IconNode format
+ * @property default Whether this plugin is added by default to new projects
  * @property languagePlugins List of language plugins provided by this plugin
  * @property contributionPlugins List of contribution plugins provided by this plugin
  */
@@ -23,6 +24,7 @@ data class BackendPlugin(
     val name: String,
     val description: String,
     val icon: JsonArray,
+    val default: Boolean = false,
     val languagePlugins: List<BackendLanguagePlugin> = emptyList(),
     val contributionPlugins: List<BackendContributionPlugin> = emptyList()
 )
@@ -123,6 +125,16 @@ data class LanguageEditorPlugin(
 @Serializable
 data class CreatePluginRequest(
     val url: String
+)
+
+/**
+ * Request payload for updating the default status of a plugin.
+ *
+ * @property default Whether the plugin should be added by default to new projects
+ */
+@Serializable
+data class UpdatePluginDefaultRequest(
+    val default: Boolean
 )
 
 /**

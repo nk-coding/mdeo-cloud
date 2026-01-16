@@ -53,7 +53,7 @@ async function initializeWorkbench() {
     const monacoApi = await monaco;
     const state = new WorkbenchState(monacoApi, backendApi);
 
-    await loadPlugins(state);
+    // await loadPlugins(state);
     workspaceState.value = state;
     await syncProjectFromPath(state);
 }
@@ -76,7 +76,8 @@ async function loadPlugins(state: WorkbenchState) {
             name: plugin.id,
             description: "",
             url: "",
-            icon: convertIcon(Plug)
+            icon: convertIcon(Plug),
+            default: false
         });
     }
 }

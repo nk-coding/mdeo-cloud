@@ -1,5 +1,9 @@
 import { Network } from "lucide";
-import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
+import {
+    defaultLanguageConfiguration,
+    defaultMonarchTokenProvider,
+    serializeMonarchTokensProvider
+} from "@mdeo/language-common";
 import {
     startLanguageService,
     convertIcon,
@@ -34,10 +38,10 @@ const metamodelServicePlugin: ServicePluginDefinition = {
             stylesUrl: "static/styles.css"
         },
         languageConfiguration: defaultLanguageConfiguration,
-        monarchTokensProvider: {
+        monarchTokensProvider: serializeMonarchTokensProvider({
             ...defaultMonarchTokenProvider,
             keywords: ["class", "extends", "abstract", "import", "from", "as"]
-        }
+        })
     },
     contributionPlugins: []
 };

@@ -50,6 +50,11 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
     private isMetadataValidated: boolean = false;
 
     /**
+     * Flag indicating if metadata has changed during a save operation.
+     */
+    private metadataSaveState: MetadataSaveState = MetadataSaveState.SAVED;
+
+    /**
      * The source model representing the domain-specific AST.
      */
     protected _sourceModel: T | undefined;
@@ -67,10 +72,27 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
     set metadata(value: GraphMetadata) {
         this._metadata = value;
         this.isMetadataValidated = false;
-        this.languageServices.shared.workspace.FileSystemProvider.writeMetadata(
-            URI.parse(this.sourceUri!),
-            this._metadata
-        );
+        this.saveMetadata();
+    }
+
+    /**
+     * Asynchronously saves the current metadata to the file system.
+     */
+    private async saveMetadata(): Promise<void> {
+        if (this.metadataSaveState === MetadataSaveState.SAVED) {
+            do {
+                this.metadataSaveState = MetadataSaveState.SAVING;
+                await this.languageServices.shared.workspace.FileSystemProvider.writeMetadata(
+                    URI.parse(this.sourceUri!),
+                    this._metadata
+                );
+                if (this.metadataSaveState === MetadataSaveState.SAVING) {
+                    this.metadataSaveState = MetadataSaveState.SAVED;
+                }
+            } while (this.metadataSaveState != MetadataSaveState.SAVED);
+        } else {
+            this.metadataSaveState = MetadataSaveState.SAVING_HAS_CHANGES;
+        }
     }
 
     /**
@@ -135,4 +157,22 @@ export class ModelState<T extends AstNode = AstNode> extends DefaultModelState {
         this.isMetadataValidated = true;
         return this._metadata;
     }
+}
+
+/**
+ * Enum representing the save state of metadata.
+ */
+enum MetadataSaveState {
+    /**
+     * Currently saving, no changes during save.
+     */
+    SAVING,
+    /**
+     * All changes saved.
+     */
+    SAVED,
+    /**
+     * Changes occurred during save, another save needed.
+     */
+    SAVING_HAS_CHANGES
 }

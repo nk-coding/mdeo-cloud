@@ -43,7 +43,7 @@ fun Route.metadataRoutes(metadataService: MetadataService) {
             val path = pathParts.joinToString("/")
             
             val result = metadataService.readMetadata(projectId, path)
-            call.respond(result)
+            call.respondApiResult(result)
         }
         
         /**
@@ -74,7 +74,7 @@ fun Route.metadataRoutes(metadataService: MetadataService) {
             
             val metadata = call.receive<JsonObject>()
             val result = metadataService.writeMetadata(projectId, path, metadata)
-            call.respond(result)
+            call.respondApiResult(result)
         }
     }
 }

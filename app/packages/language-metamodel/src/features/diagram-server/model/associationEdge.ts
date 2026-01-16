@@ -5,7 +5,9 @@ import { MetamodelElementType } from "./elementTypes.js";
  * Edge representing an association relationship.
  */
 export class AssociationEdge extends GEdge {
-    /** The association operator (e.g., composition, aggregation) */
+    /**
+     * The association operator (e.g., composition, aggregation) 
+     */
     operator?: string;
 
     /**

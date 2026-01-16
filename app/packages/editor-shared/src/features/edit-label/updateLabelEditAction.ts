@@ -5,29 +5,52 @@ import type {
     IActionDispatcher,
     CommandExecutionContext,
     CommandReturn,
-    BoundsAware
+    BoundsAware,
+    EditLabelValidationResult
 } from "@eclipse-glsp/sprotty";
 
 const { injectable, inject } = sharedImport("inversify");
 const { Command, TYPES, findParentByFeature, isSizeable } = sharedImport("@eclipse-glsp/sprotty");
 const { LocalRequestBoundsAction } = sharedImport("@eclipse-glsp/client");
 
+/**
+ * Action to update the edit mode and temporary text of a label.
+ */
 export interface UpdateLabelEditAction extends Action {
     kind: "updateLabelEdit";
+    /**
+     * ID of the label to update
+     */
     labelId: string;
+    /**
+     * Temporary text to set while editing, only relevant in edit mode
+     */
     tempText?: string;
+    /**
+     * Whether the label is in edit mode
+     */
     editMode: boolean;
+    /**
+     * Validation result for the current edit, only relevant in edit mode
+     */
+    validationResult?: EditLabelValidationResult;
 }
 
 export namespace UpdateLabelEditAction {
     export const KIND = "updateLabelEdit";
 
-    export function create(labelId: string, editMode: boolean, tempText?: string): UpdateLabelEditAction {
+    export function create(
+        labelId: string,
+        editMode: boolean,
+        tempText?: string,
+        validationResult?: EditLabelValidationResult
+    ): UpdateLabelEditAction {
         return {
             kind: KIND,
             labelId,
             editMode,
-            tempText
+            tempText,
+            validationResult
         };
     }
 }
@@ -53,6 +76,11 @@ export class UpdateLabelEditCommand extends Command {
             label.tempText = this.action.tempText;
         } else if (!this.action.editMode) {
             label.tempText = undefined;
+        }
+        if (this.action.validationResult !== undefined) {
+            label.validationResult = this.action.validationResult;
+        } else if (!this.action.editMode) {
+            label.validationResult = undefined;
         }
         const resized = findParentByFeature<BoundsAware>(label, isSizeable);
         return LocalRequestBoundsAction.fromCommand(

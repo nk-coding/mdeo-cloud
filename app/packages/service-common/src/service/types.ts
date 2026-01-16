@@ -8,7 +8,7 @@ import type { FileDataHandler, FileDataResult } from "../handler/types.js";
  * This is the Plugin interface from @mdeo/plugin with the 'url' field omitted
  * since the URL is derived from the service's deployment.
  */
-export type ServicePlugin = Omit<Plugin, "url">;
+export type ServicePlugin = Omit<Plugin, "url" | "default">;
 
 /**
  * Definition for constructing a service plugin.

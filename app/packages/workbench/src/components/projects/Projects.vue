@@ -7,10 +7,8 @@
     />
     <ProjectDetails
         v-else
-        :plugins="projectPlugins"
         :users="projectUsers"
         @update-name="handleUpdateProjectName"
-        @plugins-updated="handlePluginsUpdated"
         @users-updated="handleUsersUpdated"
         @delete-project="handleDeleteProject"
         @open-projects="handleOpenProjects"
@@ -21,7 +19,6 @@
 import { ref, inject, onActivated, watch } from "vue";
 import { workbenchStateKey } from "@/components/workbench/util";
 import type { Project } from "@/data/project/project";
-import type { BackendPlugin } from "@/data/api/pluginTypes";
 import type { UserInfo } from "@/data/api/backendApi";
 import ProjectsList from "./ProjectsList.vue";
 import ProjectDetails from "./ProjectDetails.vue";
@@ -31,7 +28,6 @@ const { backendApi, project, activeSidebar } = inject(workbenchStateKey)!;
 const projects = ref<Project[]>([]);
 const showProjectsList = ref(false);
 
-const projectPlugins = ref<BackendPlugin[]>([]);
 const projectUsers = ref<UserInfo[]>([]);
 
 async function loadProjects() {
@@ -46,16 +42,12 @@ async function loadProjectDetails() {
         return;
     }
 
-    const [pluginsResult, usersResult] = await Promise.all([
-        backendApi.getProjectPlugins(project.value.id),
-        backendApi.getProjectOwners(project.value.id)
-    ]);
+    const usersResult = await backendApi.getProjectOwners(project.value.id);
 
-    if (pluginsResult.success) {
-        projectPlugins.value = pluginsResult.value;
-    }
     if (usersResult.success) {
-        projectUsers.value = usersResult.value;
+        projectUsers.value = usersResult.value.sort((a, b) => {
+            return a.username.localeCompare(b.username);
+        });
     }
 }
 
@@ -91,10 +83,6 @@ async function handleUpdateProjectName(name: string) {
             project.value = updated;
         }
     }
-}
-
-function handlePluginsUpdated() {
-    loadProjectDetails();
 }
 
 function handleUsersUpdated() {
