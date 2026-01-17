@@ -18,7 +18,7 @@ export const ReadonlyMapType = classType("ReadonlyMap", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("ReadonlySet")
-                    .withTypeArgs(new Map([["T", genericTypeRef("K")]]))
+                    .withTypeArgs({ T: genericTypeRef("K") })
                     .build()
             )
         )
@@ -28,7 +28,7 @@ export const ReadonlyMapType = classType("ReadonlyMap", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("ReadonlyBag")
-                    .withTypeArgs(new Map([["T", genericTypeRef("V")]]))
+                    .withTypeArgs({ T: genericTypeRef("V") })
                     .build()
             )
         )

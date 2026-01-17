@@ -1,6 +1,6 @@
-import type { AstNode, PropertyMetaData, TypeMetaData } from "langium";
+import type { AstNode, GrammarAST, PropertyMetaData, TypeMetaData } from "langium";
 import type { PluginContext } from "../../plugin/pluginContext.js";
-import { GrammarSerializer } from "../serialization/grammarSerializer.js";
+import { GrammarSerializer, type SerializedAstNode } from "../serialization/grammarSerializer.js";
 import type { AstTypes, Property } from "langium/grammar";
 import type { LangiumLanguagePlugin } from "../../plugin/languagePlugin.js";
 import type { LanguageModule, AstReflection } from "./module.js";
@@ -19,8 +19,16 @@ export function createModule(
 ): LanguageModule {
     const serializedGrammars = new Map<LangiumLanguagePlugin<any>, string>();
     for (const plugin of plugins) {
-        const serializableGrammar = new GrammarSerializer(plugin.rootRule, plugin.additionalTerminals).grammar;
-        const serializedGrammar = JSON.stringify(serializableGrammar);
+        const serializableGrammar = new GrammarSerializer([plugin.rootRule], plugin.additionalTerminals).grammar;
+        (serializableGrammar.rules[0] as SerializedAstNode<GrammarAST.ParserRule>).entry = true;
+        const serializedGrammar = JSON.stringify({
+            $type: "Grammar",
+            isDeclared: true,
+            rules: serializableGrammar.rules as SerializedAstNode<GrammarAST.AbstractRule>[],
+            types: serializableGrammar.types as SerializedAstNode<GrammarAST.Type>[],
+            interfaces: serializableGrammar.interfaces as SerializedAstNode<GrammarAST.Interface>[],
+            imports: []
+        } satisfies SerializedAstNode<GrammarAST.Grammar>);
         serializedGrammars.set(plugin, serializedGrammar);
     }
     const { loadGrammarFromJson, AbstractAstReflection } = langium;

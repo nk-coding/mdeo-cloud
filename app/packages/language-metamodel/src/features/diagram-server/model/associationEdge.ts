@@ -6,7 +6,7 @@ import { MetamodelElementType } from "./elementTypes.js";
  */
 export class AssociationEdge extends GEdge {
     /**
-     * The association operator (e.g., composition, aggregation) 
+     * The association operator (e.g., composition, aggregation)
      */
     operator?: string;
 

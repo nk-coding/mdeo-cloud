@@ -617,7 +617,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             }
         } else if (ClassTypeRef.is(type)) {
             if (type.typeArgs != undefined) {
-                for (const typeArg of type.typeArgs.values()) {
+                for (const typeArg of Object.values(type.typeArgs)) {
                     if (!this.isFullyDefined(typeArg)) {
                         return false;
                     }
@@ -737,7 +737,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
         }
 
         let isArgsValid = true;
-        for (const [typeArgName, typeArgType] of declaredType.typeArgs ?? []) {
+        for (const [typeArgName, typeArgType] of Object.entries(declaredType.typeArgs ?? {})) {
             isArgsValid &&= this.checkAndUpdateType(typeArgType, actualTypeArgs!.get(typeArgName)!, false);
         }
         return isArgsValid;

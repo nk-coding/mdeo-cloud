@@ -1,6 +1,7 @@
 import type { AstNode, GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
 import type { BaseType } from "../types.js";
+import type { SerializableExternalReference } from "../../serialization/grammarSerializer.js";
 
 /**
  * Represents a union type definition in the grammar that can contain one of several
@@ -9,14 +10,25 @@ import type { BaseType } from "../types.js";
  *
  * @template T The AST node union type that this type represents
  */
-export type Type<T extends AstNode> = {
+export interface Type<T extends AstNode> {
     /**
      * TypeScript type information for the union AST node this type represents.
      * Only used for type inference and validation during compilation,
      * never assigned at runtime.
      */
     tsType?: T;
-} & SerializableGrammarNode<GrammarAST.Type>;
+
+    /**     * The name of the type as it appears in the grammar.
+     */
+    name: string;
+
+    /**     * Converts this type into a serializable grammar node that can be used
+     * in the Langium grammar generation process.
+     *
+     * @returns A serializable representation of the type or external reference
+     */
+    toType: () => SerializableGrammarNode<GrammarAST.Type> | SerializableExternalReference;
+}
 
 /**
  * Internal helper type that computes the union of types from an array of base types.

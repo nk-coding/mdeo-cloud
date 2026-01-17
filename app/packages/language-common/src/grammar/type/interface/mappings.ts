@@ -1,7 +1,9 @@
-import type { InterfaceDeclarationValue, Interface } from "./types.js";
+import type { InterfaceDeclarationValue } from "./types.js";
 import { isOptional, isResolve, isReference, isUnion } from "./helpers.js";
 import type { BaseType } from "../types.js";
 import { primitiveTypeLookup } from "../primitiveTypeLookup.js";
+import type { GrammarAST } from "langium";
+import type { SerializableGrammarNode } from "../../serialization/types.js";
 
 /**
  * Maps interface declaration values to their corresponding Langium AST type representations.
@@ -32,7 +34,9 @@ import { primitiveTypeLookup } from "../primitiveTypeLookup.js";
  * @param type The interface declaration value to map
  * @returns The corresponding Langium grammar type representation
  */
-export function mapType(type: InterfaceDeclarationValue): Interface<any>["attributes"][number]["type"] {
+export function mapType(
+    type: InterfaceDeclarationValue
+): SerializableGrammarNode<GrammarAST.Interface>["attributes"][number]["type"] {
     if (isOptional(type)) {
         return mapType(type.optional);
     }
@@ -48,9 +52,9 @@ export function mapType(type: InterfaceDeclarationValue): Interface<any>["attrib
                 $type: "SimpleType",
                 typeRef: () => {
                     if (typeof refType === "function") {
-                        return refType();
+                        return refType().toType();
                     } else {
-                        return refType;
+                        return refType.toType();
                     }
                 }
             }
@@ -83,9 +87,9 @@ export function mapType(type: InterfaceDeclarationValue): Interface<any>["attrib
         $type: "SimpleType",
         typeRef: () => {
             if (typeof type === "function") {
-                return (type as () => BaseType<any>)();
+                return (type as () => BaseType<any>)().toType();
             } else {
-                return type as BaseType<any>;
+                return (type as BaseType<any>).toType();
             }
         }
     };

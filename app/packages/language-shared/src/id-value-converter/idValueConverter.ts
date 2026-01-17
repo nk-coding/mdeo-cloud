@@ -21,7 +21,7 @@ export class IdValueConverter extends DefaultValueConverterBase {
 
 /**
  * Parses an identifier, removing backticks if present.
- * 
+ *
  * @param identifier the identifier to parse
  * @returns the parsed identifier without backticks
  */

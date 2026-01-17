@@ -5,6 +5,6 @@ import { classType, genericTypeRef } from "../../typir-extensions/config/typeBui
  */
 export const OrderedSetType = classType("OrderedSet", "builtin")
     .generics("T")
-    .extends("ReadonlyOrderedSet", new Map([["T", genericTypeRef("T")]]))
-    .extends("OrderedCollection", new Map([["T", genericTypeRef("T")]]))
+    .extends("ReadonlyOrderedSet", { T: genericTypeRef("T") })
+    .extends("OrderedCollection", { T: genericTypeRef("T") })
     .build();

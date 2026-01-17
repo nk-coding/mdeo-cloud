@@ -183,7 +183,7 @@ export class InfixRuleBuilderWithCallAndReturn<
         const createdRule: SerializableGrammarNode<GrammarAST.InfixRule> = {
             $type: "InfixRule",
             name: this.name,
-            returnType: () => this.returnType,
+            returnType: () => this.returnType.toType(),
             call: {
                 $type: "RuleCall",
                 rule: () => this.call.toRule(),

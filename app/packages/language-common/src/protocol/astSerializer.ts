@@ -51,7 +51,7 @@ export interface AstSerializer {
 
     /**
      * Guesses formatting options based on the content of the given document.
-     * 
+     *
      * @param document The Langium document to analyze
      * @returns The guessed formatting options
      */

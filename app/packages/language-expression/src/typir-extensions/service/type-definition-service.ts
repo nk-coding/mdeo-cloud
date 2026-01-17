@@ -189,7 +189,7 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
                 definition: classTypeDef,
                 isNullable: type.isNullable,
                 typeArgs: new Map(
-                    Array.from(type.typeArgs ?? new Map()).map(([key, typeArg]) => [
+                    Object.entries(type.typeArgs ?? {}).map(([key, typeArg]) => [
                         key,
                         this.resolveCustomClassOrLambdaType(typeArg, genericTypeArgs)
                     ])

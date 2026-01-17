@@ -1,4 +1,4 @@
-import type { EdgeAttributes, NodeAttributes } from "./graph-edit-distance/multiGraph.js";
+import type { Attributes } from "./metadataManager.js";
 
 /**
  * Datastructure which is used to persist metadata for GLSP-based graphical editors
@@ -28,7 +28,7 @@ export interface NodeMetadata {
     /**
      * Attributes used during graph edit distance calculations
      */
-    attrs?: NodeAttributes;
+    attrs?: Attributes;
     /**
      * The actual metadata object
      */
@@ -55,7 +55,7 @@ export interface EdgeMetadata {
     /**
      * Attributes used during graph edit distance calculations
      */
-    attrs?: EdgeAttributes;
+    attrs?: Attributes;
     /**
      * The actual metadata object
      */

@@ -31,10 +31,12 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       PLUGIN_BASE_URL: ${PLUGIN_BASE_URL}
-      DEFAULT_PLUGIN_URLS: ${DEFAULT_PLUGIN_URLS:-http://service-metamodel:3000,http://service-model:3000}
+      DEFAULT_PLUGIN_URLS: ${DEFAULT_PLUGIN_URLS:-http://service-metamodel:3000,http://service-model:3000,http://service-script:3000}
     depends_on:
       postgres:
         condition: service_healthy
+      workbench:
+        condition: service_started
     restart: unless-stopped
 
   workbench:
@@ -44,15 +46,16 @@ services:
     environment:
       PLUGIN_METAMODEL_SERVICE: ${PLUGIN_METAMODEL_SERVICE:-http://service-metamodel:3000}
       PLUGIN_MODEL_SERVICE: ${PLUGIN_MODEL_SERVICE:-http://service-model:3000}
+      PLUGIN_SCRIPT_SERVICE: ${PLUGIN_SCRIPT_SERVICE:-http://service-script:3000}
       BACKEND_SERVICE: ${BACKEND_SERVICE:-http://backend:8080}
     ports:
       - "80:80"
     depends_on:
-      backend:
-        condition: service_started
       service-metamodel:
         condition: service_healthy
       service-model:
+        condition: service_healthy
+      service-script:
         condition: service_healthy
     restart: unless-stopped
 
@@ -60,6 +63,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-metamodel/Dockerfile
+      args:
+        APP_BUILDER_IMAGE: app-builder:latest
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -71,14 +76,14 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      - backend
     restart: unless-stopped
 
   service-model:
     build:
       context: ..
       dockerfile: infra/docker/service-model/Dockerfile
+      args:
+        APP_BUILDER_IMAGE: app-builder:latest
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -90,8 +95,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      - backend
+    restart: unless-stopped
+
+  service-script:
+    build:
+      context: ..
+      dockerfile: infra/docker/service-script/Dockerfile
+      args:
+        APP_BUILDER_IMAGE: app-builder:latest
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      BACKEND_API_URL: "http://backend:8080"
+      MAX_LANGIUM_INSTANCES: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

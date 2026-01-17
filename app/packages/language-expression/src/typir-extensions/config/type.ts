@@ -24,7 +24,7 @@ export interface BaseClassTypeRef {
     /**
      * Optional type arguments for generic types (e.g., {'T': {type: 'String', isNullable: false}})
      */
-    typeArgs?: Map<string, ValueType>;
+    typeArgs?: Record<string, ValueType>;
 }
 
 /**
@@ -153,7 +153,7 @@ export interface ClassType {
     /**
      * A mapping of member names to their definitions (unified properties and methods)
      */
-    members: Map<string, Member>;
+    members: Record<string, Member>;
     /**
      * Optional list of generic type parameter names (e.g., ['T', 'U'])
      */

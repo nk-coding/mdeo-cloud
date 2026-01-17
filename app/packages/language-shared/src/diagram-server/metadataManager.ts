@@ -9,9 +9,17 @@ import type { AstReflection, LanguageServices } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
 
-export interface NodeAttributesWithLoops extends NodeAttributes {
+/**
+ * Node attributes with added loops property for self-referential edges.
+ */
+interface NodeAttributesWithLoops extends NodeAttributes {
     loops: Record<string, EdgeMetadata>;
 }
+
+/**
+ * Attributes type excluding the 'type' property.
+ */
+export type Attributes = Omit<NodeAttributes | EdgeAttributes, "type">;
 
 /**
  * Abstract base class for managing metadata validation and synchronization.
@@ -408,20 +416,21 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
             .fill(0)
             .map(() => Array(size).fill(0));
 
+        const oldLoopAttrs = oldIds.map((id) => ({ ...oldLoops[id].attrs, type: oldLoops[id].type }));
+        const newLoopAttrs = newIds.map((id) => ({ ...newLoops[id].attrs, type: newLoops[id].type }));
+
         for (let i = 0; i < n; i++) {
             for (let j = 0; j < m; j++) {
-                matrix[i][j] = this.calculateEdgeCost(oldLoops[oldIds[i]].attrs, newLoops[newIds[j]].attrs);
+                matrix[i][j] = this.calculateEdgeCost(oldLoopAttrs[i], newLoopAttrs[j]);
             }
             for (let k = 0; k < n; k++) {
-                matrix[i][m + k] =
-                    i === k ? this.calculateEdgeCost(oldLoops[oldIds[i]].attrs, undefined) : Number.MAX_VALUE;
+                matrix[i][m + k] = i === k ? this.calculateEdgeCost(oldLoopAttrs[i], undefined) : Number.MAX_VALUE;
             }
         }
 
         for (let k = 0; k < m; k++) {
             for (let j = 0; j < m; j++) {
-                matrix[n + k][j] =
-                    k === j ? this.calculateEdgeCost(undefined, newLoops[newIds[j]].attrs) : Number.MAX_VALUE;
+                matrix[n + k][j] = k === j ? this.calculateEdgeCost(undefined, newLoopAttrs[j]) : Number.MAX_VALUE;
             }
         }
         return matrix;
@@ -499,12 +508,16 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
             const nodeLoops = loops[id] || {};
             const attrs: NodeAttributesWithLoops = {
                 ...node.attrs,
+                type: node.type,
                 loops: nodeLoops
             };
             graph.addNode(id, attrs);
         }
         for (const [id, edge] of Object.entries(regularEdges)) {
-            graph.addEdge(edge.from, edge.to, id, edge.attrs);
+            graph.addEdge(edge.from, edge.to, id, {
+                ...edge.attrs,
+                type: edge.type
+            });
         }
         return graph;
     }

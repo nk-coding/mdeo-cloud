@@ -162,8 +162,8 @@ function resolveTypeFromDefinition(type: ReturnType, typeArgs: Map<string, Custo
     } else if (ClassTypeRef.is(type)) {
         const baseType = type.type;
 
-        if (type.typeArgs && type.typeArgs.size > 0) {
-            const typeArgsStr = Array.from(type.typeArgs.values())
+        if (type.typeArgs && Object.keys(type.typeArgs).length > 0) {
+            const typeArgsStr = Object.values(type.typeArgs)
                 .map((arg: any) => resolveTypeFromDefinition(arg, typeArgs))
                 .join(",");
             return `${baseType}<${typeArgsStr}>${type.isNullable ? "?" : ""}`;

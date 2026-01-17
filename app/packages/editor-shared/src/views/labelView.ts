@@ -128,25 +128,25 @@ export class GLabelView implements IView {
         }
 
         const containerClasses: Record<string, boolean> = {
-            "relative": true,
+            relative: true,
             "mt-1.5": true,
-            "group": true
+            group: true
         };
 
         const collapsedClasses: Record<string, boolean> = {
             "text-destructive": true,
             "text-sm": true,
             "font-normal": true,
-            "truncate": true,
+            truncate: true,
             "overflow-hidden": true,
             "whitespace-nowrap": true,
             "group-hover:invisible": true
         };
 
         const expandedClasses: Record<string, boolean> = {
-            "invisible": true,
+            invisible: true,
             "group-hover:visible": true,
-            "absolute": true,
+            absolute: true,
             "top-0": true,
             "left-0": true,
             "right-0": true,
@@ -156,7 +156,7 @@ export class GLabelView implements IView {
             "bg-popover": true,
             "text-popover-foreground": true,
             "rounded-md": true,
-            "border": true,
+            border: true,
             "border-destructive": true,
             "p-2": true,
             "shadow-md": true,

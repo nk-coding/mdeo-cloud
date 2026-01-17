@@ -35,7 +35,7 @@ export const longType = classType("long", "builtin")
                 .param("step", typeRef("long").build())
                 .returns(
                     typeRef("List")
-                        .withTypeArgs(new Map([["T", typeRef("int").build()]]))
+                        .withTypeArgs({ T: typeRef("int").build() })
                         .build()
                 )
         )
@@ -47,7 +47,7 @@ export const longType = classType("long", "builtin")
         m.signature((s) =>
             s.param("other", typeRef("long").build()).returns(
                 typeRef("List")
-                    .withTypeArgs(new Map([["T", typeRef("int").build()]]))
+                    .withTypeArgs({ T: typeRef("int").build() })
                     .build()
             )
         )

@@ -46,7 +46,7 @@ export const stringType = classType("string", "builtin")
         m.signature((s) =>
             s.param("reg", typeRef("string").build()).returns(
                 typeRef("List")
-                    .withTypeArgs(new Map([["T", typeRef("string").build()]]))
+                    .withTypeArgs({ T: typeRef("string").build() })
                     .build()
             )
         )
@@ -68,7 +68,7 @@ export const stringType = classType("string", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("List")
-                    .withTypeArgs(new Map([["T", typeRef("string").build()]]))
+                    .withTypeArgs({ T: typeRef("string").build() })
                     .build()
             )
         )

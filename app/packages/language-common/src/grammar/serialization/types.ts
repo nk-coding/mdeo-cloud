@@ -1,4 +1,5 @@
 import type { AstNode, Reference } from "langium";
+import type { SerializableExternalReference } from "./grammarSerializer.js";
 
 /**
  * Transforms a Langium AST node type into an easily serializable form by removing
@@ -42,9 +43,9 @@ export type SerializableGrammarNode<T extends AstNode> = Omit<
  */
 type MapLangiumAstValue<T> =
     T extends Reference<infer U>
-        ? () => MapLangiumAstValue<U>
+        ? () => MapLangiumAstValue<U> | SerializableExternalReference
         : T extends Reference<infer U>[]
-          ? (() => MapLangiumAstValue<U>)[]
+          ? (() => MapLangiumAstValue<U> | SerializableExternalReference)[]
           : T extends AstNode
             ? SerializableGrammarNode<T>
             : T extends (infer U)[]

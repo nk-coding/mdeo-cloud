@@ -94,7 +94,8 @@ export class TerminalRuleBuilder<T> {
             parenthesized: false,
             regex: regex.toString()
         };
-        return {
+
+        const serializableNode: SerializableGrammarNode<GrammarAST.TerminalRule> = {
             $type: "TerminalRule",
             name: this.name,
             hidden: this.isHidden,
@@ -107,6 +108,11 @@ export class TerminalRuleBuilder<T> {
                     : undefined,
             fragment: false,
             definition: token
+        };
+
+        return {
+            name: this.name,
+            toRule: () => serializableNode
         };
     }
 }

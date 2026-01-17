@@ -3,7 +3,7 @@ import type {
     ContextEditValidatorRegistry,
     LabelEditValidator as LabelEditValidatorType,
     RequestEditValidationAction,
-    ValidationStatus as ValidationStatusType,
+    ValidationStatus as ValidationStatusType
 } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import type { ModelState } from "./modelState.js";
@@ -35,7 +35,10 @@ export class ExtendedContextEditValidatorRegistry
         super();
         contextEditValidators.forEach((provider) => this.register(provider.contextId, provider));
         if (labelEditValidator) {
-            this.register(LabelEditValidator.CONTEXT_ID, new LenientValidateLabelEditAdapter(modelState, labelEditValidator));
+            this.register(
+                LabelEditValidator.CONTEXT_ID,
+                new LenientValidateLabelEditAdapter(modelState, labelEditValidator)
+            );
         }
     }
 }
@@ -48,7 +51,10 @@ class LenientValidateLabelEditAdapter extends ValidateLabelEditAdapter {
     override validate(action: RequestEditValidationAction): ValidationStatusType {
         const element = this.modelState.index.find(action.modelElementId);
         if (element == undefined) {
-            return { severity: ValidationStatus.Severity.ERROR, message: `Model element with ID ${action.modelElementId} not found.` };
+            return {
+                severity: ValidationStatus.Severity.ERROR,
+                message: `Model element with ID ${action.modelElementId} not found.`
+            };
         }
         if (element instanceof GModelElement) {
             return this.labelEditValidator.validate(action.text, element);

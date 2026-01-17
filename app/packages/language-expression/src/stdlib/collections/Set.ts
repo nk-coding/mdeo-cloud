@@ -5,6 +5,6 @@ import { classType, genericTypeRef } from "../../typir-extensions/config/typeBui
  */
 export const SetType = classType("Set", "builtin")
     .generics("T")
-    .extends("ReadonlySet", new Map([["T", genericTypeRef("T")]]))
-    .extends("Collection", new Map([["T", genericTypeRef("T")]]))
+    .extends("ReadonlySet", { T: genericTypeRef("T") })
+    .extends("Collection", { T: genericTypeRef("T") })
     .build();

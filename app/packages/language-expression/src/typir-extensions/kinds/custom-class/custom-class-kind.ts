@@ -1,5 +1,4 @@
-import type { Kind } from "typir";
-import type { TypirSpecifics } from "typir";
+import type { Kind, TypirSpecifics } from "typir";
 import {
     buildCustomClassIdentifier,
     CustomClassTypeImplementation,

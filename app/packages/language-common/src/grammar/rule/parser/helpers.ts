@@ -1,19 +1,8 @@
 import type { GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
 import type { TerminalRule } from "../terminal/types.js";
-import { isTerminalRule } from "../terminal/types.js";
 import type { AbstractElement, RuleEntry, CrossRef, RuleContext } from "./types.js";
 import type { ParserRule } from "../types.js";
-
-/**
- * Type guard to check if a value is a parser rule.
- *
- * @param node The value to check
- * @returns True if the node is a parser rule, false otherwise
- */
-export function isParserRule(node: unknown): node is ParserRule<any> {
-    return typeof node === "object" && node !== null && "toRule" in node && typeof node.toRule === "function";
-}
 
 /**
  * Groups multiple rule entries into a single abstract element.
@@ -47,9 +36,7 @@ export function createRuleCall(
     return {
         $type: "RuleCall",
         rule: () => {
-            if (isTerminalRule(element)) {
-                return element;
-            } else if (typeof element === "function") {
+            if (typeof element === "function") {
                 return element().toRule();
             } else {
                 return element.toRule();
@@ -72,7 +59,7 @@ export function simplifyEntry(entry: RuleEntry): AbstractElement {
             $type: "Keyword",
             value: entry
         };
-    } else if (isTerminalRule(entry) || isParserRule(entry) || typeof entry === "function") {
+    } else if ("toRule" in entry || typeof entry === "function") {
         return createRuleCall(entry);
     }
     return entry;

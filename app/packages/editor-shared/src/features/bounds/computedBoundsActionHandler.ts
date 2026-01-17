@@ -1,7 +1,7 @@
 import type { Action, IActionHandler, ICommand } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 
-const { injectable} = sharedImport("inversify");
+const { injectable } = sharedImport("inversify");
 const { ComputedBoundsAction } = sharedImport("@eclipse-glsp/sprotty");
 const { LocalComputedBoundsAction } = sharedImport("@eclipse-glsp/client");
 
@@ -11,13 +11,11 @@ const { LocalComputedBoundsAction } = sharedImport("@eclipse-glsp/client");
  */
 @injectable()
 export class ComputedBoundsActionHandler implements IActionHandler {
-
     handle(action: Action): ICommand | Action | void {
         if (ComputedBoundsAction.is(action) && !LocalComputedBoundsAction.is(action)) {
-            const newAction = {...action };
+            const newAction = { ...action };
             LocalComputedBoundsAction.mark(newAction);
             return newAction;
         }
     }
-    
 }

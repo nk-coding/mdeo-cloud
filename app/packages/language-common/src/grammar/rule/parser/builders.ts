@@ -107,7 +107,7 @@ export class RuleBuilderWithType<T extends AstNode> {
         const createdRule: SerializableGrammarNode<GrammarAST.ParserRule> = {
             $type: "ParserRule",
             name: this.name,
-            returnType: () => this.type,
+            returnType: () => this.type.toType(),
             fragment: false,
             entry: false,
             definition: {

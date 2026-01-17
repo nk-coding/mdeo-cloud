@@ -1,6 +1,8 @@
 import type { InterfaceDeclaration, Interface, CreateInterfaceReturnType } from "./types.js";
 import { isOptional } from "./helpers.js";
 import { mapType } from "./mappings.js";
+import type { SerializableGrammarNode } from "../../serialization/types.js";
+import type { GrammarAST } from "langium";
 
 /**
  * Internal function that creates the final interface definition with all configuration applied.
@@ -19,7 +21,7 @@ function createInterfaceInternal<T extends InterfaceDeclaration, E extends Inter
     attrs: T,
     extendsInterfaces: E
 ): CreateInterfaceReturnType<T, E> {
-    return {
+    const serializableNode: SerializableGrammarNode<GrammarAST.Interface> = {
         $type: "Interface",
         name,
         attributes: Object.entries(attrs).map(([attrName, attrType]) => ({
@@ -28,7 +30,12 @@ function createInterfaceInternal<T extends InterfaceDeclaration, E extends Inter
             isOptional: isOptional(attrType),
             type: mapType(attrType)
         })),
-        superTypes: extendsInterfaces.map((inter) => () => inter)
+        superTypes: extendsInterfaces.map((inter) => () => inter.toType())
+    };
+
+    return {
+        name,
+        toType: () => serializableNode
     } as CreateInterfaceReturnType<T, E>;
 }
 

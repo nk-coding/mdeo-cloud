@@ -4,14 +4,14 @@ import type { ExpressionTypirServices } from "./services.js";
 import type { Interface, AstReflection } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
-import {
-    type TypeAssignability,
-    type TypeInferenceCollector,
-    type TypeInferenceRuleWithoutInferringChildren,
-    type ValidationCollector,
-    type ValidationRuleFunctional,
-    type ValidationProblem,
-    type InferenceProblem as InferenceProblemType
+import type {
+    TypeAssignability,
+    TypeInferenceCollector,
+    TypeInferenceRuleWithoutInferringChildren,
+    ValidationCollector,
+    ValidationRuleFunctional,
+    ValidationProblem,
+    InferenceProblem as InferenceProblemType
 } from "typir";
 import type { TypeSystemConfig } from "./typeSystemConfig.js";
 

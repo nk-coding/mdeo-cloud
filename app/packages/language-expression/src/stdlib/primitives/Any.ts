@@ -8,7 +8,7 @@ export const AnyType = classType("Any", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("Bag")
-                    .withTypeArgs(new Map([["T", typeRef("Any").build()]]))
+                    .withTypeArgs({ T: typeRef("Any").build() })
                     .build()
             )
         )
@@ -19,7 +19,7 @@ export const AnyType = classType("Any", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("OrderedSet")
-                    .withTypeArgs(new Map([["T", typeRef("Any").build()]]))
+                    .withTypeArgs({ T: typeRef("Any").build() })
                     .build()
             )
         )
@@ -31,7 +31,7 @@ export const AnyType = classType("Any", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("List")
-                    .withTypeArgs(new Map([["T", typeRef("Any").build()]]))
+                    .withTypeArgs({ T: typeRef("Any").build() })
                     .build()
             )
         )
@@ -40,7 +40,7 @@ export const AnyType = classType("Any", "builtin")
         m.signature((s) =>
             s.returns(
                 typeRef("Set")
-                    .withTypeArgs(new Map([["T", typeRef("Any").build()]]))
+                    .withTypeArgs({ T: typeRef("Any").build() })
                     .build()
             )
         )

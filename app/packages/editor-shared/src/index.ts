@@ -1,5 +1,6 @@
 export * from "./base/configureDefaultModelElements.js";
 export * from "./base/findViewportZoom.js";
+export * from "./features/bounds/computedBoundsActionHandler.js";
 export * from "./features/bounds/featureModule.js";
 export * from "./features/bounds/hiddenBoundsUpdater.js";
 export * from "./features/change-bounds-tool/changeBoundsTool.js";

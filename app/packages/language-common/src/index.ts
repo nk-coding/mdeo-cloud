@@ -15,6 +15,7 @@ export * from "./grammar/rule/terminal/builders.js";
 export * from "./grammar/rule/terminal/factory.js";
 export * from "./grammar/rule/terminal/types.js";
 export * from "./grammar/rule/types.js";
+export * from "./grammar/serialization/grammarDeserializer.js";
 export * from "./grammar/serialization/grammarSerializer.js";
 export * from "./grammar/serialization/types.js";
 export * from "./grammar/type/interface/builders.js";

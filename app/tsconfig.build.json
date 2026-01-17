@@ -49,6 +49,9 @@
         },
         {
             "path": "packages/service-model"
+        },
+        {
+            "path": "packages/service-script"
         }
     ]
 }

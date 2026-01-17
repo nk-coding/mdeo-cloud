@@ -1,6 +1,7 @@
 import type { AstNode, Reference, GrammarAST } from "langium";
 import type { SerializableGrammarNode } from "../../serialization/types.js";
 import type { BaseType, Primitive } from "../types.js";
+import type { SerializableExternalReference } from "../../serialization/grammarSerializer.js";
 
 /**
  * Represents an interface definition in the grammar that corresponds to a structured AST node.
@@ -8,14 +9,27 @@ import type { BaseType, Primitive } from "../types.js";
  *
  * @template T The AST node type that this interface represents
  */
-export type Interface<T extends AstNode> = {
+export interface Interface<T extends AstNode> {
     /**
      * TypeScript type information for the AST node this interface represents.
      * Only used for type inference and validation during compilation,
      * never assigned at runtime.
      */
     tsType?: T;
-} & SerializableGrammarNode<GrammarAST.Interface>;
+
+    /**
+     * The name of the interface as it appears in the grammar.
+     */
+    name: string;
+
+    /**
+     * Converts this interface into a serializable grammar node that can be used
+     * in the Langium grammar generation process.
+     *
+     * @returns A serializable representation of the interface or external reference
+     */
+    toType: () => SerializableGrammarNode<GrammarAST.Interface> | SerializableExternalReference;
+}
 
 /**
  * Utility type that merges multiple interface types through intersection.

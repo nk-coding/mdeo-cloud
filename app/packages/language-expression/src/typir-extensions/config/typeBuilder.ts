@@ -28,7 +28,7 @@ import type {
 export class ValueTypeBuilder {
     private type: string;
     private isNullable: boolean = false;
-    private typeArgs?: Map<string, ValueType>;
+    private typeArgs?: Record<string, ValueType>;
 
     constructor(type: string) {
         this.type = type;
@@ -46,7 +46,7 @@ export class ValueTypeBuilder {
      * Add type arguments for a generic type.
      * @param args A map of generic parameter names to their concrete types
      */
-    withTypeArgs(args: Map<string, ValueType>): this {
+    withTypeArgs(args: Record<string, ValueType>): this {
         this.typeArgs = args;
         return this;
     }
@@ -299,7 +299,7 @@ type EnsureNotMember<T, K extends string> = K extends keyof T ? never : K;
  * Type representing the built ClassType with specific member names
  */
 type TypedClassType<T extends MemberNames> = ClassType & {
-    members: Map<string, Member> & { _memberNames?: T };
+    members: Record<string, Member> & { _memberNames?: T };
 };
 
 /**
@@ -322,7 +322,7 @@ type TypedClassType<T extends MemberNames> = ClassType & {
 export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     private name: string;
     private package: string;
-    members: Map<string, Member> = new Map();
+    members: Record<string, Member> = {};
     private genericNames?: string[];
     private superTypes: BaseClassTypeRef[] = [];
 
@@ -343,12 +343,12 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         type: ValueType,
         readonly: boolean = false
     ): ClassTypeBuilder<T & Record<K, never>> {
-        this.members.set(name, {
+        this.members[name] = {
             name,
             isProperty: true,
             readonly,
             type
-        });
+        };
         return this as unknown as ClassTypeBuilder<T & Record<K, never>>;
     }
 
@@ -363,11 +363,11 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         builder: (method: MethodBuilder) => MethodBuilder
     ): ClassTypeBuilder<T & Record<K, never>> {
         const methodBuilder = builder(new MethodBuilder());
-        this.members.set(name, {
+        this.members[name] = {
             name,
             isProperty: false,
             type: methodBuilder.build()
-        });
+        };
         return this as unknown as ClassTypeBuilder<T & Record<K, never>>;
     }
 
@@ -386,7 +386,7 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
      * @param type The type identifier of the super type
      * @param typeArgs Optional type arguments for the super type
      */
-    extends(type: string, typeArgs?: Map<string, ValueType>): this {
+    extends(type: string, typeArgs?: Record<string, ValueType>): this {
         const superType: BaseClassTypeRef = { type };
         if (typeArgs) {
             superType.typeArgs = typeArgs;
@@ -406,9 +406,9 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         builder.superTypes = [...this.superTypes];
 
         for (const memberName of memberNames) {
-            const member = this.members.get(memberName);
+            const member = this.members[memberName];
             if (member) {
-                builder.members.set(memberName, member);
+                builder.members[memberName] = member;
             }
         }
 
@@ -426,9 +426,9 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         builder.superTypes = [...this.superTypes];
 
         const omitSet = new Set(memberNames);
-        for (const [memberName, member] of this.members.entries()) {
+        for (const memberName in this.members) {
             if (!omitSet.has(memberName as K)) {
-                builder.members.set(memberName, member);
+                builder.members[memberName] = this.members[memberName];
             }
         }
 
@@ -478,11 +478,11 @@ export function classType(name: string, pkg: string = "builtin"): ClassTypeBuild
 export function classTypeFrom(existingType: ClassType): ClassTypeBuilder<any> {
     const builder = new ClassTypeBuilder<any>(existingType.name, existingType.package);
 
-    for (const [memberName, member] of existingType.members.entries()) {
+    for (const [memberName, member] of Object.entries(existingType.members)) {
         if (member.isProperty) {
-            builder.members.set(memberName, member);
+            builder.members[memberName] = member;
         } else {
-            (builder as any).members.set(memberName, member);
+            (builder as any).members[memberName] = member;
         }
     }
 

@@ -1,5 +1,7 @@
 import type { Type, UnionTypes } from "./types.js";
 import type { Interface } from "../interface/types.js";
+import type { SerializableGrammarNode } from "../../serialization/types.js";
+import type { GrammarAST } from "langium";
 
 /**
  * Builder for creating union types that combine multiple alternative type definitions.
@@ -45,16 +47,21 @@ export class TypeBuilder {
      * ```
      */
     types<E extends (Type<any> | Interface<any>)[]>(...types: E): Type<UnionTypes<E>> {
-        return {
+        const serializableNode: SerializableGrammarNode<GrammarAST.Type> = {
             $type: "Type",
             name: this.name,
             type: {
                 $type: "UnionType",
                 types: types.map((type) => ({
                     $type: "SimpleType",
-                    typeRef: () => type
+                    typeRef: () => type.toType()
                 }))
             }
-        } as Type<UnionTypes<E>>;
+        };
+
+        return {
+            name: this.name,
+            toType: () => serializableNode
+        };
     }
 }

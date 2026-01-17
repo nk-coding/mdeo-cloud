@@ -1,4 +1,7 @@
+import type { SerializableExternalReference } from "../../serialization/grammarSerializer.js";
 import { TypeBuilder } from "./builders.js";
+import type { Type } from "./types.js";
+import type { AstNode } from "langium";
 
 /**
  * Creates a new type builder for defining union types in the grammar.
@@ -35,4 +38,31 @@ import { TypeBuilder } from "./builders.js";
  */
 export function createType(name: string): TypeBuilder {
     return new TypeBuilder(name);
+}
+
+/**
+ * Creates an external reference to a type from another grammar.
+ * Used during language composition to reference types defined in other partial languages.
+ *
+ * @template T The AST node union type that the referenced type represents
+ * @param name The name of the external type being referenced
+ * @returns A type external reference
+ *
+ * @example
+ * ```typescript
+ * // Reference an Expression type from another grammar
+ * const ExternalExpression = createExternalType<ExpressionType>("Expression");
+ * ```
+ */
+export function createExternalType<T extends AstNode>(name: string): Type<T> {
+    const externalRef: SerializableExternalReference = {
+        $externalRef: true,
+        kind: "Type",
+        name
+    };
+
+    return {
+        name,
+        toType: () => externalRef
+    };
 }

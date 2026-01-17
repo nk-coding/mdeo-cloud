@@ -5,7 +5,7 @@ import { classType, typeRef, genericTypeRef, voidType } from "../../typir-extens
  */
 export const CollectionType = classType("Collection", "builtin")
     .generics("T")
-    .extends("ReadonlyCollection", new Map([["T", genericTypeRef("T")]]))
+    .extends("ReadonlyCollection", { T: genericTypeRef("T") })
     .method("add", (m) => m.signature((s) => s.param("item", genericTypeRef("T")).returns(typeRef("boolean").build())))
     .method("addAll", (m) =>
         m.signature((s) =>
@@ -13,7 +13,7 @@ export const CollectionType = classType("Collection", "builtin")
                 .param(
                     "col",
                     typeRef("Collection")
-                        .withTypeArgs(new Map([["T", genericTypeRef("T")]]))
+                        .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
                 .returns(typeRef("boolean").build())
@@ -29,7 +29,7 @@ export const CollectionType = classType("Collection", "builtin")
                 .param(
                     "col",
                     typeRef("Collection")
-                        .withTypeArgs(new Map([["T", genericTypeRef("T")]]))
+                        .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
                 .returns(typeRef("boolean").build())

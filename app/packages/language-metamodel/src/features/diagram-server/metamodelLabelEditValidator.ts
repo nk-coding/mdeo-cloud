@@ -29,9 +29,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
             );
         }
         if (element.type === MetamodelElementType.LABEL_PROPERTY) {
-            return (
-                this.validatePropertyLabel(label, element as PropertyLabel) ?? ValidationStatus.NONE
-            );
+            return this.validatePropertyLabel(label, element as PropertyLabel) ?? ValidationStatus.NONE;
         }
         return ValidationStatus.NONE;
     }
@@ -49,7 +47,8 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         }
         if (
             this.modelState.root.children.some(
-                (element) => element.type === MetamodelElementType.NODE_CLASS && (element as ClassNode).name === trimmedName
+                (element) =>
+                    element.type === MetamodelElementType.NODE_CLASS && (element as ClassNode).name === trimmedName
             )
         ) {
             return this.error(`A class with the name '${trimmedName}' already exists.`);
@@ -72,7 +71,9 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
 
         const parsed = parsePropertyLabel(label);
         if (parsed == undefined) {
-            return this.error("Invalid property format. Expected: 'name: type' or 'name: type[multiplicity]'. Valid multiplicity formats: [*], [+], [?], [number], [number..*], [number..number]");
+            return this.error(
+                "Invalid property format. Expected: 'name: type' or 'name: type[multiplicity]'. Valid multiplicity formats: [*], [+], [?], [number], [number..*], [number..number]"
+            );
         }
 
         const identifierValidation = this.validateRawIdentifier(parsed.identifier, "Property identifier");
@@ -126,9 +127,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         const validTypes: string[] = [...Object.values(MetamodelPrimitiveTypes)];
 
         if (!validTypes.includes(type)) {
-            return this.error(
-                `Invalid property type '${type}'. Valid types are: ${validTypes.join(", ")}.`
-            );
+            return this.error(`Invalid property type '${type}'. Valid types are: ${validTypes.join(", ")}.`);
         }
 
         return undefined;
@@ -136,7 +135,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
 
     /**
      * Validates the multiplicity format using regex.
-     * 
+     *
      * Valid formats:
      * - Single: *, +, ?, or a number
      * - Range: number..*, or number..number
@@ -146,7 +145,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      */
     private validateMultiplicity(multiplicity: string): ValidationStatusType | undefined {
         const multiplicityRegex = /^(\*|\+|\?|\d+|\d+\.\.\*|\d+\.\.\d+)$/;
-        
+
         if (!multiplicityRegex.test(multiplicity)) {
             return this.error(
                 `Invalid multiplicity format '${multiplicity}'. Valid formats: *, +, ?, number, number..*, number..number`
@@ -163,10 +162,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * @param element the property label element
      * @returns a validation status if the property name is not unique, undefined otherwise
      */
-    private validatePropertyUniqueness(
-        identifier: string,
-        element: PropertyLabel
-    ): ValidationStatusType | undefined {
+    private validatePropertyUniqueness(identifier: string, element: PropertyLabel): ValidationStatusType | undefined {
         const parsedIdentifier = parseIdentifier(identifier);
 
         const propertyNode = this.index.getAstNode(element);
@@ -175,7 +171,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         }
 
         const reflection = this.modelState.languageServices.shared.AstReflection;
-        
+
         if (!reflection.isInstance(propertyNode, Class)) {
             const originalProperty = propertyNode as PropertyType;
             const originalParsedName = originalProperty.name;
@@ -204,7 +200,6 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
 
         return undefined;
     }
-
 }
 
 /**
@@ -227,9 +222,9 @@ export interface ParsedPropertyLabel {
 
 /**
  * Parses a property label into its components.
- * 
+ *
  * Expected format: 'name: type' or 'name: type[multiplicity]'
- * 
+ *
  * @param label the label text to parse
  * @returns the parsed components or undefined if parsing fails
  */
@@ -239,8 +234,8 @@ export function parsePropertyLabel(label: string): ParsedPropertyLabel | undefin
         return undefined;
     }
 
-    const identifier =  label.substring(0, colonIndex).trim();
-    let typeWithMultiplicity = label.substring(colonIndex + 1).trim();
+    const identifier = label.substring(0, colonIndex).trim();
+    const typeWithMultiplicity = label.substring(colonIndex + 1).trim();
 
     if (identifier.length === 0 || typeWithMultiplicity.length === 0) {
         return undefined;
@@ -253,17 +248,17 @@ export function parsePropertyLabel(label: string): ParsedPropertyLabel | undefin
     if (bracketIndex >= 0) {
         type = typeWithMultiplicity.substring(0, bracketIndex).trim();
         const multiplicityPart = typeWithMultiplicity.substring(bracketIndex);
-        
+
         // Check if brackets are matched and have content
         if (!multiplicityPart.startsWith("[") || !multiplicityPart.endsWith("]")) {
             return undefined;
         }
-        
+
         const content = multiplicityPart.substring(1, multiplicityPart.length - 1).trim();
         if (content.length === 0) {
             return undefined;
         }
-        
+
         multiplicity = content;
     } else {
         type = typeWithMultiplicity;

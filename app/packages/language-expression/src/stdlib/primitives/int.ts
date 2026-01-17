@@ -35,7 +35,7 @@ export const intType = classType("int", "builtin")
                 .param("step", typeRef("int").build())
                 .returns(
                     typeRef("List")
-                        .withTypeArgs(new Map([["T", typeRef("int").build()]]))
+                        .withTypeArgs({ T: typeRef("int").build() })
                         .build()
                 )
         )
@@ -47,7 +47,7 @@ export const intType = classType("int", "builtin")
         m.signature((s) =>
             s.param("other", typeRef("int").build()).returns(
                 typeRef("List")
-                    .withTypeArgs(new Map([["T", typeRef("int").build()]]))
+                    .withTypeArgs({ T: typeRef("int").build() })
                     .build()
             )
         )

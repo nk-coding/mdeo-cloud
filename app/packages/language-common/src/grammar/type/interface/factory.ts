@@ -1,4 +1,7 @@
+import type { SerializableExternalReference } from "../../serialization/grammarSerializer.js";
 import { InterfaceBuilderFull } from "./builders.js";
+import type { Interface } from "./types.js";
+import type { AstNode } from "langium";
 
 /**
  * Creates a new interface builder for defining structured AST node types.
@@ -39,4 +42,31 @@ import { InterfaceBuilderFull } from "./builders.js";
  */
 export function createInterface(name: string): InterfaceBuilderFull {
     return new InterfaceBuilderFull(name);
+}
+
+/**
+ * Creates an external reference to an interface from another grammar.
+ * Used during language composition to reference interfaces defined in other partial languages.
+ *
+ * @template T The AST node type that the referenced interface represents
+ * @param name The name of the external interface being referenced
+ * @returns An interface external reference
+ *
+ * @example
+ * ```typescript
+ * // Reference a Person interface from another grammar
+ * const ExternalPerson = createExternalInterface<PersonType>("Person");
+ * ```
+ */
+export function createExternalInterface<T extends AstNode>(name: string): Interface<T> {
+    const externalRef: SerializableExternalReference = {
+        $externalRef: true,
+        kind: "Type",
+        name
+    };
+
+    return {
+        name,
+        toType: () => externalRef
+    };
 }

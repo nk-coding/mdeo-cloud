@@ -460,7 +460,7 @@ function isFullyDefined(
         return true;
     } else {
         if (valueType.typeArgs != undefined) {
-            for (const typeArg of valueType.typeArgs.values()) {
+            for (const typeArg of Object.values(valueType.typeArgs)) {
                 if (!isFullyDefined(typeArg, functionType, signatureGenerics)) {
                     return false;
                 }

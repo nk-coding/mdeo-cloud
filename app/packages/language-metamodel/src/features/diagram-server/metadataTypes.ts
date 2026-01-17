@@ -88,8 +88,7 @@ export namespace NodeLayoutMetadataUtil {
 
         const meta = obj as Partial<NodeLayoutMetadata>;
         return (
-            (typeof meta.prefWidth === "number") &&
-            (meta.prefHeight === undefined || typeof meta.prefHeight === "number")
+            typeof meta.prefWidth === "number" && (meta.prefHeight === undefined || typeof meta.prefHeight === "number")
         );
     }
 

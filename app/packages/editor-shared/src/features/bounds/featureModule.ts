@@ -1,4 +1,4 @@
-import { type ContainerModule } from "inversify";
+import type { ContainerModule } from "inversify";
 import { sharedImport } from "../../sharedImport.js";
 import { HiddenBoundsUpdater } from "./hiddenBoundsUpdater.js";
 import { ComputedBoundsActionHandler } from "./computedBoundsActionHandler.js";
@@ -15,5 +15,5 @@ export const boundsModule: ContainerModule = new FeatureModule((bind, unbind, is
     bind(HiddenBoundsUpdater).toSelf().inSingletonScope();
     rebind(GLSPHiddenBoundsUpdater).toService(HiddenBoundsUpdater);
 
-    configureActionHandler({bind, isBound}, ComputedBoundsAction.KIND, ComputedBoundsActionHandler)
+    configureActionHandler({ bind, isBound }, ComputedBoundsAction.KIND, ComputedBoundsActionHandler);
 });

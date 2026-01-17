@@ -5,8 +5,12 @@
 
 export type NodeId = string;
 export type EdgeKey = string | number;
-export type NodeAttributes = Record<string, unknown>;
-export type EdgeAttributes = Record<string, unknown>;
+export interface NodeAttributes extends Record<string, unknown> {
+    type: string;
+}
+export interface EdgeAttributes extends Record<string, unknown> {
+    type: string;
+}
 
 export interface EdgeData {
     source: NodeId;
@@ -43,7 +47,7 @@ export class MultiGraph {
      * @param nodeId The unique identifier for the node
      * @param attributes Optional attributes to attach to the node
      */
-    addNode(nodeId: NodeId, attributes: NodeAttributes = {}): void {
+    addNode(nodeId: NodeId, attributes: NodeAttributes): void {
         this._nodes.set(nodeId, { ...attributes });
         if (!this._adj.has(nodeId)) {
             this._adj.set(nodeId, new Map());
@@ -100,12 +104,12 @@ export class MultiGraph {
      * @param attributes Optional attributes to attach to the edge
      * @returns The key of the added edge (either provided or auto-generated)
      */
-    addEdge(source: NodeId, target: NodeId, key?: EdgeKey, attributes: EdgeAttributes = {}): EdgeKey {
+    addEdge(source: NodeId, target: NodeId, key: EdgeKey, attributes: EdgeAttributes): EdgeKey {
         if (!this._nodes.has(source)) {
-            this.addNode(source);
+            throw new Error(`Source node ${source} does not exist`);
         }
         if (!this._nodes.has(target)) {
-            this.addNode(target);
+            throw new Error(`Target node ${target} does not exist`);
         }
 
         let sourceAdj = this._adj.get(source);
@@ -275,74 +279,5 @@ export class MultiGraph {
         }
 
         return newGraph;
-    }
-
-    /**
-     * Create graph from NetworkX node-link JSON format
-     * Supports both 'links' and 'edges' field names
-     * @param data The node-link data object containing nodes and edges/links arrays
-     * @returns A new MultiGraph instance created from the provided data
-     */
-    static fromNodeLinkData(data: {
-        nodes: Array<{ id: NodeId; [key: string]: unknown }>;
-        links?: Array<{
-            source: NodeId;
-            target: NodeId;
-            key?: EdgeKey;
-            [key: string]: unknown;
-        }>;
-        edges?: Array<{
-            source: NodeId;
-            target: NodeId;
-            key?: EdgeKey;
-            [key: string]: unknown;
-        }>;
-        multigraph?: boolean;
-        directed?: boolean;
-    }): MultiGraph {
-        const graph = new MultiGraph();
-
-        for (const node of data.nodes) {
-            const { id, ...attrs } = node;
-            graph.addNode(id, attrs);
-        }
-
-        const edgeList = data.edges ?? data.links ?? [];
-        for (const link of edgeList) {
-            const { source, target, key, ...attrs } = link;
-            graph.addEdge(source, target, key, attrs);
-        }
-
-        return graph;
-    }
-
-    /**
-     * Export to NetworkX node-link JSON format
-     * @returns An object containing nodes and links arrays in NetworkX format
-     */
-    toNodeLinkData(): {
-        nodes: Array<{ id: NodeId } & NodeAttributes>;
-        links: Array<{ source: NodeId; target: NodeId; key: EdgeKey } & EdgeAttributes>;
-        multigraph: boolean;
-        directed: boolean;
-    } {
-        const nodes = Array.from(this._nodes.entries()).map(([id, attrs]) => ({
-            id,
-            ...attrs
-        }));
-
-        const links = this.edges.map(([source, target, key]) => ({
-            source,
-            target,
-            key,
-            ...this.getEdgeData(source, target, key)
-        }));
-
-        return {
-            nodes,
-            links,
-            multigraph: true,
-            directed: false
-        };
     }
 }

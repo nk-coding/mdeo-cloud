@@ -106,9 +106,9 @@ export class CustomClassTypeImplementation
     override get definition(): ClassTypeRef {
         if (this._definition == undefined) {
             const definition = this.details.definition;
-            const typeArgs = new Map<string, ValueType>();
+            const typeArgs: Record<string, ValueType> = {};
             for (const [argName, argType] of this.details.typeArgs) {
-                typeArgs.set(argName, argType.definition);
+                typeArgs[argName] = argType.definition;
             }
             this._definition = {
                 type: `${definition.package}.${definition.name}`,
@@ -143,7 +143,7 @@ export class CustomClassTypeImplementation
     }
 
     override getLocalMember(memberName: string): Member | undefined {
-        return this.details.definition.members.get(memberName);
+        return this.details.definition.members[memberName];
     }
 }
 

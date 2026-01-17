@@ -7,7 +7,7 @@ import type { EdgePlacement } from "@eclipse-glsp/protocol";
  */
 export class AssociationEndLabel extends GLabel {
     /**
-     * The placement of the label along the edge 
+     * The placement of the label along the edge
      */
     edgePlacement?: EdgePlacement;
 

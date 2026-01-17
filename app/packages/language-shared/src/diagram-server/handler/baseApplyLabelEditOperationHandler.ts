@@ -1,8 +1,4 @@
-import type {
-    MaybePromise,
-    Command,
-    ApplyLabelEditOperation as ApplyLabelEditOperationType
-} from "@eclipse-glsp/server";
+import type { Command, ApplyLabelEditOperation as ApplyLabelEditOperationType } from "@eclipse-glsp/server";
 import { ID } from "@mdeo/language-common";
 import type { AstNode, CstNode } from "langium";
 import type { TextEdit as TextEditType, WorkspaceEdit } from "vscode-languageserver-types";
@@ -31,7 +27,11 @@ export abstract class BaseApplyLabelEditOperationHandler extends BaseOperationHa
         if (sourceElement == undefined) {
             throw new Error(`AST node for label with ID ${operation.labelId} not found.`);
         }
-        return new OperationHandlerCommand(this.modelState, await this.createLabelEdit(sourceElement, operation), undefined);
+        return new OperationHandlerCommand(
+            this.modelState,
+            await this.createLabelEdit(sourceElement, operation),
+            undefined
+        );
     }
 
     /**

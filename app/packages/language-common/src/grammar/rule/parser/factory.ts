@@ -2,8 +2,10 @@ import type { AstNode } from "langium";
 import type { BaseType } from "../../type/types.js";
 import type { CrossRef, AbstractElement, RuleEntry, RuleContext } from "./types.js";
 import type { TerminalRule } from "../terminal/types.js";
+import type { ParserRule } from "../types.js";
 import { RuleBuilder } from "./builders.js";
 import { createRuleCall, defaultRuleContext, groupIfNeeded, simplifyEntries } from "./helpers.js";
+import type { SerializableExternalReference } from "../../serialization/grammarSerializer.js";
 
 /**
  * Creates a new parser rule builder for defining grammar rules.
@@ -31,6 +33,32 @@ export function createRule(name: string): RuleBuilder {
 }
 
 /**
+ * Creates an external reference to a parser rule from another grammar.
+ * Used during language composition to reference rules defined in other partial languages.
+ *
+ * @template T The AST node type that the referenced parser rule produces
+ * @param name The name of the external parser rule being referenced
+ * @returns A parser rule external reference
+ *
+ * @example
+ * ```typescript
+ * // Reference an Expression rule from another grammar
+ * const ExternalExpression = createExternalParserRule<ExpressionType>("Expression");
+ * ```
+ */
+export function createExternalParserRule<T extends AstNode>(name: string): ParserRule<T> {
+    const externalRef: SerializableExternalReference = {
+        $externalRef: true,
+        kind: "ParserRule",
+        name
+    };
+
+    return {
+        toRule: () => externalRef
+    };
+}
+
+/**
  * Creates a cross-reference to another AST node type. Cross-references allow
  * one part of the AST to reference another part by name or identifier.
  *
@@ -51,7 +79,7 @@ export function createRule(name: string): RuleBuilder {
 export function ref<T extends AstNode>(type: BaseType<T>, terminal?: TerminalRule<any>): CrossRef<T> {
     return {
         $type: "CrossReference",
-        type: () => type,
+        type: (() => type.toType()) as any,
         terminal: terminal != undefined ? createRuleCall(terminal) : undefined,
         isMulti: false,
         deprecatedSyntax: false
@@ -230,7 +258,7 @@ export function action<T extends AstNode>(
     return group(
         {
             $type: "Action",
-            type: () => type
+            type: () => type.toType()
         },
         ...handler(defaultRuleContext)
     );
@@ -268,7 +296,7 @@ export function treeRewriteAction<T extends AstNode>(
     return group(
         {
             $type: "Action",
-            type: () => type,
+            type: () => type.toType(),
             feature,
             operator
         },

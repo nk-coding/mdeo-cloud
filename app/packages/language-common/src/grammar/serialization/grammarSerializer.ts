@@ -39,6 +39,27 @@ export interface SerializableReference {
 }
 
 /**
+ * Represents a serializable external reference to a rule or type from another grammar.
+ * External references are used during language composition.
+ */
+export interface SerializableExternalReference {
+    /**
+     * Marker to identify this as an external reference.
+     */
+    $externalRef: true;
+
+    /**
+     * The kind of reference (ParserRule, TerminalRule, or Type).
+     */
+    kind: "ParserRule" | "TerminalRule" | "Type";
+
+    /**
+     * The name of the external rule/type being referenced.
+     */
+    name: string;
+}
+
+/**
  * Type that transforms any AST node into a serializable form by converting
  * Langium references to serializable references and handling circular dependencies.
  *
@@ -53,9 +74,9 @@ export type SerializedAstNode<T extends AstNode> = {
         : T[K] extends AstNode[]
           ? SerializedAstNode<T[K][number]>[]
           : T[K] extends Reference<any>
-            ? SerializableReference
+            ? SerializableReference | SerializableExternalReference
             : T[K] extends Reference<any>[]
-              ? SerializableReference[]
+              ? (SerializableReference | SerializableExternalReference)[]
               : T[K];
 };
 
@@ -66,7 +87,8 @@ export type SerializedAstNode<T extends AstNode> = {
 type SerializedRule =
     | SerializedAstNode<GrammarAST.TerminalRule>
     | SerializedAstNode<GrammarAST.ParserRule>
-    | SerializedAstNode<GrammarAST.InfixRule>;
+    | SerializedAstNode<GrammarAST.InfixRule>
+    | SerializableExternalReference;
 
 /**
  * Internal data structure that pairs a grammar node with its serializable reference.
@@ -83,7 +105,7 @@ interface NodeWithRef<T> {
     /**
      * The serializable reference that points to this node in the output.
      */
-    ref: SerializableReference;
+    ref: SerializableReference | SerializableExternalReference;
 }
 
 /**
@@ -94,6 +116,17 @@ interface NodeWithRef<T> {
 type Entry = ArrayOrT<
     SerializableGrammarNode<any> | number | string | boolean | undefined | (() => SerializableGrammarNode<any>)
 >;
+
+/**
+ * Extended serialized grammar type that supports external references.
+ * This extends the standard Langium grammar format to include external references
+ * for language composition.
+ */
+export interface SerializedGrammar {
+    rules: SerializedRule[];
+    types: (SerializedAstNode<GrammarAST.Type> | SerializableExternalReference)[];
+    interfaces: (SerializedAstNode<GrammarAST.Interface> | SerializableExternalReference)[];
+}
 
 /**
  * Serializes grammar rules and types into a JSON-serializable format that can be
@@ -122,13 +155,17 @@ export class GrammarSerializer {
      * Array of serialized types in registration order.
      * Undefined slots are placeholders during the registration process.
      */
-    private readonly types: (SerializedAstNode<GrammarAST.Type> | undefined)[] = [];
+    private readonly types: (SerializedAstNode<GrammarAST.Type> | SerializableExternalReference | undefined)[] = [];
 
     /**
      * Array of serialized interfaces in registration order.
      * Undefined slots are placeholders during the registration process.
      */
-    private readonly interfaces: (SerializedAstNode<GrammarAST.Interface> | undefined)[] = [];
+    private readonly interfaces: (
+        | SerializedAstNode<GrammarAST.Interface>
+        | SerializableExternalReference
+        | undefined
+    )[] = [];
 
     /**
      * Gets the complete serialized grammar containing all registered rules, types, and interfaces.
@@ -137,28 +174,35 @@ export class GrammarSerializer {
      *
      * @returns The complete serialized grammar ready for JSON conversion
      */
-    get grammar(): SerializedAstNode<GrammarAST.Grammar> {
+    get grammar(): SerializedGrammar {
         return {
-            $type: "Grammar",
-            isDeclared: true,
             rules: this.rules as SerializedRule[],
-            types: this.types as SerializedAstNode<GrammarAST.Type>[],
-            interfaces: this.interfaces as SerializedAstNode<GrammarAST.Interface>[],
-            imports: []
+            types: this.types as (SerializedAstNode<GrammarAST.Type> | SerializableExternalReference)[],
+            interfaces: this.interfaces as (SerializedAstNode<GrammarAST.Interface> | SerializableExternalReference)[]
         };
     }
 
     /**
      * Creates a new grammar serializer and registers the entry rule and additional terminals.
      *
-     * @param entry The main parser rule that serves as the grammar entry point
+     * @param rules The parser rules serving as entry points
      * @param additionalTerminals Array of terminal rules to include in the grammar
      */
-    constructor(entry: ParserRule<any>, additionalTerminals: TerminalRule<any>[]) {
-        this.registerRule(entry.toRule());
-        (this.rules[0] as SerializedAstNode<GrammarAST.ParserRule>).entry = true;
+    constructor(rules: ParserRule<any>[], additionalTerminals: TerminalRule<any>[]) {
+        for (const rule of rules) {
+            const entryRule = rule.toRule();
+            if (this.isExternalReference(entryRule)) {
+                throw new Error("Entry rule cannot be an external reference");
+            }
+            this.registerRule(entryRule);
+        }
         for (const terminal of additionalTerminals) {
-            this.registerRule(terminal);
+            const terminalRule = terminal.toRule();
+            if (!this.isExternalReference(terminalRule)) {
+                this.registerRule(terminalRule);
+            } else {
+                throw new Error("Additional terminals cannot be external references");
+            }
         }
     }
 
@@ -176,7 +220,9 @@ export class GrammarSerializer {
      * @returns The serialized representation of the entry
      * @throws Error if an unsupported reference type is encountered
      */
-    private visit(entry: Entry): ArrayOrT<SerializedAstNode<any> | string | number | boolean | undefined> {
+    private visit(
+        entry: Entry
+    ): ArrayOrT<SerializedAstNode<any> | string | number | boolean | undefined | SerializableExternalReference> {
         if (Array.isArray(entry)) {
             return entry.map((n) => this.visit(n)) as Entry;
         }
@@ -187,7 +233,9 @@ export class GrammarSerializer {
         }
         if (typeof entry === "function") {
             const reference = entry();
-            if (this.isRule(reference)) {
+            if (this.isExternalReference(reference)) {
+                return reference;
+            } else if (this.isRule(reference)) {
                 return this.registerRule(reference);
             } else if (this.isType(reference)) {
                 return this.registerType(reference);
@@ -211,7 +259,7 @@ export class GrammarSerializer {
      * @returns A serializable reference to the registered rule
      * @throws Error if a rule with the same name but different instance is found
      */
-    private registerRule(rule: Rule): SerializableReference {
+    private registerRule(rule: Rule): SerializableReference | SerializableExternalReference {
         const existing = this.ruleLookup.get(rule.name);
         if (existing) {
             if (existing.node !== rule) {
@@ -238,7 +286,7 @@ export class GrammarSerializer {
      * @returns A serializable reference to the registered type
      * @throws Error if a type with the same name but different instance is found
      */
-    private registerType(type: Type<any>): SerializableReference {
+    private registerType(type: Type<any>): SerializableReference | SerializableExternalReference {
         const existing = this.typeLookup.get(type.name);
         if (existing) {
             if (existing.node !== type) {
@@ -250,7 +298,7 @@ export class GrammarSerializer {
         this.types.push(undefined);
         const ref: SerializableReference = { $ref: `#/types@${id}` };
         this.typeLookup.set(type.name, { node: type, ref });
-        const serialized = this.visit(type) as SerializedAstNode<GrammarAST.Type>;
+        const serialized = this.visit(type) as SerializedAstNode<GrammarAST.Type> | SerializableExternalReference;
         this.types[id] = serialized;
         return ref;
     }
@@ -265,7 +313,7 @@ export class GrammarSerializer {
      * @returns A serializable reference to the registered interface
      * @throws Error if an interface with the same name but different instance is found
      */
-    private registerInterface(iface: Interface<any>): SerializableReference {
+    private registerInterface(iface: Interface<any>): SerializableReference | SerializableExternalReference {
         const existing = this.typeLookup.get(iface.name);
         if (existing) {
             if (existing.node !== iface) {
@@ -277,7 +325,7 @@ export class GrammarSerializer {
         this.interfaces.push(undefined);
         const ref: SerializableReference = { $ref: `#/interfaces@${id}` };
         this.typeLookup.set(iface.name, { node: iface, ref });
-        const serialized = this.visit(iface) as SerializedAstNode<GrammarAST.Interface>;
+        const serialized = this.visit(iface) as SerializedAstNode<GrammarAST.Interface> | SerializableExternalReference;
         this.interfaces[id] = serialized;
         return ref;
     }
@@ -315,5 +363,15 @@ export class GrammarSerializer {
      */
     private isInterface(value: any): value is Interface<any> {
         return value && typeof value === "object" && "$type" in value && value.$type === "Interface";
+    }
+
+    /**
+     * Type guard to check if a value is a SerializableExternalReference.
+     *
+     * @param value The value to check
+     * @returns True if the value is a SerializableExternalReference, false otherwise
+     */
+    private isExternalReference(value: any): value is SerializableExternalReference {
+        return value && typeof value === "object" && "$externalRef" in value && value.$externalRef === true;
     }
 }

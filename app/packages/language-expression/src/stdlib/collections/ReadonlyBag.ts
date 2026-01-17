@@ -5,5 +5,5 @@ import { classType, genericTypeRef } from "../../typir-extensions/config/typeBui
  */
 export const ReadonlyBagType = classType("ReadonlyBag", "builtin")
     .generics("T")
-    .extends("ReadonlyCollection", new Map([["T", genericTypeRef("T")]]))
+    .extends("ReadonlyCollection", { T: genericTypeRef("T") })
     .build();
