@@ -10,7 +10,7 @@ const { resizeFeature } = sharedImport("@eclipse-glsp/client");
  * Represents a class in the metamodel diagram with properties displayed as labels.
  */
 export class GClassNode extends GRectangularNode {
-    static override readonly DEFAULT_FEATURES = [
+    static readonly DEFAULT_FEATURES = [
         connectableFeature,
         deletableFeature,
         selectFeature,

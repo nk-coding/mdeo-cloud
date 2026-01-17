@@ -21,6 +21,7 @@
         "@codingame/monaco-vscode-search-service-override": "^25.0.0",
         "@codingame/monaco-vscode-working-copy-service-override": "^25.0.0",
         "@eclipse-glsp/client": "^2.5.0",
+        "@eclipse-glsp/protocol": "^2.5.0",
         "@eclipse-glsp/server": "^2.5.0",
         "@eclipse-glsp/sprotty": "^2.5.0",
         "@mdeo/editor-common": "^0.1.0",

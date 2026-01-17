@@ -1,12 +1,15 @@
 import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, ShapeTypeHint } from "@eclipse-glsp/server";
 import { sharedImport } from "@mdeo/language-shared";
 import { MetamodelElementType } from "./model/elementTypes.js";
-import { ClassNode } from "./model/classNode.js";
-import { ClassLabel } from "./model/classLabel.js";
-import { PropertyLabel } from "./model/propertyLabel.js";
-import { AssociationEndLabel } from "./model/associationEndLabel.js";
-import { InheritanceEdge } from "./model/inheritanceEdge.js";
-import { AssociationEdge } from "./model/associationEdge.js";
+import { GClassNode } from "./model/classNode.js";
+import { GClassLabel } from "./model/classLabel.js";
+import { GPropertyLabel } from "./model/propertyLabel.js";
+import { GInheritanceEdge } from "./model/inheritanceEdge.js";
+import { GAssociationEdge } from "./model/associationEdge.js";
+import { GAssociationMultiplicityLabel } from "./model/associationMultiplicityLabel.js";
+import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
+import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
+import { GAssociationMultiplicityNode } from "./model/associationMultiplicityNode.js";
 
 const { injectable } = sharedImport("inversify");
 const { ServerLayoutKind, getDefaultMapping } = sharedImport("@eclipse-glsp/server");
@@ -24,12 +27,17 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
 
     get typeMapping(): Map<string, GModelElementConstructor> {
         const mapping = getDefaultMapping();
-        mapping.set(MetamodelElementType.NODE_CLASS, ClassNode);
-        mapping.set(MetamodelElementType.LABEL_CLASS_NAME, ClassLabel);
-        mapping.set(MetamodelElementType.LABEL_PROPERTY, PropertyLabel);
-        mapping.set(MetamodelElementType.LABEL_ASSOCIATION_END, AssociationEndLabel);
-        mapping.set(MetamodelElementType.EDGE_INHERITANCE, InheritanceEdge);
-        mapping.set(MetamodelElementType.EDGE_ASSOCIATION, AssociationEdge);
+        mapping.set(MetamodelElementType.NODE_CLASS, GClassNode);
+        mapping.set(MetamodelElementType.NODE_ASSOCIATION_PROPERTY, GAssociationPropertyNode);
+        mapping.set(MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY, GAssociationMultiplicityNode);
+
+        mapping.set(MetamodelElementType.LABEL_CLASS_NAME, GClassLabel);
+        mapping.set(MetamodelElementType.LABEL_PROPERTY, GPropertyLabel);
+        mapping.set(MetamodelElementType.LABEL_ASSOCIATION_MULTIPLICITY, GAssociationMultiplicityLabel);
+        mapping.set(MetamodelElementType.LABEL_ASSOCIATION_PROPERTY, GAssociationPropertyLabel);
+
+        mapping.set(MetamodelElementType.EDGE_INHERITANCE, GInheritanceEdge);
+        mapping.set(MetamodelElementType.EDGE_ASSOCIATION, GAssociationEdge);
         return mapping;
     }
 

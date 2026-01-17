@@ -79,11 +79,20 @@ object FileChildrenTable : Table("file_children") {
  * File metadata table schema for storing additional metadata associated with files.
  */
 object FileMetadataTable : Table("file_metadata") {
-    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
+    val projectId = uuid("project_id")
     val path = varchar("path", 1024)
     val metadata = json<JsonObject>("metadata", Json)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
+
+    init {
+        foreignKey(
+            projectId,
+            path,
+            target = FilesTable.primaryKey,
+            onDelete = ReferenceOption.CASCADE
+        )
+    }
 
     override val primaryKey = PrimaryKey(projectId, path)
 }
@@ -156,13 +165,22 @@ object ContributionPluginsTable : Table("contribution_plugins") {
  * File data table schema for caching computed file data (e.g., AST).
  */
 object FileDataTable : Table("file_data") {
-    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
+    val projectId = uuid("project_id")
     val path = varchar("path", 1024)
     val dataKey = varchar("data_key", 255)
     val data = json<JsonElement>("data", Json)
     val sourceVersion = integer("source_version")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
+
+    init {
+        foreignKey(
+            projectId,
+            path,
+            target = FilesTable.primaryKey,
+            onDelete = ReferenceOption.CASCADE
+        )
+    }
 
     override val primaryKey = PrimaryKey(projectId, path, dataKey)
 }

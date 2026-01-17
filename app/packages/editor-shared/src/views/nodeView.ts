@@ -1,11 +1,11 @@
-import type { Point } from "@eclipse-glsp/sprotty";
+import type { Point, RenderingContext } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { GNode } from "../model/node.js";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 import type { VNode } from "snabbdom";
 
 const { injectable } = sharedImport("inversify");
-const { svg, ShapeView } = sharedImport("@eclipse-glsp/sprotty");
+const { svg, ShapeView, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 const { ResizeHandleLocation } = sharedImport("@eclipse-glsp/client");
 
 /**
@@ -44,6 +44,36 @@ export abstract class GNodeView extends ShapeView {
         { location: ResizeHandleLocation.BottomRight, startPos: 2, endPos: 2 },
         { location: ResizeHandleLocation.BottomLeft, startPos: 3, endPos: 3 }
     ];
+
+    override render(model: Readonly<GNode>, context: RenderingContext): VNode | undefined {
+        const foreignObjectVNode = svg(
+            "foreignObject",
+            {
+                class: {
+                    "pointer-events-none": true,
+                    "[&_*]:pointer-events-auto": true
+                },
+                attrs: {
+                    x: "0",
+                    y: "0",
+                    width: "99999",
+                    height: "99999",
+                    [ATTR_BBOX_ELEMENT]: true
+                }
+            },
+            this.renderForeignElement(model, context)
+        );
+        return svg("g", null, ...this.renderControlElements(model), foreignObjectVNode);
+    }
+
+    /**
+     * Abstract method to render the content inside the foreign element
+     *
+     * @param model The HTML node model
+     * @param context The rendering context
+     * @returns The VNode representing the foreign element's content
+     */
+    protected abstract renderForeignElement(model: Readonly<GNode>, context: RenderingContext): VNode;
 
     /**
      * Renders all control elements (selection rectangle and resize handles) for the node.

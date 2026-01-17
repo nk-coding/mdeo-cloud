@@ -1,4 +1,4 @@
-import type { SModelElementImpl } from "sprotty";
+import type { GModelElement } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 
 const { isViewport } = sharedImport("@eclipse-glsp/sprotty");
@@ -9,7 +9,7 @@ const { isViewport } = sharedImport("@eclipse-glsp/sprotty");
  * @param element the element which is a child of a viewport
  * @returns the found zoom or 1 if no viewport was found
  */
-export function findViewportZoom(element: Readonly<SModelElementImpl>): number {
+export function findViewportZoom(element: Readonly<GModelElement>): number {
     const viewport = element.root;
     if (isViewport(viewport)) {
         return viewport.zoom;

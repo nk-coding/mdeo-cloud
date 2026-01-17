@@ -1,8 +1,8 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode, VNodeStyle } from "snabbdom";
 import { sharedImport } from "../sharedImport.js";
-import { GHtmlNodeView } from "./htmlNodeView.js";
 import type { GRectangularNode } from "../model/rectangularNode.js";
+import { GNodeView } from "./nodeView.js";
 
 const { injectable } = sharedImport("inversify");
 const { html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
@@ -11,7 +11,7 @@ const { html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
  * Abstract view for rendering rectangular node elements.
  */
 @injectable()
-export abstract class GRectangularNodeView extends GHtmlNodeView {
+export abstract class GRectangularNodeView extends GNodeView {
     protected override renderForeignElement(model: Readonly<GRectangularNode>, context: RenderingContext): VNode {
         const style: VNodeStyle = {};
         if (model.meta?.prefWidth != undefined) {

@@ -4,19 +4,19 @@ import { MetamodelElementType } from "./elementTypes.js";
 /**
  * Edge representing an inheritance relationship (extends).
  */
-export class InheritanceEdge extends GEdge {
+export class GInheritanceEdge extends GEdge {
     /**
-     * Creates a builder for InheritanceEdge instances.
+     * Creates a builder for GInheritanceEdge instances.
      *
-     * @returns A new InheritanceEdgeBuilder
+     * @returns A new GInheritanceEdgeBuilder
      */
-    static override builder(): InheritanceEdgeBuilder {
-        return new InheritanceEdgeBuilder(InheritanceEdge).type(MetamodelElementType.EDGE_INHERITANCE);
+    static builder(): GInheritanceEdgeBuilder {
+        return new GInheritanceEdgeBuilder(GInheritanceEdge).type(MetamodelElementType.EDGE_INHERITANCE);
     }
 }
 
 /**
- * Builder for InheritanceEdge instances.
+ * Builder for GInheritanceEdge instances.
  * Provides fluent API for constructing inheritance edges.
  */
-export class InheritanceEdgeBuilder<E extends InheritanceEdge = InheritanceEdge> extends GEdgeBuilder<E> {}
+export class GInheritanceEdgeBuilder<E extends GInheritanceEdge = GInheritanceEdge> extends GEdgeBuilder<E> {}

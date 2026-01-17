@@ -18,7 +18,7 @@ import type {
     PartialAssociation
 } from "../../grammar/metamodelPartialTypes.js";
 import { Association, Class, ClassImport } from "../../grammar/metamodelTypes.js";
-import { EdgePlacementMetadataUtil, EdgeVisualMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
+import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -36,8 +36,11 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             return NodeLayoutMetadataUtil.verify(model.meta, 250);
         }
 
-        if (model.type === MetamodelElementType.LABEL_ASSOCIATION_END) {
-            return EdgePlacementMetadataUtil.verify(model.meta, 0.5);
+        if (
+            model.type === MetamodelElementType.NODE_ASSOCIATION_PROPERTY ||
+            model.type === MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY
+        ) {
+            return NodeLayoutMetadataUtil.verify(model.meta);
         }
 
         if (
@@ -45,7 +48,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             model.type === MetamodelElementType.EDGE_ASSOCIATION
         ) {
             const edgeModel = model as EdgeMetadata;
-            return EdgeVisualMetadataUtil.verify(edgeModel.meta);
+            return EdgeLayoutMetadataUtil.verify(edgeModel.meta);
         }
 
         return undefined;
@@ -265,7 +268,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
                         attrs: this.createAssociationAttributes(assoc)
                     };
 
-                    this.extractAssociationLabelMetadata(assoc, edgeId, nodes);
+                    this.extractAssociationLabelMetadata(assoc, idRegistry, nodes);
                 }
             }
         }
@@ -275,17 +278,22 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      * Extracts metadata for association end labels.
      *
      * @param assoc the association definition
-     * @param edgeId the ID of the association edge
+     * @param idRegistry model ID registry
      * @param nodes record to populate with node metadata
      */
     private extractAssociationLabelMetadata(
         assoc: PartialAssociation,
-        edgeId: string,
+        idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>
     ): void {
         if (assoc.start != undefined && (assoc.start.property != undefined || assoc.start.multiplicity != undefined)) {
-            nodes[`${edgeId}_start`] = {
-                type: MetamodelElementType.LABEL_ASSOCIATION_END,
+            const startId = idRegistry.getId(assoc.start);
+            nodes[`${startId}#property`] = {
+                type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
+                attrs: {}
+            };
+            nodes[`${startId}#multiplicity`] = {
+                type: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
                 attrs: {}
             };
         }
@@ -294,8 +302,13 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             assoc.target != undefined &&
             (assoc.target.property != undefined || assoc.target.multiplicity != undefined)
         ) {
-            nodes[`${edgeId}_target`] = {
-                type: MetamodelElementType.LABEL_ASSOCIATION_END,
+            const targetId = idRegistry.getId(assoc.target);
+            nodes[`${targetId}#property`] = {
+                type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
+                attrs: {}
+            };
+            nodes[`${targetId}#multiplicity`] = {
+                type: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
                 attrs: {}
             };
         }

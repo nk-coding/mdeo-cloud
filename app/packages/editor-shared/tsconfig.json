@@ -8,6 +8,9 @@
     "references": [
         {
             "path": "../editor-protocol"
+        },
+        {
+            "path": "../editor-common"
         }
     ]
 }

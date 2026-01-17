@@ -1,10 +1,8 @@
-import { sharedImport } from "@mdeo/editor-shared";
-
-const { SEdgeImpl } = sharedImport("@eclipse-glsp/sprotty");
+import { GEdge } from "@mdeo/editor-shared";
 
 /**
  * Client-side model for association edges.
  */
-export class GAssociationEdge extends SEdgeImpl {
+export class GAssociationEdge extends GEdge {
     operator?: string;
 }

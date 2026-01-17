@@ -15,9 +15,11 @@ import { AstReflectionKey, LanguageServicesKey } from "./langiumServices.js";
 import { ModelIdProvider } from "./modelIdProvider.js";
 import { ChangeBoundsOperationHandler } from "./handler/changeBoundsOperationHandler.js";
 import { PartialChangeBoundsOperationHandler } from "./handler/partialChangeBoundsOperationHandler.js";
+import { UpdateRoutingInformationOperationHandler } from "./handler/updateRoutingInformationOperationHandler.js";
 import { MetadataManager } from "./metadataManager.js";
 import { UpdateClientOperationHandler } from "./handler/updateClientHandler.js";
 import { ExtendedContextEditValidatorRegistry } from "./contextEditValidationRegistry.js";
+import { ModelSubmissionHandler } from "./modelSubmissionHandler.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclipse-glsp/server");
@@ -79,11 +81,16 @@ export abstract class BaseDiagramModule extends DiagramModule {
         return ExtendedContextEditValidatorRegistry;
     }
 
+    protected override bindModelSubmissionHandler(): BindingTarget<ModelSubmissionHandler> {
+        return ModelSubmissionHandler;
+    }
+
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         super.configureOperationHandlers(binding);
         binding.add(UpdateClientOperationHandler);
         binding.add(ChangeBoundsOperationHandler);
         binding.add(PartialChangeBoundsOperationHandler);
+        binding.add(UpdateRoutingInformationOperationHandler);
     }
 
     /**

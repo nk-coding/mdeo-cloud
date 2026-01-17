@@ -1,16 +1,37 @@
-import type { Point } from "@eclipse-glsp/sprotty";
+import type { Fadeable, FluentIterable, Hoverable, Point, Selectable } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import { GEdge } from "./edge.js";
 
-const { GNode: SNodeImpl } = sharedImport("@eclipse-glsp/sprotty");
+const { GShapeElement } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * Base client-side model for node elements.
  * Extends the GLSP node implementation to provide a foundation for custom nodes.
+ * Can be used for both SVG and HTML-based nodes.
  */
-export class GNode extends SNodeImpl {
+export class GNode extends GShapeElement implements Selectable, Fadeable, Hoverable {
+    /**
+     * Metadata associated with the node for layout and other information.
+     */
     meta!: NodeLayoutMetadata;
 
+    /**
+     * Indicates whether the node is currently selected.
+     */
+    selected: boolean = false;
+    /**
+     * Indicates the opacity level of the node for fade effects.
+     */
+    opacity: number = 1;
+    /**
+     * Indicates whether the node is currently being hovered over.
+     */
+    hoverFeedback: boolean = false;
+
+    /**
+     * Creates a new GNode instance.
+     */
     constructor() {
         super();
         // @ts-expect-error not optional, but will soon be redefined
@@ -27,5 +48,25 @@ export class GNode extends SNodeImpl {
             enumerable: true,
             configurable: true
         });
+    }
+
+    /**
+     * Retrieves all incoming edges connected to this node.
+     *
+     * @returns An iterable of incoming GEdge instances.
+     */
+    incomingEdges(): FluentIterable<GEdge> {
+        const allEdges = this.index.all().filter((e) => e instanceof GEdge) as FluentIterable<GEdge>;
+        return allEdges.filter((e) => e.targetId === this.id);
+    }
+
+    /**
+     * Retrieves all outgoing edges connected to this node.
+     *
+     * @returns An iterable of outgoing GEdge instances.
+     */
+    outgoingEdges(): FluentIterable<GEdge> {
+        const allEdges = this.index.all().filter((e) => e instanceof GEdge) as FluentIterable<GEdge>;
+        return allEdges.filter((e) => e.sourceId === this.id);
     }
 }

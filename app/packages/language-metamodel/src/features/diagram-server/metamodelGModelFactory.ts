@@ -12,15 +12,18 @@ import type {
     PartialClassImport,
     PartialClassExtension
 } from "../../grammar/metamodelPartialTypes.js";
-import { ClassNode } from "./model/classNode.js";
-import { InheritanceEdge } from "./model/inheritanceEdge.js";
-import { AssociationEdge } from "./model/associationEdge.js";
-import { ClassLabel } from "./model/classLabel.js";
-import { PropertyLabel } from "./model/propertyLabel.js";
-import { AssociationEndLabel } from "./model/associationEndLabel.js";
-import { ClassCompartment } from "./model/classCompartment.js";
-import { ClassDivider } from "./model/classDivider.js";
-import { EdgePlacementMetadataUtil, EdgeVisualMetadataUtil } from "./metadataTypes.js";
+import { GClassNode } from "./model/classNode.js";
+import { GInheritanceEdge } from "./model/inheritanceEdge.js";
+import { GAssociationEdge } from "./model/associationEdge.js";
+import { GClassLabel } from "./model/classLabel.js";
+import { GPropertyLabel } from "./model/propertyLabel.js";
+import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
+import { GAssociationMultiplicityNode } from "./model/associationMultiplicityNode.js";
+import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
+import { GAssociationMultiplicityLabel } from "./model/associationMultiplicityLabel.js";
+import { GClassCompartment } from "./model/classCompartment.js";
+import { GClassDivider } from "./model/classDivider.js";
+import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 
 const { injectable } = sharedImport("inversify");
 const { GGraph } = sharedImport("@eclipse-glsp/server");
@@ -103,7 +106,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
             const displayName = cls.name ?? "Unnamed";
 
-            const node = ClassNode.builder()
+            const node = GClassNode.builder()
                 .id(nodeId)
                 .name(displayName)
                 .isAbstract(cls.isAbstract ?? false)
@@ -148,7 +151,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
             const displayName = classImport.name ?? importedClass.name ?? "Unnamed";
 
-            const node = ClassNode.builder()
+            const node = GClassNode.builder()
                 .id(nodeId)
                 .name(displayName)
                 .isAbstract(importedClass.isAbstract ?? false)
@@ -173,9 +176,9 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @returns An array with the title compartment GModelElement
      */
     private createClassTitle(nodeId: string, name: string | undefined, readonly: boolean): GModelElement[] {
-        const titleCompartment = ClassCompartment.builder().id(`${nodeId}#title-compartment`).build();
+        const titleCompartment = GClassCompartment.builder().id(`${nodeId}#title-compartment`).build();
 
-        const nameLabel = ClassLabel.builder()
+        const nameLabel = GClassLabel.builder()
             .id(`${nodeId}#name`)
             .text(name ?? "Unnamed")
             .readonly(readonly)
@@ -206,10 +209,10 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             return children;
         }
 
-        const divider = ClassDivider.builder().id(`${nodeId}#divider`).build();
+        const divider = GClassDivider.builder().id(`${nodeId}#divider`).build();
         children.push(divider);
 
-        const propertiesCompartment = ClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
+        const propertiesCompartment = GClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
 
         for (const prop of properties) {
             if (prop == undefined) {
@@ -227,7 +230,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const typeName = prop.type?.name ?? "unknown";
             const propText = `${propName}: ${typeName}${multiplicityStr}`;
 
-            const propLabel = PropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(readonly).build();
+            const propLabel = GPropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(readonly).build();
             propertiesCompartment.children.push(propLabel);
         }
 
@@ -283,12 +286,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         targetClass: PartialClass,
         validatedMetadata: GraphMetadata,
         idRegistry: ModelIdRegistry
-    ): InheritanceEdge {
+    ): GInheritanceEdge {
         const edgeId = idRegistry.getId(inheritance);
         const sourceId = idRegistry.getId(sourceClass);
         const targetId = idRegistry.getId(targetClass);
         const metadata = validatedMetadata.edges[edgeId];
-        const edge = InheritanceEdge.builder().id(edgeId).sourceId(sourceId).targetId(targetId).build();
+        const edge = GInheritanceEdge.builder().id(edgeId).sourceId(sourceId).targetId(targetId).build();
 
         this.applyRoutingPoints(edge, metadata);
         return edge;
@@ -347,12 +350,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         targetClass: PartialClass,
         validatedMetadata: GraphMetadata,
         idRegistry: ModelIdRegistry
-    ): AssociationEdge {
+    ): GAssociationEdge {
         const edgeId = idRegistry.getId(assoc);
         const sourceId = idRegistry.getId(sourceClass);
         const targetId = idRegistry.getId(targetClass);
         const metadata = validatedMetadata.edges[edgeId];
-        const edge = AssociationEdge.builder()
+        const edge = GAssociationEdge.builder()
             .id(edgeId)
             .sourceId(sourceId)
             .targetId(targetId)
@@ -362,84 +365,94 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         this.applyRoutingPoints(edge, metadata);
 
         if (assoc.start != undefined) {
-            const startLabel = this.createAssociationEndLabel(
-                `${edgeId}#start`,
+            const startNodes = this.createAssociationEndNodes(
+                idRegistry.getId(assoc.start),
                 assoc.start.property,
                 assoc.start.multiplicity,
-                validatedMetadata,
-                0.2
+                "start",
+                validatedMetadata
             );
-            if (startLabel != undefined) {
-                edge.children.push(startLabel);
-            }
+            edge.children.push(...startNodes);
         }
 
         if (assoc.target != undefined) {
-            const targetLabel = this.createAssociationEndLabel(
-                `${edgeId}#target`,
+            const targetNodes = this.createAssociationEndNodes(
+                idRegistry.getId(assoc.target),
                 assoc.target.property,
                 assoc.target.multiplicity,
-                validatedMetadata,
-                0.8
+                "end",
+                validatedMetadata
             );
-            if (targetLabel != undefined) {
-                edge.children.push(targetLabel);
-            }
+            edge.children.push(...targetNodes);
         }
 
         return edge;
     }
 
     /**
-     * Creates a label for an association endpoint with property name and multiplicity.
+     * Creates nodes for an association endpoint with property name and/or multiplicity.
      *
-     * @param labelId The ID for the label
+     * @param baseId The base ID for the nodes
      * @param property The property name (optional)
      * @param multiplicity The multiplicity (optional)
-     * @param validatedMetadata The validated metadata containing label placement
-     * @param defaultPosition Default position along edge if no metadata
-     * @returns The created label or undefined if no property or multiplicity
+     * @param target Whether this is at "start" or "end" of the association
+     * @param validatedMetadata The validated metadata containing node placement
+     * @returns An array of created nodes (property and/or multiplicity)
      */
-    private createAssociationEndLabel(
-        labelId: string,
+    private createAssociationEndNodes(
+        baseId: string,
         property: string | undefined,
         multiplicity: PartialMultiplicity | undefined,
-        validatedMetadata: GraphMetadata,
-        defaultPosition: number
-    ): AssociationEndLabel | undefined {
+        target: "start" | "end",
+        validatedMetadata: GraphMetadata
+    ): GModelElement[] {
+        const nodes: GModelElement[] = [];
+
+        if (property != undefined) {
+            const propertyId = `${baseId}#property`;
+            const propertyMeta = validatedMetadata.nodes[propertyId];
+            const metadata =
+                propertyMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(propertyMeta.meta)
+                    ? propertyMeta.meta
+                    : NodeLayoutMetadataUtil.create(0, 0);
+
+            const propertyNode = GAssociationPropertyNode.builder()
+                .id(propertyId)
+                .target(target)
+                .meta(metadata)
+                .build();
+
+            const propertyLabel = GAssociationPropertyLabel.builder().id(`${propertyId}-label`).text(property).build();
+
+            propertyNode.children.push(propertyLabel);
+            nodes.push(propertyNode);
+        }
+
         const multiplicityStr = this.formatMultiplicity(multiplicity);
+        if (multiplicityStr !== "") {
+            const multiplicityId = `${baseId}#multiplicity`;
+            const multiplicityMeta = validatedMetadata.nodes[multiplicityId];
+            const metadata =
+                multiplicityMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(multiplicityMeta.meta)
+                    ? multiplicityMeta.meta
+                    : NodeLayoutMetadataUtil.create(0, 0);
 
-        if (property == undefined && multiplicityStr === "") {
-            return undefined;
+            const multiplicityNode = GAssociationMultiplicityNode.builder()
+                .id(multiplicityId)
+                .target(target)
+                .meta(metadata)
+                .build();
+
+            const multiplicityLabel = GAssociationMultiplicityLabel.builder()
+                .id(`${multiplicityId}-label`)
+                .text(multiplicityStr)
+                .build();
+
+            multiplicityNode.children.push(multiplicityLabel);
+            nodes.push(multiplicityNode);
         }
 
-        const text = property && multiplicityStr ? `${property} ${multiplicityStr}` : property || multiplicityStr;
-
-        const label = AssociationEndLabel.builder().id(labelId).text(text).build();
-
-        const labelMeta = validatedMetadata.nodes[labelId];
-        if (
-            labelMeta != undefined &&
-            labelMeta.meta != undefined &&
-            EdgePlacementMetadataUtil.isValid(labelMeta.meta)
-        ) {
-            const placement = labelMeta.meta;
-            label.edgePlacement = {
-                position: placement.position,
-                rotate: false,
-                side: placement.side ?? "top",
-                offset: placement.offset ?? 0
-            };
-        } else {
-            label.edgePlacement = {
-                position: defaultPosition,
-                rotate: false,
-                side: "top",
-                offset: 0
-            };
-        }
-
-        return label;
+        return nodes;
     }
 
     /**
@@ -448,9 +461,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param edge The edge to apply routing points to
      * @param metadata Metadata containing routing points
      */
-    private applyRoutingPoints(edge: InheritanceEdge | AssociationEdge, metadata: { meta?: object } | undefined): void {
-        if (metadata != undefined && metadata.meta != undefined && EdgeVisualMetadataUtil.isValid(metadata.meta)) {
-            edge.routingPoints = metadata.meta.routingPoints;
+    private applyRoutingPoints(
+        edge: GInheritanceEdge | GAssociationEdge,
+        metadata: { meta?: object } | undefined
+    ): void {
+        if (metadata != undefined && metadata.meta != undefined && EdgeLayoutMetadataUtil.isValid(metadata.meta)) {
+            edge.meta = metadata.meta;
         }
     }
 

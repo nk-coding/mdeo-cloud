@@ -1,19 +1,13 @@
-import type {
-    IView,
-    RenderingContext,
-    EdgeRouterRegistry as EdgeRouterRegistryType,
-    ViewerOptions
-} from "@eclipse-glsp/sprotty";
+import type { IView, RenderingContext, ViewerOptions } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { VNode } from "snabbdom";
 import type { GGraph } from "@eclipse-glsp/client";
 
 const { injectable, inject } = sharedImport("inversify");
-const { svg, EdgeRouterRegistry, TYPES } = sharedImport("@eclipse-glsp/sprotty");
+const { svg, TYPES } = sharedImport("@eclipse-glsp/sprotty");
 
 @injectable()
 export class GGraphView implements IView {
-    @inject(EdgeRouterRegistry) protected edgeRouterRegistry!: EdgeRouterRegistryType;
     @inject(TYPES.ViewerOptions) protected options!: ViewerOptions;
 
     get backgroundPatternId(): string {
@@ -21,7 +15,6 @@ export class GGraphView implements IView {
     }
 
     render(model: Readonly<GGraph>, context: RenderingContext): VNode | undefined {
-        const edgeRouting = this.edgeRouterRegistry.routeAllChildren(model);
         const transform = `scale(${model.zoom}) translate(${-model.scroll.x},${-model.scroll.y})`;
         return svg(
             "svg",
@@ -40,7 +33,7 @@ export class GGraphView implements IView {
                         transform
                     }
                 },
-                ...context.renderChildren(model, { edgeRouting })
+                ...context.renderChildren(model)
             )
         );
     }

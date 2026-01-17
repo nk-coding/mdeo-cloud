@@ -4,19 +4,19 @@ import { MetamodelElementType } from "./elementTypes.js";
 /**
  * Compartment for grouping labels within a class node.
  */
-export class ClassCompartment extends GCompartment {
+export class GClassCompartment extends GCompartment {
     /**
-     * Creates a builder for ClassCompartment instances.
+     * Creates a builder for GClassCompartment instances.
      *
-     * @returns A new ClassCompartmentBuilder with vertical box layout
+     * @returns A new GClassCompartmentBuilder with vertical box layout
      */
-    static builder(): ClassCompartmentBuilder {
-        return new ClassCompartmentBuilder(ClassCompartment).type(MetamodelElementType.COMPARTMENT);
+    static builder(): GClassCompartmentBuilder {
+        return new GClassCompartmentBuilder(GClassCompartment).type(MetamodelElementType.COMPARTMENT);
     }
 }
 
 /**
- * Builder for ClassCompartment instances.
+ * Builder for GClassCompartment instances.
  * Provides fluent API for constructing class compartments.
  */
-export class ClassCompartmentBuilder<T extends ClassCompartment = ClassCompartment> extends GCompartmentBuilder<T> {}
+export class GClassCompartmentBuilder<T extends GClassCompartment = GClassCompartment> extends GCompartmentBuilder<T> {}

@@ -4,19 +4,19 @@ import { MetamodelElementType } from "./elementTypes.js";
 /**
  * Label for property names and types.
  */
-export class PropertyLabel extends GLabel {
+export class GPropertyLabel extends GLabel {
     /**
-     * Creates a builder for PropertyLabel instances.
+     * Creates a builder for GPropertyLabel instances.
      *
-     * @returns A new PropertyLabelBuilder
+     * @returns A new GPropertyLabelBuilder
      */
-    static builder(): PropertyLabelBuilder {
-        return new PropertyLabelBuilder(PropertyLabel).type(MetamodelElementType.LABEL_PROPERTY);
+    static builder(): GPropertyLabelBuilder {
+        return new GPropertyLabelBuilder(GPropertyLabel).type(MetamodelElementType.LABEL_PROPERTY);
     }
 }
 
 /**
- * Builder for PropertyLabel instances.
+ * Builder for GPropertyLabel instances.
  * Provides fluent API for constructing property labels.
  */
-export class PropertyLabelBuilder<T extends PropertyLabel = PropertyLabel> extends GLabelBuilder<T> {}
+export class GPropertyLabelBuilder<T extends GPropertyLabel = GPropertyLabel> extends GLabelBuilder<T> {}

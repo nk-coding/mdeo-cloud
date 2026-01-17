@@ -1,10 +1,5 @@
 import type { Point } from "@eclipse-glsp/protocol";
-import type {
-    NodePositionMetadata,
-    NodeLayoutMetadata,
-    EdgePlacementMetadata,
-    EdgeVisualMetadata
-} from "@mdeo/editor-protocol";
+import type { NodePositionMetadata, NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/editor-protocol";
 
 /**
  * Helper function to validate if an object is a valid Point.
@@ -117,7 +112,7 @@ export namespace NodeLayoutMetadataUtil {
      * @param defaultPrefWidth Default preferred width if invalid
      * @returns Corrected metadata if invalid, undefined if valid
      */
-    export function verify(obj: unknown, defaultPrefWidth: number): NodeLayoutMetadata | undefined {
+    export function verify(obj: unknown, defaultPrefWidth?: number): NodeLayoutMetadata | undefined {
         if (isValid(obj)) {
             return undefined;
         }
@@ -132,36 +127,65 @@ export namespace NodeLayoutMetadataUtil {
 }
 
 /**
+ * Helper function to validate if an object is a valid EdgeAnchor.
+ *
+ * @param obj The object to validate
+ * @returns True if the object is a valid EdgeAnchor
+ */
+function isValidAnchor(obj: unknown): boolean {
+    if (typeof obj !== "object" || obj === null) {
+        return false;
+    }
+    const anchor = obj as any;
+    const validSides = ["top", "bottom", "left", "right"];
+    return (
+        validSides.includes(anchor.side) && typeof anchor.value === "number" && anchor.value >= 0 && anchor.value <= 1
+    );
+}
+
+/**
  * Namespace providing helper methods for edge metadata validation and manipulation.
  */
-export namespace EdgeVisualMetadataUtil {
+export namespace EdgeLayoutMetadataUtil {
     /**
-     * Checks if the given object is a valid EdgeVisualMetadata.
+     * Checks if the given object is a valid EdgeLayoutMetadata.
      *
      * @param obj The object to validate
-     * @returns True if the object is a valid EdgeVisualMetadata
+     * @returns True if the object is a valid EdgeLayoutMetadata
      */
-    export function isValid(obj: unknown): obj is EdgeVisualMetadata {
+    export function isValid(obj: unknown): obj is EdgeLayoutMetadata {
         if (typeof obj !== "object" || obj === null) {
             return false;
         }
 
-        const meta = obj as Partial<EdgeVisualMetadata>;
+        const meta = obj as Partial<EdgeLayoutMetadata>;
 
         if (!Array.isArray(meta.routingPoints)) {
             return false;
         }
 
-        return meta.routingPoints.every((point) => isValidPoint(point));
+        if (!meta.routingPoints.every((point) => isValidPoint(point))) {
+            return false;
+        }
+
+        if (meta.sourceAnchor !== undefined && !isValidAnchor(meta.sourceAnchor)) {
+            return false;
+        }
+
+        if (meta.targetAnchor !== undefined && !isValidAnchor(meta.targetAnchor)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
-     * Creates a default EdgeVisualMetadata with the given routing points.
+     * Creates a default EdgeLayoutMetadata with the given routing points.
      *
      * @param routingPoints Array of routing points
-     * @returns A new EdgeVisualMetadata object
+     * @returns A new EdgeLayoutMetadata object
      */
-    export function create(routingPoints: Point[] = []): EdgeVisualMetadata {
+    export function create(routingPoints: Point[] = []): EdgeLayoutMetadata {
         return { routingPoints };
     }
 
@@ -171,96 +195,19 @@ export namespace EdgeVisualMetadataUtil {
      * @param obj The object to verify
      * @returns Corrected metadata if invalid, undefined if valid
      */
-    export function verify(obj: unknown): EdgeVisualMetadata | undefined {
+    export function verify(obj: unknown): EdgeLayoutMetadata | undefined {
         if (isValid(obj)) {
             return undefined;
         }
 
-        const meta = (typeof obj === "object" && obj !== null ? obj : {}) as Partial<EdgeVisualMetadata>;
+        const meta = (typeof obj === "object" && obj !== null ? obj : {}) as Partial<EdgeLayoutMetadata>;
         const routingPoints = Array.isArray(meta.routingPoints)
             ? meta.routingPoints.filter((point) => isValidPoint(point))
             : [];
 
-        return { routingPoints };
-    }
-}
+        const sourceAnchor = isValidAnchor(meta.sourceAnchor) ? meta.sourceAnchor : undefined;
+        const targetAnchor = isValidAnchor(meta.targetAnchor) ? meta.targetAnchor : undefined;
 
-/**
- * Namespace providing helper methods for edge placement metadata.
- */
-export namespace EdgePlacementMetadataUtil {
-    /**
-     * Checks if the given object is a valid EdgePlacementMetadata.
-     *
-     * @param obj The object to validate
-     * @returns True if the object is a valid EdgePlacementMetadata
-     */
-    export function isValid(obj: unknown): obj is EdgePlacementMetadata {
-        if (typeof obj !== "object" || obj === null) {
-            return false;
-        }
-
-        const meta = obj as Partial<EdgePlacementMetadata>;
-
-        return (
-            typeof meta.position === "number" &&
-            meta.position >= 0 &&
-            meta.position <= 1 &&
-            (meta.side === undefined || ["left", "right", "top", "bottom"].includes(meta.side)) &&
-            (meta.offset === undefined || typeof meta.offset === "number")
-        );
-    }
-
-    /**
-     * Creates a default EdgePlacementMetadata.
-     *
-     * @param position Position along the edge (0.0 to 1.0)
-     * @param side Optional side of the edge
-     * @param offset Optional offset in pixels
-     * @returns A new EdgePlacementMetadata object
-     */
-    export function create(
-        position: number = 0.5,
-        side?: "left" | "right" | "top" | "bottom",
-        offset?: number
-    ): EdgePlacementMetadata {
-        const metadata: EdgePlacementMetadata = { position };
-        if (side !== undefined) {
-            metadata.side = side;
-        }
-        if (offset !== undefined) {
-            metadata.offset = offset;
-        }
-        return metadata;
-    }
-
-    /**
-     * Verifies and corrects invalid metadata.
-     *
-     * @param obj The object to verify
-     * @param defaultPosition Default position if invalid
-     * @returns Corrected metadata if invalid, undefined if valid
-     */
-    export function verify(obj: unknown, defaultPosition: number = 0.5): EdgePlacementMetadata | undefined {
-        if (isValid(obj)) {
-            return undefined;
-        }
-
-        const meta = (typeof obj === "object" && obj !== null ? obj : {}) as Partial<EdgePlacementMetadata>;
-        const position =
-            typeof meta.position === "number" && meta.position >= 0 && meta.position <= 1
-                ? meta.position
-                : defaultPosition;
-        const side = meta.side && ["left", "right", "top", "bottom"].includes(meta.side) ? meta.side : undefined;
-        const offset = typeof meta.offset === "number" ? meta.offset : undefined;
-
-        const result: EdgePlacementMetadata = { position };
-        if (side !== undefined) {
-            result.side = side;
-        }
-        if (offset !== undefined) {
-            result.offset = offset;
-        }
-        return result;
+        return { routingPoints, sourceAnchor, targetAnchor };
     }
 }

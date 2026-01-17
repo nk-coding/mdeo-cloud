@@ -4,7 +4,7 @@ import { MetamodelElementType } from "./elementTypes.js";
 /**
  * Node representing a Class in the diagram.
  */
-export class ClassNode extends GNode {
+export class GClassNode extends GNode {
     /**
      * The name of the class
      */
@@ -15,20 +15,20 @@ export class ClassNode extends GNode {
     isAbstract?: boolean;
 
     /**
-     * Creates a builder for ClassNode instances.
+     * Creates a builder for GClassNode instances.
      *
-     * @returns A new ClassNodeBuilder
+     * @returns A new GClassNodeBuilder
      */
-    static builder(): ClassNodeBuilder {
-        return new ClassNodeBuilder(ClassNode).type(MetamodelElementType.NODE_CLASS);
+    static builder(): GClassNodeBuilder {
+        return new GClassNodeBuilder(GClassNode).type(MetamodelElementType.NODE_CLASS);
     }
 }
 
 /**
- * Builder for ClassNode instances.
+ * Builder for GClassNode instances.
  * Provides fluent API for constructing class nodes.
  */
-export class ClassNodeBuilder<T extends ClassNode = ClassNode> extends GNodeBuilder<T> {
+export class GClassNodeBuilder<T extends GClassNode = GClassNode> extends GNodeBuilder<T> {
     /**
      * Sets the name of the class.
      *

@@ -1,0 +1,154 @@
+import type {
+    ResizeHandleLocation as ResizeHandleLocationType,
+    GResizeHandle as GResizeHandleType,
+    SelectableBoundsAware,
+    TrackedResize,
+    GModelElement
+} from "@eclipse-glsp/client";
+import type { Action, Operation } from "@eclipse-glsp/sprotty";
+import type {
+    PartialElementAndBounds,
+    PartialChangeBoundsOperation,
+    EdgeRoutingUpdate,
+    UpdateRoutingInformationOperation
+} from "@mdeo/editor-protocol";
+import type { ExtendedSetBoundsFeedbackAction } from "../metadata/setBoundsFeedbackCommand.js";
+import { sharedImport } from "../../sharedImport.js";
+import { GNode } from "../../model/node.js";
+import type { GEdge } from "../../model/edge.js";
+import type { ChangeBoundsTool } from "./changeBoundsTool.js";
+
+const {
+    ChangeBoundsListener: GLSPChangeBoundsListener,
+    GResizeHandle,
+    Point,
+    Dimension,
+    ResizeHandleLocation
+} = sharedImport("@eclipse-glsp/client");
+
+/**
+ * Custom change bounds listener that handles resize operations with custom SVG-based resize handles.
+ * Interprets resize handle locations from SVG data attributes to support invisible resize handles.
+ */
+
+export class ChangeBoundsListener extends GLSPChangeBoundsListener {
+    /**
+     * Updates the resize element by extracting resize handle location from SVG data attributes.
+     * Creates a virtual GResizeHandle when a resize handle location is detected in the event target.
+     *
+     * @param target The target element to resize
+     * @param event The mouse event that triggered the resize
+     * @returns True if the resize element was updated successfully
+     */
+    protected override updateResizeElement(target: GModelElement, event?: MouseEvent): boolean {
+        let actualTarget = target;
+        const eventTarget = event?.target;
+        if (eventTarget instanceof SVGElement) {
+            const location = eventTarget.dataset["resizeHandleLocation"];
+            if (typeof location === "string") {
+                const resizeHandle = new GResizeHandle(location as ResizeHandleLocationType);
+                // @ts-expect-error not readonly
+                resizeHandle.parent = target;
+                actualTarget = resizeHandle;
+            }
+        }
+        return super.updateResizeElement(actualTarget, event);
+    }
+
+    protected override handleResizeOnServer(activeResizeHandle: GResizeHandleType): Action[] {
+        const resizedElement = activeResizeHandle.parent;
+        if (this.initialBounds && this.isValidResize(resizedElement)) {
+            const location = activeResizeHandle.location;
+            const elementAndBounds: PartialElementAndBounds = {
+                elementId: resizedElement.id,
+                newPosition: {
+                    x: resizedElement.bounds.x,
+                    y: resizedElement.bounds.y
+                },
+                newSize: {
+                    width:
+                        location !== ResizeHandleLocation.Top && location !== ResizeHandleLocation.Bottom
+                            ? resizedElement.bounds.width
+                            : undefined,
+                    height:
+                        location !== ResizeHandleLocation.Left && location !== ResizeHandleLocation.Right
+                            ? resizedElement.bounds.height
+                            : undefined
+                }
+            };
+            if (!this.initialBounds.newPosition || !elementAndBounds.newPosition) {
+                return [];
+            }
+            if (
+                !Point.equals(this.initialBounds.newPosition, elementAndBounds.newPosition) ||
+                !Dimension.equals(this.initialBounds.newSize, resizedElement.bounds)
+            ) {
+                this.initialBounds = undefined;
+                return [this.createPartialChangeBoundsOperation([elementAndBounds])];
+            }
+        }
+        return [];
+    }
+
+    protected override handleMoveElementsOnServer(elementsToMove: SelectableBoundsAware[]): Operation[] {
+        const newBounds = elementsToMove.map((element) => ({
+            elementId: element.id,
+            newPosition: {
+                x: element.bounds.x,
+                y: element.bounds.y
+            }
+        }));
+        return newBounds.length > 0 ? [this.createPartialChangeBoundsOperation(newBounds)] : [];
+    }
+
+    protected override resizeBoundsAction(resize: TrackedResize): ExtendedSetBoundsFeedbackAction {
+        const location = this.activeResizeHandle?.location;
+        return {
+            ...super.resizeBoundsAction(resize),
+            setPrefWidth: location !== ResizeHandleLocation.Top && location !== ResizeHandleLocation.Bottom,
+            setPrefHeight: location !== ResizeHandleLocation.Left && location !== ResizeHandleLocation.Right
+        };
+    }
+
+    protected override handleMoveRoutingPointsOnServer(elementsToMove: SelectableBoundsAware[]): Operation[] {
+        const updates: EdgeRoutingUpdate[] = [];
+        const edges = new Set<GEdge>();
+        for (const element of elementsToMove) {
+            if (element instanceof GNode) {
+                element.incomingEdges().forEach((e) => edges.add(e));
+                element.outgoingEdges().forEach((e) => edges.add(e));
+            }
+        }
+        for (const edge of edges) {
+            const meta = (this.tool as ChangeBoundsTool).edgeRouter.computeRoute(edge).meta;
+            updates.push({
+                elementId: edge.id,
+                routingPoints: meta.routingPoints,
+                sourceAnchor: meta.sourceAnchor,
+                targetAnchor: meta.targetAnchor
+            });
+        }
+        const operation: UpdateRoutingInformationOperation = {
+            kind: "updateRoutingInformation",
+            isOperation: true,
+            updates
+        };
+        return [operation];
+    }
+
+    /**
+     * Creates a PartialChangeBoundsOperation for the given element and bounds.
+     *
+     * @param elementAndBounds The partial element and bounds to include in the operation
+     * @returns The created PartialChangeBoundsOperation
+     */
+    private createPartialChangeBoundsOperation(
+        elementAndBounds: PartialElementAndBounds[]
+    ): PartialChangeBoundsOperation {
+        return {
+            kind: "partialChangeBounds",
+            newBounds: elementAndBounds,
+            isOperation: true
+        };
+    }
+}

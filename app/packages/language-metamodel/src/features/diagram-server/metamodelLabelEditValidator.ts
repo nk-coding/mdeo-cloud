@@ -1,9 +1,9 @@
 import { BaseLabelEditValidator, parseIdentifier, sharedImport, type GModelIndex } from "@mdeo/language-shared";
 import type { GModelElement, ValidationStatus as ValidationStatusType } from "@eclipse-glsp/server";
 import { MetamodelElementType } from "./model/elementTypes.js";
-import type { ClassNode } from "./model/classNode.js";
-import type { ClassLabel } from "./model/classLabel.js";
-import type { PropertyLabel } from "./model/propertyLabel.js";
+import type { GClassNode } from "./model/classNode.js";
+import type { GClassLabel } from "./model/classLabel.js";
+import type { GPropertyLabel } from "./model/propertyLabel.js";
 import { Class, type PropertyType, type ClassType, MetamodelPrimitiveTypes } from "../../grammar/metamodelTypes.js";
 import { resolveClassChain } from "../../features/semanticInformation.js";
 
@@ -24,12 +24,12 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         if (element.type === MetamodelElementType.LABEL_CLASS_NAME) {
             return (
                 this.validateIdentifier(label, "Class name") ??
-                this.validateClassName(label, element as ClassLabel) ??
+                this.validateClassName(label, element as GClassLabel) ??
                 ValidationStatus.NONE
             );
         }
         if (element.type === MetamodelElementType.LABEL_PROPERTY) {
-            return this.validatePropertyLabel(label, element as PropertyLabel) ?? ValidationStatus.NONE;
+            return this.validatePropertyLabel(label, element as GPropertyLabel) ?? ValidationStatus.NONE;
         }
         return ValidationStatus.NONE;
     }
@@ -40,7 +40,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * @param name the class name to validate
      * @returns a validation status if the name is not unique, undefined otherwise
      */
-    private validateClassName(name: string, element: ClassLabel): ValidationStatusType | undefined {
+    private validateClassName(name: string, element: GClassLabel): ValidationStatusType | undefined {
         const trimmedName = name.trim();
         if (element.text === trimmedName) {
             return undefined;
@@ -48,7 +48,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         if (
             this.modelState.root.children.some(
                 (element) =>
-                    element.type === MetamodelElementType.NODE_CLASS && (element as ClassNode).name === trimmedName
+                    element.type === MetamodelElementType.NODE_CLASS && (element as GClassNode).name === trimmedName
             )
         ) {
             return this.error(`A class with the name '${trimmedName}' already exists.`);
@@ -63,7 +63,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * @param element the property label element
      * @returns a validation status if the label is invalid, undefined otherwise
      */
-    private validatePropertyLabel(label: string, element: PropertyLabel): ValidationStatusType | undefined {
+    private validatePropertyLabel(label: string, element: GPropertyLabel): ValidationStatusType | undefined {
         const formatValidation = this.validatePropertyFormat(label);
         if (formatValidation != undefined) {
             return formatValidation;
@@ -162,7 +162,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * @param element the property label element
      * @returns a validation status if the property name is not unique, undefined otherwise
      */
-    private validatePropertyUniqueness(identifier: string, element: PropertyLabel): ValidationStatusType | undefined {
+    private validatePropertyUniqueness(identifier: string, element: GPropertyLabel): ValidationStatusType | undefined {
         const parsedIdentifier = parseIdentifier(identifier);
 
         const propertyNode = this.index.getAstNode(element);

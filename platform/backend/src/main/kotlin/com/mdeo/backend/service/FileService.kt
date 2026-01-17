@@ -476,7 +476,6 @@ class FileService : BaseService() {
                 }
             }
             
-            // Delete all children entries for this directory
             FileChildrenTable.deleteWhere {
                 (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq path)
             }
@@ -494,7 +493,6 @@ class FileService : BaseService() {
         val prefix = if (oldPath.isEmpty()) "" else "$oldPath/"
         val newPrefix = if (newPath.isEmpty()) "" else "$newPath/"
         
-        // Update all file paths
         FilesTable.selectAll()
             .where { 
                 (FilesTable.projectId eq projectId) and 
@@ -512,7 +510,6 @@ class FileService : BaseService() {
                 }
             }
         
-        // Update all parent paths in FileChildrenTable
         FileChildrenTable.selectAll()
             .where {
                 (FileChildrenTable.projectId eq projectId) and

@@ -27,34 +27,43 @@ export interface NodeLayoutMetadata extends NodePositionMetadata {
 }
 
 /**
+ * Side of a rectangular node for edge anchoring.
+ */
+export type AnchorSide = "top" | "left" | "bottom" | "right";
+
+/**
+ * Anchor point configuration for edges.
+ * Specifies where an edge connects to a node.
+ */
+export interface EdgeAnchor {
+    /**
+     * The side of the node where the edge connects.
+     */
+    side: AnchorSide;
+    /**
+     * Position along the side, ranging from 0 to 1.
+     * 0 represents the start (left/top), 1 represents the end (right/bottom),
+     * and 0.5 represents the center of the side.
+     */
+    value: number;
+}
+
+/**
  * Metadata interface for edge visual properties.
  * Contains routing information for graph edges.
  */
-export interface EdgeVisualMetadata {
+export interface EdgeLayoutMetadata {
     /**
      * The routing points for the edge.
      * These define the path the edge takes from source to target.
      */
     routingPoints: Point[];
-}
-
-/**
- * Metadata interface for edge placement properties.
- * Defines positioning along an edge for elements like labels or decorations.
- */
-export interface EdgePlacementMetadata {
     /**
-     * The position along the edge (0.0 = start, 1.0 = end).
+     * Optional anchor point at the source of the edge.
      */
-    position: number;
-
+    sourceAnchor?: EdgeAnchor;
     /**
-     * The side of the edge the element appears on.
+     * Optional anchor point at the target of the edge.
      */
-    side?: "left" | "right" | "top" | "bottom";
-
-    /**
-     * The offset from the edge in pixels.
-     */
-    offset?: number;
+    targetAnchor?: EdgeAnchor;
 }

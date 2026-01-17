@@ -4,19 +4,19 @@ import { MetamodelElementType } from "./elementTypes.js";
 /**
  * Divider for separating compartments.
  */
-export class ClassDivider extends GModelElement {
+export class GClassDivider extends GModelElement {
     /**
-     * Creates a builder for ClassDivider instances.
+     * Creates a builder for GClassDivider instances.
      *
-     * @returns A new ClassDividerBuilder
+     * @returns A new GClassDividerBuilder
      */
-    static builder(): ClassDividerBuilder {
-        return new ClassDividerBuilder(ClassDivider).type(MetamodelElementType.DIVIDER);
+    static builder(): GClassDividerBuilder {
+        return new GClassDividerBuilder(GClassDivider).type(MetamodelElementType.DIVIDER);
     }
 }
 
 /**
- * Builder for ClassDivider instances.
+ * Builder for GClassDivider instances.
  * Provides fluent API for constructing class dividers.
  */
-export class ClassDividerBuilder<T extends ClassDivider = ClassDivider> extends GModelElementBuilder<T> {}
+export class GClassDividerBuilder<T extends GClassDivider = GClassDivider> extends GModelElementBuilder<T> {}

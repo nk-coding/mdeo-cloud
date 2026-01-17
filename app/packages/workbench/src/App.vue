@@ -53,33 +53,8 @@ async function initializeWorkbench() {
     const monacoApi = await monaco;
     const state = new WorkbenchState(monacoApi, backendApi);
 
-    // await loadPlugins(state);
-    workspaceState.value = state;
     await syncProjectFromPath(state);
-}
-
-async function loadPlugins(state: WorkbenchState) {
-    const [{ metamodelPlugin }, { scriptPlugin }, { modelPlugin }, { modelTransformationPlugin }, { configPlugin }] =
-        await Promise.all([
-            import("./plugins/metamodelPlugin"),
-            import("./plugins/scriptPlugin"),
-            import("./plugins/modelPlugin"),
-            import("./plugins/modelTransformationPlugin"),
-            import("./plugins/configPlugin")
-        ]);
-    const plugins = [metamodelPlugin, scriptPlugin, modelPlugin, modelTransformationPlugin, configPlugin];
-    for (const plugin of plugins) {
-        state.plugins.value.set(plugin.id, {
-            id: plugin.id,
-            languagePlugins: [plugin],
-            contributionPlugins: [],
-            name: plugin.id,
-            description: "",
-            url: "",
-            icon: convertIcon(Plug),
-            default: false
-        });
-    }
+    workspaceState.value = state;
 }
 
 async function syncProjectFromPath(state: WorkbenchState) {
@@ -95,6 +70,7 @@ async function syncProjectFromPath(state: WorkbenchState) {
     const project = result.value.find((p) => p.id === projectId);
     if (project) {
         state.project.value = project;
+        state.activeSidebar.value = "files";
     }
 }
 </script>

@@ -3,6 +3,7 @@ import type { PluginContext } from "@mdeo/editor-common";
 import * as inversify from "inversify";
 import * as glspClient from "@eclipse-glsp/client";
 import * as glspSprotty from "@eclipse-glsp/sprotty";
+import * as glspProtocol from "@eclipse-glsp/protocol";
 import { initializeEditorPluginContext } from "@mdeo/editor-common";
 
 /**
@@ -19,7 +20,8 @@ export const editorPlugin: Plugin = {
         const context: PluginContext = {
             inversify,
             "@eclipse-glsp/client": glspClient,
-            "@eclipse-glsp/sprotty": glspSprotty
+            "@eclipse-glsp/sprotty": glspSprotty,
+            "@eclipse-glsp/protocol": glspProtocol
         };
 
         initializeEditorPluginContext(context);

@@ -4,27 +4,27 @@ import { MetamodelElementType } from "./elementTypes.js";
 /**
  * Edge representing an association relationship.
  */
-export class AssociationEdge extends GEdge {
+export class GAssociationEdge extends GEdge {
     /**
      * The association operator (e.g., composition, aggregation)
      */
     operator?: string;
 
     /**
-     * Creates a builder for AssociationEdge instances.
+     * Creates a builder for GAssociationEdge instances.
      *
-     * @returns A new AssociationEdgeBuilder
+     * @returns A new GAssociationEdgeBuilder
      */
-    static override builder(): AssociationEdgeBuilder {
-        return new AssociationEdgeBuilder(AssociationEdge).type(MetamodelElementType.EDGE_ASSOCIATION);
+    static builder(): GAssociationEdgeBuilder {
+        return new GAssociationEdgeBuilder(GAssociationEdge).type(MetamodelElementType.EDGE_ASSOCIATION);
     }
 }
 
 /**
- * Builder for AssociationEdge instances.
+ * Builder for GAssociationEdge instances.
  * Provides fluent API for constructing association edges.
  */
-export class AssociationEdgeBuilder<E extends AssociationEdge = AssociationEdge> extends GEdgeBuilder<E> {
+export class GAssociationEdgeBuilder<E extends GAssociationEdge = GAssociationEdge> extends GEdgeBuilder<E> {
     /**
      * Sets the association operator.
      *

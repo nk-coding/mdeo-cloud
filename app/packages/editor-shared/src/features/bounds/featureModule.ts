@@ -1,9 +1,10 @@
 import type { ContainerModule } from "inversify";
 import { sharedImport } from "../../sharedImport.js";
 import { HiddenBoundsUpdater } from "./hiddenBoundsUpdater.js";
-import { ComputedBoundsActionHandler } from "./computedBoundsActionHandler.js";
+import { UpdateModelBoundsActionHandler } from "./updateModelBoundsActionHandler.js";
 
-const { FeatureModule, configureActionHandler, ComputedBoundsAction } = sharedImport("@eclipse-glsp/sprotty");
+const { FeatureModule, configureActionHandler, UpdateModelAction, SetModelAction } =
+    sharedImport("@eclipse-glsp/sprotty");
 const { GLSPHiddenBoundsUpdater } = sharedImport("@eclipse-glsp/client");
 
 /**
@@ -15,5 +16,6 @@ export const boundsModule: ContainerModule = new FeatureModule((bind, unbind, is
     bind(HiddenBoundsUpdater).toSelf().inSingletonScope();
     rebind(GLSPHiddenBoundsUpdater).toService(HiddenBoundsUpdater);
 
-    configureActionHandler({ bind, isBound }, ComputedBoundsAction.KIND, ComputedBoundsActionHandler);
+    configureActionHandler({ bind, isBound }, UpdateModelAction.KIND, UpdateModelBoundsActionHandler);
+    configureActionHandler({ bind, isBound }, SetModelAction.KIND, UpdateModelBoundsActionHandler);
 });

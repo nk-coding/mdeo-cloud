@@ -1,5 +1,6 @@
 import type * as glspClient from "@eclipse-glsp/client";
 import type * as glspSprotty from "@eclipse-glsp/sprotty";
+import type * as glspProtocol from "@eclipse-glsp/protocol";
 import type * as inversify from "inversify";
 
 /**
@@ -8,5 +9,6 @@ import type * as inversify from "inversify";
 export interface PluginContext {
     "@eclipse-glsp/client": typeof glspClient;
     "@eclipse-glsp/sprotty": typeof glspSprotty;
+    "@eclipse-glsp/protocol": typeof glspProtocol;
     inversify: typeof inversify;
 }
