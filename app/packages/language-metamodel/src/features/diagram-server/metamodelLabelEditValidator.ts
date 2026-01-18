@@ -31,6 +31,12 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         if (element.type === MetamodelElementType.LABEL_PROPERTY) {
             return this.validatePropertyLabel(label, element as GPropertyLabel) ?? ValidationStatus.NONE;
         }
+        if (element.type === MetamodelElementType.LABEL_ASSOCIATION_PROPERTY) {
+            return this.validateIdentifier(label, "Property name") ?? ValidationStatus.NONE;
+        }
+        if (element.type === MetamodelElementType.LABEL_ASSOCIATION_MULTIPLICITY) {
+            return this.validateMultiplicity(label) ?? ValidationStatus.NONE;
+        }
         return ValidationStatus.NONE;
     }
 

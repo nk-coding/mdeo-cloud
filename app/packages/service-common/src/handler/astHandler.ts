@@ -8,6 +8,7 @@ import type {
     ExternalReferences
 } from "@mdeo/language-common";
 import type { TrackedRequests } from "../service/serverApi.js";
+import { hasErrors } from "../util/hasErrors.js";
 
 /**
  * Key for the AST handler
@@ -22,7 +23,11 @@ export const AST_HANDLER_KEY = "ast";
  * @returns Promise resolving to the file data result with serialized AST
  */
 export const astHandler: FileDataHandler<AstData, ExternalReferenceAdditionalServices> = async (context) => {
-    const { uri, instance, services, serverApi } = context;
+    const { uri, instance, services, serverApi, version } = context;
+
+    if (version == undefined) {
+        throw new Error("AST handler does not support directory requests");
+    }
 
     const document = await instance.buildDocument(uri);
 
@@ -56,7 +61,7 @@ export const astHandler: FileDataHandler<AstData, ExternalReferenceAdditionalSer
             ...serializeDocument(doc, serializer, trackedRequestsLookup, dependencyAnalyzer),
             path: doc.uri.path,
             key: AST_HANDLER_KEY,
-            sourceVersion: trackedRequestsLookup.fileDependencies.get(doc.uri.path)?.version ?? -1
+            sourceVersion: trackedRequestsLookup.fileDependencies.get(doc.uri.path)?.version
         }))
     };
 };
@@ -151,7 +156,7 @@ class DependencyAnalyzer {
             const path = document.uri.path;
             const references = referenceCollector.findExternalReferences([document]);
             this.fileData.set(path, {
-                hasErrors: this.hasErrors(document),
+                hasErrors: hasErrors(document),
                 externalReferences: references,
                 hasExternalErrors: references.external.some(
                     (refUri) => this.astDataLookup.get(refUri.path)?.hasTransitiveErrors !== false
@@ -219,20 +224,6 @@ class DependencyAnalyzer {
             hasErrors: false,
             hasTransitiveErrors
         };
-    }
-
-    /**
-     * Checks if the given document has any errors (lexer, parser, or diagnostics).
-     *
-     * @param document The Langium document to check
-     * @returns True if the document has errors, false otherwise
-     */
-    private hasErrors(document: LangiumDocument): boolean {
-        return (
-            document.parseResult.lexerErrors.length > 0 ||
-            document.parseResult.parserErrors.length > 0 ||
-            (document.diagnostics != undefined && document.diagnostics.length > 0)
-        );
     }
 }
 

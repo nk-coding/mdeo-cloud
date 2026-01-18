@@ -7,7 +7,7 @@ import {
     type ScopeLocalInitialization,
     type LambdaTypeInferenceResult
 } from "@mdeo/language-expression";
-import type { ScriptTypirSpecifics } from "../plugin.js";
+import type { ScriptTypirSpecifics } from "../../plugin.js";
 
 /**
  * A scope for lambda expressions that exposes the lambda type inference result.

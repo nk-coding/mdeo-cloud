@@ -71,4 +71,12 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
     getControlFlowEntries(): ControlFlowEntry<Specifics>[] {
         return [];
     }
+
+    get level(): number {
+        return 0;
+    }
+
+    get languageNode(): Specifics["LanguageType"] | undefined {
+        return undefined;
+    }
 }

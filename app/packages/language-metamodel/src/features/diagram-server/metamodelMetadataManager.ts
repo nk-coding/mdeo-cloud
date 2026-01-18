@@ -248,11 +248,11 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         edges: Record<string, EdgeMetadata>
     ): void {
         for (const assoc of associations) {
-            if (assoc.start == undefined || assoc.target == undefined) {
+            if (assoc.source == undefined || assoc.target == undefined) {
                 continue;
             }
 
-            const startClass = assoc.start.class?.ref;
+            const startClass = assoc.source.class?.ref;
             const targetClass = assoc.target.class?.ref;
 
             if (startClass && targetClass) {
@@ -286,8 +286,8 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>
     ): void {
-        if (assoc.start != undefined && (assoc.start.property != undefined || assoc.start.multiplicity != undefined)) {
-            const startId = idRegistry.getId(assoc.start);
+        if (assoc.source != undefined && (assoc.source.name != undefined || assoc.source.multiplicity != undefined)) {
+            const startId = idRegistry.getId(assoc.source);
             nodes[`${startId}#property`] = {
                 type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
                 attrs: {}
@@ -298,10 +298,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             };
         }
 
-        if (
-            assoc.target != undefined &&
-            (assoc.target.property != undefined || assoc.target.multiplicity != undefined)
-        ) {
+        if (assoc.target != undefined && (assoc.target.name != undefined || assoc.target.multiplicity != undefined)) {
             const targetId = idRegistry.getId(assoc.target);
             nodes[`${targetId}#property`] = {
                 type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
@@ -413,8 +410,8 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     private createAssociationAttributes(assoc: PartialAssociation): Attributes {
         return {
             operator: assoc.operator ?? "",
-            startProperty: assoc.start?.property ?? "",
-            targetProperty: assoc.target?.property ?? ""
+            startProperty: assoc.source?.name ?? "",
+            targetProperty: assoc.target?.name ?? ""
         };
     }
 

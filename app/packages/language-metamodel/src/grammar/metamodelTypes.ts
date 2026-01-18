@@ -154,7 +154,7 @@ export type ClassOrImportType = ASTType<typeof ClassOrImport>;
  */
 export const AssociationEnd = createInterface("AssociationEnd").attrs({
     class: Ref(() => ClassOrImport),
-    property: Optional(String),
+    name: Optional(String),
     multiplicity: Optional(Multiplicity)
 });
 
@@ -169,7 +169,7 @@ export type AssociationEndType = ASTType<typeof AssociationEnd>;
  * Can be a regular association (--), composition from start (*--), or composition from target (--*).
  */
 export const Association = createInterface("Association").attrs({
-    start: AssociationEnd,
+    source: AssociationEnd,
     operator: Union("--", "*--", "--*"),
     target: AssociationEnd
 });

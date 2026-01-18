@@ -21,7 +21,7 @@ export type LiteralValueType = ASTType<typeof LiteralValue>;
  * References a property from the class and assigns it a value.
  */
 export const PropertyAssignment = createInterface("PropertyAssignment").attrs({
-    property: Ref(() => Property),
+    name: Ref(() => Property),
     value: LiteralValue
 });
 

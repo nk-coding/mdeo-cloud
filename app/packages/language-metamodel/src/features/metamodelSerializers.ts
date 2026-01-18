@@ -156,9 +156,9 @@ function printAssociationEnd(context: PrintContext<AssociationEndType>): Doc {
     const { ctx, path, print, printPrimitive, getPrimitive } = context;
     const docs: Doc[] = [path.call(print, "class", "ref")];
 
-    if (ctx.property != undefined) {
+    if (ctx.name != undefined) {
         docs.push(".");
-        docs.push(printPrimitive(getPrimitive(ctx, "property"), ID));
+        docs.push(printPrimitive(getPrimitive(ctx, "name"), ID));
     }
 
     if (ctx.multiplicity != undefined) {
@@ -176,7 +176,7 @@ function printAssociationEnd(context: PrintContext<AssociationEndType>): Doc {
  */
 function printAssociation(context: PrintContext<AssociationType>): Doc {
     const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    const start = path.call(print, "start");
+    const start = path.call(print, "source");
     const operator = printPrimitive(getPrimitive(ctx, "operator"), ID);
     const target = path.call(print, "target");
 

@@ -1,7 +1,7 @@
 import type { ReturnStatementAccessor, ExpressionTypirServices } from "@mdeo/language-expression";
 import type { AstNode } from "langium";
 import type { TypirLangiumSpecifics } from "typir-langium";
-import { ReturnStatement, statementTypes } from "../grammar/scriptTypes.js";
+import { ReturnStatement, statementTypes } from "../../grammar/scriptTypes.js";
 
 /**
  * Provides access to return statements in the Script language for return type analysis.

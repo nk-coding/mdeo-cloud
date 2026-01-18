@@ -310,8 +310,10 @@ class FileDataService(
                 FileDataComputeRequest(
                     path = path,
                     project = project.toString(),
-                    version = version,
-                    content = String(content, Charsets.UTF_8),
+                    source = FileSource(
+                        version = version,
+                        content = String(content, Charsets.UTF_8)
+                    ),
                     contributionPlugins = contributionPlugins
                 )
             )
@@ -344,7 +346,7 @@ class FileDataService(
         path: String,
         key: String,
         response: FileDataComputeResponse,
-        sourceVersion: Int
+        sourceVersion: Int?
     ) {
         val now = Instant.now()
 
@@ -360,7 +362,7 @@ class FileDataService(
                 it[FileDataTable.path] = path
                 it[FileDataTable.dataKey] = key
                 it[FileDataTable.data] = response.data
-                it[FileDataTable.sourceVersion] = sourceVersion
+                it[FileDataTable.sourceVersion] = sourceVersion ?: -1
                 it[FileDataTable.createdAt] = now
                 it[FileDataTable.updatedAt] = now
             }
@@ -371,7 +373,7 @@ class FileDataService(
                     it[FileDependenciesTable.path] = path
                     it[FileDependenciesTable.dataKey] = key
                     it[FileDependenciesTable.dependencyPath] = normalizePath(fileDep.path)
-                    it[FileDependenciesTable.dependencyVersion] = fileDep.version
+                    it[FileDependenciesTable.dependencyVersion] = fileDep.version ?: -1
                 }
             }
 
@@ -382,7 +384,7 @@ class FileDataService(
                     it[DataDependenciesTable.dataKey] = key
                     it[DataDependenciesTable.dependencyPath] = normalizePath(dataDep.path)
                     it[DataDependenciesTable.dependencyKey] = dataDep.key
-                    it[DataDependenciesTable.dependencyVersion] = dataDep.version
+                    it[DataDependenciesTable.dependencyVersion] = dataDep.version ?: -1
                 }
             }
         }

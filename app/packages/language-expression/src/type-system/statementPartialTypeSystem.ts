@@ -46,6 +46,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         this.registerAssignmentRules();
         this.registerBreakContinueStatementRules();
         this.registerExpressionStatementRules();
+        this.registerStatementsScopeRules();
 
         this.registerInferenceRule(this.types.forStatementVariableDeclarationType, (node) => {
             return this.inferForStatementVariableDeclarationType(node);
@@ -76,6 +77,18 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                         $problem: this.validationProblem,
                         languageNode: node,
                         message: `Initial value type '${initialValueType.getName()}' is not assignable to variable type '${declarationType.getName()}'.`,
+                        severity: "error"
+                    });
+                }
+            }
+
+            if (node.type == undefined && node.initialValue != undefined) {
+                const initialValueType = this.inference.inferType(node.initialValue);
+                if (!Array.isArray(initialValueType) && !isCustomValueType(initialValueType)) {
+                    accept({
+                        $problem: this.validationProblem,
+                        languageNode: node,
+                        message: `Only value types can be assigned to variables. Type '${initialValueType.getName()}' is not a value type.`,
                         severity: "error"
                     });
                 }
@@ -158,6 +171,9 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         accept: ValidationProblemAcceptor<Specifics>,
         message: string
     ): void {
+        if (condition == undefined) {
+            return;
+        }
         const conditionType = this.inference.inferType(condition);
         if (Array.isArray(conditionType)) {
             return;
@@ -365,6 +381,30 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                     message: `Expression statement must evaluate to void or a value type, but got '${expressionType.getName()}'.`,
                     severity: "error"
                 });
+            }
+        });
+    }
+
+    /**
+     * Registers validation rules for statements scopes.
+     * Validates that variable names are unique within the scope.
+     */
+    private registerStatementsScopeRules(): void {
+        this.registerValidationRule(this.types.statementsScopeType, (node, accept) => {
+            const declaredNames = new Set<string>();
+            for (const statement of node.statements ?? []) {
+                if (!this.astReflection.isInstance(statement, this.types.variableDeclarationStatementType)) {
+                    continue;
+                }
+                if (declaredNames.has(statement.name)) {
+                    accept({
+                        $problem: this.validationProblem,
+                        languageNode: statement,
+                        message: `Variable '${statement.name}' is already declared in this scope.`,
+                        severity: "error"
+                    });
+                }
+                declaredNames.add(statement.name);
             }
         });
     }

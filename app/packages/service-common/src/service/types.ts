@@ -91,25 +91,36 @@ export interface DirectoryEntry {
 }
 
 /**
- * Request body for file data computation
+ * Source data for file or directory
  */
-export interface FileDataComputeRequest {
+export interface FileSource {
     /**
-     * Path to the file
-     */
-    path: string;
-    /**
-     * Project identifier for the project the file belongs to
-     */
-    project: string;
-    /**
-     * Version of the file
+     * Version of the file (only for files, not directories)
      */
     version: number;
     /**
-     * Content of the file
+     * Content of the file (only for files, not directories)
      */
     content: string;
+}
+
+/**
+ * Request body for file data computation
+ * Can be used for both files and directories
+ */
+export interface FileDataComputeRequest {
+    /**
+     * Path to the file or directory
+     */
+    path: string;
+    /**
+     * Project identifier for the project the file/directory belongs to
+     */
+    project: string;
+    /**
+     * Source data (version and content), only present for files, absent for directories
+     */
+    source?: FileSource;
     /**
      * Contribution plugins to apply for this request
      */

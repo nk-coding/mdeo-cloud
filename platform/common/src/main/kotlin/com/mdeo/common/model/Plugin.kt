@@ -160,20 +160,31 @@ data class FileReadResponse(
 )
 
 /**
- * Request payload for computing file data.
+ * Source data for file or directory.
  *
- * @property path Path to the file
- * @property project Project ID the file belongs to
- * @property version Current version of the file
- * @property content Text file content
+ * @property version Current version of the file (only for files, not directories)
+ * @property content Text file content (only for files, not directories)
+ */
+@Serializable
+data class FileSource(
+    val version: Int,
+    val content: String
+)
+
+/**
+ * Request payload for computing file data.
+ * Can be used for both files and directories.
+ *
+ * @property path Path to the file or directory
+ * @property project Project ID the file/directory belongs to
+ * @property source Source data (version and content), only present for files, absent for directories
  * @property contributionPlugins Server contribution plugins associated with this language
  */
 @Serializable
 data class FileDataComputeRequest(
     val path: String,
     val project: String,
-    val version: Int,
-    val content: String,
+    val source: FileSource? = null,
     val contributionPlugins: List<JsonObject> = emptyList()
 )
 
@@ -196,36 +207,36 @@ data class FileDataComputeResponse(
 /**
  * Represents a file dependency for file data computation.
  *
- * @property path Path to the file
- * @property version Version of the file at computation time
+ * @property path Path to the file or directory
+ * @property version Version of the file at computation time (only for files, not directories)
  */
 @Serializable
 data class FileDependency(
     val path: String,
-    val version: Int
+    val version: Int? = null
 )
 
 /**
  * Represents a data dependency for file data computation.
  *
- * @property path Path to the file
+ * @property path Path to the file or directory
  * @property key Data key
- * @property version Version of the file at computation time
+ * @property version Version of the file at computation time (only for files, not directories)
  */
 @Serializable
 data class DataDependency(
     val path: String,
     val key: String,
-    val version: Int
+    val version: Int? = null
 )
 
 /**
  * Represents additional file data computed as part of another computation.
  *
- * @property path Path to the file
+ * @property path Path to the file or directory
  * @property key Data key
  * @property data Computed data
- * @property sourceVersion Version of the source file
+ * @property sourceVersion Version of the source file (only for files, not directories)
  * @property fileDependencies List of file dependencies with versions
  * @property dataDependencies List of data dependencies
  */
@@ -234,7 +245,7 @@ data class AdditionalFileData(
     val path: String,
     val key: String,
     val data: JsonElement,
-    val sourceVersion: Int,
+    val sourceVersion: Int? = null,
     val fileDependencies: List<FileDependency> = emptyList(),
     val dataDependencies: List<DataDependency> = emptyList()
 )
@@ -243,10 +254,10 @@ data class AdditionalFileData(
  * Response for file data request.
  *
  * @property data The computed file data
- * @property version The version of the source file used to compute the data
+ * @property version The version of the source file used to compute the data (only for files, not directories)
  */
 @Serializable
 data class FileDataResponse(
     val data: JsonElement,
-    val version: Int
+    val version: Int? = null
 )

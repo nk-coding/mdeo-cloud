@@ -362,6 +362,29 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                     subProblems: []
                 });
             }
+
+            const trueType = this.inference.inferType(node.trueExpression);
+            const falseType = this.inference.inferType(node.falseExpression);
+
+            if (!Array.isArray(trueType) && !isCustomValueType(trueType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node.trueExpression,
+                    message: `True expression must evaluate to a value type. Type '${trueType.getName()}' is not a value type.`,
+                    subProblems: []
+                });
+            }
+
+            if (!Array.isArray(falseType) && !isCustomValueType(falseType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node.falseExpression,
+                    message: `False expression must evaluate to a value type. Type '${falseType.getName()}' is not a value type.`,
+                    subProblems: []
+                });
+            }
         });
     }
 

@@ -8,10 +8,8 @@ const {
     ZoomMouseListener: SprottyZoomMouseListener,
     SetViewportCommand: SprottySetViewportCommand,
     configureActionHandler,
-    SetModelAction,
-    configureCommand
+    SetModelAction
 } = sharedImport("@eclipse-glsp/sprotty");
-const { FitToScreenAction } = sharedImport("@eclipse-glsp/protocol");
 
 /**
  * Feature module for extended viewport functionality

@@ -108,11 +108,11 @@ export interface FunctionSignature extends CallableType {
 }
 
 /**
- * A named function or method definition with its signature.
+ * A named function or method definition with its signatures.
  * This extends CallableType and adds support for generic type parameters.
  */
 export interface FunctionType {
-    signatures: FunctionSignature[];
+    signatures: Record<string, FunctionSignature>;
 }
 
 /**

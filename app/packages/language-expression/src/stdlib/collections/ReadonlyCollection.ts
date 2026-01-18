@@ -54,13 +54,13 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection", "builtin")
     )
     .method("concat", (m) =>
         m
-            .signature((s) => s.returns(typeRef("string").build()))
-            .signature((s) => s.param("separator", typeRef("string").build()).returns(typeRef("string").build()))
+            .signature("nosep", (s) => s.returns(typeRef("string").build()))
+            .signature("sep", (s) => s.param("separator", typeRef("string").build()).returns(typeRef("string").build()))
     )
     .method("count", (m) =>
         m
-            .signature((s) => s.param("item", typeRef("Any").build()).returns(typeRef("int").build()))
-            .signature((s) =>
+            .signature("noit", (s) => s.param("item", typeRef("Any").build()).returns(typeRef("int").build()))
+            .signature("it", (s) =>
                 s
                     .param(
                         "iterator",
@@ -159,16 +159,6 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection", "builtin")
         )
     )
     .method("isEmpty", (m) => m.signature((s) => s.returns(typeRef("boolean").build())))
-    .method("min", (m) =>
-        m
-            .signature((s) => s.returns(typeRef("double").nullable().build()))
-            .signature((s) => s.param("default", typeRef("double").build()).returns(typeRef("double").build()))
-    )
-    .method("max", (m) =>
-        m
-            .signature((s) => s.returns(typeRef("double").nullable().build()))
-            .signature((s) => s.param("default", typeRef("double").build()).returns(typeRef("double").build()))
-    )
     .method("notEmpty", (m) => m.signature((s) => s.returns(typeRef("boolean").build())))
     .method("random", (m) => m.signature((s) => s.returns(typeRef("Any").build())))
     .method("size", (m) => m.signature((s) => s.returns(typeRef("int").build())))

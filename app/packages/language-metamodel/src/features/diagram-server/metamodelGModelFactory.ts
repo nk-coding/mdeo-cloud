@@ -221,7 +221,8 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
             const propId = readonly ? idRegistry.getIdOrUnresolved(prop) : idRegistry.getId(prop);
 
-            const multiplicityStr = this.formatMultiplicity(prop.multiplicity);
+            const multiplicityStr =
+                prop.multiplicity != undefined ? `[${this.formatMultiplicity(prop.multiplicity)}]` : "";
             const propName = this.modelState.languageServices.AstSerializer.serializePrimitive(
                 { value: prop.name ?? "unnamed" },
                 ID
@@ -312,11 +313,11 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const assoc of associations) {
-            if (assoc == undefined || assoc.start == undefined || assoc.target == undefined) {
+            if (assoc == undefined || assoc.source == undefined || assoc.target == undefined) {
                 continue;
             }
 
-            const startClassRef = assoc.start.class?.ref;
+            const startClassRef = assoc.source.class?.ref;
             const targetClassRef = assoc.target.class?.ref;
 
             if (startClassRef == undefined || targetClassRef == undefined) {
@@ -364,12 +365,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
         this.applyRoutingPoints(edge, metadata);
 
-        if (assoc.start != undefined) {
+        if (assoc.source != undefined) {
             const startNodes = this.createAssociationEndNodes(
-                idRegistry.getId(assoc.start),
-                assoc.start.property,
-                assoc.start.multiplicity,
-                "start",
+                idRegistry.getId(assoc.source),
+                assoc.source.name,
+                assoc.source.multiplicity,
+                "source",
                 validatedMetadata
             );
             edge.children.push(...startNodes);
@@ -378,9 +379,9 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         if (assoc.target != undefined) {
             const targetNodes = this.createAssociationEndNodes(
                 idRegistry.getId(assoc.target),
-                assoc.target.property,
+                assoc.target.name,
                 assoc.target.multiplicity,
-                "end",
+                "target",
                 validatedMetadata
             );
             edge.children.push(...targetNodes);
@@ -395,7 +396,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param baseId The base ID for the nodes
      * @param property The property name (optional)
      * @param multiplicity The multiplicity (optional)
-     * @param target Whether this is at "start" or "end" of the association
+     * @param target Whether this is at "source" or "target" of the association
      * @param validatedMetadata The validated metadata containing node placement
      * @returns An array of created nodes (property and/or multiplicity)
      */
@@ -403,7 +404,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         baseId: string,
         property: string | undefined,
         multiplicity: PartialMultiplicity | undefined,
-        target: "start" | "end",
+        target: "source" | "target",
         validatedMetadata: GraphMetadata
     ): GModelElement[] {
         const nodes: GModelElement[] = [];
@@ -416,11 +417,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
                     ? propertyMeta.meta
                     : NodeLayoutMetadataUtil.create(0, 0);
 
-            const propertyNode = GAssociationPropertyNode.builder()
-                .id(propertyId)
-                .target(target)
-                .meta(metadata)
-                .build();
+            const propertyNode = GAssociationPropertyNode.builder().id(propertyId).end(target).meta(metadata).build();
 
             const propertyLabel = GAssociationPropertyLabel.builder().id(`${propertyId}-label`).text(property).build();
 
@@ -428,8 +425,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             nodes.push(propertyNode);
         }
 
-        const multiplicityStr = this.formatMultiplicity(multiplicity);
-        if (multiplicityStr !== "") {
+        if (multiplicity != undefined) {
             const multiplicityId = `${baseId}#multiplicity`;
             const multiplicityMeta = validatedMetadata.nodes[multiplicityId];
             const metadata =
@@ -439,13 +435,13 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
             const multiplicityNode = GAssociationMultiplicityNode.builder()
                 .id(multiplicityId)
-                .target(target)
+                .end(target)
                 .meta(metadata)
                 .build();
 
             const multiplicityLabel = GAssociationMultiplicityLabel.builder()
                 .id(`${multiplicityId}-label`)
-                .text(multiplicityStr)
+                .text(this.formatMultiplicity(multiplicity))
                 .build();
 
             multiplicityNode.children.push(multiplicityLabel);
@@ -475,26 +471,22 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * Handles both single multiplicities (*, +, ?, or numeric) and range multiplicities.
      *
      * @param multiplicity The multiplicity to format
-     * @returns Formatted string like "[*]", "[1]", "[0..1]", or empty string if no multiplicity
+     * @returns Formatted string like "*", "1", "0..1"
      */
-    private formatMultiplicity(multiplicity: PartialMultiplicity | undefined): string {
-        if (multiplicity == undefined) {
-            return "";
-        }
-
+    private formatMultiplicity(multiplicity: PartialMultiplicity): string {
         if (multiplicity.$type === "SingleMultiplicity") {
             const single = multiplicity as PartialAstNode<SingleMultiplicityType>;
             if (single.value != undefined) {
-                return `[${single.value}]`;
+                return single.value;
             }
             if (single.numericValue !== undefined && single.numericValue !== null) {
-                return `[${single.numericValue}]`;
+                return single.numericValue.toString();
             }
         } else if (multiplicity.$type === "RangeMultiplicity") {
             const range = multiplicity as PartialAstNode<RangeMultiplicityType>;
             const lower = range.lower ?? 0;
             const upper = range.upper ?? range.upperNumeric ?? "*";
-            return `[${lower}..${upper}]`;
+            return `${lower}..${upper}`;
         }
 
         return "";

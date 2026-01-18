@@ -63,6 +63,7 @@ export * from "./typir-extensions/langium/typeCreator.js";
 export * from "./typir-extensions/langium/typeSystemDefinition.js";
 export * from "./typir-extensions/rules/callValidationHelper.js";
 export * from "./typir-extensions/rules/commonParentType.js";
+export * from "./typir-extensions/rules/getCallOverload.js";
 export * from "./typir-extensions/rules/inferCall.js";
 export * from "./typir-extensions/rules/inferMemberAccess.js";
 export * from "./typir-extensions/rules/util.js";

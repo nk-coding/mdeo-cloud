@@ -270,7 +270,7 @@ function inferFromFunctionTarget<Specifics extends TypirLangiumSpecifics>(
     const definition = targetType.details.definition;
     const candidateLambdaTypes: LambdaTypeInferenceResult<Specifics>[] = [];
 
-    for (const signature of definition.signatures) {
+    for (const signature of Object.values(definition.signatures)) {
         if (argumentIndex >= signature.parameters.length && !signature.isVarArgs) {
             continue;
         }

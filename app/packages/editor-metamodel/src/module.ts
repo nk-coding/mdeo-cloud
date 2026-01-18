@@ -10,8 +10,8 @@ import {
 import { GClassLabel } from "./model/classLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";
 import { GAssociationEndLabel } from "./model/associationEndLabel.js";
-import { GAssociationProperty } from "./model/associationProperty.js";
-import { GAssociationMultiplicity } from "./model/associationMultiplicity.js";
+import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
+import { GAssociationMultiplicityNode } from "./model/associationMultiplicityNode.js";
 import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
 import { GAssociationMultiplicityLabel } from "./model/associationMultiplicityLabel.js";
 import { GInheritanceEdge } from "./model/inheritanceEdge.js";
@@ -21,6 +21,8 @@ import { GClassNodeView } from "./views/classNodeView.js";
 import { GClassLabelView } from "./views/classLabelView.js";
 import { GInheritanceEdgeView } from "./views/inheritanceEdgeView.js";
 import { GAssociationEdgeView } from "./views/associationEdgeView.js";
+import { GAssociationPropertyNodeView } from "./views/associationPropertyNodeView.js";
+import { GAssociationMultiplicityNodeView } from "./views/associationMultiplicityNodeView.js";
 import { MetamodelElementType } from "./model/elementTypes.js";
 import { GClassNode } from "./model/classNode.js";
 
@@ -40,14 +42,14 @@ export const metamodelDiagramModule = new FeatureModule(
         configureModelElement(
             context,
             MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
-            GAssociationProperty,
-            GLabelView
+            GAssociationPropertyNode,
+            GAssociationPropertyNodeView
         );
         configureModelElement(
             context,
             MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
-            GAssociationMultiplicity,
-            GLabelView
+            GAssociationMultiplicityNode,
+            GAssociationMultiplicityNodeView
         );
 
         configureModelElement(context, MetamodelElementType.LABEL_CLASS_NAME, GClassLabel, GClassLabelView, {

@@ -237,36 +237,56 @@ export function signature(): SignatureBuilder {
 }
 
 /**
+ * Type for tracking registered signature names in the builder
+ * Use an empty object literal type, not Record<string, never>
+ */
+type SignatureNames = object;
+
+/**
  * Builder for creating function/method types with multiple signatures.
  *
+ * @template T The type tracking registered signature names
  * @example
  * ```typescript
  * method()
- *   .signature(sig => sig
+ *   .signature('default', sig => sig
  *     .param('x', typeRef('number').build())
  *     .returns(typeRef('string').build())
  *   )
  *   .build()
  * ```
  */
-export class MethodBuilder {
-    private signatures: FunctionSignature[] = [];
+export class MethodBuilder<T extends SignatureNames = SignatureNames> {
+    private signatures: Record<string, FunctionSignature> = {};
 
     /**
      * Add a signature to this method/function.
+     *
+     * @param name The signature name (must not already exist), leave empty to fall back to an empty string representing default
      * @param builder A function that configures a SignatureBuilder
      */
-    signature(builder: (sig: SignatureBuilder) => SignatureBuilder): this {
-        const sig = builder(new SignatureBuilder());
-        this.signatures.push(sig.build());
-        return this;
+    signature(builder: (sig: SignatureBuilder) => SignatureBuilder): MethodBuilder<Record<string, never>>;
+    signature<K extends string>(
+        name: EnsureNotMember<T, K>,
+        builder: (sig: SignatureBuilder) => SignatureBuilder
+    ): MethodBuilder<T & Record<K, never>>;
+    signature<K extends string>(
+        nameOrBuilder: EnsureNotMember<T, K> | ((sig: SignatureBuilder) => SignatureBuilder),
+        builder?: (sig: SignatureBuilder) => SignatureBuilder
+    ): MethodBuilder<T & Record<K, never>> {
+        const sig = builder
+            ? builder(new SignatureBuilder())
+            : (nameOrBuilder as (sig: SignatureBuilder) => SignatureBuilder)(new SignatureBuilder());
+        const name = builder ? (nameOrBuilder as string) : "";
+        this.signatures[name] = sig.build();
+        return this as unknown as MethodBuilder<T & Record<K, never>>;
     }
 
     /**
      * Build the FunctionType.
      */
     build(): FunctionType {
-        if (this.signatures.length === 0) {
+        if (Object.keys(this.signatures).length === 0) {
             throw new Error("Method must have at least one signature");
         }
         return {

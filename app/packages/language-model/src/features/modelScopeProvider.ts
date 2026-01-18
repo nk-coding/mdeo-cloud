@@ -23,7 +23,7 @@ export class ModelScopeProvider extends DefaultScopeProvider {
                 [Class, ClassImport],
                 this.indexManager
             );
-        } else if (context.property === "property" && reflection.isInstance(context.container, PropertyAssignment)) {
+        } else if (context.property === "name" && reflection.isInstance(context.container, PropertyAssignment)) {
             let objectInstance = context.container.$container as ObjectInstanceType;
             // workaround for langium issue that will hopefully be fixed soon
             if (reflection.isInstance(objectInstance, PropertyAssignment)) {

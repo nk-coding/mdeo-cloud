@@ -102,10 +102,10 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * Uses class names and properties to create a semantic ID.
      */
     private getAssociationName(node: PartialAssociation): string {
-        const startClassName = this.resolveClassName(node.start?.class);
+        const startClassName = this.resolveClassName(node.source?.class);
         const targetClassName = this.resolveClassName(node.target?.class);
-        const startProperty = node.start?.property ?? "";
-        const targetProperty = node.target?.property ?? "";
+        const startProperty = node.source?.name ?? "";
+        const targetProperty = node.target?.name ?? "";
         const operator = node.operator ?? "--";
 
         return `${startClassName}_${startProperty}_${operator}_${targetClassName}_${targetProperty}`;
@@ -116,7 +116,7 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      */
     private getAssociationEndName(node: PartialAssociationEnd): string {
         const className = this.resolveClassName(node.class);
-        const property = node.property ?? "noProperty";
+        const property = node.name ?? "noProperty";
         return `${className}_${property}`;
     }
 

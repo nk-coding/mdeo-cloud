@@ -12,17 +12,17 @@ export const intType = classType("int", "builtin")
     .method("log10", (m) => m.signature((s) => s.returns(typeRef("float").build())))
     .method("max", (m) =>
         m
-            .signature((s) => s.param("other", typeRef("int").build()).returns(typeRef("int").build()))
-            .signature((s) => s.param("other", typeRef("long").build()).returns(typeRef("long").build()))
-            .signature((s) => s.param("other", typeRef("float").build()).returns(typeRef("float").build()))
-            .signature((s) => s.param("other", typeRef("double").build()).returns(typeRef("double").build()))
+            .signature("int", (s) => s.param("other", typeRef("int").build()).returns(typeRef("int").build()))
+            .signature("long", (s) => s.param("other", typeRef("long").build()).returns(typeRef("long").build()))
+            .signature("float", (s) => s.param("other", typeRef("float").build()).returns(typeRef("float").build()))
+            .signature("double", (s) => s.param("other", typeRef("double").build()).returns(typeRef("double").build()))
     )
     .method("min", (m) =>
         m
-            .signature((s) => s.param("other", typeRef("int").build()).returns(typeRef("int").build()))
-            .signature((s) => s.param("other", typeRef("long").build()).returns(typeRef("long").build()))
-            .signature((s) => s.param("other", typeRef("float").build()).returns(typeRef("float").build()))
-            .signature((s) => s.param("other", typeRef("double").build()).returns(typeRef("double").build()))
+            .signature("int", (s) => s.param("other", typeRef("int").build()).returns(typeRef("int").build()))
+            .signature("long", (s) => s.param("other", typeRef("long").build()).returns(typeRef("long").build()))
+            .signature("float", (s) => s.param("other", typeRef("float").build()).returns(typeRef("float").build()))
+            .signature("double", (s) => s.param("other", typeRef("double").build()).returns(typeRef("double").build()))
     )
     .method("pow", (m) =>
         m.signature((s) => s.param("exponent", typeRef("double").build()).returns(typeRef("double").build()))

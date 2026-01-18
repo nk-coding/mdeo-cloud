@@ -56,7 +56,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         Body: FileDataComputeRequest;
     }>("/data/:key", async (request, reply) => {
         const { key } = request.params;
-        const { path, project, version, content, contributionPlugins } = request.body;
+        const { path, project, source, contributionPlugins } = request.body;
 
         const authHeader = request.headers.authorization;
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -72,12 +72,16 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         const serverContributionPlugins = (contributionPlugins ?? []) as unknown as ServerContributionPlugin[];
         const instance = await instancePool.acquire(serverContributionPlugins, jwt, project);
         const uri = URI.file(path);
-        instance.services.shared.workspace.LangiumDocuments.createDocument(uri, content);
+
+        if (source != undefined) {
+            // File data request
+            instance.services.shared.workspace.LangiumDocuments.createDocument(uri, source.content);
+        }
 
         try {
             const result = await handler({
                 uri,
-                version,
+                version: source?.version,
                 instance,
                 services: instance.services,
                 serverApi: instance.services.shared.ServerApi

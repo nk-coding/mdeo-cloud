@@ -106,7 +106,7 @@ export const AssociationEndWithPropertyRule = createRule("AssociationEndWithProp
     .as(({ set }) => [
         set("class", ref(ClassOrImport, ID)),
         ".",
-        set("property", ID),
+        set("name", ID),
         optional(set("multiplicity", MultiplicityRule))
     ]);
 
@@ -135,7 +135,7 @@ export const CompositionEndRule = createRule("CompositionEndRule")
     .as(({ set }) => [
         set("class", ref(ClassOrImport, ID)),
         ".",
-        set("property", ID),
+        set("name", ID),
         optional(set("multiplicity", MultiplicityRule))
     ]);
 
@@ -146,7 +146,7 @@ export const CompositionEndRule = createRule("CompositionEndRule")
 export const RegularAssociationStartWithPropertyRule = createRule("RegularAssociationStartWithPropertyRule")
     .returns(Association)
     .as(({ set }) => [
-        set("start", AssociationEndWithPropertyRule),
+        set("source", AssociationEndWithPropertyRule),
         set("operator", "--"),
         set("target", AssociationEndRule)
     ]);
@@ -158,7 +158,7 @@ export const RegularAssociationStartWithPropertyRule = createRule("RegularAssoci
 export const RegularAssociationTargetWithPropertyRule = createRule("RegularAssociationTargetWithPropertyRule")
     .returns(Association)
     .as(({ set }) => [
-        set("start", AssociationEndWithoutPropertyRule),
+        set("source", AssociationEndWithoutPropertyRule),
         set("operator", "--"),
         set("target", AssociationEndWithPropertyRule)
     ]);
@@ -177,7 +177,7 @@ export const RegularAssociationRule = createRule("RegularAssociationRule")
  */
 export const CompositionFromStartRule = createRule("CompositionFromStartRule")
     .returns(Association)
-    .as(({ set }) => [set("start", CompositionEndRule), set("operator", "*--"), set("target", AssociationEndRule)]);
+    .as(({ set }) => [set("source", CompositionEndRule), set("operator", "*--"), set("target", AssociationEndRule)]);
 
 /**
  * Composition from target rule.
@@ -185,7 +185,7 @@ export const CompositionFromStartRule = createRule("CompositionFromStartRule")
  */
 export const CompositionFromTargetRule = createRule("CompositionFromTargetRule")
     .returns(Association)
-    .as(({ set }) => [set("start", AssociationEndRule), set("operator", "--*"), set("target", CompositionEndRule)]);
+    .as(({ set }) => [set("source", AssociationEndRule), set("operator", "--*"), set("target", CompositionEndRule)]);
 
 /**
  * Association rule.

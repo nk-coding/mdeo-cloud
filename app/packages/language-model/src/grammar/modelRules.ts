@@ -40,7 +40,7 @@ export const LiteralValueRule = createRule("LiteralValueRule")
  */
 export const PropertyAssignmentRule = createRule("PropertyAssignmentRule")
     .returns(PropertyAssignment)
-    .as(({ set }) => [set("property", ref(Property, ID)), "=", set("value", LiteralValueRule)]);
+    .as(({ set }) => [set("name", ref(Property, ID)), "=", set("value", LiteralValueRule)]);
 
 /**
  * Object instance rule.

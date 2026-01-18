@@ -6,7 +6,9 @@ import {
     type PropertyType,
     type SingleMultiplicityType,
     type RangeMultiplicityType,
-    type MultiplicityType
+    type MultiplicityType,
+    AssociationEnd,
+    type AssociationEndType
 } from "../../../grammar/metamodelTypes.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
@@ -37,6 +39,8 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
             }
         } else if (this.reflection.isInstance(node, Property)) {
             return await this.createRenamePropertyEdit(node, operation.text);
+        } else if (this.reflection.isInstance(node, AssociationEnd)) {
+            return await this.createRenameAssociationEndEdit(node, operation);
         }
         return undefined;
     }
@@ -149,6 +153,80 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
                 $type: "SingleMultiplicity",
                 numericValue: parseInt(multiplicity, 10)
             } as SingleMultiplicityType;
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Creates a workspace edit for renaming an association end property or multiplicity.
+     *
+     * @param node The association node
+     * @param operation The apply label edit operation
+     * @returns A workspace edit for renaming the association end, or undefined if parsing fails
+     */
+    private async createRenameAssociationEndEdit(
+        node: AssociationEndType,
+        operation: ApplyLabelEditOperation
+    ): Promise<WorkspaceEdit | undefined> {
+        const labelId = operation.labelId;
+        const text = operation.text.trim();
+
+        if (labelId.endsWith("#property-label")) {
+            const propertyNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
+            if (propertyNode == undefined) {
+                throw new Error("Property CST node not found.");
+            }
+            return this.createRenameWorkspaceEdit(propertyNode, parseIdentifier(text));
+        } else if (labelId.endsWith("#multiplicity-label")) {
+            return await this.updateAssociationMultiplicity(node, text);
+        } else {
+            throw new Error(`Unknown label ID type: ${labelId}`);
+        }
+    }
+
+    /**
+     * Updates the multiplicity of an association end.
+     *
+     * @param node The association node
+     * @param end The end to update ("source" or "target")
+     * @param multiplicityText The new multiplicity text
+     * @returns A workspace edit for updating the multiplicity
+     */
+    private async updateAssociationMultiplicity(
+        node: AssociationEndType,
+        multiplicityText: string
+    ): Promise<WorkspaceEdit | undefined> {
+        const multiplicityAst = this.parseMultiplicity(multiplicityText);
+        if (multiplicityAst == undefined) {
+            throw new Error("Invalid multiplicity format.");
+        }
+
+        if (node.multiplicity != undefined) {
+            const multiplicityNode = GrammarUtils.findNodeForProperty(node.$cstNode, "multiplicity");
+            if (multiplicityNode == undefined) {
+                throw new Error("Multiplicity CST node not found.");
+            }
+            return await this.replaceCstNode(multiplicityNode, multiplicityAst);
+        } else {
+            const serializedMultiplicity = await this.serializeNode(multiplicityAst);
+            const insertPosition = node.$cstNode?.end;
+            if (insertPosition == undefined) {
+                throw new Error("Cannot determine insert position for multiplicity.");
+            }
+            return {
+                changes: {
+                    [node.$document!.uri.toString()]: [
+                        {
+                            range: {
+                                start: node.$document!.textDocument.positionAt(insertPosition),
+                                end: node.$document!.textDocument.positionAt(insertPosition)
+                            },
+                            newText: ` ${serializedMultiplicity}`
+                        }
+                    ]
+                }
+            };
         }
 
         return undefined;

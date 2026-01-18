@@ -10,7 +10,9 @@ import {
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
-    initializePluginContext
+    initializePluginContext,
+    AST_HANDLER_KEY,
+    astHandler
 } from "@mdeo/service-common";
 import type { ScriptServices } from "@mdeo/language-script";
 
@@ -25,7 +27,7 @@ const scriptServicePlugin: ServicePluginDefinition = {
     languagePlugin: {
         id: "script",
         name: "Script",
-        extension: ".s",
+        extension: ".fn",
         defaultContent: undefined,
         icon: convertIcon(FileCode),
         serverPlugin: {
@@ -39,7 +41,7 @@ const scriptServicePlugin: ServicePluginDefinition = {
                 "import",
                 "from",
                 "as",
-                "function",
+                "fun",
                 "return",
                 "if",
                 "else",
@@ -47,13 +49,10 @@ const scriptServicePlugin: ServicePluginDefinition = {
                 "for",
                 "break",
                 "continue",
-                "let",
-                "const",
+                "var",
                 "true",
                 "false",
-                "null",
-                "new",
-                "this"
+                "null"
             ]
         })
     },
@@ -63,6 +62,7 @@ const scriptServicePlugin: ServicePluginDefinition = {
 initializePluginContext();
 
 const { scriptPluginProvider } = await import("@mdeo/language-script");
+const { typedAstHandler, TYPED_AST_HANDLER_KEY } = await import("./handler/typedAstHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
 
@@ -70,7 +70,10 @@ const config: ServiceConfig<ScriptServices> = {
     ...envConfig,
     plugin: scriptServicePlugin,
     languagePluginProvider: scriptPluginProvider,
-    handlers: {}
+    handlers: {
+        [AST_HANDLER_KEY]: astHandler,
+        [TYPED_AST_HANDLER_KEY]: typedAstHandler
+    }
 };
 
 await startLanguageService(config);

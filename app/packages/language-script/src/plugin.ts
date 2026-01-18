@@ -3,6 +3,7 @@ import {
     ML_COMMENT,
     SL_COMMENT,
     WS,
+    type ExternalReferenceAdditionalServices,
     type LangiumLanguagePlugin,
     type LangiumLanguagePluginProvider
 } from "@mdeo/language-common";
@@ -12,7 +13,8 @@ import {
     DefaultAstSerializer,
     SerializerFormatter,
     registerDefaultTokenSerializers,
-    sharedImport
+    sharedImport,
+    addExternalReferenceCollectionPhase
 } from "@mdeo/language-shared";
 import { ScriptRule } from "./grammar/scriptRules.js";
 import {
@@ -24,10 +26,12 @@ import {
     registerTypeSerializers
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
-import { ScriptTypeSystem } from "./features/typeSystem.js";
-import { ScriptScopeProvider } from "./features/scopeProvider.js";
-import { registerScriptSerializers } from "./features/scriptSerializers.js";
+import { ScriptTypeSystem } from "./features/type-system/scriptTypeSystem.js";
+import { ScriptScopeProvider } from "./features/type-system/scriptScopeProvider.js";
+import { registerScriptSerializers } from "./features/type-system/scriptSerializers.js";
 import { expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
+import { ScriptLangiumScopeProvider } from "./features/scriptScopeProvider.js";
+import { ScriptExternalReferenceCollector } from "./features/scriptExternalReferenceCollector.js";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");
@@ -42,7 +46,7 @@ export type ScriptTypirSpecifics = TypirLangiumSpecifics;
  */
 export type ScriptServices = {
     typir: ExpressionTypirServices<ScriptTypirSpecifics>;
-};
+} & ExternalReferenceAdditionalServices;
 
 /**
  * The plugin for the Script language.
@@ -54,6 +58,10 @@ const scriptPlugin: LangiumLanguagePlugin<ScriptServices> = {
         parser: {
             TokenBuilder: () => new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
             ValueConverter: () => new IdValueConverter()
+        },
+        references: {
+            ScopeProvider: (services) => new ScriptLangiumScopeProvider(services),
+            ExternalReferenceCollector: () => new ScriptExternalReferenceCollector()
         },
         typir: (services) =>
             createTypirLangiumServicesWithAdditionalServices<
@@ -81,6 +89,7 @@ const scriptPlugin: LangiumLanguagePlugin<ScriptServices> = {
         registerExpressionSerializers(services, expressionTypes);
         registerStatementSerializers(services, statementTypes);
         registerScriptSerializers(services);
+        addExternalReferenceCollectionPhase(services);
     }
 };
 

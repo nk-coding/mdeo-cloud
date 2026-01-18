@@ -17,14 +17,14 @@ export type FileDataHandler<T = unknown, S = object> = (context: FileDataContext
  */
 export interface FileDataContext<T = object> {
     /**
-     * The URI of the file, already registered in the Langium workspace
+     * The URI of the file or directory, already registered in the Langium workspace (if a file)
      */
     uri: URI;
 
     /**
-     * The version of the file
+     * The version of the file (undefined for directories)
      */
-    version: number;
+    version?: number;
 
     /**
      * The Langium instance to use for processing
@@ -77,9 +77,9 @@ export interface FileDependency {
      */
     path: string;
     /**
-     * Version of the file
+     * Version of the file (only for files, not directories)
      */
-    version: number;
+    version?: number;
 }
 /**
  * Data dependency information
@@ -87,7 +87,7 @@ export interface FileDependency {
 
 export interface DataDependency {
     /**
-     * Path to the file
+     * Path to the file or directory
      */
     path: string;
     /**
@@ -95,9 +95,9 @@ export interface DataDependency {
      */
     key: string;
     /**
-     * Version of the file the data was computed for
+     * Version of the file the data was computed for (only for files, not directories)
      */
-    version: number;
+    version?: number;
 }
 
 /**
@@ -106,7 +106,7 @@ export interface DataDependency {
  */
 export interface AdditionalFileData<T = unknown> extends Omit<FileDataResult<T>, "additionalFileData"> {
     /**
-     * Path to the file
+     * Path to the file or directory
      */
     path: string;
     /**
@@ -114,7 +114,7 @@ export interface AdditionalFileData<T = unknown> extends Omit<FileDataResult<T>,
      */
     key: string;
     /**
-     * Version of the file the data was computed for
+     * Version of the file the data was computed for (only for files, not directories)
      */
-    sourceVersion: number;
+    sourceVersion?: number;
 }

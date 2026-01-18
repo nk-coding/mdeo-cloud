@@ -9,7 +9,7 @@ export class GAssociationMultiplicityNode extends GNode {
     /**
      * Whether this multiplicity is at the start or end of the association
      */
-    target!: "start" | "end";
+    end!: "source" | "target";
 
     /**
      * Creates a builder for GAssociationMultiplicityNode instances.
@@ -33,11 +33,11 @@ export class GAssociationMultiplicityNodeBuilder<
     /**
      * Sets the target for the multiplicity node.
      *
-     * @param target Whether this is at start or end
+     * @param end Whether this is at start or end
      * @returns This builder for chaining
      */
-    target(target: "start" | "end"): this {
-        this.proxy.target = target;
+    end(end: "source" | "target"): this {
+        this.proxy.end = end;
         return this;
     }
 }

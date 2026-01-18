@@ -10,6 +10,12 @@ export interface Scope<Specifics extends TypirSpecifics> {
     readonly languageNode?: Specifics["LanguageType"];
 
     /**
+     * The level of this scope in the scope hierarchy.
+     * 0 represents the global scope, and each nested scope increments this value.
+     */
+    readonly level: number;
+
+    /**
      * Gets the scope entry with the given name at the given position.
      * Utilizes lexical scoping rules.
      *
@@ -209,6 +215,7 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
      * @param entriesProvider provider for the local scope entries
      * @param controlFlowEntriesProvider provider for the control flow entries in this scope
      * @param localInitializedEntries a map of entry names to the position at which they are initialized in this scope
+     * @param languageNode the language AST node that this scope is associated with
      */
     constructor(
         private readonly parent: BoundScope<Specifics> | undefined,
@@ -226,6 +233,10 @@ export class DefaultScope<Specifics extends TypirSpecifics> implements Scope<Spe
                 this.updateInitializationLookup(entry, init.position);
             }
         }
+    }
+
+    get level(): number {
+        return this.parent != undefined ? this.parent.scope.level + 1 : 0;
     }
 
     getEntry(name: string, position: number): ScopeEntry<Specifics> | undefined {

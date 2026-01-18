@@ -10,10 +10,17 @@ import {
     isCustomVoidType,
     isCustomLambdaType
 } from "@mdeo/language-expression";
-import { Function, LambdaExpression, Script, type FunctionType, type ScriptType } from "../grammar/scriptTypes.js";
+import {
+    Function,
+    FunctionParameter,
+    LambdaExpression,
+    Script,
+    type FunctionType,
+    type ScriptType
+} from "../../grammar/scriptTypes.js";
 import { ScriptReturnStatementAccessor } from "./scriptReturnStatementAccessor.js";
 import { LambdaScope } from "./lambdaScope.js";
-import type { ScriptTypirSpecifics } from "../plugin.js";
+import type { ScriptTypirSpecifics } from "../../plugin.js";
 
 /**
  * Partial type system implementation for Script-specific AST nodes.
@@ -32,6 +39,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
     override registerRules(): void {
         this.registerScriptNameConflictsValidationRule();
         this.registerFunctionInferenceRule();
+        this.registerFunctionParameterInferenceRule();
         this.registerFunctionValidationRule();
         this.registerFunctionDuplicateParametersValidationRule();
         this.registerLambdaInferenceRule();
@@ -108,8 +116,17 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 returnType = this.typir.factory.CustomVoid.getOrCreate();
             }
 
+            if (node.parameterList?.parameters == undefined) {
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: "Function must have a parameter list.",
+                    subProblems: []
+                };
+            }
+
             const parameters = node.parameterList.parameters.map((param) => {
-                const inferredParamType = this.inference.inferType(param.type);
+                const inferredParamType = this.inference.inferType(param);
                 const paramType = isCustomValueType(inferredParamType)
                     ? inferredParamType
                     : this.primitives.Any.asNullable;
@@ -121,16 +138,39 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
 
             return this.typir.factory.CustomFunctions.create({
                 definition: {
-                    signatures: [
-                        {
+                    signatures: {
+                        default: {
                             returnType: returnType.definition,
                             parameters: parameters
                         }
-                    ]
+                    }
                 },
                 name: node.name,
                 typeArgs: new Map()
             });
+        });
+    }
+
+    /**
+     * Registers a type inference rule for function parameters.
+     * Infers the type of function parameters based on their type annotations.
+     */
+    private registerFunctionParameterInferenceRule(): void {
+        this.registerInferenceRule(FunctionParameter, (node) => {
+            if (node.type != undefined) {
+                const type = this.inference.inferType(node.type);
+                if (Array.isArray(type)) {
+                    return type[0];
+                }
+                return type;
+            } else {
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: "Function parameter must have a type.",
+                    subProblems: []
+                };
+            }
         });
     }
 
@@ -191,9 +231,8 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
      */
     private registerFunctionDuplicateParametersValidationRule(): void {
         this.registerValidationRule(Function, (node, accept) => {
-            const functionNode = node as FunctionType;
             const parameterNames = new Set<string>();
-            for (const param of functionNode.parameterList.parameters) {
+            for (const param of node.parameterList?.parameters ?? []) {
                 if (parameterNames.has(param.name)) {
                     accept({
                         languageNode: param,

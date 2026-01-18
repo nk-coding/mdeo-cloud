@@ -82,7 +82,7 @@ const { statementsScopeRule: StatementsScopeRule } = generateStatementRules(
  */
 const FunctionParameterRule = createRule("ScriptFunctionParameterRule")
     .returns(FunctionParameter)
-    .as(({ set }) => [set("name", ID), optional(":", set("type", TypeRule))]);
+    .as(({ set }) => [set("name", ID), ":", set("type", TypeRule)]);
 
 /**
  * Function parameters rule (with round brackets).

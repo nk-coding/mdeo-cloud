@@ -1,11 +1,12 @@
-import type { RenderingContext, IView, Point } from "@eclipse-glsp/sprotty";
+import type { RenderingContext, IView, Point, Bounds } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import type { GEdge } from "../model/edge.js";
 import type { VNode } from "snabbdom";
-import { EdgeRouter } from "../features/edge-rourting/edgeRouter.js";
+import { EdgeRouter, type RouteComputationResult } from "../features/edge-rourting/edgeRouter.js";
+import type { AnchorSide } from "@mdeo/editor-protocol";
 
 const { injectable, inject } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
+const { svg, Point: PointUtil } = sharedImport("@eclipse-glsp/sprotty");
 const { isSelected } = sharedImport("@eclipse-glsp/client");
 
 /**
@@ -27,21 +28,34 @@ export interface EdgeMarkerData {
 }
 
 /**
- * Data about the edge route and marker offsets.
+ * Position of an edge attachment.
  */
-export interface EdgeRouteData {
+export enum EdgeAttachmentPosition {
+    SOURCE_LEFT = "source-left",
+    SOURCE_RIGHT = "source-right",
+    TARGET_LEFT = "target-left",
+    TARGET_RIGHT = "target-right",
+    MIDDLE_LEFT = "middle-left",
+    MIDDLE_RIGHT = "middle-right"
+}
+
+/**
+ * Interface for edge attachment data.
+ * Attachments are additional visual elements positioned relative to the edge.
+ */
+export interface EdgeAttachment {
     /**
-     * The computed route points
+     * The VNode to render for this attachment
      */
-    route: Point[];
+    vnode: VNode | undefined;
     /**
-     * Offset for elements at the start of the edge
+     * The bounds of the attachment element
      */
-    startElementOffset: number;
+    bounds: Bounds;
     /**
-     * Offset for elements at the end of the edge
+     * The target position along the edge
      */
-    endElementOffset: number;
+    position: EdgeAttachmentPosition;
 }
 
 /**
@@ -53,6 +67,21 @@ export abstract class GEdgeView implements IView {
     @inject(EdgeRouter) protected edgeRouter!: EdgeRouter;
 
     /**
+     * Distance from the edge line to the first attachment (in pixels)
+     */
+    protected attachmentDistanceToLine = 2;
+
+    /**
+     * Distance from the source/target element to the first attachment (in pixels)
+     */
+    protected attachmentDistanceFromElement = 6;
+
+    /**
+     * Distance between stacked attachments (in pixels)
+     */
+    protected attachmentDistanceBetween = 2;
+
+    /**
      * Renders the edge element with optional markers, visible path, invisible selection path, and additional content.
      *
      * @param model The edge model to render
@@ -60,32 +89,25 @@ export abstract class GEdgeView implements IView {
      * @returns The rendered VNode or undefined if rendering is not possible
      */
     render(model: Readonly<GEdge>, context: RenderingContext): VNode | undefined {
-        const route = this.edgeRouter.computeRoute(model).route;
+        const routeResult = this.edgeRouter.computeRoute(model);
+        const route = routeResult.route;
 
         const sourceMarkerData = this.renderSourceMarker(model, context);
         const targetMarkerData = this.renderTargetMarker(model, context);
 
         const startStrokeOffset = sourceMarkerData?.strokeOffset ?? 0;
         const endStrokeOffset = targetMarkerData?.strokeOffset ?? 0;
-        const startElementOffset = sourceMarkerData?.elementOffset ?? 0;
-        const endElementOffset = targetMarkerData?.elementOffset ?? 0;
 
         const adjustedRoute = this.adjustRouteForMarkers(route, startStrokeOffset, endStrokeOffset);
 
-        const routeData: EdgeRouteData = {
-            route,
-            startElementOffset,
-            endElementOffset
-        };
-
         const children: VNode[] = [];
 
-        if (sourceMarkerData) {
+        if (sourceMarkerData && route.length >= 2) {
             const sourceMarker = this.transformMarker(sourceMarkerData.marker, route[0], route[1], "source");
             children.push(sourceMarker);
         }
 
-        if (targetMarkerData) {
+        if (targetMarkerData && route.length >= 2) {
             const targetMarker = this.transformMarker(
                 targetMarkerData.marker,
                 route[route.length - 1],
@@ -99,10 +121,11 @@ export abstract class GEdgeView implements IView {
 
         children.push(...this.renderInvisiblePath(adjustedRoute, model));
 
-        children.push(...this.renderAdditional(model, context, routeData));
-        children.push(...this.renderAdditional(model, context, routeData));
+        children.push(...this.renderAdditional(model, context, routeResult));
 
-        // Apply cursor classes based on selection state
+        const attachments = this.getEdgeAttachments(model, context);
+        children.push(...this.renderAttachments(attachments, routeResult));
+
         const rootClasses: Record<string, boolean> = {};
         if (!isSelected(model)) {
             rootClasses["cursor-pointer"] = true;
@@ -153,9 +176,323 @@ export abstract class GEdgeView implements IView {
     protected renderAdditional(
         _model: Readonly<GEdge>,
         _context: RenderingContext,
-        _routeData: EdgeRouteData
+        _routeResult: RouteComputationResult
     ): VNode[] {
         return [];
+    }
+
+    /**
+     * Gets edge attachments to be rendered along the edge.
+     * Override this method to provide custom attachments like multiplicity labels or properties.
+     *
+     * @param _model The edge model
+     * @param _context The rendering context
+     * @returns An array of edge attachments
+     */
+    protected getEdgeAttachments(_model: Readonly<GEdge>, _context: RenderingContext): EdgeAttachment[] {
+        return [];
+    }
+
+    /**
+     * Renders edge attachments at their computed positions.
+     *
+     * @param attachments The attachments to render
+     * @param routeResult The route data
+     * @returns An array of VNodes for the attachments
+     */
+    private renderAttachments(attachments: EdgeAttachment[], routeResult: RouteComputationResult): VNode[] {
+        const vnodes: VNode[] = [];
+
+        const groupedAttachments = new Map<EdgeAttachmentPosition, EdgeAttachment[]>();
+        for (const attachment of attachments) {
+            const group = groupedAttachments.get(attachment.position) ?? [];
+            group.push(attachment);
+            groupedAttachments.set(attachment.position, group);
+        }
+
+        for (const [position, group] of groupedAttachments) {
+            vnodes.push(...this.renderAttachmentGroup(group, position, routeResult));
+        }
+
+        return vnodes;
+    }
+
+    /**
+     * Renders a group of attachments at a specific position.
+     *
+     * @param attachments The attachments in the group
+     * @param position The position along the edge
+     * @param routeResult The route data
+     * @returns An array of VNodes for the attachment group
+     */
+    private renderAttachmentGroup(
+        attachments: EdgeAttachment[],
+        position: EdgeAttachmentPosition,
+        routeResult: RouteComputationResult
+    ): VNode[] {
+        const route = routeResult.route;
+        if (route.length < 2) {
+            return [];
+        }
+
+        const anchorInfo = this.getAnchorInfo(position, routeResult);
+        if (!anchorInfo) {
+            return [];
+        }
+
+        const isHorizontal = Math.abs(anchorInfo.dx) > Math.abs(anchorInfo.dy);
+        const isLeftSide = this.determineAttachmentSide(position);
+        let anchorPoint = anchorInfo.anchorPoint;
+
+        if (
+            (position === EdgeAttachmentPosition.SOURCE_LEFT ||
+                position === EdgeAttachmentPosition.SOURCE_RIGHT ||
+                position === EdgeAttachmentPosition.TARGET_LEFT ||
+                position === EdgeAttachmentPosition.TARGET_RIGHT) &&
+            anchorInfo.anchorSide
+        ) {
+            const direction = this.getDirectionFromSide(anchorInfo.anchorSide);
+            const distanceFromElement = this.attachmentDistanceFromElement;
+            anchorPoint = {
+                x: anchorPoint.x + direction.x * distanceFromElement,
+                y: anchorPoint.y + direction.y * distanceFromElement
+            };
+        }
+
+        return this.stackAttachments(attachments, anchorPoint, position, isHorizontal, isLeftSide, anchorInfo);
+    }
+
+    /**
+     * Gets the anchor information for an attachment position.
+     *
+     * @param position The attachment position
+     * @param routeResult The route data
+     * @returns The anchor point, direction vector, and optional anchor side, or undefined if not computable
+     */
+    private getAnchorInfo(
+        position: EdgeAttachmentPosition,
+        routeResult: RouteComputationResult
+    ): { anchorPoint: Point; dx: number; dy: number; anchorSide?: AnchorSide } | undefined {
+        const route = routeResult.route;
+        if (route.length < 2) {
+            return undefined;
+        }
+
+        let anchorPoint: Point;
+        let dx: number;
+        let dy: number;
+        let anchorSide: AnchorSide | undefined;
+
+        if (position === EdgeAttachmentPosition.SOURCE_LEFT || position === EdgeAttachmentPosition.SOURCE_RIGHT) {
+            anchorPoint = route[0];
+            anchorSide = routeResult.sourceAnchor?.side;
+            if (anchorSide) {
+                const dir = this.getDirectionFromSide(anchorSide);
+                dx = dir.x;
+                dy = dir.y;
+            } else {
+                dx = route[1].x - route[0].x;
+                dy = route[1].y - route[0].y;
+            }
+        } else if (
+            position === EdgeAttachmentPosition.TARGET_LEFT ||
+            position === EdgeAttachmentPosition.TARGET_RIGHT
+        ) {
+            anchorPoint = route[route.length - 1];
+            anchorSide = routeResult.targetAnchor?.side;
+            if (anchorSide) {
+                const dir = this.getDirectionFromSide(anchorSide);
+                dx = dir.x;
+                dy = dir.y;
+            } else {
+                dx = route[route.length - 2].x - route[route.length - 1].x;
+                dy = route[route.length - 2].y - route[route.length - 1].y;
+            }
+        } else if (
+            position === EdgeAttachmentPosition.MIDDLE_LEFT ||
+            position === EdgeAttachmentPosition.MIDDLE_RIGHT
+        ) {
+            const middleIndex = Math.floor(route.length / 2);
+            anchorPoint = PointUtil.linear(route[middleIndex - 1], route[middleIndex], 0.5);
+            const directionPoint = route[middleIndex];
+            dx = directionPoint.x - anchorPoint.x;
+            dy = directionPoint.y - anchorPoint.y;
+        } else {
+            return undefined;
+        }
+
+        return { anchorPoint, dx, dy, anchorSide };
+    }
+
+    /**
+     * Gets the direction vector from an anchor side.
+     *
+     * @param side The anchor side
+     * @returns The direction vector
+     */
+    private getDirectionFromSide(side: AnchorSide): Point {
+        switch (side) {
+            case "top":
+                return { x: 0, y: -1 };
+            case "bottom":
+                return { x: 0, y: 1 };
+            case "left":
+                return { x: -1, y: 0 };
+            case "right":
+                return { x: 1, y: 0 };
+        }
+    }
+
+    /**
+     * Determines whether attachments should be on the left side.
+     *
+     * @param position The attachment position
+     * @returns True if attachments should be on the left side
+     */
+    private determineAttachmentSide(position: EdgeAttachmentPosition): boolean {
+        if (
+            position === EdgeAttachmentPosition.MIDDLE_LEFT ||
+            position === EdgeAttachmentPosition.SOURCE_LEFT ||
+            position === EdgeAttachmentPosition.TARGET_LEFT
+        ) {
+            return true;
+        }
+        if (
+            position === EdgeAttachmentPosition.MIDDLE_RIGHT ||
+            position === EdgeAttachmentPosition.SOURCE_RIGHT ||
+            position === EdgeAttachmentPosition.TARGET_RIGHT
+        ) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Stacks and renders attachments at the computed position.
+     *
+     * Attachments are always stacked vertically (along the Y axis).
+     * When attached to vertical lines they are aligned with the line (same Y as the anchor),
+     * when attached to horizontal lines they are aligned with the box (same X as the anchor).
+     * For horizontal middle attachments, the group is vertically centered around the anchor.
+     *
+     * The stack direction is always outwards from the box or line, depending on the context.
+     *
+     * @param attachments The attachments to stack
+     * @param anchorPoint The anchor point on the edge
+     * @param position The logical attachment position (source/target/middle, left/right)
+     * @param isHorizontal Whether the local edge segment is horizontal
+     * @param isLeftSide Whether attachments are on the logical left side
+     * @param anchorInfo Direction and side information for the anchor
+     * @returns An array of VNodes for the stacked attachments
+     */
+    private stackAttachments(
+        attachments: EdgeAttachment[],
+        anchorPoint: Point,
+        position: EdgeAttachmentPosition,
+        isHorizontal: boolean,
+        isLeftSide: boolean,
+        anchorInfo: { dx: number; dy: number; anchorSide?: AnchorSide }
+    ): VNode[] {
+        const vnodes: VNode[] = [];
+        if (attachments.length === 0) {
+            return vnodes;
+        }
+
+        const sideSign = isLeftSide ? -1 : 1;
+
+        const distanceToLine = this.attachmentDistanceToLine;
+
+        const baseLineX = anchorPoint.x;
+        const baseLineY = anchorPoint.y;
+
+        const isMiddle =
+            position === EdgeAttachmentPosition.MIDDLE_LEFT || position === EdgeAttachmentPosition.MIDDLE_RIGHT;
+        const isMiddleHorizontal = isMiddle && isHorizontal;
+        const isMiddleVertical = isMiddle && !isHorizontal;
+
+        let verticalSign = 1;
+        if (!isHorizontal && !isMiddleVertical) {
+            if (Math.abs(anchorInfo.dy) > Math.abs(anchorInfo.dx)) {
+                verticalSign = anchorInfo.dy >= 0 ? 1 : -1;
+            }
+
+            if (
+                position === EdgeAttachmentPosition.SOURCE_LEFT ||
+                position === EdgeAttachmentPosition.SOURCE_RIGHT ||
+                position === EdgeAttachmentPosition.TARGET_LEFT ||
+                position === EdgeAttachmentPosition.TARGET_RIGHT
+            ) {
+                if (anchorInfo.anchorSide === "top") {
+                    verticalSign = -1;
+                } else if (anchorInfo.anchorSide === "bottom") {
+                    verticalSign = 1;
+                }
+            }
+        }
+
+        let totalHeight = 0;
+        if (isMiddleVertical) {
+            for (const attachment of attachments) {
+                totalHeight += attachment.bounds.height;
+            }
+            totalHeight += (attachments.length - 1) * this.attachmentDistanceBetween;
+        }
+
+        let currentOffset = isMiddleVertical ? -totalHeight / 2 : 0;
+
+        for (const attachment of attachments) {
+            const width = attachment.bounds.width;
+            const height = attachment.bounds.height;
+
+            let centerX = baseLineX;
+            let centerY = baseLineY;
+
+            if (isHorizontal) {
+                const verticalDir = isLeftSide ? -1 : 1;
+                const baseY = baseLineY + verticalDir * distanceToLine;
+
+                if (isMiddleHorizontal) {
+                    centerX = baseLineX;
+                } else if (Math.abs(anchorInfo.dx) > 0) {
+                    const alongDir = anchorInfo.dx >= 0 ? 1 : -1;
+                    centerX = baseLineX + alongDir * (width / 2);
+                } else {
+                    centerX = baseLineX;
+                }
+
+                const localOffset = currentOffset + height / 2;
+                centerY = baseY + verticalDir * localOffset;
+            } else {
+                const baseX = baseLineX + sideSign * distanceToLine;
+                centerX = baseX + sideSign * (width / 2);
+
+                const localOffset = currentOffset + height / 2;
+                if (isMiddleVertical) {
+                    centerY = baseLineY + localOffset;
+                } else {
+                    centerY = baseLineY + verticalSign * localOffset;
+                }
+            }
+
+            const finalX = centerX - width / 2;
+            const finalY = centerY - height / 2;
+
+            const transformedGroup = svg(
+                "g",
+                {
+                    attrs: {
+                        transform: `translate(${finalX}, ${finalY})`
+                    }
+                },
+                attachment.vnode
+            );
+
+            vnodes.push(transformedGroup);
+
+            currentOffset += height + this.attachmentDistanceBetween;
+        }
+
+        return vnodes;
     }
 
     /**

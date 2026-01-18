@@ -24,8 +24,8 @@ import {
     TypePartialTypeSystem,
     type ExpressionTypirServices
 } from "@mdeo/language-expression";
-import type { ScriptTypirSpecifics } from "../plugin.js";
-import { expressionTypes, statementTypes, typeTypes } from "../grammar/scriptTypes.js";
+import type { ScriptTypirSpecifics } from "../../plugin.js";
+import { expressionTypes, statementTypes, typeTypes } from "../../grammar/scriptTypes.js";
 import { ScriptPartialTypeSystem } from "./scriptPartialTypeSystem.js";
 
 /**

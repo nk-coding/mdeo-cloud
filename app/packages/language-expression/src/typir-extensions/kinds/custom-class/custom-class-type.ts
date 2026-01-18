@@ -143,6 +143,9 @@ export class CustomClassTypeImplementation
     }
 
     override getLocalMember(memberName: string): Member | undefined {
+        if (!Object.hasOwn(this.details.definition.members, memberName)) {
+            return undefined;
+        }
         return this.details.definition.members[memberName];
     }
 }

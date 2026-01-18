@@ -27,6 +27,10 @@ const { InferenceProblem: InferenceProblemConstant, isSubTypeEdge, isConversionE
  */
 interface FunctionSignatureValidationResult<TProblem> {
     /**
+     * The name of the signature being validated
+     */
+    signatureName: string;
+    /**
      * The function signature being validated
      */
     signature: FunctionSignature;
@@ -95,6 +99,12 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
     inferredReturnType: CustomValueType | CustomVoidType | undefined = undefined;
 
     /**
+     * The name of the chosen function overload.
+     * undefined if the call was to a lambda (not a function) or if no overload was chosen.
+     */
+    chosenOverloadName: string | undefined = undefined;
+
+    /**
      * Creates a new call validation helper.
      * Automatically validates the call during construction.
      *
@@ -161,15 +171,17 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      * @returns true if inference succeeded and no further validation is needed
      */
     private trySimpleFunctionInference(type: CustomFunctionType, definition: FunctionType): boolean {
+        const signatureEntries = Object.entries(definition.signatures);
         if (
             this.isInferenceMode &&
-            definition.signatures.length === 1 &&
-            (definition.signatures[0]!.generics ?? []).length === 0
+            signatureEntries.length === 1 &&
+            (signatureEntries[0]![1].generics ?? []).length === 0
         ) {
-            const signature = definition.signatures[0]!;
+            const [signatureName, signature] = signatureEntries[0]!;
             const genericResolver = new GenericResolver(type, signature, false, this);
             if (genericResolver.isFullyDefined(signature.returnType)) {
                 this.inferredReturnType = genericResolver.resolveType(signature.returnType);
+                this.chosenOverloadName = signatureName;
                 return true;
             }
         }
@@ -189,8 +201,8 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
     ): FunctionSignatureValidationResult<TProblem>[] {
         const signatureValidationResults: FunctionSignatureValidationResult<TProblem>[] = [];
 
-        for (const signature of definition.signatures) {
-            const result = this.validateSingleSignature(type, signature);
+        for (const [signatureName, signature] of Object.entries(definition.signatures)) {
+            const result = this.validateSingleSignature(type, signature, signatureName);
             signatureValidationResults.push(result);
         }
 
@@ -202,11 +214,13 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      *
      * @param type The function type being called
      * @param signature The specific signature to validate
+     * @param signatureName The name of the signature
      * @returns Validation result including errors and return type
      */
     private validateSingleSignature(
         type: CustomFunctionType,
-        signature: FunctionSignature
+        signature: FunctionSignature,
+        signatureName: string
     ): FunctionSignatureValidationResult<TProblem> {
         const genericResolver = new GenericResolver(type, signature, !this.isInferenceMode, this);
         const errors: TProblem[] = [];
@@ -217,6 +231,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
         this.validateRequiredParameters(args.length, signature, errors);
 
         return {
+            signatureName,
             signature,
             errors,
             returnType: genericResolver.isFullyDefined(signature.returnType)
@@ -348,6 +363,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
 
         if (validResults.length === 1) {
             this.inferredReturnType = validResults[0]!.returnType;
+            this.chosenOverloadName = validResults[0]!.signatureName;
             return;
         }
 
@@ -400,6 +416,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
 
         if (bestScoringResults.length === 1) {
             this.inferredReturnType = bestScoringResults[0]!.returnType;
+            this.chosenOverloadName = bestScoringResults[0]!.signatureName;
             return;
         }
 

@@ -117,7 +117,9 @@ export function buildCustomFunctionIdentifier(_details: CustomFunctionDetails<an
  * @returns The name string
  */
 export function buildCustomFunctionName(details: CustomFunctionDetails<any>): string {
-    return details.definition.signatures.map((signature) => buildFunctionSignatureName(details, signature)).join("\n");
+    return Object.entries(details.definition.signatures)
+        .map(([_name, signature]) => buildFunctionSignatureName(details, signature))
+        .join("\n");
 }
 
 /**

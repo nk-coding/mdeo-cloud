@@ -7,9 +7,10 @@ import {
     type ExpressionTypirServices,
     type LambdaTypeInferenceResult,
     type Scope,
-    type ScopeEntry
+    type ScopeEntry,
+    type ScopeLocalInitialization
 } from "@mdeo/language-expression";
-import type { ScriptTypirSpecifics } from "../plugin.js";
+import type { ScriptTypirSpecifics } from "../../plugin.js";
 import {
     expressionTypes,
     Function,
@@ -19,7 +20,7 @@ import {
     type FunctionType,
     type LambdaExpressionType,
     type ScriptType
-} from "../grammar/scriptTypes.js";
+} from "../../grammar/scriptTypes.js";
 import { LambdaScope } from "./lambdaScope.js";
 
 /**
@@ -95,7 +96,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             position: -1,
             languageNode: param,
             definingScope: scope,
-            inferType: () => this.inference.inferType(param.type)
+            inferType: () => this.inference.inferType(param)
         }));
     }
 
@@ -115,10 +116,7 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
             parentScope,
             (scope) => this.getScriptScopeEntries(node, scope),
             () => [],
-            node.functions.map((func) => ({
-                name: func.name,
-                position: -1
-            })),
+            this.getScriptLocalInitializations(node),
             node
         );
     }
@@ -135,13 +133,62 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
         node: ScriptType,
         scope: Scope<ScriptTypirSpecifics>
     ): ScopeEntry<ScriptTypirSpecifics>[] {
-        return node.functions.map((func) => ({
-            name: func.name,
-            position: -1,
-            languageNode: func,
-            definingScope: scope,
-            inferType: () => this.inference.inferType(func)
-        }));
+        const entries: ScopeEntry<ScriptTypirSpecifics>[] = [];
+        for (const func of node.functions) {
+            entries.push({
+                name: func.name,
+                position: -1,
+                languageNode: func,
+                definingScope: scope,
+                inferType: () => this.inference.inferType(func)
+            });
+        }
+        for (const importStatement of node.imports) {
+            for (const functionImport of importStatement.imports) {
+                const ref = functionImport.entity.ref;
+                if (ref == undefined) {
+                    continue;
+                }
+                entries.push({
+                    name: functionImport.name ?? ref.name,
+                    position: -1,
+                    languageNode: ref,
+                    definingScope: scope,
+                    inferType: () => this.inference.inferType(ref)
+                });
+            }
+        }
+        return entries;
+    }
+
+    /**
+     * Retrieves the local initializations for a script node.
+     * Each top-level function and imported function becomes a local initialization.
+     *
+     * @param node The script node to get local initializations from
+     * @returns An array of local initializations for the script
+     */
+    getScriptLocalInitializations(node: ScriptType): ScopeLocalInitialization[] {
+        const initializations: ScopeLocalInitialization[] = [];
+        for (const func of node.functions) {
+            initializations.push({
+                name: func.name,
+                position: -1
+            });
+        }
+        for (const importStatement of node.imports) {
+            for (const functionImport of importStatement.imports) {
+                const ref = functionImport.entity.ref;
+                if (ref == undefined) {
+                    continue;
+                }
+                initializations.push({
+                    name: functionImport.name ?? ref.name,
+                    position: -1
+                });
+            }
+        }
+        return initializations;
     }
 
     /**
