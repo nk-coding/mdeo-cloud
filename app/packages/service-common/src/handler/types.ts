@@ -13,18 +13,30 @@ import type { ServiceAdditionalServices } from "../langium/types.js";
 export type FileDataHandler<T = unknown, S = object> = (context: FileDataContext<S>) => Promise<FileDataResult<T>>;
 
 /**
+ * File information for file data handlers.
+ * Contains path and version for file-based requests.
+ * Undefined for directory-based requests.
+ */
+export interface FileInfo {
+    /**
+     * The URI of the file
+     */
+    uri: URI;
+    /**
+     * Version of the file
+     */
+    version: number;
+}
+
+/**
  * Context provided to file data handlers
  */
 export interface FileDataContext<T = object> {
     /**
-     * The URI of the file or directory, already registered in the Langium workspace (if a file)
+     * File information (path and version) for file-based requests.
+     * Undefined for directory-based requests.
      */
-    uri: URI;
-
-    /**
-     * The version of the file (undefined for directories)
-     */
-    version?: number;
+    fileInfo?: FileInfo;
 
     /**
      * The Langium instance to use for processing

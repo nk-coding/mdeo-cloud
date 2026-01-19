@@ -3,7 +3,7 @@ import { classType, genericTypeRef } from "../../typir-extensions/config/typeBui
 /**
  * The built-in generic Set type exported as `SetType`.
  */
-export const SetType = classType("Set", "builtin")
+export const SetType = classType("Set")
     .generics("T")
     .extends("ReadonlySet", { T: genericTypeRef("T") })
     .extends("Collection", { T: genericTypeRef("T") })

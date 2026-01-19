@@ -11,6 +11,7 @@ import type { SerializableExternalReference } from "../../serialization/grammarS
  * @template T The AST node union type that this type represents
  */
 export interface Type<T extends AstNode> {
+    $type: "Type";
     /**
      * TypeScript type information for the union AST node this type represents.
      * Only used for type inference and validation during compilation,
@@ -18,11 +19,13 @@ export interface Type<T extends AstNode> {
      */
     tsType?: T;
 
-    /**     * The name of the type as it appears in the grammar.
+    /**
+     * The name of the type as it appears in the grammar.
      */
     name: string;
 
-    /**     * Converts this type into a serializable grammar node that can be used
+    /**
+     * Converts this type into a serializable grammar node that can be used
      * in the Langium grammar generation process.
      *
      * @returns A serializable representation of the type or external reference

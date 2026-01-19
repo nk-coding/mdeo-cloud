@@ -1,11 +1,54 @@
-import { Script, type ScriptServices, type TypedAst } from "@mdeo/language-script";
+import {
+    Script,
+    type ResolvedScriptContributionPlugins,
+    type ScriptServices,
+    type TypedAst,
+    type TypedFunction
+} from "@mdeo/language-script";
 import { hasErrors, type FileDataHandler } from "@mdeo/service-common";
 import { TypedAstConverter } from "./typedAstConverter.js";
+import type { ReturnType } from "@mdeo/language-expression";
+import { TypedAstMerger } from "./typedAstMerger.js";
 
 /**
  * Key for the typed AST handler.
  */
 export const TYPED_AST_HANDLER_KEY = "typed-ast";
+
+/**
+ * The root AST provides access to all functions contributed by plugins
+ */
+interface TypedRootAst {
+    /**
+     * Array of all types used in the plugin functions.
+     * Indexed by typeIndex in expressions.
+     */
+    types: ReturnType[];
+
+    /**
+     * All the functions contributed by plugins
+     */
+    functions: TypedPluginFunction[];
+}
+
+/**
+ * A plugin function with all its overloaded signatures
+ */
+interface TypedPluginFunction {
+    /**
+     * The name of the function
+     */
+    name: string;
+    /**
+     * The signatures of the function, keyed by overload identifier
+     */
+    signatures: Record<string, TypedPluginFunctionSignature>;
+}
+
+/**
+ * A function signature without the name
+ */
+type TypedPluginFunctionSignature = Omit<TypedFunction, "name">;
 
 /**
  * Handler for computing the typed AST of a script file.
@@ -14,14 +57,18 @@ export const TYPED_AST_HANDLER_KEY = "typed-ast";
  * @param context The file data context with path, content, and services
  * @returns Promise resolving to the file data result with typed AST
  */
-export const typedAstHandler: FileDataHandler<TypedAst | null, ScriptServices> = async (context) => {
-    const { uri, instance, version, serverApi } = context;
+export const typedAstHandler: FileDataHandler<TypedAst | TypedRootAst | null, ScriptServices> = async (context) => {
+    const { instance, fileInfo, serverApi } = context;
 
-    if (version == undefined) {
-        throw new Error("Typed AST handler does not support directory requests");
+    if (fileInfo == undefined) {
+        const typedRootAst = createTypedRootAst(instance.services.typir.ResolvedContributionPlugins);
+        return {
+            data: typedRootAst,
+            ...serverApi.getTrackedRequests()
+        };
     }
 
-    const document = await instance.buildDocument(uri);
+    const document = await instance.buildDocument(fileInfo.uri);
 
     if (hasErrors(document)) {
         return {
@@ -44,3 +91,50 @@ export const typedAstHandler: FileDataHandler<TypedAst | null, ScriptServices> =
         ...serverApi.getTrackedRequests()
     };
 };
+
+/**
+ * Creates the typed root AST containing all contributed functions from plugins
+ *
+ * @param resolvedPlugins The resolved script contribution plugins
+ * @returns The typed root AST
+ */
+function createTypedRootAst(resolvedPlugins: ResolvedScriptContributionPlugins): TypedRootAst {
+    const functions: TypedPluginFunction[] = [];
+    const merger = new TypedAstMerger();
+
+    for (const [functionName, resolvedFunction] of resolvedPlugins.functions.entries()) {
+        const signatures: Record<string, TypedPluginFunctionSignature> = {};
+
+        for (const [overloadId, contributedSignature] of Object.entries(
+            resolvedFunction.contributedFunction.signatures
+        )) {
+            const typedFunction: TypedFunction = {
+                name: functionName,
+                parameters: contributedSignature.signature.parameters.map((param) => ({
+                    name: param.name,
+                    type: merger.addTypeToGlobal(param.type)
+                })),
+                returnType: merger.addTypeToGlobal(contributedSignature.signature.returnType),
+                body: contributedSignature.implementation
+            };
+
+            const remappedFunction = merger.remapFunction(typedFunction, resolvedFunction.types);
+
+            signatures[overloadId] = {
+                parameters: remappedFunction.parameters,
+                returnType: remappedFunction.returnType,
+                body: remappedFunction.body
+            };
+        }
+
+        functions.push({
+            name: functionName,
+            signatures
+        });
+    }
+
+    return {
+        types: merger.getGlobalTypes(),
+        functions
+    };
+}

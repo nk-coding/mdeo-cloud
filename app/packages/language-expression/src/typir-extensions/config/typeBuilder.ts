@@ -1,16 +1,16 @@
-import type {
-    ClassType,
-    FunctionType,
+import {
+    type ClassType,
+    type FunctionType,
     FunctionSignature,
-    Parameter,
-    ValueType,
-    ClassTypeRef,
-    GenericTypeRef,
-    LambdaType,
-    BaseClassTypeRef,
-    Member,
-    VoidType,
-    ReturnType
+    type Parameter,
+    type ValueType,
+    type ClassTypeRef,
+    type GenericTypeRef,
+    type LambdaType,
+    type BaseClassTypeRef,
+    type Member,
+    type VoidType,
+    type ReturnType
 } from "./type.js";
 
 /**
@@ -277,7 +277,7 @@ export class MethodBuilder<T extends SignatureNames = SignatureNames> {
         const sig = builder
             ? builder(new SignatureBuilder())
             : (nameOrBuilder as (sig: SignatureBuilder) => SignatureBuilder)(new SignatureBuilder());
-        const name = builder ? (nameOrBuilder as string) : "";
+        const name = builder ? (nameOrBuilder as string) : FunctionSignature.DEFAULT_SIGNATURE;
         this.signatures[name] = sig.build();
         return this as unknown as MethodBuilder<T & Record<K, never>>;
     }

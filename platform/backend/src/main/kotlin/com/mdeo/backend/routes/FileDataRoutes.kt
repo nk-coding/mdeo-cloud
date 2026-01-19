@@ -25,10 +25,12 @@ fun Route.fileDataRoutes(
     route("/api/projects/{projectId}/file-data/{key}") {
         /**
          * Gets computed file data for a specific file.
+         * Requires either path or language parameter, but not both.
          *
          * @param projectId Path parameter for project UUID
          * @param key Path parameter for data key (e.g., "ast")
-         * @param path Query parameter for file path
+         * @param path Query parameter for file path (mutually exclusive with language)
+         * @param language Query parameter for language ID, assumes root path (mutually exclusive with path)
          * @return ApiResult with computed data or failure
          */
         get {
@@ -74,12 +76,19 @@ fun Route.fileDataRoutes(
             }
             
             val path = call.request.queryParameters["path"]
-            if (path.isNullOrBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing path parameter"))
+            val language = call.request.queryParameters["language"]
+            
+            if (path.isNullOrBlank() && language.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Either path or language parameter is required"))
                 return@get
             }
             
-            val result = fileDataService.getFileData(projectId, path, key)
+            if (!path.isNullOrBlank() && !language.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "path and language parameters are mutually exclusive"))
+                return@get
+            }
+            
+            val result = fileDataService.getFileData(projectId, path, language, key)
             call.respondApiResult(result)
         }
     }

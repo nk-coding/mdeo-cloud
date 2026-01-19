@@ -1,16 +1,20 @@
 import {
+    FunctionSignature,
     PartialTypeSystem,
     ReturnInferenceAnalyzer,
     ReturnValidationAnalyzer,
     type CustomValueType,
     type CustomVoidType,
-    type ExpressionTypirServices,
     type PrimitiveTypes,
     isCustomValueType,
     isCustomVoidType,
-    isCustomLambdaType
+    isCustomLambdaType,
+    type CustomFunctionType,
+    GenericResolver,
+    findCommonParentType
 } from "@mdeo/language-expression";
 import {
+    ExtensionExpression,
     Function,
     FunctionParameter,
     LambdaExpression,
@@ -20,7 +24,15 @@ import {
 } from "../../grammar/scriptTypes.js";
 import { ScriptReturnStatementAccessor } from "./scriptReturnStatementAccessor.js";
 import { LambdaScope } from "./lambdaScope.js";
-import type { ScriptTypirSpecifics } from "../../plugin.js";
+import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
+import type {
+    ResolvedContributedExpression,
+    ResolvedScriptContributionPlugins
+} from "../../plugin/scriptContributionPlugin.js";
+import { sharedImport } from "@mdeo/language-shared";
+import type { InferenceProblem, Type } from "typir";
+
+const { isAstNode } = sharedImport("langium");
 
 /**
  * Partial type system implementation for Script-specific AST nodes.
@@ -29,11 +41,35 @@ import type { ScriptTypirSpecifics } from "../../plugin.js";
  * @template Specifics The language-specific type system configuration extending TypirLangiumSpecifics
  */
 export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecifics, Record<string, never>> {
+    /**
+     * Lookup map for extension expression functions contributed by plugins.
+     */
+    private readonly extensionExpressionFunctionLookup: Map<string, CustomFunctionType> = new Map();
+
+    /**
+     * Constructor for ScriptPartialTypeSystem.
+     *
+     * @param typir the typir services
+     * @param primitives the primitive types
+     * @param plugins the contribution plugins, used to extend the type system
+     */
     constructor(
-        typir: ExpressionTypirServices<ScriptTypirSpecifics>,
-        private readonly primitives: PrimitiveTypes
+        typir: ScriptTypirServices,
+        private readonly primitives: PrimitiveTypes,
+        private readonly plugins: ResolvedScriptContributionPlugins
     ) {
         super(typir, {});
+        for (const expression of this.plugins.expressions) {
+            const functionType = typir.TypeDefinitions.resolveCustomFunctionType(
+                {
+                    signatures: {
+                        [FunctionSignature.DEFAULT_SIGNATURE]: expression.signature
+                    }
+                },
+                expression.name
+            );
+            this.extensionExpressionFunctionLookup.set(expression.name, functionType);
+        }
     }
 
     override registerRules(): void {
@@ -44,6 +80,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
         this.registerFunctionDuplicateParametersValidationRule();
         this.registerLambdaInferenceRule();
         this.registerLambdaValidationRule();
+        this.registerExtensionExpressionInferenceRule();
     }
 
     /**
@@ -346,6 +383,12 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
             const scope = this.typir.ScopeProvider.getScope(node).scope;
 
             if (!(scope instanceof LambdaScope)) {
+                accept({
+                    languageNode: node,
+                    message:
+                        "Lambda scope could not be created in a scope where its type cannot be inferred automatically.",
+                    severity: "error"
+                });
                 return;
             }
 
@@ -364,6 +407,12 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
             }
 
             if (Array.isArray(lambdaTypeInference)) {
+                accept({
+                    languageNode: node,
+                    message: "Could not infer lambda type.",
+                    severity: "error",
+                    subProblems: lambdaTypeInference
+                });
                 return;
             }
 
@@ -430,5 +479,232 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 }
             }
         });
+    }
+
+    /**
+     * Registers inference rule for extension expressions contributed by plugins.
+     */
+    private registerExtensionExpressionInferenceRule(): void {
+        this.registerBaseExtensionExpressionInferenceRule();
+
+        for (const expression of this.plugins.expressions) {
+            const functionType = this.extensionExpressionFunctionLookup.get(expression.name)!;
+            const signature = expression.signature;
+
+            this.registerPluginExpressionInferenceRule(expression, functionType, signature);
+
+            this.registerPluginExpressionValidationRule(expression, functionType, signature);
+        }
+    }
+
+    /**
+     * Registers the base inference rule for ExtensionExpression nodes.
+     * This rule delegates type inference to the contained extension node.
+     */
+    private registerBaseExtensionExpressionInferenceRule(): void {
+        this.registerInferenceRule(ExtensionExpression, (node) => {
+            const type = this.inference.inferType(node.extension);
+            if (Array.isArray(type)) {
+                return type[0];
+            }
+            return type;
+        });
+    }
+
+    /**
+     * Registers the inference rule for a plugin-contributed extension expression.
+     *
+     * @param expression The plugin expression metadata
+     * @param functionType The function type definition for the extension
+     * @param signature The function signature
+     * @returns The inferred type or an inference problem
+     */
+    private registerPluginExpressionInferenceRule(
+        expression: ResolvedContributedExpression,
+        functionType: CustomFunctionType,
+        signature: FunctionSignature
+    ) {
+        this.registerInferenceRule(expression.interface, (node) => {
+            const genericResolver = new GenericResolver<ScriptTypirSpecifics>(
+                functionType,
+                signature,
+                false,
+                this.typir,
+                []
+            );
+            if (genericResolver.isFullyDefined(signature.returnType)) {
+                return genericResolver.resolveType(signature.returnType);
+            }
+            for (let i = 0; i < signature.parameters.length; i++) {
+                const name = signature.parameters[i].name;
+                const argNode = node[name];
+                let type: CustomValueType;
+                if (Array.isArray(argNode)) {
+                    const types = argNode
+                        .filter(isAstNode)
+                        .map((arg) => this.inferExtensionEntry(arg))
+                        .filter(isCustomValueType);
+                    type = this.createListTypeFromArguments(types);
+                } else {
+                    const potentialType = this.inferExtensionEntry(argNode);
+                    if (!isCustomValueType(potentialType)) {
+                        continue;
+                    }
+                    type = potentialType;
+                }
+                genericResolver.checkAndUpdateArgumentType(i, type);
+            }
+            if (genericResolver.isFullyDefined(signature.returnType)) {
+                return genericResolver.resolveType(signature.returnType);
+            }
+            return {
+                $problem: this.inferenceProblem,
+                languageNode: node,
+                location: `Could not fully infer type for extension expression '${expression.name}'.`,
+                subProblems: []
+            };
+        });
+    }
+
+    /**
+     * Validates a plugin-contributed extension expression.
+     * Checks that all arguments have valid types and are assignable to the expected parameter types.
+     *
+     * @param node The extension expression AST node
+     * @param accept The validation acceptor for reporting errors
+     * @param expression The plugin expression metadata
+     * @param functionType The function type definition for the extension
+     * @param signature The function signature
+     */
+    private registerPluginExpressionValidationRule(
+        expression: ResolvedContributedExpression,
+        functionType: CustomFunctionType,
+        signature: FunctionSignature
+    ): void {
+        this.registerValidationRule(expression.interface, (node, accept) => {
+            const genericResolver = new GenericResolver<ScriptTypirSpecifics>(
+                functionType,
+                signature,
+                false,
+                this.typir,
+                []
+            );
+            let hasInnerInferenceProblems = false;
+            for (let i = 0; i < signature.parameters.length; i++) {
+                const name = signature.parameters[i].name;
+                const argNode = node[name];
+                let type: CustomValueType;
+                if (Array.isArray(argNode)) {
+                    const types = argNode.map((arg) => this.inference.inferType(arg));
+                    let hasListProblems = false;
+                    for (const type of types) {
+                        if (Array.isArray(type)) {
+                            hasListProblems = true;
+                        } else if (!isCustomValueType(type)) {
+                            hasListProblems = true;
+                            accept({
+                                languageNode: isAstNode(argNode) ? argNode : node,
+                                message: `Argument '${name}' does not have a valid value type.`,
+                                severity: "error"
+                            });
+                        }
+                    }
+                    if (hasListProblems) {
+                        hasInnerInferenceProblems = true;
+                        continue;
+                    } else {
+                        type = this.createListTypeFromArguments(types as CustomValueType[]);
+                    }
+                } else {
+                    const potentialType = this.inferExtensionEntry(argNode);
+                    if (Array.isArray(potentialType)) {
+                        hasInnerInferenceProblems = true;
+                        continue;
+                    }
+                    if (!isCustomValueType(potentialType)) {
+                        accept({
+                            languageNode: isAstNode(argNode) ? argNode : node,
+                            message: `Argument '${name}' does not have a valid value type.`,
+                            severity: "error"
+                        });
+                        continue;
+                    }
+                    type = potentialType;
+                }
+                if (!genericResolver.checkAndUpdateArgumentType(i, type)) {
+                    accept({
+                        languageNode: isAstNode(argNode) ? argNode : node,
+                        message: `Argument '${name}' of type '${type.getName()}' is not assignable.`,
+                        severity: "error"
+                    });
+                }
+            }
+            if (!hasInnerInferenceProblems) {
+                const type = this.inference.inferType(node);
+                if (Array.isArray(type)) {
+                    accept({
+                        languageNode: node,
+                        message: `Could not infer type for extension expression '${expression.name}'.`,
+                        severity: "error",
+                        subProblems: type
+                    });
+                }
+            }
+        });
+    }
+
+    /**
+     * Infers the type of an extension enpression entry value
+     *
+     * @param value the entry value to infer the type for
+     * @returns the inferred type or an inference problem or undefined if inference for the type is not possible
+     */
+    private inferExtensionEntry(value: unknown): Type | InferenceProblem<ScriptTypirSpecifics>[] | undefined {
+        if (value == undefined) {
+            return this.typir.factory.CustomNull.getOrCreate();
+        } else if (isAstNode(value)) {
+            return this.inference.inferType(value);
+        } else if (typeof value === "string") {
+            return this.primitives.string;
+        } else if (typeof value === "number") {
+            return this.primitives.double;
+        } else if (typeof value === "boolean") {
+            return this.primitives.boolean;
+        } else {
+            return undefined;
+        }
+    }
+
+    /**
+     * Creates a List type from an array of argument nodes.
+     * Infers the type of each argument and finds their common parent type.
+     *
+     * @param args The array of argument nodes to infer types from
+     * @returns A List type with the common parent type as the type argument
+     */
+    private createListTypeFromArguments(types: CustomValueType[]): CustomValueType {
+        return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+            type: "List",
+            isNullable: false,
+            typeArgs: {
+                T: this.findCommonListType(types).definition
+            }
+        });
+    }
+
+    /**
+     * Finds the common parent type for a list of types.
+     * If the list is empty, returns `Any?`.
+     *
+     * @param types The list of types to find the common parent for
+     * @returns The common parent type
+     */
+    private findCommonListType(types: CustomValueType[]): CustomValueType {
+        if (types.length === 0) {
+            return this.primitives.Any.asNullable;
+        }
+        return types.reduce<CustomValueType>((acc, current) => {
+            return findCommonParentType(acc, current, this.typir);
+        }, types[0]);
     }
 }

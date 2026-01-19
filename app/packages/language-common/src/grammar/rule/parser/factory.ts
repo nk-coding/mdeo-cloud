@@ -54,6 +54,7 @@ export function createExternalParserRule<T extends AstNode>(name: string): Parse
     };
 
     return {
+        name,
         toRule: () => externalRef
     };
 }

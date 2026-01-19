@@ -60,6 +60,7 @@ export class TypeBuilder {
         };
 
         return {
+            $type: "Type",
             name: this.name,
             toType: () => serializableNode
         };

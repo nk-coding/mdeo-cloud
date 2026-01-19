@@ -16,7 +16,8 @@ export interface TerminalRule<T> {
      */
     tsType?: T;
 
-    /**     * The name of the terminal rule as it appears in the grammar.
+    /**
+     * The name of the terminal rule as it appears in the grammar.
      */
     name: string;
 

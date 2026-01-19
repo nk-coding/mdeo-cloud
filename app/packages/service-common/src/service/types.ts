@@ -91,7 +91,9 @@ export interface DirectoryEntry {
 }
 
 /**
- * Source data for file or directory
+ * Source data for file or directory.
+ * Contains version, content, and path for files.
+ * Null/absent for directories.
  */
 export interface FileSource {
     /**
@@ -102,23 +104,25 @@ export interface FileSource {
      * Content of the file (only for files, not directories)
      */
     content: string;
+    /**
+     * Path to the file
+     */
+    path: string;
 }
 
 /**
- * Request body for file data computation
- * Can be used for both files and directories
+ * Request body for file data computation.
+ * Can be used for both files and directories.
+ * For files, source contains version, content, and path.
+ * For directories, source is absent/null.
  */
 export interface FileDataComputeRequest {
-    /**
-     * Path to the file or directory
-     */
-    path: string;
     /**
      * Project identifier for the project the file/directory belongs to
      */
     project: string;
     /**
-     * Source data (version and content), only present for files, absent for directories
+     * Source data (version, content, and path), only present for files, absent for directories
      */
     source?: FileSource;
     /**

@@ -164,25 +164,26 @@ data class FileReadResponse(
  *
  * @property version Current version of the file (only for files, not directories)
  * @property content Text file content (only for files, not directories)
+ * @property path Path to the file or directory
  */
 @Serializable
 data class FileSource(
     val version: Int,
-    val content: String
+    val content: String,
+    val path: String
 )
 
 /**
  * Request payload for computing file data.
  * Can be used for both files and directories.
+ * The path is now included inside the FileSource object.
  *
- * @property path Path to the file or directory
  * @property project Project ID the file/directory belongs to
- * @property source Source data (version and content), only present for files, absent for directories
+ * @property source Source data (version, content, and path), only present for files, absent for directories
  * @property contributionPlugins Server contribution plugins associated with this language
  */
 @Serializable
 data class FileDataComputeRequest(
-    val path: String,
     val project: String,
     val source: FileSource? = null,
     val contributionPlugins: List<JsonObject> = emptyList()

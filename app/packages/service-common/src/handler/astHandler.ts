@@ -23,13 +23,13 @@ export const AST_HANDLER_KEY = "ast";
  * @returns Promise resolving to the file data result with serialized AST
  */
 export const astHandler: FileDataHandler<AstData, ExternalReferenceAdditionalServices> = async (context) => {
-    const { uri, instance, services, serverApi, version } = context;
+    const { instance, services, serverApi, fileInfo } = context;
 
-    if (version == undefined) {
+    if (fileInfo == undefined) {
         throw new Error("AST handler does not support directory requests");
     }
 
-    const document = await instance.buildDocument(uri);
+    const document = await instance.buildDocument(fileInfo.uri);
 
     const trackedRequests = serverApi.getTrackedRequests();
 

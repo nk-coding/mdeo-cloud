@@ -546,6 +546,35 @@ class PluginService(val config: PluginConfig) : BaseService() {
     }
 
     /**
+     * Finds the plugin and language plugin responsible for a specific language ID in a project.
+     *
+     * @param projectId The UUID of the project
+     * @param languageId The language ID to find the plugin for
+     * @return Pair of plugin UUID and language plugin, or null if not found
+     */
+    fun findPluginByLanguage(projectId: UUID, languageId: String): Pair<UUID, BackendLanguagePlugin>? {
+        return transaction {
+            val projectPluginIds = ProjectPluginsTable.selectAll()
+                .where { ProjectPluginsTable.projectId eq projectId }
+                .map { it[ProjectPluginsTable.pluginId] }
+
+            if (projectPluginIds.isEmpty()) return@transaction null
+
+            val result = LanguagePluginsTable.selectAll()
+                .where {
+                    (LanguagePluginsTable.pluginId inList projectPluginIds) and
+                            (LanguagePluginsTable.id eq languageId)
+                }
+                .firstOrNull() ?: return@transaction null
+
+            val pluginId = result[LanguagePluginsTable.pluginId]
+            val pluginUrl = getPluginUrl(pluginId) ?: return@transaction null
+            val languagePlugin = rowToLanguagePlugin(result, pluginUrl)
+            Pair(pluginId, languagePlugin)
+        }
+    }
+
+    /**
      * Gets the URL for a plugin.
      *
      * @param pluginId The UUID of the plugin

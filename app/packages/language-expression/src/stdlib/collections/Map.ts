@@ -3,7 +3,7 @@ import { classType, typeRef, genericTypeRef, voidType } from "../../typir-extens
 /**
  * The built-in generic Map type exported as `MapType`.
  */
-export const MapType = classType("Map", "builtin")
+export const MapType = classType("Map")
     .generics("K", "V")
     .extends("ReadonlyMap", {
         K: genericTypeRef("K"),

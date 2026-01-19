@@ -6,6 +6,7 @@ import type { ClassType, ValueType } from "../config/type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { TypirSpecifics } from "typir";
 import { getClassTypeIdentifier } from "./util.js";
+import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
 
 /**
  * Finds the closest common parent type between two class types.
@@ -20,13 +21,16 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
     typeA: CustomValueType,
     typeB: CustomValueType,
     services: ExtendedTypirServices<Specifics>
-): CustomValueType | undefined {
+): CustomValueType {
     if (isCustomNullType(typeA)) {
         return typeB.asNullable;
     } else if (isCustomNullType(typeB)) {
         return typeA.asNullable;
     } else if (!isCustomClassType(typeA) || !isCustomClassType(typeB)) {
-        return undefined;
+        return services.TypeDefinitions.resolveCustomClassOrLambdaType({
+            type: DefaultTypeNames.Any,
+            isNullable: typeA.isNullable || typeB.isNullable
+        });
     }
     const superTypesA = findSuperTypesWithDistance(typeA, services);
     const superTypesB = findSuperTypesWithDistance(typeB, services);
@@ -44,7 +48,13 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
             }
         }
     }
-    return bestType;
+    return (
+        bestType ??
+        services.TypeDefinitions.resolveCustomClassOrLambdaType({
+            type: DefaultTypeNames.Any,
+            isNullable: typeA.isNullable || typeB.isNullable
+        })
+    );
 }
 
 /**

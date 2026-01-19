@@ -1,31 +1,68 @@
+import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
 import { classType, typeRef } from "../../typir-extensions/config/typeBuilder.js";
 
 /**
  * The built-in double type exported as `doubleType`.
  */
-export const doubleType = classType("double", "builtin")
-    .extends("Any")
-    .method("abs", (m) => m.signature((s) => s.returns(typeRef("double").build())))
-    .method("ceiling", (m) => m.signature((s) => s.returns(typeRef("long").build())))
-    .method("floor", (m) => m.signature((s) => s.returns(typeRef("long").build())))
-    .method("log", (m) => m.signature((s) => s.returns(typeRef("double").build())))
-    .method("log10", (m) => m.signature((s) => s.returns(typeRef("double").build())))
+export const doubleType = classType(DefaultTypeNames.Double)
+    .extends(DefaultTypeNames.Any)
+    .method("abs", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Double).build())))
+    .method("ceiling", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Long).build())))
+    .method("floor", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Long).build())))
+    .method("log", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Double).build())))
+    .method("log10", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Double).build())))
     .method("max", (m) =>
         m
-            .signature("int", (s) => s.param("other", typeRef("int").build()).returns(typeRef("double").build()))
-            .signature("long", (s) => s.param("other", typeRef("long").build()).returns(typeRef("double").build()))
-            .signature("float", (s) => s.param("other", typeRef("float").build()).returns(typeRef("double").build()))
-            .signature("double", (s) => s.param("other", typeRef("double").build()).returns(typeRef("double").build()))
+            .signature(DefaultTypeNames.Int, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Int).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
+            .signature(DefaultTypeNames.Long, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Long).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
+            .signature(DefaultTypeNames.Float, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Float).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
+            .signature(DefaultTypeNames.Double, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Double).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
     )
     .method("min", (m) =>
         m
-            .signature("int", (s) => s.param("other", typeRef("int").build()).returns(typeRef("double").build()))
-            .signature("long", (s) => s.param("other", typeRef("long").build()).returns(typeRef("double").build()))
-            .signature("float", (s) => s.param("other", typeRef("float").build()).returns(typeRef("double").build()))
-            .signature("double", (s) => s.param("other", typeRef("double").build()).returns(typeRef("double").build()))
+            .signature(DefaultTypeNames.Int, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Int).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
+            .signature(DefaultTypeNames.Long, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Long).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
+            .signature(DefaultTypeNames.Float, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Float).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
+            .signature(DefaultTypeNames.Double, (s) =>
+                s
+                    .param("other", typeRef(DefaultTypeNames.Double).build())
+                    .returns(typeRef(DefaultTypeNames.Double).build())
+            )
     )
     .method("pow", (m) =>
-        m.signature((s) => s.param("exponent", typeRef("double").build()).returns(typeRef("double").build()))
+        m.signature((s) =>
+            s
+                .param("exponent", typeRef(DefaultTypeNames.Double).build())
+                .returns(typeRef(DefaultTypeNames.Double).build())
+        )
     )
-    .method("round", (m) => m.signature((s) => s.returns(typeRef("long").build())))
+    .method("round", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Long).build())))
     .build();

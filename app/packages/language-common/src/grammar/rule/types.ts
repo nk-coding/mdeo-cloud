@@ -19,6 +19,11 @@ export type ParserRule<T> = {
     tsType?: T;
 
     /**
+     * The name of the parser rule as it appears in the grammar.
+     */
+    name: string;
+
+    /**
      * Converts this parser rule into a serializable grammar node that can be used
      * in the Langium grammar generation process.
      *

@@ -25,6 +25,7 @@ export enum TypedExpressionKind {
     ExpressionCall = "call",
     FunctionCall = "functionCall",
     MemberCall = "memberCall",
+    ExtensionCall = "extensionCall",
     MemberAccess = "memberAccess",
     Identifier = "identifier",
     StringLiteral = "stringLiteral",
@@ -363,7 +364,7 @@ export interface TypedCallExpression extends TypedExpression {
 }
 
 /**
- *
+ * Expression call expression.
  */
 export interface TypedExpressionCallExpression extends TypedCallExpression {
     kind: TypedExpressionKind.ExpressionCall;
@@ -407,6 +408,43 @@ export interface TypedMemberCallExpression extends TypedCallExpression {
     isNullChaining: boolean;
     /**
      * Overload identifier for the member function being called.
+     */
+    overload: string;
+}
+
+/**
+ * Argument for an extension call.
+ */
+export interface TypedExtensionCallArgument {
+    /**
+     * Name of the argument.
+     */
+    name: string;
+    /**
+     * The value expression of the argument.
+     */
+    value: TypedExpression;
+}
+
+/**
+ * Extension call expression.
+ * Represents a virtual function call for a custom extension expression
+ */
+export interface TypedExtensionCallExpression extends TypedExpression {
+    kind: TypedExpressionKind.ExtensionCall;
+    /**
+     * The name of the function being called
+     */
+    name: string;
+    /**
+     * Array of named arguments.
+     * Caution: order matters for extension calls!
+     * The same name can appear multiple times, it's the responsibility of the interpreter
+     * to resolve them in the correct order, and then dynamically create the lists for passing to the function as needed
+     */
+    arguments: TypedExtensionCallArgument[];
+    /**
+     * Overload identifier for the extension function being called.
      */
     overload: string;
 }

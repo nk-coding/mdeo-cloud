@@ -6,6 +6,7 @@ import com.mdeo.backend.database.FileDependenciesTable
 import com.mdeo.backend.database.FileDataTable
 import com.mdeo.backend.database.FilesTable
 import com.mdeo.common.model.*
+import com.mdeo.common.model.FileType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -48,14 +49,29 @@ class FileDataService(
     /**
      * Gets computed file data for a specific file and key.
      * Checks cache validity and computes if necessary.
+     * Supports both path-based and language-based lookups.
      *
      * @param projectId The UUID of the project
-     * @param path The normalizedPath to the file
+     * @param path The normalized path to the file (optional if language is provided)
+     * @param languageId The language ID (optional if path is provided, assumes root path)
      * @param key The data key (e.g., "ast")
      * @return ApiResult containing the computed data with version or an error
      */
-    suspend fun getFileData(projectId: UUID, path: String, key: String): ApiResult<FileDataResponse> {
-        val normalizedPath = normalizePath(path)
+    suspend fun getFileData(
+        projectId: UUID,
+        path: String?,
+        languageId: String?,
+        key: String
+    ): ApiResult<FileDataResponse> {
+        val normalizedPath = when {
+            path != null -> normalizePath(path)
+            languageId != null -> normalizePath("/")
+            else -> return fileDataFailure(
+                ErrorCodes.UNKNOWN,
+                "Either path or languageId must be provided"
+            )
+        }
+
         val computingCheck = transaction {
             FileDataTable.selectAll()
                 .where {
@@ -76,16 +92,51 @@ class FileDataService(
             )
         }
 
-        val fileContent = when (val result = fileService.readFile(projectId, normalizedPath)) {
-            is ApiResult.Success -> result.value
-            is ApiResult.Failure -> return ApiResult.Failure(result.error)
+        val fileRow = transaction {
+            FilesTable.selectAll()
+                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .firstOrNull()
+        } ?: return fileDataFailure(
+            ErrorCodes.FILE_NOT_FOUND,
+            "File not found: $normalizedPath"
+        )
+
+        val fileType = fileRow[FilesTable.fileType]
+        val isDirectory = fileType == FileType.DIRECTORY
+
+        val fileSource = if (!isDirectory) {
+            val fileContent = when (val result = fileService.readFile(projectId, normalizedPath)) {
+                is ApiResult.Success -> result.value
+                is ApiResult.Failure -> return ApiResult.Failure(result.error)
+            }
+
+            val fileVersion = when (val result = fileService.getFileVersion(projectId, normalizedPath)) {
+                is ApiResult.Success -> result.value
+                is ApiResult.Failure -> return ApiResult.Failure(result.error)
+            }
+
+            FileSource(
+                version = fileVersion,
+                content = String(fileContent, Charsets.UTF_8),
+                path = normalizedPath
+            )
+        } else {
+            null
         }
 
-        val pluginInfo = pluginService.findPluginForFile(projectId, normalizedPath)
-            ?: return fileDataFailure(
-                ErrorCodes.FILE_DATA_NO_PLUGIN_FOUND,
-                "No plugin found to compute data for file: $normalizedPath"
-            )
+        val pluginInfo = if (languageId != null) {
+            pluginService.findPluginByLanguage(projectId, languageId)
+                ?: return fileDataFailure(
+                    ErrorCodes.FILE_DATA_NO_PLUGIN_FOUND,
+                    "No plugin found for language: $languageId"
+                )
+        } else {
+            pluginService.findPluginForFile(projectId, normalizedPath)
+                ?: return fileDataFailure(
+                    ErrorCodes.FILE_DATA_NO_PLUGIN_FOUND,
+                    "No plugin found to compute data for file: $normalizedPath"
+                )
+        }
 
         val (pluginId, languagePlugin) = pluginInfo
         val pluginUrl = pluginService.getPluginUrl(pluginId)
@@ -96,18 +147,13 @@ class FileDataService(
 
         val contributionPlugins = pluginService.getContributionPluginsForLanguage(projectId, languagePlugin.id)
 
-        val fileVersion = when (val result = fileService.getFileVersion(projectId, normalizedPath)) {
-            is ApiResult.Success -> result.value
-            is ApiResult.Failure -> return ApiResult.Failure(result.error)
-        }
-
         try {
             val token = jwtService.generateProjectToken(projectId)
 
             val computedData =
-                computeFromPlugin(pluginUrl, key, normalizedPath, projectId, fileVersion, fileContent, token, contributionPlugins)
+                computeFromPlugin(pluginUrl, key, projectId, fileSource, token, contributionPlugins)
 
-            storeFileData(projectId, normalizedPath, key, computedData, fileVersion)
+            storeFileData(projectId, normalizedPath, key, computedData, fileSource?.version)
 
             for (additional in computedData.additionalFileData) {
                 storeFileData(
@@ -127,7 +173,7 @@ class FileDataService(
             return success(
                 FileDataResponse(
                     data = computedData.data,
-                    version = fileVersion
+                    version = fileSource?.version ?: -1
                 )
             )
         } catch (e: Exception) {
@@ -294,26 +340,31 @@ class FileDataService(
 
     /**
      * Computes file data by calling the responsible plugin.
+     * Path is now included inside the FileSource object.
+     * For files, fileSource contains version, content, and path.
+     * For directories, fileSource is null.
+     *
+     * @param pluginUrl Base URL of the plugin
+     * @param key The data key to compute (e.g., "ast")
+     * @param project Project UUID
+     * @param fileSource Source data with version, content, and path (null for directories)
+     * @param token JWT token for authentication
+     * @param contributionPlugins List of contribution plugins to send to the plugin
+     * @return Computed data response from the plugin
      */
     private suspend fun computeFromPlugin(
         pluginUrl: String,
         key: String,
-        path: String,
         project: UUID,
-        version: Int,
-        content: ByteArray,
+        fileSource: FileSource?,
         token: String,
         contributionPlugins: List<JsonObject>
     ): FileDataComputeResponse {
         return withContext(Dispatchers.IO) {
             val requestBody = json.encodeToString(
                 FileDataComputeRequest(
-                    path = path,
                     project = project.toString(),
-                    source = FileSource(
-                        version = version,
-                        content = String(content, Charsets.UTF_8)
-                    ),
+                    source = fileSource,
                     contributionPlugins = contributionPlugins
                 )
             )

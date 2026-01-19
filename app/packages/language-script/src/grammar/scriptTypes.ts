@@ -117,6 +117,29 @@ export type LambdaParameterType = ASTType<typeof LambdaParameter>;
 export type LambdaParametersType = ASTType<typeof LambdaParameters>;
 
 /**
+ * Base type for all Script extensions used in ExtensionExpressions.
+ */
+export const BaseExtension = createInterface("ScriptBaseExtension").extends(BaseExpression).attrs({});
+
+/**
+ * Extension expression type for Script.
+ * Contributed by a plugin
+ */
+export const ExtensionExpression = createInterface("ScriptExtensionExpression").extends(BaseExpression).attrs({
+    extension: BaseExtension
+});
+
+/**
+ * Type representing an ExtensionExpression AST node.
+ */
+export type ExtensionExpressionType = ASTType<typeof ExtensionExpression>;
+
+/**
+ * Type representing a BaseExtension AST node.
+ */
+export type BaseExtensionType = ASTType<typeof BaseExtension>;
+
+/**
  * Type representing the base type annotation.
  */
 export const ScriptBaseType = typeTypes.baseTypeType;
@@ -155,6 +178,11 @@ export type FunctionType = ASTType<typeof Function>;
  * Type representing a FunctionParameters AST node.
  */
 export type FunctionParametersType = ASTType<typeof FunctionParameters>;
+
+/**
+ * Type representing a FunctionParameter AST node.
+ */
+export type FunctionParameterType = ASTType<typeof FunctionParameter>;
 
 /**
  * File scoping configuration for functions.

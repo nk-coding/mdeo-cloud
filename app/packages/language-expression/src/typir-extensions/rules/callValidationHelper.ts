@@ -140,7 +140,10 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             }
         } else {
             this.errors.push(
-                this.createError(this.functionReferenceNode, `Function reference type is not a function or lambda.`)
+                this.createError(
+                    this.functionReferenceNode,
+                    `Cannot call expression of type '${functionReferenceType.getName()}'.`
+                )
             );
         }
     }
@@ -178,7 +181,13 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             (signatureEntries[0]![1].generics ?? []).length === 0
         ) {
             const [signatureName, signature] = signatureEntries[0]!;
-            const genericResolver = new GenericResolver(type, signature, false, this);
+            const genericResolver = new GenericResolver(
+                type,
+                signature,
+                false,
+                this.services,
+                this.genericArgumentTypes
+            );
             if (genericResolver.isFullyDefined(signature.returnType)) {
                 this.inferredReturnType = genericResolver.resolveType(signature.returnType);
                 this.chosenOverloadName = signatureName;
@@ -222,7 +231,13 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
         signature: FunctionSignature,
         signatureName: string
     ): FunctionSignatureValidationResult<TProblem> {
-        const genericResolver = new GenericResolver(type, signature, !this.isInferenceMode, this);
+        const genericResolver = new GenericResolver(
+            type,
+            signature,
+            !this.isInferenceMode,
+            this.services,
+            this.genericArgumentTypes
+        );
         const errors: TProblem[] = [];
 
         const args = this.argumentNodes.map((argNode) => this.services.Inference.inferType(argNode));
@@ -554,7 +569,7 @@ enum TypeResolutionState {
  *
  * @template Specifics Language-specific types extending TypirSpecifics
  */
-class GenericResolver<Specifics extends TypirSpecifics> {
+export class GenericResolver<Specifics extends TypirSpecifics> {
     /**
      * Map of generic type names to their resolved types for this call
      */
@@ -575,18 +590,19 @@ class GenericResolver<Specifics extends TypirSpecifics> {
      * @param functionType The function type being called
      * @param signature The specific signature being validated
      * @param strict Whether to perform strict validation
-     * @param callValidator The parent call validator
+     * @param services The extended Typir services
+     * @param genericArgumentTypes The explicit generic argument types provided in the call
      */
     constructor(
         readonly functionType: CustomFunctionType,
         readonly signature: FunctionSignature,
         readonly strict: boolean,
-        readonly callValidator: CallValidationHelper<Specifics, any>
+        readonly services: ExtendedTypirServices<Specifics>,
+        genericArgumentTypes: (CustomValueType | InferenceProblem<Specifics>[])[]
     ) {
-        this.typeDefinitionsService = callValidator.services.TypeDefinitions;
-        this.assignabilityService = callValidator.services.Assignability;
-        this.equalityService = callValidator.services.Equality;
-        const genericArgumentTypes = callValidator.genericArgumentTypes;
+        this.typeDefinitionsService = services.TypeDefinitions;
+        this.assignabilityService = services.Assignability;
+        this.equalityService = services.Equality;
         for (const [name, type] of this.functionType.details.typeArgs) {
             this.callResolvedGenericArguments.set(name, type);
             this.callResolvedGenericArgumentStates.set(name, TypeResolutionState.Fixed);
@@ -666,7 +682,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
     resolveType(type: ReturnType): CustomValueType | CustomVoidType;
     resolveType(type: ValueType | ReturnType): CustomValueType | CustomVoidType {
         if (VoidType.is(type)) {
-            return this.callValidator.services.factory.CustomVoid.getOrCreate();
+            return this.services.factory.CustomVoid.getOrCreate();
         }
         return this.typeDefinitionsService.resolveCustomClassOrLambdaType(
             type,
@@ -744,7 +760,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
                 getClassTypeIdentifier(declaredTypeDefinition);
             actualTypeArgs = actualType.details.typeArgs;
         } else {
-            const result = findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition, this.callValidator.services);
+            const result = findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition, this.services);
             isAllowed = result != undefined;
             actualTypeArgs = result?.typeArgs;
         }
@@ -1076,11 +1092,7 @@ class GenericResolver<Specifics extends TypirSpecifics> {
             return true;
         }
 
-        const commonType = findCommonParentType(
-            current.asNonNullable,
-            actualType.asNonNullable,
-            this.callValidator.services
-        );
+        const commonType = findCommonParentType(current.asNonNullable, actualType.asNonNullable, this.services);
 
         if (commonType !== undefined) {
             this.callResolvedGenericArguments.set(

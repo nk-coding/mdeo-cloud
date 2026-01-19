@@ -116,6 +116,7 @@ export class RuleBuilderWithType<T extends AstNode> {
             parameters: []
         };
         return {
+            name: this.name,
             toRule: () => {
                 if (!initialized) {
                     initialized = true;
@@ -182,6 +183,7 @@ export class RuleBuilderWithDataType<T> {
             parameters: []
         };
         return {
+            name: this.name,
             toRule: () => {
                 if (!initialized) {
                     initialized = true;

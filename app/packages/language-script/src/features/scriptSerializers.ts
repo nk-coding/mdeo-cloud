@@ -2,7 +2,12 @@ import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
 import { ID } from "@mdeo/language-common";
-import { serializeNewlineSep, printDanglingComments, sharedImport } from "@mdeo/language-shared";
+import {
+    serializeNewlineSep,
+    printDanglingComments,
+    sharedImport,
+    registerImportSerializers
+} from "@mdeo/language-shared";
 import type {
     ReturnStatementType,
     LambdaExpressionType,
@@ -10,8 +15,10 @@ import type {
     LambdaParametersType,
     FunctionParametersType,
     FunctionType,
-    ScriptType
-} from "../../grammar/scriptTypes.js";
+    ScriptType,
+    FunctionParameterType,
+    ExtensionExpressionType
+} from "../grammar/scriptTypes.js";
 import {
     ReturnStatement,
     LambdaExpression,
@@ -22,8 +29,9 @@ import {
     Function,
     FunctionImport,
     FunctionFileImport,
-    Script
-} from "../../grammar/scriptTypes.js";
+    Script,
+    ExtensionExpression
+} from "../grammar/scriptTypes.js";
 
 const { doc } = sharedImport("prettier");
 const { join, line, group, softline, indent } = doc.builders;
@@ -43,9 +51,9 @@ export function registerScriptSerializers(services: LangiumCoreServices & AstSer
     AstSerializer.registerNodeSerializer(FunctionParameter, (ctx) => printFunctionParameter(ctx));
     AstSerializer.registerNodeSerializer(FunctionParameters, (ctx) => printFunctionParameters(ctx));
     AstSerializer.registerNodeSerializer(Function, (ctx) => printFunction(ctx));
-    AstSerializer.registerNodeSerializer(FunctionImport, (ctx) => printFunctionImport(ctx));
-    AstSerializer.registerNodeSerializer(FunctionFileImport, (ctx) => printFunctionFileImport(ctx));
     AstSerializer.registerNodeSerializer(Script, (ctx) => printScript(ctx));
+    AstSerializer.registerNodeSerializer(ExtensionExpression, (ctx) => printExtensionExpression(ctx));
+    registerImportSerializers(services, doc.builders, FunctionImport, FunctionFileImport);
 }
 
 /**
@@ -124,7 +132,7 @@ function printLambdaExpression(context: PrintContext<LambdaExpressionType>): Doc
  * @param context The print context
  * @returns The formatted function parameter
  */
-function printFunctionParameter(context: PrintContext<any>): Doc {
+function printFunctionParameter(context: PrintContext<FunctionParameterType>): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
     const docs: Doc[] = [printPrimitive(getPrimitive(ctx, "name"), ID)];
 
@@ -179,41 +187,6 @@ function printFunction(context: PrintContext<FunctionType>): Doc {
 }
 
 /**
- * Prints a function import node.
- *
- * @param context The print context
- * @returns The formatted function import
- */
-function printFunctionImport(context: PrintContext<any>): Doc {
-    const { path, print } = context;
-    return path.call(print, "function", "ref");
-}
-
-/**
- * Prints a function file import node.
- *
- * @param context The print context
- * @returns The formatted function file import
- */
-function printFunctionFileImport(context: PrintContext<any>): Doc {
-    const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    const docs: Doc[] = ["import "];
-
-    if (ctx.imports && ctx.imports.length > 0) {
-        docs.push("{");
-        const imports = path.map(print, "imports");
-        docs.push(join(", ", imports));
-        docs.push("} from ");
-    } else {
-        docs.push("* from ");
-    }
-
-    docs.push(printPrimitive(getPrimitive(ctx, "uri"), ID));
-
-    return docs;
-}
-
-/**
  * Prints the root script node.
  *
  * @param context The print context
@@ -221,4 +194,19 @@ function printFunctionFileImport(context: PrintContext<any>): Doc {
  */
 function printScript(context: PrintContext<ScriptType>): Doc {
     return serializeNewlineSep(context, ["imports", "functions"], doc.builders);
+}
+
+/**
+ * Prints an extension expression node.
+ * For now just returns the text as-is.
+ *
+ * @param context The print context
+ * @returns The formatted extension expression
+ */
+function printExtensionExpression(context: PrintContext<ExtensionExpressionType>): Doc {
+    const cstNode = context.ctx.$cstNode;
+    if (cstNode == undefined) {
+        throw new Error("CST node is undefined for ExtensionExpression");
+    }
+    return cstNode.text;
 }

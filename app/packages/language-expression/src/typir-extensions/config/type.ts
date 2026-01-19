@@ -107,6 +107,13 @@ export interface FunctionSignature extends CallableType {
     isVarArgs?: boolean;
 }
 
+export namespace FunctionSignature {
+    /**
+     * Default function signature identifier
+     */
+    export const DEFAULT_SIGNATURE = "";
+}
+
 /**
  * A named function or method definition with its signatures.
  * This extends CallableType and adds support for generic type parameters.

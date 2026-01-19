@@ -3,7 +3,7 @@ import { classType, genericTypeRef } from "../../typir-extensions/config/typeBui
 /**
  * The built-in generic OrderedSet type exported as `OrderedSetType`.
  */
-export const OrderedSetType = classType("OrderedSet", "builtin")
+export const OrderedSetType = classType("OrderedSet")
     .generics("T")
     .extends("ReadonlyOrderedSet", { T: genericTypeRef("T") })
     .extends("OrderedCollection", { T: genericTypeRef("T") })

@@ -10,9 +10,6 @@ import type { ParserRule } from "../rule/types.js";
 import type { TerminalRule } from "../rule/terminal/types.js";
 import type { Interface } from "../type/interface/types.js";
 import type { Type } from "../type/type/types.js";
-import { createExternalParserRule } from "../rule/parser/factory.js";
-import { createExternalTerminalRule } from "../rule/terminal/factory.js";
-import { createExternalInterface } from "../type/interface/factory.js";
 
 /**
  * Context for resolving external references during grammar deserialization.
@@ -36,6 +33,43 @@ export interface GrammarDeserializationContext {
     terminalRules?: Map<string, TerminalRule<any>>;
 }
 
+export namespace GrammarDeserializationContext {
+    /**
+     * Creates a new deserialization context from the provided arrays of types, parser rules, and terminal rules.
+     *
+     * @param types the types
+     * @param parserRules the parser rules
+     * @param terminalRules the terminal rules
+     * @returns The constructed deserialization context
+     */
+    export function create(
+        types: (Interface<any> | Type<any>)[],
+        parserRules: ParserRule<any>[],
+        terminalRules: TerminalRule<any>[]
+    ): GrammarDeserializationContext {
+        const typeMap = new Map<string, Interface<any> | Type<any>>();
+        for (const type of types) {
+            typeMap.set(type.name, type);
+        }
+
+        const parserRuleMap = new Map<string, ParserRule<any>>();
+        for (const rule of parserRules) {
+            parserRuleMap.set(rule.name, rule);
+        }
+
+        const terminalRuleMap = new Map<string, TerminalRule<any>>();
+        for (const rule of terminalRules) {
+            terminalRuleMap.set(rule.name, rule);
+        }
+
+        return {
+            types: typeMap,
+            parserRules: parserRuleMap,
+            terminalRules: terminalRuleMap
+        };
+    }
+}
+
 /**
  * Deserializes a serialized grammar back into ParserRule, TerminalRule, Interface,
  * and Type instances that can be used to build a composed language.
@@ -57,17 +91,17 @@ export class GrammarDeserializer {
     /**
      * Lazy lookup for internal rule references, indexed by position.
      */
-    private readonly ruleLookup = new Map<number, () => ParserRule<any> | TerminalRule<any>>();
+    private readonly ruleLookup = new Map<number, ParserRule<any> | TerminalRule<any>>();
 
     /**
      * Lazy lookup for internal type references, indexed by position.
      */
-    private readonly typeLookup = new Map<number, () => Type<any>>();
+    private readonly typeLookup = new Map<number, Type<any>>();
 
     /**
      * Lazy lookup for internal interface references, indexed by position.
      */
-    private readonly interfaceLookup = new Map<number, () => Interface<any>>();
+    private readonly interfaceLookup = new Map<number, Interface<any>>();
 
     /**
      * Creates a new grammar deserializer bound to a specific serialized grammar.
@@ -95,9 +129,9 @@ export class GrammarDeserializer {
         types: Type<any>[];
         interfaces: Interface<any>[];
     } {
-        const rules = this.serializedGrammar.rules.map((_, index) => this.ruleLookup.get(index)!());
-        const types = this.serializedGrammar.types.map((_, index) => this.typeLookup.get(index)!());
-        const interfaces = this.serializedGrammar.interfaces.map((_, index) => this.interfaceLookup.get(index)!());
+        const rules = this.serializedGrammar.rules.map((_, index) => this.ruleLookup.get(index)!);
+        const types = this.serializedGrammar.types.map((_, index) => this.typeLookup.get(index)!);
+        const interfaces = this.serializedGrammar.interfaces.map((_, index) => this.interfaceLookup.get(index)!);
 
         return { rules, types, interfaces };
     }
@@ -108,15 +142,15 @@ export class GrammarDeserializer {
      */
     private initializeLookups(): void {
         this.serializedGrammar.rules.forEach((serializedRule, index) => {
-            this.ruleLookup.set(index, () => this.deserializeRule(serializedRule));
+            this.ruleLookup.set(index, this.deserializeRule(serializedRule));
         });
 
         this.serializedGrammar.types.forEach((serializedType, index) => {
-            this.typeLookup.set(index, () => this.deserializeType(serializedType));
+            this.typeLookup.set(index, this.deserializeType(serializedType));
         });
 
         this.serializedGrammar.interfaces.forEach((serializedInterface, index) => {
-            this.interfaceLookup.set(index, () => this.deserializeInterface(serializedInterface));
+            this.interfaceLookup.set(index, this.deserializeInterface(serializedInterface));
         });
     }
 
@@ -151,10 +185,15 @@ export class GrammarDeserializer {
      * @returns A `TerminalRule` implementation with `name` and `toRule`.
      */
     private deserializeTerminalRule(serialized: SerializedAstNode<GrammarAST.TerminalRule>): TerminalRule<any> {
-        const resolved = this.resolveReferences(serialized) as SerializableGrammarNode<GrammarAST.TerminalRule>;
+        let cached: SerializableGrammarNode<GrammarAST.TerminalRule> | undefined = undefined;
         return {
             name: serialized.name,
-            toRule: () => resolved
+            toRule: () => {
+                if (cached == undefined) {
+                    cached = this.resolveReferences(serialized) as SerializableGrammarNode<GrammarAST.TerminalRule>;
+                }
+                return cached;
+            }
         };
     }
 
@@ -167,11 +206,20 @@ export class GrammarDeserializer {
     private deserializeParserRule(
         serialized: SerializedAstNode<GrammarAST.ParserRule> | SerializedAstNode<GrammarAST.InfixRule>
     ): ParserRule<any> {
-        const resolved = this.resolveReferences(serialized) as
+        let cached:
             | SerializableGrammarNode<GrammarAST.ParserRule>
-            | SerializableGrammarNode<GrammarAST.InfixRule>;
+            | SerializableGrammarNode<GrammarAST.InfixRule>
+            | undefined = undefined;
         return {
-            toRule: () => resolved
+            name: serialized.name,
+            toRule: () => {
+                if (cached == undefined) {
+                    cached = this.resolveReferences(serialized) as
+                        | SerializableGrammarNode<GrammarAST.ParserRule>
+                        | SerializableGrammarNode<GrammarAST.InfixRule>;
+                }
+                return cached;
+            }
         };
     }
 
@@ -186,10 +234,16 @@ export class GrammarDeserializer {
             return this.resolveExternalType(serialized);
         }
 
-        const resolved = this.resolveReferences(serialized) as SerializableGrammarNode<GrammarAST.Type>;
+        let cached: SerializableGrammarNode<GrammarAST.Type> | undefined = undefined;
         return {
+            $type: "Type",
             name: serialized.name,
-            toType: () => resolved
+            toType: () => {
+                if (cached == undefined) {
+                    cached = this.resolveReferences(serialized) as SerializableGrammarNode<GrammarAST.Type>;
+                }
+                return cached;
+            }
         };
     }
 
@@ -205,11 +259,17 @@ export class GrammarDeserializer {
         if (this.isExternalReference(serialized)) {
             return this.resolveExternalInterface(serialized);
         }
+        let cached: SerializableGrammarNode<GrammarAST.Interface> | undefined = undefined;
 
-        const resolved = this.resolveReferences(serialized);
         return {
+            $type: "Interface",
             name: serialized.name,
-            toType: () => resolved
+            toType: () => {
+                if (cached == undefined) {
+                    cached = this.resolveReferences(serialized) as SerializableGrammarNode<GrammarAST.Interface>;
+                }
+                return cached;
+            }
         };
     }
 
@@ -258,11 +318,11 @@ export class GrammarDeserializer {
 
         switch (collection) {
             case "rules":
-                return this.ruleLookup.get(index)!;
+                return () => this.ruleLookup.get(index)!.toRule();
             case "types":
-                return this.typeLookup.get(index)!;
+                return () => this.typeLookup.get(index)!.toType();
             case "interfaces":
-                return this.interfaceLookup.get(index)!;
+                return () => this.interfaceLookup.get(index)!.toType();
             default:
                 throw new Error(`Unknown collection: ${collection}`);
         }
@@ -277,12 +337,27 @@ export class GrammarDeserializer {
     private createExternalReferenceFunction(ref: SerializableExternalReference): () => any {
         return () => {
             switch (ref.kind) {
-                case "ParserRule":
-                    return this.context.parserRules?.get(ref.name) ?? createExternalParserRule(ref.name);
-                case "TerminalRule":
-                    return this.context.terminalRules?.get(ref.name) ?? createExternalTerminalRule(ref.name);
-                case "Type":
-                    return this.context.types?.get(ref.name) ?? createExternalInterface(ref.name);
+                case "ParserRule": {
+                    const rule = this.context.parserRules?.get(ref.name);
+                    if (rule == undefined) {
+                        throw new Error(`External ParserRule not found: ${ref.name}`);
+                    }
+                    return rule.toRule();
+                }
+                case "TerminalRule": {
+                    const terminal = this.context.terminalRules?.get(ref.name);
+                    if (terminal == undefined) {
+                        throw new Error(`External TerminalRule not found: ${ref.name}`);
+                    }
+                    return terminal.toRule();
+                }
+                case "Type": {
+                    const type = this.context.types?.get(ref.name);
+                    if (type == undefined) {
+                        throw new Error(`External Type not found: ${ref.name}`);
+                    }
+                    return type.toType();
+                }
                 default:
                     throw new Error(`Unknown external reference kind: ${(ref as any).kind}`);
             }
@@ -297,9 +372,17 @@ export class GrammarDeserializer {
      */
     private resolveExternalRule(ref: SerializableExternalReference): ParserRule<any> | TerminalRule<any> {
         if (ref.kind === "ParserRule") {
-            return this.context.parserRules?.get(ref.name) ?? createExternalParserRule(ref.name);
+            const rule = this.context.parserRules?.get(ref.name);
+            if (rule == undefined) {
+                throw new Error(`ParserRule not found or is not a ParserRule: ${ref.name}`);
+            }
+            return rule;
         } else if (ref.kind === "TerminalRule") {
-            return this.context.terminalRules?.get(ref.name) ?? createExternalTerminalRule(ref.name);
+            const rule = this.context.terminalRules?.get(ref.name);
+            if (rule == undefined) {
+                throw new Error(`TerminalRule not found or is not a TerminalRule: ${ref.name}`);
+            }
+            return rule;
         }
         throw new Error(`Invalid rule kind: ${ref.kind}`);
     }
@@ -311,14 +394,11 @@ export class GrammarDeserializer {
      * @returns The resolved `Type` or `Interface` from the provided context or a created external placeholder.
      */
     private resolveExternalType(ref: SerializableExternalReference): Type<any> {
-        const fromContext = this.context.types?.get(ref.name);
-        if (fromContext && "toType" in fromContext) {
-            const result = fromContext.toType();
-            if ("$type" in result && result.$type === "Type") {
-                return fromContext as Type<any>;
-            }
+        const type = this.context.types?.get(ref.name);
+        if (type == undefined || type.$type !== "Type") {
+            throw new Error(`Type not found or is not a Type: ${ref.name}`);
         }
-        return createExternalInterface(ref.name) as Type<any>;
+        return type;
     }
 
     /**
@@ -328,7 +408,11 @@ export class GrammarDeserializer {
      * @returns The resolved `Interface` from the context or a created external placeholder.
      */
     private resolveExternalInterface(ref: SerializableExternalReference): Interface<any> {
-        return (this.context.types?.get(ref.name) as Interface<any>) ?? createExternalInterface(ref.name);
+        const type = this.context.types?.get(ref.name);
+        if (type == undefined || type.$type !== "Interface") {
+            throw new Error(`Interface not found or is not an Interface: ${ref.name}`);
+        }
+        return type;
     }
 
     /**

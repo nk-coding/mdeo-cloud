@@ -1,8 +1,5 @@
 import type { AstNode, GrammarAST, Reference } from "langium";
 import type { SerializableGrammarNode } from "./types.js";
-import type { BaseType } from "../type/types.js";
-import type { Type } from "../type/type/types.js";
-import type { Interface } from "../type/interface/types.js";
 import type { ParserRule } from "../rule/types.js";
 import type { TerminalRule } from "../rule/terminal/types.js";
 
@@ -141,9 +138,13 @@ export class GrammarSerializer {
 
     /**
      * Lookup table mapping type names to their registered nodes and references.
-     * Handles both Type and Interface definitions.
      */
-    private readonly typeLookup = new Map<string, NodeWithRef<BaseType<any>>>();
+    private readonly typeLookup = new Map<string, NodeWithRef<SerializableGrammarNode<GrammarAST.Type>>>();
+
+    /**
+     * Lookup table mapping interface names to their registered nodes and references.
+     */
+    private readonly interfaceLookup = new Map<string, NodeWithRef<SerializableGrammarNode<GrammarAST.Interface>>>();
 
     /**
      * Array of serialized rules in registration order.
@@ -286,7 +287,9 @@ export class GrammarSerializer {
      * @returns A serializable reference to the registered type
      * @throws Error if a type with the same name but different instance is found
      */
-    private registerType(type: Type<any>): SerializableReference | SerializableExternalReference {
+    private registerType(
+        type: SerializableGrammarNode<GrammarAST.Type>
+    ): SerializableReference | SerializableExternalReference {
         const existing = this.typeLookup.get(type.name);
         if (existing) {
             if (existing.node !== type) {
@@ -313,8 +316,10 @@ export class GrammarSerializer {
      * @returns A serializable reference to the registered interface
      * @throws Error if an interface with the same name but different instance is found
      */
-    private registerInterface(iface: Interface<any>): SerializableReference | SerializableExternalReference {
-        const existing = this.typeLookup.get(iface.name);
+    private registerInterface(
+        iface: SerializableGrammarNode<GrammarAST.Interface>
+    ): SerializableReference | SerializableExternalReference {
+        const existing = this.interfaceLookup.get(iface.name);
         if (existing) {
             if (existing.node !== iface) {
                 throw new Error(`Duplicate interface name: ${iface.name}`);
@@ -324,7 +329,7 @@ export class GrammarSerializer {
         const id = this.interfaces.length;
         this.interfaces.push(undefined);
         const ref: SerializableReference = { $ref: `#/interfaces@${id}` };
-        this.typeLookup.set(iface.name, { node: iface, ref });
+        this.interfaceLookup.set(iface.name, { node: iface, ref });
         const serialized = this.visit(iface) as SerializedAstNode<GrammarAST.Interface> | SerializableExternalReference;
         this.interfaces[id] = serialized;
         return ref;
@@ -351,7 +356,7 @@ export class GrammarSerializer {
      * @param value The value to check
      * @returns True if the value is a Type, false otherwise
      */
-    private isType(value: any): value is Type<any> {
+    private isType(value: any): value is SerializableGrammarNode<GrammarAST.Type> {
         return value && typeof value === "object" && "$type" in value && value.$type === "Type";
     }
 
@@ -361,7 +366,7 @@ export class GrammarSerializer {
      * @param value The value to check
      * @returns True if the value is an Interface, false otherwise
      */
-    private isInterface(value: any): value is Interface<any> {
+    private isInterface(value: any): value is SerializableGrammarNode<GrammarAST.Interface> {
         return value && typeof value === "object" && "$type" in value && value.$type === "Interface";
     }
 

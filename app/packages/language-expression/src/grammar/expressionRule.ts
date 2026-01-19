@@ -61,6 +61,10 @@ const BOOLEAN = createRule("BOOLEAN")
  * precedence, and ternary conditional expressions. The generated rules follow standard
  * operator precedence and support extensibility through additional custom expression rules.
  *
+ * CAUTION: The additionalExpressionRules is not used immediately, it will be used when the ExpressionRule is actually resolved.
+ * Thus, it can be safely modified even after this function returns.
+ * This can be used to solve circular dependencies between rules.
+ *
  * @param config Configuration object containing naming for all expression rules and types
  * @param types The generated expression type interfaces to use as return types
  * @param typeRule The type parser rule to use for generic type arguments
@@ -107,20 +111,22 @@ export function generateExpressionRules(
 
     const primaryExpressionRule = createRule(config.primaryExpressionRuleName)
         .returns(types.baseExpressionType)
-        .as(() => [
-            or(
-                stringLiteralExpressionRule,
-                intLiteralExpressionRule,
-                longLiteralExpressionRule,
-                floatLiteralExpressionRule,
-                doubleLiteralExpressionRule,
-                booleanLiteralExpressionRule,
-                nullLiteralExpressionRule,
-                identifierExpressionRule,
-                group("(", () => expressionRule, ")"),
-                ...additionalExpressionRules
-            )
-        ]);
+        .as(() => {
+            return [
+                or(
+                    stringLiteralExpressionRule,
+                    intLiteralExpressionRule,
+                    longLiteralExpressionRule,
+                    floatLiteralExpressionRule,
+                    doubleLiteralExpressionRule,
+                    booleanLiteralExpressionRule,
+                    nullLiteralExpressionRule,
+                    identifierExpressionRule,
+                    group("(", () => expressionRule, ")"),
+                    ...additionalExpressionRules
+                )
+            ];
+        });
 
     const memberAccessAndCallExpressionRule = createRule(config.memberAccessAndCallExpressionRuleName)
         .returns(types.baseExpressionType)
@@ -200,6 +206,20 @@ export function generateExpressionRules(
 
     return {
         expressionRule,
-        assignableExpressionRule
+        assignableExpressionRule,
+        stringLiteralExpressionRule,
+        intLiteralExpressionRule,
+        longLiteralExpressionRule,
+        floatLiteralExpressionRule,
+        doubleLiteralExpressionRule,
+        booleanLiteralExpressionRule,
+        nullLiteralExpressionRule,
+        identifierExpressionRule,
+        primaryExpressionRule,
+        memberAccessAndCallExpressionRule,
+        callExpressionGenericArgsRule,
+        unaryExpressionRule,
+        binaryExpressionRule,
+        ternaryExpressionRule
     };
 }

@@ -196,6 +196,7 @@ export class InfixRuleBuilderWithCallAndReturn<
             parameters: []
         };
         return {
+            name: this.name,
             toRule: () => {
                 return createdRule;
             }

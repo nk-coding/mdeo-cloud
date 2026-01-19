@@ -62,6 +62,7 @@ export function createExternalType<T extends AstNode>(name: string): Type<T> {
     };
 
     return {
+        $type: "Type",
         name,
         toType: () => externalRef
     };

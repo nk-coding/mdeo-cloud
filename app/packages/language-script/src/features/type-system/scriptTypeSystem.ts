@@ -21,18 +21,23 @@ import {
     SetType,
     StatementPartialTypeSystem,
     stringType,
-    TypePartialTypeSystem,
-    type ExpressionTypirServices
+    TypePartialTypeSystem
 } from "@mdeo/language-expression";
-import type { ScriptTypirSpecifics } from "../../plugin.js";
+import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
 import { expressionTypes, statementTypes, typeTypes } from "../../grammar/scriptTypes.js";
 import { ScriptPartialTypeSystem } from "./scriptPartialTypeSystem.js";
+import type { ResolvedScriptContributionPlugins } from "../../plugin/scriptContributionPlugin.js";
 
 /**
  * The type system for the Script language.
  */
 export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics> {
-    constructor() {
+    /**
+     * Creates an instance of ScriptTypeSystem.
+     *
+     * @param plugins The contribution plugins for the Script language.
+     */
+    constructor(private readonly plugins: ResolvedScriptContributionPlugins) {
         super(
             {
                 Any: AnyType,
@@ -60,11 +65,15 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
                 lambdaSuperTypes: [{ type: AnyType.name }]
             },
             expressionTypes,
-            []
+            [...plugins.functions.entries()].map(([name, func]) => ({
+                name,
+                isProperty: false,
+                type: func.function
+            }))
         );
     }
 
-    protected override onInitializeExtended(typir: ExpressionTypirServices<ScriptTypirSpecifics>): void {
+    protected override onInitializeExtended(typir: ScriptTypirServices): void {
         const statementPartialTypeSystem = new StatementPartialTypeSystem<ScriptTypirSpecifics>(
             typir,
             statementTypes,
@@ -81,7 +90,7 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
         );
         typePartialTypeSystem.registerRules();
 
-        const scriptPartialTypeSystem = new ScriptPartialTypeSystem(typir, this.primitiveTypes);
+        const scriptPartialTypeSystem = new ScriptPartialTypeSystem(typir, this.primitiveTypes, this.plugins);
         scriptPartialTypeSystem.registerRules();
     }
 }

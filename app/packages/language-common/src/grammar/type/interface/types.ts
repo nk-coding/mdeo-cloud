@@ -10,6 +10,7 @@ import type { SerializableExternalReference } from "../../serialization/grammarS
  * @template T The AST node type that this interface represents
  */
 export interface Interface<T extends AstNode> {
+    $type: "Interface";
     /**
      * TypeScript type information for the AST node this interface represents.
      * Only used for type inference and validation during compilation,

@@ -66,6 +66,7 @@ export function createExternalInterface<T extends AstNode>(name: string): Interf
     };
 
     return {
+        $type: "Interface",
         name,
         toType: () => externalRef
     };

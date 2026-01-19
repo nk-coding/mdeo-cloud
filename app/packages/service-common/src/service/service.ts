@@ -7,6 +7,7 @@ import { LangiumInstancePool } from "../langium/langiumPool.js";
 import type { ServerContributionPlugin } from "@mdeo/plugin";
 import { URI } from "vscode-uri";
 import { buildManifest } from "./util.js";
+import type { FileInfo } from "../handler/types.js";
 
 /**
  * Creates and configures a Fastify-based language service.
@@ -56,7 +57,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         Body: FileDataComputeRequest;
     }>("/data/:key", async (request, reply) => {
         const { key } = request.params;
-        const { path, project, source, contributionPlugins } = request.body;
+        const { project, source, contributionPlugins } = request.body;
 
         const authHeader = request.headers.authorization;
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -71,17 +72,20 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
 
         const serverContributionPlugins = (contributionPlugins ?? []) as unknown as ServerContributionPlugin[];
         const instance = await instancePool.acquire(serverContributionPlugins, jwt, project);
-        const uri = URI.file(path);
 
+        let fileInfo: FileInfo | undefined = undefined;
         if (source != undefined) {
-            // File data request
+            const uri = URI.parse(source.path);
+            fileInfo = {
+                uri,
+                version: source.version
+            };
             instance.services.shared.workspace.LangiumDocuments.createDocument(uri, source.content);
         }
 
         try {
             const result = await handler({
-                uri,
-                version: source?.version,
+                fileInfo,
                 instance,
                 services: instance.services,
                 serverApi: instance.services.shared.ServerApi

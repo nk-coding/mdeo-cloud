@@ -1,6 +1,10 @@
 import type {
-    ScriptTypirSpecifics,
+    ExtensionExpressionType,
+    ResolvedContributedExpression,
+    ScriptTypirServices,
     TypedExpressionCallExpression,
+    TypedExtensionCallArgument,
+    TypedExtensionCallExpression,
     TypedFunctionCallExpression,
     TypedMemberCallExpression
 } from "@mdeo/language-script";
@@ -37,12 +41,12 @@ import {
     type TypedBooleanLiteralExpression,
     type TypedNullLiteralExpression,
     type TypedLambdaExpression,
-    type TypedImport
+    type TypedImport,
+    ExtensionExpression
 } from "@mdeo/language-script";
 import type { ScriptType, FunctionType, LambdaExpressionType, FunctionParametersType } from "@mdeo/language-script";
 import { LambdaExpression, ReturnStatement, statementTypes, expressionTypes } from "@mdeo/language-script";
 import type {
-    ExpressionTypirServices,
     IfStatementType,
     ElseIfClauseType,
     WhileStatementType,
@@ -61,7 +65,6 @@ import type {
     FloatLiteralExpressionType,
     DoubleLiteralExpressionType,
     BooleanLiteralExpressionType,
-    NullLiteralExpressionType,
     ReturnType,
     ValueType,
     ClassTypeRef
@@ -71,9 +74,11 @@ import {
     isCustomVoidType,
     isCustomClassType,
     isCustomLambdaType,
-    isCustomFunctionType
+    isCustomFunctionType,
+    DefaultTypeNames,
+    isCustomNullType
 } from "@mdeo/language-expression";
-import type { AstNode } from "langium";
+import { GrammarUtils, isAstNode, type AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
 import type { Type } from "typir";
 
@@ -96,9 +101,39 @@ export class TypedAstConverter {
      * The Any? type used for generic type parameter replacement.
      */
     private readonly anyNullableType: ClassTypeRef = {
-        type: "Any",
+        type: DefaultTypeNames.Any,
         isNullable: true
     };
+
+    /**
+     * Index for the void type in the types array.
+     */
+    private voidTypeIndex: number;
+
+    /**
+     * Index for the string type in the types array.
+     */
+    private stringTypeIndex: number;
+
+    /**
+     * Index for the double type in the types array.
+     */
+    private doubleTypeIndex: number;
+
+    /**
+     * Index for the boolean type in the types array.
+     */
+    private booleanTypeIndex: number;
+
+    /**
+     * Index for the null type in the types array.
+     */
+    private nullTypeIndex: number;
+
+    /**
+     * Lookup of resolved contributed expressions by their type name
+     */
+    private extensionTypeLookup = new Map<string, ResolvedContributedExpression>();
 
     /**
      * Creates a new TypedAstConverter.
@@ -107,12 +142,23 @@ export class TypedAstConverter {
      * @param reflection The AST reflection for type checking
      */
     constructor(
-        private readonly typir: ExpressionTypirServices<ScriptTypirSpecifics>,
+        private readonly typir: ScriptTypirServices,
         private readonly reflection: AstReflection
     ) {
-        const customVoid = typir.factory.CustomVoid.getOrCreate();
-        this.types.push({ kind: "void" });
-        this.typeLookup.set(customVoid, 0);
+        this.voidTypeIndex = this.getTypeIndexForType(typir.factory.CustomVoid.getOrCreate());
+        this.stringTypeIndex = this.getTypeIndexForType(
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.String, isNullable: false })
+        );
+        this.doubleTypeIndex = this.getTypeIndexForType(
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.Double, isNullable: false })
+        );
+        this.booleanTypeIndex = this.getTypeIndexForType(
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.Boolean, isNullable: false })
+        );
+        this.nullTypeIndex = this.getTypeIndexForType(typir.factory.CustomNull.getOrCreate());
+        for (const expression of typir.ResolvedContributionPlugins.expressions) {
+            this.extensionTypeLookup.set(expression.interface.name, expression);
+        }
     }
 
     /**
@@ -145,7 +191,7 @@ export class TypedAstConverter {
      */
     private convertFunction(func: FunctionType): TypedFunction {
         const parameters = this.convertParameters(func.parameterList);
-        const returnTypeIndex = func.returnType != undefined ? this.getTypeIndex(func.returnType) : 0;
+        const returnTypeIndex = func.returnType != undefined ? this.getTypeIndex(func.returnType) : this.voidTypeIndex;
         const body = this.convertCallableBody(func.body);
 
         return {
@@ -395,9 +441,11 @@ export class TypedAstConverter {
         } else if (this.reflection.isInstance(expr, expressionTypes.booleanLiteralExpressionType)) {
             return this.convertBooleanLiteral(expr);
         } else if (this.reflection.isInstance(expr, expressionTypes.nullLiteralExpressionType)) {
-            return this.convertNullLiteral(expr);
+            return this.convertNullLiteral();
         } else if (this.reflection.isInstance(expr, LambdaExpression)) {
-            return this.convertLambdaExpression(expr as LambdaExpressionType);
+            return this.convertLambdaExpression(expr);
+        } else if (this.reflection.isInstance(expr, ExtensionExpression)) {
+            return this.convertExtensionExpression(expr);
         }
         throw new Error(`Unsupported expression type: ${expr}`);
     }
@@ -572,7 +620,7 @@ export class TypedAstConverter {
     private convertStringLiteral(expr: StringLiteralExpressionType): TypedStringLiteralExpression {
         return {
             kind: TypedExpressionKind.StringLiteral,
-            evalType: this.getTypeIndex(expr),
+            evalType: this.stringTypeIndex,
             value: expr.value
         };
     }
@@ -628,7 +676,7 @@ export class TypedAstConverter {
     private convertDoubleLiteral(expr: DoubleLiteralExpressionType): TypedDoubleLiteralExpression {
         return {
             kind: TypedExpressionKind.DoubleLiteral,
-            evalType: this.getTypeIndex(expr),
+            evalType: this.doubleTypeIndex,
             value: expr.value
         };
     }
@@ -650,13 +698,12 @@ export class TypedAstConverter {
     /**
      * Converts a null literal expression.
      *
-     * @param expr The null literal AST node
      * @returns The TypedNullLiteralExpression representation
      */
-    private convertNullLiteral(expr: NullLiteralExpressionType): TypedNullLiteralExpression {
+    private convertNullLiteral(): TypedNullLiteralExpression {
         return {
             kind: TypedExpressionKind.NullLiteral,
-            evalType: this.getTypeIndex(expr)
+            evalType: this.nullTypeIndex
         };
     }
 
@@ -693,6 +740,95 @@ export class TypedAstConverter {
     }
 
     /**
+     * Converts an extension expression.
+     *
+     * @param expr The extension expression AST node
+     * @returns The TypedExtensionCallExpression representation
+     */
+    private convertExtensionExpression(expr: ExtensionExpressionType): TypedExtensionCallExpression {
+        const extension = expr.extension;
+        const config = this.extensionTypeLookup.get(extension.$type);
+        if (config == undefined) {
+            throw new Error(`Extension expression type '${extension.$type}' not found`);
+        }
+        if (!this.reflection.isInstance(extension, config.interface)) {
+            throw new Error(`Extension expression is not an instance of '${config.interface.name}'`);
+        }
+        const args: { arg: TypedExtensionCallArgument; position: number }[] = [];
+        for (const param of config.signature.parameters) {
+            const argValue = extension[param.name];
+            if (Array.isArray(argValue)) {
+                for (let i = 0; i < argValue.length; i++) {
+                    const cstNode = GrammarUtils.findNodeForProperty(extension.$cstNode, param.name, i);
+                    const argExpr = this.convertExtensionArgument(argValue[i]);
+                    args.push({
+                        arg: { name: param.name, value: argExpr },
+                        position: cstNode?.offset ?? -1
+                    });
+                }
+            } else {
+                const cstNode = GrammarUtils.findNodeForProperty(extension.$cstNode, param.name);
+                const argExpr = this.convertExtensionArgument(argValue);
+                args.push({
+                    arg: { name: param.name, value: argExpr },
+                    position: cstNode?.offset ?? -1
+                });
+            }
+        }
+        args.sort((a, b) => a.position - b.position);
+
+        return {
+            kind: TypedExpressionKind.ExtensionCall,
+            evalType: this.getTypeIndex(extension),
+            arguments: args.map((a) => a.arg),
+            name: config.name,
+            overload: ""
+        };
+    }
+
+    /**
+     * Converts an extension argument value to a TypedExpression.
+     *
+     * @param value The extension argument value
+     * @returns The TypedExpression representation
+     * @throws Error if the value type is unsupported
+     */
+    private convertExtensionArgument(value: unknown): TypedExpression {
+        if (value == undefined) {
+            return {
+                kind: TypedExpressionKind.NullLiteral,
+                evalType: this.nullTypeIndex
+            };
+        }
+        if (isAstNode(value)) {
+            return this.convertExpression(value);
+        } else if (typeof value === "string") {
+            const stringExp: TypedStringLiteralExpression = {
+                kind: TypedExpressionKind.StringLiteral,
+                evalType: this.stringTypeIndex,
+                value
+            };
+            return stringExp;
+        } else if (typeof value === "number") {
+            const doubleExp: TypedDoubleLiteralExpression = {
+                kind: TypedExpressionKind.DoubleLiteral,
+                evalType: this.doubleTypeIndex,
+                value: value.toString()
+            };
+            return doubleExp;
+        } else if (typeof value === "boolean") {
+            const boolExp: TypedBooleanLiteralExpression = {
+                kind: TypedExpressionKind.BooleanLiteral,
+                evalType: this.booleanTypeIndex,
+                value
+            };
+            return boolExp;
+        } else {
+            throw new Error(`Unsupported extension argument type: ${value}`);
+        }
+    }
+
+    /**
      * Gets the index of a type in the types array for the given AST node.
      * Infers the type, erases generic parameters, and adds to the types array if not already present.
      *
@@ -704,23 +840,36 @@ export class TypedAstConverter {
         if (Array.isArray(inferredType)) {
             throw new Error("Cannot infer type");
         }
-        if (this.typeLookup.has(inferredType)) {
-            return this.typeLookup.get(inferredType)!;
+        return this.getTypeIndexForType(inferredType);
+    }
+
+    /**
+     * Gets the index of a type in the types array.
+     * Adds the type to the types array if not already present.
+     *
+     * @param type The type to get the index for
+     * @returns The index into the types array
+     */
+    private getTypeIndexForType(type: Type): number {
+        if (this.typeLookup.has(type)) {
+            return this.typeLookup.get(type)!;
         }
 
-        let type: ReturnType;
-        if (isCustomVoidType(inferredType)) {
-            return 0;
-        } else if (isCustomClassType(inferredType) || isCustomLambdaType(inferredType)) {
-            type = inferredType.definition;
+        let returnType: ReturnType;
+        if (isCustomVoidType(type)) {
+            returnType = { kind: "void" };
+        } else if (isCustomClassType(type) || isCustomLambdaType(type)) {
+            returnType = type.definition;
+        } else if (isCustomNullType(type)) {
+            returnType = this.anyNullableType;
         } else {
             throw new Error("Unsupported type for indexing");
         }
 
-        const erasedType = this.eraseGenericTypeParameters(type);
+        const erasedType = this.eraseGenericTypeParameters(returnType);
         const newIndex = this.types.length;
         this.types.push(erasedType);
-        this.typeLookup.set(inferredType, newIndex);
+        this.typeLookup.set(type, newIndex);
         return newIndex;
     }
 

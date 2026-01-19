@@ -9,6 +9,21 @@
 import type { BaseClassTypeRef, ClassType } from "../typir-extensions/config/type.js";
 
 /**
+ * DefaultTypeNames enumerates the canonical names of primitive and core types
+ * used in the language-expression type system.
+ */
+export enum DefaultTypeNames {
+    Any = "Any",
+    Int = "int",
+    Long = "long",
+    Float = "float",
+    Double = "double",
+    String = "string",
+    Boolean = "boolean",
+    Iterable = "Iterable"
+}
+
+/**
  * DefaultTypeConfig describes the set of primitive and core types
  * available in the language-expression package and maps their canonical
  * names to `ClassType` objects.
@@ -17,35 +32,35 @@ export interface TypeSystemConfig {
     /**
      * The root Any type from which all other types derive.
      */
-    Any: ClassType;
+    [DefaultTypeNames.Any]: ClassType;
     /**
      * 32-bit integer type
      */
-    int: ClassType;
+    [DefaultTypeNames.Int]: ClassType;
     /**
      * 64-bit integer type
      */
-    long: ClassType;
+    [DefaultTypeNames.Long]: ClassType;
     /**
      * single-precision floating point
      */
-    float: ClassType;
+    [DefaultTypeNames.Float]: ClassType;
     /**
      * double-precision floating point
      */
-    double: ClassType;
+    [DefaultTypeNames.Double]: ClassType;
     /**
      * immutable sequence of characters
      */
-    string: ClassType;
+    [DefaultTypeNames.String]: ClassType;
     /**
      * boolean true/false
      */
-    boolean: ClassType;
+    [DefaultTypeNames.Boolean]: ClassType;
     /**
      * The iterable type for types which can be iterated, should have exactly one generic type param
      */
-    Iterable: ClassType;
+    [DefaultTypeNames.Iterable]: ClassType;
     /**
      * Additional types to register in the type system
      */

@@ -4,13 +4,12 @@ import {
     StatementsScopeProvider,
     inferLambdaTypeFromContext,
     type BoundScope,
-    type ExpressionTypirServices,
     type LambdaTypeInferenceResult,
     type Scope,
     type ScopeEntry,
     type ScopeLocalInitialization
 } from "@mdeo/language-expression";
-import type { ScriptTypirSpecifics } from "../../plugin.js";
+import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
 import {
     expressionTypes,
     Function,
@@ -28,7 +27,7 @@ import { LambdaScope } from "./lambdaScope.js";
  * Adds support for function scopes, and the document scope
  */
 export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpecifics> {
-    constructor(typir: ExpressionTypirServices<ScriptTypirSpecifics>) {
+    constructor(typir: ScriptTypirServices) {
         super(typir, statementTypes, expressionTypes, IterableType);
     }
 

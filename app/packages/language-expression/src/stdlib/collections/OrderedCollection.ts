@@ -1,13 +1,14 @@
+import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
 import { classType, typeRef, genericTypeRef, lambdaType } from "../../typir-extensions/config/typeBuilder.js";
 
 /**
  * The built-in generic OrderedCollection type exported as `OrderedCollectionType`.
  */
-export const OrderedCollectionType = classType("OrderedCollection", "builtin")
+export const OrderedCollectionType = classType("OrderedCollection")
     .generics("T")
     .extends("ReadonlyOrderedCollection", { T: genericTypeRef("T") })
     .method("removeAt", (m) =>
-        m.signature((s) => s.param("index", typeRef("int").build()).returns(genericTypeRef("T")))
+        m.signature((s) => s.param("index", typeRef(DefaultTypeNames.Int).build()).returns(genericTypeRef("T")))
     )
     .method("sortBy", (m) =>
         m.signature((s) =>
