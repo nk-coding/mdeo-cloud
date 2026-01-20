@@ -19,8 +19,8 @@ export class OperationHandlerCommand implements Command {
         readonly workspaceEdit: WorkspaceEdit | undefined,
         readonly metadataEdits:
             | {
-                  nodes?: Record<string, Partial<NodeMetadata>>;
-                  edges?: Record<string, Partial<EdgeMetadata>>;
+                  nodes?: Record<string, Partial<NodeMetadata> | null>;
+                  edges?: Record<string, Partial<EdgeMetadata> | null>;
               }
             | undefined
     ) {}
@@ -50,35 +50,36 @@ export class OperationHandlerCommand implements Command {
      */
     private mergeMetadata<T extends EdgeMetadata | NodeMetadata>(
         current: Record<string, T>,
-        edits: Record<string, Partial<T>> | undefined
+        edits: Record<string, Partial<T> | null> | undefined
     ): Record<string, T> {
         if (edits == undefined) {
             return current;
         }
 
-        return {
-            ...current,
-            ...Object.fromEntries(
-                Object.entries(edits).map(([key, value]) => {
-                    const currentEntry = current[key] ?? {};
-                    const meta =
-                        currentEntry.meta != undefined
-                            ? {
-                                  ...currentEntry.meta,
-                                  ...value?.meta
-                              }
-                            : value?.meta;
-                    return [
-                        key,
-                        {
-                            ...currentEntry,
-                            ...value,
-                            meta
-                        }
-                    ];
-                })
-            )
-        };
+        const result = { ...current };
+
+        for (const [key, value] of Object.entries(edits)) {
+            if (value === null) {
+                delete result[key];
+            } else {
+                const currentEntry = current[key] ?? {};
+                let meta: object | undefined;
+                if (currentEntry.meta != undefined) {
+                    meta = {
+                        ...currentEntry.meta,
+                        ...value?.meta
+                    };
+                } else {
+                    meta = value?.meta;
+                }
+                result[key] = {
+                    ...currentEntry,
+                    ...value,
+                    meta
+                };
+            }
+        }
+        return result;
     }
 
     undo(): MaybePromise<void> {

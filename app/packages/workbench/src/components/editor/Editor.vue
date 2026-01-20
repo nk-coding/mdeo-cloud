@@ -160,6 +160,14 @@ function openTab(file: File, temporary: boolean) {
 
 onMounted(() => {
     const monacoEditor = monacoApi.monaco.editor.create(editorElement.value!);
+    monacoEditor.updateOptions({
+        hover: {
+            above: false
+        },
+        glyphMargin: false,
+        fixedOverflowWidgets: true,
+        automaticLayout: false
+    })
     monacoEditor.layout();
     editor.value = monacoEditor;
     monacoApi.openEditorFunc = async (createModelReference, options) => {

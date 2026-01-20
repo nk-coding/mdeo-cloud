@@ -3,6 +3,7 @@ import type {
     MetaModelType,
     ClassType,
     ClassExtensionType,
+    ClassExtensionsType,
     PropertyType,
     AssociationType,
     AssociationEndType,
@@ -31,6 +32,11 @@ export type PartialClass = PartialAstNode<ClassType>;
  * Partial class extension type with optional domain properties.
  */
 export type PartialClassExtension = PartialAstNode<ClassExtensionType>;
+
+/**
+ * Partial class extensions type with optional domain properties.
+ */
+export type PartialClassExtensions = PartialAstNode<ClassExtensionsType>;
 
 /**
  * Partial property type with optional domain properties.

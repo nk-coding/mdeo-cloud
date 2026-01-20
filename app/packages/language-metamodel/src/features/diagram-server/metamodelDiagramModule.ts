@@ -7,6 +7,7 @@ import { MetamodelDiagramConfiguration } from "./metamodelDiagramConfiguration.j
 import { MetamodelModelIdProvider } from "./metamodelModelIdProvider.js";
 import { MetamodelMetadataManager } from "./metamodelMetadataManager.js";
 import { MetamodelApplyLabelEditOperationHandler } from "./handler/metamodelApplyLabelEditOperationHandler.js";
+import { MetamodelReconnectEdgeOperationHandler } from "./handler/metamodelReconnectEdgeOperationHandler.js";
 import { MetamodelLabelEditValidator } from "./metamodelLabelEditValidator.js";
 
 const { injectable } = sharedImport("inversify");
@@ -36,6 +37,7 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         super.configureOperationHandlers(binding);
         binding.add(MetamodelApplyLabelEditOperationHandler);
+        binding.add(MetamodelReconnectEdgeOperationHandler);
     }
 
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {

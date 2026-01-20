@@ -1,16 +1,26 @@
 import type { Action, Point, GModelElement, BoundsAware } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
-import type { GEdge } from "../../model/edge.js";
+import { GEdge } from "../../model/edge.js";
 import type { EdgeRouter } from "../edge-rourting/edgeRouter.js";
 import { Orientation } from "../edge-rourting/edgeRouter.js";
 import { SetEdgeRoutingFeedbackAction } from "./edgeRoutingFeedback.js";
-import { isEdgeWithMeta } from "./util.js";
 import type { EdgeEditTool } from "./edgeEditTool.js";
-import type { EdgeLayoutMetadata, EdgeAnchor, AnchorSide } from "@mdeo/editor-protocol";
+import type {
+    EdgeLayoutMetadata,
+    EdgeAnchor,
+    AnchorSide,
+    UpdateRoutingInformationOperation
+} from "@mdeo/editor-protocol";
 import type { Bounds as BoundsType } from "@eclipse-glsp/protocol";
 
-const { DragAwareMouseListener, getAbsolutePosition } = sharedImport("@eclipse-glsp/client");
+const { DragAwareMouseListener, getAbsolutePosition, cursorFeedbackAction, isSelected } =
+    sharedImport("@eclipse-glsp/client");
 const { Point: PointUtil } = sharedImport("@eclipse-glsp/protocol");
+
+/**
+ * CSS class for edge segment move cursor.
+ */
+const CSS_EDGE_SEGMENT_MOVE = "edge-segment-move-mode";
 
 /**
  * Mouse listener that handles edge route segment dragging.
@@ -48,6 +58,11 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
     protected initialMousePosition?: Point;
 
     /**
+     * Feedback emitter for cursor changes.
+     */
+    protected cursorFeedback;
+
+    /**
      * Constructs a new FeedbackEdgeRouteMovingMouseListener.
      *
      * @param tool The edge edit tool
@@ -55,12 +70,17 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
     constructor(protected tool: EdgeEditTool) {
         super();
         this.edgeRouter = tool.edgeRouter;
+        this.cursorFeedback = this.tool.createFeedbackEmitter();
     }
 
     override mouseDown(target: GModelElement, event: MouseEvent): Action[] {
         const result = super.mouseDown(target, event);
 
-        if (event.button !== 0) {
+        if (!(target instanceof GEdge)) {
+            return result;
+        }
+
+        if (event.button != 0) {
             return result;
         }
         const eventTarget = event.target;
@@ -68,18 +88,16 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
             return result;
         }
         const segmentIndexStr = eventTarget.dataset["edgeSegmentIndex"];
-        const edgeId = eventTarget.dataset["edgeId"];
-        if (segmentIndexStr == undefined || edgeId == undefined) {
+        if (segmentIndexStr == undefined) {
             return result;
         }
 
         const segmentIndex = parseInt(segmentIndexStr, 10);
-        const edge = target.root.index.getById(edgeId);
 
-        if (isEdgeWithMeta(edge) && !Number.isNaN(segmentIndex)) {
-            this.edge = edge;
+        if (target != undefined && isSelected(target) && !Number.isNaN(segmentIndex)) {
+            this.edge = target;
             this.segmentIndex = segmentIndex;
-            const routeResult = this.edgeRouter.computeRoute(edge);
+            const routeResult = this.edgeRouter.computeRoute(target);
             this.startMeta = {
                 routingPoints: routeResult.route.slice(1, -1),
                 sourceAnchor: routeResult.sourceAnchor,
@@ -87,6 +105,7 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
             };
             this.isTracking = true;
             this.initialMousePosition = getAbsolutePosition(target, event);
+            this.cursorFeedback.add(cursorFeedbackAction(CSS_EDGE_SEGMENT_MOVE), cursorFeedbackAction()).submit();
         }
 
         return result;
@@ -117,14 +136,32 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
         return [];
     }
 
-    override draggingMouseUp(): Action[] {
-        if (!this.isTracking || !this.edge) {
+    override draggingMouseUp(target: GModelElement, event: MouseEvent): Action[] {
+        if (!this.isTracking || !this.edge || this.segmentIndex === undefined || !this.initialMousePosition) {
             this.resetTracking();
+            this.cursorFeedback.add(cursorFeedbackAction(), cursorFeedbackAction()).submit();
             return [];
         }
 
+        const edge = this.edge;
+        const mousePosition = getAbsolutePosition(target, event);
+        const newMeta = this.computeRouteWithEditedSegment(edge, this.segmentIndex, mousePosition);
+
+        const routingUpdate = {
+            elementId: edge.id,
+            routingPoints: newMeta.routingPoints,
+            sourceAnchor: newMeta.sourceAnchor,
+            targetAnchor: newMeta.targetAnchor
+        };
+        const operation: UpdateRoutingInformationOperation = {
+            kind: "updateRoutingInformation",
+            isOperation: true,
+            updates: [routingUpdate]
+        };
+
         this.resetTracking();
-        return [];
+        this.cursorFeedback.add(cursorFeedbackAction(), cursorFeedbackAction()).submit();
+        return [operation];
     }
 
     /**
@@ -161,6 +198,7 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
 
     override dispose(): void {
         this.resetTracking();
+        this.cursorFeedback.dispose();
         super.dispose();
     }
 

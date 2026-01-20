@@ -111,6 +111,9 @@ export class ChangeBoundsListener extends GLSPChangeBoundsListener {
     }
 
     protected override handleMoveRoutingPointsOnServer(elementsToMove: SelectableBoundsAware[]): Operation[] {
+        if (elementsToMove.length === 0) {
+            return [];
+        }
         const updates: EdgeRoutingUpdate[] = [];
         const edges = new Set<GEdge>();
         for (const element of elementsToMove) {

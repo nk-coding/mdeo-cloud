@@ -58,9 +58,10 @@
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-protocol": "^3.17.5",
         "vscode-languageserver-textdocument": "^1.0.12",
-        "vue": "^3.5.26"
+        "vue": "^3.5.27"
     },
     "devDependencies": {
+        "@mdeo/editor-protocol": "^0.1.0",
         "@types/node": "^25.0.9",
         "@vitejs/plugin-vue": "^6.0.3",
         "@vue/tsconfig": "^0.8.1",

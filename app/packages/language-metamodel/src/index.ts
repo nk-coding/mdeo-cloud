@@ -1,4 +1,5 @@
 export * from "./features/diagram-server/handler/metamodelApplyLabelEditOperationHandler.js";
+export * from "./features/diagram-server/handler/metamodelReconnectEdgeOperationHandler.js";
 export * from "./features/diagram-server/model/associationEdge.js";
 export * from "./features/diagram-server/model/associationMultiplicityLabel.js";
 export * from "./features/diagram-server/model/associationMultiplicityNode.js";

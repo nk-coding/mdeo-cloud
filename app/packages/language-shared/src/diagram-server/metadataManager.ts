@@ -171,6 +171,8 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
 
     /**
      * Checks if the new metadata is valid with respect to the current metadata.
+     * To be considered valid, all nodes and edges in the new metadata
+     * must exist in the current metadata with matching types and defined meta.
      *
      * @param newMetadata The new metadata extracted from the graph.
      * @param currentMetadata The current metadata.
@@ -218,6 +220,8 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
                 } else {
                     modifiedNodes[id] = currentNodeMeta;
                 }
+            } else {
+                hasChanges = true;
             }
         }
         for (const [id, currentEdgeMeta] of Object.entries(currentMetadata.edges)) {
@@ -232,6 +236,8 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
                 } else {
                     modifiedEdges[id] = currentEdgeMeta;
                 }
+            } else {
+                hasChanges = true;
             }
         }
 

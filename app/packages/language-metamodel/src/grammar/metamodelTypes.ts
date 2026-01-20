@@ -104,13 +104,26 @@ export const ClassExtension = createInterface("ClassExtension").attrs({
 export type ClassExtensionType = ASTType<typeof ClassExtension>;
 
 /**
+ * ClassExtensions definition.
+ * Wraps the extends keyword and list of class extensions.
+ */
+export const ClassExtensions = createInterface("ClassExtensions").attrs({
+    extensions: [ClassExtension]
+});
+
+/**
+ * Type representing a ClassExtensions AST node.
+ */
+export type ClassExtensionsType = ASTType<typeof ClassExtensions>;
+
+/**
  * Class definition.
  * Represents a class in the metamodel with properties and inheritance relationships.
  */
 export const Class = createInterface("Class").attrs({
     name: String,
     isAbstract: Boolean,
-    extends: [ClassExtension],
+    extensions: ClassExtensions,
     properties: [Property]
 });
 

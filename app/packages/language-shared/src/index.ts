@@ -3,6 +3,7 @@ export * from "./diagram-server/graph-edit-distance/hungarian.js";
 export * from "./diagram-server/graph-edit-distance/multiGraph.js";
 export * from "./diagram-server/handler/baseApplyLabelEditOperationHandler.js";
 export * from "./diagram-server/handler/baseOperationHandler.js";
+export * from "./diagram-server/handler/baseReconnectEdgeOperationHandler.js";
 export * from "./diagram-server/handler/changeBoundsOperationHandler.js";
 export * from "./diagram-server/handler/operationHandlerCommand.js";
 export * from "./diagram-server/handler/partialChangeBoundsOperationHandler.js";

@@ -29,7 +29,7 @@ export function resolveClassChain(classOrImport: ClassOrImportType, reflection: 
         }
         resultSet.add(currentClass);
         result.push(currentClass);
-        for (const classExtension of currentClass.extends) {
+        for (const classExtension of currentClass.extensions?.extensions ?? []) {
             const reference = classExtension.class.ref;
             if (reference != undefined) {
                 queue.push(reference);

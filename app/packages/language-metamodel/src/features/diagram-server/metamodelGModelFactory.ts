@@ -254,7 +254,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
                 continue;
             }
 
-            const extendsRefs = cls.extends ?? [];
+            const extendsRefs = cls.extensions?.extensions ?? [];
             for (const extendsDef of extendsRefs) {
                 if (extendsDef == undefined) {
                     continue;

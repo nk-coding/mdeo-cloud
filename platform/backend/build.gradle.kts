@@ -4,7 +4,6 @@ val hikariVersion = "7.0.2"
 val postgresVersion = "42.7.8"
 val logbackVersion = "1.5.24"
 val bcryptVersion = "0.10.2"
-val caffeineVersion = "3.2.3"
 
 plugins {
     kotlin("jvm")
@@ -49,9 +48,6 @@ dependencies {
     
     // Security
     implementation("at.favre.lib:bcrypt:$bcryptVersion")
-    
-    // Caching
-    implementation("com.github.ben-manes.caffeine:caffeine:$caffeineVersion")
     
     // Logging
     implementation("ch.qos.logback:logback-classic:$logbackVersion")

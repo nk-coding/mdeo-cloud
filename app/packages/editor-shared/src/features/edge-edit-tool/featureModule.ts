@@ -1,6 +1,11 @@
 import { sharedImport } from "../../sharedImport.js";
 import { EdgeEditTool } from "./edgeEditTool.js";
 import { SetEdgeRoutingFeedbackCommand } from "./edgeRoutingFeedback.js";
+import {
+    StartEdgeReconnectFeedbackCommand,
+    UpdateEdgeReconnectFeedbackCommand,
+    StopEdgeReconnectFeedbackCommand
+} from "./reconnectFeedback.js";
 
 const { FeatureModule, configureCommand, bindAsService, TYPES } = sharedImport("@eclipse-glsp/client");
 
@@ -12,4 +17,7 @@ export const edgeEditToolModule = new FeatureModule((bind, unbind, isBound) => {
     bindAsService({ bind }, TYPES.IDefaultTool, EdgeEditTool);
 
     configureCommand({ bind, isBound }, SetEdgeRoutingFeedbackCommand);
+    configureCommand({ bind, isBound }, StartEdgeReconnectFeedbackCommand);
+    configureCommand({ bind, isBound }, UpdateEdgeReconnectFeedbackCommand);
+    configureCommand({ bind, isBound }, StopEdgeReconnectFeedbackCommand);
 });

@@ -7,6 +7,7 @@ import {
     Multiplicity,
     Property,
     ClassExtension,
+    ClassExtensions,
     Class,
     AssociationEnd,
     Association,
@@ -82,6 +83,18 @@ export const ClassExtensionRule = createRule("ClassExtensionRule")
     .as(({ set }) => [set("class", ref(ClassOrImport, ID))]);
 
 /**
+ * Class extensions rule.
+ * Matches the extends keyword and list of class extensions.
+ */
+export const ClassExtensionsRule = createRule("ClassExtensionsRule")
+    .returns(ClassExtensions)
+    .as(({ add }) => [
+        "extends",
+        add("extensions", ClassExtensionRule),
+        many(",", add("extensions", ClassExtensionRule))
+    ]);
+
+/**
  * Class rule.
  * Matches a class definition with optional abstract modifier, name, inheritance, and properties.
  */
@@ -91,7 +104,7 @@ export const ClassRule = createRule("ClassRule")
         optional(flag("isAbstract", "abstract")),
         "class",
         set("name", ID),
-        optional("extends", add("extends", ClassExtensionRule), many(",", add("extends", ClassExtensionRule))),
+        optional(set("extensions", ClassExtensionsRule)),
         "{",
         many(or(add("properties", PropertyRule), NEWLINE)),
         "}"

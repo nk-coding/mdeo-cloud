@@ -205,11 +205,12 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         edges: Record<string, EdgeMetadata>
     ): void {
         for (const cls of classes) {
-            if (!cls.extends) {
+            const extensions = cls.extensions?.extensions ?? [];
+            if (extensions.length === 0) {
                 continue;
             }
 
-            for (const extendsDef of cls.extends) {
+            for (const extendsDef of extensions) {
                 if (extendsDef?.class?.ref == undefined) {
                     continue;
                 }
@@ -286,28 +287,36 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>
     ): void {
-        if (assoc.source != undefined && (assoc.source.name != undefined || assoc.source.multiplicity != undefined)) {
+        if (assoc.source != undefined) {
             const startId = idRegistry.getId(assoc.source);
-            nodes[`${startId}#property`] = {
-                type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
-                attrs: {}
-            };
-            nodes[`${startId}#multiplicity`] = {
-                type: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
-                attrs: {}
-            };
+            if (assoc.source.name != undefined) {
+                nodes[`${startId}#property`] = {
+                    type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
+                    attrs: {}
+                };
+            }
+            if (assoc.source.multiplicity != undefined) {
+                nodes[`${startId}#multiplicity`] = {
+                    type: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
+                    attrs: {}
+                };
+            }
         }
 
-        if (assoc.target != undefined && (assoc.target.name != undefined || assoc.target.multiplicity != undefined)) {
+        if (assoc.target != undefined) {
             const targetId = idRegistry.getId(assoc.target);
-            nodes[`${targetId}#property`] = {
-                type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
-                attrs: {}
-            };
-            nodes[`${targetId}#multiplicity`] = {
-                type: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
-                attrs: {}
-            };
+            if (assoc.target.name != undefined) {
+                nodes[`${targetId}#property`] = {
+                    type: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
+                    attrs: {}
+                };
+            }
+            if (assoc.target.multiplicity != undefined) {
+                nodes[`${targetId}#multiplicity`] = {
+                    type: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
+                    attrs: {}
+                };
+            }
         }
     }
 

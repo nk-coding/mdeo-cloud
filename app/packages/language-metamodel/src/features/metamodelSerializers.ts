@@ -9,6 +9,7 @@ import {
     RangeMultiplicity,
     Property,
     Class,
+    ClassExtensions,
     AssociationEnd,
     Association,
     MetaModel,
@@ -19,6 +20,7 @@ import {
     type RangeMultiplicityType,
     type PropertyType,
     type ClassType,
+    type ClassExtensionsType,
     type AssociationEndType,
     type AssociationType,
     type MetaModelType
@@ -40,6 +42,7 @@ export function registerMetamodelSerializers(services: LangiumCoreServices & Ast
     AstSerializer.registerNodeSerializer(RangeMultiplicity, (ctx) => printRangeMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(Property, (ctx) => printProperty(ctx));
     AstSerializer.registerNodeSerializer(Class, (ctx) => printClass(ctx));
+    AstSerializer.registerNodeSerializer(ClassExtensions, (ctx) => printClassExtensions(ctx));
     AstSerializer.registerNodeSerializer(AssociationEnd, (ctx) => printAssociationEnd(ctx));
     AstSerializer.registerNodeSerializer(Association, (ctx) => printAssociation(ctx));
     registerImportSerializers(services, doc.builders, ClassImport, ClassFileImport);
@@ -116,7 +119,7 @@ function printProperty(context: PrintContext<PropertyType>): Doc {
  * @returns The formatted class
  */
 function printClass(context: PrintContext<ClassType>): Doc {
-    const { ctx, printPrimitive, printReference, getPrimitive, path } = context;
+    const { ctx, printPrimitive, getPrimitive, path, print } = context;
     const docs: Doc[] = [];
 
     if (ctx.isAbstract) {
@@ -126,12 +129,9 @@ function printClass(context: PrintContext<ClassType>): Doc {
     docs.push("class ");
     docs.push(printPrimitive(getPrimitive(ctx, "name"), ID));
 
-    if (ctx.extends.length > 0) {
-        docs.push(" extends ");
-        const extendsRefs = path.map((extendsDef) => {
-            return extendsDef.call((ref) => printReference(ref, ID), "class");
-        }, "extends");
-        docs.push(join(", ", extendsRefs));
+    if (ctx.extensions != undefined) {
+        docs.push(" ");
+        docs.push(path.call(print, "extensions"));
     }
 
     docs.push(" {");
@@ -144,6 +144,22 @@ function printClass(context: PrintContext<ClassType>): Doc {
     docs.push("}");
 
     return group(docs);
+}
+
+/**
+ * Prints a class extensions node.
+ *
+ * @param context The print context
+ * @returns The formatted class extensions
+ */
+function printClassExtensions(context: PrintContext<ClassExtensionsType>): Doc {
+    const { path, printReference } = context;
+
+    const extendsRefs = path.map((extendsDef) => {
+        return extendsDef.call((ref) => printReference(ref, ID), "class");
+    }, "extensions");
+
+    return ["extends ", join(", ", extendsRefs)];
 }
 
 /**

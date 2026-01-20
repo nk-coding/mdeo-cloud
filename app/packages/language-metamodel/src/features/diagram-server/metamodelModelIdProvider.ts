@@ -124,7 +124,7 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * Generates ID for ClassExtension based on parent class and extension name.
      */
     private getClassExtensionName(node: PartialClassExtension): string {
-        const owningClass = node.$container as PartialClass | undefined;
+        const owningClass = node.$container?.$container as PartialClass | undefined;
         const parentClassName = owningClass != undefined ? this.getClassName(owningClass) : "unknownParent";
         const extensionName = this.resolveClassName(node.class);
         return `${parentClassName}_${extensionName}`;

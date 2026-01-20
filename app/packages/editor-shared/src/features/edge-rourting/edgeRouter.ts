@@ -1,7 +1,7 @@
 import type { Point } from "@eclipse-glsp/protocol";
 import { type Bounds as BoundsType } from "@eclipse-glsp/protocol";
 import type { EdgeLayoutMetadata, AnchorSide, EdgeAnchor } from "@mdeo/editor-protocol";
-import type { GEdge } from "../../model/edge.js";
+import type { GEdge, EdgeReconnectData } from "../../model/edge.js";
 import type { BoundsAware, ISnapper } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 
@@ -52,6 +52,11 @@ export class EdgeRouter {
      * @returns The route computation result
      */
     computeRoute(edge: GEdge): RouteComputationResult {
+        const reconnectData = edge.reconnectData as EdgeReconnectData | undefined;
+        if (reconnectData) {
+            return this.computeReconnectRoute(edge, reconnectData);
+        }
+
         const sourceBounds = (edge.index.getById(edge.sourceId) as BoundsAware | undefined)?.bounds;
         const targetBounds = (edge.index.getById(edge.targetId) as BoundsAware | undefined)?.bounds;
         const meta = edge.meta;
@@ -128,6 +133,72 @@ export class EdgeRouter {
             },
             sourceAnchor,
             targetAnchor
+        };
+    }
+
+    /**
+     * Computes the route for an edge in reconnect mode.
+     * Uses the reconnect position or anchor as one end and computes the route to the other end.
+     *
+     * @param edge The edge to compute the route for
+     * @param reconnectData The reconnect data
+     * @returns The route computation result
+     */
+    protected computeReconnectRoute(edge: GEdge, reconnectData: EdgeReconnectData): RouteComputationResult {
+        const isReconnectingSource = reconnectData.end === "source";
+        const fixedEndId = isReconnectingSource ? edge.targetId : edge.sourceId;
+        const fixedEndBounds = (edge.index.getById(fixedEndId) as BoundsAware | undefined)?.bounds;
+
+        if (fixedEndBounds == undefined) {
+            throw new Error("Cannot compute reconnect route: fixed end bounds are undefined.");
+        }
+
+        let fixedAnchor: EdgeAnchor;
+        let movingAnchor: EdgeAnchor;
+        let fixedPoint: Point;
+        let movingPoint: Point;
+
+        if (reconnectData.anchor && reconnectData.targetId) {
+            const targetBounds = (edge.index.getById(reconnectData.targetId) as BoundsAware | undefined)?.bounds;
+            if (!targetBounds) {
+                throw new Error("Cannot compute reconnect route: target bounds are undefined.");
+            }
+
+            movingAnchor = reconnectData.anchor;
+            movingPoint = this.anchorToPoint(movingAnchor, targetBounds);
+
+            const fixedProjection = this.projectAnchor(edge, movingPoint, fixedEndBounds);
+            fixedAnchor = fixedProjection.anchor;
+            fixedPoint = this.anchorToPoint(fixedAnchor, fixedEndBounds);
+        } else if (reconnectData.position) {
+            const fixedProjection = this.projectAnchor(edge, reconnectData.position, fixedEndBounds);
+            fixedAnchor = fixedProjection.anchor;
+            fixedPoint = this.anchorToPoint(fixedAnchor, fixedEndBounds);
+            movingPoint = reconnectData.position;
+            movingAnchor = { side: fixedAnchor.side, value: 0.5 };
+        } else {
+            throw new Error("Invalid reconnect data: must have either position or anchor");
+        }
+
+        const normalizedPoints = this.normalizeRoutingPoints(
+            isReconnectingSource ? movingPoint : fixedPoint,
+            isReconnectingSource ? movingAnchor.side : fixedAnchor.side,
+            [],
+            isReconnectingSource ? fixedPoint : movingPoint,
+            isReconnectingSource ? fixedAnchor.side : movingAnchor.side
+        );
+
+        const route = this.simplifyRoutingPoints([
+            isReconnectingSource ? movingPoint : fixedPoint,
+            ...normalizedPoints,
+            isReconnectingSource ? fixedPoint : movingPoint
+        ]);
+
+        return {
+            route,
+            meta: edge.meta,
+            sourceAnchor: isReconnectingSource ? movingAnchor : fixedAnchor,
+            targetAnchor: isReconnectingSource ? fixedAnchor : movingAnchor
         };
     }
 
@@ -285,10 +356,7 @@ export class EdgeRouter {
             chosen = candidates.reduce((a, b) => (a.distance < b.distance ? a : b));
             isDirect = true;
         } else {
-            if (
-                preferSide === "vertical" ||
-                (preferSide == undefined && Math.min(dxLeft, dxRight) < Math.min(dyTop, dyBottom))
-            ) {
+            if (preferSide === "vertical") {
                 chosen =
                     dxLeft < dxRight
                         ? { side: "left", distance: dxLeft, snapCoord: { x: left, y: point.y } }

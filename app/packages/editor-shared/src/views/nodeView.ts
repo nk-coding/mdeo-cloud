@@ -33,12 +33,10 @@ export abstract class GNodeView extends ShapeView {
      * Configuration for all resize handles (edges and corners)
      */
     private static readonly RESIZE_HANDLES: ResizeHandleConfig[] = [
-        // Edges
         { location: ResizeHandleLocation.Right, startPos: 1, endPos: 2 },
         { location: ResizeHandleLocation.Left, startPos: 3, endPos: 0 },
         { location: ResizeHandleLocation.Top, startPos: 0, endPos: 1 },
         { location: ResizeHandleLocation.Bottom, startPos: 2, endPos: 3 },
-        // Corners
         { location: ResizeHandleLocation.TopLeft, startPos: 0, endPos: 0 },
         { location: ResizeHandleLocation.TopRight, startPos: 1, endPos: 1 },
         { location: ResizeHandleLocation.BottomRight, startPos: 2, endPos: 2 },
@@ -83,11 +81,18 @@ export abstract class GNodeView extends ShapeView {
      * @returns The control elements
      */
     protected renderControlElements(model: Readonly<GNode>): VNode[] {
-        if (!model.selected) {
-            return [];
+        const result: VNode[] = [];
+
+        if (model.isReconnectTarget) {
+            result.push(...this.renderReconnectTargetBorder(model));
         }
+
+        if (!model.selected) {
+            return result;
+        }
+
         const zoom = findViewportZoom(model);
-        return [...this.renderSelectedRect(model, zoom), ...this.renderResizeHandles(model, zoom)];
+        return [...result, ...this.renderSelectedRect(model, zoom), ...this.renderResizeHandles(model, zoom)];
     }
 
     /**
@@ -232,5 +237,31 @@ export abstract class GNodeView extends ShapeView {
         const x = pos === 1 || pos === 2 ? model.bounds.width + scaledOffset : -scaledOffset;
         const y = pos < 2 ? -scaledOffset : model.bounds.height + scaledOffset;
         return { x, y };
+    }
+
+    /**
+     * Renders a semitransparent border when the node is a reconnect target.
+     *
+     * @param model The model of the element
+     * @returns The border elements
+     */
+    private renderReconnectTargetBorder(model: Readonly<GNode>): VNode[] {
+        const { width, height } = model.bounds;
+
+        return [
+            svg("path", {
+                class: {
+                    "stroke-primary/50": true,
+                    "stroke-[15px]": true,
+                    "fill-none": true,
+                    "non-scaling-stroke": true,
+                    "pointer-events-none": true,
+                    "[stroke-linejoin:round]": true
+                },
+                attrs: {
+                    d: `M0 0H${width}V${height}H0Z`
+                }
+            })
+        ];
     }
 }

@@ -2,6 +2,7 @@ import type { Fadeable, FluentIterable, Hoverable, Point, Selectable } from "@ec
 import { sharedImport } from "../sharedImport.js";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 import { GEdge } from "./edge.js";
+import type { Connectable } from "../features/edge-rourting/connectable.js";
 
 const { GShapeElement } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -10,7 +11,7 @@ const { GShapeElement } = sharedImport("@eclipse-glsp/sprotty");
  * Extends the GLSP node implementation to provide a foundation for custom nodes.
  * Can be used for both SVG and HTML-based nodes.
  */
-export class GNode extends GShapeElement implements Selectable, Fadeable, Hoverable {
+export class GNode extends GShapeElement implements Selectable, Fadeable, Hoverable, Connectable {
     /**
      * Metadata associated with the node for layout and other information.
      */
@@ -28,6 +29,11 @@ export class GNode extends GShapeElement implements Selectable, Fadeable, Hovera
      * Indicates whether the node is currently being hovered over.
      */
     hoverFeedback: boolean = false;
+
+    /**
+     * Indicates whether the node is currently a reconnect target.
+     */
+    isReconnectTarget: boolean = false;
 
     /**
      * Creates a new GNode instance.
@@ -48,6 +54,17 @@ export class GNode extends GShapeElement implements Selectable, Fadeable, Hovera
             enumerable: true,
             configurable: true
         });
+    }
+
+    /**
+     * Determines if a connection can be made to this node with the given edge and role.
+     *
+     * @param _edge the edge to connect
+     * @param _role the role of the connection ('source' or 'target')
+     * @returns true if the connection is allowed, false otherwise
+     */
+    canConnect(_edge: GEdge, _role: "source" | "target"): boolean {
+        return true;
     }
 
     /**

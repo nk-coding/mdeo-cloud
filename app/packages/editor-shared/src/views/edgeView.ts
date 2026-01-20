@@ -1,9 +1,10 @@
 import type { RenderingContext, IView, Point, Bounds } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
-import type { GEdge } from "../model/edge.js";
+import type { GEdge, EdgeReconnectData } from "../model/edge.js";
 import type { VNode } from "snabbdom";
 import { EdgeRouter, type RouteComputationResult } from "../features/edge-rourting/edgeRouter.js";
 import type { AnchorSide } from "@mdeo/editor-protocol";
+import { findViewportZoom } from "../base/findViewportZoom.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, Point: PointUtil } = sharedImport("@eclipse-glsp/sprotty");
@@ -82,6 +83,16 @@ export abstract class GEdgeView implements IView {
     protected attachmentDistanceBetween = 2;
 
     /**
+     * Size of the reconnect handle (in pixels at zoom 1.0)
+     */
+    protected static readonly RECONNECT_HANDLE_SIZE = 20;
+
+    /**
+     * Size of the inner reconnect handle (in pixels at zoom 1.0)
+     */
+    protected static readonly RECONNECT_HANDLE_INNER_SIZE = 10;
+
+    /**
      * Renders the edge element with optional markers, visible path, invisible selection path, and additional content.
      *
      * @param model The edge model to render
@@ -126,9 +137,17 @@ export abstract class GEdgeView implements IView {
         const attachments = this.getEdgeAttachments(model, context);
         children.push(...this.renderAttachments(attachments, routeResult));
 
+        if (isSelected(model) && route.length >= 2) {
+            children.push(...this.renderReconnectHandles(model, route));
+        }
+
         const rootClasses: Record<string, boolean> = {};
         if (!isSelected(model)) {
             rootClasses["cursor-pointer"] = true;
+        }
+        // Add pointer-events-none when reconnecting to prevent edge from interfering with target detection
+        if (model.reconnectData) {
+            rootClasses["pointer-events-none"] = true;
         }
 
         return svg("g", { class: rootClasses }, ...children);
@@ -623,8 +642,7 @@ export abstract class GEdgeView implements IView {
                     y1: route[i].y,
                     x2: route[i + 1].x,
                     y2: route[i + 1].y,
-                    "data-edge-segment-index": i,
-                    "data-edge-id": model.id
+                    "data-edge-segment-index": i
                 }
             });
             segments.push(segment);
@@ -649,5 +667,79 @@ export abstract class GEdgeView implements IView {
             path += ` L ${points[i].x} ${points[i].y}`;
         }
         return path;
+    }
+
+    /**
+     * Renders reconnect handles at the source and target of the edge.
+     * Only rendered when the edge is selected.
+     *
+     * @param model The edge model
+     * @param route The computed route
+     * @returns An array of VNodes for the reconnect handles
+     */
+    protected renderReconnectHandles(model: Readonly<GEdge>, route: Point[]): VNode[] {
+        const reconnectData = (model as any).reconnectData as EdgeReconnectData | undefined;
+        const zoom = findViewportZoom(model);
+        const handles: VNode[] = [];
+
+        const sourcePoint = route[0];
+        const targetPoint = route[route.length - 1];
+
+        const sourceActive = reconnectData?.end === "source";
+        const targetActive = reconnectData?.end === "target";
+
+        handles.push(this.renderReconnectHandle(sourcePoint, "source", zoom, sourceActive ?? false));
+        handles.push(this.renderReconnectHandle(targetPoint, "target", zoom, targetActive ?? false));
+
+        return handles;
+    }
+
+    /**
+     * Renders a single reconnect handle.
+     *
+     * @param position The position of the handle
+     * @param end The end type (source or target)
+     * @param zoom The current zoom level
+     * @param isActive Whether this handle is currently being dragged
+     * @returns The VNode for the handle
+     */
+    protected renderReconnectHandle(position: Point, end: "source" | "target", zoom: number, isActive: boolean): VNode {
+        const outerRadius = GEdgeView.RECONNECT_HANDLE_SIZE / 2 / zoom;
+        const innerRadius = GEdgeView.RECONNECT_HANDLE_INNER_SIZE / 2 / zoom;
+
+        return svg(
+            "g",
+            {},
+            svg("circle", {
+                attrs: {
+                    cx: position.x,
+                    cy: position.y,
+                    r: outerRadius,
+                    "data-reconnect-handle": end
+                },
+                class: {
+                    "fill-transparent": !isActive,
+                    "fill-primary/50": isActive,
+                    "hover:fill-primary/50": true,
+                    "non-scaling-stroke": true,
+                    "cursor-pointer": true
+                }
+            }),
+            svg("circle", {
+                attrs: {
+                    cx: position.x,
+                    cy: position.y,
+                    r: innerRadius,
+                    "data-reconnect-handle": end
+                },
+                class: {
+                    "fill-background": true,
+                    "stroke-primary": true,
+                    "stroke-[1.5px]": true,
+                    "non-scaling-stroke": true,
+                    "pointer-events-none": true
+                }
+            })
+        );
     }
 }
