@@ -28,7 +28,6 @@ const metamodelServicePlugin: ServicePluginDefinition = {
         id: "metamodel",
         name: "Metamodel",
         extension: ".mm",
-        defaultContent: undefined,
         icon: convertIcon(Network),
         serverPlugin: {
             import: "static/language.js"

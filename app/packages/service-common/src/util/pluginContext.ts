@@ -12,6 +12,7 @@ import * as glspGraph from "@eclipse-glsp/graph";
 import * as inversify from "inversify";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import * as vscodeLanguageserverTypes from "vscode-languageserver-types";
+import * as vscodeLanguageserverProtocol from "vscode-languageserver-protocol";
 
 /**
  * Initializes the plugin context with required dependencies.
@@ -30,6 +31,7 @@ export function initializePluginContext(): void {
         "@eclipse-glsp/graph": glspGraph,
         inversify,
         "vscode-jsonrpc": vscodeJsonrpc,
-        "vscode-languageserver-types": vscodeLanguageserverTypes
+        "vscode-languageserver-types": vscodeLanguageserverTypes,
+        "vscode-languageserver-protocol": vscodeLanguageserverProtocol
     });
 }

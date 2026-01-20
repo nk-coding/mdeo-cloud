@@ -28,7 +28,6 @@ const scriptServicePlugin: ServicePluginDefinition = {
         id: "script",
         name: "Script",
         extension: ".fn",
-        defaultContent: undefined,
         icon: convertIcon(FileCode),
         serverPlugin: {
             import: "static/language.js"

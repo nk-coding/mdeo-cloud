@@ -32,6 +32,7 @@ import type { ResolvedWorkbenchLanguagePlugin, WorkbenchPlugin } from "./plugin/
 import type { LanguageContributionPlugin } from "@mdeo/plugin";
 import type { ServerPlugin } from "./plugin/serverPlugin";
 import { resolvePlugin } from "./plugin/resolvePlugin";
+import type { ActionStartParams } from "@mdeo/language-common";
 
 /**
  * Manager for the overall state of the workbench
@@ -78,6 +79,13 @@ export class WorkbenchState {
      * Can be used as vue key to force re-creation of components
      */
     readonly clientVersionCounter = ref(0);
+
+    /**
+     * The pending action to trigger an action dialog flow.
+     * When set, the action dialog will be displayed.
+     * Only one action can be active at a time; setting a new action discards the current one.
+     */
+    readonly pendingAction = shallowRef<ActionStartParams>();
 
     /**
      * File type plugins provided by any plugin

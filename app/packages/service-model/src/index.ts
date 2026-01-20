@@ -40,7 +40,7 @@ const modelServicePlugin: ServicePluginDefinition = {
         id: "model",
         name: "Model",
         extension: ".m",
-        defaultContent: undefined,
+        newFileAction: true,
         icon: convertIcon(Network).map((entry) => {
             if (entry[0] === "rect") {
                 return [

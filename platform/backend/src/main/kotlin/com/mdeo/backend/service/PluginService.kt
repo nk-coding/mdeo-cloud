@@ -40,7 +40,7 @@ data class ManifestLanguagePlugin(
     val id: String,
     val name: String,
     val extension: String,
-    val defaultContent: String? = null,
+    val newFileAction: Boolean = false,
     val serverPlugin: ManifestServerPlugin,
     val editorPlugin: ManifestEditorPlugin? = null,
     val languageConfiguration: JsonObject,
@@ -68,6 +68,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
     private val pluginBaseUrl = config.baseUrl
+    private val internalPluginBaseUrl = config.internalBaseUrl
 
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
@@ -89,7 +90,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
                     val description = row[PluginsTable.description]
                     val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
                     val default = row[PluginsTable.default]
-                    createBackendPlugin(id, resolvePluginUrl(url), name, description, icon, default)
+                    createBackendPlugin(id, resolvePluginUrl(url, useInternal = false), name, description, icon, default)
                 }
         }
     }
@@ -112,7 +113,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
                     val description = row[PluginsTable.description]
                     val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
                     val default = row[PluginsTable.default]
-                    createBackendPlugin(id, resolvePluginUrl(url), name, description, icon, default)
+                    createBackendPlugin(id, resolvePluginUrl(url, useInternal = false), name, description, icon, default)
                 }
         }
     }
@@ -139,7 +140,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
             val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
             val default = row[PluginsTable.default]
 
-            success(createBackendPlugin(pluginId, resolvePluginUrl(url), name, description, icon, default))
+            success(createBackendPlugin(pluginId, resolvePluginUrl(url, useInternal = false), name, description, icon, default))
         }
     }
 
@@ -196,7 +197,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
             success(
                 createBackendPlugin(
                     pluginId,
-                    resolvePluginUrl(url),
+                    resolvePluginUrl(url, useInternal = false),
                     manifest.name,
                     manifest.description,
                     manifest.icon,
@@ -254,11 +255,13 @@ class PluginService(val config: PluginConfig) : BaseService() {
 
     /**
      * Fetches the plugin manifest from the plugin's GET / endpoint.
+     * Uses the internal base URL for backend-to-plugin communication.
      */
     private suspend fun fetchPluginManifest(url: String): PluginManifest {
         return withContext(Dispatchers.IO) {
+            val resolvedUrl = resolvePluginUrl(url, useInternal = true)
             val request = HttpRequest.newBuilder()
-                .uri(URI.create(resolvePluginUrl(url)))
+                .uri(URI.create(resolvedUrl))
                 .GET()
                 .timeout(Duration.ofSeconds(30))
                 .build()
@@ -283,7 +286,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
                 it[LanguagePluginsTable.pluginId] = pluginId
                 it[name] = lp.name
                 it[extension] = lp.extension
-                it[defaultContent] = lp.defaultContent
+                it[newFileAction] = lp.newFileAction
                 it[serverPluginImport] = lp.serverPlugin.import
                 it[editorPluginImport] = lp.editorPlugin?.import
                 it[editorStylesUrl] = lp.editorPlugin?.stylesUrl
@@ -539,7 +542,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
                 .firstOrNull() ?: return@transaction null
 
             val pluginId = result[LanguagePluginsTable.pluginId]
-            val pluginUrl = getPluginUrl(pluginId) ?: return@transaction null
+            val pluginUrl = getPluginUrl(pluginId, useInternal = false) ?: return@transaction null
             val languagePlugin = rowToLanguagePlugin(result, pluginUrl)
             Pair(pluginId, languagePlugin)
         }
@@ -568,7 +571,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
                 .firstOrNull() ?: return@transaction null
 
             val pluginId = result[LanguagePluginsTable.pluginId]
-            val pluginUrl = getPluginUrl(pluginId) ?: return@transaction null
+            val pluginUrl = getPluginUrl(pluginId, useInternal = false) ?: return@transaction null
             val languagePlugin = rowToLanguagePlugin(result, pluginUrl)
             Pair(pluginId, languagePlugin)
         }
@@ -578,15 +581,16 @@ class PluginService(val config: PluginConfig) : BaseService() {
      * Gets the URL for a plugin.
      *
      * @param pluginId The UUID of the plugin
+     * @param useInternal If true, returns internal URL for backend communication; if false, returns public URL for frontend
      * @return The resolved plugin URL, or null if not found
      */
-    fun getPluginUrl(pluginId: UUID): String? {
+    fun getPluginUrl(pluginId: UUID, useInternal: Boolean = false): String? {
         return transaction {
             PluginsTable.selectAll()
                 .where { PluginsTable.id eq pluginId }
                 .firstOrNull()
                 ?.get(PluginsTable.url)
-                ?.let { resolvePluginUrl(it) }
+                ?.let { resolvePluginUrl(it, useInternal) }
         }
     }
 
@@ -702,7 +706,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
             id = row[LanguagePluginsTable.id],
             name = row[LanguagePluginsTable.name],
             extension = row[LanguagePluginsTable.extension],
-            defaultContent = row[LanguagePluginsTable.defaultContent],
+            newFileAction = row[LanguagePluginsTable.newFileAction],
             serverPlugin = LanguageServerPlugin(
                 import = resolveUrl(row[LanguagePluginsTable.serverPluginImport], pluginUrl)
             ),
@@ -741,12 +745,13 @@ class PluginService(val config: PluginConfig) : BaseService() {
 
     /**
      * Resolves a plugin URL against the configured base URL.
-     * This is used to dynamically resolve plugin URLs when returning them to clients.
-     *
+     * 
      * @param pluginUrl The stored plugin URL (may be relative or absolute)
+     * @param useInternal If true, uses internal base URL for backend communication; if false, uses public base URL for frontend
      * @return The resolved absolute plugin URL
      */
-    private fun resolvePluginUrl(pluginUrl: String): String {
-        return resolveUrl(pluginUrl, pluginBaseUrl)
+    private fun resolvePluginUrl(pluginUrl: String, useInternal: Boolean = false): String {
+        val baseUrl = if (useInternal) internalPluginBaseUrl else pluginBaseUrl
+        return resolveUrl(pluginUrl, baseUrl)
     }
 }

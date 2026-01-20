@@ -34,8 +34,9 @@ services:
       CORS_ALLOWED_HOSTS: localhost:4242,localhost:5173,127.0.0.1:4242,127.0.0.1:5173
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
-      PLUGIN_BASE_URL: "workbench:80"
-      DEFAULT_PLUGIN_URLS: "http://service-metamodel:3000,http://service-model:3000,http://service-script:3000"
+      PLUGIN_BASE_URL: "http://localhost:4242"
+      INTERNAL_PLUGIN_BASE_URL: "http://workbench:80"
+      DEFAULT_PLUGIN_URLS: "/plugin/metamodel,/plugin/model,/plugin/script"
     depends_on:
       postgres:
         condition: service_healthy

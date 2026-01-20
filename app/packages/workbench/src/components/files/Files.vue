@@ -113,7 +113,7 @@ function handleSelect(entry: FileSystemNode) {
 
 async function handleCreateFile(uri: Uri, fileType: ResolvedWorkbenchLanguagePlugin) {
     const fileService = monacoApi.fileService;
-    await fileService.createFile(uri, VSBuffer.fromString(fileType.defaultContent ?? ""));
+    await fileService.createFile(uri, VSBuffer.fromString(""));
     await nextTick();
 
     const file = findFileInTree(rootFolder, uri);
@@ -131,6 +131,16 @@ async function handleCreateFile(uri: Uri, fileType: ResolvedWorkbenchLanguagePlu
             };
             tabs.value.push(newTab);
             workbenchState.activeTab.value = newTab;
+        }
+
+        if (fileType.newFileAction === true) {
+            workbenchState.pendingAction.value = {
+                type: "new-file",
+                languageId: fileType.id,
+                data: {
+                    filePath: uri.toString()
+                }
+            };
         }
     }
 }

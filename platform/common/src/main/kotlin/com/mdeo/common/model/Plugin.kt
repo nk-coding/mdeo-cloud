@@ -87,7 +87,7 @@ data class BackendLanguagePlugin(
     val id: String,
     val name: String,
     val extension: String,
-    val defaultContent: String? = null,
+    val newFileAction: Boolean = false,
     val serverPlugin: LanguageServerPlugin,
     val editorPlugin: LanguageEditorPlugin? = null,
     val languageConfiguration: JsonObject,

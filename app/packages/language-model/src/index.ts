@@ -1,3 +1,4 @@
+export * from "./features/modelActionHandler.js";
 export * from "./features/modelExternalReferenceCollector.js";
 export * from "./features/modelScopeProvider.js";
 export * from "./grammar/modelRules.js";

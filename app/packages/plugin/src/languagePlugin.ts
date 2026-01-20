@@ -38,9 +38,9 @@ export interface LanguagePlugin {
      */
     extension: string;
     /**
-     * Optional default content for new files of this type
+     * When true, an action dialog will be triggered when a new file is created
      */
-    defaultContent?: string;
+    newFileAction?: boolean;
     /**
      * Server plugin for the language
      */

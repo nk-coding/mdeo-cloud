@@ -1056,6 +1056,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 https://github.com/hylimo/hylimo
 files:
   - src/features/viewport/viewport.ts
+  - src/features/viewport/fitToScreenAction.ts
+  - src/features/viewport/setModelActionHandler.ts
+  - src/features/pointer-tool/
 
 Eclipse Public License - v 2.0
 

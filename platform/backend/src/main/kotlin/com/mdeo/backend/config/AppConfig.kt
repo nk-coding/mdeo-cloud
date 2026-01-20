@@ -75,6 +75,8 @@ data class AppConfig(
                 ),
                 plugin = PluginConfig(
                     baseUrl = System.getenv("PLUGIN_BASE_URL"),
+                    internalBaseUrl = System.getenv("INTERNAL_PLUGIN_BASE_URL") 
+                        ?: System.getenv("PLUGIN_BASE_URL"),
                     forceHttp1 = System.getenv("PLUGIN_FORCE_HTTP1")?.toBoolean() ?: false,
                     defaultPluginUrls = System.getenv("DEFAULT_PLUGIN_URLS")
                         ?.split(",")
@@ -151,12 +153,14 @@ data class DefaultAdminConfig(
 /**
  * Plugin system configuration.
  *
- * @property baseUrl Base URL for resolving relative plugin URLs
+ * @property baseUrl Base URL for resolving relative plugin URLs (public URL exposed to frontend)
+ * @property internalBaseUrl Base URL for internal backend-to-plugin communication
  * @property forceHttp1 Whether to force HTTP/1.1 for plugin requests
  * @property defaultPluginUrls List of plugin URLs to initialize as default plugins at startup
  */
 data class PluginConfig(
     val baseUrl: String,
+    val internalBaseUrl: String,
     val forceHttp1: Boolean,
     val defaultPluginUrls: List<String> = emptyList()
 )

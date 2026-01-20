@@ -34,6 +34,7 @@
     <Teleport to="head">
         <link v-for="styleUrl in pluginStylesUrls" rel="stylesheet" :href="styleUrl" as="style" />
     </Teleport>
+    <ActionDialog :workbench-state="workbenchState" />
 </template>
 <script setup lang="ts">
 import { computed, provide, ref, Teleport, useTemplateRef, watch } from "vue";
@@ -43,6 +44,7 @@ import Sidebar from "../sidebar/Sidebar.vue";
 import SidebarRail from "../sidebar/SidebarRail.vue";
 import Editor from "../editor/Editor.vue";
 import WorkbenchBackground from "./WorkbenchBackground.vue";
+import ActionDialog from "../action/ActionDialog.vue";
 import { useResizeObserver } from "@vueuse/core";
 import { SplitterPanel } from "reka-ui";
 import { authStateKey, workbenchStateKey } from "./util";
@@ -118,4 +120,16 @@ const pluginStylesUrls = computed(() =>
         .map((plugin) => plugin.editorPlugin?.stylesUrl)
         .filter((url) => url != undefined)
 );
+
+/**
+ * Triggers the demo action dialog by setting the pending action.
+ * This demonstrates the action dialog feature with multi-step forms.
+ */
+function triggerDemoAction(): void {
+    props.workbenchState.pendingAction.value = {
+        type: "demo",
+        languageId: "model",
+        data: {}
+    };
+}
 </script>

@@ -6,6 +6,7 @@ import {
 import { ModelRule, ModelTerminals } from "./grammar/modelRules.js";
 import {
     addExternalReferenceCollectionPhase,
+    type ActionAdditionalServices,
     DefaultAstSerializer,
     IdValueConverter,
     NewlineAwareTokenBuilder,
@@ -13,8 +14,9 @@ import {
 } from "@mdeo/language-shared";
 import { ModelScopeProvider } from "./features/modelScopeProvider.js";
 import { ModelExternalReferenceCollector } from "./features/modelExternalReferenceCollector.js";
+import { ModelActionHandler } from "./features/modelActionHandler.js";
 
-export type ModelServices = ExternalReferenceAdditionalServices;
+export type ModelServices = ExternalReferenceAdditionalServices & ActionAdditionalServices;
 
 /**
  * The plugin for the Model language.
@@ -35,7 +37,10 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
         lsp: {
             Formatter: (services) => new SerializerFormatter(services)
         },
-        AstSerializer: (services) => new DefaultAstSerializer(services)
+        AstSerializer: (services) => new DefaultAstSerializer(services),
+        action: {
+            ActionHandler: (services) => new ModelActionHandler(services.shared)
+        }
     },
     postCreate(services) {
         addExternalReferenceCollectionPhase(services);

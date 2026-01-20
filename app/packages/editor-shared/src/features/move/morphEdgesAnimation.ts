@@ -166,9 +166,9 @@ export class MorphEdgesAnimation extends Animation {
      * automatically choose the shortest clockwise or counter-clockwise
      * direction.
      *
-     * @param start - Starting anchor
-     * @param end - Ending anchor
-     * @param t - Interpolation factor in the range [0, 1]
+     * @param start Starting anchor
+     * @param end Ending anchor
+     * @param t Interpolation factor in the range [0, 1]
      * @returns The interpolated anchor
      */
     protected interpolateAnchor(start: EdgeAnchor, end: EdgeAnchor, t: number): EdgeAnchor {
@@ -195,7 +195,7 @@ export class MorphEdgesAnimation extends Animation {
      * - [2, 3)   : bottom
      * - [3, 4)   : left
      *
-     * @param anchor - Anchor to convert
+     * @param anchor Anchor to convert
      * @returns Perimeter position in the range [0, 4)
      */
     private anchorToPerimeter(anchor: EdgeAnchor): number {
@@ -214,7 +214,7 @@ export class MorphEdgesAnimation extends Animation {
     /**
      * Wraps a perimeter position so it stays within [0, 4).
      *
-     * @param p - Perimeter position
+     * @param p Perimeter position
      * @returns Wrapped perimeter position
      */
     private wrapPerimeter(p: number): number {
@@ -225,7 +225,7 @@ export class MorphEdgesAnimation extends Animation {
     /**
      * Converts a perimeter position back into an anchor.
      *
-     * @param p - Perimeter position in the range [0, 4)
+     * @param p Perimeter position in the range [0, 4)
      * @returns Corresponding anchor
      */
     private perimeterToAnchor(p: number): EdgeAnchor {

@@ -4,8 +4,8 @@ FROM node:22-alpine AS workbench-builder
 WORKDIR /build
 COPY app/ ./
 
-RUN npm install
-RUN npm run build -w @mdeo/workbench
+RUN npm ci
+RUN npm run build
 
 # Workbench runtime (nginx)
 FROM nginx:alpine AS workbench

@@ -139,7 +139,7 @@ class FileDataService(
         }
 
         val (pluginId, languagePlugin) = pluginInfo
-        val pluginUrl = pluginService.getPluginUrl(pluginId)
+        val pluginUrl = pluginService.getPluginUrl(pluginId, useInternal = true)
             ?: return fileDataFailure(
                 ErrorCodes.PLUGIN_NOT_FOUND,
                 "Plugin URL not found"

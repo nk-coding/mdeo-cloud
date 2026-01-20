@@ -31,6 +31,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       PLUGIN_BASE_URL: ${PLUGIN_BASE_URL}
+      INTERNAL_PLUGIN_BASE_URL: ${INTERNAL_PLUGIN_BASE_URL:-http://workbench:80}
       DEFAULT_PLUGIN_URLS: ${DEFAULT_PLUGIN_URLS:-http://service-metamodel:3000,http://service-model:3000,http://service-script:3000}
     depends_on:
       postgres:

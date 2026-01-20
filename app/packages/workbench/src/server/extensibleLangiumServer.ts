@@ -17,6 +17,7 @@ import * as glspGraph from "@eclipse-glsp/graph";
 import * as inversify from "inversify";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import * as vscodeLanguageserverTypes from "vscode-languageserver-types";
+import * as vscodeLanguageserverProtocol from "vscode-languageserver-protocol";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import {
@@ -39,6 +40,7 @@ import type {
 } from "langium";
 import { lspFileSystem } from "./lspFileSystem";
 import { NoopExternalReferenceResolver } from "./noopExternalReferenceResolver";
+import { addActionHandlers } from "./actionHandlers";
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
@@ -56,7 +58,8 @@ const pluginContext = {
     "@eclipse-glsp/graph": glspGraph,
     inversify,
     "vscode-jsonrpc": vscodeJsonrpc,
-    "vscode-languageserver-types": vscodeLanguageserverTypes
+    "vscode-languageserver-types": vscodeLanguageserverTypes,
+    "vscode-languageserver-protocol": vscodeLanguageserverProtocol
 };
 
 initializePluginContext(pluginContext);
@@ -164,4 +167,5 @@ const shared = createLanguageServices({ connection, ...lspFileSystem(connection)
 connection.sendNotification(ServerReadyNotification.method, {});
 
 configureGLSPServer(shared);
+addActionHandlers(connection, shared, pluginContext);
 langiumLsp.startLanguageServer(shared);
