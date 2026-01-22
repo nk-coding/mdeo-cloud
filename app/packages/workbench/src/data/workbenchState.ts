@@ -20,6 +20,7 @@ import {
     ReadDirectoryRequest,
     ReadMetadataRequest,
     WriteMetadataRequest,
+    TriggerActionNotification,
     type ReadFileParams,
     type StatParams,
     type StatResponse,
@@ -538,6 +539,9 @@ export class WorkbenchState {
         // Register file system request handlers
         this.registerFileSystemHandlers(languageClient);
 
+        // Register action notification handlers
+        this.registerActionHandlers(languageClient);
+
         languageClient.start();
 
         setTimeout(async () => {
@@ -619,6 +623,18 @@ export class WorkbenchState {
             if (!result.success) {
                 throw new Error("Failed to write metadata");
             }
+        });
+    }
+
+    /**
+     * Registers action notification handlers on the language client.
+     * Handles notifications from the language server to trigger action dialogs.
+     *
+     * @param client The language client to register handlers on
+     */
+    private registerActionHandlers(client: MonacoLanguageClient) {
+        client.onNotification(TriggerActionNotification.type, (params) => {
+            this.pendingAction.value = params;
         });
     }
 }

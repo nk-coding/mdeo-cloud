@@ -1,19 +1,19 @@
-import type { ActionHandler } from "./actionHandler.js";
+import type { ActionHandlerRegistry } from "./actionHandlerRegistry.js";
 import type { ActionProvider } from "./actionProvider.js";
 
 /**
- * Additional services for action support.
+ * Additional services for action handler registry support.
  * Extends Langium's language-specific services with action handling capabilities.
  */
-export interface ActionAdditionalServices {
+export interface ActionHandlerRegistryAdditionalServices {
     /**
      * Action services namespace
      */
     action: {
         /**
-         * The action service for handling dialog flows
+         * The action handler registry for managing action handlers
          */
-        ActionHandler: ActionHandler;
+        ActionHandlerRegistry: ActionHandlerRegistry;
         /**
          * The action provider for getting available file actions
          */

@@ -66,9 +66,6 @@ const props = withDefaults(
 
 const model = defineModel<unknown>();
 
-
-
-
 const elements = computed(() => {
     if (Array.isArray(model.value)) {
         return model.value;
@@ -76,22 +73,11 @@ const elements = computed(() => {
     return [];
 });
 
-
-
-
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
-
-
-
 
 function addElement(): void {
     model.value = [...elements.value, generateDefaultValue(props.schema.elements)];
 }
-
-
-
-
-
 
 function removeElement(index: number): void {
     model.value = elements.value.filter((_, i) => i !== index);

@@ -192,7 +192,7 @@ async function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
     if (event instanceof KeyboardEvent) {
         event.preventDefault();
     }
-    
+
     const reportUri = Uri.file(`/${project.value!.id}/executions/${props.executionData.execution.id}/report.md`);
 
     await monacoApi.editorService.openEditor({

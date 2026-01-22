@@ -14,7 +14,11 @@ import {
     DefaultAstSerializer,
     SerializerFormatter,
     registerDefaultTokenSerializers,
-    addExternalReferenceCollectionPhase
+    addExternalReferenceCollectionPhase,
+    type ActionHandlerRegistryAdditionalServices,
+    DefaultActionProvider,
+    DefaultWorkspaceEditService,
+    ActionHandlerRegistry
 } from "@mdeo/language-shared";
 import { MetamodelScopeProvider } from "./features/metamodelScopeProvider.js";
 import { registerMetamodelSerializers } from "./features/metamodelSerializers.js";
@@ -22,11 +26,12 @@ import { MetamodelDiagramModule } from "./features/diagram-server/metamodelDiagr
 import { MetamodelNameProvider } from "./features/metamodelNameProvider.js";
 import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.js";
 import { MetamodelExternalReferenceCollector } from "./features/metamodelExternalReferenceCollector.js";
+import { ImportClassActionHandler } from "./action-handlers/importClassActionHandler.js";
 
 /**
  * The additional services for the Metamodel language.
  */
-export type MetamodelServices = ExternalReferenceAdditionalServices;
+export type MetamodelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
 /**
  * The plugin for the Metamodel language.
@@ -49,7 +54,18 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
         lsp: {
             Formatter: (services) => new SerializerFormatter(services)
         },
-        AstSerializer: (services) => new DefaultAstSerializer(services)
+        AstSerializer: (services) => new DefaultAstSerializer(services),
+        action: {
+            ActionHandlerRegistry: (services) => {
+                const registry = new ActionHandlerRegistry();
+                registry.register("import-class", new ImportClassActionHandler(services));
+                return registry;
+            },
+            ActionProvider: () => new DefaultActionProvider()
+        },
+        workspace: {
+            WorkspaceEdit: (services) => new DefaultWorkspaceEditService(services)
+        }
     },
     postCreate(services) {
         registerDefaultTokenSerializers(services);

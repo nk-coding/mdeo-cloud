@@ -1,5 +1,9 @@
 <template>
-    <div ref="sprottyWrapper" class="sprotty-wrapper w-full h-full relative ml-1.5">
+    <div
+        ref="sprottyWrapper"
+        class="sprotty-wrapper w-full h-full relative ml-1.5"
+        :class="{ [`editor-${languagePlugin.id}`]: true }"
+    >
         <div v-if="graphicalEditorPlugin != undefined" :id="id"></div>
     </div>
 </template>
@@ -13,17 +17,17 @@ import { MonacoGLSPClient } from "./glspClient";
 import { DiagramLoader } from "@eclipse-glsp/client";
 import { editorContextKey } from "@/lib/editorPlugin";
 import { useResizeObserver } from "@vueuse/core";
-import { ResetCanvasBoundsAction } from "@mdeo/editor-protocol";
+import type { ResetCanvasBoundsAction } from "@mdeo/editor-protocol";
 import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { TYPES } from "@eclipse-glsp/sprotty";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 
 const props = defineProps<{
     tab: EditorTab;
-    languagePlugin: ResolvedWorkbenchLanguagePlugin
+    languagePlugin: ResolvedWorkbenchLanguagePlugin;
 }>();
 
-const { languagePluginByExtension, languageClient } = inject(workbenchStateKey)!;
+const { languageClient } = inject(workbenchStateKey)!;
 const editorContext = inject(editorContextKey)!;
 
 const id = useId();
@@ -35,7 +39,7 @@ const graphicalEditorPlugin = computed(() => {
 });
 
 useResizeObserver(sprottyWrapper, () => {
-    actionDispatcher.value?.dispatch({ kind: ResetCanvasBoundsAction.KIND } satisfies ResetCanvasBoundsAction);
+    actionDispatcher.value?.dispatch({ kind: "resetCanvasBoundsAction" } satisfies ResetCanvasBoundsAction);
 });
 
 onMounted(async () => {

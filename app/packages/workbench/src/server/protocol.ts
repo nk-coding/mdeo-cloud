@@ -1,5 +1,6 @@
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
-import { RequestType } from "vscode-languageserver-protocol";
+import { NotificationType, RequestType } from "vscode-languageserver-protocol";
+import type { ActionStartParams } from "@mdeo/language-common";
 
 /**
  * Namespace for the get plugins request
@@ -179,4 +180,15 @@ export namespace WriteMetadataRequest {
      * Request type for writing file metadata
      */
     export const type = new RequestType<WriteMetadataParams, void, any>("fs/writeMetadata");
+}
+
+/**
+ * Namespace for the trigger action notification.
+ * This notification is sent from the language server to trigger an action dialog in the workbench.
+ */
+export namespace TriggerActionNotification {
+    /**
+     * Notification type for triggering an action dialog
+     */
+    export const type = new NotificationType<ActionStartParams>("action/trigger");
 }

@@ -51,7 +51,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { workbenchStateKey } from "../workbench/util";
 import { watchArray } from "@vueuse/core";
-import { ActionDisplayLocation, createActionProtocol, type FileMenuActionData, type FileAction } from "@mdeo/language-common";
+import {
+    ActionDisplayLocation,
+    createActionProtocol,
+    type FileMenuActionData,
+    type FileAction
+} from "@mdeo/language-common";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import { getFileExtension } from "@/data/filesystem/util";
 
@@ -178,7 +183,7 @@ function handleActionClick(action: FileAction): void {
         languageId: languagePlugin.id,
         data: {
             uri: tab.fileUri.toString()
-        }satisfies FileMenuActionData
+        } satisfies FileMenuActionData
     };
 }
 

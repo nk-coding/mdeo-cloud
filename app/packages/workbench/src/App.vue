@@ -24,7 +24,7 @@ import BaseSidebarRail from "./components/sidebar/BaseSidebarRail.vue";
 import { useColorMode } from "@vueuse/core";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/sonner";
-import 'vue-sonner/style.css'
+import "vue-sonner/style.css";
 
 const monaco = inject(monacoApiProviderKey)!;
 const backendApi = new BackendApi();
@@ -36,7 +36,7 @@ const authState = new AuthState(backendApi, () => {
 
 const isCheckingAuth = ref(true);
 
-const theme =useColorMode();
+const theme = useColorMode();
 
 onMounted(async () => {
     await authState.checkAuthentication();

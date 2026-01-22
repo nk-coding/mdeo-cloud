@@ -9,6 +9,7 @@ import type { MetadataFileSystemProviderAdditionalServices } from "../protocol/m
 import type { AstSerializerAdditionalServices } from "../protocol/astSerializer.js";
 import type { ServerContributionPlugin } from "@mdeo/plugin";
 import type { ExternalReferenceSharedAdditionalServices } from "../protocol/externalReference.js";
+import type { WorkspaceEditAdditionalServices } from "../protocol/workspaceEditAdditionalServices.js";
 
 /**
  * Combined language services including GLSP shared additional services
@@ -16,7 +17,8 @@ import type { ExternalReferenceSharedAdditionalServices } from "../protocol/exte
 export type LanguageServices = ExtendedLangiumServices &
     MetadataFileSystemProviderAdditionalServices & {
         shared: GLSPSharedAdditionalServices & ExternalReferenceSharedAdditionalServices;
-    } & AstSerializerAdditionalServices;
+    } & AstSerializerAdditionalServices &
+    WorkspaceEditAdditionalServices;
 
 /**
  * Partial type for language services including GLSP shared additional services

@@ -15,6 +15,7 @@ import { AstReflectionKey, LanguageServicesKey } from "./langiumServices.js";
 import { ModelIdProvider } from "./modelIdProvider.js";
 import { ChangeBoundsOperationHandler } from "./handler/changeBoundsOperationHandler.js";
 import { PartialChangeBoundsOperationHandler } from "./handler/partialChangeBoundsOperationHandler.js";
+import { TriggerActionOperationHandler } from "./handler/triggerActionOperationHandler.js";
 import { UpdateRoutingInformationOperationHandler } from "./handler/updateRoutingInformationOperationHandler.js";
 import { MetadataManager } from "./metadataManager.js";
 import { UpdateClientOperationHandler } from "./handler/updateClientHandler.js";
@@ -90,6 +91,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         binding.add(UpdateClientOperationHandler);
         binding.add(ChangeBoundsOperationHandler);
         binding.add(PartialChangeBoundsOperationHandler);
+        binding.add(TriggerActionOperationHandler);
         binding.add(UpdateRoutingInformationOperationHandler);
     }
 

@@ -3,7 +3,13 @@ import { sharedImport } from "../sharedImport.js";
 import type { EdgeLayoutMetadata, EdgeAnchor } from "@mdeo/editor-protocol";
 import type { Point } from "@eclipse-glsp/protocol";
 
-const { GChildElement, selectFeature, moveFeature, Point: PointOrigin } = sharedImport("@eclipse-glsp/sprotty");
+const {
+    GChildElement,
+    selectFeature,
+    moveFeature,
+    Point: PointOrigin,
+    deletableFeature
+} = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * Type of reconnect end - source or target.
@@ -38,7 +44,7 @@ export interface EdgeReconnectData {
  * Extends the GLSP edge implementation with metadata and routing support.
  */
 export class GEdge extends GChildElement implements Selectable, Locateable {
-    static readonly DEFAULT_FEATURES = [selectFeature, moveFeature];
+    static readonly DEFAULT_FEATURES = [selectFeature, moveFeature, deletableFeature];
 
     /**
      * The metadata for this edge, including routing information.

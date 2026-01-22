@@ -41,6 +41,8 @@ export * from "./protocol/defaultActions.js";
 export * from "./protocol/externalReference.js";
 export * from "./protocol/glsp.js";
 export * from "./protocol/metadataFileSystemProvider.js";
+export * from "./protocol/triggerAction.js";
+export * from "./protocol/workspaceEditAdditionalServices.js";
 export * from "./util/assertUnreachable.js";
 export * from "./util/convertIcon.js";
 export * from "./util/partialAstNode.js";

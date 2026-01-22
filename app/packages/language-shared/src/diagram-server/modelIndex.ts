@@ -19,6 +19,11 @@ export class GModelIndex extends BaseGModelIndex {
     protected idToAstNode = new Map<string, AstNode>();
 
     /**
+     * Reverse mapping from AST nodes to their corresponding model element IDs.
+     */
+    protected astNodeToId = new Map<AstNode, string>();
+
+    /**
      * Indexes the source model root AST nodes.
      *
      * @param root the source model root AST node
@@ -26,9 +31,12 @@ export class GModelIndex extends BaseGModelIndex {
      */
     indexSourceModelRoot(root: AstNode, idRegistry: ModelIdRegistry): void {
         this.idToAstNode.clear();
+        this.astNodeToId.clear();
         for (const node of AstUtils.streamAst(root)) {
             if (idRegistry.hasId(node)) {
-                this.idToAstNode.set(idRegistry.getId(node), node);
+                const id = idRegistry.getId(node);
+                this.idToAstNode.set(id, node);
+                this.astNodeToId.set(node, id);
             }
         }
     }
@@ -42,6 +50,16 @@ export class GModelIndex extends BaseGModelIndex {
     getAstNode(node: GModelElement): AstNode | undefined {
         const normalizedId = this.normalizeId(node.id);
         return this.idToAstNode.get(normalizedId);
+    }
+
+    /**
+     * Gets the element ID corresponding to the given AST node.
+     *
+     * @param node the AST node
+     * @returns the corresponding element ID, or undefined if not found
+     */
+    getElementId(node: AstNode): string | undefined {
+        return this.astNodeToId.get(node);
     }
 
     /**

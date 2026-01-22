@@ -9,6 +9,7 @@ import { moveModule } from "./move/featureModule.js";
 import { pointerToolModule } from "./pointer-tool/featureModule.js";
 import { reconnectEdgeModule } from "./reconnect-edge/featureModule.js";
 import { viewportModule } from "./viewport/featureModule.js";
+import { toolboxModule } from "./toolbox/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
@@ -23,6 +24,7 @@ import { viewportModule } from "./viewport/featureModule.js";
  * - moveModule: Enhanced move command with custom edge morphing animations
  * - pointerToolModule: Pointer event handling and capture support
  * - reconnectEdgeModule: Reconnect edge operation support with metadata updates
+ * - toolboxModule: Toolbox UI for tool selection and element palette
  */
 export const DEFAULT_MODULES = [
     boundsModule,
@@ -35,5 +37,6 @@ export const DEFAULT_MODULES = [
     moveModule,
     pointerToolModule,
     reconnectEdgeModule,
-    viewportModule
+    viewportModule,
+    toolboxModule
 ];

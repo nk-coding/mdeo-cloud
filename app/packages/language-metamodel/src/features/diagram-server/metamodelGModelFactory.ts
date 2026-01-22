@@ -10,7 +10,8 @@ import type {
     PartialAssociation,
     PartialMultiplicity,
     PartialClassImport,
-    PartialClassExtension
+    PartialClassExtension,
+    PartialAssociationEnd
 } from "../../grammar/metamodelPartialTypes.js";
 import { GClassNode } from "./model/classNode.js";
 import { GInheritanceEdge } from "./model/inheritanceEdge.js";
@@ -366,24 +367,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         this.applyRoutingPoints(edge, metadata);
 
         if (assoc.source != undefined) {
-            const startNodes = this.createAssociationEndNodes(
-                idRegistry.getId(assoc.source),
-                assoc.source.name,
-                assoc.source.multiplicity,
-                "source",
-                validatedMetadata
-            );
+            const startNodes = this.createAssociationEndNodes(idRegistry, assoc.source, "source", validatedMetadata);
             edge.children.push(...startNodes);
         }
 
         if (assoc.target != undefined) {
-            const targetNodes = this.createAssociationEndNodes(
-                idRegistry.getId(assoc.target),
-                assoc.target.name,
-                assoc.target.multiplicity,
-                "target",
-                validatedMetadata
-            );
+            const targetNodes = this.createAssociationEndNodes(idRegistry, assoc.target, "target", validatedMetadata);
             edge.children.push(...targetNodes);
         }
 
@@ -393,24 +382,24 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
     /**
      * Creates nodes for an association endpoint with property name and/or multiplicity.
      *
-     * @param baseId The base ID for the nodes
-     * @param property The property name (optional)
-     * @param multiplicity The multiplicity (optional)
+     * @param idRegistry The ID registry for AST node ID generation
+     * @param associationEnd The association end definition
      * @param target Whether this is at "source" or "target" of the association
      * @param validatedMetadata The validated metadata containing node placement
      * @returns An array of created nodes (property and/or multiplicity)
      */
     private createAssociationEndNodes(
-        baseId: string,
-        property: string | undefined,
-        multiplicity: PartialMultiplicity | undefined,
+        idRegistry: ModelIdRegistry,
+        associationEnd: PartialAssociationEnd,
         target: "source" | "target",
         validatedMetadata: GraphMetadata
     ): GModelElement[] {
         const nodes: GModelElement[] = [];
+        const property = associationEnd.name;
+        const multiplicity = associationEnd.multiplicity;
 
         if (property != undefined) {
-            const propertyId = `${baseId}#property`;
+            const propertyId = idRegistry.getId(associationEnd);
             const propertyMeta = validatedMetadata.nodes[propertyId];
             const metadata =
                 propertyMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(propertyMeta.meta)
@@ -426,7 +415,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         }
 
         if (multiplicity != undefined) {
-            const multiplicityId = `${baseId}#multiplicity`;
+            const multiplicityId = idRegistry.getId(multiplicity);
             const multiplicityMeta = validatedMetadata.nodes[multiplicityId];
             const metadata =
                 multiplicityMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(multiplicityMeta.meta)

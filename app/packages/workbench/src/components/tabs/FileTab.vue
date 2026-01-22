@@ -15,7 +15,10 @@
                     @dblclick="tab.temporary = false"
                     @click.middle="handleClose"
                 >
-                    <FileTypeIcon :model-value="languagePluginByExtension.get(getFileExtension(tab.fileUri.path))" class="size-4" />
+                    <FileTypeIcon
+                        :model-value="languagePluginByExtension.get(getFileExtension(tab.fileUri.path))"
+                        class="size-4"
+                    />
                     <span class="truncate max-w-64" :class="{ italic: tab.temporary }">{{ fileName }}</span>
                     <span
                         @click.stop="handleClose"
@@ -30,19 +33,11 @@
                 </TabsTrigger>
             </ContextMenuTrigger>
             <ContextMenuContent>
-                <ContextMenuItem @click="handleClose">
-                    Close
-                </ContextMenuItem>
-                <ContextMenuItem @click="emit('closeOthers', tab)">
-                    Close Others
-                </ContextMenuItem>
-                <ContextMenuItem @click="emit('closeToRight', tab)">
-                    Close to the Right
-                </ContextMenuItem>
+                <ContextMenuItem @click="handleClose"> Close </ContextMenuItem>
+                <ContextMenuItem @click="emit('closeOthers', tab)"> Close Others </ContextMenuItem>
+                <ContextMenuItem @click="emit('closeToRight', tab)"> Close to the Right </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem @click="emit('closeAll')">
-                    Close All
-                </ContextMenuItem>
+                <ContextMenuItem @click="emit('closeAll')"> Close All </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>
     </div>

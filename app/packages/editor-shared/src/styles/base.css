@@ -1,6 +1,8 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss/utilities.css" layer(utilities);
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
     --color-foreground: var(--editor-foreground);
     --color-primary: var(--editor-primary);
@@ -10,6 +12,13 @@
     --color-ring: var(--editor-ring);
     --spacing: var(--editor-spacing);
     --font-weight-bold: var(--editor-font-weight-bold);
+    --color-accent: var(--editor-accent);
+    --color-accent-foreground: var(--editor-accent-foreground);
+    --color-border: var(--editor-border);
+    --color-input: var(--editor-input);
+    --color-popover: var(--editor-popover);
+    --color-muted-foreground: var(--editor-muted-foreground);
+    --color-toolbox: var(--editor-toolbox);
 }
 
 @utility non-scaling-stroke {

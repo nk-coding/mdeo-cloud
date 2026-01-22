@@ -10,13 +10,29 @@
     --editor-ring: var(--ring);
     --editor-spacing: var(--spacing);
     --editor-font-weight-bold: 700;
+    --editor-accent: var(--accent);
+    --editor-accent-foreground: var(--accent-foreground);
+    --editor-border: var(--border);
+    --editor-input: var(--input);
+    --editor-popover: var(--popover);
+    --editor-muted-foreground: var(--muted-foreground);
+    --editor-toolbox: var(--background);
 }
 
-.sprotty-wrapper svg {
+.sprotty:is(.dark *) {
+    --editor-toolbox: color-mix(in oklch, var(--card) 70%, var(--background) 30%);
+}
+
+.sprotty-wrapper svg.sprotty-graph {
     width: 100%;
     height: 100%;
     border: none !important;
     outline: none;
+}
+
+.sprotty svg {
+    outline: none;
+    border: none !important;
 }
 
 .sprotty.sprotty-hidden {

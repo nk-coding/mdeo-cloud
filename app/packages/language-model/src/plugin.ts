@@ -6,18 +6,19 @@ import {
 import { ModelRule, ModelTerminals } from "./grammar/modelRules.js";
 import {
     addExternalReferenceCollectionPhase,
-    type ActionAdditionalServices,
+    type ActionHandlerRegistryAdditionalServices,
     DefaultAstSerializer,
     IdValueConverter,
     NewlineAwareTokenBuilder,
     SerializerFormatter,
-    DefaultActionProvider
+    DefaultActionProvider,
+    ActionHandlerRegistry
 } from "@mdeo/language-shared";
 import { ModelScopeProvider } from "./features/modelScopeProvider.js";
 import { ModelExternalReferenceCollector } from "./features/modelExternalReferenceCollector.js";
-import { ModelActionHandler } from "./features/modelActionHandler.js";
+import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 
-export type ModelServices = ExternalReferenceAdditionalServices & ActionAdditionalServices;
+export type ModelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
 /**
  * The plugin for the Model language.
@@ -40,7 +41,11 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),
         action: {
-            ActionHandler: (services) => new ModelActionHandler(services.shared),
+            ActionHandlerRegistry: (services) => {
+                const registry = new ActionHandlerRegistry();
+                registry.register("new-file", new NewFileActionHandler(services.shared));
+                return registry;
+            },
             ActionProvider: () => new DefaultActionProvider()
         }
     },

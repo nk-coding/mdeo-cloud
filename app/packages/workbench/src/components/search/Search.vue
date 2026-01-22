@@ -133,7 +133,14 @@ async function searchSingleFile(uri: Uri): Promise<FileSearchResult | null> {
         const relativePath = uri.path.startsWith("/") ? uri.path.substring(1) : uri.path;
 
         const searchResult = await monacoApi.searchService.textSearch(
-            createSearchQuery(project.value!.id, searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value, relativePath)
+            createSearchQuery(
+                project.value!.id,
+                searchText.value,
+                isRegex.value,
+                isCaseSensitive.value,
+                isWholeWord.value,
+                relativePath
+            )
         );
 
         const fileResult = searchResult.results.find((result) => result.resource.path === uri.path);

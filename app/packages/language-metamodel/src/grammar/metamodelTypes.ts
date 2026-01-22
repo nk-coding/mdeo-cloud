@@ -123,7 +123,7 @@ export type ClassExtensionsType = ASTType<typeof ClassExtensions>;
 export const Class = createInterface("Class").attrs({
     name: String,
     isAbstract: Boolean,
-    extensions: ClassExtensions,
+    extensions: Optional(ClassExtensions),
     properties: [Property]
 });
 

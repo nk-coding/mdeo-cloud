@@ -66,25 +66,13 @@ const props = withDefaults(
 
 const model = defineModel<unknown>();
 
-
-
-
 const hasValue = computed(() => model.value !== undefined);
 
-
-
-
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
-
-
-
 
 function addValue(): void {
     model.value = generateDefaultValue(props.schema.optional);
 }
-
-
-
 
 function removeValue(): void {
     model.value = undefined;

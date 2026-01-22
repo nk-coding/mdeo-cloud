@@ -3,7 +3,8 @@
         <ActionTypeForm
             v-if="isTypeFormSchema"
             :schema="<ActionSchemaTypeForm>schema"
-            v-model="typeFormModel"
+            v-model="<string | boolean | number>modelValue"
+            @update:model-value="console.log($event)"
             :errors="filteredErrors"
             :path="path"
             :label="label"
@@ -11,7 +12,7 @@
         <ActionEnumForm
             v-else-if="isEnumFormSchema"
             :schema="<ActionSchemaEnumForm>schema"
-            v-model="enumFormModel"
+            v-model="<string>modelValue"
             :errors="filteredErrors"
             :path="path"
             :label="label"
@@ -88,57 +89,15 @@ const props = withDefaults(
 
 const modelValue = defineModel<unknown>();
 
-
-
-
 const isTypeFormSchema = computed(() => isTypeForm(props.schema));
-
-
-
 
 const isEnumFormSchema = computed(() => isEnumForm(props.schema));
 
-
-
-
 const isElementsFormSchema = computed(() => isElementsForm(props.schema));
-
-
-
 
 const isOptionalFormSchema = computed(() => isOptionalForm(props.schema));
 
-
-
-
 const isPropertiesFormSchema = computed(() => isPropertiesForm(props.schema));
 
-
-
-
 const filteredErrors = computed(() => filterErrorsByPath(props.errors, props.path));
-
-
-
-
-const typeFormModel = computed({
-    get(): string | number | boolean | undefined {
-        return modelValue.value as string | number | boolean | undefined;
-    },
-    set(value: string | number | boolean | undefined) {
-        modelValue.value = value;
-    }
-});
-
-
-
-
-const enumFormModel = computed({
-    get(): string | undefined {
-        return modelValue.value as string | undefined;
-    },
-    set(value: string | undefined) {
-        modelValue.value = value;
-    }
-});
 </script>

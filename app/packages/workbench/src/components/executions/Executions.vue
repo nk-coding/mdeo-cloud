@@ -55,8 +55,8 @@
                 <AlertDialogHeader>
                     <AlertDialogTitle>Delete All Executions</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Are you sure you want to delete all {{ executionsList.length }} execution(s)? This action cannot be
-                        undone.
+                        Are you sure you want to delete all {{ executionsList.length }} execution(s)? This action cannot
+                        be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -153,7 +153,7 @@ async function handleExecutionSummarySelection(executionId: string) {
         return;
     }
 
-    activeEntry.value = executionData
+    activeEntry.value = executionData;
 }
 
 async function handleExecutionFileSelection(executionId: string, filePath: string) {

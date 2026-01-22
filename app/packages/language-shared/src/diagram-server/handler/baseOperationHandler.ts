@@ -1,4 +1,4 @@
-import type { AstReflection, AstSerializer } from "@mdeo/language-common";
+import type { AstReflection, AstSerializer, WorkspaceEditService } from "@mdeo/language-common";
 import { sharedImport } from "../../sharedImport.js";
 import { AstReflectionKey } from "../langiumServices.js";
 import type { GModelIndex } from "../modelIndex.js";
@@ -8,7 +8,6 @@ import type { AstNode, CstNode } from "langium";
 
 const { injectable, inject } = sharedImport("inversify");
 const { OperationHandler, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
-const { Range } = sharedImport("vscode-languageserver-types");
 
 /**
  * Base class for operation handlers in the diagram server.
@@ -31,10 +30,31 @@ export abstract class BaseOperationHandler extends OperationHandler {
     protected reflection!: AstReflection;
 
     /**
+     * Workspace edit service for creating workspace edits.
+     */
+    protected get workspaceEditService(): WorkspaceEditService {
+        return this.modelState.languageServices.workspace.WorkspaceEdit;
+    }
+
+    /**
      * Gets the AST serializer service for serializing AST nodes.
      */
     protected get serializer(): AstSerializer {
         return this.modelState.languageServices.AstSerializer;
+    }
+
+    /**
+     * Gets the source document for the current model state.
+     *
+     * @returns the source document
+     * @throws Error if the source model document is not available
+     */
+    protected getSourceDocument() {
+        const document = this.modelState.sourceModel?.$document;
+        if (document == undefined) {
+            throw new Error("Source model document is not available.");
+        }
+        return document;
     }
 
     /**
@@ -44,18 +64,7 @@ export abstract class BaseOperationHandler extends OperationHandler {
      * @returns the merged workspace edit
      */
     protected mergeWorkspaceEdits(edits: WorkspaceEdit[]): WorkspaceEdit {
-        const mergedEdit: WorkspaceEdit = { changes: {} };
-        for (const edit of edits) {
-            if (edit.changes) {
-                for (const uri of Object.keys(edit.changes)) {
-                    if (!mergedEdit.changes![uri]) {
-                        mergedEdit.changes![uri] = [];
-                    }
-                    mergedEdit.changes![uri]!.push(...edit.changes[uri]!);
-                }
-            }
-        }
-        return mergedEdit;
+        return this.workspaceEditService.mergeWorkspaceEdits(edits);
     }
 
     /**
@@ -65,17 +74,7 @@ export abstract class BaseOperationHandler extends OperationHandler {
      * @returns the workspace edit that performs the deletion
      */
     protected deleteCstNode(cstNode: CstNode): WorkspaceEdit {
-        const edit: WorkspaceEdit = {
-            changes: {
-                [this.modelState.sourceUri!]: [
-                    {
-                        range: cstNode.range,
-                        newText: ""
-                    }
-                ]
-            }
-        };
-        return edit;
+        return this.workspaceEditService.deleteCstNode(cstNode, this.modelState.sourceUri!);
     }
 
     /**
@@ -86,28 +85,8 @@ export abstract class BaseOperationHandler extends OperationHandler {
      * @returns the workspace edit that performs the replacement
      */
     protected async replaceCstNode(cstNode: CstNode, newContent: AstNode | string): Promise<WorkspaceEdit> {
-        let replacementText: string;
-        if (typeof newContent === "string") {
-            replacementText = newContent;
-        } else {
-            replacementText = await this.serializeNode(newContent);
-        }
-        const indentation = this.getIndentationForLine(cstNode.range.start);
-        const indentedText = replacementText
-            .split("\n")
-            .map((line, index) => (index === 0 ? line : indentation + line))
-            .join("\n");
-        const edit: WorkspaceEdit = {
-            changes: {
-                [this.modelState.sourceUri!]: [
-                    {
-                        range: cstNode.range,
-                        newText: indentedText
-                    }
-                ]
-            }
-        };
-        return edit;
+        const document = this.getSourceDocument();
+        return this.workspaceEditService.replaceCstNode(cstNode, newContent, document);
     }
 
     /**
@@ -117,12 +96,8 @@ export abstract class BaseOperationHandler extends OperationHandler {
      * @returns the serialized string
      */
     protected async serializeNode(node: AstNode): Promise<string> {
-        const serializer = this.modelState.languageServices.AstSerializer;
-        const document = this.modelState.sourceModel?.$document;
-        if (document == undefined) {
-            throw new Error("Source model document is not available for serialization.");
-        }
-        return await serializer.serializeNode(node, document, serializer.guessFormattingOptions(document));
+        const document = this.getSourceDocument();
+        return this.workspaceEditService.serializeNode(node, document);
     }
 
     /**
@@ -132,12 +107,25 @@ export abstract class BaseOperationHandler extends OperationHandler {
      * @returns the indentation string (spaces and/or tabs) for the line
      */
     protected getIndentationForLine(position: Position): string {
-        const document = this.modelState.sourceModel?.$document;
-        if (document == undefined) {
-            throw new Error("Source model document is not available for indentation retrieval.");
-        }
-        const line = document.textDocument.getText(Range.create(position.line, 0, position.line + 1, 0));
-        const match = line.match(/^\s*/);
-        return match ? match[0] : "";
+        const document = this.getSourceDocument();
+        return this.workspaceEditService.getIndentationForLine(position, document);
+    }
+
+    /**
+     * Creates a workspace edit to insert content after the given CST node.
+     * Automatically adds proper spacing with blank lines if needed and applies proper indentation.
+     *
+     * @param cstNode the CST node after which to insert content
+     * @param content the content to insert
+     * @param ensureNewlineBefore whether to ensure a newline before the content (defaults to true, but not needed for empty documents)
+     * @returns the workspace edit that performs the insertion
+     */
+    protected async createInsertAfterNodeEdit(
+        cstNode: CstNode,
+        content: string,
+        ensureNewlineBefore: boolean = true
+    ): Promise<WorkspaceEdit> {
+        const document = this.getSourceDocument();
+        return this.workspaceEditService.createInsertAfterNodeEdit(cstNode, content, document, ensureNewlineBefore);
     }
 }

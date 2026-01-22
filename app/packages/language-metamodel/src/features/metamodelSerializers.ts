@@ -56,8 +56,8 @@ export function registerMetamodelSerializers(services: LangiumCoreServices & Ast
  * @returns The formatted primitive type
  */
 function printPrimitiveType(context: PrintContext<PrimitiveTypeType>): Doc {
-    const { ctx, printPrimitive, getPrimitive } = context;
-    return printPrimitive(getPrimitive(ctx, "name"), ID);
+    const { ctx, getPrimitive } = context;
+    return getPrimitive(ctx, "name").value;
 }
 
 /**

@@ -7,7 +7,11 @@ import {
     AssociationEnd,
     MetaModel,
     ClassImport,
-    ClassExtension
+    ClassExtension,
+    SingleMultiplicity,
+    RangeMultiplicity,
+    type SingleMultiplicityType,
+    type RangeMultiplicityType
 } from "../../grammar/metamodelTypes.js";
 import type {
     PartialClass,
@@ -49,6 +53,11 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
             return this.getAssociationEndName(node);
         } else if (this.reflection.isInstance(node, ClassExtension)) {
             return this.getClassExtensionName(node);
+        } else if (
+            this.reflection.isInstance(node, SingleMultiplicity) ||
+            this.reflection.isInstance(node, RangeMultiplicity)
+        ) {
+            return this.getMultiplicityName(node);
         }
         return undefined;
     }
@@ -148,5 +157,17 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
         }
 
         return "unknown";
+    }
+
+    /**
+     * Generates ID for Multiplicity nodes.
+     */
+    private getMultiplicityName(node: SingleMultiplicityType | RangeMultiplicityType): string {
+        const owning = node.$container;
+        if (owning == undefined) {
+            return "unknownParent_multiplicity";
+        } else {
+            return `${this.getName(owning) ?? "unknownParent"}_multiplicity`;
+        }
     }
 }

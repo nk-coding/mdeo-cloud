@@ -7,24 +7,38 @@ import type {
     ActionSubmitResponse,
     NewFileActionData
 } from "@mdeo/language-common";
-import type { ActionHandler } from "@mdeo/language-shared";
+import { calculateRelativePath, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { URI } from "langium";
 
 /**
- * Action service for handling new file creation in the Model language.
+ * Input data collected from the dialog.
+ */
+interface MetamodelSelectionInputs {
+    metamodel: string;
+}
+
+/**
+ * Type guard to check if a value is MetamodelSelectionInputs.
+ */
+function isMetamodelSelectionInputs(value: unknown): value is MetamodelSelectionInputs {
+    return typeof value === "object" && value !== null && "metamodel" in value;
+}
+
+/**
+ * Handler for the "new-file" action in the Model language.
  *
- * This action:
+ * This handler:
  *  - Collects all metamodel (.mm) files in the workspace
- *  - Presents them as *relative paths* to the new file
+ *  - Presents them as relative paths to the new file
  *  - Inserts a `using "<relative-path>"` statement at the top of the file
  */
-export class ModelActionHandler implements ActionHandler {
+export class NewFileActionHandler implements ActionHandler {
     /**
-     * Shared Langium services provided by the language server.
+     * Shared Langium services for accessing workspace documents.
      */
-    private sharedServices: LangiumSharedServices;
+    private readonly sharedServices: LangiumSharedServices;
 
     /**
      * URI string of the newly created model file.
@@ -32,6 +46,11 @@ export class ModelActionHandler implements ActionHandler {
      */
     private newFilePath?: string;
 
+    /**
+     * Creates a new file action handler.
+     *
+     * @param sharedServices Shared Langium services
+     */
     constructor(sharedServices: LangiumSharedServices) {
         this.sharedServices = sharedServices;
     }
@@ -49,22 +68,79 @@ export class ModelActionHandler implements ActionHandler {
      * @returns The dialog page with metamodel selection
      */
     async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
-        if (params.type !== "new-file") {
-            throw new Error(`Unsupported action type: ${params.type}`);
-        }
-
         const data = params.data as NewFileActionData;
         this.newFilePath = data.uri;
 
         const metamodelFiles = await this.findMetamodelFiles();
+        const options = this.buildFileOptions(metamodelFiles);
 
-        const options: string[] = [];
-        const basePath = URI.parse(this.newFilePath).path;
+        return this.createSelectionPage(options);
+    }
 
-        for (const absolutePath of metamodelFiles) {
-            options.push(this.calculateRelativePath(basePath, absolutePath));
+    /**
+     * Submits the dialog and returns the workspace edit for inserting the `using` statement.
+     *
+     * @param params The submit parameters with selected metamodel
+     * @returns Completion response with workspace edit for inserting the statement
+     */
+    async submitAction(params: ActionSubmitParams): Promise<ActionSubmitResponse> {
+        const rawInputs = params.inputs[0];
+
+        if (!isMetamodelSelectionInputs(rawInputs)) {
+            return {
+                kind: "validation",
+                errors: [{ path: "/metamodel", message: "Invalid input structure" }]
+            };
         }
 
+        const metamodelPath = rawInputs.metamodel;
+
+        if (!metamodelPath) {
+            return {
+                kind: "validation",
+                errors: [{ path: "/metamodel", message: "Please select a metamodel file" }]
+            };
+        }
+
+        const workspaceEdit = this.createUsingStatementEdit(metamodelPath);
+        const connection = this.sharedServices.lsp.Connection;
+        await connection?.workspace.applyEdit(workspaceEdit);
+
+        return { kind: "completion" };
+    }
+
+    /**
+     * Finds all metamodel (.mm) files in the workspace.
+     *
+     * @returns Array of absolute workspace paths to metamodel files
+     */
+    private async findMetamodelFiles(): Promise<string[]> {
+        const documents = this.sharedServices.workspace.LangiumDocuments.all.toArray();
+        return documents.filter((doc) => doc.textDocument.languageId === "metamodel").map((doc) => doc.uri.path);
+    }
+
+    /**
+     * Builds the list of file options as relative paths.
+     *
+     * @param metamodelFiles The list of metamodel file paths
+     * @returns Array of relative paths for the selection dropdown
+     */
+    private buildFileOptions(metamodelFiles: string[]): string[] {
+        if (!this.newFilePath) {
+            return [];
+        }
+
+        const basePath = URI.parse(this.newFilePath).path;
+        return metamodelFiles.map((absolutePath) => calculateRelativePath(basePath, absolutePath));
+    }
+
+    /**
+     * Creates the metamodel selection dialog page.
+     *
+     * @param options The list of file options
+     * @returns The dialog page response
+     */
+    private createSelectionPage(options: string[]): ActionStartResponse {
         const schema: ActionSchema = {
             properties: {
                 metamodel: {
@@ -90,52 +166,14 @@ export class ModelActionHandler implements ActionHandler {
     }
 
     /**
-     * Submits the dialog and returns the workspace edit for inserting the `using` statement.
-     *
-     * The selected value is already a relative path and is inserted verbatim.
-     *
-     * @param params The submit parameters with selected metamodel
-     * @returns Completion response with workspace edit for inserting the statement
-     */
-    async submitAction(params: ActionSubmitParams): Promise<ActionSubmitResponse> {
-        const inputs = params.inputs[0] || {};
-        const metamodelPath = inputs["metamodel"] as string;
-
-        if (!metamodelPath) {
-            return {
-                kind: "validation",
-                errors: [{ path: "/metamodel", message: "Please select a metamodel file" }]
-            };
-        }
-
-        const workspaceEdit = this.createUsingStatementEdit(metamodelPath);
-        const connection = this.sharedServices.lsp.Connection;
-        if (connection != undefined && workspaceEdit !== undefined) {
-            await connection.workspace.applyEdit(workspaceEdit);
-        }
-        return { kind: "completion" };
-    }
-
-    /**
-     * Finds all metamodel (.mm) files in the workspace.
-     *
-     * @returns Array of absolute workspace paths to metamodel files
-     */
-    private async findMetamodelFiles(): Promise<string[]> {
-        const documents = this.sharedServices.workspace.LangiumDocuments.all.toArray();
-
-        return documents.filter((doc) => doc.textDocument.languageId === "metamodel").map((doc) => doc.uri.path);
-    }
-
-    /**
-     * Creates a workspace edit for inserting a `using` statement at the beginning of the new file.
+     * Creates a workspace edit for inserting a `using` statement at the beginning of the file.
      *
      * @param relativePath Relative path to the selected metamodel
      * @returns The workspace edit for inserting the using statement
      */
-    private createUsingStatementEdit(relativePath: string): WorkspaceEdit | undefined {
+    private createUsingStatementEdit(relativePath: string): WorkspaceEdit {
         if (!this.newFilePath) {
-            return undefined;
+            throw new Error("New file path is not set");
         }
 
         const usingStatement = `using "${relativePath}"\n\n`;
@@ -153,38 +191,5 @@ export class ModelActionHandler implements ActionHandler {
                 ]
             }
         };
-    }
-
-    /**
-     * Calculates the relative path from one file to another.
-     *
-     * @param fromPath Absolute path of the source file
-     * @param toPath Absolute path of the target file
-     * @returns Relative path from source file to target file
-     */
-    private calculateRelativePath(fromPath: string, toPath: string): string {
-        const fromParts = fromPath.split("/");
-        const toParts = toPath.split("/");
-
-        fromParts.pop();
-
-        let commonLength = 0;
-        while (
-            commonLength < fromParts.length &&
-            commonLength < toParts.length &&
-            fromParts[commonLength] === toParts[commonLength]
-        ) {
-            commonLength++;
-        }
-
-        const upLevels = fromParts.length - commonLength;
-        const relativeParts: string[] = ["."];
-
-        for (let i = 0; i < upLevels; i++) {
-            relativeParts.push("..");
-        }
-
-        relativeParts.push(...toParts.slice(commonLength));
-        return relativeParts.join("/");
     }
 }

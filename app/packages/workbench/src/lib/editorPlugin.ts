@@ -4,6 +4,8 @@ import * as inversify from "inversify";
 import * as glspClient from "@eclipse-glsp/client";
 import * as glspSprotty from "@eclipse-glsp/sprotty";
 import * as glspProtocol from "@eclipse-glsp/protocol";
+import * as minisearch from "minisearch";
+import * as lucide from "lucide";
 import { initializeEditorPluginContext } from "@mdeo/editor-common";
 
 /**
@@ -21,7 +23,9 @@ export const editorPlugin: Plugin = {
             inversify,
             "@eclipse-glsp/client": glspClient,
             "@eclipse-glsp/sprotty": glspSprotty,
-            "@eclipse-glsp/protocol": glspProtocol
+            "@eclipse-glsp/protocol": glspProtocol,
+            minisearch,
+            lucide
         };
 
         initializeEditorPluginContext(context);

@@ -57,7 +57,7 @@ import { useResizeObserver, watchArray } from "@vueuse/core";
 import * as monacoType from "monaco-editor";
 import { workbenchStateKey } from "../workbench/util";
 import type { EditorTab } from "@/data/tab/editorTab";
-import { EditorState, TextualEditorState } from "./editorState";
+import { EditorState } from "./editorState";
 import GraphicalEditor from "./GraphicalEditor.vue";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
 import { AlertCircle, Settings } from "lucide-vue-next";
@@ -135,7 +135,7 @@ const showFileEditor = computed(() => {
 
 const showMarkdownViewer = computed(() => {
     return activeTabEditorState.value?.hasMarkdownViewer.value ?? false;
-})
+});
 
 const showNoLanguageSupport = computed(() => {
     return !showFileEditor.value && !showMarkdownViewer.value;

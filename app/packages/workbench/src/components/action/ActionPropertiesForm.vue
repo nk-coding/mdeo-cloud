@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import type { ActionSchemaPropertiesForm, ActionValidationError } from "@mdeo/language-common";
 import { FieldError } from "@/components/ui/field";
 import { getErrorsForPath } from "./actionFormUtils";
@@ -42,9 +42,6 @@ const props = withDefaults(
 );
 
 const model = defineModel<Record<string, unknown>>();
-
-
-
 
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
 </script>

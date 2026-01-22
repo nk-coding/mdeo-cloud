@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import type { ActionSchemaTypeForm, ActionValidationError } from "@mdeo/language-common";
 import { Field, FieldContent, FieldLabel, FieldError } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
@@ -39,7 +39,7 @@ const props = defineProps<{
     label?: string;
 }>();
 
-const model = defineModel<boolean | number | string | undefined>();
+const model = defineModel<string | boolean | number | undefined>();
 
 const isBoolean = computed(() => props.schema.type === "boolean");
 
@@ -139,7 +139,7 @@ const booleanModel = computed({
 
 const numberModel = computed({
     get() {
-        if (model.value === undefined || model.value === null) {
+        if (model.value == undefined) {
             return undefined;
         }
         return Number(model.value);
@@ -151,7 +151,7 @@ const numberModel = computed({
 
 const stringModel = computed({
     get() {
-        if (model.value === undefined || model.value === null) {
+        if (model.value == undefined) {
             return "";
         }
         return String(model.value);

@@ -12,11 +12,10 @@
                 <ScrollArea class="flex-1 min-h-10 -mx-2">
                     <ActionForm
                         v-if="currentPage"
+                        v-model="currentInputs"
                         class="m-2"
                         :schema="currentPage.schema"
-                        :model-value="currentInputs"
                         :errors="validationErrors"
-                        @update:model-value="onInputsUpdate"
                     />
                 </ScrollArea>
             </div>
@@ -38,7 +37,7 @@
                     >
                         <Loader2 v-if="isSubmitting" class="size-4 mr-1 animate-spin" />
                         <Check v-else class="size-4 mr-1" />
-                        Submit
+                        {{ currentPage?.submitButtonLabel ?? "Submit" }}
                     </Button>
                     <Button v-else class="min-w-27.5" :disabled="isSubmitting" @click="handleNext">
                         Next
@@ -73,7 +72,6 @@ import {
     type ActionSubmitResponse,
     type ActionExecutionRequest
 } from "@mdeo/language-common";
-import type { WorkspaceEdit } from "vscode-languageserver-types";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import { workbenchStateKey } from "../workbench/util";
 import { deepCloneWithSchema, generateDefaultValue, verifyAndFix } from "./actionFormUtils";
@@ -136,10 +134,6 @@ function resetDialogState(): void {
     currentInputs.value = {};
     validationErrors.value = [];
     isSubmitting.value = false;
-}
-
-function onInputsUpdate(value: unknown): void {
-    currentInputs.value = value;
 }
 
 function buildAllInputs(): Record<string, unknown>[] {
@@ -226,6 +220,7 @@ async function handleSubmitResponse(response: ActionSubmitResponse): Promise<voi
     if (response.kind === "validation") {
         validationErrors.value = response.errors ?? [];
     } else if (response.kind === "nextPage" && response.page) {
+        console.log(response);
         previousPagesStack.value.push({
             page: currentPage.value!,
             inputs: currentInputs.value

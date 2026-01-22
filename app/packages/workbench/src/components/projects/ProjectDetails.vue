@@ -59,7 +59,12 @@
                         </template>
                     </SidebarPanelHeader>
                     <ScrollArea class="flex-1 min-h-0 px-2">
-                        <Tree v-if="sortedPlugins.length > 0" class="w-full" :active-element="null" :expanded-items="new Set()">
+                        <Tree
+                            v-if="sortedPlugins.length > 0"
+                            class="w-full"
+                            :active-element="null"
+                            :expanded-items="new Set()"
+                        >
                             <TreeItem
                                 v-for="plugin in sortedPlugins"
                                 :key="plugin.id"

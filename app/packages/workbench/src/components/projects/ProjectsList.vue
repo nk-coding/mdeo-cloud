@@ -8,9 +8,7 @@
             </template>
         </SidebarPanelHeader>
         <div class="px-3 pb-2">
-            <Button @click="openNewProjectDialog" class="w-full mb-2">
-                <Plus class="size-4 mr-2" />New Project
-            </Button>
+            <Button @click="openNewProjectDialog" class="w-full mb-2"> <Plus class="size-4 mr-2" />New Project </Button>
             <Input v-model="searchText" placeholder="Search projects..." />
         </div>
         <ScrollArea class="flex-1 min-h-0 w-full">

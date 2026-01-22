@@ -85,8 +85,8 @@
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Folder</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Are you sure you want to delete the folder "{{ entry.name }}" and all its contents?
-                    This action cannot be undone.
+                    Are you sure you want to delete the folder "{{ entry.name }}" and all its contents? This action
+                    cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -128,7 +128,12 @@ import { treeContextKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 import { Uri } from "vscode";
 import FileTypeIcon from "../FileTypeIcon.vue";
-import { ActionDisplayLocation, createActionProtocol, type FileMenuActionData, type FileAction } from "@mdeo/language-common";
+import {
+    ActionDisplayLocation,
+    createActionProtocol,
+    type FileMenuActionData,
+    type FileAction
+} from "@mdeo/language-common";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import { getFileExtension } from "@/data/filesystem/util";
 
@@ -139,7 +144,8 @@ const props = defineProps<{
 }>();
 
 const workbenchState = inject(workbenchStateKey)!;
-const { monacoApi, languagePlugins, activeTab, languagePluginByExtension, languageClient, pendingAction } = workbenchState;
+const { monacoApi, languagePlugins, activeTab, languagePluginByExtension, languageClient, pendingAction } =
+    workbenchState;
 const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{
@@ -159,7 +165,7 @@ const newItem = ref<NewItemState>();
 const fileActions = ref<FileAction[]>([]);
 
 const contextMenuActions = computed(() =>
-    fileActions.value.filter(action => action.displayLocations.includes(ActionDisplayLocation.CONTEXT_MENU))
+    fileActions.value.filter((action) => action.displayLocations.includes(ActionDisplayLocation.CONTEXT_MENU))
 );
 
 async function handleContextMenuOpen(open: boolean): Promise<void> {
@@ -198,7 +204,7 @@ async function fetchFileActions(): Promise<void> {
 
 function handleFileAction(action: FileAction): void {
     if (props.entry.type !== FileType.File) return;
-    
+
     const languagePlugin = languagePluginByExtension.value.get(props.entry.extension);
     if (!languagePlugin) return;
 
@@ -273,7 +279,7 @@ function handleRename() {
 
 function handleDeleteClick() {
     if (isRenaming.value) return;
-    
+
     if (props.entry.type === FileType.Directory) {
         showDeleteDialog.value = true;
     } else {

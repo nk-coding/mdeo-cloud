@@ -1,15 +1,13 @@
 import type { Connection } from "vscode-languageserver/browser.js";
 import type { LangiumSharedCoreServices, LangiumCoreServices } from "langium";
 import { createActionProtocol } from "@mdeo/language-common";
-import type { ActionAdditionalServices, ActionProviderAdditionalServices } from "@mdeo/language-shared";
+import type { ActionHandlerRegistryAdditionalServices } from "@mdeo/language-shared";
 import type { PluginContext } from "@mdeo/language-common";
 
 /**
- * Language services extended with action support.
+ * Language services extended with action handler registry support.
  */
-type ActionExtendedServices = LangiumCoreServices &
-    Partial<ActionAdditionalServices> &
-    Partial<ActionProviderAdditionalServices>;
+type ActionExtendedServices = LangiumCoreServices & Partial<ActionHandlerRegistryAdditionalServices>;
 
 /**
  * Finds language services by language ID from the service registry.
@@ -47,12 +45,20 @@ export function addActionHandlers(
             throw new Error(`Language services not found for language: ${params.languageId}`);
         }
 
-        const actionService = languageServices.action?.ActionHandler;
-        if (actionService == undefined) {
-            throw new Error(`Action service not available for language: ${params.languageId}`);
+        const registry = languageServices.action?.ActionHandlerRegistry;
+        if (registry == undefined) {
+            throw new Error(`Action handler registry not available for language: ${params.languageId}`);
         }
 
-        return await actionService.startAction(params);
+        const handler = registry.getHandler(params.type);
+        if (!handler) {
+            throw new Error(
+                `No handler registered for action type: ${params.type}. ` +
+                    `Available types: ${registry.getRegisteredTypes().join(", ")}`
+            );
+        }
+
+        return await handler.startAction(params);
     });
 
     connection.onRequest(ActionProtocol.ActionSubmitRequest, async (params) => {
@@ -62,12 +68,20 @@ export function addActionHandlers(
             throw new Error(`Language services not found for language: ${languageId}`);
         }
 
-        const actionService = languageServices.action?.ActionHandler;
-        if (actionService == undefined) {
-            throw new Error(`Action service not available for language: ${languageId}`);
+        const registry = languageServices.action?.ActionHandlerRegistry;
+        if (registry == undefined) {
+            throw new Error(`Action handler registry not available for language: ${languageId}`);
         }
 
-        return await actionService.submitAction(params);
+        const handler = registry.getHandler(params.config.type);
+        if (!handler) {
+            throw new Error(
+                `No handler registered for action type: ${params.config.type}. ` +
+                    `Available types: ${registry.getRegisteredTypes().join(", ")}`
+            );
+        }
+
+        return await handler.submitAction(params);
     });
 
     connection.onRequest(ActionProtocol.GetFileActionsRequest, async (params) => {
