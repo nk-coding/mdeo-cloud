@@ -75,11 +75,10 @@ data class BackendContributionPlugin(
  * @property id Unique identifier for the language plugin
  * @property name Display name of the language
  * @property extension File extension including the dot (e.g., ".model")
- * @property defaultContent Optional default content for new files
+ * @property newFileAction When true, an action dialog will be triggered when a new file is created
  * @property serverPlugin Server plugin configuration
- * @property editorPlugin Optional editor plugin configuration for graphical editors
- * @property languageConfiguration Monaco language configuration as JSON
- * @property monarchTokensProvider Monarch tokens provider for syntax highlighting as JSON
+ * @property graphicalEditorPlugin Optional graphical editor plugin configuration
+ * @property textualEditorPlugin Optional textual editor plugin configuration
  * @property icon Icon data in Lucide IconNode format
  */
 @Serializable
@@ -89,9 +88,8 @@ data class BackendLanguagePlugin(
     val extension: String,
     val newFileAction: Boolean = false,
     val serverPlugin: LanguageServerPlugin,
-    val editorPlugin: LanguageEditorPlugin? = null,
-    val languageConfiguration: JsonObject,
-    val monarchTokensProvider: JsonObject,
+    val graphicalEditorPlugin: LanguageGraphicalEditorPlugin? = null,
+    val textualEditorPlugin: LanguageTextualEditorPlugin? = null,
     val icon: JsonArray
 )
 
@@ -106,15 +104,29 @@ data class LanguageServerPlugin(
 )
 
 /**
- * Editor plugin configuration for a graphical editor.
+ * Graphical editor plugin configuration.
+ * Provides the container configuration for GLSP/Sprotty diagrams.
  *
  * @property import Import path which resolves to the container configuration
  * @property stylesUrl URL to the CSS styles for this editor
  */
 @Serializable
-data class LanguageEditorPlugin(
+data class LanguageGraphicalEditorPlugin(
     val import: String,
     val stylesUrl: String
+)
+
+/**
+ * Textual editor plugin configuration.
+ * Provides Monaco editor configuration for syntax highlighting and language features.
+ *
+ * @property languageConfiguration Monaco language configuration as JSON
+ * @property monarchTokensProvider Monarch tokens provider for syntax highlighting as JSON
+ */
+@Serializable
+data class LanguageTextualEditorPlugin(
+    val languageConfiguration: JsonObject,
+    val monarchTokensProvider: JsonObject
 )
 
 /**

@@ -15,6 +15,7 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import io.ktor.server.websocket.*
 import io.ktor.util.*
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -37,24 +38,33 @@ fun main() {
 /**
  * Main application module that configures all services, plugins, and routing.
  *
- * @param config Application configuration
+ * @param appConfig Application configuration
  */
-fun Application.module(config: AppConfig) {
-    DatabaseFactory.init(config.database)
+fun Application.module(appConfig: AppConfig) {
+    DatabaseFactory.init(appConfig.database)
     
-    val userService = UserService()
-    val pluginService = PluginService(config.plugin)
-    val fileService = FileService()
-    val projectService = ProjectService(pluginService, fileService)
-    val metadataService = MetadataService()
-    val jwtService = JwtService(config.jwt)
-    val fileDataService = FileDataService(config.fileData, pluginService, fileService, jwtService)
+    /**
+     * Lazy-initialized service container implementing InjectedServices.
+     * Uses lazy delegation to handle circular dependencies between services.
+     */
+    val services = object : InjectedServices {
+        override val config: AppConfig = appConfig
+        override val userService: UserService by lazy { UserService(this) }
+        override val pluginService: PluginService by lazy { PluginService(this) }
+        override val fileService: FileService by lazy { FileService(this) }
+        override val projectService: ProjectService by lazy { ProjectService(this) }
+        override val metadataService: MetadataService by lazy { MetadataService(this) }
+        override val jwtService: JwtService by lazy { JwtService(this) }
+        override val fileDataService: FileDataService by lazy { FileDataService(this) }
+        override val executionService: ExecutionService by lazy { ExecutionService(this) }
+        override val webSocketNotificationService: WebSocketNotificationService by lazy { WebSocketNotificationService() }
+    }
     
-    jwtService.init()
+    services.jwtService.init()
     
     runBlocking {
-        userService.createDefaultAdmin(config.defaultAdmin.username, config.defaultAdmin.password)
-        pluginService.initializeDefaultPlugins(config.plugin.defaultPluginUrls)
+        services.userService.createDefaultAdmin(appConfig.defaultAdmin.username, appConfig.defaultAdmin.password)
+        services.pluginService.initializeDefaultPlugins(appConfig.plugin.defaultPluginUrls)
     }
     
     monitor.subscribe(ApplicationStopped) {
@@ -66,37 +76,45 @@ fun Application.module(config: AppConfig) {
     }
     
     install(Sessions) {
-        val secretSignKey = hex(config.session.encryptionKey)
+        val secretSignKey = hex(appConfig.session.encryptionKey)
         cookie<UserSession>("MDEO_SESSION") {
             cookie.path = "/"
             cookie.httpOnly = true
-            cookie.secure = config.session.cookieSecure
-            cookie.maxAgeInSeconds = config.session.maxIdleSeconds
-            cookie.extensions["SameSite"] = config.session.sameSite
+            cookie.secure = appConfig.session.cookieSecure
+            cookie.maxAgeInSeconds = appConfig.session.maxIdleSeconds
+            cookie.extensions["SameSite"] = appConfig.session.sameSite
             transform(SessionTransportTransformerMessageAuthentication(secretSignKey))
         }
     }
     
     configureSerialization()
-    configureCors(config.cors)
+    configureCors(appConfig.cors)
     configureStatusPages()
-    configureAuthentication(jwtService)
+    configureAuthentication(services.jwtService)
+    
+    install(WebSockets) {
+        pingPeriodMillis = 30_000
+        timeoutMillis = 60_000
+    }
     
     routing {
-        authRoutes(userService)
-        publicKeyRoute(jwtService)
+        authRoutes(services.userService)
+        publicKeyRoute(services.jwtService)
         
         authenticate(AUTH_SESSION, AUTH_JWT, optional = true) {
-            fileRoutes(fileService, projectService)
-            fileDataRoutes(fileDataService, projectService, jwtService)
+            fileRoutes(services.fileService, services.projectService)
+            fileDataRoutes(services.fileDataService, services.projectService, services.jwtService)
+            executionStateRoutes(services.executionService, services.jwtService)
         }
         
         authenticate(AUTH_SESSION) {
-            projectRoutes(projectService)
-            metadataRoutes(metadataService)
-            pluginRoutes(pluginService, projectService, fileDataService)
-            adminRoutes(userService)
-            userRoutes(userService, projectService)
+            webSocketRoutes(services.webSocketNotificationService, services.projectService)
+            projectRoutes(services.projectService)
+            metadataRoutes(services.metadataService)
+            pluginRoutes(services.pluginService, services.projectService)
+            adminRoutes(services.userService)
+            userRoutes(services.userService, services.projectService)
+            executionRoutes(services.executionService, services.projectService)
         }
     }
 }

@@ -10,7 +10,8 @@ import {
     DefaultAstSerializer,
     IdValueConverter,
     NewlineAwareTokenBuilder,
-    SerializerFormatter
+    SerializerFormatter,
+    DefaultActionProvider
 } from "@mdeo/language-shared";
 import { ModelScopeProvider } from "./features/modelScopeProvider.js";
 import { ModelExternalReferenceCollector } from "./features/modelExternalReferenceCollector.js";
@@ -39,7 +40,8 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),
         action: {
-            ActionHandler: (services) => new ModelActionHandler(services.shared)
+            ActionHandler: (services) => new ModelActionHandler(services.shared),
+            ActionProvider: () => new DefaultActionProvider()
         }
     },
     postCreate(services) {

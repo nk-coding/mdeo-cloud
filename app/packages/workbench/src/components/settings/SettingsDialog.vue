@@ -10,15 +10,15 @@
                     <div
                         class="flex items-center justify-center h-9 w-9 rounded-full bg-muted/30 text-muted-foreground"
                     >
-                        <Settings class="w-4 h-4" />
+                        <Settings class="size-4" />
                     </div>
                     <TabsList class="inline-flex h-9 items-center gap-1 rounded-full bg-muted/30 p-1">
                         <TabsTrigger value="users" class="px-4 py-1.5 rounded-full gap-2">
-                            <Users class="w-4 h-4" />
+                            <Users class="size-4" />
                             Users
                         </TabsTrigger>
                         <TabsTrigger value="plugins" class="px-4 py-1.5 rounded-full gap-2">
-                            <Puzzle class="w-4 h-4" />
+                            <Puzzle class="size-4" />
                             Plugins
                         </TabsTrigger>
                     </TabsList>

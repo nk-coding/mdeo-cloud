@@ -12,6 +12,7 @@ import getWorkingCopyServiceOverride from "@codingame/monaco-vscode-working-copy
 import { useColorMode } from "@vueuse/core";
 import {
     getService,
+    IBulkEditService,
     IConfigurationService,
     IEditorService,
     IFileService,
@@ -29,6 +30,7 @@ export interface MonacoApi {
     fileService: IFileService;
     searchService: ISearchService;
     editorService: IEditorService;
+    bulkEditService: IBulkEditService;
     openEditorFunc: OpenEditor | undefined;
 }
 
@@ -96,6 +98,7 @@ async function setupMonaco(): Promise<MonacoApi> {
     const logService = await getService(ILogService);
     const searchService = await getService(ISearchService);
     const editorService = await getService(IEditorService);
+    const bulkEditService = await getService(IBulkEditService);
 
     // @ts-expect-error patch to prvent vscode from loading config files
     workspaceContextService.loadFolderConfigurations = async (folders: any[]) =>
@@ -119,6 +122,7 @@ async function setupMonaco(): Promise<MonacoApi> {
         fileService,
         searchService,
         editorService,
+        bulkEditService,
         openEditorFunc: undefined
     };
     return monacoApi;

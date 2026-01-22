@@ -5,15 +5,15 @@ import {
     serializeMonarchTokensProvider
 } from "@mdeo/language-common";
 import {
-    startLanguageService,
-    convertIcon,
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
     initializePluginContext,
     astHandler,
-    AST_HANDLER_KEY
+    AST_HANDLER_KEY,
+    startLanguageService
 } from "@mdeo/service-common";
+import { convertIcon } from "@mdeo/language-common";
 import type { ModelServices } from "@mdeo/language-model";
 
 /**
@@ -57,12 +57,14 @@ const modelServicePlugin: ServicePluginDefinition = {
         serverPlugin: {
             import: "static/language.js"
         },
-        editorPlugin: undefined,
-        languageConfiguration: defaultLanguageConfiguration,
-        monarchTokensProvider: serializeMonarchTokensProvider({
-            ...defaultMonarchTokenProvider,
-            keywords: ["using"]
-        })
+        graphicalEditorPlugin: undefined,
+        textualEditorPlugin: {
+            languageConfiguration: defaultLanguageConfiguration,
+            monarchTokensProvider: serializeMonarchTokensProvider({
+                ...defaultMonarchTokenProvider,
+                keywords: ["using"]
+            })
+        }
     },
     contributionPlugins: []
 };

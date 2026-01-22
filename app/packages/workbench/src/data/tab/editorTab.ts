@@ -1,13 +1,13 @@
-import type { File } from "../filesystem/file";
+import type { Uri } from "vscode";
 
 /**
  * A tab in the editor
  */
 export interface EditorTab {
     /**
-     * The file being edited in this tab
+     * The URI of the file being edited in this tab
      */
-    file: File;
+    fileUri: Uri;
     /**
      * Whether this is a temporarily opened tab
      */

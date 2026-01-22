@@ -11,9 +11,9 @@ import java.util.*
 /**
  * Service for managing projects and project ownership.
  * 
- * @param pluginService Service for managing plugins
+ * @param services The injected services providing access to configuration and other services
  */
-class ProjectService(val pluginService: PluginService, private val fileService: FileService) : BaseService() {
+class ProjectService(services: InjectedServices) : BaseService(), InjectedServices by services {
     
     /**
      * Retrieves all projects accessible by a user.

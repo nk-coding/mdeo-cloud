@@ -112,8 +112,7 @@ function handleDrop(event: DragEvent) {
     }
 
     const draggedItemInfo = JSON.parse(draggedItemData);
-    const draggedItem = { id: draggedItemInfo.id };
 
-    treeContext.dragAndDrop.value.callbacks?.onTreeDrop?.(draggedItem, event);
+    treeContext.dragAndDrop.value.callbacks?.onTreeDrop?.(draggedItemInfo.id as string, event);
 }
 </script>

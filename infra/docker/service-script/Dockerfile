@@ -1,18 +1,13 @@
 # Build stage
 FROM node:23-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
+COPY app/ ./
 
-# Copy package files
-COPY app/package*.json ./
-COPY app/tsconfig*.json ./
-COPY app/packages ./packages
-
-# Install dependencies
 RUN npm ci
-
-# Build the packages
-RUN npm run build
+RUN npm run build:packages
+RUN npm run build:css
+RUN npm run -w @mdeo/service-script build:static
 
 # Production stage
 FROM node:23-alpine
@@ -23,9 +18,9 @@ RUN apk add --no-cache curl
 WORKDIR /workspace
 
 # Copy the entire packages structure with built artifacts and dependencies
-COPY --from=builder /app/packages /workspace/packages
-COPY --from=builder /app/node_modules /workspace/node_modules
-COPY --from=builder /app/package.json /workspace/
+COPY --from=builder /build/packages /workspace/packages
+COPY --from=builder /build/node_modules /workspace/node_modules
+COPY --from=builder /build/package.json /workspace/
 
 # Set working directory to service-script
 WORKDIR /workspace/packages/service-script

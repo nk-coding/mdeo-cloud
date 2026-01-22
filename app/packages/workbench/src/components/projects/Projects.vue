@@ -22,6 +22,7 @@ import type { Project } from "@/data/project/project";
 import type { UserInfo } from "@/data/api/backendApi";
 import ProjectsList from "./ProjectsList.vue";
 import ProjectDetails from "./ProjectDetails.vue";
+import { showApiError } from "@/lib/notifications";
 
 const { backendApi, project, activeSidebar } = inject(workbenchStateKey)!;
 
@@ -31,9 +32,11 @@ const showProjectsList = ref(false);
 const projectUsers = ref<UserInfo[]>([]);
 
 async function loadProjects() {
-    const result = await backendApi.getProjects();
+    const result = await backendApi.projects.getAll();
     if (result.success) {
         projects.value = result.value;
+    } else {
+        showApiError("load projects", result.error.message);
     }
 }
 
@@ -42,12 +45,14 @@ async function loadProjectDetails() {
         return;
     }
 
-    const usersResult = await backendApi.getProjectOwners(project.value.id);
+    const usersResult = await backendApi.projects.getOwners(project.value.id);
 
     if (usersResult.success) {
         projectUsers.value = usersResult.value.sort((a, b) => {
             return a.username.localeCompare(b.username);
         });
+    } else {
+        showApiError("load project details", usersResult.error.message);
     }
 }
 
@@ -62,11 +67,13 @@ function handleCloseToDetails() {
 }
 
 async function handleCreateProject(name: string) {
-    const result = await backendApi.createProject(name);
+    const result = await backendApi.projects.create(name);
     if (result.success) {
         const created = result.value;
         project.value = created;
         await loadProjects();
+    } else {
+        showApiError("create project", result.error.message);
     }
 }
 
@@ -75,13 +82,15 @@ async function handleUpdateProjectName(name: string) {
         return;
     }
 
-    const result = await backendApi.updateProject(project.value.id, { name });
+    const result = await backendApi.projects.update(project.value.id, { name });
     if (result.success) {
         const updated = result.value;
         await loadProjects();
         if (project.value?.id === updated.id) {
             project.value = updated;
         }
+    } else {
+        showApiError("update project name", result.error.message);
     }
 }
 
@@ -94,10 +103,12 @@ async function handleDeleteProject() {
         return;
     }
 
-    const result = await backendApi.deleteProject(project.value.id);
+    const result = await backendApi.projects.delete(project.value.id);
     if (result.success) {
         await loadProjects();
         project.value = undefined;
+    } else {
+        showApiError("delete project", result.error.message);
     }
 }
 

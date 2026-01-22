@@ -88,39 +88,39 @@ const props = withDefaults(
 
 const modelValue = defineModel<unknown>();
 
-/**
- * Whether the schema is a type form
- */
+
+
+
 const isTypeFormSchema = computed(() => isTypeForm(props.schema));
 
-/**
- * Whether the schema is an enum form
- */
+
+
+
 const isEnumFormSchema = computed(() => isEnumForm(props.schema));
 
-/**
- * Whether the schema is an elements form
- */
+
+
+
 const isElementsFormSchema = computed(() => isElementsForm(props.schema));
 
-/**
- * Whether the schema is an optional form
- */
+
+
+
 const isOptionalFormSchema = computed(() => isOptionalForm(props.schema));
 
-/**
- * Whether the schema is a properties form
- */
+
+
+
 const isPropertiesFormSchema = computed(() => isPropertiesForm(props.schema));
 
-/**
- * Errors filtered to this path and its children
- */
+
+
+
 const filteredErrors = computed(() => filterErrorsByPath(props.errors, props.path));
 
-/**
- * Type-safe computed for ActionTypeForm
- */
+
+
+
 const typeFormModel = computed({
     get(): string | number | boolean | undefined {
         return modelValue.value as string | number | boolean | undefined;
@@ -130,9 +130,9 @@ const typeFormModel = computed({
     }
 });
 
-/**
- * Type-safe computed for ActionEnumForm
- */
+
+
+
 const enumFormModel = computed({
     get(): string | undefined {
         return modelValue.value as string | undefined;

@@ -15,7 +15,7 @@
             target="_blank"
             rel="noreferrer noopener"
         >
-            <Link class="w-4 h-4" />
+            <Link class="size-4" />
             {{ plugin.url }}
         </a>
 
@@ -46,7 +46,10 @@
                         Extension: <span class="font-mono">{{ langPlugin.extension }}</span>
                     </div>
                     <div class="text-sm text-muted-foreground mt-1">
-                        Graphical Editor: {{ langPlugin.editorPlugin ? "Supported" : "Not supported" }}
+                        Graphical Editor: {{ langPlugin.graphicalEditorPlugin ? "Supported" : "Not supported" }}
+                    </div>
+                    <div class="text-sm text-muted-foreground mt-1">
+                        Textual Editor: {{ langPlugin.textualEditorPlugin ? "Supported" : "Not supported" }}
                     </div>
                 </div>
             </div>

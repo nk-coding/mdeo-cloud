@@ -18,7 +18,7 @@
                             @click="handleSelectUser(user)"
                         >
                             <template #content>
-                                <UserIcon class="w-4 h-4 mr-2" />
+                                <UserIcon class="size-4 mr-2" />
                                 <div class="flex-1 min-w-0 text-left">
                                     <div class="font-medium truncate">{{ user.username }}</div>
                                 </div>
@@ -41,6 +41,7 @@ import TreeItem from "@/components/tree/TreeItem.vue";
 import type { User, UserInfo } from "@/data/api/backendApi";
 import { User as UserIcon } from "lucide-vue-next";
 import { workbenchStateKey } from "@/components/workbench/util";
+import { showApiError } from "@/lib/notifications";
 
 const props = defineProps<{
     open: boolean;
@@ -74,24 +75,30 @@ const filteredUsers = computed(() => {
 
 async function loadUsers() {
     const [allUsersResult, projectUsersResult] = await Promise.all([
-        backendApi.getAllUsers(),
-        backendApi.getProjectOwners(props.projectId)
+        backendApi.users.getAll(),
+        backendApi.projects.getOwners(props.projectId)
     ]);
 
     if (allUsersResult.success) {
         allUsers.value = allUsersResult.value;
+    } else {
+        showApiError("load users", allUsersResult.error.message);
     }
     if (projectUsersResult.success) {
         projectUsers.value = projectUsersResult.value;
+    } else {
+        showApiError("load project users", projectUsersResult.error.message);
     }
 }
 
 async function handleSelectUser(user: User) {
-    const result = await backendApi.addProjectOwner(props.projectId, user.id);
+    const result = await backendApi.projects.addOwner(props.projectId, user.id);
     if (result.success) {
         await loadUsers();
         emit("usersUpdated");
         emit("update:open", false);
+    } else {
+        showApiError("add user to project", result.error.message);
     }
 }
 

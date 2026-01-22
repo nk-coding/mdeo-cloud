@@ -41,14 +41,8 @@ const props = defineProps<{
 
 const model = defineModel<boolean | number | string | undefined>();
 
-/**
- * Whether this is a boolean type
- */
 const isBoolean = computed(() => props.schema.type === "boolean");
 
-/**
- * Whether this is a numeric type
- */
 const isNumber = computed(() => {
     const type = props.schema.type;
     return (
@@ -63,9 +57,6 @@ const isNumber = computed(() => {
     );
 });
 
-/**
- * Whether the number type is an integer
- */
 const isInteger = computed(() => {
     const type = props.schema.type;
     return (
@@ -78,9 +69,6 @@ const isInteger = computed(() => {
     );
 });
 
-/**
- * Minimum value for the number field
- */
 const numberMin = computed(() => {
     const type = props.schema.type;
     switch (type) {
@@ -99,9 +87,6 @@ const numberMin = computed(() => {
     }
 });
 
-/**
- * Maximum value for the number field
- */
 const numberMax = computed(() => {
     const type = props.schema.type;
     switch (type) {
@@ -122,16 +107,10 @@ const numberMax = computed(() => {
     }
 });
 
-/**
- * Step value for the number field
- */
 const numberStep = computed(() => {
     return isInteger.value ? 1 : 0.01;
 });
 
-/**
- * Format options for the number field
- */
 const numberFormatOptions = computed(() => {
     return {
         minimumFractionDigits: isInteger.value ? 0 : 0,
@@ -139,11 +118,7 @@ const numberFormatOptions = computed(() => {
     };
 });
 
-/**
- * Placeholder text for the input
- */
 const placeholder = computed(() => {
-    // Use schema placeholder if provided
     if (props.schema.placeholder) {
         return props.schema.placeholder;
     }
@@ -153,9 +128,6 @@ const placeholder = computed(() => {
     return "Enter text...";
 });
 
-/**
- * Computed property for boolean values
- */
 const booleanModel = computed({
     get() {
         return model.value as boolean;
@@ -165,9 +137,6 @@ const booleanModel = computed({
     }
 });
 
-/**
- * Computed property for number values
- */
 const numberModel = computed({
     get() {
         if (model.value === undefined || model.value === null) {
@@ -180,9 +149,6 @@ const numberModel = computed({
     }
 });
 
-/**
- * Computed property for string values
- */
 const stringModel = computed({
     get() {
         if (model.value === undefined || model.value === null) {
@@ -195,8 +161,5 @@ const stringModel = computed({
     }
 });
 
-/**
- * Validation errors for this specific field
- */
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
 </script>

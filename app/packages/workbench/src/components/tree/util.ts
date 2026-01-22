@@ -1,15 +1,15 @@
 import type { ComputedRef, InjectionKey } from "vue";
 
 export interface TreeItem {
-    id: any;
+    id: string;
 }
 
 export interface DragAndDropCallbacks {
     onDragStart?: (item: TreeItem, event: DragEvent) => void;
     onDragEnd?: (item: TreeItem, event: DragEvent) => void;
-    onDrop?: (droppedItem: TreeItem, targetItem: TreeItem, event: DragEvent) => void | Promise<void>;
-    onTreeDrop?: (droppedItem: TreeItem, event: DragEvent) => void | Promise<void>;
-    canDrop?: (droppedItem: TreeItem, targetItem: TreeItem) => boolean;
+    onDrop?: (droppedItemId: string, targetItem: TreeItem, event: DragEvent) => void | Promise<void>;
+    onTreeDrop?: (droppedItemId: string, event: DragEvent) => void | Promise<void>;
+    canDrop?: (droppedItemId: string, targetItem: TreeItem) => boolean;
 }
 
 export interface DragAndDropConfig {

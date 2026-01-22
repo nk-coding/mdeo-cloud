@@ -12,8 +12,10 @@ import java.util.*
 
 /**
  * Service for managing file metadata within projects.
+ *
+ * @param services The injected services providing access to configuration and other services
  */
-class MetadataService : BaseService() {
+class MetadataService(services: InjectedServices) : BaseService(), InjectedServices by services {
     
     /**
      * Reads metadata for a file or directory.

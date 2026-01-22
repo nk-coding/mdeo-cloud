@@ -1,5 +1,4 @@
-import { convertIcon } from "@/lib/convertIcon";
-import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
+import { convertIcon, defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Network } from "lucide";
 import { metamodelEditorPlugin } from "@mdeo/editor-metamodel";
 import editorMetamodelStylesUrl from "@mdeo/editor-metamodel/styles?url";
@@ -17,14 +16,16 @@ export const metamodelPlugin: ResolvedWorkbenchLanguagePlugin = {
     serverPlugin: {
         import: metamodelServerPluginUrl
     },
-    editorPlugin: {
+    graphicalEditorPlugin: {
         containerConfiguration: metamodelEditorPlugin,
         stylesUrl: editorMetamodelStylesUrl
     },
-    languageConfiguration: defaultLanguageConfiguration,
-    monarchTokensProvider: {
-        ...defaultMonarchTokenProvider,
-        keywords: ["class", "extends", "abstract", "import", "from", "as"]
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: {
+            ...defaultMonarchTokenProvider,
+            keywords: ["class", "extends", "abstract", "import", "from", "as"]
+        }
     },
     icon: convertIcon(Network),
     contributionPlugins: []

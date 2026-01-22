@@ -1,6 +1,5 @@
 package com.mdeo.backend.service
 
-import com.mdeo.backend.config.PluginConfig
 import com.mdeo.backend.database.ContributionPluginsTable
 import com.mdeo.backend.database.LanguagePluginsTable
 import com.mdeo.backend.database.PluginsTable
@@ -42,9 +41,8 @@ data class ManifestLanguagePlugin(
     val extension: String,
     val newFileAction: Boolean = false,
     val serverPlugin: ManifestServerPlugin,
-    val editorPlugin: ManifestEditorPlugin? = null,
-    val languageConfiguration: JsonObject,
-    val monarchTokensProvider: JsonObject,
+    val graphicalEditorPlugin: ManifestGraphicalEditorPlugin? = null,
+    val textualEditorPlugin: ManifestTextualEditorPlugin? = null,
     val icon: JsonArray
 )
 
@@ -54,25 +52,36 @@ data class ManifestServerPlugin(
 )
 
 @kotlinx.serialization.Serializable
-data class ManifestEditorPlugin(
+data class ManifestGraphicalEditorPlugin(
     val import: String,
     val stylesUrl: String
+)
+
+@kotlinx.serialization.Serializable
+data class ManifestTextualEditorPlugin(
+    val languageConfiguration: JsonObject,
+    val monarchTokensProvider: JsonObject
 )
 
 /**
  * Service for managing plugins and their associations with projects.
  *
- * @param config The plugin configuration settings
+ * @param services The injected services providing access to configuration and other services
  */
-class PluginService(val config: PluginConfig) : BaseService() {
+class PluginService(services: InjectedServices) : BaseService(), InjectedServices by services {
     private val logger = LoggerFactory.getLogger(PluginService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
-    private val pluginBaseUrl = config.baseUrl
-    private val internalPluginBaseUrl = config.internalBaseUrl
+
+    /**
+     * Plugin configuration settings 
+     */
+    private val pluginConfig get() = config.plugin
+    private val pluginBaseUrl get() = pluginConfig.baseUrl
+    private val internalPluginBaseUrl get() = pluginConfig.internalBaseUrl
 
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
-        .version(if (config.forceHttp1) HttpClient.Version.HTTP_1_1 else HttpClient.Version.HTTP_2)
+        .version(if (pluginConfig.forceHttp1) HttpClient.Version.HTTP_1_1 else HttpClient.Version.HTTP_2)
         .build()
 
     /**
@@ -209,6 +218,7 @@ class PluginService(val config: PluginConfig) : BaseService() {
 
     /**
      * Refreshes plugin data by re-fetching the manifest and updating stored language plugins.
+     * Invalidates file data for all projects using this plugin.
      *
      * @param pluginId The UUID of the plugin to refresh
      * @return ApiResult indicating success or containing an error
@@ -250,6 +260,8 @@ class PluginService(val config: PluginConfig) : BaseService() {
             }
         }
 
+        fileDataService.invalidatePluginData(pluginId)
+        
         return success(Unit)
     }
 
@@ -280,19 +292,19 @@ class PluginService(val config: PluginConfig) : BaseService() {
      * Stores language plugins in the database.
      */
     private fun storeLanguagePlugins(pluginId: UUID, languagePlugins: List<ManifestLanguagePlugin>, now: Instant) {
-        for (lp in languagePlugins) {
+        for (plugin in languagePlugins) {
             LanguagePluginsTable.insert {
-                it[id] = lp.id
+                it[id] = plugin.id
                 it[LanguagePluginsTable.pluginId] = pluginId
-                it[name] = lp.name
-                it[extension] = lp.extension
-                it[newFileAction] = lp.newFileAction
-                it[serverPluginImport] = lp.serverPlugin.import
-                it[editorPluginImport] = lp.editorPlugin?.import
-                it[editorStylesUrl] = lp.editorPlugin?.stylesUrl
-                it[languageConfiguration] = lp.languageConfiguration.toString()
-                it[monarchTokensProvider] = lp.monarchTokensProvider.toString()
-                it[icon] = lp.icon.toString()
+                it[name] = plugin.name
+                it[extension] = plugin.extension
+                it[newFileAction] = plugin.newFileAction
+                it[serverPluginImport] = plugin.serverPlugin.import
+                it[graphicalEditorPluginImport] = plugin.graphicalEditorPlugin?.import
+                it[graphicalEditorStylesUrl] = plugin.graphicalEditorPlugin?.stylesUrl
+                it[textualEditorLanguageConfiguration] = plugin.textualEditorPlugin?.languageConfiguration?.toString()
+                it[textualEditorMonarchTokensProvider] = plugin.textualEditorPlugin?.monarchTokensProvider?.toString()
+                it[icon] = plugin.icon.toString()
                 it[createdAt] = now
                 it[updatedAt] = now
             }
@@ -304,12 +316,12 @@ class PluginService(val config: PluginConfig) : BaseService() {
      * Contribution plugins provide additional functionality to existing languages.
      */
     private fun storeContributionPlugins(pluginId: UUID, contributionPlugins: List<JsonObject>, now: Instant) {
-        for (cp in contributionPlugins) {
-            val languageId = cp["languageId"]?.jsonPrimitive?.content ?: continue
-            val description = cp["description"]?.jsonPrimitive?.content ?: ""
+        for (plugin in contributionPlugins) {
+            val languageId = plugin["languageId"]?.jsonPrimitive?.content ?: continue
+            val description = plugin["description"]?.jsonPrimitive?.content ?: ""
             val additionalKeywords =
-                cp["additionalKeywords"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-            val serverPlugins = cp["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
+                plugin["additionalKeywords"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            val serverPlugins = plugin["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
 
             ContributionPluginsTable.insert {
                 it[id] = UUID.randomUUID()
@@ -327,11 +339,14 @@ class PluginService(val config: PluginConfig) : BaseService() {
     /**
      * Deletes a plugin and removes it from all projects.
      * Cascading deletes handle language plugins, contribution plugins, and project associations.
+     * Invalidates file data for all projects using this plugin.
      *
      * @param pluginId The UUID of the plugin to delete
      * @return ApiResult indicating success or containing an error
      */
     fun deletePlugin(pluginId: UUID): ApiResult<Unit> {
+        fileDataService.invalidatePluginData(pluginId)
+        
         return transaction {
             val deleted = PluginsTable.deleteWhere { PluginsTable.id eq pluginId }
 
@@ -345,13 +360,14 @@ class PluginService(val config: PluginConfig) : BaseService() {
 
     /**
      * Associates a plugin with a project.
+     * Invalidates file data for the project after adding the plugin.
      *
      * @param projectId The UUID of the project
      * @param pluginId The UUID of the plugin
      * @return ApiResult indicating success or containing an error
      */
     fun addPluginToProject(projectId: UUID, pluginId: UUID): ApiResult<BackendPlugin> {
-        return transaction {
+        val result = transaction {
             val pluginExists = PluginsTable.selectAll()
                 .where { PluginsTable.id eq pluginId }
                 .count() > 0
@@ -379,24 +395,31 @@ class PluginService(val config: PluginConfig) : BaseService() {
                 it[ProjectPluginsTable.pluginId] = pluginId
             }
 
-            val plugin = when(val result = getPlugin(pluginId)) {
-                is ApiResult.Success -> result.value
-                is ApiResult.Failure -> return@transaction result
+            val plugin = when(val pluginResult = getPlugin(pluginId)) {
+                is ApiResult.Success -> pluginResult.value
+                is ApiResult.Failure -> return@transaction pluginResult
             }
 
             success(plugin)
         }
+        
+        if (result is ApiResult.Success) {
+            fileDataService.invalidateProjectData(projectId)
+        }
+        
+        return result
     }
 
     /**
      * Removes a plugin association from a project.
+     * Invalidates file data for the project after removing the plugin.
      *
      * @param projectId The UUID of the project
      * @param pluginId The UUID of the plugin
      * @return ApiResult indicating success or containing an error
      */
     fun removePluginFromProject(projectId: UUID, pluginId: UUID): ApiResult<Unit> {
-        return transaction {
+        val result = transaction {
             val deleted = ProjectPluginsTable.deleteWhere {
                 (ProjectPluginsTable.projectId eq projectId) and
                         (ProjectPluginsTable.pluginId eq pluginId)
@@ -411,6 +434,12 @@ class PluginService(val config: PluginConfig) : BaseService() {
 
             success(Unit)
         }
+        
+        if (result is ApiResult.Success) {
+            fileDataService.invalidateProjectData(projectId)
+        }
+        
+        return result
     }
 
     /**
@@ -710,14 +739,18 @@ class PluginService(val config: PluginConfig) : BaseService() {
             serverPlugin = LanguageServerPlugin(
                 import = resolveUrl(row[LanguagePluginsTable.serverPluginImport], pluginUrl)
             ),
-            editorPlugin = row[LanguagePluginsTable.editorPluginImport]?.let { importPath ->
-                LanguageEditorPlugin(
+            graphicalEditorPlugin = row[LanguagePluginsTable.graphicalEditorPluginImport]?.let { importPath ->
+                LanguageGraphicalEditorPlugin(
                     import = resolveUrl(importPath, pluginUrl),
-                    stylesUrl = resolveUrl(row[LanguagePluginsTable.editorStylesUrl] ?: "", pluginUrl)
+                    stylesUrl = resolveUrl(row[LanguagePluginsTable.graphicalEditorStylesUrl] ?: "", pluginUrl)
                 )
             },
-            languageConfiguration = json.parseToJsonElement(row[LanguagePluginsTable.languageConfiguration]).jsonObject,
-            monarchTokensProvider = json.parseToJsonElement(row[LanguagePluginsTable.monarchTokensProvider]).jsonObject,
+            textualEditorPlugin = row[LanguagePluginsTable.textualEditorLanguageConfiguration]?.let { langConfig ->
+                LanguageTextualEditorPlugin(
+                    languageConfiguration = json.parseToJsonElement(langConfig).jsonObject,
+                    monarchTokensProvider = json.parseToJsonElement(row[LanguagePluginsTable.textualEditorMonarchTokensProvider] ?: "{}").jsonObject
+                )
+            },
             icon = json.parseToJsonElement(row[LanguagePluginsTable.icon]).jsonArray
         )
     }

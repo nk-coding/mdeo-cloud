@@ -1,35 +1,43 @@
 <template>
     <div class="w-full h-full">
-        <ResizablePanelGroup v-show="languagePlugin != undefined" direction="horizontal">
-            <ResizablePanel>
+        <ResizablePanelGroup v-show="showFileEditor" direction="horizontal">
+            <ResizablePanel v-show="hasTextualEditor">
                 <div ref="editorElement" class="h-full w-full"></div>
             </ResizablePanel>
-            <ResizableHandle :class="{ hidden: !hasEditor }" />
-            <ResizablePanel :class="{ hidden: !hasEditor }">
+            <ResizableHandle v-show="hasTextualEditor && hasGraphicalEditor" />
+            <ResizablePanel v-show="hasGraphicalEditor">
                 <GraphicalEditor
-                    v-for="tab in tabs"
-                    :key="tab.file.id.toString()"
-                    v-show="tab === activeTab"
-                    :tab="tab"
+                    v-for="state in graphicalEditorStates"
+                    :key="state.tab.fileUri.toString()"
+                    v-show="state.tab === activeTab"
+                    :tab="state.tab"
+                    :language-plugin="state.languagePlugin.value!"
                 />
             </ResizablePanel>
         </ResizablePanelGroup>
-        <div
-            v-show="languagePlugin === undefined && activeTab != undefined"
-            class="h-full flex items-center justify-center p-8"
-        >
+        <div v-show="showMarkdownViewer" class="h-full w-full">
+            <MarkdownRenderer
+                v-for="state in markdownEditorStates"
+                :key="state.tab.fileUri.toString()"
+                v-show="state.tab === activeTab"
+                :uri="state.tab.fileUri"
+            />
+        </div>
+        <div v-show="showNoLanguageSupport" class="h-full flex items-center justify-center p-8">
             <div class="flex flex-col items-center gap-4 max-w-md text-center">
                 <AlertCircle class="w-12 h-12 text-muted-foreground" />
                 <div class="space-y-2">
                     <h3 class="text-lg font-semibold text-foreground">No Language Support Available</h3>
                     <p class="text-sm text-muted-foreground">
                         No language support for the file extension
-                        <span class="font-mono font-medium">{{ activeTab?.file.extension }}</span> is currently
-                        available.
+                        <span class="font-mono font-medium">{{
+                            activeTab && getFileExtension(activeTab.fileUri.path)
+                        }}</span>
+                        is currently available.
                     </p>
                 </div>
                 <Button @click="openManagePlugins">
-                    <Settings class="w-4 h-4 mr-2" />
+                    <Settings class="size-4 mr-2" />
                     Manage Plugins
                 </Button>
             </div>
@@ -49,15 +57,16 @@ import { useResizeObserver, watchArray } from "@vueuse/core";
 import * as monacoType from "monaco-editor";
 import { workbenchStateKey } from "../workbench/util";
 import type { EditorTab } from "@/data/tab/editorTab";
-import { EditorState } from "./util";
-import type { File } from "@/data/filesystem/file";
-import { findFileInTree } from "@/data/filesystem/util";
+import { EditorState, TextualEditorState } from "./editorState";
 import GraphicalEditor from "./GraphicalEditor.vue";
+import MarkdownRenderer from "./MarkdownRenderer.vue";
 import { AlertCircle, Settings } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import ManagePluginsDialog from "../projects/ManagePluginsDialog.vue";
+import type { Uri } from "vscode";
+import { getFileExtension } from "@/data/filesystem/util";
 
-const { tabs, activeTab, languagePluginByExtension, monacoApi, fileTree, project } = inject(workbenchStateKey)!;
+const { tabs, activeTab, languagePluginByExtension, monacoApi, project } = inject(workbenchStateKey)!;
 const editorElement = useTemplateRef("editorElement");
 const editor = shallowRef<monacoType.editor.IStandaloneCodeEditor>();
 
@@ -79,8 +88,29 @@ watchArray(
     }
 );
 
-const activeTabUri = computed(() => {
-    return activeTab.value?.file.id;
+function getOrCreateEditorState(tab: EditorTab): EditorState {
+    let state = editorStates.get(tab);
+    if (state == undefined) {
+        state = new EditorState(tab, languagePluginByExtension, editor);
+        editorStates.set(tab, state);
+    }
+    return state;
+}
+
+const activeTabEditorState = computed(() => {
+    const tab = activeTab.value;
+    if (tab == undefined) {
+        return undefined;
+    }
+    return getOrCreateEditorState(tab);
+});
+
+const graphicalEditorStates = computed(() => {
+    return tabs.value.map((tab) => getOrCreateEditorState(tab)).filter((state) => state.hasGraphicalEditor.value);
+});
+
+const markdownEditorStates = computed(() => {
+    return tabs.value.map((tab) => getOrCreateEditorState(tab)).filter((state) => state.hasMarkdownViewer.value);
 });
 
 const languagePlugin = computed(() => {
@@ -88,43 +118,39 @@ const languagePlugin = computed(() => {
     if (tab == undefined) {
         return undefined;
     }
-    return languagePluginByExtension.value.get(tab.file.extension);
+    return languagePluginByExtension.value.get(getFileExtension(tab.fileUri.path));
 });
 
-const languageId = computed(() => {
-    const plugin = languagePlugin.value;
-    return plugin?.id;
+const hasGraphicalEditor = computed(() => {
+    return activeTabEditorState.value?.hasGraphicalEditor.value ?? false;
 });
 
-const hasEditor = computed(() => {
-    const plugin = languagePlugin.value;
-    return plugin?.editorPlugin != undefined;
+const hasTextualEditor = computed(() => {
+    return activeTabEditorState.value?.hasTextualEditor.value ?? false;
+});
+
+const showFileEditor = computed(() => {
+    return hasGraphicalEditor.value || hasTextualEditor.value;
+});
+
+const showMarkdownViewer = computed(() => {
+    return activeTabEditorState.value?.hasMarkdownViewer.value ?? false;
+})
+
+const showNoLanguageSupport = computed(() => {
+    return !showFileEditor.value && !showMarkdownViewer.value;
 });
 
 watch(
-    [activeTab, activeTabUri, languageId],
-    async ([newTab, newTabUri, newLanguageId], [oldTab, oldTabUri, oldLanguageId]) => {
-        if (newTab == undefined || newTabUri == undefined || newLanguageId == undefined) {
-            editor.value?.setModel(null);
-            return;
+    activeTab,
+    (newTab, oldTab) => {
+        const oldState = oldTab ? editorStates.get(oldTab) : undefined;
+        if (oldState != undefined) {
+            oldState.deactivate();
         }
-        const oldEditorState = oldTab != undefined ? editorStates.get(oldTab) : undefined;
-        let newEditorState = editorStates.get(newTab);
-        if (newEditorState == undefined) {
-            newEditorState = new EditorState(newTab.file.id);
-            await newEditorState.updateUri(newTab.file.id, newLanguageId);
-            editorStates.set(newTab, newEditorState);
-        } else if (newTabUri !== oldTabUri || newLanguageId !== oldLanguageId) {
-            await newEditorState.updateUri(newTabUri, newLanguageId);
-        }
-        if (oldEditorState != undefined && editor.value != undefined) {
-            oldEditorState.viewState = editor.value.saveViewState() ?? undefined;
-        }
-        if (editor.value != undefined) {
-            editor.value.setModel(newEditorState.modelReference!.object.textEditorModel);
-            if (newEditorState.viewState != undefined) {
-                editor.value.restoreViewState(newEditorState.viewState);
-            }
+        const newState = newTab ? getOrCreateEditorState(newTab) : undefined;
+        if (newState != undefined) {
+            newState.activate();
         }
     },
     {
@@ -140,8 +166,8 @@ useResizeObserver(editorElement, () => {
     }
 });
 
-function openTab(file: File, temporary: boolean) {
-    const existingTab = tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
+function openTab(file: Uri, temporary: boolean) {
+    const existingTab = tabs.value.find((tab) => tab.fileUri.toString() === file.toString());
 
     if (existingTab) {
         activeTab.value = existingTab;
@@ -149,8 +175,8 @@ function openTab(file: File, temporary: boolean) {
             existingTab.temporary = false;
         }
     } else {
-        const newTab = {
-            file: file,
+        const newTab: EditorTab = {
+            fileUri: file,
             temporary: temporary
         };
         tabs.value.push(newTab);
@@ -167,14 +193,11 @@ onMounted(() => {
         glyphMargin: false,
         fixedOverflowWidgets: true,
         automaticLayout: false
-    })
+    });
     monacoEditor.layout();
     editor.value = monacoEditor;
     monacoApi.openEditorFunc = async (createModelReference, options) => {
-        openTab(
-            findFileInTree(fileTree, createModelReference.object.textEditorModel.uri) as File,
-            options?.pinned !== true
-        );
+        openTab(createModelReference.object.textEditorModel.uri, options?.pinned !== true);
         return monacoEditor;
     };
 });
@@ -182,7 +205,6 @@ onMounted(() => {
 const isManagePluginsDialogOpen = shallowRef(false);
 
 function openManagePlugins() {
-    // If user is admin, we could open settings, but for now just open project's manage plugins
     if (project.value) {
         isManagePluginsDialogOpen.value = true;
     }

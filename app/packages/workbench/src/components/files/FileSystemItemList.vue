@@ -9,7 +9,7 @@
         />
         <FileSystemItem
             v-for="item in items.folders"
-            :key="item.id.toString()"
+            :key="item.uri.toString()"
             :entry="item"
             @select="$emit('select', $event)"
             @create-file="handleCreateFile"
@@ -30,7 +30,7 @@
         />
         <FileSystemItem
             v-for="item in items.files"
-            :key="item.id.toString()"
+            :key="item.uri.toString()"
             :entry="item"
             @select="$emit('select', $event)"
             @create-file="handleCreateFile"

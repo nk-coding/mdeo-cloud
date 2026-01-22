@@ -13,11 +13,13 @@ export const modelTransformationPlugin: ResolvedWorkbenchLanguagePlugin = {
     serverPlugin: {
         import: modelTransformationServerPluginUrl
     },
-    editorPlugin: undefined,
-    languageConfiguration: defaultLanguageConfiguration,
-    monarchTokensProvider: {
-        ...defaultMonarchTokenProvider,
-        keywords: []
+    graphicalEditorPlugin: undefined,
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: {
+            ...defaultMonarchTokenProvider,
+            keywords: []
+        }
     },
     icon: [
         [

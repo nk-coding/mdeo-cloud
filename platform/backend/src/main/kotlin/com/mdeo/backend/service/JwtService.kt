@@ -17,10 +17,15 @@ import java.util.*
 /**
  * Service for JWT token generation and verification using RSA key pairs.
  *
- * @param config JWT configuration settings
+ * @param services The injected services providing access to configuration and other services
  */
-class JwtService(private val config: JwtConfig) : BaseService() {
+class JwtService(services: InjectedServices) : BaseService(), InjectedServices by services {
     private val logger = LoggerFactory.getLogger(JwtService::class.java)
+    
+    /**
+     * JWT configuration settings 
+     */
+    private val jwtConfig: JwtConfig get() = config.jwt
     
     private lateinit var privateKey: RSAPrivateKey
     private lateinit var publicKey: RSAPublicKey
@@ -28,10 +33,13 @@ class JwtService(private val config: JwtConfig) : BaseService() {
     
     companion object {
         const val CLAIM_PROJECT_ID = "projectId"
+        const val CLAIM_EXECUTION_ID = "executionId"
         const val CLAIM_SCOPE = "scope"
         
         val SCOPE_FILES_READ = "files:read"
         val SCOPE_FILE_DATA_READ = "file-data:read"
+        val SCOPE_EXECUTION_READ = "execution:read"
+        val SCOPE_EXECUTION_WRITE = "execution:write"
     }
     
     /**
@@ -41,10 +49,10 @@ class JwtService(private val config: JwtConfig) : BaseService() {
     fun init() {
         logger.info("Initializing JWT service...")
         
-        if (config.privateKey != null && config.publicKey != null) {
+        if (jwtConfig.privateKey != null && jwtConfig.publicKey != null) {
             logger.info("Loading RSA key pair from configuration")
-            val privateKeyBytes = Base64.getDecoder().decode(config.privateKey)
-            val publicKeyBytes = Base64.getDecoder().decode(config.publicKey)
+            val privateKeyBytes = Base64.getDecoder().decode(jwtConfig.privateKey)
+            val publicKeyBytes = Base64.getDecoder().decode(jwtConfig.publicKey)
             
             val keyFactory = KeyFactory.getInstance("RSA")
             privateKey = keyFactory.generatePrivate(PKCS8EncodedKeySpec(privateKeyBytes)) as RSAPrivateKey
@@ -78,14 +86,41 @@ class JwtService(private val config: JwtConfig) : BaseService() {
      */
     fun generateProjectToken(projectId: UUID): String {
         val now = Instant.now()
-        val expiration = now.plusSeconds(config.expirationSeconds)
+        val expiration = now.plusSeconds(jwtConfig.expirationSeconds)
         
         return JWT.create()
-            .withIssuer(config.issuer)
+            .withIssuer(jwtConfig.issuer)
             .withIssuedAt(Date.from(now))
             .withExpiresAt(Date.from(expiration))
             .withClaim(CLAIM_PROJECT_ID, projectId.toString())
             .withArrayClaim(CLAIM_SCOPE, arrayOf(SCOPE_FILES_READ, SCOPE_FILE_DATA_READ))
+            .sign(algorithm)
+    }
+    
+    /**
+     * Generates a JWT token for execution operations.
+     * Includes read access to project data and write access to execution progress.
+     *
+     * @param projectId The UUID of the project
+     * @param executionId The UUID of the execution
+     * @return The generated JWT token string
+     */
+    fun generateExecutionToken(projectId: UUID, executionId: UUID): String {
+        val now = Instant.now()
+        val expiration = now.plusSeconds(jwtConfig.expirationSeconds)
+        
+        return JWT.create()
+            .withIssuer(jwtConfig.issuer)
+            .withIssuedAt(Date.from(now))
+            .withExpiresAt(Date.from(expiration))
+            .withClaim(CLAIM_PROJECT_ID, projectId.toString())
+            .withClaim(CLAIM_EXECUTION_ID, executionId.toString())
+            .withArrayClaim(CLAIM_SCOPE, arrayOf(
+                SCOPE_FILES_READ,
+                SCOPE_FILE_DATA_READ,
+                SCOPE_EXECUTION_READ,
+                SCOPE_EXECUTION_WRITE
+            ))
             .sign(algorithm)
     }
     
@@ -96,7 +131,7 @@ class JwtService(private val config: JwtConfig) : BaseService() {
      */
     fun getVerifier(): com.auth0.jwt.JWTVerifier {
         return JWT.require(algorithm)
-            .withIssuer(config.issuer)
+            .withIssuer(jwtConfig.issuer)
             .build()
     }
     
@@ -158,5 +193,5 @@ class JwtService(private val config: JwtConfig) : BaseService() {
      *
      * @return The issuer string
      */
-    fun getIssuer(): String = config.issuer
+    fun getIssuer(): String = jwtConfig.issuer
 }

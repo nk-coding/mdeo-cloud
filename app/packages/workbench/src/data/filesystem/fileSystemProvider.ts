@@ -17,48 +17,21 @@ import {
     createFileSystemProviderError,
     FileSystemProviderErrorCode
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
-import type { FileSystemError, ProjectError } from "../api/apiResult";
-import { FileSystemErrorCode, ProjectErrorCode, CommonErrorCode } from "../api/apiResult";
-
-/**
- * Converts an API error to a VSCode FileSystemProvider error.
- */
-function apiErrorToVSCodeError(error: FileSystemError | ProjectError): Error {
-    let errorCode: FileSystemProviderErrorCode;
-
-    switch (error.code) {
-        case FileSystemErrorCode.FileNotFound:
-        case ProjectErrorCode.ProjectNotFound:
-            errorCode = FileSystemProviderErrorCode.FileNotFound;
-            break;
-        case FileSystemErrorCode.FileExists:
-            errorCode = FileSystemProviderErrorCode.FileExists;
-            break;
-        case FileSystemErrorCode.FileIsADirectory:
-            errorCode = FileSystemProviderErrorCode.FileIsADirectory;
-            break;
-        case FileSystemErrorCode.FileNotADirectory:
-            errorCode = FileSystemProviderErrorCode.FileNotADirectory;
-            break;
-        case CommonErrorCode.Unavailable:
-            errorCode = FileSystemProviderErrorCode.Unavailable;
-            break;
-        case FileSystemErrorCode.DirectoryNotEmpty:
-        case CommonErrorCode.Unknown:
-        default:
-            errorCode = FileSystemProviderErrorCode.Unknown;
-            break;
-    }
-
-    return createFileSystemProviderError(error.message, errorCode);
-}
+import type { FileSystemError, ProjectError, ExecutionError } from "../api/apiResult";
+import { FileSystemErrorCode, ProjectErrorCode, CommonErrorCode, ExecutionErrorCode } from "../api/apiResult";
+import { parseUri as parseUriUtil, FileCategory } from "./util";
+import { Uri } from "vscode";
 
 /**
  * File system provider that forwards operations to a backend API.
  *
- * URIs are expected to have the format: schema://projectId/path
+ * URIs support three formats:
+ * 1. Regular files: schema://projectId/files/path
+ * 2. Execution summaries: schema://projectId/executions/executionId.md
+ * 3. Execution result files: schema://projectId/executions/files/path
+ *
  * This provider extracts the projectId and path from the URI and forwards
- * the operation to the backend API.
+ * the operation to the backend API or execution API based on the path structure.
  */
 export class BackendFileSystemProvider implements IFileSystemProviderWithFileReadWriteCapability {
     readonly capabilities = FileSystemProviderCapabilities.FileReadWrite;
@@ -70,38 +43,29 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
 
     constructor(private readonly backendApi: BackendApi) {}
 
-    /**
-     * Parse a URI into projectId and path components.
-     * Expected format: schema://projectId/path
-     */
-    private parseUri(uri: URI): { projectId: string; path: string } {
-        const fullPath = uri.path;
-        const parts = fullPath.substring(1).split("/");
-        const projectId = parts[0];
-
-        if (!projectId) {
-            throw new Error("Invalid URI: missing project ID");
-        }
-
-        const path = "/" + parts.slice(1).join("/");
-
-        return { projectId, path };
-    }
-
     async stat(resource: URI): Promise<IStat> {
-        const fullPath = resource.path;
+        const parsed = parseUriUtil(Uri.from(resource));
+        const { projectId, category } = parsed;
 
-        if (fullPath === "/" || fullPath === "") {
+        if (category === FileCategory.ExecutionSummary) {
             return {
-                type: FileType.Directory,
+                type: FileType.File,
                 mtime: Date.now(),
                 ctime: Date.now(),
                 size: 0
             };
         }
 
-        const { projectId, path } = this.parseUri(resource);
+        if (category === FileCategory.ExecutionResultFile) {
+            return {
+                type: FileType.File,
+                mtime: Date.now(),
+                ctime: Date.now(),
+                size: 0
+            };
+        }
 
+        const path = parsed.path;
         if (path === "/" || path === "") {
             return {
                 type: FileType.Directory,
@@ -111,7 +75,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
             };
         }
 
-        const fileTypeResult = await this.backendApi.stat(projectId, path);
+        const fileTypeResult = await this.backendApi.files.stat(projectId, path);
         if (!fileTypeResult.success) {
             throw apiErrorToVSCodeError(fileTypeResult.error);
         }
@@ -123,7 +87,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
         }
 
         if (fileTypeResult.value === FileType.File) {
-            const contentResult = await this.backendApi.readFile(projectId, path);
+            const contentResult = await this.backendApi.files.readFile(projectId, path);
             if (!contentResult.success) {
                 throw apiErrorToVSCodeError(contentResult.error);
             }
@@ -144,18 +108,18 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async readdir(resource: URI): Promise<[string, FileType][]> {
-        const fullPath = resource.path;
+        const parsed = parseUriUtil(Uri.from(resource));
+        const { projectId, category } = parsed;
 
-        if (fullPath === "/" || fullPath === "") {
-            const projectsResult = await this.backendApi.getProjects();
-            if (!projectsResult.success) {
-                throw apiErrorToVSCodeError(projectsResult.error);
-            }
-            return projectsResult.value.map((project) => [project.id, FileType.Directory]);
+        if (category !== FileCategory.RegularFile) {
+            throw createFileSystemProviderError(
+                `Directory listing not supported for this path: ${resource.toString()}`,
+                FileSystemProviderErrorCode.FileNotADirectory
+            );
         }
 
-        const { projectId, path } = this.parseUri(resource);
-        const result = await this.backendApi.readdir(projectId, path);
+        const path = parsed.path;
+        const result = await this.backendApi.files.readdir(projectId, path);
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
@@ -163,8 +127,34 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async readFile(resource: URI): Promise<Uint8Array> {
-        const { projectId, path } = this.parseUri(resource);
-        const result = await this.backendApi.readFile(projectId, path);
+        const parsed = parseUriUtil(Uri.from(resource));
+        const { projectId, category } = parsed;
+
+        if (category === FileCategory.ExecutionSummary) {
+            const executionId = parsed.executionId;
+            if (!executionId) {
+                throw createFileSystemProviderError(
+                    `Invalid execution summary URI: ${resource.toString()}`,
+                    FileSystemProviderErrorCode.FileNotFound
+                );
+            }
+            const result = await this.backendApi.executions.getSummary(projectId, executionId);
+            if (!result.success) {
+                throw apiErrorToVSCodeError(result.error);
+            }
+            return result.value;
+        }
+
+        if (category === FileCategory.ExecutionResultFile) {
+            const result = await this.backendApi.executions.getFile(projectId, parsed.executionId, parsed.path);
+            if (!result.success) {
+                throw apiErrorToVSCodeError(result.error);
+            }
+            return result.value;
+        }
+
+        const path = parsed.path;
+        const result = await this.backendApi.files.readFile(projectId, path);
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
@@ -172,17 +162,26 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async writeFile(resource: URI, content: Uint8Array, opts: IFileWriteOptions): Promise<void> {
-        const { projectId, path } = this.parseUri(resource);
+        const parsed = parseUriUtil(Uri.from(resource));
+        const { projectId, category } = parsed;
 
+        if (category !== FileCategory.RegularFile) {
+            throw createFileSystemProviderError(
+                `Write not supported for this file type: ${resource.toString()}`,
+                FileSystemProviderErrorCode.NoPermissions
+            );
+        }
+
+        const path = parsed.path;
         let exists: boolean;
         try {
-            const statResult = await this.backendApi.stat(projectId, path);
+            const statResult = await this.backendApi.files.stat(projectId, path);
             exists = statResult.success;
         } catch {
             exists = false;
         }
 
-        const result = await this.backendApi.writeFile(projectId, path, content, opts);
+        const result = await this.backendApi.files.writeFile(projectId, path, content, opts);
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
@@ -195,8 +194,18 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async mkdir(resource: URI): Promise<void> {
-        const { projectId, path } = this.parseUri(resource);
-        const result = await this.backendApi.mkdir(projectId, path);
+        const parsed = parseUriUtil(Uri.from(resource));
+        const { projectId, category } = parsed;
+
+        if (category !== FileCategory.RegularFile) {
+            throw createFileSystemProviderError(
+                `mkdir not supported for this path type: ${resource.toString()}`,
+                FileSystemProviderErrorCode.NoPermissions
+            );
+        }
+
+        const path = parsed.path;
+        const result = await this.backendApi.files.mkdir(projectId, path);
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
@@ -205,8 +214,18 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async delete(resource: URI, opts: IFileDeleteOptions): Promise<void> {
-        const { projectId, path } = this.parseUri(resource);
-        const result = await this.backendApi.delete(projectId, path, opts);
+        const parsed = parseUriUtil(Uri.from(resource));
+        const { projectId, category } = parsed;
+
+        if (category !== FileCategory.RegularFile) {
+            throw createFileSystemProviderError(
+                `Delete not supported for this file type: ${resource.toString()}`,
+                FileSystemProviderErrorCode.NoPermissions
+            );
+        }
+
+        const path = parsed.path;
+        const result = await this.backendApi.files.delete(projectId, path, opts);
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
@@ -215,14 +234,21 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async rename(from: URI, to: URI, opts: IFileOverwriteOptions): Promise<void> {
-        const fromParsed = this.parseUri(from);
-        const toParsed = this.parseUri(to);
+        const fromParsed = parseUriUtil(Uri.from(from));
+        const toParsed = parseUriUtil(Uri.from(to));
+
+        if (fromParsed.category !== FileCategory.RegularFile || toParsed.category !== FileCategory.RegularFile) {
+            throw createFileSystemProviderError(
+                `Rename not supported for this file type: ${from.toString()} -> ${to.toString()}`,
+                FileSystemProviderErrorCode.NoPermissions
+            );
+        }
 
         if (fromParsed.projectId !== toParsed.projectId) {
             throw new Error("Cannot rename across projects");
         }
 
-        const result = await this.backendApi.rename(fromParsed.projectId, fromParsed.path, toParsed.path, opts);
+        const result = await this.backendApi.files.rename(fromParsed.projectId, fromParsed.path, toParsed.path, opts);
         if (!result.success) {
             throw apiErrorToVSCodeError(result.error);
         }
@@ -242,4 +268,43 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     dispose(): void {
         this._onDidChangeFile.dispose();
     }
+}
+
+/**
+ * Converts an API error to a VSCode FileSystemProvider error.
+ *
+ * @param error The error from the API.
+ * @returns An Error object compatible with VSCode FileSystemProvider.
+ */
+function apiErrorToVSCodeError(error: FileSystemError | ProjectError | ExecutionError): Error {
+    let errorCode: FileSystemProviderErrorCode;
+
+    switch (error.code) {
+        case FileSystemErrorCode.FileNotFound:
+        case ProjectErrorCode.ProjectNotFound:
+        case ExecutionErrorCode.ExecutionNotFound:
+            errorCode = FileSystemProviderErrorCode.FileNotFound;
+            break;
+        case FileSystemErrorCode.FileExists:
+            errorCode = FileSystemProviderErrorCode.FileExists;
+            break;
+        case FileSystemErrorCode.FileIsADirectory:
+            errorCode = FileSystemProviderErrorCode.FileIsADirectory;
+            break;
+        case FileSystemErrorCode.FileNotADirectory:
+            errorCode = FileSystemProviderErrorCode.FileNotADirectory;
+            break;
+        case CommonErrorCode.Unavailable:
+            errorCode = FileSystemProviderErrorCode.Unavailable;
+            break;
+        case FileSystemErrorCode.DirectoryNotEmpty:
+        case ExecutionErrorCode.ExecutionNotCompleted:
+        case ExecutionErrorCode.ExecutionAlreadyTerminal:
+        case CommonErrorCode.Unknown:
+        default:
+            errorCode = FileSystemProviderErrorCode.Unknown;
+            break;
+    }
+
+    return createFileSystemProviderError(error.message, errorCode);
 }

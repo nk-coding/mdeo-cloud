@@ -31,6 +31,7 @@ dependencies {
     implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("io.ktor:ktor-server-double-receive:$ktorVersion")
+    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
     
     // Ktor Client (for plugin manifest fetching)
     implementation("io.ktor:ktor-client-core:$ktorVersion")

@@ -13,7 +13,7 @@
                                     :is-active="selectedUserId === user.id"
                                     @click="selectUser(user.id)"
                                 >
-                                    <User class="w-4 h-4 shrink-0" />
+                                    <User class="size-4 shrink-0" />
                                     <span class="text-sm font-medium truncate">{{ user.username }}</span>
                                     <span
                                         v-if="user.isAdmin"
@@ -120,7 +120,7 @@ function selectUser(userId: string) {
 async function loadUsers(preferredSelection?: string) {
     isLoading.value = true;
     try {
-        const result = await props.backendApi.getAllUsers();
+        const result = await props.backendApi.users.getAll();
         if (result.success) {
             users.value = result.value.sort((a, b) => {
                 return a.username.localeCompare(b.username);

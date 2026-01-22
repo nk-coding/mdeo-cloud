@@ -24,7 +24,7 @@
             <DialogFooter class="flex flex-row justify-between sm:justify-between">
                 <div>
                     <Button v-if="canGoPrevious" variant="outline" :disabled="isSubmitting" @click="handlePrevious">
-                        <ChevronLeft class="w-4 h-4 mr-1" />
+                        <ChevronLeft class="size-4 mr-1" />
                         Previous
                     </Button>
                 </div>
@@ -36,14 +36,14 @@
                         :disabled="isSubmitting"
                         @click="handleSubmit"
                     >
-                        <Loader2 v-if="isSubmitting" class="w-4 h-4 mr-1 animate-spin" />
-                        <Check v-else class="w-4 h-4 mr-1" />
+                        <Loader2 v-if="isSubmitting" class="size-4 mr-1 animate-spin" />
+                        <Check v-else class="size-4 mr-1" />
                         Submit
                     </Button>
                     <Button v-else class="min-w-27.5" :disabled="isSubmitting" @click="handleNext">
                         Next
-                        <Loader2 v-if="isSubmitting" class="w-4 h-4 ml-1 animate-spin" />
-                        <ChevronRight v-else class="w-4 h-4 ml-1" />
+                        <Loader2 v-if="isSubmitting" class="size-4 ml-1 animate-spin" />
+                        <ChevronRight v-else class="size-4 ml-1" />
                     </Button>
                 </div>
             </DialogFooter>
@@ -68,15 +68,21 @@ import ActionForm from "./ActionForm.vue";
 import {
     createActionProtocol,
     type ActionDialogPage,
-    type ActionValidationError
+    type ActionValidationError,
+    type ActionStartResponse,
+    type ActionSubmitResponse,
+    type ActionExecutionRequest
 } from "@mdeo/language-common";
+import type { WorkspaceEdit } from "vscode-languageserver-types";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import { workbenchStateKey } from "../workbench/util";
 import { deepCloneWithSchema, generateDefaultValue, verifyAndFix } from "./actionFormUtils";
+import { showApiError, showError, showSuccess } from "@/lib/notifications";
 
 const ActionProtocol = createActionProtocol(vscodeJsonrpc);
 
-const { pendingAction, languageClient } = inject(workbenchStateKey)!;
+const workbenchState = inject(workbenchStateKey)!;
+const { pendingAction, languageClient, backendApi, project } = workbenchState;
 
 const isOpen = ref(false);
 const currentPage = ref<ActionDialogPage>();
@@ -87,9 +93,6 @@ const validationErrors = ref<ActionValidationError[]>([]);
 const isSubmitting = ref(false);
 const canGoPrevious = computed(() => previousPagesStack.value.length > 0);
 
-/**
- * Watches the pendingAction ref and starts the action dialog flow when set
- */
 watch(
     pendingAction,
     async (newAction) => {
@@ -100,30 +103,32 @@ watch(
     { immediate: true }
 );
 
-/**
- * Starts the action dialog by sending a request to the language client
- *
- * @param params The action start parameters
- */
 async function startActionDialog(params: { type: string; languageId: string; data: unknown }): Promise<void> {
     resetDialogState();
 
     try {
-        const response = await languageClient.value?.sendRequest(ActionProtocol.ActionStartRequest, params);
+        const response = (await languageClient.value?.sendRequest(ActionProtocol.ActionStartRequest, params)) as
+            | ActionStartResponse
+            | undefined;
 
         if (response) {
-            currentPage.value = response.page;
-            currentInputs.value = generateDefaultValue(response.page.schema);
-            isOpen.value = true;
+            if (response.kind === "completion") {
+                await handleCompletionEffects(response.executions);
+                pendingAction.value = undefined;
+            } else if (response.kind === "page") {
+                currentPage.value = response.page;
+                currentInputs.value = generateDefaultValue(response.page.schema);
+                isOpen.value = true;
+            }
         }
     } catch (error) {
+        showError("Failed to start action", {
+            description: error instanceof Error ? error.message : String(error)
+        });
         pendingAction.value = undefined;
     }
 }
 
-/**
- * Resets the dialog state to initial values
- */
 function resetDialogState(): void {
     currentPage.value = undefined;
     previousPagesStack.value = [];
@@ -133,20 +138,10 @@ function resetDialogState(): void {
     isSubmitting.value = false;
 }
 
-/**
- * Handles updates to the form inputs
- *
- * @param value The new input values
- */
 function onInputsUpdate(value: unknown): void {
     currentInputs.value = value;
 }
 
-/**
- * Builds the complete inputs array from all pages
- *
- * @returns Array of input values from all pages (stack of pages with last being current)
- */
 function buildAllInputs(): Record<string, unknown>[] {
     const allInputs: Record<string, unknown>[] = [];
     for (const { page, inputs } of previousPagesStack.value) {
@@ -158,14 +153,10 @@ function buildAllInputs(): Record<string, unknown>[] {
     return allInputs;
 }
 
-/**
- * Handles the Previous button click
- */
 function handlePrevious(): void {
     if (previousPagesStack.value.length > 0) {
-        // Save current values to nextValuesStack for potential reuse
         nextValuesStack.value.push(currentInputs.value);
-        
+
         const previous = previousPagesStack.value.pop()!;
         currentPage.value = previous.page;
         currentInputs.value = previous.inputs;
@@ -173,9 +164,6 @@ function handlePrevious(): void {
     }
 }
 
-/**
- * Handles the Next button click - submits current page and advances
- */
 async function handleNext(): Promise<void> {
     if (pendingAction.value == undefined || languageClient.value == undefined) {
         return;
@@ -183,36 +171,58 @@ async function handleNext(): Promise<void> {
 
     isSubmitting.value = true;
     try {
-        const response = await languageClient.value.sendRequest(ActionProtocol.ActionSubmitRequest, {
+        const response = (await languageClient.value.sendRequest(ActionProtocol.ActionSubmitRequest, {
             config: pendingAction.value,
             inputs: buildAllInputs()
-        });
+        })) as ActionSubmitResponse | undefined;
 
         if (response != undefined) {
-            handleSubmitResponse(response);
+            await handleSubmitResponse(response);
         }
     } finally {
         isSubmitting.value = false;
     }
 }
 
-/**
- * Handles the Submit button click - submits final page
- */
 async function handleSubmit(): Promise<void> {
     await handleNext();
 }
 
-/**
- * Processes the submit response from the language server
- *
- * @param response The action submit response
- */
-function handleSubmitResponse(response: {
-    kind: string;
-    errors?: ActionValidationError[];
-    page?: ActionDialogPage;
-}): void {
+async function createExecutions(executions: ActionExecutionRequest[]): Promise<void> {
+    if (!project.value) {
+        return;
+    }
+
+    for (const executionRequest of executions) {
+        try {
+            const result = await backendApi.executions.create(project.value.id, {
+                filePath: executionRequest.filePath,
+                data: executionRequest.data
+            });
+
+            if (result.success) {
+                workbenchState.addExecution(result.value);
+                showSuccess("Execution submitted", {
+                    description: `${result.value.name} has been submitted`
+                });
+            } else {
+                showApiError("create execution", result.error.message);
+            }
+        } catch (error) {
+            showError("Failed to create execution", {
+                description: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+}
+
+async function handleCompletionEffects(executions?: ActionExecutionRequest[]): Promise<void> {
+    if (executions != undefined && executions.length > 0) {
+        await createExecutions(executions);
+    }
+}
+
+async function handleSubmitResponse(response: ActionSubmitResponse): Promise<void> {
     if (response.kind === "validation") {
         validationErrors.value = response.errors ?? [];
     } else if (response.kind === "nextPage" && response.page) {
@@ -220,32 +230,26 @@ function handleSubmitResponse(response: {
             page: currentPage.value!,
             inputs: currentInputs.value
         });
-        
-        // Restore values from nextValuesStack or generate defaults
+
         if (nextValuesStack.value.length > 0) {
             const savedValues = nextValuesStack.value.pop()!;
             currentInputs.value = verifyAndFix(savedValues, response.page.schema);
         } else {
             currentInputs.value = generateDefaultValue(response.page.schema);
         }
-        
+
         validationErrors.value = [];
         currentPage.value = response.page;
     } else if (response.kind === "completion") {
+        await handleCompletionEffects(response.executions);
         closeDialog();
     }
 }
 
-/**
- * Handles the Cancel button click
- */
 function handleCancel(): void {
     closeDialog();
 }
 
-/**
- * Closes the dialog without resetting state (to preserve animation)
- */
 function closeDialog(): void {
     isOpen.value = false;
     pendingAction.value = undefined;

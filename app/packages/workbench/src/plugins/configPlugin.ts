@@ -1,6 +1,5 @@
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
-import { convertIcon } from "@/lib/convertIcon";
-import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
+import { convertIcon, defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Settings2 } from "lucide";
 import configServerPluginUrl from "../modules/configPlugin.js?url";
 
@@ -15,11 +14,13 @@ export const configPlugin: ResolvedWorkbenchLanguagePlugin = {
     serverPlugin: {
         import: configServerPluginUrl
     },
-    editorPlugin: undefined,
-    languageConfiguration: defaultLanguageConfiguration,
-    monarchTokensProvider: {
-        ...defaultMonarchTokenProvider,
-        keywords: []
+    graphicalEditorPlugin: undefined,
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: {
+            ...defaultMonarchTokenProvider,
+            keywords: []
+        }
     },
     icon: convertIcon(Settings2),
     contributionPlugins: []

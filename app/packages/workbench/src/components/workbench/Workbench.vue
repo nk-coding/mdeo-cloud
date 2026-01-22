@@ -117,7 +117,7 @@ watch(
 
 const pluginStylesUrls = computed(() =>
     props.workbenchState.languagePlugins.value
-        .map((plugin) => plugin.editorPlugin?.stylesUrl)
+        .map((plugin) => plugin.graphicalEditorPlugin?.stylesUrl)
         .filter((url) => url != undefined)
 );
 

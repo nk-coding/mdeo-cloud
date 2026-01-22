@@ -1,7 +1,6 @@
 package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
-import com.mdeo.backend.service.FileDataService
 import com.mdeo.backend.service.PluginService
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
@@ -16,12 +15,10 @@ import java.util.*
  *
  * @param pluginService Service for plugin operations
  * @param projectService Service for project access validation
- * @param fileDataService Service for file data invalidation
  */
 fun Route.pluginRoutes(
     pluginService: PluginService, 
-    projectService: ProjectService,
-    fileDataService: FileDataService
+    projectService: ProjectService
 ) {
     route("/api/plugins") {
         /**
@@ -72,8 +69,6 @@ fun Route.pluginRoutes(
                 return@delete
             }
             
-            fileDataService.invalidatePluginData(pluginId)
-            
             val result = pluginService.deletePlugin(pluginId)
             call.respondApiResult(result)
         }
@@ -99,10 +94,6 @@ fun Route.pluginRoutes(
             }
             
             val result = pluginService.refreshPluginData(pluginId)
-            
-            if (result is ApiResult.Success) {
-                fileDataService.invalidatePluginData(pluginId)
-            }
             
             call.respondApiResult(result)
         }
@@ -229,10 +220,6 @@ fun Route.pluginRoutes(
             
             val result = pluginService.addPluginToProject(projectId, pluginId)
             
-            if (result is ApiResult.Success) {
-                fileDataService.invalidateProjectData(projectId)
-            }
-            
             call.respondApiResult(result)
         }
         
@@ -277,10 +264,6 @@ fun Route.pluginRoutes(
             }
             
             val result = pluginService.removePluginFromProject(projectId, pluginId)
-            
-            if (result is ApiResult.Success) {
-                fileDataService.invalidateProjectData(projectId)
-            }
             
             call.respondApiResult(result)
         }

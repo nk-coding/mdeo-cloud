@@ -1,6 +1,5 @@
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
-import { convertIcon } from "@/lib/convertIcon";
-import { defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
+import { convertIcon, defaultLanguageConfiguration, defaultMonarchTokenProvider } from "@mdeo/language-common";
 import { Network } from "lucide";
 import modelServerPluginUrl from "../modules/modelPlugin.js?url";
 
@@ -15,11 +14,13 @@ export const modelPlugin: ResolvedWorkbenchLanguagePlugin = {
     serverPlugin: {
         import: modelServerPluginUrl
     },
-    editorPlugin: undefined,
-    languageConfiguration: defaultLanguageConfiguration,
-    monarchTokensProvider: {
-        ...defaultMonarchTokenProvider,
-        keywords: ["using"]
+    graphicalEditorPlugin: undefined,
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: {
+            ...defaultMonarchTokenProvider,
+            keywords: ["using"]
+        }
     },
     icon: convertIcon(Network).map((entry) => {
         if (entry[0] === "rect") {

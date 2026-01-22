@@ -26,13 +26,13 @@
                     aria-label="Remove value"
                     @click="removeValue"
                 >
-                    <X class="h-4 w-4" />
+                    <X class="size-4" />
                 </Button>
             </div>
 
             <div v-if="!hasValue" class="pt-1">
                 <Button variant="outline" size="sm" class="w-full" @click="addValue">
-                    <Plus class="h-4 w-4 mr-1" />
+                    <Plus class="size-4 mr-1" />
                     Add Value
                 </Button>
             </div>
@@ -66,26 +66,26 @@ const props = withDefaults(
 
 const model = defineModel<unknown>();
 
-/**
- * Whether a value is currently set (not undefined)
- */
+
+
+
 const hasValue = computed(() => model.value !== undefined);
 
-/**
- * Validation errors for the optional field itself (not child values)
- */
+
+
+
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
 
-/**
- * Adds a new value by generating a default value for the inner schema
- */
+
+
+
 function addValue(): void {
     model.value = generateDefaultValue(props.schema.optional);
 }
 
-/**
- * Removes the current value by setting it to undefined
- */
+
+
+
 function removeValue(): void {
     model.value = undefined;
 }

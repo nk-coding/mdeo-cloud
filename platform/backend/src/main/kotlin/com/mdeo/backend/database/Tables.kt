@@ -133,10 +133,10 @@ object LanguagePluginsTable : Table("language_plugins") {
     val extension = varchar("extension", 64)
     val newFileAction = bool("new_file_action").default(false)
     val serverPluginImport = varchar("server_plugin_import", 2048)
-    val editorPluginImport = varchar("editor_plugin_import", 2048).nullable()
-    val editorStylesUrl = varchar("editor_styles_url", 2048).nullable()
-    val languageConfiguration = text("language_configuration")
-    val monarchTokensProvider = text("monarch_tokens_provider")
+    val graphicalEditorPluginImport = varchar("graphical_editor_plugin_import", 2048).nullable()
+    val graphicalEditorStylesUrl = varchar("graphical_editor_styles_url", 2048).nullable()
+    val textualEditorLanguageConfiguration = text("textual_editor_language_configuration").nullable()
+    val textualEditorMonarchTokensProvider = text("textual_editor_monarch_tokens_provider").nullable()
     val icon = text("icon")
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
@@ -245,5 +245,48 @@ object DataDependenciesTable : Table("data_dependencies") {
             dependencyPath,
             dependencyKey
         )
+    }
+}
+
+/**
+ * Execution state enum values stored as strings in the database.
+ */
+object ExecutionState {
+    const val SUBMITTED = "submitted"
+    const val INITIALIZING = "initializing"
+    const val RUNNING = "running"
+    const val COMPLETED = "completed"
+    const val CANCELLED = "cancelled"
+    const val FAILED = "failed"
+}
+
+/**
+ * Executions table schema for storing execution metadata.
+ * Files are not cascade deleted (executions persist after source file deletion),
+ * but project deletion cascades to remove all executions.
+ */
+object ExecutionsTable : Table("executions") {
+    val id = uuid("id")
+    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
+    val name = varchar("name", 255)
+    val state = varchar("state", 32).default(ExecutionState.SUBMITTED)
+    val progressText = text("progress_text").nullable()
+    val filePath = varchar("file_path", 1024)
+    val languageId = varchar("language_id", 255)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+    /**
+     * Timestamp when the execution started running (transitioned to running state) 
+     */
+    val startedAt = timestamp("started_at").nullable()
+    /**
+     * Timestamp when the execution finished (completed, cancelled, or failed) 
+     */
+    val finishedAt = timestamp("finished_at").nullable()
+
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index(false, projectId)
     }
 }

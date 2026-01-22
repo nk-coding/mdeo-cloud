@@ -55,7 +55,7 @@ import {
     ContextMenuItem,
     ContextMenuSeparator
 } from "@/components/ui/context-menu";
-import type { FileSystemNode } from "@/data/filesystem/file";
+import type { FileSystemNode, Folder } from "@/data/filesystem/file";
 import type { DragAndDropCallbacks } from "@/components/tree/util";
 import FileSystemItemList, { type NewItemState } from "./FileSystemItemList.vue";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
@@ -64,14 +64,15 @@ import { VSBuffer } from "@codingame/monaco-vscode-api/vscode/vs/base/common/buf
 import { workbenchStateKey } from "../workbench/util";
 import { Uri } from "vscode";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
-import { findFileInTree } from "@/data/filesystem/util";
+import { findFileInTree, parseUri, FileCategory } from "@/data/filesystem/util";
 import { FolderIcon } from "lucide-vue-next";
 import FileTypeIcon from "../FileTypeIcon.vue";
+import type { EditorTab } from "@/data/tab/editorTab";
 
 const workbenchState = inject(workbenchStateKey)!;
 const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins: fileTypePlugins, tabs } = workbenchState;
 
-const activeEntry = ref<FileSystemNode | undefined>();
+const activeEntry = ref<FileSystemNode>();
 const expandedItems = ref<Set<FileSystemNode>>(new Set());
 
 const newItem = ref<NewItemState>();
@@ -81,8 +82,21 @@ const treeRef = useTemplateRef("treeRef");
 watch(
     activeTab,
     (newTab) => {
-        if (newTab != undefined) {
-            const file = newTab.file;
+        if (newTab == undefined) {
+            activeEntry.value = undefined;
+            return;
+        }
+        const parsed = parseUri(newTab.fileUri);
+        if (parsed.category !== FileCategory.RegularFile) {
+            activeEntry;
+        }
+
+        if (parsed.category === FileCategory.RegularFile) {
+            const file = findFileInTree(rootFolder, parsed.path);
+            if (file == undefined) {
+                activeEntry.value = undefined;
+                return;
+            }
             activeEntry.value = file;
             let parent = file.parent;
             while (parent != undefined) {
@@ -116,32 +130,28 @@ async function handleCreateFile(uri: Uri, fileType: ResolvedWorkbenchLanguagePlu
     await fileService.createFile(uri, VSBuffer.fromString(""));
     await nextTick();
 
-    const file = findFileInTree(rootFolder, uri);
+    const existingTab = tabs.value.find((tab) => tab.fileUri.toString() === uri.toString());
 
-    if (file != undefined && file.type === FileType.File) {
-        const existingTab = tabs.value.find((tab) => tab.file.id.toString() === file.id.toString());
+    if (existingTab) {
+        workbenchState.activeTab.value = existingTab;
+        existingTab.temporary = false;
+    } else {
+        const newTab: EditorTab = {
+            fileUri: uri,
+            temporary: false
+        };
+        tabs.value.push(newTab);
+        workbenchState.activeTab.value = newTab;
+    }
 
-        if (existingTab) {
-            workbenchState.activeTab.value = existingTab;
-            existingTab.temporary = false;
-        } else {
-            const newTab = {
-                file: file,
-                temporary: false
-            };
-            tabs.value.push(newTab);
-            workbenchState.activeTab.value = newTab;
-        }
-
-        if (fileType.newFileAction === true) {
-            workbenchState.pendingAction.value = {
-                type: "new-file",
-                languageId: fileType.id,
-                data: {
-                    filePath: uri.toString()
-                }
-            };
-        }
+    if (fileType.newFileAction === true) {
+        workbenchState.pendingAction.value = {
+            type: "new-file",
+            languageId: fileType.id,
+            data: {
+                uri: uri.toString()
+            }
+        };
     }
 }
 
@@ -181,52 +191,67 @@ function handleCreateFolderFromContext() {
 }
 
 const dragAndDropCallbacks: DragAndDropCallbacks = {
-    canDrop: (draggedItem, targetItem) => {
-        const draggedNode = draggedItem as unknown as FileSystemNode;
-        const targetNode = targetItem as unknown as FileSystemNode;
+    canDrop: (draggedItemId, targetItem) => {
+        const draggedNode = findFileInRoot(Uri.file(draggedItemId));
+        if (draggedNode == undefined) {
+            return false;
+        }
+        const targetNode = targetItem as FileSystemNode;
 
         if (targetNode.type !== FileType.Directory) {
             return false;
         }
 
-        if (draggedNode.id.toString() === targetNode.id.toString()) {
+        if (draggedNode.uri.toString() === targetNode.uri.toString()) {
             return false;
         }
 
         return true;
     },
 
-    onDrop: async (draggedItem, targetItem) => {
-        const draggedNode = draggedItem as unknown as FileSystemNode;
-        const targetNode = targetItem as unknown as FileSystemNode;
+    onDrop: async (draggedItemId, targetItem) => {
+        const draggedNode = findFileInRoot(Uri.file(draggedItemId));
+        if (draggedNode == undefined) {
+            return;
+        }
+        const targetNode = targetItem as FileSystemNode;
 
         if (targetNode.type !== FileType.Directory) {
             return;
         }
-
         if (draggedNode.type === FileType.Directory) {
-            let current = targetNode.parent;
-            while (current) {
-                if (current.id.toString() === draggedNode.id.toString()) {
+            let current: Folder | null = targetNode;
+            while (current != null) {
+                if (current.uri.toString() === draggedNode.uri.toString()) {
                     return;
                 }
                 current = current.parent;
             }
         }
 
-        handleMove(draggedNode.id, targetNode.id);
+        handleMove(draggedNode.uri, targetNode.uri);
     },
 
     onTreeDrop: async (draggedItem) => {
-        const draggedNode = draggedItem as unknown as FileSystemNode;
-
-        if (draggedNode.parent?.id.toString() === rootFolder.id.toString()) {
+        const draggedNode = findFileInRoot(Uri.file(draggedItem));
+        if (draggedNode == undefined) {
+            return;
+        }
+        if (draggedNode.parent?.uri.toString() === rootFolder.uri.toString()) {
             return;
         }
 
-        handleMove(draggedNode.id, rootFolder.id);
+        handleMove(draggedNode.uri, rootFolder.uri);
     }
 };
+
+function findFileInRoot(uri: Uri): FileSystemNode | undefined {
+    const parsed = parseUri(uri);
+    if (parsed.category !== FileCategory.RegularFile) {
+        return undefined;
+    }
+    return findFileInTree(rootFolder, parsed.path);
+}
 </script>
 <style scoped>
 .files-container :deep(div[data-reka-scroll-area-viewport] > div:first-child) {

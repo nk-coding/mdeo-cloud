@@ -1,7 +1,7 @@
 <template>
     <TreeItem :data="temporaryItem" :mode="'edit'" :is-folder="itemType === 'folder'" :has-children="false" @click.stop>
         <template #content>
-            <FileTypeIcon v-if="itemType === 'file'" :model-value="fileType" class="w-4 h-4" />
+            <FileTypeIcon v-if="itemType === 'file'" :model-value="fileType" class="size-4" />
             <span class="flex flex-1">
                 <TreeItemInput
                     :model-value="fileName"
@@ -59,7 +59,7 @@ function handleSubmit(value: string) {
     }
     if (value.trim()) {
         const fullName = props.itemType === "file" ? `${value.trim()}${fileExtension.value}` : value.trim();
-        const newUri = Uri.joinPath(props.parent.id, fullName);
+        const newUri = Uri.joinPath(props.parent.uri, fullName);
         submitted.value = true;
         emit("submit", newUri, props.fileType);
     } else {

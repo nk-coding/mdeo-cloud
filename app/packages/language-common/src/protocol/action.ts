@@ -1,6 +1,13 @@
 import type { PluginContext } from "../plugin/pluginContext.js";
 
 /**
+ * Represents a serializable icon node.
+ * Each element is a tuple of [tagName, attributes].
+ * This is compatible with Lucide IconNode but uses simpler types for serialization.
+ */
+export type ActionIconNode = [string, Record<string, string>][];
+
+/**
  * Primitive type forms supported by the action schema.
  * Based on a simplified JSON Type Definition (RFC 8927) without timestamp support.
  */
@@ -139,14 +146,39 @@ export interface ActionStartParams {
 }
 
 /**
- * Response returned when starting an action dialog.
+ * Response with a dialog page to show.
  */
-export interface ActionStartResponse {
+export interface ActionStartPageResponse {
+    /**
+     * Discriminator for the response type
+     */
+    kind: "page";
     /**
      * The first page of the action dialog
      */
     page: ActionDialogPage;
 }
+
+/**
+ * Response indicating the action completed immediately without needing a dialog.
+ */
+export interface ActionStartCompletionResponse {
+    /**
+     * Discriminator for the response type
+     */
+    kind: "completion";
+    /**
+     * Optional list of executions to create after completion.
+     * Each execution contains the file path and data needed to start an execution.
+     */
+    executions?: ActionExecutionRequest[];
+}
+
+/**
+ * Response returned when starting an action dialog.
+ * Can either show a dialog page or complete immediately.
+ */
+export type ActionStartResponse = ActionStartPageResponse | ActionStartCompletionResponse;
 
 /**
  * Parameters for submitting an action dialog page.
@@ -213,6 +245,25 @@ export interface ActionSubmitCompletionResponse {
      * Discriminator for the response type
      */
     kind: "completion";
+    /**
+     * Optional list of executions to create after completion.
+     * Each execution contains the file path and data needed to start an execution.
+     */
+    executions?: ActionExecutionRequest[];
+}
+
+/**
+ * Request data for creating an execution from an action.
+ */
+export interface ActionExecutionRequest {
+    /**
+     * Path to the file to execute
+     */
+    filePath: string;
+    /**
+     * Arbitrary JSON data for the execution (e.g., function to execute)
+     */
+    data: unknown;
 }
 
 /**
@@ -226,6 +277,66 @@ export type ActionSubmitResponse =
     | ActionSubmitValidationResponse
     | ActionSubmitNextPageResponse
     | ActionSubmitCompletionResponse;
+
+/**
+ * Location where an action can be displayed.
+ */
+export enum ActionDisplayLocation {
+    /**
+     * Action displayed in the context menu for a file
+     */
+    CONTEXT_MENU = "contextMenu",
+    /**
+     * Action displayed in the editor title area
+     */
+    EDITOR_TITLE = "editorTitle"
+}
+
+/**
+ * Represents an action that can be triggered for a file.
+ */
+export interface FileAction {
+    /**
+     * Display name of the action
+     */
+    name: string;
+    /**
+     * Icon for the action (serializable Lucide IconNode)
+     */
+    icon: ActionIconNode;
+    /**
+     * The key/identifier of the action it triggers
+     */
+    key: string;
+    /**
+     * Where this action should be displayed
+     */
+    displayLocations: ActionDisplayLocation[];
+}
+
+/**
+ * Parameters for getting actions available for a file.
+ */
+export interface GetFileActionsParams {
+    /**
+     * The language identifier of the file
+     */
+    languageId: string;
+    /**
+     * The URI of the file
+     */
+    fileUri: string;
+}
+
+/**
+ * Response containing the list of actions available for a file.
+ */
+export interface GetFileActionsResponse {
+    /**
+     * List of actions available for the file
+     */
+    actions: FileAction[];
+}
 
 /**
  * Creates a namespace containing JSON-RPC message types for action dialog communication.
@@ -248,6 +359,14 @@ export function createActionProtocol(vscodeJsonrpc: PluginContext["vscode-jsonrp
          * Request type for submitting an action dialog page.
          * Used to submit form data for the current dialog page.
          */
-        ActionSubmitRequest: new RequestType<ActionSubmitParams, ActionSubmitResponse, void>("action/submit")
+        ActionSubmitRequest: new RequestType<ActionSubmitParams, ActionSubmitResponse, void>("action/submit"),
+
+        /**
+         * Request type for getting available actions for a file.
+         * Used to populate context menus and editor title actions.
+         */
+        GetFileActionsRequest: new RequestType<GetFileActionsParams, GetFileActionsResponse, void>(
+            "action/getFileActions"
+        )
     };
 }

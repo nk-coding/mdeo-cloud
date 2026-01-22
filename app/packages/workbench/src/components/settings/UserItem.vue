@@ -4,7 +4,7 @@
         @click="toggleExpanded"
     >
         <div class="flex items-center gap-2 flex-1 min-w-0">
-            <component :is="expanded ? ChevronDown : ChevronRight" class="w-4 h-4 shrink-0" />
+            <component :is="expanded ? ChevronDown : ChevronRight" class="size-4 shrink-0" />
             <span class="truncate">{{ user.username }}</span>
             <span
                 v-if="user.isAdmin"

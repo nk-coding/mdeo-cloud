@@ -8,7 +8,7 @@
             <div class="space-y-5">
                 <div class="flex items-center gap-4 rounded-3xl border border-border/70 bg-muted/40 p-4">
                     <div class="rounded-2xl bg-primary/10 p-3 text-primary">
-                        <UserRound class="h-5 w-5" />
+                        <UserRound class="size-5" />
                     </div>
                     <div>
                         <p class="text-sm font-semibold text-foreground">{{ username }}</p>
@@ -19,7 +19,7 @@
                 <Collapsible v-model:open="isPasswordSectionOpen">
                     <CollapsibleTrigger asChild>
                         <Button variant="outline" class="w-full">
-                            <component :is="isPasswordSectionOpen ? ChevronUp : ChevronDown" class="h-4 w-4" />
+                            <component :is="isPasswordSectionOpen ? ChevronUp : ChevronDown" class="size-4" />
                             <span>Change password</span>
                         </Button>
                     </CollapsibleTrigger>
@@ -96,7 +96,7 @@
                         @click="handleLogout"
                         :disabled="isLoggingOut"
                     >
-                        <LogOut class="h-4 w-4" />
+                        <LogOut class="size-4" />
                         <span>{{ isLoggingOut ? "Logging out…" : "Log out" }}</span>
                     </Button>
                     <DialogClose asChild>

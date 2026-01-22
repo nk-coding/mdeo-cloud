@@ -49,6 +49,15 @@ export enum FileDataErrorCode {
 }
 
 /**
+ * Error codes specific to execution operations.
+ */
+export enum ExecutionErrorCode {
+    ExecutionNotFound = "ExecutionNotFound",
+    ExecutionNotCompleted = "ExecutionNotCompleted",
+    ExecutionAlreadyTerminal = "ExecutionAlreadyTerminal"
+}
+
+/**
  * Union of all possible error codes.
  */
 export type ApiErrorCode =
@@ -56,7 +65,8 @@ export type ApiErrorCode =
     | FileSystemErrorCode
     | ProjectErrorCode
     | PluginErrorCode
-    | FileDataErrorCode;
+    | FileDataErrorCode
+    | ExecutionErrorCode;
 
 /**
  * Base interface for API errors.
@@ -96,6 +106,11 @@ export type PluginError = ApiError<PluginErrorCode | CommonErrorCode>;
  * Error type for file data computation operations.
  */
 export type FileDataError = ApiError<FileDataErrorCode | FileSystemErrorCode | CommonErrorCode>;
+
+/**
+ * Error type for execution operations.
+ */
+export type ExecutionError = ApiError<ExecutionErrorCode | CommonErrorCode>;
 
 /**
  * Namespace containing helper functions for creating ApiResult instances
@@ -169,6 +184,19 @@ export namespace ApiResult {
         code: FileDataErrorCode | FileSystemErrorCode | CommonErrorCode,
         message: string
     ): ApiResult<T, FileDataError> {
+        return { success: false, error: { code, message } };
+    }
+
+    /**
+     * Creates a failed API result with an execution error.
+     * @param code The execution or common error code indicating the type of failure.
+     * @param message A descriptive error message explaining the failure.
+     * @returns A failed API result containing the execution error information.
+     */
+    export function executionFailure<T>(
+        code: ExecutionErrorCode | CommonErrorCode,
+        message: string
+    ): ApiResult<T, ExecutionError> {
         return { success: false, error: { code, message } };
     }
 }

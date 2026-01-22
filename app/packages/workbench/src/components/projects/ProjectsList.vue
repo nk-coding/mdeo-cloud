@@ -3,13 +3,13 @@
         <SidebarPanelHeader label="Projects">
             <template #actions>
                 <Button v-if="project != undefined" variant="ghost" size="icon" class="h-8 w-8" @click="handleClose">
-                    <X class="w-4 h-4" />
+                    <X class="size-4" />
                 </Button>
             </template>
         </SidebarPanelHeader>
         <div class="px-3 pb-2">
             <Button @click="openNewProjectDialog" class="w-full mb-2">
-                <Plus class="w-4 h-4 mr-2" />New Project
+                <Plus class="size-4 mr-2" />New Project
             </Button>
             <Input v-model="searchText" placeholder="Search projects..." />
         </div>
@@ -24,7 +24,7 @@
                     @click="handleSelectProject(project)"
                 >
                     <template #content>
-                        <Folder class="w-4 h-4 mr-2" />
+                        <Folder class="size-4 mr-2" />
                         <span>{{ project.name }}</span>
                     </template>
                 </TreeItem>

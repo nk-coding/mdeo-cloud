@@ -1,5 +1,6 @@
 export * from "./action/actionHandler.js";
 export * from "./action/actionModule.js";
+export * from "./action/actionProvider.js";
 export * from "./diagram-server/graph-edit-distance/graphEditDistance.js";
 export * from "./diagram-server/graph-edit-distance/hungarian.js";
 export * from "./diagram-server/graph-edit-distance/multiGraph.js";

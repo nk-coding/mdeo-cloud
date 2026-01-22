@@ -1,6 +1,5 @@
 package com.mdeo.backend.service
 
-import com.mdeo.backend.config.FileDataConfig
 import com.mdeo.backend.database.DataDependenciesTable
 import com.mdeo.backend.database.FileDependenciesTable
 import com.mdeo.backend.database.FileDataTable
@@ -27,24 +26,23 @@ import java.util.*
 /**
  * Service for computing and caching file data (e.g., AST) with dependency tracking.
  *
- * @param config File data computation configuration
- * @param pluginService Plugin service for finding responsible plugins
- * @param fileService File service for reading file contents and versions
- * @param jwtService JWT service for generating plugin authentication tokens
+ * @param services The injected services providing access to configuration and other services
  */
-class FileDataService(
-    private val config: FileDataConfig,
-    private val pluginService: PluginService,
-    private val fileService: FileService,
-    private val jwtService: JwtService
-) : BaseService() {
+class FileDataService(services: InjectedServices) : BaseService(), InjectedServices by services {
     private val logger = LoggerFactory.getLogger(FileDataService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
-        .version(if (pluginService.config.forceHttp1) HttpClient.Version.HTTP_1_1 else HttpClient.Version.HTTP_2)
-        .build()
+    /**
+     * File data configuration settings 
+     */
+    private val fileDataConfig get() = config.fileData
+
+    private val httpClient by lazy {
+        HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .version(if (config.plugin.forceHttp1) HttpClient.Version.HTTP_1_1 else HttpClient.Version.HTTP_2)
+            .build()
+    }
 
     /**
      * Gets computed file data for a specific file and key.

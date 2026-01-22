@@ -14,7 +14,7 @@
                     class="w-80"
                 >
                     <template #plugin-indicator="{ plugin }">
-                        <Check v-if="isPluginInstalled(plugin)" class="w-4 h-4 ml-auto" />
+                        <Check v-if="isPluginInstalled(plugin)" class="size-4 ml-auto" />
                     </template>
                 </PluginList>
                 <PluginDetailsContainer :plugin="selectedPlugin" class="flex-1">
@@ -26,7 +26,7 @@
                                     :disabled="isProcessing"
                                     @click="handleAddPlugin()"
                                 >
-                                    <Plus class="w-4 h-4 mr-2" />
+                                    <Plus class="size-4 mr-2" />
                                     Add to Project
                                 </Button>
                                 <Button
@@ -35,7 +35,7 @@
                                     :disabled="isProcessing"
                                     @click="openRemoveDialog()"
                                 >
-                                    <Trash2 class="w-4 h-4 mr-2" />
+                                    <Trash2 class="size-4 mr-2" />
                                     Remove from Project
                                 </Button>
                             </template>
@@ -82,6 +82,7 @@ import PluginDetails from "@/components/plugins/PluginDetails.vue";
 import { workbenchStateKey } from "@/components/workbench/util";
 import type { Plugin } from "@mdeo/plugin";
 import { resolvePlugin } from "@/data/plugin/resolvePlugin";
+import { showApiError } from "@/lib/notifications";
 
 const props = defineProps<{
     open: boolean;
@@ -120,12 +121,14 @@ function openRemoveDialog() {
 }
 
 async function loadPlugins() {
-    const allPluginsResult = await backendApi.getPlugins();
+    const allPluginsResult = await backendApi.plugins.getAll();
 
     if (allPluginsResult.success) {
         allPlugins.value = allPluginsResult.value.sort((a, b) => {
             return a.name.localeCompare(b.name);
         });
+    } else {
+        showApiError("load plugins", allPluginsResult.error.message);
     }
 }
 
@@ -136,9 +139,11 @@ async function handleAddPlugin() {
 
     isProcessing.value = true;
     try {
-        const result = await backendApi.addPluginToProject(props.projectId, selectedPlugin.value.id);
+        const result = await backendApi.plugins.addToProject(props.projectId, selectedPlugin.value.id);
         if (result.success) {
             installedPlugins.value.set(selectedPlugin.value.id, await resolvePlugin(result.value));
+        } else {
+            showApiError("add plugin to project", result.error.message);
         }
     } finally {
         isProcessing.value = false;
@@ -152,9 +157,11 @@ async function handleRemovePlugin() {
 
     isProcessing.value = true;
     try {
-        const result = await backendApi.removePluginFromProject(props.projectId, selectedPlugin.value.id);
+        const result = await backendApi.plugins.removeFromProject(props.projectId, selectedPlugin.value.id);
         if (result.success) {
             installedPlugins.value.delete(selectedPlugin.value.id);
+        } else {
+            showApiError("remove plugin from project", result.error.message);
         }
     } finally {
         isProcessing.value = false;

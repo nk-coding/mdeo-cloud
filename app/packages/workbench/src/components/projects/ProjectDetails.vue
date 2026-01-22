@@ -5,7 +5,7 @@
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" class="h-8 w-8" @click="handleOpenProjects">
-                            <FolderOpen class="w-4 h-4" />
+                            <FolderOpen class="size-4" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">Open Projects</TooltipContent>
@@ -29,7 +29,7 @@
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" class="h-8 w-8" @click="handleEditName">
-                                    <Pencil class="w-4 h-4" />
+                                    <Pencil class="size-4" />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="right">Edit Name</TooltipContent>
@@ -51,7 +51,7 @@
                                         class="h-8 w-8"
                                         @click="openManagePluginsDialog"
                                     >
-                                        <Settings2 class="w-4 h-4" />
+                                        <Settings2 class="size-4" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">Manage Plugins</TooltipContent>
@@ -69,7 +69,7 @@
                                 @click="handlePluginClick(plugin as WorkbenchPlugin)"
                             >
                                 <template #content>
-                                    <Icon :iconNode="plugin.icon" name="PluginIcon" class="w-4 h-4 mr-2" />
+                                    <Icon :iconNode="plugin.icon" name="PluginIcon" class="size-4 mr-2" />
                                     <span class="truncate">{{ plugin.name }}</span>
                                 </template>
                             </TreeItem>
@@ -85,7 +85,7 @@
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" class="h-8 w-8" @click="openAddUserDialog">
-                                        <Plus class="w-4 h-4" />
+                                        <Plus class="size-4" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">Add User</TooltipContent>
@@ -98,14 +98,14 @@
                                 <ContextMenuTrigger>
                                     <TreeItem :data="user" :is-folder="false" :has-children="false">
                                         <template #content>
-                                            <UserIcon class="w-4 h-4 mr-2" />
+                                            <UserIcon class="size-4 mr-2" />
                                             <span class="truncate">{{ user.username }}</span>
                                         </template>
                                     </TreeItem>
                                 </ContextMenuTrigger>
                                 <ContextMenuContent>
                                     <ContextMenuItem @click="handleRemoveUser(user)" :disabled="users.length <= 1">
-                                        <Trash2 class="w-4 h-4 mr-2" />
+                                        <Trash2 class="size-4 mr-2" />
                                         Remove
                                     </ContextMenuItem>
                                 </ContextMenuContent>
@@ -120,7 +120,7 @@
                     <SidebarPanelHeader label="Management" />
                     <div class="px-4 py-2">
                         <Button variant="destructive" class="w-full" @click="openDeleteDialog">
-                            <Trash2 class="w-4 h-4 mr-2" />
+                            <Trash2 class="size-4 mr-2" />
                             Delete Project
                         </Button>
                     </div>
@@ -185,6 +185,7 @@ import type { UserInfo } from "@/data/api/backendApi";
 import { Pencil, Plus, Trash2, FolderOpen, User as UserIcon, Settings2, Icon } from "lucide-vue-next";
 import { workbenchStateKey } from "@/components/workbench/util";
 import type { WorkbenchPlugin } from "@/data/plugin/plugin";
+import { showApiError } from "@/lib/notifications";
 
 const props = defineProps<{
     users: UserInfo[];
@@ -246,9 +247,11 @@ function handleUsersUpdated() {
 async function handleRemoveUser(user: UserInfo) {
     if (props.users.length <= 1) return;
 
-    const result = await backendApi.removeProjectOwner(project.value!.id, user.id);
+    const result = await backendApi.projects.removeOwner(project.value!.id, user.id);
     if (result.success) {
         emit("usersUpdated");
+    } else {
+        showApiError("remove user from project", result.error.message);
     }
 }
 

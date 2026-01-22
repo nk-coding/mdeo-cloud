@@ -6,7 +6,19 @@ import {
 } from "@codingame/monaco-vscode-api/vscode/vs/workbench/services/search/common/search";
 import type { SearchMatch, FileSearchResult } from "./types";
 
+/**
+ * Creates a search query for the specified project
+ *
+ * @param project the id of the project to search in
+ * @param searchText the text to search for
+ * @param isRegex whether the search text is a regex
+ * @param isCaseSensitive whether the search is case sensitive
+ * @param isWholeWord whether to match whole words only
+ * @param includePattern an optional include pattern for filtering
+ * @returns a text search query object
+ */
 export function createSearchQuery(
+    project: string,
     searchText: string,
     isRegex: boolean,
     isCaseSensitive: boolean,
@@ -23,7 +35,7 @@ export function createSearchQuery(
         },
         folderQueries: [
             {
-                folder: Uri.parse("file:///")
+                folder: Uri.file(`${project}/files`)
             }
         ],
         ...(includePattern && {
@@ -60,9 +72,19 @@ export function getFileName(uri: Uri): string {
 
 export function getRelativePath(uri: Uri): string {
     const pathSegments = uri.path.split("/").filter((s) => s.length > 0);
+    // Handle new URI structure: /projectId/files/path
+    // Skip projectId and "files" prefix, then exclude the last segment (filename)
     if (pathSegments.length <= 2) {
         return "";
     }
+    // If second segment is "files", skip projectId and "files"
+    if (pathSegments[1] === "files") {
+        if (pathSegments.length <= 3) {
+            return "";
+        }
+        return pathSegments.slice(2, -1).join("/");
+    }
+    // Fallback for other URI structures
     return pathSegments.slice(1, -1).join("/");
 }
 

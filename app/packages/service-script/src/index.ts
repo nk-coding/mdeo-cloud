@@ -6,7 +6,6 @@ import {
 } from "@mdeo/language-common";
 import {
     startLanguageService,
-    convertIcon,
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
@@ -14,6 +13,7 @@ import {
     AST_HANDLER_KEY,
     astHandler
 } from "@mdeo/service-common";
+import { convertIcon } from "@mdeo/language-common";
 import type { ScriptServices } from "@mdeo/language-script";
 
 /**
@@ -32,28 +32,30 @@ const scriptServicePlugin: ServicePluginDefinition = {
         serverPlugin: {
             import: "static/language.js"
         },
-        editorPlugin: undefined,
-        languageConfiguration: defaultLanguageConfiguration,
-        monarchTokensProvider: serializeMonarchTokensProvider({
-            ...defaultMonarchTokenProvider,
-            keywords: [
-                "import",
-                "from",
-                "as",
-                "fun",
-                "return",
-                "if",
-                "else",
-                "while",
-                "for",
-                "break",
-                "continue",
-                "var",
-                "true",
-                "false",
-                "null"
-            ]
-        })
+        graphicalEditorPlugin: undefined,
+        textualEditorPlugin: {
+            languageConfiguration: defaultLanguageConfiguration,
+            monarchTokensProvider: serializeMonarchTokensProvider({
+                ...defaultMonarchTokenProvider,
+                keywords: [
+                    "import",
+                    "from",
+                    "as",
+                    "fun",
+                    "return",
+                    "if",
+                    "else",
+                    "while",
+                    "for",
+                    "break",
+                    "continue",
+                    "var",
+                    "true",
+                    "false",
+                    "null"
+                ]
+            })
+        }
     },
     contributionPlugins: []
 };

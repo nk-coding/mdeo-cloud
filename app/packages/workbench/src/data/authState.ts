@@ -47,7 +47,7 @@ export class AuthState {
      */
     async checkAuthentication(): Promise<void> {
         try {
-            const result = await this.backendApi.getCurrentUser();
+            const result = await this.backendApi.auth.getCurrentUser();
             if (result.success) {
                 this.user.value = result.value;
             }
@@ -67,7 +67,7 @@ export class AuthState {
         this.authError.value = undefined;
         this.isAuthenticating.value = true;
         try {
-            const result = await this.backendApi.login(username, password);
+            const result = await this.backendApi.auth.login(username, password);
             if (!result.success) {
                 this.authError.value = result.error.message;
                 return { success: false, error: result.error.message };
@@ -90,7 +90,7 @@ export class AuthState {
         this.authError.value = undefined;
         this.isAuthenticating.value = true;
         try {
-            const result = await this.backendApi.register(username, password);
+            const result = await this.backendApi.auth.register(username, password);
             if (!result.success) {
                 this.authError.value = result.error.message;
                 return { success: false, error: result.error.message };
@@ -106,7 +106,7 @@ export class AuthState {
      * Logs out the current user
      */
     async logout(): Promise<void> {
-        await this.backendApi.logout();
+        await this.backendApi.auth.logout();
         this.user.value = undefined;
         if (this.onLogout) {
             await this.onLogout();
@@ -120,6 +120,6 @@ export class AuthState {
      * @param newPassword The new password
      */
     async changePassword(currentPassword: string, newPassword: string) {
-        return this.backendApi.changePassword(currentPassword, newPassword);
+        return this.backendApi.auth.changePassword(currentPassword, newPassword);
     }
 }

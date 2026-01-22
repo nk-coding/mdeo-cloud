@@ -1,4 +1,10 @@
-import type { LanguageContributionPlugin, LanguageEditorPlugin, LanguagePlugin, Plugin } from "@mdeo/plugin";
+import type {
+    LanguageContributionPlugin,
+    LanguageGraphicalEditorPlugin,
+    LanguagePlugin,
+    LanguageTextualEditorPlugin,
+    Plugin
+} from "@mdeo/plugin";
 import type { ContainerConfiguration } from "@eclipse-glsp/sprotty";
 import type { languages } from "monaco-editor";
 
@@ -13,19 +19,20 @@ export interface WorkbenchPlugin extends Omit<Plugin, "languagePlugins"> {
 }
 
 /**
- * A resolved version of the langauge plugin, where import of the editor plugin is already handled
+ * A resolved version of the language plugin, where import of the editor plugin is already handled
  * and monarchTokensProvider is deserialized to contain actual RegExp objects.
  */
-export interface WorkbenchLanguagePlugin extends Omit<LanguagePlugin, "editorPlugin" | "monarchTokensProvider"> {
+export interface WorkbenchLanguagePlugin extends Omit<LanguagePlugin, "graphicalEditorPlugin" | "textualEditorPlugin"> {
     /**
-     * Editor plugin for the language, if undefined no graphical editor will be provided
+     * Graphical editor plugin for the language, if undefined no graphical editor will be provided
      */
-    editorPlugin: WorkbenchLanguageEditorPlugin | undefined;
+    graphicalEditorPlugin: WorkbenchLanguageGraphicalEditorPlugin | undefined;
 
     /**
-     * Monarch tokens provider for syntax highlighting in the editor (deserialized with RegExp objects)
+     * Textual editor plugin for the language, if undefined no textual editor will be provided.
+     * Contains deserialized monarch tokens provider with actual RegExp objects.
      */
-    monarchTokensProvider: languages.IMonarchLanguage;
+    textualEditorPlugin: WorkbenchLanguageTextualEditorPlugin | undefined;
 }
 
 /**
@@ -38,10 +45,26 @@ export interface ResolvedWorkbenchLanguagePlugin extends WorkbenchLanguagePlugin
     contributionPlugins: LanguageContributionPlugin[];
 }
 
-export interface WorkbenchLanguageEditorPlugin extends Omit<LanguageEditorPlugin, "import"> {
+/**
+ * Workbench-specific graphical editor plugin with resolved container configuration.
+ */
+export interface WorkbenchLanguageGraphicalEditorPlugin extends Omit<LanguageGraphicalEditorPlugin, "import"> {
     /**
      * Container configuration for the GLSP/Sprotty container.
      * This configures the model elements, views, and other diagram features.
      */
     containerConfiguration: ContainerConfiguration;
+}
+
+/**
+ * Workbench-specific textual editor plugin with deserialized monarch tokens.
+ */
+export interface WorkbenchLanguageTextualEditorPlugin extends Omit<
+    LanguageTextualEditorPlugin,
+    "monarchTokensProvider"
+> {
+    /**
+     * Monarch tokens provider for syntax highlighting in the editor (deserialized with RegExp objects)
+     */
+    monarchTokensProvider: languages.IMonarchLanguage;
 }

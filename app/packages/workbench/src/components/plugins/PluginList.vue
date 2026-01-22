@@ -13,7 +13,7 @@
                             :is-active="selectedPluginId === plugin.id"
                             @click="$emit('select', plugin.id)"
                         >
-                            <Icon :iconNode="plugin.icon" name="PluginIcon" class="w-4 h-4 shrink-0" />
+                            <Icon :iconNode="plugin.icon" name="PluginIcon" class="size-4 shrink-0" />
                             <span class="text-sm font-medium truncate">{{ plugin.name }}</span>
                             <slot name="plugin-indicator" :plugin="plugin" />
                         </SidebarMenuButtonChild>

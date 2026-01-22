@@ -1,13 +1,15 @@
 import type { Connection } from "vscode-languageserver/browser.js";
 import type { LangiumSharedCoreServices, LangiumCoreServices } from "langium";
 import { createActionProtocol } from "@mdeo/language-common";
-import type { ActionAdditionalServices } from "@mdeo/language-shared";
+import type { ActionAdditionalServices, ActionProviderAdditionalServices } from "@mdeo/language-shared";
 import type { PluginContext } from "@mdeo/language-common";
 
 /**
  * Language services extended with action support.
  */
-type ActionExtendedServices = LangiumCoreServices & Partial<ActionAdditionalServices>;
+type ActionExtendedServices = LangiumCoreServices &
+    Partial<ActionAdditionalServices> &
+    Partial<ActionProviderAdditionalServices>;
 
 /**
  * Finds language services by language ID from the service registry.
@@ -26,7 +28,7 @@ function getServicesByLanguageId(
 
 /**
  * Registers action dialog request handlers on the LSP connection.
- * Handles both action/start and action/submit requests.
+ * Handles action/start, action/submit, and action/getFileActions requests.
  *
  * @param connection The LSP connection to register handlers on
  * @param services The shared Langium services for accessing the service registry
@@ -41,12 +43,12 @@ export function addActionHandlers(
 
     connection.onRequest(ActionProtocol.ActionStartRequest, async (params) => {
         const languageServices = getServicesByLanguageId(services, params.languageId);
-        if (!languageServices) {
+        if (languageServices == undefined) {
             throw new Error(`Language services not found for language: ${params.languageId}`);
         }
 
         const actionService = languageServices.action?.ActionHandler;
-        if (!actionService) {
+        if (actionService == undefined) {
             throw new Error(`Action service not available for language: ${params.languageId}`);
         }
 
@@ -56,15 +58,29 @@ export function addActionHandlers(
     connection.onRequest(ActionProtocol.ActionSubmitRequest, async (params) => {
         const languageId = params.config.languageId;
         const languageServices = getServicesByLanguageId(services, languageId);
-        if (!languageServices) {
+        if (languageServices == undefined) {
             throw new Error(`Language services not found for language: ${languageId}`);
         }
 
         const actionService = languageServices.action?.ActionHandler;
-        if (!actionService) {
+        if (actionService == undefined) {
             throw new Error(`Action service not available for language: ${languageId}`);
         }
 
         return await actionService.submitAction(params);
+    });
+
+    connection.onRequest(ActionProtocol.GetFileActionsRequest, async (params) => {
+        const languageServices = getServicesByLanguageId(services, params.languageId);
+        if (languageServices == undefined) {
+            return { actions: [] };
+        }
+
+        const actionProvider = languageServices.action?.ActionProvider;
+        if (actionProvider == undefined) {
+            return { actions: [] };
+        }
+
+        return await actionProvider.getFileActions(params);
     });
 }

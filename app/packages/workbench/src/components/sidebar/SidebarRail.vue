@@ -24,6 +24,15 @@
                     <Search />
                 </SidebarRailButton>
             </li>
+            <li v-if="project != undefined">
+                <SidebarRailButton
+                    tooltip="Executions"
+                    :active="activeSidebar === 'executions'"
+                    @click="toggleSidebar('executions')"
+                >
+                    <Play />
+                </SidebarRailButton>
+            </li>
         </ul>
         <template v-if="isAdmin">
             <SidebarRailButton tooltip="Settings" @click="openSettings" class="mt-2">
@@ -43,7 +52,7 @@
 </template>
 <script setup lang="ts">
 import { inject, ref } from "vue";
-import { Files, Sun, Moon, Search, Settings, UserRound } from "lucide-vue-next";
+import { Files, Sun, Moon, Search, Settings, UserRound, Play } from "lucide-vue-next";
 import { useColorMode } from "@vueuse/core";
 import Icon from "../Icon.vue";
 import SidebarRailButton from "./SidebarRailButton.vue";

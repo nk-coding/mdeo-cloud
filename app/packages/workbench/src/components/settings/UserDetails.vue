@@ -38,7 +38,7 @@
                     :key="project.id"
                     class="flex items-center gap-2 p-2 rounded-md border text-sm"
                 >
-                    <Folder class="w-4 h-4 text-muted-foreground" />
+                    <Folder class="size-4 text-muted-foreground" />
                     <span>{{ project.name }}</span>
                 </div>
             </div>
@@ -101,7 +101,7 @@ const pendingAdminValue = ref(false);
 async function loadProjects() {
     loadingProjects.value = true;
     try {
-        const result = await props.backendApi.getUserProjects(props.user.id);
+        const result = await props.backendApi.users.getProjects(props.user.id);
         if (result.success) {
             projects.value = result.value;
         }
@@ -118,7 +118,7 @@ function handleAdminToggle(newValue: boolean) {
 async function confirmAdminChange() {
     updatingAdmin.value = true;
     try {
-        const result = await props.backendApi.updateUserAdmin(props.user.id, pendingAdminValue.value);
+        const result = await props.backendApi.users.updateAdmin(props.user.id, pendingAdminValue.value);
         if (result.success) {
             emit("adminUpdated", props.user.id, pendingAdminValue.value);
         }

@@ -26,13 +26,13 @@
                     :aria-label="`Remove item ${index + 1}`"
                     @click="removeElement(index)"
                 >
-                    <X class="h-4 w-4" />
+                    <X class="size-4" />
                 </Button>
             </div>
 
             <div class="pt-1">
                 <Button variant="outline" size="sm" class="w-full" @click="addElement">
-                    <Plus class="h-4 w-4 mr-1" />
+                    <Plus class="size-4 mr-1" />
                     Add Item
                 </Button>
             </div>
@@ -66,9 +66,9 @@ const props = withDefaults(
 
 const model = defineModel<unknown>();
 
-/**
- * The array elements, ensuring it's always an array
- */
+
+
+
 const elements = computed(() => {
     if (Array.isArray(model.value)) {
         return model.value;
@@ -76,23 +76,23 @@ const elements = computed(() => {
     return [];
 });
 
-/**
- * Validation errors for the array itself (not child elements)
- */
+
+
+
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
 
-/**
- * Adds a new element to the array
- */
+
+
+
 function addElement(): void {
     model.value = [...elements.value, generateDefaultValue(props.schema.elements)];
 }
 
-/**
- * Removes an element at the specified index
- *
- * @param index The index of the element to remove
- */
+
+
+
+
+
 function removeElement(index: number): void {
     model.value = elements.value.filter((_, i) => i !== index);
 }

@@ -10,23 +10,24 @@
             </div>
         </div>
     </TooltipProvider>
+    <Toaster :theme="theme == 'auto' ? 'system' : theme" />
 </template>
 <script setup lang="ts">
 import { inject, shallowRef, onMounted, ref } from "vue";
 import { monacoApiProviderKey } from "./lib/monacoPlugin";
-import { HttpBackendApi } from "./data/api/httpBackendApi";
+import { BackendApi } from "./data/api/backendApi";
 import { WorkbenchState } from "./data/workbenchState";
 import { AuthState } from "./data/authState";
 import Workbench from "./components/workbench/Workbench.vue";
 import LoginCard from "./components/auth/LoginCard.vue";
 import BaseSidebarRail from "./components/sidebar/BaseSidebarRail.vue";
 import { useColorMode } from "@vueuse/core";
-import { convertIcon } from "./lib/convertIcon";
-import { Plug } from "lucide";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Toaster } from "./components/ui/sonner";
+import 'vue-sonner/style.css'
 
 const monaco = inject(monacoApiProviderKey)!;
-const backendApi = new HttpBackendApi();
+const backendApi = new BackendApi();
 const workspaceState = shallowRef<WorkbenchState>();
 
 const authState = new AuthState(backendApi, () => {
@@ -35,7 +36,7 @@ const authState = new AuthState(backendApi, () => {
 
 const isCheckingAuth = ref(true);
 
-useColorMode();
+const theme =useColorMode();
 
 onMounted(async () => {
     await authState.checkAuthentication();
@@ -63,7 +64,7 @@ async function syncProjectFromPath(state: WorkbenchState) {
         return;
     }
     const projectId = path.startsWith("/") ? path.slice(1) : path;
-    const result = await backendApi.getProjects();
+    const result = await backendApi.projects.getAll();
     if (!result.success) {
         return;
     }

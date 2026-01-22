@@ -10,6 +10,7 @@ import {
     type IFileStatWithMetadata
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import { Uri } from "vscode";
+import { getFileExtension } from "./util";
 
 /**
  * Creates a reactive folder tree for a project that automatically updates
@@ -22,17 +23,18 @@ import { Uri } from "vscode";
 export function useFileTree(monacoApi: MonacoApi, workbenchState: WorkbenchState): Folder {
     const project = workbenchState.project;
     const root = reactive<Folder>({
+        id: "/",
         name: "",
         type: FileType.Directory,
-        id: markRaw(Uri.parse("file:///")),
+        uri: markRaw(Uri.file("/")),
         children: [],
         parent: null
     });
 
     const loadTree = async (currentProject: Project) => {
-        const projectUri = markRaw(Uri.parse(`file:///${currentProject.id}`));
+        const projectUri = markRaw(Uri.file(`/${currentProject.id}/files`));
         root.name = currentProject.name;
-        root.id = projectUri;
+        root.uri = projectUri;
         const children = await loadChildren(monacoApi, projectUri, root);
         root.children = children;
     };
@@ -75,9 +77,10 @@ async function loadChildren(monacoApi: MonacoApi, uri: Uri, parent: Folder): Pro
 
         if (entry.isDirectory) {
             const folder = reactive<Folder>({
+                id: childUri.path,
                 name: entry.name,
                 type: FileType.Directory,
-                id: childUri,
+                uri: childUri,
                 children: [],
                 parent
             });
@@ -87,9 +90,10 @@ async function loadChildren(monacoApi: MonacoApi, uri: Uri, parent: Folder): Pro
         } else {
             children.push(
                 reactive<File>({
+                    id: childUri.path,
                     name: entry.name,
                     type: FileType.File,
-                    id: childUri,
+                    uri: childUri,
                     parent,
                     extension: getFileExtension(entry.name)
                 })
@@ -120,7 +124,7 @@ async function handleFileOperation(
         return;
     }
 
-    const projectPrefix = `/${currentProject.id}`;
+    const projectPrefix = `/${currentProject.id}/files`;
 
     if (event.operation === FileOperation.CREATE && event.target != undefined) {
         handleCreate(monacoApi, root, event.target, projectPrefix);
@@ -167,9 +171,10 @@ async function handleCreate(
 
     if (target.isDirectory) {
         const folder = reactive<Folder>({
+            id: childUri.path,
             name,
             type: FileType.Directory,
-            id: childUri,
+            uri: childUri,
             children: [],
             parent
         });
@@ -179,9 +184,10 @@ async function handleCreate(
     } else {
         parent.children.push(
             reactive<File>({
+                id: childUri.path,
                 name,
                 type: FileType.File,
-                id: childUri,
+                uri: childUri,
                 parent,
                 extension: getFileExtension(name)
             })
@@ -266,7 +272,7 @@ function handleMove(root: Folder, oldResource: Uri, newResource: Uri, projectPre
     oldParent.children.splice(nodeIndex, 1);
 
     node.name = newName;
-    node.id = markRaw(newResource);
+    node.uri = markRaw(newResource);
     node.parent = newParent;
 
     if (node.type === FileType.Directory) {
@@ -285,12 +291,12 @@ function handleMove(root: Folder, oldResource: Uri, newResource: Uri, projectPre
  */
 function updateDescendantUris(folder: Folder, oldBaseUri: Uri, newBaseUri: Uri): void {
     for (const child of folder.children) {
-        const oldPath = child.id.path;
+        const oldPath = child.uri.path;
         const oldBasePath = oldBaseUri.path;
         const newBasePath = newBaseUri.path;
 
         const newPath = oldPath.replace(oldBasePath, newBasePath);
-        child.id = markRaw(Uri.file(newPath));
+        child.uri = markRaw(Uri.file(newPath));
 
         if (child.type === FileType.Directory) {
             updateDescendantUris(child, oldBaseUri, newBaseUri);
@@ -306,10 +312,10 @@ function updateDescendantUris(folder: Folder, oldBaseUri: Uri, newBaseUri: Uri):
  */
 function closeTabsForNode(node: FileSystemNode, workbenchState: WorkbenchState): void {
     const tabsToClose: number[] = [];
-    const nodePath = node.id.path;
+    const nodePath = node.uri.path;
 
     workbenchState.tabs.value.forEach((tab, index) => {
-        const tabPath = tab.file.id.path;
+        const tabPath = tab.fileUri.path;
         if (tabPath === nodePath || tabPath.startsWith(nodePath + "/")) {
             tabsToClose.push(index);
         }
@@ -351,13 +357,13 @@ function findParentFolder(root: Folder, resource: Uri): Folder | null {
     const path = resource.path;
     const segments = path.split("/").filter((s) => s.length > 0);
 
-    if (segments.length <= 1) {
+    if (segments.length <= 2) {
         return null;
     }
 
     let current: FileSystemNode = root;
 
-    for (let i = 1; i < segments.length - 1; i++) {
+    for (let i = 2; i < segments.length - 1; i++) {
         if (current.type !== FileType.Directory) {
             return null;
         }
@@ -383,15 +389,4 @@ function getResourceName(resource: Uri): string {
     const path = resource.path;
     const segments = path.split("/").filter((s) => s.length > 0);
     return segments[segments.length - 1] || "";
-}
-
-/**
- * Extracts the file extension from a file name.
- *
- * @param fileName The full file name
- * @returns The file extension including the dot
- */
-function getFileExtension(fileName: string): string {
-    const parts = fileName.split(".");
-    return parts.length > 1 ? "." + parts.pop()! : "";
 }

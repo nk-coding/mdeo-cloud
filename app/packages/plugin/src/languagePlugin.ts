@@ -46,17 +46,13 @@ export interface LanguagePlugin {
      */
     serverPlugin: LanguageServerPlugin;
     /**
-     * Editor plugin for the language, if undefined no graphical editor will be provided
+     * Graphical editor plugin for the language, if undefined no graphical editor will be provided
      */
-    editorPlugin: LanguageEditorPlugin | undefined;
+    graphicalEditorPlugin: LanguageGraphicalEditorPlugin | undefined;
     /**
-     * Configuration for the language in the editor
+     * Textual editor plugin for the language, if undefined no textual editor will be provided
      */
-    languageConfiguration: languages.LanguageConfiguration;
-    /**
-     * Monarch tokens provider for syntax highlighting in the editor
-     */
-    monarchTokensProvider: DeepSerializeRegex<languages.IMonarchLanguage>;
+    textualEditorPlugin: LanguageTextualEditorPlugin | undefined;
     /**
      * Icon representing the language
      */
@@ -65,8 +61,9 @@ export interface LanguagePlugin {
 
 /**
  * Plugin configuration for a graphical editor.
+ * Provides the container configuration for GLSP/Sprotty diagrams.
  */
-export interface LanguageEditorPlugin {
+export interface LanguageGraphicalEditorPlugin {
     /**
      * Import which resolves to the container configuration for the GLSP/Sprotty container.
      */
@@ -80,6 +77,23 @@ export interface LanguageEditorPlugin {
 }
 
 /**
+ * Plugin configuration for a textual editor.
+ * Provides Monaco editor configuration for syntax highlighting and language features.
+ */
+export interface LanguageTextualEditorPlugin {
+    /**
+     * Configuration for the language in the Monaco editor.
+     * Includes settings for brackets, comments, auto-closing pairs, etc.
+     */
+    languageConfiguration: languages.LanguageConfiguration;
+    /**
+     * Monarch tokens provider for syntax highlighting in the Monaco editor.
+     * Defines token patterns and styling rules.
+     */
+    monarchTokensProvider: DeepSerializeRegex<languages.IMonarchLanguage>;
+}
+
+/**
  * Server plugin configuration for a language.
  */
 export interface LanguageServerPlugin {
@@ -88,3 +102,9 @@ export interface LanguageServerPlugin {
      */
     import: string;
 }
+
+/**
+ * Type alias for the legacy editorPlugin field.
+ * @deprecated Use LanguageGraphicalEditorPlugin instead
+ */
+export type LanguageEditorPlugin = LanguageGraphicalEditorPlugin;

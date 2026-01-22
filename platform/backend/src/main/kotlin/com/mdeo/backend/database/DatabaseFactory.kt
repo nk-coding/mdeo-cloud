@@ -50,7 +50,8 @@ object DatabaseFactory {
                 ContributionPluginsTable,
                 FileDataTable,
                 FileDependenciesTable,
-                DataDependenciesTable
+                DataDependenciesTable,
+                ExecutionsTable
             )
         }
         

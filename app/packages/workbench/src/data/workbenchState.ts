@@ -1,5 +1,5 @@
 import { computed, nextTick, ref, shallowRef, watch, type Reactive } from "vue";
-import { type EditorTab } from "./tab/editorTab";
+import type { EditorTab } from "./tab/editorTab";
 import type { BackendApi } from "./api/backendApi";
 import type { MonacoApi } from "@/lib/monacoPlugin";
 import type { Project } from "./project/project";
@@ -33,6 +33,31 @@ import type { LanguageContributionPlugin } from "@mdeo/plugin";
 import type { ServerPlugin } from "./plugin/serverPlugin";
 import { resolvePlugin } from "./plugin/resolvePlugin";
 import type { ActionStartParams } from "@mdeo/language-common";
+import type { Execution } from "./execution/execution";
+import { buildExecutionFileTree } from "./execution/execution";
+import { showApiError } from "@/lib/notifications";
+
+/**
+ * Represents an execution with its loaded file tree data.
+ */
+export interface ExecutionWithLoadedTree {
+    /**
+     * The unique identifier of the execution
+     */
+    id: string;
+    /**
+     * The execution metadata
+     */
+    execution: Execution;
+    /**
+     * The loaded file tree for the execution as a tree structure (undefined if not loaded yet)
+     */
+    fileTree: Folder | undefined;
+    /**
+     * Whether the file tree is currently being loaded
+     */
+    isLoadingTree: boolean;
+}
 
 /**
  * Manager for the overall state of the workbench
@@ -67,6 +92,12 @@ export class WorkbenchState {
      * Plugins loaded in the workbench
      */
     readonly plugins = ref<Map<string, WorkbenchPlugin>>(new Map());
+
+    /**
+     * The list of executions for the current project.
+     * Map from execution ID to execution with loaded tree data.
+     */
+    readonly executions = ref<Map<string, ExecutionWithLoadedTree>>(new Map());
 
     /**
      * The current language client if existing
@@ -153,6 +184,7 @@ export class WorkbenchState {
                 this._project.value = newProject;
                 this.tabs.value = [];
                 this.activeTab.value = undefined;
+                this.executions.value = new Map();
 
                 const newPath = `/${newProject?.id ?? ""}`;
                 if (window.location.pathname !== newPath) {
@@ -162,9 +194,9 @@ export class WorkbenchState {
                 if (newProject != undefined) {
                     reinitializeWorkspace({
                         id: newProject.id,
-                        uri: Uri.parse(`file:///${newProject.id}`)
+                        uri: Uri.parse(`file:///${newProject.id}/files`)
                     });
-                    this.backendApi.precache(newProject);
+                    this.backendApi.files.precache(newProject);
                 }
             }
         }
@@ -193,7 +225,126 @@ export class WorkbenchState {
         const fileSystemProvider = new BackendFileSystemProvider(backendApi);
         registerFileSystemOverlay(1, fileSystemProvider);
         this.fileTree = useFileTree(monacoApi, this);
+        this.initializeWebSocket();
         this.initiLsp();
+    }
+
+    /**
+     * Initializes the WebSocket connection and sets up the execution state change handler.
+     * Subscribes to project changes to update the WebSocket subscription.
+     */
+    private initializeWebSocket(): void {
+        this.backendApi.websocket.onExecutionStateChange((execution) => {
+            this.handleExecutionStateChange(execution);
+        });
+
+        watch(
+            () => this.project.value,
+            (newProject) => {
+                if (newProject) {
+                    this.backendApi.websocket.subscribeToProject(newProject.id);
+                } else {
+                    this.backendApi.websocket.disconnect();
+                }
+            },
+            { immediate: true }
+        );
+    }
+
+    /**
+     * Handles an execution state change notification from the WebSocket.
+     * Updates the local execution state and triggers any necessary UI updates.
+     *
+     * @param execution The updated execution data
+     */
+    private handleExecutionStateChange(execution: Execution): void {
+        const existingData = this.executions.value.get(execution.id);
+
+        this.executions.value.set(execution.id, {
+            id: execution.id,
+            execution,
+            fileTree: existingData?.fileTree,
+            isLoadingTree: existingData?.isLoadingTree ?? false
+        });
+    }
+
+    /**
+     * Refreshes the list of executions for the current project.
+     * Only updates non-terminal executions to preserve loaded data for completed/failed/cancelled executions.
+     *
+     * @returns A promise that resolves when the refresh is complete
+     */
+    async refreshExecutions(): Promise<void> {
+        if (this.project.value == undefined) {
+            this.executions.value = new Map();
+            return;
+        }
+
+        const result = await this.backendApi.executions.list(this.project.value.id);
+        if (!result.success) {
+            showApiError("refresh executions", result.error.message);
+            return;
+        }
+
+        for (const execution of result.value) {
+            const existing = this.executions.value.get(execution.id);
+            if (existing != undefined) {
+                existing.execution = execution;
+            } else {
+                this.executions.value.set(execution.id, {
+                    id: execution.id,
+                    execution,
+                    fileTree: undefined,
+                    isLoadingTree: false
+                });
+            }
+        }
+    }
+
+    /**
+     * Loads the file tree for a specific execution.
+     *
+     * @param executionId The ID of the execution to load the file tree for
+     * @returns A promise that resolves when the file tree is loaded
+     */
+    async loadExecutionFileTree(executionId: string): Promise<void> {
+        if (this.project.value == undefined) {
+            return;
+        }
+
+        const executionData = this.executions.value.get(executionId);
+        if (!executionData) {
+            return;
+        }
+
+        executionData.isLoadingTree = true;
+
+        const result = await this.backendApi.executions.get(this.project.value.id, executionId);
+
+        if (result.success) {
+            executionData.execution = result.value.execution;
+            executionData.fileTree = result.value.fileTree
+                ? buildExecutionFileTree(result.value.fileTree, executionId, this.project.value.id)
+                : undefined;
+            executionData.isLoadingTree = false;
+        } else {
+            showApiError("load execution file tree", result.error.message);
+            executionData.isLoadingTree = false;
+        }
+    }
+
+    /**
+     * Adds a new execution to the executions list.
+     *
+     * @param execution The execution to add
+     */
+    addExecution(execution: Execution): void {
+        this.executions.value.set(execution.id, {
+            id: execution.id,
+            execution,
+            fileTree: undefined,
+            isLoadingTree: false
+        });
     }
 
     /**
@@ -205,7 +356,7 @@ export class WorkbenchState {
             return;
         }
         const newPlugins: Map<string, WorkbenchPlugin> = new Map();
-        const pluginsResult = await this.backendApi.getProjectPlugins(this.project.value.id);
+        const pluginsResult = await this.backendApi.plugins.getForProject(this.project.value.id);
         if (!pluginsResult.success) {
             throw new Error("Failed to load plugins");
         }
@@ -228,11 +379,16 @@ export class WorkbenchState {
                         this.monacoApi.monaco.languages.register({ id: plugin.id });
                         this.registeredLanguages.add(plugin.id);
                     }
-                    this.monacoApi.monaco.languages.setLanguageConfiguration(plugin.id, plugin.languageConfiguration);
-                    this.monacoApi.monaco.languages.setMonarchTokensProvider(
-                        plugin.id,
-                        this.generateMonarchTokensProvider(plugin)
-                    );
+                    if (plugin.textualEditorPlugin != undefined) {
+                        this.monacoApi.monaco.languages.setLanguageConfiguration(
+                            plugin.id,
+                            plugin.textualEditorPlugin.languageConfiguration
+                        );
+                        this.monacoApi.monaco.languages.setMonarchTokensProvider(
+                            plugin.id,
+                            this.generateMonarchTokensProvider(plugin)
+                        );
+                    }
                 }
             },
             { immediate: true }
@@ -250,16 +406,18 @@ export class WorkbenchState {
     }
 
     /**
-     * Generates monarch tokens provider with merged keywords from contribution plugins
+     * Generates monarch tokens provider with merged keywords from contribution plugins.
+     * Requires the plugin to have a textualEditorPlugin defined.
      *
-     * @param plugin The resolved language plugin
+     * @param plugin The resolved language plugin with textualEditorPlugin
      * @returns The monarch tokens provider with merged keywords
      */
     private generateMonarchTokensProvider(plugin: ResolvedWorkbenchLanguagePlugin) {
+        const textualPlugin = plugin.textualEditorPlugin!;
         return {
-            ...plugin.monarchTokensProvider,
+            ...textualPlugin.monarchTokensProvider,
             keywords: [
-                ...plugin.monarchTokensProvider.keywords,
+                ...textualPlugin.monarchTokensProvider.keywords,
                 ...plugin.contributionPlugins.flatMap(
                     (contributionPlugin) => contributionPlugin.additionalKeywords ?? []
                 )
@@ -368,7 +526,7 @@ export class WorkbenchState {
                     closed: () => ({ action: CloseAction.DoNotRestart })
                 },
                 workspaceFolder: {
-                    uri: Uri.file(`/${project.id}`),
+                    uri: Uri.file(`/${project.id}/files`),
                     name: project.name,
                     index: 0
                 }
@@ -391,11 +549,18 @@ export class WorkbenchState {
 
     /**
      * Extracts the path from a URI.
-     * Expected format: schema://projectId/path
+     * Expected format for regular files: schema://projectId/files/path
+     * Returns the path after removing projectId and /files/ prefix
      */
     private extractPath(uri: Uri): string {
         const fullPath = uri.path;
         const parts = fullPath.substring(1).split("/");
+
+        if (parts[1] === "files") {
+            const path = "/" + parts.slice(2).join("/");
+            return path;
+        }
+
         const path = "/" + parts.slice(1).join("/");
         return path;
     }
@@ -437,7 +602,7 @@ export class WorkbenchState {
 
         client.onRequest(ReadMetadataRequest.type, async (params: ReadMetadataParams): Promise<object> => {
             const uri = Uri.parse(params.uri);
-            const result = await this.backendApi.readMetadata(this.project.value!.id, this.extractPath(uri));
+            const result = await this.backendApi.files.readMetadata(this.project.value!.id, this.extractPath(uri));
             if (result.success) {
                 return result.value;
             }
@@ -446,7 +611,7 @@ export class WorkbenchState {
 
         client.onRequest(WriteMetadataRequest.type, async (params: WriteMetadataParams): Promise<void> => {
             const uri = Uri.parse(params.uri);
-            const result = await this.backendApi.writeMetadata(
+            const result = await this.backendApi.files.writeMetadata(
                 this.project.value!.id,
                 this.extractPath(uri),
                 params.metadata
@@ -461,4 +626,4 @@ export class WorkbenchState {
 /**
  * Type for the sidebar
  */
-export type SidebarType = "files" | "search" | "projects";
+export type SidebarType = "files" | "search" | "projects" | "executions";

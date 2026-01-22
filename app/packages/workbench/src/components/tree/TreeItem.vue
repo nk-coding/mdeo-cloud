@@ -43,6 +43,7 @@
                         )
                     "
                     @click.stop
+                    @dblclick.stop
                 >
                     <slot name="items" />
                 </ul>
@@ -141,16 +142,15 @@ function handleDrop(event: DragEvent) {
 
     const draggedItemInfo = JSON.parse(draggedItemData);
 
-    const draggedItem = { id: draggedItemInfo.id };
-
-    const canDrop = treeContext.dragAndDrop.value.callbacks?.canDrop?.(draggedItem, props.data) ?? true;
+    const canDrop =
+        treeContext.dragAndDrop.value.callbacks?.canDrop?.(draggedItemInfo.id as string, props.data) ?? true;
     if (!canDrop) {
         return;
     }
 
     if (props.isFolder) {
         event.stopPropagation();
-        treeContext.dragAndDrop.value.callbacks?.onDrop?.(draggedItem, props.data, event);
+        treeContext.dragAndDrop.value.callbacks?.onDrop?.(draggedItemInfo.id as string, props.data, event);
     }
 }
 </script>

@@ -6,6 +6,10 @@ import type { FileType } from "@codingame/monaco-vscode-files-service-override";
  */
 export interface FileMetadata {
     /**
+     * Unique identifier of the node
+     */
+    id: string;
+    /**
      * Display name of the node
      */
     name: string;
@@ -16,7 +20,7 @@ export interface FileMetadata {
     /**
      * Full path from root to this node
      */
-    id: Uri;
+    uri: Uri;
     /**
      * Parent folder of this node, or null if this is the root
      */

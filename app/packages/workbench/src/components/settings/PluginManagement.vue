@@ -16,14 +16,14 @@
                                 :is-active="selectedEntry === 'add'"
                                 @click="selectAddEntry"
                             >
-                                <PlusCircle class="w-4 h-4" />
+                                <PlusCircle class="size-4" />
                                 <span class="text-sm font-medium">Add plugin</span>
                             </SidebarMenuButtonChild>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </template>
                 <template #plugin-indicator="{ plugin }">
-                    <Pin v-if="plugin.default" class="w-4 h-4 ml-auto fill-current" />
+                    <Pin v-if="plugin.default" class="size-4 ml-auto fill-current" />
                 </template>
             </PluginList>
 
@@ -40,7 +40,7 @@
                                             :disabled="updatingDefaultPluginId === selectedPlugin.id"
                                             @click="handleDefaultToggle(!selectedPlugin.default)"
                                         >
-                                            <Pin class="w-4 h-4" :class="{ 'fill-current': selectedPlugin.default }" />
+                                            <Pin class="size-4" :class="{ 'fill-current': selectedPlugin.default }" />
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -60,7 +60,7 @@
                                             @click="handleRefreshPlugin"
                                         >
                                             <RefreshCw
-                                                class="w-4 h-4"
+                                                class="size-4"
                                                 :class="{ 'animate-spin': refreshingPluginId === selectedPlugin.id }"
                                             />
                                         </Button>
@@ -73,7 +73,7 @@
                                     :disabled="deletingPluginId === selectedPlugin.id"
                                     @click="openDeleteDialog"
                                 >
-                                    <Trash2 class="w-4 h-4 mr-2" />
+                                    <Trash2 class="size-4 mr-2" />
                                     Delete
                                 </Button>
                             </template>
@@ -95,7 +95,7 @@
                             @keydown.enter="handleAddPlugin"
                         />
                         <Button class="sm:w-auto" :disabled="!newPluginUrl.trim() || isAdding" @click="handleAddPlugin">
-                            <PlusCircle class="w-4 h-4 mr-2" />
+                            <PlusCircle class="size-4 mr-2" />
                             Add plugin
                         </Button>
                     </div>
@@ -149,6 +149,7 @@ import {
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import type { Plugin } from "@mdeo/plugin";
+import { showApiError } from "@/lib/notifications";
 
 const props = defineProps<{
     backendApi: BackendApi;
@@ -197,7 +198,7 @@ function selectAddEntry() {
 async function loadPlugins(preferredSelection?: string) {
     isLoading.value = true;
     try {
-        const result = await props.backendApi.getPlugins();
+        const result = await props.backendApi.plugins.getAll();
         if (result.success) {
             plugins.value = result.value.sort((a, b) => {
                 return a.name.localeCompare(b.name);
@@ -216,6 +217,8 @@ async function loadPlugins(preferredSelection?: string) {
                     selectedEntry.value = firstPlugin.id;
                 }
             }
+        } else {
+            showApiError("load plugins", result.error.message);
         }
     } finally {
         isLoading.value = false;
@@ -232,7 +235,7 @@ async function handleAddPlugin() {
     addError.value = "";
 
     try {
-        const result = await props.backendApi.createPlugin(url);
+        const result = await props.backendApi.plugins.create(url);
         if (result.success) {
             newPluginUrl.value = "";
             await loadPlugins(result.value);
@@ -259,9 +262,11 @@ async function handleRefreshPlugin() {
     const pluginId = selectedPlugin.value.id;
     refreshingPluginId.value = pluginId;
     try {
-        const result = await props.backendApi.refreshPlugin(pluginId);
+        const result = await props.backendApi.plugins.refresh(pluginId);
         if (result.success) {
             await loadPlugins(pluginId);
+        } else {
+            showApiError("refresh plugin", result.error.message);
         }
     } finally {
         refreshingPluginId.value = undefined;
@@ -275,10 +280,12 @@ async function confirmDelete() {
     }
     const pluginId = selectedPlugin.value.id;
     deletingPluginId.value = pluginId;
-    const result = await props.backendApi.deletePlugin(pluginId);
+    const result = await props.backendApi.plugins.delete(pluginId);
     if (result.success) {
         selectedEntry.value = "add";
         await loadPlugins();
+    } else {
+        showApiError("delete plugin", result.error.message);
     }
     deletingPluginId.value = undefined;
 }
@@ -290,9 +297,11 @@ async function handleDefaultToggle(isDefault: boolean) {
     const pluginId = selectedPlugin.value.id;
     updatingDefaultPluginId.value = pluginId;
     try {
-        const result = await props.backendApi.updatePluginDefault(pluginId, isDefault);
+        const result = await props.backendApi.plugins.updateDefault(pluginId, isDefault);
         if (result.success) {
             selectedPlugin.value.default = isDefault;
+        } else {
+            showApiError("update plugin default status", result.error.message);
         }
     } finally {
         updatingDefaultPluginId.value = undefined;

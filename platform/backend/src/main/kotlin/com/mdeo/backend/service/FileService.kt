@@ -1,5 +1,7 @@
 package com.mdeo.backend.service
 
+import com.mdeo.backend.database.ExecutionState
+import com.mdeo.backend.database.ExecutionsTable
 import com.mdeo.backend.database.FilesTable
 import com.mdeo.backend.database.FileChildrenTable
 import com.mdeo.common.model.*
@@ -13,8 +15,44 @@ import java.util.Base64
 
 /**
  * Service for managing files and directories within projects.
+ *
+ * @param services The injected services providing access to configuration and other services
  */
-class FileService : BaseService() {
+class FileService(services: InjectedServices) : BaseService(), InjectedServices by services {
+    
+    /**
+     * Checks if a project is locked due to an execution in initializing state.
+     *
+     * @param projectId The UUID of the project
+     * @return true if the project is locked, false otherwise
+     */
+    private fun isProjectLocked(projectId: UUID): Boolean {
+        return ExecutionsTable.selectAll()
+            .where {
+                (ExecutionsTable.projectId eq projectId) and
+                (ExecutionsTable.state eq ExecutionState.INITIALIZING)
+            }
+            .count() > 0
+    }
+    
+    /**
+     * Returns a failure result if the project is locked.
+     *
+     * @param projectId The UUID of the project
+     * @return ApiResult.Failure if locked, null otherwise
+     */
+    private fun checkProjectLock(projectId: UUID): ApiResult.Failure? {
+        return if (isProjectLocked(projectId)) {
+            ApiResult.Failure(
+                ApiError(
+                    ErrorCodes.PROJECT_LOCKED,
+                    "Project is locked: an execution is initializing. File modifications are not allowed."
+                )
+            )
+        } else {
+            null
+        }
+    }
     
     /**
      * Reads the contents of a file.
@@ -47,6 +85,7 @@ class FileService : BaseService() {
     
     /**
      * Writes content to a file, optionally creating or overwriting it.
+     * Will fail if the project is locked due to an execution in initializing state.
      *
      * @param projectId The UUID of the project
      * @param path The path to the file
@@ -66,6 +105,8 @@ class FileService : BaseService() {
         val now = Instant.now()
         
         return transaction {
+            // Check project lock before modifying files
+            checkProjectLock(projectId)?.let { return@transaction it }
             val existing = FilesTable.selectAll()
                 .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
@@ -116,6 +157,7 @@ class FileService : BaseService() {
     
     /**
      * Creates a directory at the specified path.
+     * Will fail if the project is locked due to an execution in initializing state.
      *
      * @param projectId The UUID of the project
      * @param path The path where the directory should be created
@@ -126,6 +168,9 @@ class FileService : BaseService() {
         val now = Instant.now()
         
         return transaction {
+            // Check project lock before modifying files
+            checkProjectLock(projectId)?.let { return@transaction it }
+            
             val existing = FilesTable.selectAll()
                 .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
@@ -243,6 +288,7 @@ class FileService : BaseService() {
     
     /**
      * Deletes a file or directory.
+     * Will fail if the project is locked due to an execution in initializing state.
      *
      * @param projectId The UUID of the project
      * @param path The path to delete
@@ -253,6 +299,9 @@ class FileService : BaseService() {
         val normalizedPath = normalizePath(path)
         
         return transaction {
+            // Check project lock before modifying files
+            checkProjectLock(projectId)?.let { return@transaction it }
+            
             val row = FilesTable.selectAll()
                 .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
@@ -290,6 +339,7 @@ class FileService : BaseService() {
     
     /**
      * Renames or moves a file or directory.
+     * Will fail if the project is locked due to an execution in initializing state.
      *
      * @param projectId The UUID of the project
      * @param from The current path
@@ -303,6 +353,9 @@ class FileService : BaseService() {
         val now = Instant.now()
         
         return transaction {
+            // Check project lock before modifying files
+            checkProjectLock(projectId)?.let { return@transaction it }
+            
             val sourceRow = FilesTable.selectAll()
                 .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedFrom) }
                 .firstOrNull()

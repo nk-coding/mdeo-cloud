@@ -1,353 +1,184 @@
-import type {
-    IFileDeleteOptions,
-    IFileOverwriteOptions,
-    IFileWriteOptions,
-    FileType
-} from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
-import type { Project } from "../project/project";
-import type { ApiResult, FileSystemError, ProjectError, PluginError, CommonError, FileDataError } from "./apiResult";
-import type { Plugin } from "@mdeo/plugin";
+import { ApiResult, CommonErrorCode } from "./apiResult";
+import { AuthApi } from "./areas/authApi";
+import { UsersApi } from "./areas/usersApi";
+import { ProjectsApi } from "./areas/rojectsApi";
+import { FilesApi } from "./areas/filesApi";
+import { PluginsApi } from "./areas/pluginsApi";
+import { ExecutionsApi } from "./areas/executionsApi";
+import { FileDataApi } from "./areas/fileDataApi";
+import { WebSocketApi } from "./areas/webSocketApi";
+
+export type { User } from "./areas/authApi";
+export type { UserInfo } from "./areas/rojectsApi";
+export type { FileReadResult } from "./areas/filesApi";
 
 /**
- * Response from reading a file, including content and version
+ * Interface for the core backend API functionality shared with area APIs.
+ * Provides HTTP utilities and common operations.
  */
-export interface FileReadResult {
-    content: Uint8Array;
-    version: number;
+export interface BackendApiCore {
+    /**
+     * The base URL for all API requests
+     */
+    readonly baseUrl: string;
+
+    /**
+     * Makes an API request and parses the result
+     *
+     * @param url The URL to fetch
+     * @param init Optional fetch init options
+     * @returns The parsed API result
+     */
+    fetchApiResult<T>(url: string, init?: RequestInit): Promise<ApiResult<T, any>>;
+
+    /**
+     * Parses an error response from the backend
+     *
+     * @param response The HTTP response to parse
+     * @returns An ApiResult containing the error information
+     */
+    parseErrorResponse<E>(response: Response): Promise<ApiResult<never, E>>;
 }
 
 /**
- * User information returned from login
- */
-export interface User {
-    id: string;
-    username: string;
-    isAdmin: boolean;
-}
-
-/**
- * User info for owner listings
- */
-export interface UserInfo {
-    id: string;
-    username: string;
-}
-
-/**
- * Backend API interface for managing projects and file system operations.
+ * Main backend API class that provides access to all API areas.
+ * Acts as the entry point for all backend communication.
  *
- * This interface provides methods for:
- * File system operations (read, write, delete, rename, mkdir, readdir)
- * Project management (create, update, delete)
- * Authentication (login, register, logout)
- * User management (get current user, change password)
- * Project ownership (add/remove owners)
- *
- * All file operations require a projectId to scope the operation to a specific project.
- * All operations return ApiResult to handle errors explicitly without throwing exceptions.
+ * Usage:
+ * - `backendApi.auth.login(...)` - Authentication operations
+ * - `backendApi.users.getAll()` - User management
+ * - `backendApi.projects.create(...)` - Project operations
+ * - `backendApi.files.readFile(...)` - File system operations
+ * - `backendApi.plugins.getAll()` - Plugin management
+ * - `backendApi.executions.list(...)` - Execution management
+ * - `backendApi.fileData.get(...)` - File data computation
+ * - `backendApi.websocket.connect(...)` - WebSocket real-time notifications
  */
-export interface BackendApi {
+export class BackendApi implements BackendApiCore {
     /**
-     * Reads the contents of a file along with its version.
+     * Authentication operations (login, logout, register, etc.)
+     */
+    readonly auth: AuthApi;
+
+    /**
+     * User management operations (list users, manage admin status)
+     */
+    readonly users: UsersApi;
+
+    /**
+     * Project operations (create, update, delete, manage owners)
+     */
+    readonly projects: ProjectsApi;
+
+    /**
+     * File system operations (read, write, delete, rename, etc.)
+     */
+    readonly files: FilesApi;
+
+    /**
+     * Plugin management operations (create, delete, refresh, project association)
+     */
+    readonly plugins: PluginsApi;
+
+    /**
+     * Execution management operations (create, list, cancel, delete)
+     */
+    readonly executions: ExecutionsApi;
+
+    /**
+     * File data computation operations (get computed file data)
+     */
+    readonly fileData: FileDataApi;
+
+    /**
+     * WebSocket API for real-time notifications
+     */
+    readonly websocket: WebSocketApi;
+
+    /**
+     * Creates a new BackendApi instance with all area APIs
      *
-     * @param projectId The ID of the project containing the file
-     * @param path The path to the file relative to the project root
-     * @returns A promise that resolves to an ApiResult containing the file contents and version
-     *          Possible errors: FileNotFound, FileIsADirectory, Unavailable, Unknown
+     * @param baseUrl The base URL of the backend API (default: "/api")
      */
-    readFile(projectId: string, path: string): Promise<ApiResult<FileReadResult, FileSystemError>>;
+    constructor(readonly baseUrl: string = "/api") {
+        this.auth = new AuthApi(this);
+        this.users = new UsersApi(this);
+        this.projects = new ProjectsApi(this);
+        this.files = new FilesApi(this);
+        this.plugins = new PluginsApi(this);
+        this.executions = new ExecutionsApi(this);
+        this.fileData = new FileDataApi(this);
+        this.websocket = new WebSocketApi({ baseUrl });
+    }
 
     /**
-     * Writes content to a file.
+     * Makes an API request and parses the result
      *
-     * @param projectId The ID of the project containing the file
-     * @param path The path to the file relative to the project root
-     * @param content The content to write as a Uint8Array
-     * @param opts Write options (e.g., create, overwrite)
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: FileIsADirectory, FileExists, FileNotFound, Unavailable, Unknown
+     * @param url The URL to fetch
+     * @param init Optional fetch init options
+     * @returns The parsed API result
      */
-    writeFile(
-        projectId: string,
-        path: string,
-        content: Uint8Array,
-        opts: IFileWriteOptions
-    ): Promise<ApiResult<void, FileSystemError>>;
+    async fetchApiResult<T>(url: string, init?: RequestInit): Promise<ApiResult<T, any>> {
+        try {
+            const response = await fetch(url, {
+                ...init,
+                credentials: "include"
+            });
+
+            if (!response.ok) {
+                return this.handleErrorResponse(response);
+            }
+
+            return this.handleSuccessResponse<T>(response);
+        } catch (error) {
+            return ApiResult.fileSystemFailure(CommonErrorCode.Unavailable, String(error));
+        }
+    }
 
     /**
-     * Creates a new directory.
+     * Parses an error response from the backend
      *
-     * @param projectId The ID of the project where the directory should be created
-     * @param path The path to the directory relative to the project root
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: FileExists, Unavailable, Unknown
+     * @param response The HTTP response to parse
+     * @returns An ApiResult containing the error information
      */
-    mkdir(projectId: string, path: string): Promise<ApiResult<void, FileSystemError>>;
+    async parseErrorResponse<E>(response: Response): Promise<ApiResult<never, E>> {
+        try {
+            const data = await response.json();
+            if (typeof data === "object" && "success" in data && !data.success) {
+                return data as ApiResult<never, E>;
+            }
+            if (typeof data === "object" && "error" in data) {
+                return { success: false, error: data.error };
+            }
+            return { success: false, error: { code: CommonErrorCode.Unknown, message: JSON.stringify(data) } as E };
+        } catch {
+            return { success: false, error: { code: CommonErrorCode.Unknown, message: response.statusText } as E };
+        }
+    }
 
-    /**
-     * Reads the contents of a directory.
-     *
-     * @param projectId The ID of the project containing the directory
-     * @param path The path to the directory relative to the project root
-     * @returns A promise that resolves to an ApiResult containing an array of [name, FileType] tuples
-     *          Possible errors: FileNotFound, FileNotADirectory, Unavailable, Unknown
-     */
-    readdir(projectId: string, path: string): Promise<ApiResult<[string, FileType][], FileSystemError>>;
+    private async handleErrorResponse<T>(response: Response): Promise<ApiResult<T, any>> {
+        if (response.status === 401) {
+            return {
+                success: false,
+                error: { code: CommonErrorCode.Unavailable, message: "Not authenticated" }
+            };
+        }
+        if (response.status === 403) {
+            return {
+                success: false,
+                error: { code: CommonErrorCode.Unavailable, message: "Access denied" }
+            };
+        }
+        return this.parseErrorResponse(response);
+    }
 
-    /**
-     * Gets the type of a file or directory.
-     *
-     * @param projectId The ID of the project containing the file/directory
-     * @param path The path to the file/directory relative to the project root
-     * @returns A promise that resolves to an ApiResult containing the FileType
-     *          Possible errors: FileNotFound, Unavailable, Unknown
-     */
-    stat(projectId: string, path: string): Promise<ApiResult<FileType | undefined, FileSystemError>>;
+    private async handleSuccessResponse<T>(response: Response): Promise<ApiResult<T, any>> {
+        const contentType = response.headers.get("Content-Type");
+        if (!contentType || response.status === 204) {
+            return ApiResult.success(undefined as T);
+        }
 
-    /**
-     * Deletes a file or directory.
-     *
-     * @param projectId The ID of the project containing the file/directory
-     * @param path The path to the file/directory relative to the project root
-     * @param opts Delete options (e.g., recursive, useTrash)
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: FileNotFound, DirectoryNotEmpty, Unavailable, Unknown
-     */
-    delete(projectId: string, path: string, opts: IFileDeleteOptions): Promise<ApiResult<void, FileSystemError>>;
-
-    /**
-     * Renames or moves a file or directory.
-     *
-     * @param projectId The ID of the project containing the file/directory
-     * @param from The current path relative to the project root
-     * @param to The new path relative to the project root
-     * @param opts Rename options (e.g., overwrite)
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: FileNotFound, FileExists, Unavailable, Unknown
-     */
-    rename(
-        projectId: string,
-        from: string,
-        to: string,
-        opts: IFileOverwriteOptions
-    ): Promise<ApiResult<void, FileSystemError>>;
-
-    /**
-     * Gets all projects.
-     *
-     * @returns A promise that resolves to an ApiResult containing an array of projects
-     *          Possible errors: Unavailable, Unknown
-     */
-    getProjects(): Promise<ApiResult<Project[], ProjectError>>;
-
-    /**
-     * Creates a new project and returns the created project.
-     *
-     * @param name The name of the project
-     * @param metadata Optional metadata for the project
-     * @returns A promise that resolves to an ApiResult containing the created project
-     *          Possible errors: Unavailable, Unknown
-     */
-    createProject(name: string): Promise<ApiResult<Project, ProjectError>>;
-
-    /**
-     * Updates an existing project's metadata.
-     *
-     * @param projectId The ID of the project to update.
-     * @param updates The fields to update (e.g., name, metadata)
-     * @returns A promise that resolves to an ApiResult containing the updated project on success
-     *          Possible errors: ProjectNotFound, Unavailable, Unknown
-     */
-    updateProject(projectId: string, updates: { name?: string }): Promise<ApiResult<Project, ProjectError>>;
-
-    /**
-     * Deletes a project and all its associated files.
-     *
-     * @param projectId The ID of the project to delete
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: Unavailable, Unknown
-     */
-    deleteProject(projectId: string): Promise<ApiResult<void, ProjectError>>;
-
-    /**
-     * Reads metadata for a file.
-     *
-     * @param projectId The ID of the project containing the file
-     * @param path The path to the file relative to the project root
-     * @returns A promise that resolves to an ApiResult containing the metadata object
-     *          If no metadata exists, returns an empty object
-     *          Possible errors: FileNotFound, Unavailable, Unknown
-     */
-    readMetadata(projectId: string, path: string): Promise<ApiResult<object, FileSystemError>>;
-
-    /**
-     * Writes metadata for a file.
-     *
-     * @param projectId The ID of the project containing the file
-     * @param path The path to the file relative to the project root
-     * @param metadata The metadata object to write
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: FileNotFound, Unavailable, Unknown
-     */
-    writeMetadata(projectId: string, path: string, metadata: object): Promise<ApiResult<void, FileSystemError>>;
-
-    /**
-     * Creates a new plugin.
-     *
-     * @param url The URL where the plugin is hosted
-     * @returns A promise that resolves to an ApiResult containing the ID of the created plugin
-     *          Possible errors: PluginAlreadyExists, Unavailable, Unknown
-     */
-    createPlugin(url: string): Promise<ApiResult<string, PluginError>>;
-
-    /**
-     * Deletes a plugin.
-     *
-     * @param pluginId The ID of the plugin to delete
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: PluginNotFound, Unavailable, Unknown
-     */
-    deletePlugin(pluginId: string): Promise<ApiResult<void, PluginError>>;
-
-    /**
-     * Refreshes a plugin by re-fetching its manifest.
-     *
-     * @param pluginId The ID of the plugin to refresh
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: PluginNotFound, Unavailable, Unknown
-     */
-    refreshPlugin(pluginId: string): Promise<ApiResult<void, PluginError>>;
-
-    /**
-     * Updates the default status of a plugin.
-     *
-     * @param pluginId The ID of the plugin to update
-     * @param isDefault Whether the plugin should be added by default to new projects
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: PluginNotFound, Unavailable, Unknown
-     */
-    updatePluginDefault(pluginId: string, isDefault: boolean): Promise<ApiResult<void, PluginError>>;
-
-    /**
-     * Gets all plugins.
-     *
-     * @returns A promise that resolves to an ApiResult containing an array of plugins
-     *          Possible errors: Unavailable, Unknown
-     */
-    getPlugins(): Promise<ApiResult<Plugin[], PluginError>>;
-
-    /**
-     * Gets all plugins associated with a project.
-     *
-     * @param projectId The ID of the project
-     * @returns A promise that resolves to an ApiResult containing an array of plugins
-     *          Possible errors: ProjectNotFound, Unavailable, Unknown
-     */
-    getProjectPlugins(projectId: string): Promise<ApiResult<Plugin[], PluginError>>;
-
-    /**
-     * Adds a plugin to a project.
-     *
-     * @param projectId The ID of the project
-     * @param pluginId The ID of the plugin to add
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: ProjectNotFound, PluginNotFound, PluginAlreadyAddedToProject, Unavailable, Unknown
-     */
-    addPluginToProject(projectId: string, pluginId: string): Promise<ApiResult<Plugin, PluginError>>;
-
-    /**
-     * Removes a plugin from a project.
-     *
-     * @param projectId The ID of the project
-     * @param pluginId The ID of the plugin to remove
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: ProjectNotFound, PluginNotFound, PluginNotAddedToProject, Unavailable, Unknown
-     */
-    removePluginFromProject(projectId: string, pluginId: string): Promise<ApiResult<void, PluginError>>;
-
-    /**
-     * Get the current authenticated user
-     */
-    getCurrentUser(): Promise<ApiResult<User, CommonError>>;
-
-    /**
-     * Login with username and password
-     */
-    login(username: string, password: string): Promise<ApiResult<User, CommonError>>;
-
-    /**
-     * Register a new user account
-     */
-    register(username: string, password: string): Promise<ApiResult<User, CommonError>>;
-
-    /**
-     * Logout the current user
-     */
-    logout(): Promise<void>;
-
-    /**
-     * Change the current user's password
-     */
-    changePassword(currentPassword: string, newPassword: string): Promise<ApiResult<void, CommonError>>;
-
-    /**
-     * Get project owners
-     */
-    getProjectOwners(projectId: string): Promise<ApiResult<UserInfo[], ProjectError>>;
-
-    /**
-     * Add an owner to a project
-     */
-    addProjectOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>>;
-
-    /**
-     * Remove an owner from a project
-     */
-    removeProjectOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>>;
-
-    /**
-     * Precache file tree for a project to optimize subsequent file operations.
-     * When called with a different project, the previous cache is dropped.
-     *
-     * @param project The project to precache
-     */
-    precache(project: Project): Promise<void>;
-
-    /**
-     * Get all users in the system
-     *
-     * @returns A promise that resolves to an ApiResult containing an array of users
-     *          Possible errors: Unavailable, Unknown
-     */
-    getAllUsers(): Promise<ApiResult<User[], CommonError>>;
-
-    /**
-     * Get projects that a user owns
-     *
-     * @param userId The ID of the user
-     * @returns A promise that resolves to an ApiResult containing an array of projects
-     *          Possible errors: Unavailable, Unknown
-     */
-    getUserProjects(userId: string): Promise<ApiResult<Project[], ProjectError>>;
-
-    /**
-     * Update a user's admin status
-     *
-     * @param userId The ID of the user to update
-     * @param isAdmin The new admin status
-     * @returns A promise that resolves to an ApiResult indicating success or failure
-     *          Possible errors: Unavailable, Unknown
-     */
-    updateUserAdmin(userId: string, isAdmin: boolean): Promise<ApiResult<void, CommonError>>;
-
-    /**
-     * Get computed file data (e.g., AST) for a file
-     *
-     * @param projectId The ID of the project
-     * @param path The path to the file within the project
-     * @param key The type of data to compute (e.g., "ast")
-     * @returns A promise that resolves to an ApiResult containing the computed data as a string
-     *          Possible errors: NotFound, NoPlugin, CycleDetected, PluginError, Unavailable, Unknown
-     */
-    getFileData(projectId: string, path: string, key: string): Promise<ApiResult<string, FileDataError>>;
+        const data = await response.json();
+        return ApiResult.success(data as T);
+    }
 }

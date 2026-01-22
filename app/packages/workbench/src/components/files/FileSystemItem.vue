@@ -1,5 +1,5 @@
 <template>
-    <ContextMenu>
+    <ContextMenu @update:open="handleContextMenuOpen">
         <ContextMenuTrigger as-child>
             <TreeItem
                 :data="entry"
@@ -15,7 +15,7 @@
                     <FileTypeIcon
                         v-if="entry.type === FileType.File"
                         :model-value="languagePluginByExtension.get(entry.extension)"
-                        class="w-4 h-4"
+                        class="size-4"
                     />
                     <span v-if="isRenaming" class="flex flex-1">
                         <TreeItemInput
@@ -42,35 +42,64 @@
             </TreeItem>
         </ContextMenuTrigger>
         <ContextMenuContent @close-auto-focus="$event.preventDefault()">
-            <ContextMenuItem
-                v-for="fileType in languagePlugins"
-                :key="fileType.id"
-                @click="() => handleCreateFileOfType(fileType)"
-            >
-                <FileTypeIcon :model-value="fileType" />
-                <span>Create New {{ fileType.name }}</span>
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem @click="handleCreateFolder">
-                <FolderIcon />
-                <span>Create New Folder</span>
-            </ContextMenuItem>
-            <ContextMenuSeparator />
+            <template v-if="entry.type === FileType.File && fileActions.length > 0">
+                <ContextMenuItem
+                    v-for="action in contextMenuActions"
+                    :key="action.key"
+                    @click="() => handleFileAction(action)"
+                >
+                    <Icon :iconNode="action.icon" :name="action.key" class="size-4 mr-2" />
+                    <span>{{ action.name }}</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </template>
+            <template v-if="entry.type === FileType.Directory">
+                <ContextMenuItem
+                    v-for="fileType in languagePlugins"
+                    :key="fileType.id"
+                    @click="() => handleCreateFileOfType(fileType)"
+                >
+                    <FileTypeIcon :model-value="fileType" />
+                    <span>Create New {{ fileType.name }}</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem @click="handleCreateFolder">
+                    <FolderIcon />
+                    <span>Create New Folder</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+            </template>
             <ContextMenuItem @click="handleRename">
                 <EditIcon />
                 <span>Rename</span>
             </ContextMenuItem>
-            <ContextMenuItem @click="handleDelete">
+            <ContextMenuItem @click="handleDeleteClick">
                 <Trash2Icon />
                 <span>Delete</span>
             </ContextMenuItem>
         </ContextMenuContent>
     </ContextMenu>
+
+    <AlertDialog v-model:open="showDeleteDialog">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Folder</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete the folder "{{ entry.name }}" and all its contents?
+                    This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="confirmDelete">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 </template>
 
 <script setup lang="ts">
-import { ref, inject } from "vue";
-import { FolderIcon, EditIcon, Trash2Icon } from "lucide-vue-next";
+import { ref, inject, computed } from "vue";
+import { FolderIcon, EditIcon, Trash2Icon, Icon } from "lucide-vue-next";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import TreeItemInput from "../tree/TreeItemInput.vue";
 import FileSystemItemList from "./FileSystemItemList.vue";
@@ -81,6 +110,16 @@ import {
     ContextMenuItem,
     ContextMenuSeparator
 } from "@/components/ui/context-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { type FileSystemNode } from "@/data/filesystem/file";
 import type { NewItemState } from "./FileSystemItemList.vue";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
@@ -89,12 +128,18 @@ import { treeContextKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 import { Uri } from "vscode";
 import FileTypeIcon from "../FileTypeIcon.vue";
+import { ActionDisplayLocation, createActionProtocol, type FileMenuActionData, type FileAction } from "@mdeo/language-common";
+import * as vscodeJsonrpc from "vscode-jsonrpc";
+import { getFileExtension } from "@/data/filesystem/util";
+
+const ActionProtocol = createActionProtocol(vscodeJsonrpc);
 
 const props = defineProps<{
     entry: FileSystemNode;
 }>();
 
-const { monacoApi, languagePlugins, activeTab, languagePluginByExtension } = inject(workbenchStateKey)!;
+const workbenchState = inject(workbenchStateKey)!;
+const { monacoApi, languagePlugins, activeTab, languagePluginByExtension, languageClient, pendingAction } = workbenchState;
 const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{
@@ -109,8 +154,62 @@ const emit = defineEmits<{
 }>();
 
 const isRenaming = ref(false);
-
+const showDeleteDialog = ref(false);
 const newItem = ref<NewItemState>();
+const fileActions = ref<FileAction[]>([]);
+
+const contextMenuActions = computed(() =>
+    fileActions.value.filter(action => action.displayLocations.includes(ActionDisplayLocation.CONTEXT_MENU))
+);
+
+async function handleContextMenuOpen(open: boolean): Promise<void> {
+    if (open && props.entry.type === FileType.File) {
+        await fetchFileActions();
+    }
+}
+
+async function fetchFileActions(): Promise<void> {
+    if (!languageClient.value) {
+        fileActions.value = [];
+        return;
+    }
+
+    if (props.entry.type !== FileType.File) {
+        fileActions.value = [];
+        return;
+    }
+
+    const languagePlugin = languagePluginByExtension.value.get(props.entry.extension);
+    if (languagePlugin == undefined) {
+        fileActions.value = [];
+        return;
+    }
+
+    try {
+        const response = await languageClient.value.sendRequest(ActionProtocol.GetFileActionsRequest, {
+            languageId: languagePlugin.id,
+            fileUri: props.entry.uri.toString()
+        });
+        fileActions.value = response?.actions ?? [];
+    } catch {
+        fileActions.value = [];
+    }
+}
+
+function handleFileAction(action: FileAction): void {
+    if (props.entry.type !== FileType.File) return;
+    
+    const languagePlugin = languagePluginByExtension.value.get(props.entry.extension);
+    if (!languagePlugin) return;
+
+    pendingAction.value = {
+        type: action.key,
+        languageId: languagePlugin.id,
+        data: {
+            uri: props.entry.uri.toString()
+        } satisfies FileMenuActionData
+    };
+}
 
 async function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
     if (props.entry.type === FileType.File && !isRenaming.value) {
@@ -120,7 +219,7 @@ async function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {
             event.preventDefault();
         }
         await monacoApi.editorService.openEditor({
-            resource: file.id,
+            resource: file.uri,
             options: {
                 preserveFocus: temporary
             }
@@ -158,22 +257,39 @@ function handleCreateFolder() {
 function handleKeydown(event: KeyboardEvent) {
     if (event.key === "F2") {
         handleRename();
+        event.stopPropagation();
     } else if (event.key === "Delete") {
-        handleDelete();
+        handleDeleteClick();
+        event.stopPropagation();
     } else if (event.key === "Enter") {
         openTab(false, event);
+        event.stopPropagation();
     }
-    event.stopPropagation();
 }
 
 function handleRename() {
     isRenaming.value = true;
 }
 
+function handleDeleteClick() {
+    if (isRenaming.value) return;
+    
+    if (props.entry.type === FileType.Directory) {
+        showDeleteDialog.value = true;
+    } else {
+        handleDelete();
+    }
+}
+
 function handleDelete() {
     if (!isRenaming.value) {
-        emit("delete", props.entry.id);
+        emit("delete", props.entry.uri);
     }
+}
+
+function confirmDelete() {
+    handleDelete();
+    showDeleteDialog.value = false;
 }
 
 function handleRenameSubmit(newName: string) {
@@ -181,8 +297,8 @@ function handleRenameSubmit(newName: string) {
         const extension = getFileExtension(props.entry.name);
         const fullName = `${newName.trim()}${extension}`;
         const parent = props.entry.parent;
-        const newUri = parent ? Uri.joinPath(parent.id, fullName) : Uri.file(`/${fullName}`);
-        emit("rename", props.entry.id, newUri);
+        const newUri = parent ? Uri.joinPath(parent.uri, fullName) : Uri.file(`/${fullName}`);
+        emit("rename", props.entry.uri, newUri);
     }
     isRenaming.value = false;
 }
@@ -216,11 +332,6 @@ function getFileNameWithoutExtension(filename: string): string {
     return lastDotIndex > 0 ? filename.substring(0, lastDotIndex) : filename;
 }
 
-function getFileExtension(filename: string): string {
-    const lastDotIndex = filename.lastIndexOf(".");
-    return lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
-}
-
 function validateRename(newName: string): boolean {
     if (newName.trim().length === 0) {
         return false;
@@ -232,7 +343,7 @@ function validateRename(newName: string): boolean {
     const parent = props.entry.parent;
     return (
         parent?.children.every(
-            (child) => child.id.toString() === props.entry.id.toString() || child.name !== fullName
+            (child) => child.uri.toString() === props.entry.uri.toString() || child.name !== fullName
         ) ?? true
     );
 }

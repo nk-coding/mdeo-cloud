@@ -1,6 +1,6 @@
 <template>
     <div ref="sprottyWrapper" class="sprotty-wrapper w-full h-full relative ml-1.5">
-        <div v-if="editorPlugin != undefined" :id="id"></div>
+        <div v-if="graphicalEditorPlugin != undefined" :id="id"></div>
     </div>
 </template>
 <script setup lang="ts">
@@ -16,9 +16,11 @@ import { useResizeObserver } from "@vueuse/core";
 import { ResetCanvasBoundsAction } from "@mdeo/editor-protocol";
 import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { TYPES } from "@eclipse-glsp/sprotty";
+import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 
 const props = defineProps<{
     tab: EditorTab;
+    languagePlugin: ResolvedWorkbenchLanguagePlugin
 }>();
 
 const { languagePluginByExtension, languageClient } = inject(workbenchStateKey)!;
@@ -28,10 +30,8 @@ const id = useId();
 const sprottyWrapper = ref<HTMLElement | null>(null);
 const actionDispatcher = shallowRef<IActionDispatcher>();
 
-const languagePlugin = computed(() => languagePluginByExtension.value.get(props.tab.file.extension));
-
-const editorPlugin = computed(() => {
-    return languagePlugin.value?.editorPlugin;
+const graphicalEditorPlugin = computed(() => {
+    return props.languagePlugin.graphicalEditorPlugin;
 });
 
 useResizeObserver(sprottyWrapper, () => {
@@ -39,7 +39,7 @@ useResizeObserver(sprottyWrapper, () => {
 });
 
 onMounted(async () => {
-    if (languagePlugin.value == undefined) {
+    if (props.languagePlugin.graphicalEditorPlugin == undefined) {
         return;
     }
 
@@ -48,15 +48,15 @@ onMounted(async () => {
         id: id
     });
 
-    const plugin = editorPlugin.value;
+    const plugin = graphicalEditorPlugin.value;
     if (plugin == undefined) {
         return undefined;
     }
     const container = createContainer(editorContext, plugin.containerConfiguration, {
         clientId: id,
-        diagramType: languagePlugin.value.id,
+        diagramType: props.languagePlugin.id,
         glspClientProvider: async () => client,
-        sourceUri: props.tab.file.id.toString()
+        sourceUri: props.tab.fileUri.toString()
     });
 
     const currentActionDispatcher = container.get<IActionDispatcher>(TYPES.IActionDispatcher);

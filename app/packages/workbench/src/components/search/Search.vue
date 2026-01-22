@@ -51,7 +51,7 @@
                     @focus="activeElement = fileResult"
                 >
                     <template #content>
-                        <File class="w-4 h-4 mr-2" />
+                        <File class="size-4 mr-2" />
                         <span>{{ getFileName(fileResult.resource) }}</span>
                         <span class="ml-2 text-xs opacity-80">{{ getRelativePath(fileResult.resource) }}</span>
                     </template>
@@ -98,8 +98,6 @@ import SidebarPanelHeader from "@/components/sidebar/SidebarPanelHeader.vue";
 import TreeItem from "@/components/tree/TreeItem.vue";
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { File, CaseSensitive, WholeWord, Regex } from "lucide-vue-next";
-import { FileType } from "@codingame/monaco-vscode-files-service-override";
-import { findFileInTree } from "@/data/filesystem/util";
 import type { SearchMatch, FileSearchResult } from "./types";
 import {
     createSearchQuery,
@@ -111,7 +109,7 @@ import {
     getPreviewAfter
 } from "./util";
 
-const { monacoApi, fileTree, project, activeTab } = inject(workbenchStateKey)!;
+const { monacoApi, project, activeTab } = inject(workbenchStateKey)!;
 
 const searchText = ref("");
 const isCaseSensitive = ref(false);
@@ -135,7 +133,7 @@ async function searchSingleFile(uri: Uri): Promise<FileSearchResult | null> {
         const relativePath = uri.path.startsWith("/") ? uri.path.substring(1) : uri.path;
 
         const searchResult = await monacoApi.searchService.textSearch(
-            createSearchQuery(searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value, relativePath)
+            createSearchQuery(project.value!.id, searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value, relativePath)
         );
 
         const fileResult = searchResult.results.find((result) => result.resource.path === uri.path);
@@ -161,7 +159,7 @@ async function performSearch() {
     }
 
     const searchResult = await monacoApi.searchService.textSearch(
-        createSearchQuery(searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value)
+        createSearchQuery(project.value!.id, searchText.value, isRegex.value, isCaseSensitive.value, isWholeWord.value)
     );
 
     const processedPaths = new Set<string>();
@@ -268,28 +266,24 @@ onDeactivated(() => {
 async function handleSelectResult(match: SearchMatch, temporary: boolean) {
     activeElement.value = match;
 
-    const file = findFileInTree(fileTree, match.fileResult.resource);
-
-    if (file != undefined && file.type === FileType.File) {
-        const range = match.range?.source;
-        await monacoApi.editorService.openEditor({
-            resource: file.id,
-            options: {
-                preserveFocus: true,
-                selection:
-                    range != undefined
-                        ? {
-                              startLineNumber: range.startLineNumber + 1,
-                              startColumn: range.startColumn + 1,
-                              endLineNumber: range.endLineNumber + 1,
-                              endColumn: range.endColumn + 1
-                          }
-                        : undefined
-            }
-        });
-        if (!temporary && activeTab.value != undefined) {
-            activeTab.value.temporary = false;
+    const range = match.range?.source;
+    await monacoApi.editorService.openEditor({
+        resource: match.fileResult.resource,
+        options: {
+            preserveFocus: true,
+            selection:
+                range != undefined
+                    ? {
+                          startLineNumber: range.startLineNumber + 1,
+                          startColumn: range.startColumn + 1,
+                          endLineNumber: range.endLineNumber + 1,
+                          endColumn: range.endColumn + 1
+                      }
+                    : undefined
         }
+    });
+    if (!temporary && activeTab.value != undefined) {
+        activeTab.value.temporary = false;
     }
 }
 </script>

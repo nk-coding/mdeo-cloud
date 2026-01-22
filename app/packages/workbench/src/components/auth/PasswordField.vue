@@ -15,7 +15,7 @@
             @click="showPassword = !showPassword"
             :aria-label="showPassword ? 'Hide password' : 'Show password'"
         >
-            <component :is="showPassword ? EyeOff : Eye" class="h-4 w-4" />
+            <component :is="showPassword ? EyeOff : Eye" class="size-4" />
         </InputGroupButton>
     </InputGroup>
 </template>

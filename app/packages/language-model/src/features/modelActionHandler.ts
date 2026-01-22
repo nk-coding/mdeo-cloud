@@ -9,6 +9,7 @@ import type {
 } from "@mdeo/language-common";
 import type { ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
+import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { URI } from "langium";
 
 /**
@@ -53,7 +54,7 @@ export class ModelActionHandler implements ActionHandler {
         }
 
         const data = params.data as NewFileActionData;
-        this.newFilePath = data.filePath;
+        this.newFilePath = data.uri;
 
         const metamodelFiles = await this.findMetamodelFiles();
 
@@ -85,16 +86,16 @@ export class ModelActionHandler implements ActionHandler {
             submitButtonLabel: "Insert Using Statement"
         };
 
-        return { page };
+        return { kind: "page", page };
     }
 
     /**
-     * Submits the dialog and inserts the `using` statement.
+     * Submits the dialog and returns the workspace edit for inserting the `using` statement.
      *
      * The selected value is already a relative path and is inserted verbatim.
      *
      * @param params The submit parameters with selected metamodel
-     * @returns Completion response after inserting the statement
+     * @returns Completion response with workspace edit for inserting the statement
      */
     async submitAction(params: ActionSubmitParams): Promise<ActionSubmitResponse> {
         const inputs = params.inputs[0] || {};
@@ -107,7 +108,11 @@ export class ModelActionHandler implements ActionHandler {
             };
         }
 
-        await this.insertUsingStatement(metamodelPath);
+        const workspaceEdit = this.createUsingStatementEdit(metamodelPath);
+        const connection = this.sharedServices.lsp.Connection;
+        if (connection != undefined && workspaceEdit !== undefined) {
+            await connection.workspace.applyEdit(workspaceEdit);
+        }
         return { kind: "completion" };
     }
 
@@ -123,20 +128,19 @@ export class ModelActionHandler implements ActionHandler {
     }
 
     /**
-     * Inserts a `using` statement at the beginning of the new file.
+     * Creates a workspace edit for inserting a `using` statement at the beginning of the new file.
      *
      * @param relativePath Relative path to the selected metamodel
+     * @returns The workspace edit for inserting the using statement
      */
-    private async insertUsingStatement(relativePath: string): Promise<void> {
+    private createUsingStatementEdit(relativePath: string): WorkspaceEdit | undefined {
         if (!this.newFilePath) {
-            return;
+            return undefined;
         }
 
         const usingStatement = `using "${relativePath}"\n\n`;
 
-        const connection = this.sharedServices.lsp.Connection!;
-
-        const workspaceEdit = {
+        return {
             changes: {
                 [this.newFilePath]: [
                     {
@@ -149,8 +153,6 @@ export class ModelActionHandler implements ActionHandler {
                 ]
             }
         };
-
-        await connection.workspace.applyEdit({ edit: workspaceEdit });
     }
 
     /**

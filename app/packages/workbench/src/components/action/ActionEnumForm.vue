@@ -13,7 +13,7 @@
                                 :aria-describedby="fieldErrors.length > 0 ? errorId : undefined"
                             />
                             <ComboboxTrigger class="mr-3">
-                                <ChevronDown class="w-4 h-4 opacity-50" />
+                                <ChevronDown class="size-4 opacity-50" />
                             </ComboboxTrigger>
                         </InputGroup>
                     </ComboboxAnchor>

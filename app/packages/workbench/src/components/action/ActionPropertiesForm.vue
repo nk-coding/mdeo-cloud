@@ -43,8 +43,8 @@ const props = withDefaults(
 
 const model = defineModel<Record<string, unknown>>();
 
-/**
- * Validation errors for the object itself
- */
+
+
+
 const fieldErrors = computed(() => getErrorsForPath(props.errors, props.path));
 </script>

@@ -13,6 +13,7 @@ import { computed, inject } from "vue";
 import Files from "../files/Files.vue";
 import Projects from "../projects/Projects.vue";
 import Search from "../search/Search.vue";
+import Executions from "../executions/Executions.vue";
 import SidebarPanel from "./SidebarPanel.vue";
 import { Separator } from "../ui/separator";
 import { workbenchStateKey } from "../workbench/util";
@@ -26,6 +27,8 @@ const sidebarComponent = computed(() => {
         return Projects;
     } else if (activeSidebar.value === "search") {
         return Search;
+    } else if (activeSidebar.value === "executions") {
+        return Executions;
     }
     return null;
 });

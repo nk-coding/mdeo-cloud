@@ -6,7 +6,6 @@ import {
 } from "@mdeo/language-common";
 import {
     startLanguageService,
-    convertIcon,
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
@@ -14,6 +13,7 @@ import {
     astHandler,
     AST_HANDLER_KEY
 } from "@mdeo/service-common";
+import { convertIcon } from "@mdeo/language-common";
 import type { MetamodelServices } from "@mdeo/language-metamodel";
 
 /**
@@ -32,15 +32,17 @@ const metamodelServicePlugin: ServicePluginDefinition = {
         serverPlugin: {
             import: "static/language.js"
         },
-        editorPlugin: {
+        graphicalEditorPlugin: {
             import: "static/editor.js",
             stylesUrl: "static/styles.css"
         },
-        languageConfiguration: defaultLanguageConfiguration,
-        monarchTokensProvider: serializeMonarchTokensProvider({
-            ...defaultMonarchTokenProvider,
-            keywords: ["class", "extends", "abstract", "import", "from", "as"]
-        })
+        textualEditorPlugin: {
+            languageConfiguration: defaultLanguageConfiguration,
+            monarchTokensProvider: serializeMonarchTokensProvider({
+                ...defaultMonarchTokenProvider,
+                keywords: ["class", "extends", "abstract", "import", "from", "as"]
+            })
+        }
     },
     contributionPlugins: []
 };

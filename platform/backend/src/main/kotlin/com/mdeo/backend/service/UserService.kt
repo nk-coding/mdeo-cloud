@@ -14,8 +14,10 @@ import java.util.*
 
 /**
  * Service for managing user accounts and authentication.
+ *
+ * @param services The injected services providing access to configuration and other services
  */
-class UserService : BaseService() {
+class UserService(services: InjectedServices) : BaseService(), InjectedServices by services {
     private val logger = LoggerFactory.getLogger(UserService::class.java)
     
     /**
