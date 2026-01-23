@@ -1,3 +1,4 @@
+export * from "./action-handlers/importClassActionHandler.js";
 export * from "./features/diagram-server/handler/createClassOperationHandler.js";
 export * from "./features/diagram-server/handler/metamodelApplyLabelEditOperationHandler.js";
 export * from "./features/diagram-server/handler/metamodelDeleteElementOperationHandler.js";
@@ -22,7 +23,6 @@ export * from "./features/diagram-server/metamodelLabelEditValidator.js";
 export * from "./features/diagram-server/metamodelMetadataManager.js";
 export * from "./features/diagram-server/metamodelModelIdProvider.js";
 export * from "./features/diagram-server/metamodelToolPaletteItemProvider.js";
-export * from "./action-handlers/importClassActionHandler.js";
 export * from "./features/metamodelExternalReferenceCollector.js";
 export * from "./features/metamodelNameProvider.js";
 export * from "./features/metamodelScopeComputation.js";

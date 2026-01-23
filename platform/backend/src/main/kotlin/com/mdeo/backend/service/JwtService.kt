@@ -182,6 +182,47 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
     }
     
     /**
+     * Gets the public key in JWKS (JSON Web Key Set) format for external verification.
+     * Returns a JWKS containing the RSA public key with standard parameters.
+     *
+     * @return Map representing the JWKS structure
+     */
+    fun getJwks(): Map<String, Any> {
+        // Fix: Strip leading 0x00 byte from BigInteger.toByteArray() to comply with RFC 7518
+        // BigInteger.toByteArray() includes a sign bit which must be removed for proper Base64url encoding
+        val modulusBytes = publicKey.modulus.toByteArray()
+        val modulusStripped = if (modulusBytes[0] == 0.toByte() && modulusBytes.size > 1) {
+            modulusBytes.copyOfRange(1, modulusBytes.size)
+        } else {
+            modulusBytes
+        }
+        
+        val exponentBytes = publicKey.publicExponent.toByteArray()
+        val exponentStripped = if (exponentBytes[0] == 0.toByte() && exponentBytes.size > 1) {
+            exponentBytes.copyOfRange(1, exponentBytes.size)
+        } else {
+            exponentBytes
+        }
+        
+        val modulusBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(modulusStripped)
+        val exponentBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(exponentStripped)
+        
+        // Generate a stable key ID based on the modulus (for key rotation support)
+        val keyId = "mdeo-key-1"
+        
+        val key = mapOf(
+            "kty" to "RSA",
+            "use" to "sig",
+            "alg" to "RS256",
+            "kid" to keyId,
+            "n" to modulusBase64,
+            "e" to exponentBase64
+        )
+        
+        return mapOf("keys" to listOf(key))
+    }
+    
+    /**
      * Gets the RSA algorithm for use in authentication configuration.
      *
      * @return The RSA algorithm instance

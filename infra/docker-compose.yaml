@@ -1,14 +1,29 @@
 services:
-  postgres:
+  postgres-backend:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_USER: ${BACKEND_DB_USER:-${DATABASE_USER}}
+      POSTGRES_PASSWORD: ${BACKEND_DB_PASSWORD:-${DATABASE_PASSWORD}}
       POSTGRES_DB: mdeo
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-backend-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d mdeo"]
+      test: ["CMD-SHELL", "pg_isready -U ${BACKEND_DB_USER:-${DATABASE_USER}} -d mdeo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-script:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${EXECUTIONS_DB_USER:-${DATABASE_USER}}
+      POSTGRES_PASSWORD: ${EXECUTIONS_DB_PASSWORD:-${DATABASE_PASSWORD}}
+      POSTGRES_DB: mdeo
+    volumes:
+      - postgres-script-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EXECUTIONS_DB_USER:-${DATABASE_USER}} -d mdeo"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -20,8 +35,8 @@ services:
       dockerfile: infra/docker/backend/Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      DATABASE_USER: ${DATABASE_USER}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_USER: ${BACKEND_DB_USER:-${DATABASE_USER}}
+      DATABASE_PASSWORD: ${BACKEND_DB_PASSWORD:-${DATABASE_PASSWORD}}
       SESSION_MAX_IDLE_SECONDS: ${SESSION_MAX_IDLE_SECONDS}
       SESSION_MAX_ABSOLUTE_SECONDS: ${SESSION_MAX_ABSOLUTE_SECONDS}
       CSRF_ROTATION_SECONDS: ${CSRF_ROTATION_SECONDS}
@@ -34,7 +49,7 @@ services:
       INTERNAL_PLUGIN_BASE_URL: ${INTERNAL_PLUGIN_BASE_URL:-http://workbench:80}
       DEFAULT_PLUGIN_URLS: ${DEFAULT_PLUGIN_URLS:-http://service-metamodel:3000,http://service-model:3000,http://service-script:3000}
     depends_on:
-      postgres:
+      postgres-backend:
         condition: service_healthy
       workbench:
         condition: service_started
@@ -64,8 +79,6 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-metamodel/Dockerfile
-      args:
-        APP_BUILDER_IMAGE: app-builder:latest
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -83,8 +96,6 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-model/Dockerfile
-      args:
-        APP_BUILDER_IMAGE: app-builder:latest
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -102,12 +113,11 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-script/Dockerfile
-      args:
-        APP_BUILDER_IMAGE: app-builder:latest
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
+      SCRIPT_EXECUTION_SERVICE_URL: ${SCRIPT_EXECUTION_SERVICE_URL:-http://script-execution:8081}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -117,5 +127,30 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  script-execution:
+    build:
+      context: ..
+      dockerfile: infra/docker/script-execution/Dockerfile
+    environment:
+      SERVER_PORT: "8081"
+      DATABASE_URL: ${SCRIPT_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-script:5432/mdeo}
+      DATABASE_USER: ${EXECUTIONS_DB_USER:-${DATABASE_USER}}
+      DATABASE_PASSWORD: ${EXECUTIONS_DB_PASSWORD:-${DATABASE_PASSWORD}}
+      BACKEND_API_URL: ${SCRIPT_EXECUTION_BACKEND_URL:-http://backend:8080}
+      EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-300000}
+    depends_on:
+      postgres-script:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
-  postgres-data:
+  postgres-backend-data:
+  postgres-script-data:

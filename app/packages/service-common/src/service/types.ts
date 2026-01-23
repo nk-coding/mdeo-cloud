@@ -2,6 +2,7 @@ import type { LangiumLanguagePluginProvider } from "@mdeo/language-common";
 import type { Plugin, LanguagePlugin } from "@mdeo/plugin";
 import type { FastifyInstance } from "fastify";
 import type { FileDataHandler, FileDataResult } from "../handler/types.js";
+import type { ExecutionHandler } from "../execution/types.js";
 
 /**
  * Plugin definition for the service.
@@ -60,6 +61,11 @@ export interface ServiceConfig<T = object> {
      * File data handlers keyed by data key (e.g., "ast", "diagram")
      */
     handlers: Record<string, FileDataHandler<unknown, T>>;
+
+    /**
+     * Execution handlers for processing execution requests (optional)
+     */
+    executionHandlers?: ExecutionHandler<unknown, T>[];
 
     /**
      * Whether to serve static files (default: true)

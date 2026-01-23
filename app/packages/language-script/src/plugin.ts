@@ -15,7 +15,9 @@ import {
     SerializerFormatter,
     registerDefaultTokenSerializers,
     sharedImport,
-    addExternalReferenceCollectionPhase
+    addExternalReferenceCollectionPhase,
+    ActionHandlerRegistry,
+    type ActionHandlerRegistryAdditionalServices
 } from "@mdeo/language-shared";
 import {
     defaultExtendedTypirServices,
@@ -35,6 +37,8 @@ import { ScriptExternalReferenceCollector } from "./features/scriptExternalRefer
 import type { ResolvedScriptContributionPlugins, ScriptContributionPlugin } from "./plugin/scriptContributionPlugin.js";
 import { generateScriptRule } from "./grammar/scriptRules.js";
 import type { AbstractAstReflection } from "langium";
+import { ScriptActionProvider } from "./features/scriptActionProvider.js";
+import { RunScriptActionHandler } from "./action-handlers/runScriptActionHandler.js";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");
@@ -61,7 +65,7 @@ export type ScriptTypirServices = ExpressionTypirServices<ScriptTypirSpecifics> 
  */
 export type ScriptServices = {
     typir: ScriptTypirServices;
-} & ExternalReferenceAdditionalServices;
+} & ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
 /**
  * Provider for the Script language plugin.
@@ -99,7 +103,15 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
                 lsp: {
                     Formatter: (services) => new SerializerFormatter(services)
                 },
-                AstSerializer: (services) => new DefaultAstSerializer(services)
+                AstSerializer: (services) => new DefaultAstSerializer(services),
+                action: {
+                    ActionHandlerRegistry: (services) => {
+                        const registry = new ActionHandlerRegistry();
+                        registry.register("run", new RunScriptActionHandler(services.shared));
+                        return registry;
+                    },
+                    ActionProvider: () => new ScriptActionProvider()
+                }
             },
             postCreate(services) {
                 initializeLangiumTypirServices(services as any, services.typir);

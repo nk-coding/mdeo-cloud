@@ -1,3 +1,5 @@
+export * from "./action-handlers/runScriptActionHandler.js";
+export * from "./features/scriptActionProvider.js";
 export * from "./features/type-system/lambdaScope.js";
 export * from "./features/type-system/scriptPartialTypeSystem.js";
 export * from "./features/type-system/scriptReturnStatementAccessor.js";

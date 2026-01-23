@@ -175,10 +175,28 @@ export interface ActionStartCompletionResponse {
 }
 
 /**
- * Response returned when starting an action dialog.
- * Can either show a dialog page or complete immediately.
+ * Response indicating an error occurred while starting the action.
  */
-export type ActionStartResponse = ActionStartPageResponse | ActionStartCompletionResponse;
+export interface ActionStartErrorResponse {
+    /**
+     * Discriminator for the response type
+     */
+    kind: "error";
+    /**
+     * Error message to display to the user
+     */
+    message: string;
+    /**
+     * Optional detailed description of the error
+     */
+    description?: string;
+}
+
+/**
+ * Response returned when starting an action dialog.
+ * Can either show a dialog page, complete immediately, or indicate an error.
+ */
+export type ActionStartResponse = ActionStartPageResponse | ActionStartCompletionResponse | ActionStartErrorResponse;
 
 /**
  * Parameters for submitting an action dialog page.
@@ -253,6 +271,24 @@ export interface ActionSubmitCompletionResponse {
 }
 
 /**
+ * Response indicating an error occurred during action submission.
+ */
+export interface ActionSubmitErrorResponse {
+    /**
+     * Discriminator for the response type
+     */
+    kind: "error";
+    /**
+     * Error message to display to the user
+     */
+    message: string;
+    /**
+     * Optional detailed description of the error
+     */
+    description?: string;
+}
+
+/**
  * Request data for creating an execution from an action.
  */
 export interface ActionExecutionRequest {
@@ -272,11 +308,13 @@ export interface ActionExecutionRequest {
  * - Validation errors if the submission is invalid
  * - Next page if there are more pages to display
  * - Completion if this was the last page and submission succeeded
+ * - Error if the submission failed due to an error condition
  */
 export type ActionSubmitResponse =
     | ActionSubmitValidationResponse
     | ActionSubmitNextPageResponse
-    | ActionSubmitCompletionResponse;
+    | ActionSubmitCompletionResponse
+    | ActionSubmitErrorResponse;
 
 /**
  * Location where an action can be displayed.

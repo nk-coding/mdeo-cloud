@@ -2,6 +2,7 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.UserService
+import com.mdeo.backend.service.JwtService
 import com.mdeo.common.model.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -13,8 +14,9 @@ import io.ktor.server.sessions.*
  * Configures authentication routes.
  *
  * @param userService Service for user authentication and management
+ * @param jwtService Service for JWT operations
  */
-fun Route.authRoutes(userService: UserService) {
+fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
     route("/api/auth") {
         /**
          * Authenticates a user and creates a session.
@@ -100,6 +102,18 @@ fun Route.authRoutes(userService: UserService) {
                     isAdmin = session.isAdmin
                 ))
             }
+        }
+
+        /**
+         * Gets the JWKS (JSON Web Key Set) for JWT verification.
+         * This is the standard endpoint for JWT validation using public keys.
+         * Follows the JWKS format specification (RFC 7517).
+         *
+         * @return JWKS containing the RSA public key
+         */
+        get("/jwks") {
+            val jwks = jwtService.getJwks()
+            call.respond(jwks)
         }
     }
 }

@@ -70,7 +70,9 @@ import {
     type ActionValidationError,
     type ActionStartResponse,
     type ActionSubmitResponse,
-    type ActionExecutionRequest
+    type ActionExecutionRequest,
+    type ActionStartErrorResponse,
+    type ActionSubmitErrorResponse
 } from "@mdeo/language-common";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import { workbenchStateKey } from "../workbench/util";
@@ -117,6 +119,9 @@ async function startActionDialog(params: { type: string; languageId: string; dat
                 currentPage.value = response.page;
                 currentInputs.value = generateDefaultValue(response.page.schema);
                 isOpen.value = true;
+            } else if (response.kind === "error") {
+                handleErrorResponse(response);
+                pendingAction.value = undefined;
             }
         }
     } catch (error) {
@@ -216,11 +221,16 @@ async function handleCompletionEffects(executions?: ActionExecutionRequest[]): P
     }
 }
 
+function handleErrorResponse(response: ActionStartErrorResponse | ActionSubmitErrorResponse): void {
+    showError(response.message, {
+        description: response.description
+    });
+}
+
 async function handleSubmitResponse(response: ActionSubmitResponse): Promise<void> {
     if (response.kind === "validation") {
         validationErrors.value = response.errors ?? [];
     } else if (response.kind === "nextPage" && response.page) {
-        console.log(response);
         previousPagesStack.value.push({
             page: currentPage.value!,
             inputs: currentInputs.value
@@ -237,6 +247,9 @@ async function handleSubmitResponse(response: ActionSubmitResponse): Promise<voi
         currentPage.value = response.page;
     } else if (response.kind === "completion") {
         await handleCompletionEffects(response.executions);
+        closeDialog();
+    } else if (response.kind === "error") {
+        handleErrorResponse(response);
         closeDialog();
     }
 }

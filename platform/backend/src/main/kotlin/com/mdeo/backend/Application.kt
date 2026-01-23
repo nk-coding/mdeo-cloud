@@ -98,8 +98,8 @@ fun Application.module(appConfig: AppConfig) {
     }
     
     routing {
-        authRoutes(services.userService)
-        publicKeyRoute(services.jwtService)
+        healthRoutes()
+        authRoutes(services.userService, services.jwtService)
         
         authenticate(AUTH_SESSION, AUTH_JWT, optional = true) {
             fileRoutes(services.fileService, services.projectService)

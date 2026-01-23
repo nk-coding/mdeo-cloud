@@ -1,3 +1,6 @@
+export * from "./auth/jwtAuth.js";
+export * from "./execution/types.js";
+export * from "./execution/utils.js";
 export * from "./handler/astHandler.js";
 export * from "./handler/types.js";
 export * from "./langium/backendExternalReferencesResolver.js";

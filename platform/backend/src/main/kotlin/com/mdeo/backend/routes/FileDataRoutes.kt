@@ -93,24 +93,3 @@ fun Route.fileDataRoutes(
         }
     }
 }
-
-/**
- * Configures public routes for JWT public key.
- * This should be called outside of authentication blocks.
- *
- * @param jwtService Service for JWT operations
- */
-fun Route.publicKeyRoute(jwtService: JwtService) {
-    route("/api/auth/public-key") {
-        /**
-         * Gets the public key for JWT verification.
-         * This endpoint is public and can be accessed by plugins to verify tokens.
-         *
-         * @return Public key in PEM format
-         */
-        get {
-            val publicKey = jwtService.getPublicKeyPem()
-            call.respond(mapOf("publicKey" to publicKey))
-        }
-    }
-}

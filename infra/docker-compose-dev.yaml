@@ -1,5 +1,5 @@
 services:
-  postgres:
+  postgres-backend:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: mdeo
@@ -8,7 +8,24 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-backend-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mdeo -d mdeo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-script:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: mdeo
+      POSTGRES_PASSWORD: mdeo
+      POSTGRES_DB: mdeo
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-script-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mdeo -d mdeo"]
       interval: 10s
@@ -23,7 +40,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/mdeo
+      DATABASE_URL: jdbc:postgresql://postgres-backend:5432/mdeo
       DATABASE_USER: mdeo
       DATABASE_PASSWORD: mdeo
       SESSION_MAX_IDLE_SECONDS: 604800
@@ -38,7 +55,7 @@ services:
       INTERNAL_PLUGIN_BASE_URL: "http://workbench:80"
       DEFAULT_PLUGIN_URLS: "/plugin/metamodel,/plugin/model,/plugin/script"
     depends_on:
-      postgres:
+      postgres-backend:
         condition: service_healthy
       workbench:
         condition: service_started
@@ -68,8 +85,6 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-metamodel/Dockerfile
-      args:
-        APP_BUILDER_IMAGE: app-builder:latest
     ports:
       - "3001:3000"
     environment:
@@ -108,14 +123,13 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-script/Dockerfile
-      args:
-        APP_BUILDER_IMAGE: app-builder:latest
     ports:
       - "3003:3000"
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
+      SCRIPT_EXECUTION_SERVICE_URL: "http://script-execution:8081"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -125,5 +139,32 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  script-execution:
+    build:
+      context: ..
+      dockerfile: infra/docker/script-execution/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: "8081"
+      DATABASE_URL: "jdbc:postgresql://postgres-script:5432/mdeo"
+      DATABASE_USER: "mdeo"
+      DATABASE_PASSWORD: "mdeo"
+      BACKEND_API_URL: "http://backend:8080"
+      EXECUTION_TIMEOUT_MS: "300000"
+    depends_on:
+      postgres-script:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
-  postgres-data:
+  postgres-backend-data:
+  postgres-script-data:
