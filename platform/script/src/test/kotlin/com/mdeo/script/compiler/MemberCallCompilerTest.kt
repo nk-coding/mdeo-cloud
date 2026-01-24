@@ -31,7 +31,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("hello", stringType),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -58,7 +58,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("", stringType),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -84,7 +84,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("hello", stringType),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -110,7 +110,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("HELLO", stringType),
                             member = "toLowerCase",
-                            overload = "toLowerCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -136,7 +136,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("  hello  ", stringType),
                             member = "trim",
-                            overload = "trim():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -164,7 +164,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello, ", stringType),
                             member = "concat",
-                            overload = "concat(builtin.string):builtin.string",
+                            overload = "",
                             arguments = listOf(stringLiteral("World", stringType)),
                             resultTypeIndex = stringType
                         )
@@ -191,7 +191,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello, World", stringType),
                             member = "startsWith",
-                            overload = "startsWith(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("Hello", stringType)),
                             resultTypeIndex = boolType
                         )
@@ -218,7 +218,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello, World", stringType),
                             member = "startsWith",
-                            overload = "startsWith(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("World", stringType)),
                             resultTypeIndex = boolType
                         )
@@ -245,7 +245,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello, World", stringType),
                             member = "endsWith",
-                            overload = "endsWith(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("World", stringType)),
                             resultTypeIndex = boolType
                         )
@@ -272,7 +272,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello, World", stringType),
                             member = "substring",
-                            overload = "substring(builtin.int):builtin.string",
+                            overload = "1",
                             arguments = listOf(intLiteral(7, intType)),
                             resultTypeIndex = stringType
                         )
@@ -299,7 +299,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello, World", stringType),
                             member = "substring",
-                            overload = "substring(builtin.int,builtin.int):builtin.string",
+                            overload = "2",
                             arguments = listOf(
                                 intLiteral(0, intType),
                                 intLiteral(5, intType)
@@ -329,7 +329,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("Hello", stringType),
                             member = "characterAt",
-                            overload = "characterAt(builtin.int):builtin.string",
+                            overload = "",
                             arguments = listOf(intLiteral(1, intType)),
                             resultTypeIndex = stringType
                         )
@@ -356,7 +356,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("llo", stringType),
                             member = "isSubstringOf",
-                            overload = "isSubstringOf(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("Hello", stringType)),
                             resultTypeIndex = boolType
                         )
@@ -383,7 +383,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("hello123", stringType),
                             member = "matches",
-                            overload = "matches(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("[a-z]+[0-9]+", stringType)),
                             resultTypeIndex = boolType
                         )
@@ -409,7 +409,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("hello world", stringType),
                             member = "replace",
-                            overload = "replace(builtin.string,builtin.string):builtin.string",
+                            overload = "",
                             arguments = listOf(
                                 stringLiteral("world", stringType),
                                 stringLiteral("there", stringType)
@@ -439,7 +439,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("12345", stringType),
                             member = "isInteger",
-                            overload = "isInteger():builtin.boolean",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = boolType
                         )
@@ -466,7 +466,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("12.34", stringType),
                             member = "isInteger",
-                            overload = "isInteger():builtin.boolean",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = boolType
                         )
@@ -493,7 +493,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("3.14159", stringType),
                             member = "isReal",
-                            overload = "isReal():builtin.boolean",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = boolType
                         )
@@ -520,7 +520,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("42", stringType),
                             member = "asInteger",
-                            overload = "asInteger():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -546,7 +546,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("hello", stringType),
                             member = "firstToUpperCase",
-                            overload = "firstToUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -572,7 +572,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = stringLiteral("HELLO", stringType),
                             member = "firstToLowerCase",
-                            overload = "firstToLowerCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -602,12 +602,12 @@ class MemberCallCompilerTest {
                             expression = memberCall(
                                 expression = stringLiteral("  hello  ", stringType),
                                 member = "trim",
-                                overload = "trim():builtin.string",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
                             ),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -636,17 +636,17 @@ class MemberCallCompilerTest {
                                 expression = memberCall(
                                     expression = stringLiteral("Hello World", stringType),
                                     member = "toLowerCase",
-                                    overload = "toLowerCase():builtin.string",
+                                    overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = stringType
                                 ),
                                 member = "concat",
-                                overload = "concat(builtin.string):builtin.string",
+                                overload = "",
                                 arguments = listOf(stringLiteral("!", stringType)),
                                 resultTypeIndex = stringType
                             ),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -676,7 +676,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = nullLiteral(stringNullableType),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -706,7 +706,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -734,7 +734,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = nullLiteral(stringNullableType),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = stringNullableType
@@ -762,7 +762,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = stringNullableType
@@ -793,7 +793,7 @@ class MemberCallCompilerTest {
                         memberCall(
                             expression = identifier("message", stringType, 3),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -822,7 +822,7 @@ class MemberCallCompilerTest {
                             memberCall(
                                 expression = stringLiteral("hello", stringType),
                                 member = "length",
-                                overload = "length():builtin.int",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = intType
                             ),
@@ -830,7 +830,7 @@ class MemberCallCompilerTest {
                             memberCall(
                                 expression = stringLiteral("world", stringType),
                                 member = "length",
-                                overload = "length():builtin.int",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = intType
                             ),
@@ -862,7 +862,7 @@ class MemberCallCompilerTest {
                             memberCall(
                                 expression = stringLiteral("hello", stringType),
                                 member = "length",
-                                overload = "length():builtin.int",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = intType
                             ),
@@ -898,7 +898,7 @@ class MemberCallCompilerTest {
                             memberCall(
                                 expression = stringLiteral("hello", stringType),
                                 member = "startsWith",
-                                overload = "startsWith(builtin.string):builtin.boolean",
+                                overload = "",
                                 arguments = listOf(stringLiteral("h", stringType)),
                                 resultTypeIndex = boolType
                             ),

@@ -106,9 +106,13 @@ const showDeleteDialog = ref(false);
 const executionToDelete = ref<ExecutionWithLoadedTree | null>(null);
 const showDeleteAllDialog = ref(false);
 const executionsList = computed(() => {
-    return Array.from(executions.value.values()).sort((a, b) => {
-        return b.execution.name.localeCompare(a.execution.name);
-    });
+    return Array.from(executions.value.values())
+        .map((execution) => ({
+            execution,
+            key: new Date(execution.execution.createdAt).getTime()
+        }))
+        .sort((a, b) => b.key - a.key)
+        .map(({ execution }) => execution);
 });
 
 watch(

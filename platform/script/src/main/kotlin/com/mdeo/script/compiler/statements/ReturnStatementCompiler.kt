@@ -7,7 +7,7 @@ import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.ast.types.VoidType
-import com.mdeo.script.compiler.CoercionUtil
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.StatementCompiler
 import org.objectweb.asm.MethodVisitor

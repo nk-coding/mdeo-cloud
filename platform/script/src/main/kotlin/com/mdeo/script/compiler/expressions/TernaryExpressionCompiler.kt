@@ -4,7 +4,7 @@ import com.mdeo.script.ast.TypedExpressionKind
 import com.mdeo.script.ast.expressions.TypedExpression
 import com.mdeo.script.ast.expressions.TypedTernaryExpression
 import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.compiler.CoercionUtil
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.Label

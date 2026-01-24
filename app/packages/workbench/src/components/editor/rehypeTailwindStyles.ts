@@ -42,9 +42,9 @@ function getClassesForElement(tagName: string): string | undefined {
         case "h1":
             return "font-heading mt-2 scroll-m-28 text-3xl font-bold tracking-tight";
         case "h2":
-            return "font-heading [&+*]:![code]:text-xl mt-10 scroll-m-28 text-xl font-medium tracking-tight first:mt-0 lg:mt-16 [&+.steps]:!mt-0 [&+.steps>h3]:!mt-4 [&+h3]:!mt-6 [&+p]:!mt-4";
+            return "font-heading [&+*]:![code]:text-xl mt-8 scroll-m-28 text-xl font-medium tracking-tight first:mt-0 [&+.steps]:!mt-0 [&+.steps>h3]:!mt-4 [&+h3]:!mt-6 [&+p]:!mt-4";
         case "h3":
-            return "font-heading mt-12 scroll-m-28 text-lg font-medium tracking-tight [&+p]:!mt-4 *:[code]:text-xl";
+            return "font-heading mt-8 scroll-m-28 text-lg font-medium tracking-tight [&+p]:!mt-4 *:[code]:text-xl";
         case "h4":
             return "font-heading mt-8 scroll-m-28 text-base font-medium tracking-tight";
         case "h5":
@@ -64,9 +64,9 @@ function getClassesForElement(tagName: string): string | undefined {
         case "blockquote":
             return "mt-6 border-l-2 pl-6 italic";
         case "code":
-            return "bg-muted relative rounded-md px-[0.3rem] py-[0.2rem] font-mono text-[0.8rem] outline-none";
+            return "bg-muted relative rounded-md px-[0.3rem] py-[0.2rem] font-mono text-[0.8rem] outline-none group-[&]:px-0";
         case "pre":
-            return "no-scrollbar min-w-0 overflow-x-auto px-4 py-3.5 outline-none";
+            return "no-scrollbar min-w-0 overflow-x-auto px-4 py-3.5 outline-none bg-muted rounded-lg mt-4 group";
         case "strong":
             return "font-medium";
         case "em":

@@ -6,6 +6,11 @@ import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.ast.types.VoidType
+import com.mdeo.script.compiler.registry.function.FunctionRegistry
+import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
+import com.mdeo.script.compiler.registry.property.GlobalPropertyRegistry
+import com.mdeo.script.compiler.registry.type.TypeRegistry
+import com.mdeo.script.compiler.util.ASMUtil
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
@@ -38,13 +43,19 @@ data class LoopLabels(
  *                            For lambda bodies, this should be a LambdaBodyScope instance.
  * @param statementScopes Maps AST elements (statements, expressions) to their pre-built scopes.
  *                        Used to look up the correct scope when compiling nested structures.
- * @param lambdaContext Context for lambda compilation, tracks generated lambda method names.
- *                      May be null if lambda compilation is not enabled for this context.
  * @param classWriter The ClassWriter for the current class being compiled. Used by lambda compilation
- *                    to add synthetic methods for lambda bodies. May be null for lambda body contexts
- *                    which inherit the parent's class writer via lambdaContext.
+ *                    to add synthetic methods for lambda bodies.
  * @param generatedInterfaces Shared mutable map for collecting generated functional interfaces.
  *                            All compilation contexts share the same map to avoid duplicate generation.
+ * @param globalFunctionRegistry Registry for global scope functions.
+ *                               Defaults to the global stdlib registry but can be customized per compilation.
+ * @param globalPropertyRegistry Registry for global scope properties.
+ *                               Defaults to the global stdlib registry but can be customized per compilation.
+ * @param functionRegistry The hierarchical function registry for file-scope and imported function lookups.
+ *                         Defaults to the global function registry but should be a FileFunctionRegistry
+ *                         for proper cross-file import resolution.
+ * @param typeRegistry The type registry for looking up type definitions (methods and properties on types).
+ *                     Defaults to the global stdlib registry.
  */
 class CompilationContext(
     val ast: TypedAst,
@@ -54,9 +65,13 @@ class CompilationContext(
     val functionReturnTypeIndex: Int = -1,
     val functionParamsScope: Scope? = null,
     private val statementScopes: Map<Any, Scope> = emptyMap(),
-    val lambdaContext: LambdaCompilationContext? = null,
     val classWriter: ClassWriter? = null,
-    private val generatedInterfaces: MutableMap<String, ByteArray> = mutableMapOf()
+    private val generatedInterfaces: MutableMap<String, ByteArray> = mutableMapOf(),
+    private val lambdaCounter: LambdaCounter = LambdaCounter(),
+    val globalFunctionRegistry: GlobalFunctionRegistry = GlobalFunctionRegistry.GLOBAL,
+    val globalPropertyRegistry: GlobalPropertyRegistry = GlobalPropertyRegistry.GLOBAL,
+    val functionRegistry: FunctionRegistry = globalFunctionRegistry,
+    val typeRegistry: TypeRegistry = TypeRegistry.GLOBAL
 ) {
     /**
      * The current scope during compilation.
@@ -111,6 +126,16 @@ class CompilationContext(
     }
     
     /**
+     * Generates a unique synthetic method name for a lambda.
+     * Uses Java-style naming: lambda$script$N.
+     * 
+     * @return A unique method name like "lambda$script$0".
+     */
+    fun generateLambdaMethodName(): String {
+        return "lambda${'$'}script${'$'}${lambdaCounter.getAndIncrement()}"
+    }
+    
+    /**
      * Enters a new scope during compilation.
      * 
      * @param scope The scope to enter.
@@ -128,30 +153,6 @@ class CompilationContext(
      */
     fun getStatementScope(element: Any): Scope? {
         return statementScopes[element]
-    }
-    
-    /**
-     * Gets all pre-built statement scopes.
-     * 
-     * This is used when creating child compilation contexts (e.g., for lambda bodies)
-     * that need to access the same scope tree as the parent context.
-     * 
-     * @return The map of AST elements to their pre-built scopes.
-     */
-    fun getStatementScopes(): Map<Any, Scope> {
-        return statementScopes
-    }
-    
-    /**
-     * Gets the shared generated interfaces map for child contexts.
-     * 
-     * This is used when creating child compilation contexts (e.g., for lambda bodies)
-     * that need to share the same generated interfaces map as the parent context.
-     * 
-     * @return The mutable map of generated interfaces.
-     */
-    fun getSharedInterfaces(): MutableMap<String, ByteArray> {
-        return generatedInterfaces
     }
     
     /**
@@ -234,6 +235,38 @@ class CompilationContext(
     }
     
     /**
+     * Creates a new compilation context for a lambda body with modified return type and params scope.
+     * 
+     * This method creates a copy of the current context, replacing only the fields that need to change
+     * for lambda compilation while sharing all other resources (compilers, registries, interfaces, etc.).
+     * 
+     * @param functionReturnTypeIndex The return type index for the lambda method.
+     * @param functionParamsScope The scope containing lambda parameters and captured variables.
+     * @return A new CompilationContext configured for lambda compilation.
+     */
+    fun withLambdaContext(
+        functionReturnTypeIndex: Int,
+        functionParamsScope: Scope
+    ): CompilationContext {
+        return CompilationContext(
+            ast = ast,
+            currentClassName = currentClassName,
+            expressionCompilers = expressionCompilers,
+            statementCompilers = statementCompilers,
+            functionReturnTypeIndex = functionReturnTypeIndex,
+            functionParamsScope = functionParamsScope,
+            statementScopes = statementScopes,
+            classWriter = classWriter,
+            generatedInterfaces = generatedInterfaces,
+            lambdaCounter = lambdaCounter,
+            globalFunctionRegistry = globalFunctionRegistry,
+            globalPropertyRegistry = globalPropertyRegistry,
+            functionRegistry = functionRegistry,
+            typeRegistry = typeRegistry
+        )
+    }
+    
+    /**
      * Compiles an expression using the appropriate expression compiler.
      * 
      * @param expression The expression to compile.
@@ -264,3 +297,18 @@ class CompilationContext(
  * Exception thrown when compilation fails.
  */
 class CompilationException(message: String) : RuntimeException(message)
+
+/**
+ * Mutable counter for generating unique lambda method names.
+ * This is shared across compilation contexts to ensure uniqueness across nested lambdas.
+ */
+class LambdaCounter {
+    private var counter: Int = 0
+    
+    /**
+     * Gets the current counter value and increments it.
+     * 
+     * @return The counter value before incrementing.
+     */
+    fun getAndIncrement(): Int = counter++
+}

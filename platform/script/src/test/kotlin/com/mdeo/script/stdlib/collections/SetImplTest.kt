@@ -1,7 +1,8 @@
-package com.mdeo.script.stdlib.collections
+package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.function.Function
 import kotlin.test.assertEquals
@@ -375,15 +376,35 @@ class SetImplTest {
     }
 
     @Test
-    fun `forAll returns true when all match`() {
+    fun `forEach executes for all elements`() {
         val set = SetImpl.of(2, 4, 6)
-        assertTrue(set.forAll(Predicate { it % 2 == 0 }))
+        var count = 0
+        set.forEach(Consumer { count++ })
+        assertEquals(3, count)
     }
 
     @Test
     fun `none returns true when no matches`() {
         val set = SetImpl.of(1, 2, 3)
         assertTrue(set.none(Predicate { it > 10 }))
+    }
+
+    @Test
+    fun `all returns true when all elements match`() {
+        val set = SetImpl.of(2, 4, 6)
+        assertTrue(set.all(Predicate { it % 2 == 0 }))
+    }
+
+    @Test
+    fun `all returns false when at least one element does not match`() {
+        val set = SetImpl.of(2, 4, 5)
+        assertFalse(set.all(Predicate { it % 2 == 0 }))
+    }
+
+    @Test
+    fun `all returns true for empty set`() {
+        val set = SetImpl<Int>()
+        assertTrue(set.all(Predicate { it < 0 }))
     }
 
     @Test

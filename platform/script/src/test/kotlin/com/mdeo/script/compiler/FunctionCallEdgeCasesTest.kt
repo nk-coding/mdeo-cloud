@@ -41,7 +41,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.int?):builtin.int?",
+                            overload = "",
                             arguments = listOf(intLiteral(42, intType)),
                             resultTypeIndex = intNullableType
                         )
@@ -76,7 +76,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.long?):builtin.long?",
+                            overload = "",
                             arguments = listOf(longLiteral(9876543210L, longType)),
                             resultTypeIndex = longNullableType
                         )
@@ -111,7 +111,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.double?):builtin.double?",
+                            overload = "",
                             arguments = listOf(doubleLiteral(3.14159, doubleType)),
                             resultTypeIndex = doubleNullableType
                         )
@@ -146,7 +146,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.boolean?):builtin.boolean?",
+                            overload = "",
                             arguments = listOf(booleanLiteral(true, boolType)),
                             resultTypeIndex = boolNullableType
                         )
@@ -180,7 +180,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.int?):builtin.int?",
+                            overload = "",
                             arguments = listOf(nullLiteral(intNullableType)),
                             resultTypeIndex = intNullableType
                         )
@@ -220,7 +220,7 @@ class FunctionCallEdgeCasesTest {
                         binaryExpr(
                             functionCall(
                                 name = "getValue",
-                                overload = "getValue():builtin.int?",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = intNullableType
                             ),
@@ -261,7 +261,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.long?):builtin.long?",
+                            overload = "",
                             arguments = listOf(intLiteral(42, intType)),
                             resultTypeIndex = longNullableType
                         )
@@ -296,7 +296,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.double?):builtin.double?",
+                            overload = "",
                             arguments = listOf(intLiteral(42, intType)),
                             resultTypeIndex = doubleNullableType
                         )
@@ -333,7 +333,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.any?):builtin.any?",
+                            overload = "",
                             arguments = listOf(intLiteral(42, intType)),
                             resultTypeIndex = anyNullableType
                         )
@@ -368,7 +368,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.any?):builtin.any?",
+                            overload = "",
                             arguments = listOf(longLiteral(9876543210L, longType)),
                             resultTypeIndex = anyNullableType
                         )
@@ -403,7 +403,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.any?):builtin.any?",
+                            overload = "",
                             arguments = listOf(booleanLiteral(true, boolType)),
                             resultTypeIndex = anyNullableType
                         )
@@ -446,7 +446,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "add",
-                            overload = "add(builtin.int,builtin.int?):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 intLiteral(10, intType),
                                 intLiteral(32, intType)  // int passed to Int? - needs boxing
@@ -489,7 +489,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "add",
-                            overload = "add(builtin.int?,builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 intLiteral(10, intType),  // int passed to Int? - needs boxing
                                 intLiteral(32, intType)   // int passed to Int - no boxing
@@ -529,7 +529,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.float?):builtin.float?",
+                            overload = "",
                             arguments = listOf(floatLiteral(3.14f, floatType)),
                             resultTypeIndex = floatNullableType
                         )
@@ -567,7 +567,7 @@ class FunctionCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "identity",
-                            overload = "identity(builtin.int?):builtin.int?",
+                            overload = "",
                             arguments = listOf(identifier("value", intNullableType, 3)),
                             resultTypeIndex = intNullableType
                         )

@@ -3,7 +3,7 @@ package com.mdeo.script.compiler.expressions
 import com.mdeo.script.ast.expressions.TypedBinaryExpression
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
-import com.mdeo.script.compiler.TypeConversionUtil
+import com.mdeo.script.compiler.util.TypeConversionUtil
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes

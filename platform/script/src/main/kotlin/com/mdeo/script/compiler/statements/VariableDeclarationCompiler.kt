@@ -5,12 +5,12 @@ import com.mdeo.script.ast.statements.TypedVariableDeclarationStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.compiler.ASMUtil
-import com.mdeo.script.compiler.CoercionUtil
+import com.mdeo.script.compiler.util.ASMUtil
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.StatementCompiler
-import com.mdeo.script.compiler.TypeConversionUtil
+import com.mdeo.script.compiler.util.TypeConversionUtil
 import com.mdeo.script.compiler.VariableInfo
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes

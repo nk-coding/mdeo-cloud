@@ -34,7 +34,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -65,7 +65,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -97,7 +97,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "startsWith",
-                            overload = "startsWith(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("h", stringType)),
                             isNullChaining = true,
                             resultTypeIndex = boolNullableType
@@ -129,7 +129,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "startsWith",
-                            overload = "startsWith(builtin.string):builtin.boolean",
+                            overload = "",
                             arguments = listOf(stringLiteral("h", stringType)),
                             isNullChaining = true,
                             resultTypeIndex = boolNullableType
@@ -162,13 +162,13 @@ class MemberCallEdgeCasesTest {
                             expression = memberCall(
                                 expression = identifier("s", stringNullableType, 3),
                                 member = "trim",
-                                overload = "trim():builtin.string",
+                                overload = "",
                                 arguments = emptyList(),
                                 isNullChaining = true,
                                 resultTypeIndex = stringNullableType
                             ),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = stringNullableType
@@ -199,13 +199,13 @@ class MemberCallEdgeCasesTest {
                             expression = memberCall(
                                 expression = identifier("s", stringNullableType, 3),
                                 member = "trim",
-                                overload = "trim():builtin.string",
+                                overload = "",
                                 arguments = emptyList(),
                                 isNullChaining = true,
                                 resultTypeIndex = stringNullableType
                             ),
                             member = "toUpperCase",
-                            overload = "toUpperCase():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = stringNullableType
@@ -241,7 +241,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -272,7 +272,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = stringLiteral("hello", stringType),
                             member = "substring",
-                            overload = "substring(builtin.int):builtin.string",
+                            overload = "1",
                             arguments = listOf(intLiteral(1, intType)),
                             resultTypeIndex = stringType
                         )
@@ -305,7 +305,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "substring",
-                            overload = "substring(builtin.int,builtin.int):builtin.string",
+                            overload = "2",
                             arguments = listOf(
                                 intLiteral(0, intType),
                                 intLiteral(5, intType)
@@ -339,7 +339,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "substring",
-                            overload = "substring(builtin.int,builtin.int):builtin.string",
+                            overload = "2",
                             arguments = listOf(
                                 intLiteral(0, intType),
                                 intLiteral(5, intType)
@@ -375,7 +375,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "asInteger",
-                            overload = "asInteger():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -406,7 +406,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "asInteger",
-                            overload = "asInteger():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -453,12 +453,12 @@ class MemberCallEdgeCasesTest {
                     returnStmt(
                         functionCall(
                             name = "doubleValue",
-                            overload = "doubleValue(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 memberCall(
                                     expression = stringLiteral("hello", stringType),
                                     member = "length",
-                                    overload = "length():builtin.int",
+                                    overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = intType
                                 )
@@ -498,12 +498,12 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = functionCall(
                                 name = "getMessage",
-                                overload = "getMessage():builtin.string",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
                             ),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -535,7 +535,7 @@ class MemberCallEdgeCasesTest {
                         memberCall(
                             expression = identifier("s", stringNullableType, 3),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType

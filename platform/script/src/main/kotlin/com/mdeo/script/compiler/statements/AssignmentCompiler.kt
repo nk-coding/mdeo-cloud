@@ -5,14 +5,15 @@ import com.mdeo.script.ast.expressions.TypedMemberAccessExpression
 import com.mdeo.script.ast.statements.TypedAssignmentStatement
 import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.types.ClassTypeRef
+import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.compiler.CoercionUtil
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.StatementCompiler
-import com.mdeo.script.compiler.TypeConversionUtil
+import com.mdeo.script.compiler.util.TypeConversionUtil
 import com.mdeo.script.compiler.VariableInfo
-import com.mdeo.script.compiler.ASMUtil
+import com.mdeo.script.compiler.util.ASMUtil
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -202,7 +203,7 @@ class AssignmentCompiler : StatementCompiler {
             TypeConversionUtil.emitConversionIfNeeded(exprType, propertyType, mv)
         }
 
-        emitPropertySet(left.member, targetObjectType, propertyType, mv)
+        emitPropertySet(context, left.member, targetObjectType, propertyType, mv)
     }
 
     /**
@@ -211,68 +212,34 @@ class AssignmentCompiler : StatementCompiler {
      * Generates a setter method call (e.g., setPropertyName) using either
      * INVOKEINTERFACE for collection types or INVOKEVIRTUAL for regular classes.
      *
+     * Lambda types are not expected to have settable properties, but we handle them
+     * gracefully by treating them as Any.
+     *
+     * @param context the compilation context
      * @param memberName the name of the property being set
      * @param targetType the type of the object containing the property
      * @param propertyType the type of the property value
      * @param mv the method visitor for emitting bytecode
      */
     private fun emitPropertySet(
+        context: CompilationContext,
         memberName: String,
         targetType: ReturnType,
         propertyType: ReturnType,
         mv: MethodVisitor
     ) {
-        if (targetType !is ClassTypeRef) {
-            throw UnsupportedOperationException("Cannot set property on non-class type")
+        val lookupType = if (targetType is LambdaType) {
+            "builtin.any"
+        } else if (targetType is ClassTypeRef) {
+            targetType.type
+        } else {
+            throw UnsupportedOperationException("Cannot set property on non-class/lambda type")
         }
 
-        val ownerClass = typeToInternalName(targetType.type)
-        val setterName = "set${memberName.replaceFirstChar { it.uppercaseChar() }}"
-        val paramDesc = ASMUtil.getTypeDescriptor(propertyType)
-
-        val isInterface = isCollectionType(targetType.type)
-
-        mv.visitMethodInsn(
-            if (isInterface) Opcodes.INVOKEINTERFACE else Opcodes.INVOKEVIRTUAL,
-            ownerClass,
-            setterName,
-            "($paramDesc)V",
-            isInterface
-        )
-    }
-
-    /**
-     * Checks if a type is a collection type.
-     *
-     * Collection types are those in the stdlib package that represent
-     * List, Set, Bag, OrderedSet, Map, or Sequence.
-     *
-     * @param typeName the fully qualified type name to check
-     * @return true if the type is a stdlib collection type, false otherwise
-     */
-    private fun isCollectionType(typeName: String): Boolean {
-        return typeName.startsWith("stdlib.") && typeName.substringAfter("stdlib.") in listOf(
-            "List", "Set", "Bag", "OrderedSet", "Map", "Sequence"
-        )
-    }
-
-    /**
-     * Converts a type name to a JVM internal class name.
-     *
-     * Handles stdlib types specially by mapping them to their implementation
-     * classes in com/mdeo/script/stdlib/collections.
-     *
-     * @param typeName the fully qualified type name (e.g., "stdlib.List" or "com.example.MyClass")
-     * @return the JVM internal name with slashes instead of dots
-     */
-    private fun typeToInternalName(typeName: String): String {
-        return when {
-            typeName.startsWith("stdlib.") -> {
-                val name = typeName.substringAfter("stdlib.")
-                "com/mdeo/script/stdlib/collections/Script$name"
-            }
-
-            else -> typeName.replace(".", "/")
-        }
+        val propertyDef = context.typeRegistry.lookupProperty(lookupType, memberName)
+            ?: throw UnsupportedOperationException("Property $memberName not found on type $lookupType")
+        
+        val valueDescriptor = ASMUtil.getTypeDescriptor(propertyType)
+        propertyDef.emitSet(mv, valueDescriptor)
     }
 }

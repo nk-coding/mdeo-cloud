@@ -319,7 +319,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 if (Array.isArray(expressionType)) {
                     return expressionType[0];
                 }
-                if (!isCustomValueType(expressionType)) {
+                if (!isCustomValueType(expressionType) && !isCustomVoidType(expressionType)) {
                     return {
                         $problem: this.inferenceProblem,
                         languageNode: node.expression,
@@ -461,7 +461,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 if (Array.isArray(expressionType)) {
                     return;
                 }
-                if (!isCustomValueType(expressionType)) {
+                if (!isCustomValueType(expressionType) && !isCustomVoidType(expressionType)) {
                     accept({
                         languageNode: node.expression,
                         message: "Lambda expression must return a value type.",

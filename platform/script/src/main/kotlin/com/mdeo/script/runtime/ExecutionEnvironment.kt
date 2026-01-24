@@ -25,6 +25,9 @@ class ExecutionEnvironment(
     /**
      * Invokes a function from a specific file.
      * 
+     * Sets up the execution context with the console stream before invoking,
+     * so that println and other output functions write to the correct stream.
+     * 
      * @param fileUri The file URI containing the function.
      * @param functionName The name of the function to invoke.
      * @param args The arguments to pass to the function.
@@ -32,12 +35,14 @@ class ExecutionEnvironment(
      * @throws IllegalArgumentException if the file or function is not found.
      */
     fun invoke(fileUri: String, functionName: String, vararg args: Any?): Any? {
-        val clazz = classLoader.loadClassForFile(fileUri)
-        
-        val method = findMethod(clazz, functionName, args)
-            ?: throw IllegalArgumentException("Function not found: $functionName in $fileUri")
-        
-        return method.invoke(null, *args)
+        return ExecutionContext.withConsole(console) {
+            val clazz = classLoader.loadClassForFile(fileUri)
+            
+            val method = findMethod(clazz, functionName, args)
+                ?: throw IllegalArgumentException("Function not found: $functionName in $fileUri")
+            
+            method.invoke(null, *args)
+        }
     }
     
     /**

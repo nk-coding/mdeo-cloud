@@ -212,10 +212,19 @@ class ExecutionService(
             compiler.compile(input)
         } catch (e: Exception) {
             logger.error("Compilation failed", e)
+            
+            val errorMessage = "Compilation error: ${e.message}"
+            
+            transaction {
+                ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+                    it[ExecutionsTable.error] = errorMessage
+                }
+            }
+            
             updateExecutionState(
                 executionId,
                 ExecutionState.FAILED,
-                "Compilation error: ${e.message}",
+                errorMessage,
                 jwtToken
             )
             return
@@ -378,9 +387,14 @@ class ExecutionService(
                 buildString {
                     append("## Result\n\n")
                     append(result ?: "null")
-                    append("\n\n## Output\n\n```\n")
-                    append(output ?: "")
-                    append("\n```")
+                    append("\n\n## Output\n\n")
+                    if (output.isNullOrBlank()) {
+                        append("*no output produced*")
+                    } else {
+                        append("```\n")
+                        append(output)
+                        append("\n```")
+                    }
                 }
             }
 
@@ -397,9 +411,14 @@ class ExecutionService(
                     buildString {
                         append("## Runtime Error\n\n")
                         append(errorText)
-                        append("\n\n## Output\n\n```\n")
-                        append(output ?: "")
-                        append("\n```")
+                        append("\n\n## Output\n\n")
+                        if (output.isNullOrBlank()) {
+                            append("*no output produced*")
+                        } else {
+                            append("```\n")
+                            append(output)
+                            append("\n```")
+                        }
                     }
                 }
             }

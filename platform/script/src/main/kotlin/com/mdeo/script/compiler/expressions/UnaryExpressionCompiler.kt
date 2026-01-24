@@ -5,7 +5,7 @@ import com.mdeo.script.ast.expressions.TypedExpression
 import com.mdeo.script.ast.expressions.TypedUnaryExpression
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
-import com.mdeo.script.compiler.TypeConversionUtil
+import com.mdeo.script.compiler.util.TypeConversionUtil
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes

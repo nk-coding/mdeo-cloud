@@ -5,10 +5,11 @@ import com.mdeo.script.ast.expressions.TypedExpression
 import com.mdeo.script.ast.expressions.TypedExpressionCallExpression
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.compiler.CoercionUtil
+import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
-import com.mdeo.script.compiler.ExpressionCompiler
-import com.mdeo.script.compiler.TypeConversionUtil
+import com.mdeo.script.compiler.util.TypeConversionUtil
+import com.mdeo.script.compiler.util.MethodDescriptorUtil
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -28,7 +29,7 @@ import org.objectweb.asm.Opcodes
  * 2. Push all arguments onto the stack (no boxing needed with custom interfaces)
  * 3. Invoke the `call` method on the custom functional interface using INVOKEINTERFACE
  */
-class ExpressionCallCompiler : ExpressionCompiler {
+class ExpressionCallCompiler : AbstractCallCompiler() {
     
     /**
      * Checks if this compiler can handle the given expression.
@@ -67,7 +68,7 @@ class ExpressionCallCompiler : ExpressionCompiler {
         compileArguments(exprCall, calleeType, context, mv)
         
         val functionalInterface = getFunctionalInterface(calleeType)
-        val methodDescriptor = buildMethodDescriptor(calleeType, context)
+        val methodDescriptor = buildMethodDescriptor(calleeType)
         
         mv.visitMethodInsn(
             Opcodes.INVOKEINTERFACE,
@@ -82,6 +83,7 @@ class ExpressionCallCompiler : ExpressionCompiler {
      * Compiles all arguments for the expression call.
      *
      * With custom interfaces using primitive types directly, no boxing is needed.
+     * Delegates to the base class method for argument compilation with type coercion.
      *
      * @param exprCall The expression call containing the arguments.
      * @param calleeType The lambda type being called.
@@ -94,33 +96,21 @@ class ExpressionCallCompiler : ExpressionCompiler {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        for ((index, arg) in exprCall.arguments.withIndex()) {
-            context.compileExpression(arg, mv)
-            
-            if (index < calleeType.parameters.size) {
-                val argType = context.getType(arg.evalType)
-                val paramType = calleeType.parameters[index].type
-                
-                if (argType is ClassTypeRef && paramType is ClassTypeRef) {
-                    TypeConversionUtil.emitConversionIfNeeded(argType, paramType, mv)
-                }
-            }
-        }
+        val parameterTypes = calleeType.parameters.map { it.type }
+        compileArgumentsWithReturnTypeCoercion(exprCall.arguments, parameterTypes, context, mv)
     }
     
     /**
      * Builds the method descriptor for the call method.
      *
+     * Delegates to the base class method for consistent descriptor building.
+     *
      * @param lambdaType The lambda type.
-     * @param context The compilation context.
      * @return The method descriptor (e.g., "(I)I" for (int) -> int).
      */
-    private fun buildMethodDescriptor(lambdaType: LambdaType, context: CompilationContext): String {
-        val params = lambdaType.parameters.joinToString("") { param ->
-            context.getTypeDescriptor(param.type)
-        }
-        val returnDesc = context.getTypeDescriptor(lambdaType.returnType)
-        return "($params)$returnDesc"
+    private fun buildMethodDescriptor(lambdaType: LambdaType): String {
+        val parameterTypes = lambdaType.parameters.map { it.type }
+        return MethodDescriptorUtil.buildDescriptor(parameterTypes, lambdaType.returnType)
     }
     
     /**
@@ -135,5 +125,28 @@ class ExpressionCallCompiler : ExpressionCompiler {
     private fun getFunctionalInterface(lambdaType: LambdaType): String {
         val parameterTypes = lambdaType.parameters.map { it.type }
         return CoercionUtil.getFunctionalInterfaceName(lambdaType.returnType, parameterTypes)
+    }
+
+        /**
+     * Compiles arguments with coercion to target parameter types.
+     *
+     * @param arguments The argument expressions to compile.
+     * @param parameterTypes The expected parameter types (as ReturnType).
+     * @param context The compilation context.
+     * @param mv The method visitor.
+     */
+    private fun compileArgumentsWithReturnTypeCoercion(
+        arguments: List<TypedExpression>,
+        parameterTypes: List<ReturnType>,
+        context: CompilationContext,
+        mv: MethodVisitor
+    ) {
+        for ((index, arg) in arguments.withIndex()) {
+            context.compileExpression(arg, mv)
+            if (index < parameterTypes.size) {
+                val argType = context.getType(arg.evalType)
+                CoercionUtil.emitCoercion(argType, parameterTypes[index], arg, mv)
+            }
+        }
     }
 }

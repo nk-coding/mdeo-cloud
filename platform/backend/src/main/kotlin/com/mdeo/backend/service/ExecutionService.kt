@@ -860,6 +860,11 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
 
+            if (response.statusCode() == 404) {
+                logger.warn("Plugin returned 404 when deleting execution $executionId; assuming already deleted")
+                return@withContext
+            }
+
             if (response.statusCode() != 200 && response.statusCode() != 204) {
                 throw RuntimeException("Plugin returned status ${response.statusCode()}: ${response.body()}")
             }

@@ -1274,4 +1274,44 @@ class LambdaCompilerTest {
         val result = helper.compileAndInvoke(ast, "testFunction", listOf(1, 2, 3))
         assertEquals(36, result)
     }
+
+    @Test
+    fun `lambda asString returns string representation`() {
+        // Test that asString() works on lambdas (inherited from Any)
+        val ast = buildTypedAst {
+            val stringType = stringType()
+            val lambdaTypeIdx = lambdaType(
+                ClassTypeRef("builtin.int", false)
+            )
+            function(
+                name = "testFunction",
+                returnType = stringType,
+                body = listOf(
+                    // Create lambda
+                    varDecl("f", lambdaTypeIdx, lambdaExpr(
+                        parameters = emptyList(),
+                        body = listOf(
+                            returnStmt(intLiteral(42, intType()))
+                        ),
+                        lambdaTypeIndex = lambdaTypeIdx
+                    )),
+                    // Call asString() on the lambda
+                    returnStmt(
+                        memberCall(
+                            expression = identifier("f", lambdaTypeIdx, 3),
+                            member = "asString",
+                            overload = "",
+                            arguments = emptyList(),
+                            resultTypeIndex = stringType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast, "testFunction") as String
+        // Lambda should return some string representation (implementation defined)
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+    }
 }

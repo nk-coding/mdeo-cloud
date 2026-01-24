@@ -22,6 +22,7 @@ import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.ast.types.ValueType
+import com.mdeo.script.compiler.util.ASMUtil
 import java.util.LinkedHashMap
 
 /**

@@ -6,8 +6,8 @@ import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.ast.types.VoidType
-import com.mdeo.script.compiler.ASMUtil
-import com.mdeo.script.compiler.CoercionUtil
+import com.mdeo.script.compiler.util.ASMUtil
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import com.mdeo.script.compiler.LocalVariableIndexAssigner
@@ -83,12 +83,9 @@ class LambdaCompiler : ExpressionCompiler {
         val lambda = expression as TypedLambdaExpression
         val lambdaType = context.getType(lambda.evalType) as LambdaType
 
-        val lambdaContext = context.lambdaContext
-            ?: throw IllegalStateException("Lambda compilation requires LambdaCompilationContext")
-
         val capturedVariables = analyzeCapturedVariables(lambda, context)
 
-        val methodName = lambdaContext.generateLambdaMethodName(getCurrentContextName(context))
+        val methodName = context.generateLambdaMethodName()
 
         generateSyntheticMethod(
             methodName,
@@ -98,19 +95,7 @@ class LambdaCompiler : ExpressionCompiler {
             context
         )
 
-        lambdaContext.finishLambdaCompilation()
-
         emitInvokeDynamic(methodName, lambdaType, capturedVariables, context, mv)
-    }
-
-    /**
-     * Gets the current context name for synthetic method naming.
-     *
-     * @param context The compilation context.
-     * @return The context name for lambda method naming.
-     */
-    private fun getCurrentContextName(context: CompilationContext): String {
-        return context.lambdaContext?.getCurrentLambdaMethodName() ?: "script"
     }
 
     /**
@@ -250,19 +235,10 @@ class LambdaCompiler : ExpressionCompiler {
         /* 
          * Create a new compilation context for the lambda method.
          * Use the lambda params scope as the function params scope.
-         * Pass the statement scopes so nested lambdas can look up their scopes.
          */
-        val lambdaCompilationContext = CompilationContext(
-            ast = context.ast,
-            currentClassName = context.currentClassName,
-            expressionCompilers = getExpressionCompilers(context),
-            statementCompilers = getStatementCompilers(context),
+        val lambdaCompilationContext = context.withLambdaContext(
             functionReturnTypeIndex = returnTypeIndex,
-            functionParamsScope = lambdaParamsScope,
-            statementScopes = context.getStatementScopes(),
-            lambdaContext = context.lambdaContext,
-            classWriter = cw,
-            generatedInterfaces = context.getSharedInterfaces()
+            functionParamsScope = lambdaParamsScope
         )
 
         lambdaCompilationContext.enterScope(lambdaBodyScope)
@@ -564,38 +540,6 @@ class LambdaCompiler : ExpressionCompiler {
             }
         }
         return -1
-    }
-
-    /**
-     * Gets the expression compilers from the outer context.
-     *
-     * Uses reflection to access the private field since the compilers
-     * need to be shared between the outer and lambda contexts.
-     *
-     * @param context The compilation context to extract compilers from.
-     * @return The list of expression compilers from the context.
-     */
-    private fun getExpressionCompilers(context: CompilationContext): List<ExpressionCompiler> {
-        val field = CompilationContext::class.java.getDeclaredField("expressionCompilers")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        return field.get(context) as List<ExpressionCompiler>
-    }
-
-    /**
-     * Gets the statement compilers from the outer context.
-     *
-     * Uses reflection to access the private field since the compilers
-     * need to be shared between the outer and lambda contexts.
-     *
-     * @param context The compilation context to extract compilers from.
-     * @return The list of statement compilers from the context.
-     */
-    private fun getStatementCompilers(context: CompilationContext): List<StatementCompiler> {
-        val field = CompilationContext::class.java.getDeclaredField("statementCompilers")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        return field.get(context) as List<StatementCompiler>
     }
 
     /**

@@ -1,53 +1,17 @@
-package com.mdeo.script.stdlib.primitives
+package com.mdeo.script.stdlib.impl.primitives
 
-import com.mdeo.script.stdlib.collections.*
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 
 /**
  * Comprehensive tests for AnyHelper.
+ *
+ * Note: The following methods and their tests have been removed:
+ * - asBag, asList, asSet, asOrderedSet
  */
 class AnyHelperTest {
-
-    // ==================== asBag() tests ====================
-    @Test
-    fun `asBag creates bag with single element`() {
-        val result = AnyHelper.asBag(42)
-        assertEquals(1, result.size())
-        assertTrue(result.includes(42))
-    }
-
-    @Test
-    fun `asBag with string creates bag`() {
-        val result = AnyHelper.asBag("hello")
-        assertEquals(1, result.size())
-        assertTrue(result.includes("hello"))
-    }
-
-    @Test
-    fun `asBag with null creates bag with null`() {
-        val result = AnyHelper.asBag(null)
-        assertEquals(1, result.size())
-        assertTrue(result.includes(null))
-    }
-
-    @Test
-    fun `asBag returns Bag type`() {
-        val result = AnyHelper.asBag(1)
-        assertTrue(result is Bag)
-    }
-
-    @Test
-    fun `asBag with object creates bag`() {
-        data class Person(val name: String)
-        val person = Person("John")
-        val result = AnyHelper.asBag(person)
-        assertTrue(result.includes(person))
-    }
 
     // ==================== asBoolean() tests ====================
     @Test
@@ -151,100 +115,6 @@ class AnyHelperTest {
     @Test
     fun `asFloat converts long to float`() {
         assertEquals(42.0f, AnyHelper.asFloat(42L))
-    }
-
-    // ==================== asList() tests ====================
-    @Test
-    fun `asList creates list with single element`() {
-        val result = AnyHelper.asList(42)
-        assertEquals(1, result.size())
-        assertTrue(result.includes(42))
-    }
-
-    @Test
-    fun `asList with string creates list`() {
-        val result = AnyHelper.asList("hello")
-        assertTrue(result.includes("hello"))
-    }
-
-    @Test
-    fun `asList with null creates list with null`() {
-        val result = AnyHelper.asList(null)
-        assertTrue(result.includes(null))
-    }
-
-    @Test
-    fun `asList returns ScriptList type`() {
-        val result = AnyHelper.asList(1)
-        assertTrue(result is ScriptList)
-    }
-
-    @Test
-    fun `asList first element matches input`() {
-        val result = AnyHelper.asList(42)
-        assertEquals(42, result.first())
-    }
-
-    // ==================== asSet() tests ====================
-    @Test
-    fun `asSet creates set with single element`() {
-        val result = AnyHelper.asSet(42)
-        assertEquals(1, result.size())
-    }
-
-    @Test
-    fun `asSet with string creates set`() {
-        val result = AnyHelper.asSet("hello")
-        assertTrue(result.includes("hello"))
-    }
-
-    @Test
-    fun `asSet with null creates set with null`() {
-        val result = AnyHelper.asSet(null)
-        assertTrue(result.includes(null))
-    }
-
-    @Test
-    fun `asSet returns ScriptSet type`() {
-        val result = AnyHelper.asSet(1)
-        assertTrue(result is ScriptSet)
-    }
-
-    @Test
-    fun `asSet contains input element`() {
-        val result = AnyHelper.asSet("test")
-        assertTrue(result.includes("test"))
-    }
-
-    // ==================== asOrderedSet() tests ====================
-    @Test
-    fun `asOrderedSet creates ordered set with single element`() {
-        val result = AnyHelper.asOrderedSet(42)
-        assertEquals(1, result.size())
-    }
-
-    @Test
-    fun `asOrderedSet with string creates ordered set`() {
-        val result = AnyHelper.asOrderedSet("hello")
-        assertTrue(result.includes("hello"))
-    }
-
-    @Test
-    fun `asOrderedSet with null creates ordered set with null`() {
-        val result = AnyHelper.asOrderedSet(null)
-        assertTrue(result.includes(null))
-    }
-
-    @Test
-    fun `asOrderedSet returns OrderedSet type`() {
-        val result = AnyHelper.asOrderedSet(1)
-        assertTrue(result is OrderedSet)
-    }
-
-    @Test
-    fun `asOrderedSet first equals input`() {
-        val result = AnyHelper.asOrderedSet(42)
-        assertEquals(42, result.first())
     }
 
     // ==================== asString() tests ====================

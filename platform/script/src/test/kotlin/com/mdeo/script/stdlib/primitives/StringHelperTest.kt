@@ -1,4 +1,4 @@
-package com.mdeo.script.stdlib.primitives
+package com.mdeo.script.stdlib.impl.primitives
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

@@ -50,7 +50,7 @@ class IntegrationTest {
                             "*",
                             functionCall(
                                 name = "factorial",
-                                overload = "factorial(builtin.int):builtin.int",
+                                overload = "",
                                 arguments = listOf(
                                     binaryExpr(
                                         identifier("n", intType, 2),
@@ -74,7 +74,7 @@ class IntegrationTest {
                     returnStmt(
                         functionCall(
                             name = "factorial",
-                            overload = "factorial(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(intLiteral(5, intType)),
                             resultTypeIndex = intType
                         )
@@ -115,7 +115,7 @@ class IntegrationTest {
                         binaryExpr(
                             functionCall(
                                 name = "fib",
-                                overload = "fib(builtin.int):builtin.int",
+                                overload = "",
                                 arguments = listOf(
                                     binaryExpr(
                                         identifier("n", intType, 2),
@@ -129,7 +129,7 @@ class IntegrationTest {
                             "+",
                             functionCall(
                                 name = "fib",
-                                overload = "fib(builtin.int):builtin.int",
+                                overload = "",
                                 arguments = listOf(
                                     binaryExpr(
                                         identifier("n", intType, 2),
@@ -153,7 +153,7 @@ class IntegrationTest {
                     returnStmt(
                         functionCall(
                             name = "fib",
-                            overload = "fib(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(intLiteral(10, intType)),
                             resultTypeIndex = intType
                         )
@@ -435,7 +435,7 @@ class IntegrationTest {
                         binaryExpr(
                             identifier("sum", intType, 3),
                             "+",
-                            functionCall("categorize", "categorize(builtin.int):builtin.int", 
+                            functionCall("categorize", "", 
                                 listOf(intLiteral(250, intType)), intType),
                             intType
                         )
@@ -445,7 +445,7 @@ class IntegrationTest {
                         binaryExpr(
                             identifier("sum", intType, 3),
                             "+",
-                            functionCall("categorize", "categorize(builtin.int):builtin.int",
+                            functionCall("categorize", "",
                                 listOf(intLiteral(150, intType)), intType),
                             intType
                         )
@@ -455,7 +455,7 @@ class IntegrationTest {
                         binaryExpr(
                             identifier("sum", intType, 3),
                             "+",
-                            functionCall("categorize", "categorize(builtin.int):builtin.int",
+                            functionCall("categorize", "",
                                 listOf(intLiteral(75, intType)), intType),
                             intType
                         )
@@ -465,7 +465,7 @@ class IntegrationTest {
                         binaryExpr(
                             identifier("sum", intType, 3),
                             "+",
-                            functionCall("categorize", "categorize(builtin.int):builtin.int",
+                            functionCall("categorize", "",
                                 listOf(intLiteral(25, intType)), intType),
                             intType
                         )
@@ -475,7 +475,7 @@ class IntegrationTest {
                         binaryExpr(
                             identifier("sum", intType, 3),
                             "+",
-                            functionCall("categorize", "categorize(builtin.int):builtin.int",
+                            functionCall("categorize", "",
                                 listOf(intLiteral(-5, intType)), intType),
                             intType
                         )
@@ -625,11 +625,11 @@ class IntegrationTest {
                     returnStmt(
                         functionCall(
                             name = "addDouble",
-                            overload = "addDouble(builtin.double):builtin.double",
+                            overload = "",
                             arguments = listOf(
                                 functionCall(
                                     name = "addLong",
-                                    overload = "addLong(builtin.long):builtin.long",
+                                    overload = "",
                                     // int 5 coerced to long at call site
                                     arguments = listOf(intLiteral(5, intType)),
                                     resultTypeIndex = longType
@@ -723,17 +723,17 @@ class IntegrationTest {
                                 expression = memberCall(
                                     expression = stringLiteral("  hello world  ", stringType),
                                     member = "trim",
-                                    overload = "trim():builtin.string",
+                                    overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = stringType
                                 ),
                                 member = "toUpperCase",
-                                overload = "toUpperCase():builtin.string",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
                             ),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -768,7 +768,7 @@ class IntegrationTest {
                             memberCall(
                                 expression = identifier("input", stringType, 2),
                                 member = "length",
-                                overload = "length():builtin.int",
+                                overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = intType
                             ),
@@ -781,7 +781,7 @@ class IntegrationTest {
                                 memberCall(
                                     expression = identifier("input", stringType, 2),
                                     member = "toUpperCase",
-                                    overload = "toUpperCase():builtin.string",
+                                    overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = stringType
                                 )
@@ -792,7 +792,7 @@ class IntegrationTest {
                                 memberCall(
                                     expression = identifier("input", stringType, 2),
                                     member = "toLowerCase",
-                                    overload = "toLowerCase():builtin.string",
+                                    overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = stringType
                                 )
@@ -811,14 +811,14 @@ class IntegrationTest {
                         binaryExpr(
                             functionCall(
                                 name = "processString",
-                                overload = "processString(builtin.string):builtin.string",
+                                overload = "",
                                 arguments = listOf(stringLiteral("LongWord", stringType)),
                                 resultTypeIndex = stringType
                             ),
                             "+",
                             functionCall(
                                 name = "processString",
-                                overload = "processString(builtin.string):builtin.string",
+                                overload = "",
                                 arguments = listOf(stringLiteral("Hi", stringType)),
                                 resultTypeIndex = stringType
                             ),
@@ -1190,13 +1190,13 @@ class IntegrationTest {
                             condition = identifier("cond", boolType, 2),
                             trueExpr = functionCall(
                                 name = "inc",
-                                overload = "inc(builtin.int):builtin.int",
+                                overload = "",
                                 arguments = listOf(intLiteral(5, intType)),
                                 resultTypeIndex = intType
                             ),
                             falseExpr = functionCall(
                                 name = "dec",
-                                overload = "dec(builtin.int):builtin.int",
+                                overload = "",
                                 arguments = listOf(intLiteral(5, intType)),
                                 resultTypeIndex = intType
                             ),
@@ -1214,14 +1214,14 @@ class IntegrationTest {
                         binaryExpr(
                             functionCall(
                                 name = "process",
-                                overload = "process(builtin.boolean):builtin.int",
+                                overload = "",
                                 arguments = listOf(booleanLiteral(true, boolType)),
                                 resultTypeIndex = intType
                             ),
                             "+",
                             functionCall(
                                 name = "process",
-                                overload = "process(builtin.boolean):builtin.int",
+                                overload = "",
                                 arguments = listOf(booleanLiteral(false, boolType)),
                                 resultTypeIndex = intType
                             ),
@@ -1259,19 +1259,19 @@ class IntegrationTest {
                                 expression = memberCall(
                                     expression = identifier("s", stringNullableType, 2),
                                     member = "trim",
-                                    overload = "trim():builtin.string",
+                                    overload = "",
                                     arguments = emptyList(),
                                     isNullChaining = true,
                                     resultTypeIndex = stringNullableType
                                 ),
                                 member = "toUpperCase",
-                                overload = "toUpperCase():builtin.string",
+                                overload = "",
                                 arguments = emptyList(),
                                 isNullChaining = true,
                                 resultTypeIndex = stringNullableType
                             ),
                             member = "length",
-                            overload = "length():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
                             resultTypeIndex = intNullableType
@@ -1668,7 +1668,7 @@ class IntegrationTest {
                     returnStmt(
                         functionCall(
                             name = "addNTimes",
-                            overload = "addNTimes(builtin.int,builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(intLiteral(3, intType), intLiteral(4, intType)),
                             resultTypeIndex = intType
                         )
@@ -1750,7 +1750,7 @@ class IntegrationTest {
                     ifStmt(
                         condition = functionCall(
                             "evaluate",
-                            "evaluate(builtin.int,builtin.int,builtin.int,builtin.int):builtin.boolean",
+                            "",
                             listOf(intLiteral(6, intType), intLiteral(3, intType), intLiteral(1, intType), intLiteral(0, intType)),
                             boolType
                         ),
@@ -1765,7 +1765,7 @@ class IntegrationTest {
                     ifStmt(
                         condition = functionCall(
                             "evaluate",
-                            "evaluate(builtin.int,builtin.int,builtin.int,builtin.int):builtin.boolean",
+                            "",
                             listOf(intLiteral(3, intType), intLiteral(3, intType), intLiteral(0, intType), intLiteral(1, intType)),
                             boolType
                         ),
@@ -1780,7 +1780,7 @@ class IntegrationTest {
                     ifStmt(
                         condition = functionCall(
                             "evaluate",
-                            "evaluate(builtin.int,builtin.int,builtin.int,builtin.int):builtin.boolean",
+                            "",
                             listOf(intLiteral(3, intType), intLiteral(3, intType), intLiteral(1, intType), intLiteral(1, intType)),
                             boolType
                         ),

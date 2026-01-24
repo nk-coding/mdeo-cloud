@@ -382,7 +382,7 @@ class CoercionEdgeCasesTest {
                         returnStmt(
                             functionCall(
                                 name = "square",
-                                overload = "square(builtin.double):builtin.double",
+                                overload = "",
                                 arguments = listOf(intLiteral(5, intType)),
                                 resultTypeIndex = doubleType
                             )
@@ -417,7 +417,7 @@ class CoercionEdgeCasesTest {
                         returnStmt(
                             functionCall(
                                 name = "identity",
-                                overload = "identity(builtin.double?):builtin.double?",
+                                overload = "",
                                 arguments = listOf(intLiteral(7, intType)),
                                 resultTypeIndex = doubleNullableType
                             )

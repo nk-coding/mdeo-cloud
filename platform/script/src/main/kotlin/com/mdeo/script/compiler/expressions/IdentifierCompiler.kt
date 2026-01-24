@@ -4,7 +4,7 @@ import com.mdeo.script.ast.expressions.TypedExpression
 import com.mdeo.script.ast.expressions.TypedIdentifierExpression
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.compiler.ASMUtil
+import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import com.mdeo.script.compiler.RefTypeUtil
@@ -18,6 +18,10 @@ import org.objectweb.asm.Opcodes
  * An identifier expression loads the value of a local variable onto the stack.
  * If the variable is wrapped in a Ref type (because it's written by a lambda),
  * this compiler loads the Ref and then reads its .value field.
+ * 
+ * For global scope identifiers (scope level 0), this compiler first checks
+ * the global function registry for global properties, then falls back to
+ * local variable lookup.
  * 
  * This compiler uses polymorphic scope lookup to handle both regular function
  * scopes and lambda body scopes uniformly. The LambdaBodyScope class returns
@@ -41,6 +45,10 @@ class IdentifierCompiler : ExpressionCompiler {
     /**
      * Compiles an identifier expression to bytecode.
      *
+     * For global scope identifiers (scope level 0), first checks the global function
+     * registry for global properties. If not found there, falls back to local variable
+     * lookup.
+     *
      * For variables with isWrittenByLambda=true, loads the Ref object first,
      * then reads its `.value` field. Otherwise, loads directly from the slot.
      *
@@ -50,6 +58,15 @@ class IdentifierCompiler : ExpressionCompiler {
      */
     override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val identifier = expression as TypedIdentifierExpression
+        
+        if (identifier.scope == 0) {
+            val globalProperty = context.globalPropertyRegistry.getPropertyOrGlobal(identifier.name)
+            if (globalProperty != null) {
+                globalProperty.emitAccess(mv)
+                return
+            }
+        }
+        
         val variable = context.currentScope?.lookupVariable(identifier.name, identifier.scope)
             ?: throw IllegalStateException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
         

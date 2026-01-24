@@ -27,6 +27,7 @@ import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js"
 import { expressionTypes, statementTypes, typeTypes } from "../../grammar/scriptTypes.js";
 import { ScriptPartialTypeSystem } from "./scriptPartialTypeSystem.js";
 import type { ResolvedScriptContributionPlugins } from "../../plugin/scriptContributionPlugin.js";
+import { stdlibGlobalFunctions } from "../stdlib/globalFunctions.js";
 
 /**
  * The type system for the Script language.
@@ -65,11 +66,14 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
                 lambdaSuperTypes: [{ type: AnyType.name }]
             },
             expressionTypes,
-            [...plugins.functions.entries()].map(([name, func]) => ({
-                name,
-                isProperty: false,
-                type: func.function
-            }))
+            [
+                ...stdlibGlobalFunctions,
+                ...[...plugins.functions.entries()].map(([name, func]) => ({
+                    name,
+                    isProperty: false,
+                    type: func.function
+                }))
+            ]
         );
     }
 

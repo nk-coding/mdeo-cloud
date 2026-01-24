@@ -36,7 +36,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "getValue",
-                            overload = "getValue():builtin.int",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = intType
                         )
@@ -67,7 +67,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "getValue",
-                            overload = "getValue():builtin.long",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = longType
                         )
@@ -98,7 +98,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "getValue",
-                            overload = "getValue():builtin.float",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = floatType
                         )
@@ -129,7 +129,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "getValue",
-                            overload = "getValue():builtin.double",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = doubleType
                         )
@@ -160,7 +160,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "getValue",
-                            overload = "getValue():builtin.boolean",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = boolType
                         )
@@ -191,7 +191,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "getValue",
-                            overload = "getValue():builtin.string",
+                            overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType
                         )
@@ -235,7 +235,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "double",
-                            overload = "double(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(intLiteral(21, intType)),
                             resultTypeIndex = intType
                         )
@@ -276,7 +276,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "double",
-                            overload = "double(builtin.long):builtin.long",
+                            overload = "",
                             arguments = listOf(longLiteral(5000000000L, longType)),
                             resultTypeIndex = longType
                         )
@@ -318,7 +318,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "greet",
-                            overload = "greet(builtin.string):builtin.string",
+                            overload = "",
                             arguments = listOf(stringLiteral("World", stringType)),
                             resultTypeIndex = stringType
                         )
@@ -365,7 +365,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "add",
-                            overload = "add(builtin.int,builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 intLiteral(10, intType),
                                 intLiteral(32, intType)
@@ -411,7 +411,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "format",
-                            overload = "format(builtin.string,builtin.double,builtin.int):builtin.string",
+                            overload = "",
                             arguments = listOf(
                                 stringLiteral("Result: ", stringType),
                                 doubleLiteral(3.14, doubleType),
@@ -461,7 +461,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "processLong",
-                            overload = "processLong(builtin.long):builtin.long",
+                            overload = "",
                             arguments = listOf(intLiteral(41, intType)),
                             resultTypeIndex = longType
                         )
@@ -505,7 +505,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "processDouble",
-                            overload = "processDouble(builtin.double):builtin.double",
+                            overload = "",
                             arguments = listOf(intLiteral(21, intType)),
                             resultTypeIndex = doubleType
                         )
@@ -540,7 +540,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "processDouble",
-                            overload = "processDouble(builtin.double):builtin.double",
+                            overload = "",
                             arguments = listOf(floatLiteral(3.14f, floatType)),
                             resultTypeIndex = doubleType
                         )
@@ -576,7 +576,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "processDouble",
-                            overload = "processDouble(builtin.double):builtin.double",
+                            overload = "",
                             arguments = listOf(longLiteral(100L, longType)),
                             resultTypeIndex = doubleType
                         )
@@ -621,15 +621,15 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "increment",
-                            overload = "increment(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 functionCall(
                                     name = "increment",
-                                    overload = "increment(builtin.int):builtin.int",
+                                    overload = "",
                                     arguments = listOf(
                                         functionCall(
                                             name = "increment",
-                                            overload = "increment(builtin.int):builtin.int",
+                                            overload = "",
                                             arguments = listOf(intLiteral(0, intType)),
                                             resultTypeIndex = intType
                                         )
@@ -698,17 +698,17 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "add",
-                            overload = "add(builtin.int,builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 functionCall(
                                     name = "square",
-                                    overload = "square(builtin.int):builtin.int",
+                                    overload = "",
                                     arguments = listOf(intLiteral(2, intType)),
                                     resultTypeIndex = intType
                                 ),
                                 functionCall(
                                     name = "square",
-                                    overload = "square(builtin.int):builtin.int",
+                                    overload = "",
                                     arguments = listOf(intLiteral(3, intType)),
                                     resultTypeIndex = intType
                                 )
@@ -755,7 +755,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "double",
-                            overload = "double(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(identifier("myVar", intType, 3)),
                             resultTypeIndex = intType
                         )
@@ -797,7 +797,7 @@ class FunctionCallCompilerTest {
                     returnStmt(
                         functionCall(
                             name = "square",
-                            overload = "square(builtin.int):builtin.int",
+                            overload = "",
                             arguments = listOf(
                                 binaryExpr(
                                     intLiteral(3, intType),
@@ -851,7 +851,7 @@ class FunctionCallCompilerTest {
                         ternaryExpr(
                             functionCall(
                                 name = "isPositive",
-                                overload = "isPositive(builtin.int):builtin.boolean",
+                                overload = "",
                                 arguments = listOf(intLiteral(5, intType)),
                                 resultTypeIndex = boolType
                             ),

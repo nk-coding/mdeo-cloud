@@ -1,4 +1,4 @@
-package com.mdeo.script.stdlib.collections
+package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

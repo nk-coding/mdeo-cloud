@@ -1,7 +1,8 @@
-package com.mdeo.script.stdlib.collections
+package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.function.Function
 import kotlin.test.assertEquals
@@ -431,15 +432,35 @@ class BagImplTest {
     }
 
     @Test
-    fun `forAll returns true when all match`() {
+    fun `forEach executes for all elements`() {
         val bag = BagImpl.of(2, 2, 4, 4, 6)
-        assertTrue(bag.forAll(Predicate { it % 2 == 0 }))
+        var count = 0
+        bag.forEach(Consumer { count++ })
+        assertEquals(5, count)
     }
 
     @Test
     fun `none returns true when no matches`() {
         val bag = BagImpl.of(1, 1, 2, 2, 3)
         assertTrue(bag.none(Predicate { it > 10 }))
+    }
+
+    @Test
+    fun `all returns true when all elements match`() {
+        val bag = BagImpl.of(2, 2, 4, 4, 6)
+        assertTrue(bag.all(Predicate { it % 2 == 0 }))
+    }
+
+    @Test
+    fun `all returns false when at least one element does not match`() {
+        val bag = BagImpl.of(2, 2, 4, 5, 6)
+        assertFalse(bag.all(Predicate { it % 2 == 0 }))
+    }
+
+    @Test
+    fun `all returns true for empty bag`() {
+        val bag = BagImpl<Int>()
+        assertTrue(bag.all(Predicate { it < 0 }))
     }
 
     @Test

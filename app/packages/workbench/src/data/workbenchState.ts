@@ -255,6 +255,7 @@ export class WorkbenchState {
     /**
      * Handles an execution state change notification from the WebSocket.
      * Updates the local execution state and triggers any necessary UI updates.
+     * If an execution completes within 5 seconds, automatically opens the summary in a temporary tab.
      *
      * @param execution The updated execution data
      */
@@ -267,6 +268,48 @@ export class WorkbenchState {
             fileTree: existingData?.fileTree,
             isLoadingTree: existingData?.isLoadingTree ?? false
         });
+
+        if (
+            execution.state === "completed" &&
+            execution.startedAt != undefined &&
+            execution.finishedAt != undefined &&
+            this.project.value != null
+        ) {
+            const startTime = new Date(execution.startedAt).getTime();
+            const completionTime = new Date(execution.finishedAt).getTime();
+            const duration = completionTime - startTime;
+
+            if (duration <= 5000) {
+                nextTick(async () => {
+                    await this.openExecutionSummary(execution.id, true);
+                });
+            }
+        }
+    }
+
+    /**
+     * Opens the execution summary in the editor.
+     *
+     * @param executionId The ID of the execution
+     * @param temporary Whether to open as a temporary tab
+     */
+    private async openExecutionSummary(executionId: string, temporary: boolean = false): Promise<void> {
+        if (this.project.value == null) {
+            return;
+        }
+
+        const uri = Uri.file(`/${this.project.value.id}/executions/${executionId}/report.md`);
+
+        await this.monacoApi.editorService.openEditor({
+            resource: uri,
+            options: {
+                preserveFocus: false
+            }
+        });
+
+        if (temporary && this.activeTab.value != null) {
+            this.activeTab.value.temporary = true;
+        }
     }
 
     /**
@@ -336,6 +379,8 @@ export class WorkbenchState {
 
     /**
      * Adds a new execution to the executions list.
+     * If the sidebar is open (not collapsed), automatically switch to the executions tab.
+     * Records the start time for auto-opening quick executions.
      *
      * @param execution The execution to add
      */
@@ -346,6 +391,10 @@ export class WorkbenchState {
             fileTree: undefined,
             isLoadingTree: false
         });
+        // start time is provided by the execution itself (startedAt)
+        if (!this.sidebarCollapsed.value) {
+            this.activeSidebar.value = "executions";
+        }
     }
 
     /**

@@ -133,7 +133,7 @@ export class LambdaTypeBuilder {
      * Set the return type and build the lambda type.
      * @param type The return type
      */
-    returns(type: ValueType): LambdaType {
+    returns(type: ReturnType): LambdaType {
         const result: LambdaType = {
             parameters: this.parameters,
             returnType: type,
@@ -517,4 +517,99 @@ export function classTypeFrom(existingType: ClassType): ClassTypeBuilder<any> {
     }
 
     return builder;
+}
+
+/**
+ * Builder for creating global function definitions with a fluent API.
+ *
+ * Global functions are top-level functions that are available in the global scope
+ * without requiring a class or object context.
+ *
+ * @example
+ * ```typescript
+ * globalFunction('println')
+ *   .signature(sig => sig
+ *     .param('message', typeRef('string').build())
+ *     .returns(voidType())
+ *   )
+ *   .build()
+ * ```
+ */
+export class GlobalFunctionBuilder {
+    private name: string;
+    private signatures: Record<string, FunctionSignature> = {};
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    /**
+     * Add a signature to this global function.
+     *
+     * @param builder A function that configures a SignatureBuilder
+     */
+    signature(builder: (sig: SignatureBuilder) => SignatureBuilder): this;
+    /**
+     * Add a named signature to this global function.
+     *
+     * @param name The signature name (overload key)
+     * @param builder A function that configures a SignatureBuilder
+     */
+    signature<K extends string>(name: K, builder: (sig: SignatureBuilder) => SignatureBuilder): this;
+    signature<K extends string>(
+        nameOrBuilder: K | ((sig: SignatureBuilder) => SignatureBuilder),
+        builder?: (sig: SignatureBuilder) => SignatureBuilder
+    ): this {
+        const sig = builder
+            ? builder(new SignatureBuilder())
+            : (nameOrBuilder as (sig: SignatureBuilder) => SignatureBuilder)(new SignatureBuilder());
+        const name = builder ? (nameOrBuilder as string) : FunctionSignature.DEFAULT_SIGNATURE;
+        this.signatures[name] = sig.build();
+        return this;
+    }
+
+    /**
+     * Build the global function as a Member.
+     */
+    build(): Member {
+        if (Object.keys(this.signatures).length === 0) {
+            throw new Error("Global function must have at least one signature");
+        }
+        return {
+            name: this.name,
+            isProperty: false,
+            type: {
+                signatures: this.signatures
+            }
+        };
+    }
+}
+
+/**
+ * Create a new GlobalFunctionBuilder.
+ *
+ * @param name The name of the global function
+ */
+export function globalFunction(name: string): GlobalFunctionBuilder {
+    return new GlobalFunctionBuilder(name);
+}
+
+/**
+ * Builder for creating global property definitions with a fluent API.
+ *
+ * Global properties are top-level constants or values that are available
+ * in the global scope without requiring a class or object context.
+ *
+ * @example
+ * ```typescript
+ * globalProperty('PI', typeRef('double').build())
+ * ```
+ */
+export function globalProperty(name: string, type: ValueType, readonly: boolean = true): Member {
+    return {
+        name,
+        isProperty: true,
+        readonly,
+        type
+    };
 }

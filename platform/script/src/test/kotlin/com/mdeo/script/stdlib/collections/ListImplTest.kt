@@ -1,7 +1,8 @@
-package com.mdeo.script.stdlib.collections
+package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.function.Function
 import kotlin.test.assertEquals
@@ -1500,37 +1501,76 @@ class ListImplTest {
         assertTrue(list.exists(Predicate { it == null }))
     }
 
-    // ==================== forAll() tests ====================
+    // ==================== forEach() tests ====================
     @Test
-    fun `forAll returns true when all match`() {
+    fun `forEach executes for all elements`() {
         val list = ListImpl.of(2, 4, 6, 8)
-        assertTrue(list.forAll(Predicate { it % 2 == 0 }))
+        var count = 0
+        list.forEach(Consumer { count++ })
+        assertEquals(4, count)
     }
 
     @Test
-    fun `forAll returns false when one doesnt match`() {
+    fun `forEach executes action for each element`() {
         val list = ListImpl.of(2, 4, 5, 8)
-        assertFalse(list.forAll(Predicate { it % 2 == 0 }))
+        val results = mutableListOf<Int>()
+        list.forEach(Consumer { results.add(it * 2) })
+        assertEquals(listOf(4, 8, 10, 16), results)
     }
 
     @Test
-    fun `forAll returns true for empty list`() {
+    fun `forEach handles empty list`() {
         val list = ListImpl<Int>()
-        assertTrue(list.forAll(Predicate { false }))
+        var count = 0
+        list.forEach(Consumer { count++ })
+        assertEquals(0, count)
     }
 
     @Test
-    fun `forAll short-circuits on first non-match`() {
+    fun `forEach executes for all elements unconditionally`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
         var count = 0
-        list.forAll(Predicate { count++; it < 3 })
-        assertEquals(3, count) // Should stop at 3
+        list.forEach(Consumer { count++ })
+        assertEquals(5, count)
     }
 
     @Test
-    fun `forAll handles single element`() {
+    fun `forEach handles single element`() {
         val list = ListImpl.of(5)
-        assertTrue(list.forAll(Predicate { it == 5 }))
+        var sum = 0
+        list.forEach(Consumer { sum += it })
+        assertEquals(5, sum)
+    }
+
+    // ==================== all() tests ====================
+    @Test
+    fun `all returns true when all elements match predicate`() {
+        val list = ListImpl.of(2, 4, 6, 8)
+        assertTrue(list.all(Predicate { it % 2 == 0 }))
+    }
+
+    @Test
+    fun `all returns false when at least one element does not match`() {
+        val list = ListImpl.of(2, 4, 5, 8)
+        assertFalse(list.all(Predicate { it % 2 == 0 }))
+    }
+
+    @Test
+    fun `all returns true for empty list`() {
+        val list = ListImpl<Int>()
+        assertTrue(list.all(Predicate { it < 0 }))
+    }
+
+    @Test
+    fun `all returns false when first element does not match`() {
+        val list = ListImpl.of(1, 2, 3, 4, 5)
+        assertFalse(list.all(Predicate { it > 1 }))
+    }
+
+    @Test
+    fun `all returns false when last element does not match`() {
+        val list = ListImpl.of(2, 4, 6, 8, 9)
+        assertFalse(list.all(Predicate { it % 2 == 0 }))
     }
 
     // ==================== associate() tests ====================
