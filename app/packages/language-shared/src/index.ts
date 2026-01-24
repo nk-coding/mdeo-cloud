@@ -36,6 +36,8 @@ export * from "./diagram-server/modelIndex.js";
 export * from "./diagram-server/modelState.js";
 export * from "./diagram-server/modelSubmissionHandler.js";
 export * from "./diagram-server/sourceModelStorage.js";
+export * from "./extended-parser/extendedParser.js";
+export * from "./extended-parser/types.js";
 export * from "./external-reference/externalReferenceCollectionPhase.js";
 export * from "./file-scoping/config.js";
 export * from "./file-scoping/rule.js";

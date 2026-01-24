@@ -41,12 +41,6 @@ export class NewFileActionHandler implements ActionHandler {
     private readonly sharedServices: LangiumSharedServices;
 
     /**
-     * URI string of the newly created model file.
-     * Used as the base for computing relative paths.
-     */
-    private newFilePath?: string;
-
-    /**
      * Creates a new file action handler.
      *
      * @param sharedServices Shared Langium services
@@ -69,10 +63,9 @@ export class NewFileActionHandler implements ActionHandler {
      */
     async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
         const data = params.data as NewFileActionData;
-        this.newFilePath = data.uri;
 
         const metamodelFiles = await this.findMetamodelFiles();
-        const options = this.buildFileOptions(metamodelFiles);
+        const options = this.buildFileOptions(data.uri, metamodelFiles);
 
         return this.createSelectionPage(options);
     }
@@ -84,6 +77,7 @@ export class NewFileActionHandler implements ActionHandler {
      * @returns Completion response with workspace edit for inserting the statement
      */
     async submitAction(params: ActionSubmitParams): Promise<ActionSubmitResponse> {
+        const data = params.config.data as NewFileActionData;
         const rawInputs = params.inputs[0];
 
         if (!isMetamodelSelectionInputs(rawInputs)) {
@@ -102,7 +96,7 @@ export class NewFileActionHandler implements ActionHandler {
             };
         }
 
-        const workspaceEdit = this.createUsingStatementEdit(metamodelPath);
+        const workspaceEdit = this.createUsingStatementEdit(data.uri, metamodelPath);
         const connection = this.sharedServices.lsp.Connection;
         await connection?.workspace.applyEdit(workspaceEdit);
 
@@ -122,15 +116,12 @@ export class NewFileActionHandler implements ActionHandler {
     /**
      * Builds the list of file options as relative paths.
      *
+     * @param uri The URI of the new file
      * @param metamodelFiles The list of metamodel file paths
      * @returns Array of relative paths for the selection dropdown
      */
-    private buildFileOptions(metamodelFiles: string[]): string[] {
-        if (!this.newFilePath) {
-            return [];
-        }
-
-        const basePath = URI.parse(this.newFilePath).path;
+    private buildFileOptions(uri: string, metamodelFiles: string[]): string[] {
+        const basePath = URI.parse(uri).path;
         return metamodelFiles.map((absolutePath) => calculateRelativePath(basePath, absolutePath));
     }
 
@@ -168,19 +159,16 @@ export class NewFileActionHandler implements ActionHandler {
     /**
      * Creates a workspace edit for inserting a `using` statement at the beginning of the file.
      *
+     * @param uri The URI of the selected metamodel
      * @param relativePath Relative path to the selected metamodel
      * @returns The workspace edit for inserting the using statement
      */
-    private createUsingStatementEdit(relativePath: string): WorkspaceEdit {
-        if (!this.newFilePath) {
-            throw new Error("New file path is not set");
-        }
-
+    private createUsingStatementEdit(uri: string, relativePath: string): WorkspaceEdit {
         const usingStatement = `using "${relativePath}"\n\n`;
 
         return {
             changes: {
-                [this.newFilePath]: [
+                [uri]: [
                     {
                         range: {
                             start: { line: 0, character: 0 },

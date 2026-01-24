@@ -231,43 +231,13 @@ class ScriptCompiler {
      */
     private fun buildMethodDescriptor(function: TypedFunction, ast: TypedAst): String {
         val params = function.parameters.joinToString("") { param ->
-            getTypeDescriptor(ast.types[param.type])
+            ASMUtil.getTypeDescriptor(ast.types[param.type])
         }
-        val returnDesc = getTypeDescriptor(ast.types[function.returnType])
+        val returnDesc = ASMUtil.getTypeDescriptor(ast.types[function.returnType])
         return "($params)$returnDesc"
     }
     
-    /**
-     * Gets the JVM type descriptor for a return type.
-     * 
-     * @param returnType The return type.
-     * @return The JVM type descriptor.
-     */
-    private fun getTypeDescriptor(returnType: ReturnType): String {
-        return when (returnType) {
-            is VoidType -> "V"
-            is ClassTypeRef -> getClassTypeDescriptor(returnType)
-            else -> "Ljava/lang/Object;"
-        }
-    }
-    
-    /**
-     * Gets the JVM type descriptor for a class type reference.
-     * 
-     * @param classType The class type reference.
-     * @return The JVM type descriptor.
-     */
-    private fun getClassTypeDescriptor(classType: ClassTypeRef): String {
-        return when (classType.type) {
-            "builtin.int" -> if (classType.isNullable) "Ljava/lang/Integer;" else "I"
-            "builtin.long" -> if (classType.isNullable) "Ljava/lang/Long;" else "J"
-            "builtin.float" -> if (classType.isNullable) "Ljava/lang/Float;" else "F"
-            "builtin.double" -> if (classType.isNullable) "Ljava/lang/Double;" else "D"
-            "builtin.boolean" -> if (classType.isNullable) "Ljava/lang/Boolean;" else "Z"
-            "builtin.string" -> "Ljava/lang/String;"
-            else -> "Ljava/lang/Object;"
-        }
-    }
+
     
     /**
      * Ensures the method ends with a return instruction.

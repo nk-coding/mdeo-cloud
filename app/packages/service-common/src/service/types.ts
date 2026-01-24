@@ -65,7 +65,7 @@ export interface ServiceConfig<T = object> {
     /**
      * Execution handlers for processing execution requests (optional)
      */
-    executionHandlers?: ExecutionHandler<unknown, T>[];
+    executionHandlers?: ExecutionHandler<unknown>[];
 
     /**
      * Whether to serve static files (default: true)

@@ -560,7 +560,7 @@ class LocalVariableIndexAssigner(
 
         for ((_, variable) in scope.declaredVariables) {
             variable.slotIndex = nextSlot
-            nextSlot += getSlotsForType(variable.type, variable.isWrittenByLambda)
+            nextSlot += ASMUtil.getSlotsForType(variable.type, variable.isWrittenByLambda)
         }
 
         if (nextSlot > maxSlotUsed) {
@@ -579,28 +579,7 @@ class LocalVariableIndexAssigner(
         slotStack.removeAt(slotStack.lastIndex)
     }
 
-    /**
-     * Gets the number of JVM slots needed for a type.
-     * Long and double take 2 slots, everything else takes 1.
-     * If wrapped in a Ref, always takes 1 slot (object reference).
-     * 
-     * @param type The type of the variable.
-     * @param isWrapped Whether the variable is wrapped in a Ref.
-     * @return The number of slots needed.
-     */
-    private fun getSlotsForType(type: ReturnType, isWrapped: Boolean): Int {
-        if (isWrapped) {
-            return 1
-        }
 
-        if (type is ClassTypeRef) {
-            return when (type.type) {
-                "builtin.long", "builtin.double" -> 2
-                else -> 1
-            }
-        }
-        return 1
-    }
 
     /**
      * Gets the maximum number of local variable slots used.

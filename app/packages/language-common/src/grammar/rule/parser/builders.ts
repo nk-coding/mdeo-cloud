@@ -16,8 +16,12 @@ export class RuleBuilder {
      * Creates a new rule builder.
      *
      * @param name The unique name for this parser rule in the grammar
+     * @param isFragment Whether this rule is a fragment (not directly usable)
      */
-    constructor(readonly name: string) {}
+    constructor(
+        readonly name: string,
+        readonly isFragment: boolean
+    ) {}
 
     /**
      * Specifies the return type for this parser rule. The return type defines
@@ -57,11 +61,9 @@ export class RuleBuilder {
         | RuleBuilderWithType<T extends AstNode ? T : never>
         | RuleBuilderWithDataType<T extends Primitive ? MapPrimitive<T> : never> {
         if (typeof type === "function") {
-            // It's a primitive type constructor
-            return new RuleBuilderWithDataType(this.name, type as Primitive) as any;
+            return new RuleBuilderWithDataType(this.name, this.isFragment, type as Primitive) as any;
         } else {
-            // It's a BaseType (Interface or Type)
-            return new RuleBuilderWithType(this.name, type as BaseType<AstNode>) as any;
+            return new RuleBuilderWithType(this.name, this.isFragment, type as BaseType<AstNode>) as any;
         }
     }
 }
@@ -77,10 +79,12 @@ export class RuleBuilderWithType<T extends AstNode> {
      * Creates a typed rule builder.
      *
      * @param name The unique name for this parser rule
+     * @param isFragment Whether this rule is a fragment (not directly usable)
      * @param type The AST node type this rule will produce
      */
     constructor(
         private readonly name: string,
+        private readonly isFragment: boolean,
         private readonly type: BaseType<T>
     ) {}
 
@@ -108,7 +112,7 @@ export class RuleBuilderWithType<T extends AstNode> {
             $type: "ParserRule",
             name: this.name,
             returnType: () => this.type.toType(),
-            fragment: false,
+            fragment: this.isFragment,
             entry: false,
             definition: {
                 $type: "EndOfFile"
@@ -145,10 +149,12 @@ export class RuleBuilderWithDataType<T> {
      * Creates a typed rule builder with a primitive data type.
      *
      * @param name The unique name for this parser rule
+     * @param isFragment Whether this rule is a fragment (not directly usable)
      * @param type The primitive type constructor this rule will produce
      */
     constructor(
         private readonly name: string,
+        private readonly isFragment: boolean,
         type: Primitive
     ) {
         this.primitiveType = primitiveTypeLookup.get(type)!;
@@ -175,7 +181,7 @@ export class RuleBuilderWithDataType<T> {
             $type: "ParserRule",
             name: this.name,
             dataType: this.primitiveType,
-            fragment: false,
+            fragment: this.isFragment,
             entry: false,
             definition: {
                 $type: "EndOfFile"

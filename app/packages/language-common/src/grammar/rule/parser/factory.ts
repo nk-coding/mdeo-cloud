@@ -29,7 +29,32 @@ import type { SerializableExternalReference } from "../../serialization/grammarS
  * ```
  */
 export function createRule(name: string): RuleBuilder {
-    return new RuleBuilder(name);
+    return new RuleBuilder(name, false);
+}
+
+/**
+ * Creates a new parser rule builder for defining grammar rules.
+ *
+ * Parser rules define how to parse specific AST node types from input text.
+ * They specify the syntax pattern and how to construct the resulting AST node.
+ *
+ * @param name The unique name for this parser rule in the grammar
+ * @returns A new RuleBuilder instance for configuring the parser rule
+ *
+ * @example
+ * ```typescript
+ * // Create a rule for parsing person declarations
+ * const PersonRule = createRule("Person")
+ *     .returns(PersonInterface)
+ *     .as(({ set, add, flag }) => [
+ *         set("name", STRING_TERMINAL),
+ *         set("age", NUMBER_TERMINAL),
+ *         flag("isActive", "active")
+ *     ]);
+ * ```
+ */
+export function createFragmentRule(name: string): RuleBuilder {
+    return new RuleBuilder(name, true);
 }
 
 /**

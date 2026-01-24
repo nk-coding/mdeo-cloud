@@ -63,6 +63,11 @@ export class ExpressionConfig {
     readonly memberAccessExpressionTypeName: string;
 
     /**
+     * The name for the MemberAccessAndCallExpression rule.
+     */
+    readonly memberAccessOrCallFragmentRuleName: string;
+
+    /**
      * The name for the MemberAccessExpression rule.
      */
     readonly memberAccessAndCallExpressionRuleName: string;
@@ -185,6 +190,7 @@ export class ExpressionConfig {
         this.callExpressionGenericArgsRuleName = prefix + "CallExpressionGenericArgsRule";
         this.memberAccessExpressionTypeName = prefix + "MemberAccessExpression";
         this.memberAccessAndCallExpressionRuleName = prefix + "MemberAccessAndCallExpressionRule";
+        this.memberAccessOrCallFragmentRuleName = prefix + "MemberAccessOrCallFragmentRule";
         this.identifierExpressionTypeName = prefix + "IdentifierExpression";
         this.identifierExpressionRuleName = prefix + "IdentifierExpressionRule";
         this.stringLiteralExpressionTypeName = prefix + "StringLiteralExpression";

@@ -7,11 +7,7 @@ import { ExecutionState, type ExecutionEvent, type ExecutionEventType } from "./
  * @returns True if the state is terminal
  */
 export function isTerminalState(state: ExecutionState): boolean {
-    return (
-        state === ExecutionState.COMPLETED ||
-        state === ExecutionState.CANCELLED ||
-        state === ExecutionState.FAILED
-    );
+    return state === ExecutionState.COMPLETED || state === ExecutionState.CANCELLED || state === ExecutionState.FAILED;
 }
 
 /**
@@ -22,9 +18,7 @@ export function isTerminalState(state: ExecutionState): boolean {
  */
 export function isActiveState(state: ExecutionState): boolean {
     return (
-        state === ExecutionState.SUBMITTED ||
-        state === ExecutionState.INITIALIZING ||
-        state === ExecutionState.RUNNING
+        state === ExecutionState.SUBMITTED || state === ExecutionState.INITIALIZING || state === ExecutionState.RUNNING
     );
 }
 
@@ -137,22 +131,22 @@ export function calculateExecutionDuration(startedAt?: string, finishedAt?: stri
  */
 export function formatExecutionDuration(durationMs: number): string {
     const seconds = durationMs / 1000;
-    
+
     if (seconds < 1) {
         return `${Math.round(durationMs)}ms`;
     }
-    
+
     if (seconds < 60) {
         return `${seconds.toFixed(1)}s`;
     }
-    
+
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
-    
+
     if (minutes < 60) {
         return `${minutes}m ${remainingSeconds}s`;
     }
-    
+
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;

@@ -1,7 +1,6 @@
 package com.mdeo.scriptexecution
 
-import com.mdeo.scriptexecution.auth.configureJwtAuth
-import com.mdeo.scriptexecution.auth.fetchJwks
+import com.mdeo.scriptexecution.plugins.configureJwtAuth
 import com.mdeo.scriptexecution.config.*
 import com.mdeo.scriptexecution.database.DatabaseFactory
 import com.mdeo.scriptexecution.routes.executionRoutes
@@ -17,7 +16,6 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
@@ -49,17 +47,6 @@ fun Application.module(appConfig: AppConfig) {
         }
     }
     
-    // Fetch JWKS from backend
-    val jwksKeys = runBlocking {
-        fetchJwks(httpClient, appConfig.backendApiUrl)
-    }
-    
-    if (jwksKeys.isEmpty()) {
-        logger.error("Failed to fetch JWKS from backend. Authentication will not work!")
-    } else {
-        logger.info("Successfully fetched ${jwksKeys.size} keys from JWKS endpoint")
-    }
-    
     val backendApiService = BackendApiService(appConfig.backendApiUrl)
     val executionService = ExecutionService(
         backendApiService,
@@ -77,7 +64,8 @@ fun Application.module(appConfig: AppConfig) {
     
     configureSerialization()
     configureStatusPages()
-    configureJwtAuth(httpClient, appConfig.backendApiUrl, jwksKeys)
+    
+    configureJwtAuth(appConfig.backendApiUrl)
     
     routing {
         healthRoutes()

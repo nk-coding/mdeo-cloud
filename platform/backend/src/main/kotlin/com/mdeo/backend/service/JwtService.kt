@@ -36,10 +36,14 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
         const val CLAIM_EXECUTION_ID = "executionId"
         const val CLAIM_SCOPE = "scope"
         
-        val SCOPE_FILES_READ = "files:read"
-        val SCOPE_FILE_DATA_READ = "file-data:read"
-        val SCOPE_EXECUTION_READ = "execution:read"
-        val SCOPE_EXECUTION_WRITE = "execution:write"
+        const val SCOPE_FILES_READ = "files:read"
+        const val SCOPE_FILE_DATA_READ = "file-data:read"
+        const val SCOPE_EXECUTION_READ = "execution:read"
+        const val SCOPE_EXECUTION_WRITE = "execution:write"
+        const val SCOPE_PLUGIN_EXECUTION_READ = "plugin:execution:read"
+        const val SCOPE_PLUGIN_EXECUTION_CANCEL = "plugin:execution:cancel"
+        const val SCOPE_PLUGIN_EXECUTION_DELETE = "plugin:execution:delete"
+
     }
     
     /**
@@ -103,9 +107,10 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
      *
      * @param projectId The UUID of the project
      * @param executionId The UUID of the execution
+     * @param additionalScopes Additional scopes to include in the token
      * @return The generated JWT token string
      */
-    fun generateExecutionToken(projectId: UUID, executionId: UUID): String {
+    fun generateExecutionToken(projectId: UUID, executionId: UUID, additionalScopes: List<String>): String {
         val now = Instant.now()
         val expiration = now.plusSeconds(jwtConfig.expirationSeconds)
         
@@ -118,9 +123,8 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
             .withArrayClaim(CLAIM_SCOPE, arrayOf(
                 SCOPE_FILES_READ,
                 SCOPE_FILE_DATA_READ,
-                SCOPE_EXECUTION_READ,
-                SCOPE_EXECUTION_WRITE
-            ))
+                SCOPE_EXECUTION_READ
+            ) + additionalScopes)
             .sign(algorithm)
     }
     

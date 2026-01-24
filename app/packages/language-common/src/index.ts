@@ -45,4 +45,5 @@ export * from "./protocol/triggerAction.js";
 export * from "./protocol/workspaceEditAdditionalServices.js";
 export * from "./util/assertUnreachable.js";
 export * from "./util/convertIcon.js";
+export * from "./util/parseUri.js";
 export * from "./util/partialAstNode.js";

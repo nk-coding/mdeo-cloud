@@ -5,6 +5,7 @@ import com.mdeo.script.ast.statements.TypedVariableDeclarationStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.compiler.ASMUtil
 import com.mdeo.script.compiler.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
@@ -101,7 +102,7 @@ class VariableDeclarationCompiler : StatementCompiler {
             emitDefaultValue(type, mv)
         }
         
-        val storeOpcode = getStoreOpcode(type)
+        val storeOpcode = ASMUtil.getStoreOpcode(type)
         mv.visitVarInsn(storeOpcode, variable.slotIndex)
     }
     
@@ -213,37 +214,5 @@ class VariableDeclarationCompiler : StatementCompiler {
         return "(Ljava/lang/Object;)V"
     }
     
-    /**
-     * Gets the appropriate STORE opcode for a type.
-     *
-     * Returns the JVM opcode for storing a value of the given type to a local variable slot.
-     *
-     * @param type the return type to get the store opcode for
-     * @return the JVM opcode for storing a value of this type (e.g., ISTORE, ASTORE, etc.)
-     */
-    private fun getStoreOpcode(type: ReturnType): Int {
-        if (type is ClassTypeRef) {
-            if (type.isNullable) {
-                return Opcodes.ASTORE
-            }
-            return when (type.type) {
-                "builtin.int", "builtin.boolean" -> {
-                    Opcodes.ISTORE
-                }
-                "builtin.long" -> {
-                    Opcodes.LSTORE
-                }
-                "builtin.float" -> {
-                    Opcodes.FSTORE
-                }
-                "builtin.double" -> {
-                    Opcodes.DSTORE
-                }
-                else -> {
-                    Opcodes.ASTORE
-                }
-            }
-        }
-        return Opcodes.ASTORE
-    }
+
 }

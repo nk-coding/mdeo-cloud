@@ -30,7 +30,7 @@ data class AppConfig(
                     password = System.getenv("DATABASE_PASSWORD") ?: "mdeo",
                     maxPoolSize = System.getenv("DATABASE_MAX_POOL_SIZE")?.toIntOrNull() ?: 10
                 ),
-                backendApiUrl = System.getenv("BACKEND_API_URL") ?: "http://localhost:8080",
+                backendApiUrl = System.getenv("BACKEND_API_URL") ?: "http://localhost:8080/api",
                 executionTimeoutMs = System.getenv("EXECUTION_TIMEOUT_MS")?.toLongOrNull() ?: 30000L
             )
         }

@@ -197,45 +197,26 @@ object ASMUtil {
             return
         }
         
-        when (targetType.type) {
-            "builtin.int" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false)
+        val typeName = targetType.type
+        
+        when (typeName) {
+            "builtin.int", "builtin.long", "builtin.float", "builtin.double", "builtin.boolean" -> {
+                // Get wrapper class name
+                val wrapperClass = when (typeName) {
+                    "builtin.int" -> "java/lang/Integer"
+                    "builtin.long" -> "java/lang/Long"
+                    "builtin.float" -> "java/lang/Float"
+                    "builtin.double" -> "java/lang/Double"
+                    "builtin.boolean" -> "java/lang/Boolean"
+                    else -> throw IllegalStateException("Unexpected type: $typeName")
                 }
-            }
-            "builtin.long" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false)
-                }
-            }
-            "builtin.float" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false)
-                }
-            }
-            "builtin.double" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false)
-                }
-            }
-            "builtin.boolean" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false)
+                
+                // Always cast Object to wrapper type
+                mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
+                
+                // Unbox to primitive if not nullable
+                if (!targetType.isNullable) {
+                    CoercionUtil.emitUnboxing(typeName, mv)
                 }
             }
             "builtin.string" -> {

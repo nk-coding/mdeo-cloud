@@ -36,6 +36,7 @@ dependencies {
     
     // JWT for service-to-service authentication
     implementation("com.auth0:java-jwt:4.5.0")
+    implementation("com.auth0:jwks-rsa:0.23.0")
     
     // Database
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
@@ -55,6 +56,8 @@ dependencies {
     // Testing
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
 }
 
 tasks.shadowJar {

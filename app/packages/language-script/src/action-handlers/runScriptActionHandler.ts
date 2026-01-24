@@ -1,15 +1,18 @@
-import type {
-    ActionStartParams,
-    ActionStartResponse,
-    ActionSubmitParams,
-    ActionSubmitResponse,
-    ActionSchema,
-    ActionExecutionRequest
+import {
+    type ActionStartParams,
+    type ActionStartResponse,
+    type ActionSubmitParams,
+    type ActionSubmitResponse,
+    type ActionSchema,
+    type ActionExecutionRequest,
+    type FileMenuActionData,
+    parseUri,
+    FileCategory
 } from "@mdeo/language-common";
 import type { ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
 import { URI } from "langium";
-import { Script, type FunctionType, type ScriptType } from "../grammar/scriptTypes.js";
+import { type ScriptType } from "../grammar/scriptTypes.js";
 
 /**
  * Input data collected from the dialog.
@@ -47,11 +50,6 @@ export class RunScriptActionHandler implements ActionHandler {
     private readonly sharedServices: LangiumSharedServices;
 
     /**
-     * URI string of the script file to execute.
-     */
-    private fileUri?: string;
-
-    /**
      * Creates a new run script action handler.
      *
      * @param sharedServices Shared Langium services
@@ -73,18 +71,17 @@ export class RunScriptActionHandler implements ActionHandler {
      * @returns The dialog page with method selection or immediate completion
      */
     async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
-        const data = params.data as { uri: string };
-        this.fileUri = data.uri;
+        const data = params.data as FileMenuActionData;
 
-        const methods = await this.findParameterlessMethods();
+        const methods = await this.findParameterlessMethods(data.uri);
 
         if (methods.length === 0) {
-            // Return a page with an error message
             return {
                 kind: "page",
                 page: {
                     title: "Run Script Method",
-                    description: "No parameterless methods found in this file. Only methods with no parameters can be executed.",
+                    description:
+                        "No parameterless methods found in this file. Only methods with no parameters can be executed.",
                     schema: {
                         properties: {}
                     },
@@ -93,9 +90,8 @@ export class RunScriptActionHandler implements ActionHandler {
             };
         }
 
-        // If only one method, execute it directly
         if (methods.length === 1) {
-            return this.createExecutionStart(methods[0]);
+            return this.createExecutionStart(data.uri, methods[0]);
         }
 
         return this.createSelectionPage(methods);
@@ -108,6 +104,7 @@ export class RunScriptActionHandler implements ActionHandler {
      * @returns Completion response with execution request
      */
     async submitAction(params: ActionSubmitParams): Promise<ActionSubmitResponse> {
+        const data = params.config.data as FileMenuActionData;
         const rawInputs = params.inputs[0];
 
         if (!isMethodSelectionInputs(rawInputs)) {
@@ -126,7 +123,7 @@ export class RunScriptActionHandler implements ActionHandler {
             };
         }
 
-        return this.createExecutionSubmit(methodName);
+        return this.createExecutionSubmit(data.uri, methodName);
     }
 
     /**
@@ -134,28 +131,18 @@ export class RunScriptActionHandler implements ActionHandler {
      *
      * @returns Array of method names that have no parameters
      */
-    private async findParameterlessMethods(): Promise<string[]> {
-        if (!this.fileUri) {
-            return [];
-        }
-
-        const uri = URI.parse(this.fileUri);
-        const document = this.sharedServices.workspace.LangiumDocuments.getDocument(uri);
+    private async findParameterlessMethods(uri: string): Promise<string[]> {
+        const parsedUri = URI.parse(uri);
+        const document = this.sharedServices.workspace.LangiumDocuments.getDocument(parsedUri);
 
         if (!document || document.parseResult.lexerErrors.length > 0 || document.parseResult.parserErrors.length > 0) {
             return [];
         }
 
-        const root = document.parseResult.value;
-        if (root.$type !== Script.$type) {
-            return [];
-        }
+        const root = document.parseResult.value as ScriptType;
 
-        const scriptRoot = root as ScriptType;
-
-        // Filter to only functions with no parameters
-        const parameterlessFunctions = scriptRoot.functions.filter((func) => {
-            return func.parameterList !== undefined && func.parameterList.parameters.length === 0;
+        const parameterlessFunctions = root.functions.filter((func) => {
+            return func.parameterList == undefined || func.parameterList.parameters.length === 0;
         });
 
         return parameterlessFunctions.map((func) => func.name);
@@ -195,16 +182,16 @@ export class RunScriptActionHandler implements ActionHandler {
     /**
      * Creates an execution request for the given method name.
      *
+     * @param uri The URI of the script file
      * @param methodName The name of the method to execute
-     * @returns The execution request or null if file URI is not available
+     * @returns The execution request
      */
-    private createExecutionRequest(methodName: string): ActionExecutionRequest | null {
-        if (!this.fileUri) {
-            return null;
+    private createExecutionRequest(uri: string, methodName: string): ActionExecutionRequest {
+        const parsedUri = parseUri(URI.parse(uri));
+        if (parsedUri.category !== FileCategory.RegularFile) {
+            throw new Error("Invalid file category for script execution");
         }
-
-        const uri = URI.parse(this.fileUri);
-        const filePath = uri.path;
+        const filePath = parsedUri.path;
 
         return {
             filePath,
@@ -218,12 +205,13 @@ export class RunScriptActionHandler implements ActionHandler {
     /**
      * Creates an execution completion response for startAction.
      *
+     * @param uri The URI of the script file
      * @param methodName The name of the method to execute
      * @returns The start completion response with execution request
      */
-    private createExecutionStart(methodName: string): ActionStartResponse {
-        const executionRequest = this.createExecutionRequest(methodName);
-        
+    private createExecutionStart(uri: string, methodName: string): ActionStartResponse {
+        const executionRequest = this.createExecutionRequest(uri, methodName);
+
         if (!executionRequest) {
             return {
                 kind: "page",
@@ -247,12 +235,13 @@ export class RunScriptActionHandler implements ActionHandler {
     /**
      * Creates an execution completion response for submitAction.
      *
+     * @param uri The URI of the script file
      * @param methodName The name of the method to execute
      * @returns The submit completion response with execution request
      */
-    private createExecutionSubmit(methodName: string): ActionSubmitResponse {
-        const executionRequest = this.createExecutionRequest(methodName);
-        
+    private createExecutionSubmit(uri: string, methodName: string): ActionSubmitResponse {
+        const executionRequest = this.createExecutionRequest(uri, methodName);
+
         if (!executionRequest) {
             return {
                 kind: "validation",

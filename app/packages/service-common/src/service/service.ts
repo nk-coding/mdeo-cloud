@@ -8,13 +8,13 @@ import type { ServerContributionPlugin } from "@mdeo/plugin";
 import { URI } from "vscode-uri";
 import { buildManifest } from "./util.js";
 import type { FileInfo } from "../handler/types.js";
-import type { ExecutionContext, ExecuteResponse, FileEntry } from "../execution/types.js";
+import type { ExecutionContext } from "../execution/types.js";
 import { JwtAuthMiddleware } from "../auth/jwtAuth.js";
 
 /**
  * Extracts JWT token from the Authorization header of a request.
  * Assumes the request has already passed authentication middleware.
- * 
+ *
  * @param request - The Fastify request object
  * @returns The JWT token string
  * @throws Error if Authorization header is missing or malformed
@@ -64,7 +64,6 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         backendUrl: config.backendApiUrl
     });
 
-    // Initialize JWT authentication middleware
     const jwtAuth = new JwtAuthMiddleware(config.backendApiUrl);
 
     const manifest = buildManifest(config.plugin);
@@ -73,7 +72,6 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         return reply.send(manifest);
     });
 
-    // File data endpoint - protected with JWT authentication
     fastify.post<{
         Params: { key: string };
         Body: FileDataComputeRequest;
@@ -86,12 +84,10 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             const { key } = request.params;
             const { project, source, contributionPlugins } = request.body;
 
-            // Security: Validate scope for file-data access
             if (!JwtAuthMiddleware.hasScope(request, "file-data:read")) {
                 return reply.status(403).send({ error: "Insufficient permissions: file-data:read scope required" });
             }
 
-            // Get the JWT from the Authorization header (already validated by middleware)
             const jwt = extractJwtFromRequest(request);
 
             const handler = config.handlers[key];
@@ -132,7 +128,6 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         }
     );
 
-    // Execution endpoints - all protected with JWT authentication
     if (config.executionHandlers && config.executionHandlers.length > 0) {
         /**
          * Creates a new execution
@@ -149,19 +144,18 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             async (request, reply) => {
                 const { executionId, project, filePath, data } = request.body;
 
-                // Security: Validate scope for execution write access
                 if (!JwtAuthMiddleware.hasScope(request, "execution:write")) {
-                    return reply.status(403).send({ error: "Insufficient permissions: execution:write scope required" });
+                    return reply
+                        .status(403)
+                        .send({ error: "Insufficient permissions: execution:write scope required" });
                 }
 
-                // Get the JWT from the Authorization header (already validated by middleware)
                 const jwt = extractJwtFromRequest(request);
 
                 if (!config.executionHandlers || config.executionHandlers.length === 0) {
                     return reply.status(503).send({ error: "Execution service not available" });
                 }
 
-                // Create execution context
                 const executionContext: ExecutionContext = {
                     executionId,
                     project,
@@ -170,7 +164,6 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                     jwt
                 };
 
-                // Find a handler that can handle this execution
                 let selectedHandler = null;
                 for (const handler of config.executionHandlers) {
                     const canHandleResult = await handler.canHandle(executionContext);
@@ -201,11 +194,9 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         /**
          * Gets the summary for an execution
          * GET /executions/:executionId/summary
-         * Query: project
          */
         fastify.get<{
             Params: { executionId: string };
-            Querystring: { project?: string };
         }>(
             "/executions/:executionId/summary",
             {
@@ -213,29 +204,23 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             },
             async (request, reply) => {
                 const { executionId } = request.params;
-                const project = request.query.project;
 
-                // Security: Validate scope for execution read access
-                if (!JwtAuthMiddleware.hasScope(request, "execution:read")) {
-                    return reply.status(403).send({ error: "Insufficient permissions: execution:read scope required" });
+                if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:read")) {
+                    return reply
+                        .status(403)
+                        .send({ error: "Insufficient permissions: plugin:execution:read scope required" });
                 }
 
-                // Get the JWT from the Authorization header (already validated by middleware)
                 const jwt = extractJwtFromRequest(request);
-
-                if (!project) {
-                    return reply.status(400).send({ error: "Missing project parameter" });
-                }
 
                 if (!config.executionHandlers || config.executionHandlers.length === 0) {
                     return reply.status(503).send({ error: "Execution service not available" });
                 }
 
-                // Use the first handler (they should all support these operations)
                 const handler = config.executionHandlers[0];
 
                 try {
-                    const summary = await handler.getSummary(executionId, project, jwt);
+                    const summary = await handler.getSummary(executionId, jwt);
                     return reply.send({ summary });
                 } catch (error) {
                     fastify.log.error(error);
@@ -249,11 +234,9 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         /**
          * Gets the file tree for an execution
          * GET /executions/:executionId/files
-         * Query: project
          */
         fastify.get<{
             Params: { executionId: string };
-            Querystring: { project?: string };
         }>(
             "/executions/:executionId/files",
             {
@@ -261,29 +244,22 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             },
             async (request, reply) => {
                 const { executionId } = request.params;
-                const project = request.query.project;
 
-                // Security: Validate scope for execution read access
-                if (!JwtAuthMiddleware.hasScope(request, "execution:read")) {
-                    return reply.status(403).send({ error: "Insufficient permissions: execution:read scope required" });
+                if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:read")) {
+                    return reply
+                        .status(403)
+                        .send({ error: "Insufficient permissions: plugin:execution:read scope required" });
                 }
-
-                // Get the JWT from the Authorization header (already validated by middleware)
                 const jwt = extractJwtFromRequest(request);
-
-                if (!project) {
-                    return reply.status(400).send({ error: "Missing project parameter" });
-                }
 
                 if (!config.executionHandlers || config.executionHandlers.length === 0) {
                     return reply.status(503).send({ error: "Execution service not available" });
                 }
 
-                // Use the first handler
                 const handler = config.executionHandlers[0];
 
                 try {
-                    const files = await handler.getFileTree(executionId, project, jwt);
+                    const files = await handler.getFileTree(executionId, jwt);
                     return reply.send({ files });
                 } catch (error) {
                     fastify.log.error(error);
@@ -297,11 +273,9 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         /**
          * Gets a specific file from an execution
          * GET /executions/:executionId/files/:path
-         * Query: project
          */
         fastify.get<{
             Params: { executionId: string; "*": string };
-            Querystring: { project?: string };
         }>(
             "/executions/:executionId/files/*",
             {
@@ -310,29 +284,23 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             async (request, reply) => {
                 const { executionId } = request.params;
                 const path = request.params["*"];
-                const project = request.query.project;
 
-                // Security: Validate scope for execution read access
-                if (!JwtAuthMiddleware.hasScope(request, "execution:read")) {
-                    return reply.status(403).send({ error: "Insufficient permissions: execution:read scope required" });
+                if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:read")) {
+                    return reply
+                        .status(403)
+                        .send({ error: "Insufficient permissions: plugin:execution:read scope required" });
                 }
 
-                // Get the JWT from the Authorization header (already validated by middleware)
                 const jwt = extractJwtFromRequest(request);
-
-                if (!project) {
-                    return reply.status(400).send({ error: "Missing project parameter" });
-                }
 
                 if (!config.executionHandlers || config.executionHandlers.length === 0) {
                     return reply.status(503).send({ error: "Execution service not available" });
                 }
 
-                // Use the first handler
                 const handler = config.executionHandlers[0];
 
                 try {
-                    const fileContent = await handler.getFile(executionId, project, path, jwt);
+                    const fileContent = await handler.getFile(executionId, path, jwt);
                     return reply.type("application/octet-stream").send(fileContent);
                 } catch (error) {
                     fastify.log.error(error);
@@ -346,11 +314,9 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         /**
          * Cancels an execution
          * POST /executions/:executionId/cancel
-         * Query: project
          */
         fastify.post<{
             Params: { executionId: string };
-            Querystring: { project?: string };
         }>(
             "/executions/:executionId/cancel",
             {
@@ -358,29 +324,23 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             },
             async (request, reply) => {
                 const { executionId } = request.params;
-                const project = request.query.project;
 
-                // Security: Validate scope for execution write access
-                if (!JwtAuthMiddleware.hasScope(request, "execution:write")) {
-                    return reply.status(403).send({ error: "Insufficient permissions: execution:write scope required" });
+                if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:cancel")) {
+                    return reply
+                        .status(403)
+                        .send({ error: "Insufficient permissions: plugin:execution:cancel scope required" });
                 }
 
-                // Get the JWT from the Authorization header (already validated by middleware)
                 const jwt = extractJwtFromRequest(request);
-
-                if (!project) {
-                    return reply.status(400).send({ error: "Missing project parameter" });
-                }
 
                 if (!config.executionHandlers || config.executionHandlers.length === 0) {
                     return reply.status(503).send({ error: "Execution service not available" });
                 }
 
-                // Use the first handler
                 const handler = config.executionHandlers[0];
 
                 try {
-                    await handler.cancel(executionId, project, jwt);
+                    await handler.cancel(executionId, jwt);
                     return reply.status(204).send();
                 } catch (error) {
                     fastify.log.error(error);
@@ -394,11 +354,9 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         /**
          * Deletes an execution
          * DELETE /executions/:executionId
-         * Query: project
          */
         fastify.delete<{
             Params: { executionId: string };
-            Querystring: { project?: string };
         }>(
             "/executions/:executionId",
             {
@@ -406,29 +364,23 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             },
             async (request, reply) => {
                 const { executionId } = request.params;
-                const project = request.query.project;
 
-                // Security: Validate scope for execution write access
-                if (!JwtAuthMiddleware.hasScope(request, "execution:write")) {
-                    return reply.status(403).send({ error: "Insufficient permissions: execution:write scope required" });
+                if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:delete")) {
+                    return reply
+                        .status(403)
+                        .send({ error: "Insufficient permissions: plugin:execution:write scope required" });
                 }
 
-                // Get the JWT from the Authorization header (already validated by middleware)
                 const jwt = extractJwtFromRequest(request);
-
-                if (!project) {
-                    return reply.status(400).send({ error: "Missing project parameter" });
-                }
 
                 if (!config.executionHandlers || config.executionHandlers.length === 0) {
                     return reply.status(503).send({ error: "Execution service not available" });
                 }
 
-                // Use the first handler
                 const handler = config.executionHandlers[0];
 
                 try {
-                    await handler.delete(executionId, project, jwt);
+                    await handler.delete(executionId, jwt);
                     return reply.status(204).send();
                 } catch (error) {
                     fastify.log.error(error);

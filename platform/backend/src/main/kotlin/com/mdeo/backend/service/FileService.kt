@@ -1,6 +1,6 @@
 package com.mdeo.backend.service
 
-import com.mdeo.backend.database.ExecutionState
+import com.mdeo.common.model.ExecutionState
 import com.mdeo.backend.database.ExecutionsTable
 import com.mdeo.backend.database.FilesTable
 import com.mdeo.backend.database.FileChildrenTable

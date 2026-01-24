@@ -18,7 +18,7 @@ interface ScriptExecutionData {
 
 /**
  * Execution handler for script files.
- * 
+ *
  * This handler processes execution requests for script files by forwarding
  * them to the script-execution backend service. It does not execute scripts
  * locally but acts as a proxy to the specialized backend service.
@@ -40,7 +40,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
 
     /**
      * Determines if this handler can process the execution request.
-     * 
+     *
      * Checks:
      * - The execution data is a valid object
      * - The methodName field is present and is a string
@@ -82,7 +82,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
 
     /**
      * Executes the script by forwarding the request to the backend service.
-     * 
+     *
      * This method:
      * 1. Extracts execution parameters from the context
      * 2. Constructs a request to the script-execution backend
@@ -97,11 +97,6 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
         const { executionId, project, filePath, data, jwt } = context;
         const typedData = data as ScriptExecutionData;
 
-        // The Kotlin backend expects CreateExecutionRequest with:
-        // - executionId: string
-        // - project: string
-        // - filePath: string
-        // - data: JsonElement (the methodName as a JSON string)
         const requestBody = {
             executionId,
             project,
@@ -114,7 +109,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${jwt}`
+                    Authorization: `Bearer ${jwt}`
                 },
                 body: JSON.stringify(requestBody)
             });
@@ -139,7 +134,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                    `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`
                 );
             }
             throw error;
@@ -148,21 +143,20 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
 
     /**
      * Gets a markdown summary of the execution results.
-     * 
+     *
      * Forwards the request to the script-execution backend service.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise resolving to a markdown-formatted summary
      */
-    async getSummary(executionId: string, project: string, jwt: string): Promise<string> {
+    async getSummary(executionId: string, jwt: string): Promise<string> {
         try {
             const response = await fetch(`${this.backendUrl}/api/executions/${executionId}/summary`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${jwt}`
+                    Authorization: `Bearer ${jwt}`
                 }
             });
 
@@ -179,7 +173,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                    `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`
                 );
             }
             throw error;
@@ -188,52 +182,42 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
 
     /**
      * Gets the file tree of execution results.
-     * 
+     *
      * Script executions never produce any files, so this always returns an empty array.
      *
-     * @param executionId Unique identifier for the execution
-     * @param project Project identifier
-     * @param jwt JWT token for authentication
      * @returns Promise resolving to an empty list
      */
-    async getFileTree(executionId: string, project: string, jwt: string): Promise<FileEntry[]> {
-        // Script executions never produce files
+    async getFileTree(): Promise<FileEntry[]> {
         return [];
     }
 
     /**
      * Reads a specific file from the execution results.
-     * 
+     *
      * Script executions never produce any files, so this always throws an error.
      *
-     * @param executionId Unique identifier for the execution
-     * @param project Project identifier
-     * @param path Path to the file to read
-     * @param jwt JWT token for authentication
      * @returns Promise that rejects with an error
      */
-    async getFile(executionId: string, project: string, path: string, jwt: string): Promise<Buffer> {
-        // Script executions never produce files
+    async getFile(): Promise<Buffer> {
         throw new Error(`File not found: Script executions do not produce files`);
     }
 
     /**
      * Cancels a running execution.
-     * 
+     *
      * Forwards the request to the script-execution backend service.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is cancelled
      */
-    async cancel(executionId: string, project: string, jwt: string): Promise<void> {
+    async cancel(executionId: string, jwt: string): Promise<void> {
         try {
             const response = await fetch(`${this.backendUrl}/api/executions/${executionId}/cancel`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${jwt}`
+                    Authorization: `Bearer ${jwt}`
                 }
             });
 
@@ -247,7 +231,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                    `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`
                 );
             }
             throw error;
@@ -256,20 +240,19 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
 
     /**
      * Deletes an execution and its results.
-     * 
+     *
      * Forwards the request to the script-execution backend service.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is deleted
      */
-    async delete(executionId: string, project: string, jwt: string): Promise<void> {
+    async delete(executionId: string, jwt: string): Promise<void> {
         try {
             const response = await fetch(`${this.backendUrl}/api/executions/${executionId}`, {
                 method: "DELETE",
                 headers: {
-                    "Authorization": `Bearer ${jwt}`
+                    Authorization: `Bearer ${jwt}`
                 }
             });
 
@@ -283,7 +266,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                    `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`
                 );
             }
             throw error;

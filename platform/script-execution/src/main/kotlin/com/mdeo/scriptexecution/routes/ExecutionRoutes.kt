@@ -1,8 +1,8 @@
 package com.mdeo.scriptexecution.routes
 
-import com.mdeo.scriptexecution.auth.AUTH_JWT
-import com.mdeo.scriptexecution.auth.getJwtPrincipal
-import com.mdeo.scriptexecution.auth.getJwtToken
+import com.mdeo.scriptexecution.plugins.AUTH_JWT
+import com.mdeo.scriptexecution.plugins.getJwtPrincipal
+import com.mdeo.scriptexecution.plugins.getJwtToken
 import com.mdeo.scriptexecution.model.*
 import com.mdeo.scriptexecution.service.ExecutionService
 import io.ktor.http.*
@@ -24,9 +24,8 @@ import java.util.*
 fun Route.executionRoutes(executionService: ExecutionService) {
     val logger = LoggerFactory.getLogger("ExecutionRoutes")
     
-    // All execution routes require JWT authentication
     authenticate(AUTH_JWT) {
-        route("/executions") {
+        route("/api/executions") {
             post {
                 val principal = call.getJwtPrincipal()
                 if (principal == null) {
@@ -99,7 +98,7 @@ fun Route.executionRoutes(executionService: ExecutionService) {
                     return@post
                 }
                 
-                if (!principal.scopes.contains("execution:write")) {
+                if (!principal.scopes.contains("plugin:execution:cancel")) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
                     return@post
                 }
@@ -133,7 +132,7 @@ fun Route.executionRoutes(executionService: ExecutionService) {
                     return@delete
                 }
                 
-                if (!principal.scopes.contains("execution:write")) {
+                if (!principal.scopes.contains("plugin:execution:delete")) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
                     return@delete
                 }
@@ -160,7 +159,6 @@ fun Route.executionRoutes(executionService: ExecutionService) {
                 }
             }
             
-            // GET /executions/:id/summary - Get execution summary
             get("{id}/summary") {
                 val principal = call.getJwtPrincipal()
                 if (principal == null) {
@@ -168,8 +166,7 @@ fun Route.executionRoutes(executionService: ExecutionService) {
                     return@get
                 }
                 
-                // Verify the token has execution:read scope
-                if (!principal.scopes.contains("execution:read")) {
+                if (!principal.scopes.contains("plugin:execution:read")) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
                     return@get
                 }
@@ -182,7 +179,6 @@ fun Route.executionRoutes(executionService: ExecutionService) {
                     return@get
                 }
                 
-                // Verify the token is for the correct execution
                 if (principal.executionId != null && principal.executionId != executionId.toString()) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token execution mismatch"))
                     return@get

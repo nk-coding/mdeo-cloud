@@ -104,16 +104,18 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
             }
         }
 
-        /**
-         * Gets the JWKS (JSON Web Key Set) for JWT verification.
-         * This is the standard endpoint for JWT validation using public keys.
-         * Follows the JWKS format specification (RFC 7517).
-         *
-         * @return JWKS containing the RSA public key
-         */
-        get("/jwks") {
-            val jwks = jwtService.getJwks()
-            call.respond(jwks)
-        }
+    }
+    
+    /**
+     * Standard JWKS (JSON Web Key Set) endpoint for JWT verification.
+     * Located at /api/.well-known/jwks.json as per RFC 8414 (OAuth 2.0 Authorization Server Metadata)
+     * and OpenID Connect Discovery specifications.
+     * Follows the JWKS format specification (RFC 7517).
+     *
+     * @return JWKS containing the RSA public key
+     */
+    get("/api/.well-known/jwks.json") {
+        val jwks = jwtService.getJwks()
+        call.respond(jwks)
     }
 }

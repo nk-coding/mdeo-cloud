@@ -19,8 +19,8 @@ import {
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { FileSystemError, ProjectError, ExecutionError } from "../api/apiResult";
 import { FileSystemErrorCode, ProjectErrorCode, CommonErrorCode, ExecutionErrorCode } from "../api/apiResult";
-import { parseUri as parseUriUtil, FileCategory } from "./util";
 import { Uri } from "vscode";
+import { FileCategory, parseUri } from "@mdeo/language-common";
 
 /**
  * File system provider that forwards operations to a backend API.
@@ -44,7 +44,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     constructor(private readonly backendApi: BackendApi) {}
 
     async stat(resource: URI): Promise<IStat> {
-        const parsed = parseUriUtil(Uri.from(resource));
+        const parsed = parseUri(Uri.from(resource));
         const { projectId, category } = parsed;
 
         if (category === FileCategory.ExecutionSummary) {
@@ -108,7 +108,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async readdir(resource: URI): Promise<[string, FileType][]> {
-        const parsed = parseUriUtil(Uri.from(resource));
+        const parsed = parseUri(Uri.from(resource));
         const { projectId, category } = parsed;
 
         if (category !== FileCategory.RegularFile) {
@@ -127,7 +127,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async readFile(resource: URI): Promise<Uint8Array> {
-        const parsed = parseUriUtil(Uri.from(resource));
+        const parsed = parseUri(Uri.from(resource));
         const { projectId, category } = parsed;
 
         if (category === FileCategory.ExecutionSummary) {
@@ -162,7 +162,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async writeFile(resource: URI, content: Uint8Array, opts: IFileWriteOptions): Promise<void> {
-        const parsed = parseUriUtil(Uri.from(resource));
+        const parsed = parseUri(Uri.from(resource));
         const { projectId, category } = parsed;
 
         if (category !== FileCategory.RegularFile) {
@@ -194,7 +194,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async mkdir(resource: URI): Promise<void> {
-        const parsed = parseUriUtil(Uri.from(resource));
+        const parsed = parseUri(Uri.from(resource));
         const { projectId, category } = parsed;
 
         if (category !== FileCategory.RegularFile) {
@@ -214,7 +214,7 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async delete(resource: URI, opts: IFileDeleteOptions): Promise<void> {
-        const parsed = parseUriUtil(Uri.from(resource));
+        const parsed = parseUri(Uri.from(resource));
         const { projectId, category } = parsed;
 
         if (category !== FileCategory.RegularFile) {
@@ -234,8 +234,8 @@ export class BackendFileSystemProvider implements IFileSystemProviderWithFileRea
     }
 
     async rename(from: URI, to: URI, opts: IFileOverwriteOptions): Promise<void> {
-        const fromParsed = parseUriUtil(Uri.from(from));
-        const toParsed = parseUriUtil(Uri.from(to));
+        const fromParsed = parseUri(Uri.from(from));
+        const toParsed = parseUri(Uri.from(to));
 
         if (fromParsed.category !== FileCategory.RegularFile || toParsed.category !== FileCategory.RegularFile) {
             throw createFileSystemProviderError(

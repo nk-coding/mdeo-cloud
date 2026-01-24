@@ -17,7 +17,8 @@ import {
     sharedImport,
     addExternalReferenceCollectionPhase,
     ActionHandlerRegistry,
-    type ActionHandlerRegistryAdditionalServices
+    type ActionHandlerRegistryAdditionalServices,
+    generateExtendedParser
 } from "@mdeo/language-shared";
 import {
     defaultExtendedTypirServices,
@@ -25,13 +26,14 @@ import {
     type ExpressionTypirServices,
     registerExpressionSerializers,
     registerStatementSerializers,
-    registerTypeSerializers
+    registerTypeSerializers,
+    generateExpressionRuleOverride
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import { ScriptTypeSystem } from "./features/type-system/scriptTypeSystem.js";
 import { ScriptScopeProvider } from "./features/type-system/scriptScopeProvider.js";
 import { registerScriptSerializers } from "./features/scriptSerializers.js";
-import { expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
+import { expressionConfig, expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
 import { ScriptLangiumScopeProvider } from "./features/scriptScopeProvider.js";
 import { ScriptExternalReferenceCollector } from "./features/scriptExternalReferenceCollector.js";
 import type { ResolvedScriptContributionPlugins, ScriptContributionPlugin } from "./plugin/scriptContributionPlugin.js";
@@ -65,7 +67,8 @@ export type ScriptTypirServices = ExpressionTypirServices<ScriptTypirSpecifics> 
  */
 export type ScriptServices = {
     typir: ScriptTypirServices;
-} & ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
+} & ExternalReferenceAdditionalServices &
+    ActionHandlerRegistryAdditionalServices;
 
 /**
  * Provider for the Script language plugin.
@@ -80,7 +83,8 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
                 parser: {
                     TokenBuilder: () =>
                         new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
-                    ValueConverter: () => new IdValueConverter()
+                    ValueConverter: () => new IdValueConverter(),
+                    ...generateExtendedParser(generateExpressionRuleOverride(expressionConfig))
                 },
                 references: {
                     ScopeProvider: (services) => new ScriptLangiumScopeProvider(services),

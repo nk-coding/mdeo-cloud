@@ -1,9 +1,10 @@
-import { FileCategory, getFileExtension, parseUri, type ParsedUri } from "@/data/filesystem/util";
+import { getFileExtension } from "@/data/filesystem/util";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { type IReference, type ITextFileEditorModel, createModelReference } from "@codingame/monaco-vscode-api/monaco";
 import type { ICodeEditorViewState } from "@codingame/monaco-vscode-api/vscode/vs/editor/common/editorCommon";
 import type { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
+import { FileCategory, parseUri, type ParsedUri } from "@mdeo/language-common";
 import type { IDisposable } from "monaco-editor";
 import type { Uri } from "vscode";
 import { computed, watch, type ComputedRef, type ShallowRef } from "vue";

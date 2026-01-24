@@ -2,6 +2,7 @@ export * from "./features/expressionSerializers.js";
 export * from "./features/inferLambdaType.js";
 export * from "./features/precedenceHelper.js";
 export * from "./features/returnAnalyzer.js";
+export * from "./features/ruleOverride.js";
 export * from "./features/statementSerializers.js";
 export * from "./features/statementsScopeProvider.js";
 export * from "./features/typeSerializers.js";

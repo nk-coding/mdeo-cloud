@@ -1,5 +1,6 @@
 import {
     action,
+    createFragmentRule,
     createInfixRule,
     createRule,
     createTerminal,
@@ -128,27 +129,49 @@ export function generateExpressionRules(
             ];
         });
 
+    const memberAccessOrCallFragment = createFragmentRule(config.memberAccessOrCallFragmentRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [
+            or(
+                treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
+                    or(flag("isNullChaining", "?."), "."),
+                    set("member", ID)
+                ]),
+                treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
+                    set("genericArgs", callExpressionGenericArgsRule),
+                    "(",
+                    ...manySep(
+                        add("arguments", () => expressionRule),
+                        ",",
+                        LeadingTrailing.TRAILING
+                    ),
+                    ")"
+                ])
+            )
+        ]);
+
     const memberAccessAndCallExpressionRule = createRule(config.memberAccessAndCallExpressionRuleName)
         .returns(types.baseExpressionType)
         .as(() => [
             primaryExpressionRule,
             many(
-                or(
-                    treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
-                        or(flag("isNullChaining", "?."), "."),
-                        set("member", ID)
-                    ]),
-                    treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
-                        set("genericArgs", callExpressionGenericArgsRule),
-                        "(",
-                        ...manySep(
-                            add("arguments", () => expressionRule),
-                            ",",
-                            LeadingTrailing.TRAILING
-                        ),
-                        ")"
-                    ])
-                )
+                // or(
+                //     treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
+                //         or(flag("isNullChaining", "?."), "."),
+                //         set("member", ID)
+                //     ]),
+                //     treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
+                //         set("genericArgs", callExpressionGenericArgsRule),
+                //         "(",
+                //         ...manySep(
+                //             add("arguments", () => expressionRule),
+                //             ",",
+                //             LeadingTrailing.TRAILING
+                //         ),
+                //         ")"
+                //     ])
+                // )
+                memberAccessOrCallFragment
             )
         ]);
 

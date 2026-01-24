@@ -4,6 +4,7 @@ import com.mdeo.script.ast.statements.TypedForStatement
 import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.compiler.ASMUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LoopLabels
 import com.mdeo.script.compiler.Scope
@@ -195,9 +196,9 @@ class ForStatementCompiler : StatementCompiler {
             true
         )
         
-        emitUnboxOrCast(variableType, mv)
+        ASMUtil.emitUnboxOrCast(variableType, mv)
         
-        val storeOpcode = getStoreOpcode(variableType)
+        val storeOpcode = ASMUtil.getStoreOpcode(variableType)
         mv.visitVarInsn(storeOpcode, variableSlot)
     }
     
@@ -224,95 +225,7 @@ class ForStatementCompiler : StatementCompiler {
         context.exitScope()
     }
     
-    /**
-     * Emits bytecode to unbox or cast a value from Object to the target type.
-     * 
-     * For primitive types, casts to the wrapper type and unboxes (unless nullable).
-     * For String, casts to String. For other object types, keeps as Object.
-     * 
-     * @param targetType The target type to convert to.
-     * @param mv The method visitor for emitting bytecode.
-     */
-    private fun emitUnboxOrCast(targetType: ReturnType, mv: MethodVisitor) {
-        if (targetType !is ClassTypeRef) {
-            return
-        }
-        
-        when (targetType.type) {
-            "builtin.int" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false)
-                }
-            }
-            "builtin.long" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false)
-                }
-            }
-            "builtin.float" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false)
-                }
-            }
-            "builtin.double" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false)
-                }
-            }
-            "builtin.boolean" -> {
-                if (targetType.isNullable) {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
-                } else {
-                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false)
-                }
-            }
-            "builtin.string" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String")
-            }
-            else -> {
-            }
-        }
-    }
+
     
-    /**
-     * Gets the appropriate STORE opcode for a type.
-     * 
-     * Returns the JVM store instruction opcode based on the type:
-     * - ISTORE for int and boolean primitives
-     * - LSTORE for long primitives
-     * - FSTORE for float primitives
-     * - DSTORE for double primitives
-     * - ASTORE for all reference types (including nullable primitives)
-     * 
-     * @param type The type to get the store opcode for.
-     * @return The appropriate JVM STORE opcode.
-     */
-    private fun getStoreOpcode(type: ReturnType): Int {
-        if (type is ClassTypeRef) {
-            if (type.isNullable) {
-                return Opcodes.ASTORE
-            }
-            return when (type.type) {
-                "builtin.int", "builtin.boolean" -> Opcodes.ISTORE
-                "builtin.long" -> Opcodes.LSTORE
-                "builtin.float" -> Opcodes.FSTORE
-                "builtin.double" -> Opcodes.DSTORE
-                else -> Opcodes.ASTORE
-            }
-        }
-        return Opcodes.ASTORE
-    }
+
 }

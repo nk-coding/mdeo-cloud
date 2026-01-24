@@ -1,6 +1,6 @@
 package com.mdeo.backend.service
 
-import com.mdeo.backend.database.ExecutionState
+import com.mdeo.common.model.ExecutionState
 import com.mdeo.backend.database.ExecutionsTable
 import com.mdeo.backend.database.FilesTable
 import com.mdeo.common.model.*
@@ -42,6 +42,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
          * JWT scope for reading execution data 
          */
         const val SCOPE_EXECUTION_READ = "execution:read"
+
         /**
          * JWT scope for writing execution state 
          */
@@ -77,7 +78,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 .selectAll()
                 .where {
                     (ExecutionsTable.id eq executionId) and
-                    (ExecutionsTable.projectId eq projectId)
+                            (ExecutionsTable.projectId eq projectId)
                 }
                 .firstOrNull()
 
@@ -136,7 +137,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             FilesTable.selectAll()
                 .where {
                     (FilesTable.projectId eq projectId) and
-                    (FilesTable.path eq normalizedPath)
+                            (FilesTable.path eq normalizedPath)
                 }
                 .firstOrNull()
         }
@@ -224,11 +225,11 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         }
 
         val result = performStateUpdateTransaction(executionId, newState, progressText)
-        
+
         if (result is ApiResult.Success) {
             notifyExecutionStateChange(result.value)
         }
-        
+
         return result
     }
 
@@ -258,7 +259,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             }
 
             val currentState = existing[ExecutionsTable.state]
-            
+
             if (isTerminalState(currentState)) {
                 return@transaction executionFailure(
                     ErrorCodes.EXECUTION_ALREADY_COMPLETED,
@@ -289,7 +290,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             logger.warn("Invalid project ID in execution: ${execution.projectId}")
             return
         }
-        
+
         webSocketNotificationService.broadcastExecutionStateChange(projectId, execution)
     }
 
@@ -342,16 +343,16 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         currentState: String
     ) {
         val now = Instant.now()
-        
+
         ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
             it[state] = newState
             it[ExecutionsTable.progressText] = progressText
             it[updatedAt] = now
-            
+
             if (newState == ExecutionState.RUNNING && currentState != ExecutionState.RUNNING) {
                 it[startedAt] = now
             }
-            
+
             if (isTerminalState(newState) && !isTerminalState(currentState)) {
                 it[finishedAt] = now
             }
@@ -507,7 +508,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
         return try {
             callPluginCancel(pluginUrl, executionId, projectId)
-            
+
             transaction {
                 val now = Instant.now()
                 ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
@@ -516,7 +517,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                     it[finishedAt] = now
                 }
             }
-            
+
             success(Unit)
         } catch (e: Exception) {
             logger.error("Failed to cancel execution via plugin", e)
@@ -553,12 +554,12 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
         return try {
             callPluginDelete(pluginUrl, executionId, projectId)
-            
+
             // Delete from database
             transaction {
                 ExecutionsTable.deleteWhere { ExecutionsTable.id eq executionId }
             }
-            
+
             success(Unit)
         } catch (e: Exception) {
             logger.error("Failed to delete execution via plugin", e)
@@ -577,7 +578,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      */
     suspend fun deleteAllExecutions(projectId: UUID): ApiResult<Unit> {
         val executions = listExecutions(projectId)
-        
+
         if (executions.isEmpty()) {
             return success(Unit)
         }
@@ -623,22 +624,10 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             ExecutionsTable.selectAll()
                 .where {
                     (ExecutionsTable.projectId eq projectId) and
-                    (ExecutionsTable.state eq ExecutionState.INITIALIZING)
+                            (ExecutionsTable.state eq ExecutionState.INITIALIZING)
                 }
                 .count() > 0
         }
-    }
-
-    /**
-     * Generates a JWT token for execution operations.
-     * Includes read access to project data and write access to execution progress.
-     *
-     * @param projectId The UUID of the project
-     * @param executionId The UUID of the execution
-     * @return The generated JWT token string
-     */
-    fun generateExecutionToken(projectId: UUID, executionId: UUID): String {
-        return jwtService.generateExecutionToken(projectId, executionId)
     }
 
     /**
@@ -683,7 +672,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         data: JsonElement
     ): CreateExecutionResponse {
         return withContext(Dispatchers.IO) {
-            val token = generateExecutionToken(projectId, executionId)
+            val token =
+                jwtService.generateExecutionToken(projectId, executionId, listOf(JwtService.SCOPE_EXECUTION_WRITE))
             val requestBody = json.encodeToString(
                 PluginCreateExecutionRequest.serializer(),
                 PluginCreateExecutionRequest(
@@ -722,9 +712,13 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         projectId: UUID
     ): List<FileEntry> {
         return withContext(Dispatchers.IO) {
-            val token = jwtService.generateProjectToken(projectId)
+            val token = jwtService.generateExecutionToken(
+                projectId,
+                executionId,
+                listOf(JwtService.SCOPE_PLUGIN_EXECUTION_READ)
+            )
             val uri = URI.create(pluginUrl).resolve("executions/$executionId/files")
-            
+
             val request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Authorization", "Bearer $token")
@@ -751,9 +745,13 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         projectId: UUID
     ): String {
         return withContext(Dispatchers.IO) {
-            val token = jwtService.generateProjectToken(projectId)
+            val token = jwtService.generateExecutionToken(
+                projectId,
+                executionId,
+                listOf(JwtService.SCOPE_PLUGIN_EXECUTION_READ)
+            )
             val uri = URI.create(pluginUrl).resolve("executions/$executionId/summary")
-            
+
             val request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Authorization", "Bearer $token")
@@ -781,10 +779,14 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         path: String
     ): ByteArray {
         return withContext(Dispatchers.IO) {
-            val token = jwtService.generateProjectToken(projectId)
+            val token = jwtService.generateExecutionToken(
+                projectId,
+                executionId,
+                listOf(JwtService.SCOPE_PLUGIN_EXECUTION_READ)
+            )
             val normalizedPath = normalizePath(path)
             val uri = URI.create(pluginUrl).resolve("executions/$executionId/files/$normalizedPath")
-            
+
             val request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Authorization", "Bearer $token")
@@ -811,9 +813,13 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         projectId: UUID
     ) {
         withContext(Dispatchers.IO) {
-            val token = jwtService.generateProjectToken(projectId)
+            val token = jwtService.generateExecutionToken(
+                projectId,
+                executionId,
+                listOf(JwtService.SCOPE_PLUGIN_EXECUTION_CANCEL)
+            )
             val uri = URI.create(pluginUrl).resolve("executions/$executionId/cancel")
-            
+
             val request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Authorization", "Bearer $token")
@@ -838,9 +844,13 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         projectId: UUID
     ) {
         withContext(Dispatchers.IO) {
-            val token = jwtService.generateProjectToken(projectId)
+            val token = jwtService.generateExecutionToken(
+                projectId,
+                executionId,
+                listOf(JwtService.SCOPE_PLUGIN_EXECUTION_DELETE)
+            )
             val uri = URI.create(pluginUrl).resolve("executions/$executionId")
-            
+
             val request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Authorization", "Bearer $token")

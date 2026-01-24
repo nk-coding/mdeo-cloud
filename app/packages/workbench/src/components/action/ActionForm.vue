@@ -4,7 +4,6 @@
             v-if="isTypeFormSchema"
             :schema="<ActionSchemaTypeForm>schema"
             v-model="<string | boolean | number>modelValue"
-            @update:model-value="console.log($event)"
             :errors="filteredErrors"
             :path="path"
             :label="label"

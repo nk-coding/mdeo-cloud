@@ -112,3 +112,16 @@ data class ExecutionFileTreeResponse(
 data class ExecutionSummaryResponse(
     val summary: String
 )
+
+/**
+ * Execution state constants used across services.
+ * Centralized here to avoid inconsistent definitions in multiple modules.
+ */
+object ExecutionState {
+    const val SUBMITTED = "submitted"
+    const val INITIALIZING = "initializing"
+    const val RUNNING = "running"
+    const val COMPLETED = "completed"
+    const val CANCELLED = "cancelled"
+    const val FAILED = "failed"
+}

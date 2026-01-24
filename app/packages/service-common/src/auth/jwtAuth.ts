@@ -9,12 +9,12 @@ export interface JwtClaims extends JWTPayload {
      * Project ID from the JWT
      */
     projectId?: string;
-    
+
     /**
      * Execution ID from the JWT
      */
     executionId?: string;
-    
+
     /**
      * Scopes/permissions granted by the token
      */
@@ -29,27 +29,25 @@ export interface JwtClaims extends JWTPayload {
 export class JwtAuthMiddleware {
     private jwks: ReturnType<typeof createRemoteJWKSet>;
     private issuer: string;
-    
+
     /**
      * Creates a new JWT authentication middleware.
-     * 
-     * @param backendUrl - Base URL of the backend (e.g., "http://localhost:8080")
-     * @param issuer - Expected issuer in JWT tokens (default: "mdeo-backend")
+     *
+     * @param backendUrl - Base URL of the backend (e.g., "http://localhost:8080/api")
      */
-    constructor(backendUrl: string, issuer: string = "mdeo-backend") {
-        // Create JWKS client that will fetch and cache public keys from the backend
-        this.jwks = createRemoteJWKSet(new URL(`${backendUrl}/api/auth/jwks`));
-        this.issuer = issuer;
+    constructor(backendUrl: string) {
+        this.jwks = createRemoteJWKSet(new URL(`${backendUrl}/.well-known/jwks.json`));
+        this.issuer = backendUrl;
     }
-    
+
     /**
      * Fastify hook that validates JWT tokens.
      * This can be used as a preHandler hook for routes that need authentication.
-     * 
+     *
      * @param request - Fastify request object
      * @param reply - Fastify reply object
      * @throws Will send 401 response if authentication fails
-     * 
+     *
      * @example
      * ```typescript
      * const authMiddleware = new JwtAuthMiddleware("http://localhost:8080");
@@ -59,23 +57,25 @@ export class JwtAuthMiddleware {
     async authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
         try {
             const authHeader = request.headers.authorization;
-            
+
             if (!authHeader) {
                 return reply.status(401).send({ error: "Missing Authorization header" });
             }
-            
+
             if (!authHeader.startsWith("Bearer ")) {
-                return reply.status(401).send({ error: "Invalid Authorization header format. Expected 'Bearer <token>'" });
+                return reply
+                    .status(401)
+                    .send({ error: "Invalid Authorization header format. Expected 'Bearer <token>'" });
             }
-            
+
             const token = authHeader.substring(7);
-            
+
             // Verify the JWT using the backend's public keys
             const { payload } = await jwtVerify<JwtClaims>(token, this.jwks, {
                 issuer: this.issuer,
                 algorithms: ["RS256"]
             });
-            
+
             // Attach the validated claims to the request for use in route handlers
             (request as any).jwtClaims = payload;
         } catch (error) {
@@ -89,33 +89,25 @@ export class JwtAuthMiddleware {
             return reply.status(401).send({ error: "Authentication failed" });
         }
     }
-    
+
     /**
      * Helper method to get JWT claims from an authenticated request.
      * This should only be called in routes protected by the authenticate middleware.
-     * 
+     *
      * @param request - Fastify request object
      * @returns The JWT claims, or undefined if not authenticated
-     * 
-     * @example
-     * ```typescript
-     * const claims = JwtAuthMiddleware.getClaims(request);
-     * if (claims) {
-     *     console.log("Project ID:", claims.projectId);
-     * }
-     * ```
      */
     static getClaims(request: FastifyRequest): JwtClaims | undefined {
         return (request as any).jwtClaims;
     }
-    
+
     /**
      * Checks if the JWT token has a specific scope/permission.
-     * 
+     *
      * @param request - Fastify request object
      * @param scope - The required scope to check for
      * @returns true if the token has the scope, false otherwise
-     * 
+     *
      * @example
      * ```typescript
      * if (JwtAuthMiddleware.hasScope(request, "file-data:read")) {

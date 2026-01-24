@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.json.json
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import com.mdeo.common.model.ExecutionState
 import org.jetbrains.exposed.sql.javatime.timestamp
 
 /**
@@ -248,17 +249,7 @@ object DataDependenciesTable : Table("data_dependencies") {
     }
 }
 
-/**
- * Execution state enum values stored as strings in the database.
- */
-object ExecutionState {
-    const val SUBMITTED = "submitted"
-    const val INITIALIZING = "initializing"
-    const val RUNNING = "running"
-    const val COMPLETED = "completed"
-    const val CANCELLED = "cancelled"
-    const val FAILED = "failed"
-}
+// ExecutionState is centralized in `com.mdeo.common.model.ExecutionState`.
 
 /**
  * Executions table schema for storing execution metadata.

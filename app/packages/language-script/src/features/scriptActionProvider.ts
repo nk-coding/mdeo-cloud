@@ -1,8 +1,9 @@
 import type { GetFileActionsParams, GetFileActionsResponse, ActionIconNode } from "@mdeo/language-common";
-import { convertIcon } from "@mdeo/language-common";
+import { convertIcon, FileCategory, parseUri } from "@mdeo/language-common";
 import type { ActionProvider } from "@mdeo/language-shared";
 import { ActionDisplayLocation } from "@mdeo/language-common";
 import { Play } from "lucide";
+import { URI } from "langium";
 
 /**
  * Action provider for script files.
@@ -16,8 +17,11 @@ export class ScriptActionProvider implements ActionProvider {
      * @returns A promise resolving to the list of available actions
      */
     async getFileActions(params: GetFileActionsParams): Promise<GetFileActionsResponse> {
-        // Only provide actions for script files
         if (params.languageId !== "script") {
+            return { actions: [] };
+        }
+        const parsedUri = parseUri(URI.parse(params.fileUri));
+        if (parsedUri.category !== FileCategory.RegularFile) {
             return { actions: [] };
         }
 

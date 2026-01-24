@@ -114,9 +114,8 @@ export interface FileEntry {
  * - Managing execution lifecycle (cancel, delete)
  *
  * @template T The return type of the execute method
- * @template S The type of additional services (if any)
  */
-export interface ExecutionHandler<T = unknown, S = object> {
+export interface ExecutionHandler<T = unknown> {
     /**
      * Determines if this handler can process the given execution request.
      * This method analyzes the execution data to decide if the handler
@@ -140,52 +139,45 @@ export interface ExecutionHandler<T = unknown, S = object> {
      * Gets a markdown summary of the execution results.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise resolving to a markdown-formatted summary
      */
-    getSummary(executionId: string, project: string, jwt: string): Promise<string>;
+    getSummary(executionId: string, jwt: string): Promise<string>;
 
     /**
      * Gets the file tree of execution results.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise resolving to the list of files and directories
      */
-    getFileTree(executionId: string, project: string, jwt: string): Promise<FileEntry[]>;
-
+    getFileTree(executionId: string, jwt: string): Promise<FileEntry[]>;
     /**
      * Reads a specific file from the execution results.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param path Path to the file to read
      * @param jwt JWT token for authentication
      * @returns Promise resolving to the file contents
      */
-    getFile(executionId: string, project: string, path: string, jwt: string): Promise<Buffer>;
-
+    getFile(executionId: string, path: string, jwt: string): Promise<Buffer>;
     /**
      * Cancels a running execution.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is cancelled
      */
-    cancel(executionId: string, project: string, jwt: string): Promise<void>;
+    cancel(executionId: string, jwt: string): Promise<void>;
 
     /**
      * Deletes an execution and its results.
      *
      * @param executionId Unique identifier for the execution
-     * @param project Project identifier
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is deleted
      */
-    delete(executionId: string, project: string, jwt: string): Promise<void>;
+    delete(executionId: string, jwt: string): Promise<void>;
 }
 
 /**

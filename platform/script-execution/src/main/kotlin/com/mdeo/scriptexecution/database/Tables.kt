@@ -2,6 +2,7 @@ package com.mdeo.scriptexecution.database
 
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
+import com.mdeo.common.model.ExecutionState
 
 /**
  * Database table for script executions.
@@ -75,37 +76,4 @@ object ExecutionsTable : Table("script_executions") {
     }
 }
 
-/**
- * Execution state constants representing the lifecycle of a script execution.
- */
-object ExecutionState {
-    /**
-     * Execution has been submitted but not yet started.
-     */
-    const val SUBMITTED = "SUBMITTED"
-    
-    /**
-     * Execution is initializing (fetching AST, compiling).
-     */
-    const val INITIALIZING = "INITIALIZING"
-    
-    /**
-     * Execution is running.
-     */
-    const val RUNNING = "RUNNING"
-    
-    /**
-     * Execution completed successfully.
-     */
-    const val COMPLETED = "COMPLETED"
-    
-    /**
-     * Execution was cancelled.
-     */
-    const val CANCELLED = "CANCELLED"
-    
-    /**
-     * Execution failed.
-     */
-    const val FAILED = "FAILED"
-}
+// ExecutionState is centralized in `com.mdeo.common.model.ExecutionState`.

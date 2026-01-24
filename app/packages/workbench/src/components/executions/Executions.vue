@@ -90,9 +90,9 @@ import ExecutionItem from "./ExecutionItem.vue";
 import { Trash2 } from "lucide-vue-next";
 import type { ExecutionWithLoadedTree } from "@/data/workbenchState";
 import type { FileSystemNode } from "@/data/filesystem/file";
-import { Uri } from "vscode";
-import { parseUri, FileCategory, findFileInTree } from "@/data/filesystem/util";
+import { findFileInTree } from "@/data/filesystem/util";
 import { showApiError } from "@/lib/notifications";
+import { FileCategory, parseUri } from "@mdeo/language-common";
 
 const workbenchState = inject(workbenchStateKey)!;
 const { executions, project, backendApi, monacoApi, activeTab } = workbenchState;

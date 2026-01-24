@@ -64,10 +64,11 @@ import { VSBuffer } from "@codingame/monaco-vscode-api/vscode/vs/base/common/buf
 import { workbenchStateKey } from "../workbench/util";
 import { Uri } from "vscode";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
-import { findFileInTree, parseUri, FileCategory } from "@/data/filesystem/util";
+import { findFileInTree } from "@/data/filesystem/util";
 import { FolderIcon } from "lucide-vue-next";
 import FileTypeIcon from "../FileTypeIcon.vue";
 import type { EditorTab } from "@/data/tab/editorTab";
+import { FileCategory, parseUri } from "@mdeo/language-common";
 
 const workbenchState = inject(workbenchStateKey)!;
 const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins: fileTypePlugins, tabs } = workbenchState;
