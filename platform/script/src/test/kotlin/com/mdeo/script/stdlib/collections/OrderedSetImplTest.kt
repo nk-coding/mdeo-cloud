@@ -2,8 +2,8 @@ package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.util.function.Predicate
-import java.util.function.Function
+import com.mdeo.script.runtime.interfaces.Predicate1
+import com.mdeo.script.runtime.interfaces.Func1
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
@@ -231,7 +231,7 @@ class OrderedSetImplTest {
     @Test
     fun `sortBy sorts in place`() {
         val set = OrderedSetImpl.of(3, 1, 2)
-        set.sortBy(Function { it })
+        set.sortBy(Func1 { it })
         assertEquals(1, set.at(0))
         assertEquals(2, set.at(1))
         assertEquals(3, set.at(2))
@@ -240,28 +240,28 @@ class OrderedSetImplTest {
     @Test
     fun `sortBy with custom key`() {
         val set = OrderedSetImpl.of("apple", "cat", "banana")
-        set.sortBy(Function { it.length })
+        set.sortBy(Func1 { it.length })
         assertEquals("cat", set.first())
     }
 
     @Test
     fun `sortBy returns same set`() {
         val set = OrderedSetImpl.of(3, 1, 2)
-        val result = set.sortBy(Function { it })
+        val result = set.sortBy(Func1 { it })
         assertTrue(result === set)
     }
 
     @Test
     fun `sortBy handles empty set`() {
         val set = OrderedSetImpl<Int>()
-        set.sortBy(Function { it })
+        set.sortBy(Func1 { it })
         assertTrue(set.isEmpty())
     }
 
     @Test
     fun `sortBy handles single element`() {
         val set = OrderedSetImpl.of(1)
-        set.sortBy(Function { it })
+        set.sortBy(Func1 { it })
         assertEquals(1, set.first())
     }
 
@@ -269,7 +269,7 @@ class OrderedSetImplTest {
     @Test
     fun `sortedBy returns new sorted collection`() {
         val set = OrderedSetImpl.of(3, 1, 2)
-        val sorted = set.sortedBy(Function { it })
+        val sorted = set.sortedBy(Func1 { it })
         assertEquals(1, sorted.first())
         assertEquals(3, set.first()) // Original unchanged
     }
@@ -277,28 +277,28 @@ class OrderedSetImplTest {
     @Test
     fun `sortedBy with custom key`() {
         val set = OrderedSetImpl.of("apple", "cat", "banana")
-        val sorted = set.sortedBy(Function { it.length })
+        val sorted = set.sortedBy(Func1 { it.length })
         assertEquals("cat", sorted.first())
     }
 
     @Test
     fun `sortedBy does not modify original`() {
         val set = OrderedSetImpl.of(3, 1, 2)
-        set.sortedBy(Function { it })
+        set.sortedBy(Func1 { it })
         assertEquals(3, set.first())
     }
 
     @Test
     fun `sortedBy handles empty set`() {
         val set = OrderedSetImpl<Int>()
-        val sorted = set.sortedBy(Function { it })
+        val sorted = set.sortedBy(Func1 { it })
         assertTrue(sorted.isEmpty())
     }
 
     @Test
     fun `sortedBy preserves all elements`() {
         val set = OrderedSetImpl.of(3, 1, 2)
-        val sorted = set.sortedBy(Function { it })
+        val sorted = set.sortedBy(Func1 { it })
         assertEquals(3, sorted.size())
     }
 
@@ -346,14 +346,14 @@ class OrderedSetImplTest {
     @Test
     fun `map returns ordered set`() {
         val set = OrderedSetImpl.of(1, 2, 3)
-        val mapped = set.map(Function { it * 2 })
+        val mapped = set.map(Func1 { it * 2 })
         assertTrue(mapped is ReadonlyOrderedSet)
     }
 
     @Test
     fun `map preserves order`() {
         val set = OrderedSetImpl.of(1, 2, 3)
-        val mapped = set.map(Function { it * 10 })
+        val mapped = set.map(Func1 { it * 10 })
         assertEquals(10, mapped.first())
         assertEquals(30, mapped.last())
     }
@@ -361,21 +361,21 @@ class OrderedSetImplTest {
     @Test
     fun `map can collapse duplicates`() {
         val set = OrderedSetImpl.of(1, 2, 3, 4)
-        val mapped = set.map(Function { it % 2 })
+        val mapped = set.map(Func1 { it % 2 })
         assertEquals(2, mapped.size())
     }
 
     @Test
     fun `map handles empty set`() {
         val set = OrderedSetImpl<Int>()
-        val mapped = set.map(Function { it * 2 })
+        val mapped = set.map(Func1 { it * 2 })
         assertTrue(mapped.isEmpty())
     }
 
     @Test
     fun `map can change type`() {
         val set = OrderedSetImpl.of(1, 2, 3)
-        val mapped = set.map(Function { it.toString() })
+        val mapped = set.map(Func1 { it.toString() })
         assertEquals("1", mapped.first())
     }
 
@@ -383,14 +383,14 @@ class OrderedSetImplTest {
     @Test
     fun `filter returns ordered set`() {
         val set = OrderedSetImpl.of(1, 2, 3, 4, 5)
-        val result = set.filter(Predicate { it > 3 })
+        val result = set.filter(Predicate1 { it > 3 })
         assertTrue(result is OrderedSet)
     }
 
     @Test
     fun `filter preserves order`() {
         val set = OrderedSetImpl.of(5, 4, 3, 2, 1)
-        val result = set.filter(Predicate { it > 2 })
+        val result = set.filter(Predicate1 { it > 2 })
         assertEquals(5, result.first())
         assertEquals(3, result.last())
     }
@@ -398,14 +398,14 @@ class OrderedSetImplTest {
     @Test
     fun `reject returns ordered set`() {
         val set = OrderedSetImpl.of(1, 2, 3, 4, 5)
-        val result = set.reject(Predicate { it > 3 })
+        val result = set.reject(Predicate1 { it > 3 })
         assertTrue(result is OrderedSet)
     }
 
     @Test
     fun `rejectOne returns ordered set`() {
         val set = OrderedSetImpl.of(1, 2, 3, 4)
-        val result = set.rejectOne(Predicate { it > 2 })
+        val result = set.rejectOne(Predicate1 { it > 2 })
         assertTrue(result is OrderedSet)
         assertEquals(3, result.size())
     }
@@ -413,7 +413,7 @@ class OrderedSetImplTest {
     @Test
     fun `filter on empty returns empty`() {
         val set = OrderedSetImpl<Int>()
-        val result = set.filter(Predicate { it > 0 })
+        val result = set.filter(Predicate1 { it > 0 })
         assertTrue(result.isEmpty())
     }
 

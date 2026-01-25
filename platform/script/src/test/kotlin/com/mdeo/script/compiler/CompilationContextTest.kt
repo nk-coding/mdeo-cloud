@@ -117,7 +117,7 @@ class CompilationContextTest {
         }
         
         assertThrows<CompilationException> {
-            context.compileExpression(unsupportedExpression, DummyMethodVisitor())
+            context.compileExpression(unsupportedExpression, DummyMethodVisitor(), ast.types[0])
         }
     }
     

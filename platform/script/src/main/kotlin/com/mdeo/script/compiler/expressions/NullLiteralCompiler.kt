@@ -11,7 +11,7 @@ import org.objectweb.asm.Opcodes
  * Compiler for null literal expressions.
  * Generates bytecode to push null (ACONST_NULL) onto the operand stack.
  */
-class NullLiteralCompiler : ExpressionCompiler {
+class NullLiteralCompiler : ExpressionCompiler() {
 
     /**
      * Determines if this compiler can handle the given expression.
@@ -30,7 +30,7 @@ class NullLiteralCompiler : ExpressionCompiler {
      * @param context The compilation context containing compiler state.
      * @param mv The method visitor used to generate bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         mv.visitInsn(Opcodes.ACONST_NULL)
     }
 }

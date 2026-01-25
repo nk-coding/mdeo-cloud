@@ -1,6 +1,7 @@
 package com.mdeo.script.compiler.registry.function
 
 import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.ast.types.ValueType
 import com.mdeo.script.compiler.util.MethodDescriptorUtil
 
 /**
@@ -106,11 +107,10 @@ fun createSimpleFileFunction(
 ): FunctionDefinition {
     val impl = FunctionDefinitionImpl(name, ownerClass)
     
-    val paramTypeNames = parameters.mapNotNull { param ->
-        extractTypeName(param.type)
+    val paramTypes: List<ValueType> = parameters.mapNotNull { param ->
+        param.type as? ValueType
     }
     
-    val returnTypeName = extractTypeName(returnType)
     val descriptor = MethodDescriptorUtil.buildDescriptor(parameters.map { it.type }, returnType)
     
     val signature = StaticFunctionSignatureDefinition(
@@ -119,32 +119,10 @@ fun createSimpleFileFunction(
         ownerClass = ownerClass,
         jvmMethodName = name,
         isVarArgs = false,
-        parameterTypes = paramTypeNames,
-        returnType = returnTypeName
+        parameterTypes = paramTypes,
+        returnType = returnType
     )
     
     impl.addOverload(signature)
     return impl
-}
-
-/**
- * Extracts the type name from a ReturnType for coercion purposes.
- *
- * @param type The return type to extract name from.
- * @return The type name string, or null for void.
- */
-private fun extractTypeName(type: ReturnType): String? {
-    return when (type) {
-        is com.mdeo.script.ast.types.ClassTypeRef -> {
-            if (type.isNullable) "${type.type}?" else type.type
-        }
-        is com.mdeo.script.ast.types.VoidType -> null
-        is com.mdeo.script.ast.types.GenericTypeRef -> {
-            if (type.isNullable == true) "${type.generic}?" else type.generic
-        }
-        is com.mdeo.script.ast.types.LambdaType -> {
-            if (type.isNullable) "builtin.function?" else "builtin.function"
-        }
-        else -> "java.lang.Object"
-    }
 }

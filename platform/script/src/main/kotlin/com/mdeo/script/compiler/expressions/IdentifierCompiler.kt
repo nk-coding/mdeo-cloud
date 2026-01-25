@@ -6,6 +6,8 @@ import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.CompilationContext
+import com.mdeo.script.compiler.CompilationException
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.ExpressionCompiler
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.VariableInfo
@@ -29,9 +31,13 @@ import org.objectweb.asm.Opcodes
  * - Lambda parameters (loaded from local slots)
  * - Captured variables (loaded from parameter slots, with isWrittenByLambda=true if Ref-wrapped)
  * - Local variables declared in the lambda body
+ * 
+ * This compiler overrides [compile] to provide correct coercion from the variable's
+ * actual type (from scope lookup) to the expected type, rather than relying on
+ * the AST's evalType which may differ (e.g., for lambda parameters with generic types).
  */
-class IdentifierCompiler : ExpressionCompiler {
-    
+class IdentifierCompiler : ExpressionCompiler() {
+
     /**
      * Checks if this compiler can handle the given expression.
      *
@@ -41,40 +47,69 @@ class IdentifierCompiler : ExpressionCompiler {
     override fun canCompile(expression: TypedExpression): Boolean {
         return expression is TypedIdentifierExpression
     }
-    
+
     /**
-     * Compiles an identifier expression to bytecode.
+     * Compiles an identifier expression to bytecode with proper coercion.
      *
-     * For global scope identifiers (scope level 0), first checks the global function
-     * registry for global properties. If not found there, falls back to local variable
-     * lookup.
+     * Overrides the base compile method to use the variable's actual type (from scope)
+     * for coercion, rather than the expression's evalType. This is necessary because
+     * lambda parameters may have a different type in scope (e.g., any?) than what
+     * the expression claims (e.g., int).
      *
-     * For variables with isWrittenByLambda=true, loads the Ref object first,
-     * then reads its `.value` field. Otherwise, loads directly from the slot.
-     *
-     * @param expression The identifier expression to compile (must be a [TypedIdentifierExpression]).
-     * @param context The compilation context containing scope and type information.
+     * @param expression The identifier expression to compile.
+     * @param context The compilation context.
      * @param mv The method visitor for emitting bytecode.
+     * @param expectedType The expected type to coerce to.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    // override fun compile(
+    //     expression: TypedExpression,
+    //     context: CompilationContext,
+    //     mv: MethodVisitor,
+    //     expectedType: ReturnType
+    // ) {
+    //     val identifier = expression as TypedIdentifierExpression
+
+    //     // Handle global properties first
+    //     if (identifier.scope == 0) {
+    //         val globalProperty = context.globalPropertyRegistry.getProperty(identifier.name)
+    //         if (globalProperty != null) {
+    //             globalProperty.emitAccess(mv)
+    //             // For global properties, use the expression's evalType for coercion
+    //             val actualType = context.getType(expression.evalType)
+    //             CoercionUtil.emitCoercion(actualType, expectedType, mv, context)
+    //             return
+    //         }
+    //     }
+
+    //     val variable = context.currentScope?.lookupVariable(identifier.name, identifier.scope)
+    //         ?: throw IllegalStateException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
+
+    //     // Load the variable
+    //     compileVariableLoad(variable, variable.type, mv)
+
+    //     // Coerce from the VARIABLE's actual type to the expected type
+    //     CoercionUtil.emitCoercion(variable.type, expectedType, mv, context)
+    // }
+
+    /**
+     * Not used - this compiler overrides [compile] directly.
+     */
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val identifier = expression as TypedIdentifierExpression
-        
+
         if (identifier.scope == 0) {
-            val globalProperty = context.globalPropertyRegistry.getPropertyOrGlobal(identifier.name)
-            if (globalProperty != null) {
-                globalProperty.emitAccess(mv)
-                return
-            }
+            val globalProperty = context.globalPropertyRegistry.getProperty(identifier.name)
+                ?: throw CompilationException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
+            globalProperty.emitAccess(mv)
+            return
         }
-        
+
         val variable = context.currentScope?.lookupVariable(identifier.name, identifier.scope)
             ?: throw IllegalStateException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
-        
-        val type = variable.type
-        
-        compileVariableLoad(variable, type, mv)
+
+        compileVariableLoad(variable, variable.type, mv)
     }
-    
+
     /**
      * Compiles a variable load, handling Ref-wrapped variables if needed.
      *
@@ -97,7 +132,7 @@ class IdentifierCompiler : ExpressionCompiler {
             mv.visitVarInsn(loadOpcode, variable.slotIndex)
         }
     }
-    
+
     /**
      * Compiles a load of a variable wrapped in a Ref type.
      *
@@ -113,7 +148,7 @@ class IdentifierCompiler : ExpressionCompiler {
         mv: MethodVisitor
     ) {
         mv.visitVarInsn(Opcodes.ALOAD, slotIndex)
-        
+
         val refClassName = RefTypeUtil.getRefClassName(type)
         val valueDescriptor = RefTypeUtil.getRefValueDescriptor(type)
         mv.visitFieldInsn(Opcodes.GETFIELD, refClassName, "value", valueDescriptor)

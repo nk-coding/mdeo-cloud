@@ -11,7 +11,7 @@ import org.objectweb.asm.MethodVisitor
  * Compiler for string literal expressions.
  * Generates bytecode to push a string constant onto the operand stack.
  */
-class StringLiteralCompiler : ExpressionCompiler {
+class StringLiteralCompiler : ExpressionCompiler() {
 
     /**
      * Checks if this compiler can handle the given expression.
@@ -31,7 +31,7 @@ class StringLiteralCompiler : ExpressionCompiler {
      * @param context The compilation context with type information and utilities.
      * @param mv The method visitor to emit bytecode to.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val stringExpr = expression as TypedStringLiteralExpression
         mv.visitLdcInsn(stringExpr.value)
     }

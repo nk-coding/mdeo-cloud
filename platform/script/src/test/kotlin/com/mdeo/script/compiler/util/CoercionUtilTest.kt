@@ -16,101 +16,7 @@ import kotlin.test.assertTrue
  * Tests the utility functions for type coercion, boxing, and unboxing.
  */
 class CoercionUtilTest {
-    
-    // ==================== isPrimitiveType Tests ====================
-    
-    @Nested
-    inner class IsPrimitiveType {
-        
-        @Test
-        fun `int is primitive type`() {
-            assertTrue(CoercionUtil.isPrimitiveType("builtin.int"))
-        }
-        
-        @Test
-        fun `long is primitive type`() {
-            assertTrue(CoercionUtil.isPrimitiveType("builtin.long"))
-        }
-        
-        @Test
-        fun `float is primitive type`() {
-            assertTrue(CoercionUtil.isPrimitiveType("builtin.float"))
-        }
-        
-        @Test
-        fun `double is primitive type`() {
-            assertTrue(CoercionUtil.isPrimitiveType("builtin.double"))
-        }
-        
-        @Test
-        fun `boolean is primitive type`() {
-            assertTrue(CoercionUtil.isPrimitiveType("builtin.boolean"))
-        }
-        
-        @Test
-        fun `string is not primitive type`() {
-            assertFalse(CoercionUtil.isPrimitiveType("builtin.string"))
-        }
-        
-        @Test
-        fun `unknown type is not primitive type`() {
-            assertFalse(CoercionUtil.isPrimitiveType("custom.type"))
-        }
-    }
-    
-    // ==================== getPrimitiveTypeName Tests ====================
-    
-    @Nested
-    inner class GetPrimitiveTypeName {
-        
-        @Test
-        fun `returns type name for int`() {
-            val type = ClassTypeRef("builtin.int", false)
-            assertEquals("builtin.int", CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns type name for long`() {
-            val type = ClassTypeRef("builtin.long", false)
-            assertEquals("builtin.long", CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns type name for float`() {
-            val type = ClassTypeRef("builtin.float", false)
-            assertEquals("builtin.float", CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns type name for double`() {
-            val type = ClassTypeRef("builtin.double", false)
-            assertEquals("builtin.double", CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns type name for boolean`() {
-            val type = ClassTypeRef("builtin.boolean", false)
-            assertEquals("builtin.boolean", CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns type name for nullable int`() {
-            val type = ClassTypeRef("builtin.int", true)
-            assertEquals("builtin.int", CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns null for string`() {
-            val type = ClassTypeRef("builtin.string", false)
-            assertNull(CoercionUtil.getPrimitiveTypeName(type))
-        }
-        
-        @Test
-        fun `returns null for unknown type`() {
-            val type = ClassTypeRef("custom.type", false)
-            assertNull(CoercionUtil.getPrimitiveTypeName(type))
-        }
-    }
+
     
     // ==================== producesStackPrimitive Tests ====================
     
@@ -164,30 +70,6 @@ class CoercionUtilTest {
         fun `string does not produce primitive`() {
             val type = ClassTypeRef("builtin.string", false)
             assertFalse(CoercionUtil.producesStackPrimitive(type))
-        }
-    }
-    
-    // ==================== expectsStackPrimitive Tests ====================
-    
-    @Nested
-    inner class ExpectsStackPrimitive {
-        
-        @Test
-        fun `non-nullable int expects primitive`() {
-            val type = ClassTypeRef("builtin.int", false)
-            assertTrue(CoercionUtil.expectsStackPrimitive(type))
-        }
-        
-        @Test
-        fun `nullable int does not expect primitive`() {
-            val type = ClassTypeRef("builtin.int", true)
-            assertFalse(CoercionUtil.expectsStackPrimitive(type))
-        }
-        
-        @Test
-        fun `string does not expect primitive`() {
-            val type = ClassTypeRef("builtin.string", false)
-            assertFalse(CoercionUtil.expectsStackPrimitive(type))
         }
     }
     

@@ -48,9 +48,8 @@ class ExpressionStatementCompiler : StatementCompiler {
     override fun compile(statement: TypedStatement, context: CompilationContext, mv: MethodVisitor) {
         val exprStmt = statement as TypedExpressionStatement
         
-        context.compileExpression(exprStmt.expression, mv)
-        
         val resultType = context.getType(exprStmt.expression.evalType)
+        context.compileExpression(exprStmt.expression, mv, resultType)
         
         popResultIfNeeded(resultType, mv)
     }

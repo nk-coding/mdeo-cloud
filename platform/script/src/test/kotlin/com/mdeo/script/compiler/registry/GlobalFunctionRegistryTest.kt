@@ -1,5 +1,6 @@
 package com.mdeo.script.compiler.registry
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
 import com.mdeo.script.compiler.registry.function.globalFunction
 import com.mdeo.script.compiler.registry.function.globalProperty
@@ -40,18 +41,20 @@ class GlobalFunctionRegistryTest {
                     descriptor = "()I"
                     owner = "test/Helper"
                     jvmMethod = "testFunc"
+                    parameterTypes = emptyList()
+                    returnType = BuiltinTypes.INT
                 }
             }
             registry.registerFunction(funcDef)
 
-            val retrieved = registry.getFunction("testFunc")
+            val retrieved = registry.lookupFunction("testFunc")
             assertNotNull(retrieved)
             assertEquals("testFunc", retrieved.name)
         }
 
         @Test
         fun `returns null for unregistered function`() {
-            val retrieved = registry.getFunction("nonexistent")
+            val retrieved = registry.lookupFunction("nonexistent")
             assertNull(retrieved)
         }
 
@@ -62,6 +65,8 @@ class GlobalFunctionRegistryTest {
                     descriptor = "()I"
                     owner = "test/Helper"
                     jvmMethod = "funcA"
+                    parameterTypes = emptyList()
+                    returnType = BuiltinTypes.INT
                 }
             })
             registry.registerFunction(globalFunction("funcB") {
@@ -69,71 +74,13 @@ class GlobalFunctionRegistryTest {
                     descriptor = "()Ljava/lang/String;"
                     owner = "test/Helper"
                     jvmMethod = "funcB"
+                    parameterTypes = emptyList()
+                    returnType = BuiltinTypes.STRING
                 }
             })
 
-            assertNotNull(registry.getFunction("funcA"))
-            assertNotNull(registry.getFunction("funcB"))
-        }
-    }
-
-    @Nested
-    inner class OverloadLookup {
-
-        @Test
-        fun `can lookup function with overload key`() {
-            val funcDef = globalFunction("println") {
-                staticOverload("") {
-                    descriptor = "(Ljava/lang/String;)V"
-                    owner = "test/Helper"
-                    jvmMethod = "println"
-                }
-            }
-            registry.registerFunction(funcDef)
-
-            val method = registry.lookupMethod("println", "")
-            assertNotNull(method)
-            assertEquals("", method.overloadKey)
-        }
-
-        @Test
-        fun `can lookup function with multiple overloads`() {
-            val funcDef = globalFunction("format") {
-                staticOverload("builtin.string") {
-                    descriptor = "(Ljava/lang/String;)Ljava/lang/String;"
-                    owner = "test/Helper"
-                    jvmMethod = "format1"
-                }
-                staticOverload("builtin.string,builtin.string") {
-                    descriptor = "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
-                    owner = "test/Helper"
-                    jvmMethod = "format2"
-                }
-            }
-            registry.registerFunction(funcDef)
-
-            val method1 = registry.lookupMethod("format", "builtin.string")
-            val method2 = registry.lookupMethod("format", "builtin.string,builtin.string")
-
-            assertNotNull(method1)
-            assertEquals("format1", method1.jvmMethodName)
-            assertNotNull(method2)
-            assertEquals("format2", method2.jvmMethodName)
-        }
-
-        @Test
-        fun `returns null for nonexistent overload`() {
-            val funcDef = globalFunction("println") {
-                staticOverload("") {
-                    descriptor = "(Ljava/lang/String;)V"
-                    owner = "test/Helper"
-                    jvmMethod = "println"
-                }
-            }
-            registry.registerFunction(funcDef)
-
-            val method = registry.lookupMethod("println", "builtin.int")
-            assertNull(method)
+            assertNotNull(registry.lookupFunction("funcA"))
+            assertNotNull(registry.lookupFunction("funcB"))
         }
     }
 
@@ -168,102 +115,59 @@ class GlobalFunctionRegistryTest {
 
         @Test
         fun `global registry contains println`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("println")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("println")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains listOf`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("listOf")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("listOf")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains setOf`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("setOf")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("setOf")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains bagOf`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("bagOf")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("bagOf")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains orderedSetOf`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("orderedSetOf")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("orderedSetOf")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains emptyList`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("emptyList")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("emptyList")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains emptySet`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("emptySet")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("emptySet")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains emptyBag`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("emptyBag")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("emptyBag")
             assertNotNull(func)
         }
 
         @Test
         fun `global registry contains emptyOrderedSet`() {
-            val func = GlobalFunctionRegistry.GLOBAL.getFunction("emptyOrderedSet")
+            val func = GlobalFunctionRegistry.GLOBAL.lookupFunction("emptyOrderedSet")
             assertNotNull(func)
         }
 
-        @Test
-        fun `can lookup println overload`() {
-            val method = GlobalFunctionRegistry.GLOBAL.lookupMethod(
-                "println",
-                ""
-            )
-            assertNotNull(method)
-            assertEquals("println", method.jvmMethodName)
-        }
-
-        @Test
-        fun `listOf is varargs`() {
-            val method = GlobalFunctionRegistry.GLOBAL.lookupMethod(
-                "listOf",
-                ""
-            )
-            assertNotNull(method)
-            assertTrue(method.isVarArgs)
-        }
     }
 
-    @Nested
-    inner class GlobalFallback {
 
-        @Test
-        fun `local registry falls back to global for functions`() {
-            val func = registry.getFunctionOrGlobal("println")
-            assertNotNull(func)
-        }
-
-        @Test
-        fun `local registry prefers local over global`() {
-            val localFunc = globalFunction("println") {
-                staticOverload("builtin.int") {
-                    descriptor = "(I)V"
-                    owner = "local/Helper"
-                    jvmMethod = "localPrintln"
-                }
-            }
-            registry.registerFunction(localFunc)
-
-            val method = registry.lookupMethod("println", "builtin.int")
-            assertNotNull(method)
-            assertEquals("localPrintln", method.jvmMethodName)
-        }
-    }
 }

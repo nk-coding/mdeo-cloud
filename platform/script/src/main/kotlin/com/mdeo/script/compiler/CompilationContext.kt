@@ -47,6 +47,8 @@ data class LoopLabels(
  *                    to add synthetic methods for lambda bodies.
  * @param generatedInterfaces Shared mutable map for collecting generated functional interfaces.
  *                            All compilation contexts share the same map to avoid duplicate generation.
+ * @param lambdaInterfaceRegistry Registry for looking up predefined functional interfaces (Func0-3, Action0-3, Predicate1)
+ *                                or generating new interface names with simple counting when needed.
  * @param globalFunctionRegistry Registry for global scope functions.
  *                               Defaults to the global stdlib registry but can be customized per compilation.
  * @param globalPropertyRegistry Registry for global scope properties.
@@ -68,6 +70,7 @@ class CompilationContext(
     val classWriter: ClassWriter? = null,
     private val generatedInterfaces: MutableMap<String, ByteArray> = mutableMapOf(),
     private val lambdaCounter: LambdaCounter = LambdaCounter(),
+    private val lambdaInterfaceRegistry: LambdaInterfaceRegistry = LambdaInterfaceRegistry(),
     val globalFunctionRegistry: GlobalFunctionRegistry = GlobalFunctionRegistry.GLOBAL,
     val globalPropertyRegistry: GlobalPropertyRegistry = GlobalPropertyRegistry.GLOBAL,
     val functionRegistry: FunctionRegistry = globalFunctionRegistry,
@@ -235,6 +238,15 @@ class CompilationContext(
     }
     
     /**
+     * Gets the lambda interface registry for looking up predefined or generating new interfaces.
+     *
+     * @return The lambda interface registry.
+     */
+    fun getLambdaInterfaceRegistry(): LambdaInterfaceRegistry {
+        return lambdaInterfaceRegistry
+    }
+    
+    /**
      * Creates a new compilation context for a lambda body with modified return type and params scope.
      * 
      * This method creates a copy of the current context, replacing only the fields that need to change
@@ -259,6 +271,7 @@ class CompilationContext(
             classWriter = classWriter,
             generatedInterfaces = generatedInterfaces,
             lambdaCounter = lambdaCounter,
+            lambdaInterfaceRegistry = lambdaInterfaceRegistry,
             globalFunctionRegistry = globalFunctionRegistry,
             globalPropertyRegistry = globalPropertyRegistry,
             functionRegistry = functionRegistry,
@@ -271,12 +284,13 @@ class CompilationContext(
      * 
      * @param expression The expression to compile.
      * @param mv The method visitor to emit bytecode to.
+     * @param expectedType The type the expression result should be coerced to.
      * @throws CompilationException if no compiler can handle the expression.
      */
-    fun compileExpression(expression: TypedExpression, mv: MethodVisitor) {
+    fun compileExpression(expression: TypedExpression, mv: MethodVisitor, expectedType: ReturnType) {
         val compiler = expressionCompilers.find { it.canCompile(expression) }
             ?: throw CompilationException("No compiler found for expression: ${expression.kind}")
-        compiler.compile(expression, this, mv)
+        compiler.compile(expression, this, mv, expectedType)
     }
     
     /**

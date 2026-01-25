@@ -2,9 +2,9 @@ package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.util.function.Consumer
-import java.util.function.Function
-import java.util.function.Predicate
+import com.mdeo.script.runtime.interfaces.Action1
+import com.mdeo.script.runtime.interfaces.Func1
+import com.mdeo.script.runtime.interfaces.Predicate1
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -308,69 +308,69 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `atLeastNMatch returns true when exactly n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atLeastNMatch(Predicate { it > 3 }, 2))
+        assertTrue(list.atLeastNMatch(Predicate1 { it > 3 }, 2))
     }
 
     @Test
     fun `atLeastNMatch returns true when more than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atLeastNMatch(Predicate { it > 2 }, 2))
+        assertTrue(list.atLeastNMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `atLeastNMatch returns false when fewer than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.atLeastNMatch(Predicate { it > 4 }, 2))
+        assertFalse(list.atLeastNMatch(Predicate1 { it > 4 }, 2))
     }
 
     @Test
     fun `atLeastNMatch returns true for n=0`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.atLeastNMatch(Predicate { it > 10 }, 0))
+        assertTrue(list.atLeastNMatch(Predicate1 { it > 10 }, 0))
     }
 
     @Test
     fun `atLeastNMatch handles empty collection`() {
         val list = ListImpl<Int>()
-        assertFalse(list.atLeastNMatch(Predicate { true }, 1))
+        assertFalse(list.atLeastNMatch(Predicate1 { true }, 1))
     }
 
     // ==================== atMostNMatch() tests ====================
     @Test
     fun `atMostNMatch returns true when exactly n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atMostNMatch(Predicate { it > 3 }, 2))
+        assertTrue(list.atMostNMatch(Predicate1 { it > 3 }, 2))
     }
 
     @Test
     fun `atMostNMatch returns true when fewer than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atMostNMatch(Predicate { it > 4 }, 2))
+        assertTrue(list.atMostNMatch(Predicate1 { it > 4 }, 2))
     }
 
     @Test
     fun `atMostNMatch returns false when more than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.atMostNMatch(Predicate { it > 2 }, 2))
+        assertFalse(list.atMostNMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `atMostNMatch returns true for empty collection`() {
         val list = ListImpl<Int>()
-        assertTrue(list.atMostNMatch(Predicate { true }, 5))
+        assertTrue(list.atMostNMatch(Predicate1 { true }, 5))
     }
 
     @Test
     fun `atMostNMatch returns false when all match and n is too small`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.atMostNMatch(Predicate { it > 0 }, 2))
+        assertFalse(list.atMostNMatch(Predicate1 { it > 0 }, 2))
     }
 
     // ==================== aggregate() tests ====================
     @Test
     fun `aggregate groups elements by key`() {
         val list = ListImpl.of(1, 2, 3, 4, 5, 6)
-        val result = list.aggregate(Function { it % 2 })
+        val result = list.aggregate(Func1 { it % 2 })
         assertEquals(2, result.size())
         assertEquals(3, result.get(0)?.size())
         assertEquals(3, result.get(1)?.size())
@@ -379,7 +379,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `aggregate handles single group`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.aggregate(Function { "same" })
+        val result = list.aggregate(Func1 { "same" })
         assertEquals(1, result.size())
         assertEquals(3, result.get("same")?.size())
     }
@@ -387,14 +387,14 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `aggregate handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.aggregate(Function { it })
+        val result = list.aggregate(Func1 { it })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `aggregate preserves all elements`() {
         val list = ListImpl.of("apple", "banana", "apricot", "cherry")
-        val result = list.aggregate(Function { it[0] })
+        val result = list.aggregate(Func1 { it[0] })
         var totalSize = 0
         for (group in result.values()) {
             totalSize += group.size()
@@ -405,7 +405,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `aggregate with complex key function`() {
         val list = ListImpl.of(1, 2, 3, 4, 5, 6, 7, 8, 9)
-        val result = list.aggregate(Function { it / 3 })
+        val result = list.aggregate(Func1 { it / 3 })
         assertTrue(result.size() >= 3)
     }
 
@@ -413,7 +413,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `map transforms all elements`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.map(Function { it * 2 })
+        val result = list.map(Func1 { it * 2 })
         assertEquals(3, result.size())
         assertTrue(result.includes(2))
         assertTrue(result.includes(4))
@@ -423,14 +423,14 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `map handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.map(Function { it * 2 })
+        val result = list.map(Func1 { it * 2 })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `map can change type`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.map(Function { it.toString() })
+        val result = list.map(Func1 { it.toString() })
         assertEquals(3, result.size())
         assertTrue(result.includes("1"))
     }
@@ -438,7 +438,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `map preserves order`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.map(Function { it * 2 }) as ScriptList
+        val result = list.map(Func1 { it * 2 }) as ScriptList
         assertEquals(2, result.at(0))
         assertEquals(4, result.at(1))
         assertEquals(6, result.at(2))
@@ -447,7 +447,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `map with complex transformation`() {
         val list = ListImpl.of("a", "bb", "ccc")
-        val result = list.map(Function { it.length })
+        val result = list.map(Func1 { it.length })
         assertTrue(result.includes(1))
         assertTrue(result.includes(2))
         assertTrue(result.includes(3))
@@ -457,31 +457,31 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `exists returns true when element matches`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.exists(Predicate { it > 3 }))
+        assertTrue(list.exists(Predicate1 { it > 3 }))
     }
 
     @Test
     fun `exists returns false when no element matches`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.exists(Predicate { it > 10 }))
+        assertFalse(list.exists(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `exists returns false for empty collection`() {
         val list = ListImpl<Int>()
-        assertFalse(list.exists(Predicate { true }))
+        assertFalse(list.exists(Predicate1 { true }))
     }
 
     @Test
     fun `exists returns true when first element matches`() {
         val list = ListImpl.of(5, 1, 2, 3)
-        assertTrue(list.exists(Predicate { it > 4 }))
+        assertTrue(list.exists(Predicate1 { it > 4 }))
     }
 
     @Test
     fun `exists with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "cherry")
-        assertTrue(list.exists(Predicate { it.startsWith("b") }))
+        assertTrue(list.exists(Predicate1 { it.startsWith("b") }))
     }
 
     // ==================== forEach() tests ====================
@@ -489,7 +489,7 @@ class ReadonlyCollectionMethodsTest {
     fun `forEach executes action for all elements`() {
         val list = ListImpl.of(1, 2, 3)
         val sum = arrayOf(0)
-        list.forEach(Consumer { sum[0] += it })
+        list.forEach(Action1 { sum[0] += it })
         assertEquals(6, sum[0])
     }
 
@@ -497,7 +497,7 @@ class ReadonlyCollectionMethodsTest {
     fun `forEach handles empty collection`() {
         val list = ListImpl<Int>()
         var called = false
-        list.forEach(Consumer { called = true })
+        list.forEach(Action1 { called = true })
         assertFalse(called)
     }
 
@@ -505,7 +505,7 @@ class ReadonlyCollectionMethodsTest {
     fun `forEach executes in order for ordered collections`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
         val result = mutableListOf<Int>()
-        list.forEach(Consumer { result.add(it) })
+        list.forEach(Action1 { result.add(it) })
         assertEquals(listOf(1, 2, 3, 4, 5), result)
     }
 
@@ -513,7 +513,7 @@ class ReadonlyCollectionMethodsTest {
     fun `forEach with side effects`() {
         val list = ListImpl.of("a", "b", "c")
         val builder = StringBuilder()
-        list.forEach(Consumer { builder.append(it) })
+        list.forEach(Action1 { builder.append(it) })
         assertEquals("abc", builder.toString())
     }
 
@@ -521,7 +521,7 @@ class ReadonlyCollectionMethodsTest {
     fun `forEach processes all elements exactly once`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
         var count = 0
-        list.forEach(Consumer { count++ })
+        list.forEach(Action1 { count++ })
         assertEquals(5, count)
     }
 
@@ -529,7 +529,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `associate creates map with computed values`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.associate(Function { it * 2 })
+        val result = list.associate(Func1 { it * 2 })
         assertEquals(3, result.size())
         assertEquals(2, result.get(1))
         assertEquals(4, result.get(2))
@@ -539,14 +539,14 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `associate handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.associate(Function { it * 2 })
+        val result = list.associate(Func1 { it * 2 })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `associate uses elements as keys`() {
         val list = ListImpl.of("a", "bb", "ccc")
-        val result = list.associate(Function { it.length })
+        val result = list.associate(Func1 { it.length })
         assertEquals(3, result.size())
         assertTrue(result.containsKey("a"))
         assertEquals(1, result.get("a"))
@@ -555,7 +555,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `associate handles duplicate keys`() {
         val list = ListImpl.of(1, 2, 3, 4)
-        val result = list.associate(Function { it % 2 })
+        val result = list.associate(Func1 { it % 2 })
         // Each element becomes its own key, so we get 4 entries
         // 1->1, 2->0, 3->1, 4->0 (last value wins)
         assertEquals(4, result.size())
@@ -564,7 +564,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `associate with complex value function`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.associate(Function { "value$it" })
+        val result = list.associate(Func1 { "value$it" })
         assertEquals("value1", result.get(1))
         assertEquals("value2", result.get(2))
     }
@@ -573,100 +573,100 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `nMatch returns true when exactly n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.nMatch(Predicate { it > 3 }, 2))
+        assertTrue(list.nMatch(Predicate1 { it > 3 }, 2))
     }
 
     @Test
     fun `nMatch returns false when more than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.nMatch(Predicate { it > 2 }, 2))
+        assertFalse(list.nMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `nMatch returns false when fewer than n match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.nMatch(Predicate { it > 2 }, 2))
+        assertFalse(list.nMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `nMatch returns true for n=0 when no matches`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.nMatch(Predicate { it > 10 }, 0))
+        assertTrue(list.nMatch(Predicate1 { it > 10 }, 0))
     }
 
     @Test
     fun `nMatch handles all matching`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.nMatch(Predicate { it > 0 }, 3))
+        assertTrue(list.nMatch(Predicate1 { it > 0 }, 3))
     }
 
     // ==================== none() tests ====================
     @Test
     fun `none returns true when no elements match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.none(Predicate { it > 10 }))
+        assertTrue(list.none(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `none returns false when one element matches`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.none(Predicate { it == 2 }))
+        assertFalse(list.none(Predicate1 { it == 2 }))
     }
 
     @Test
     fun `none returns false when all elements match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.none(Predicate { it > 0 }))
+        assertFalse(list.none(Predicate1 { it > 0 }))
     }
 
     @Test
     fun `none returns true for empty collection`() {
         val list = ListImpl<Int>()
-        assertTrue(list.none(Predicate { true }))
+        assertTrue(list.none(Predicate1 { true }))
     }
 
     @Test
     fun `none with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "cherry")
-        assertTrue(list.none(Predicate { it.startsWith("z") }))
+        assertTrue(list.none(Predicate1 { it.startsWith("z") }))
     }
 
     // ==================== one() tests ====================
     @Test
     fun `one returns true when exactly one matches`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.one(Predicate { it == 3 }))
+        assertTrue(list.one(Predicate1 { it == 3 }))
     }
 
     @Test
     fun `one returns false when no elements match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.one(Predicate { it > 10 }))
+        assertFalse(list.one(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `one returns false when multiple elements match`() {
         val list = ListImpl.of(1, 2, 3, 4)
-        assertFalse(list.one(Predicate { it > 2 }))
+        assertFalse(list.one(Predicate1 { it > 2 }))
     }
 
     @Test
     fun `one returns false for empty collection`() {
         val list = ListImpl<Int>()
-        assertFalse(list.one(Predicate { true }))
+        assertFalse(list.one(Predicate1 { true }))
     }
 
     @Test
     fun `one with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "cherry", "apricot")
-        assertTrue(list.one(Predicate { it.startsWith("b") }))
+        assertTrue(list.one(Predicate1 { it.startsWith("b") }))
     }
 
     // ==================== reject() tests ====================
     @Test
     fun `reject removes matching elements`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.reject(Predicate { it > 3 })
+        val result = list.reject(Predicate1 { it > 3 })
         assertEquals(3, result.size())
         assertTrue(result.includes(1))
         assertTrue(result.includes(2))
@@ -676,28 +676,28 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `reject returns all elements when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.reject(Predicate { it > 10 })
+        val result = list.reject(Predicate1 { it > 10 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `reject returns empty when all match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.reject(Predicate { it > 0 })
+        val result = list.reject(Predicate1 { it > 0 })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `reject handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.reject(Predicate { true })
+        val result = list.reject(Predicate1 { true })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `reject with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "apricot", "cherry")
-        val result = list.reject(Predicate { it.startsWith("a") })
+        val result = list.reject(Predicate1 { it.startsWith("a") })
         assertEquals(2, result.size())
         assertTrue(result.includes("banana"))
         assertTrue(result.includes("cherry"))
@@ -707,7 +707,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `rejectOne removes first matching element`() {
         val list = ListImpl.of(1, 2, 3, 2, 4)
-        val result = list.rejectOne(Predicate { it == 2 })
+        val result = list.rejectOne(Predicate1 { it == 2 })
         assertEquals(4, result.size())
         assertEquals(1, result.count(2))
     }
@@ -715,28 +715,28 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `rejectOne returns all elements when no match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.rejectOne(Predicate { it > 10 })
+        val result = list.rejectOne(Predicate1 { it > 10 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `rejectOne removes only one element`() {
         val list = ListImpl.of(1, 1, 1)
-        val result = list.rejectOne(Predicate { it == 1 })
+        val result = list.rejectOne(Predicate1 { it == 1 })
         assertEquals(2, result.size())
     }
 
     @Test
     fun `rejectOne handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.rejectOne(Predicate { true })
+        val result = list.rejectOne(Predicate1 { true })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `rejectOne preserves order`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.rejectOne(Predicate { it == 3 }) as ScriptList<Int>
+        val result = list.rejectOne(Predicate1 { it == 3 }) as ScriptList<Int>
         assertEquals(1, result.at(0))
         assertEquals(2, result.at(1))
         assertEquals(4, result.at(2))
@@ -746,7 +746,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `filter keeps matching elements`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.filter(Predicate { it > 3 })
+        val result = list.filter(Predicate1 { it > 3 })
         assertEquals(2, result.size())
         assertTrue(result.includes(4))
         assertTrue(result.includes(5))
@@ -755,28 +755,28 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `filter returns empty when no match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.filter(Predicate { it > 10 })
+        val result = list.filter(Predicate1 { it > 10 })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `filter returns all elements when all match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.filter(Predicate { it > 0 })
+        val result = list.filter(Predicate1 { it > 0 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `filter handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.filter(Predicate { true })
+        val result = list.filter(Predicate1 { true })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `filter with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "apricot", "cherry")
-        val result = list.filter(Predicate { it.startsWith("a") })
+        val result = list.filter(Predicate1 { it.startsWith("a") })
         assertEquals(2, result.size())
         assertTrue(result.includes("apple"))
         assertTrue(result.includes("apricot"))
@@ -786,66 +786,66 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `all returns true when all elements match`() {
         val list = ListImpl.of(2, 4, 6, 8)
-        assertTrue(list.all(Predicate { it % 2 == 0 }))
+        assertTrue(list.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns false when one element doesn't match`() {
         val list = ListImpl.of(2, 4, 5, 8)
-        assertFalse(list.all(Predicate { it % 2 == 0 }))
+        assertFalse(list.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns false when no elements match`() {
         val list = ListImpl.of(1, 3, 5)
-        assertFalse(list.all(Predicate { it % 2 == 0 }))
+        assertFalse(list.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns true for empty collection`() {
         val list = ListImpl<Int>()
-        assertTrue(list.all(Predicate { false }))
+        assertTrue(list.all(Predicate1 { false }))
     }
 
     @Test
     fun `all with complex predicate`() {
         val list = ListImpl.of("apple", "apricot", "avocado")
-        assertTrue(list.all(Predicate { it.startsWith("a") }))
+        assertTrue(list.all(Predicate1 { it.startsWith("a") }))
     }
 
     // ==================== find() tests ====================
     @Test
     fun `find returns first matching element`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.find(Predicate { it > 2 })
+        val result = list.find(Predicate1 { it > 2 })
         assertEquals(3, result)
     }
 
     @Test
     fun `find returns null when no match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.find(Predicate { it > 10 })
+        val result = list.find(Predicate1 { it > 10 })
         assertNull(result)
     }
 
     @Test
     fun `find returns null for empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.find(Predicate { true })
+        val result = list.find(Predicate1 { true })
         assertNull(result)
     }
 
     @Test
     fun `find returns first element if it matches`() {
         val list = ListImpl.of(5, 1, 2, 3)
-        val result = list.find(Predicate { it > 4 })
+        val result = list.find(Predicate1 { it > 4 })
         assertEquals(5, result)
     }
 
     @Test
     fun `find with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "cherry")
-        val result = list.find(Predicate { it.length > 5 })
+        val result = list.find(Predicate1 { it.length > 5 })
         assertEquals("banana", result)
     }
 
@@ -853,7 +853,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `sortedBy sorts elements by key`() {
         val list = ListImpl.of(3, 1, 4, 1, 5, 9, 2, 6)
-        val result = list.sortedBy(Function { it }) as ReadonlyList<Int>
+        val result = list.sortedBy(Func1 { it }) as ReadonlyList<Int>
         assertEquals(1, result.at(0))
         assertEquals(1, result.at(1))
         assertEquals(2, result.at(2))
@@ -862,14 +862,14 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `sortedBy handles empty collection`() {
         val list = ListImpl<Int>()
-        val result = list.sortedBy(Function { it })
+        val result = list.sortedBy(Func1 { it })
         assertEquals(0, result.size())
     }
 
     @Test
     fun `sortedBy with complex key extractor`() {
         val list = ListImpl.of("apple", "pie", "banana", "split")
-        val result = list.sortedBy(Function { it.length }) as ReadonlyList<String>
+        val result = list.sortedBy(Func1 { it.length }) as ReadonlyList<String>
         assertEquals("pie", result.at(0))
         assertEquals("apple", result.at(1))
     }
@@ -877,14 +877,14 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `sortedBy does not modify original`() {
         val list = ListImpl.of(3, 1, 2)
-        list.sortedBy(Function { it })
+        list.sortedBy(Func1 { it })
         assertEquals(3, (list as ScriptList<Int>).at(0))
     }
 
     @Test
     fun `sortedBy sorts in ascending order`() {
         val list = ListImpl.of(5, 4, 3, 2, 1)
-        val result = list.sortedBy(Function { it }) as ReadonlyList<Int>
+        val result = list.sortedBy(Func1 { it }) as ReadonlyList<Int>
         assertEquals(1, result.at(0))
         assertEquals(5, result.at(4))
     }

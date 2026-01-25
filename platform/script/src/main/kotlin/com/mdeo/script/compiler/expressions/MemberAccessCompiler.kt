@@ -29,7 +29,7 @@ import org.objectweb.asm.Opcodes
  * If a property is not found in the registry, the compiler falls back to
  * file-scope behavior for custom types.
  */
-class MemberAccessCompiler : ExpressionCompiler {
+class MemberAccessCompiler : ExpressionCompiler() {
 
     /**
      * Checks if this compiler can handle the given expression.
@@ -48,7 +48,7 @@ class MemberAccessCompiler : ExpressionCompiler {
      * @param context The compilation context containing type information and utilities.
      * @param mv The method visitor used to emit bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val memberAccess = expression as TypedMemberAccessExpression
         val targetType = context.getType(memberAccess.expression.evalType)
         val resultType = context.getType(memberAccess.evalType)
@@ -74,17 +74,15 @@ class MemberAccessCompiler : ExpressionCompiler {
         val nullLabel = Label()
         val endLabel = Label()
 
-        context.compileExpression(memberAccess.expression, mv)
+        context.compileExpression(memberAccess.expression, mv, targetType)
 
         mv.visitInsn(Opcodes.DUP)
         mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
         emitMemberAccess(context, memberAccess.member, targetType, resultType, mv)
 
-        if (resultType is ClassTypeRef && !resultType.isNullable &&
-            CoercionUtil.getPrimitiveTypeName(resultType) != null
-        ) {
-            CoercionUtil.emitBoxing(resultType.type, mv)
+        if (CoercionUtil.isPrimitiveType(resultType)) {
+            CoercionUtil.emitBoxing((resultType as ClassTypeRef).type, mv)
         }
 
         mv.visitJumpInsn(Opcodes.GOTO, endLabel)
@@ -106,7 +104,7 @@ class MemberAccessCompiler : ExpressionCompiler {
         targetType: ReturnType,
         resultType: ReturnType
     ) {
-        context.compileExpression(memberAccess.expression, mv)
+        context.compileExpression(memberAccess.expression, mv, targetType)
 
         emitMemberAccess(context, memberAccess.member, targetType, resultType, mv)
     }

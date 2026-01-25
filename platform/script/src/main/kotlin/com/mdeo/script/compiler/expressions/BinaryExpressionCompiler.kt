@@ -36,7 +36,7 @@ import org.objectweb.asm.MethodVisitor
  * @see EqualityOperationHelper
  * @see LogicalOperationHelper
  */
-class BinaryExpressionCompiler : ExpressionCompiler {
+class BinaryExpressionCompiler : ExpressionCompiler() {
     
     /**
      * Determines if this compiler can handle the given expression.
@@ -62,7 +62,7 @@ class BinaryExpressionCompiler : ExpressionCompiler {
      * @param mv The ASM method visitor for emitting bytecode instructions.
      * @throws IllegalArgumentException if the operator is not supported.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val binaryExpr = expression as TypedBinaryExpression
         val resultType = context.getType(binaryExpr.evalType)
         val leftType = context.getType(binaryExpr.left.evalType)

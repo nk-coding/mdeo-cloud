@@ -18,7 +18,7 @@ import org.objectweb.asm.Opcodes
  * - SIPUSH for values in short range (-32768 to 32767)
  * - LDC for all other integer values
  */
-class IntLiteralCompiler : ExpressionCompiler {
+class IntLiteralCompiler : ExpressionCompiler() {
 
     /**
      * Determines if this compiler can handle the given expression.
@@ -43,7 +43,7 @@ class IntLiteralCompiler : ExpressionCompiler {
      * @param context The compilation context containing compiler state.
      * @param mv The method visitor used to emit bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val intExpr = expression as TypedIntLiteralExpression
         val value = intExpr.value.toInt()
 

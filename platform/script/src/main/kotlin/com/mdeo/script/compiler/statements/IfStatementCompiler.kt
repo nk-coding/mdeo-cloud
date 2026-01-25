@@ -64,7 +64,8 @@ class IfStatementCompiler : StatementCompiler {
         val endLabel = Label()
         val nextBranchLabel = Label()
         
-        context.compileExpression(ifStmt.condition, mv)
+        val conditionType = context.getType(ifStmt.condition.evalType)
+        context.compileExpression(ifStmt.condition, mv, conditionType)
         mv.visitJumpInsn(Opcodes.IFEQ, nextBranchLabel)
         
         compileThenBlock(ifStmt, context, mv)
@@ -141,7 +142,8 @@ class IfStatementCompiler : StatementCompiler {
             val isLast = index == ifStmt.elseIfs.size - 1
             val nextLabel = Label()
             
-            context.compileExpression(elseIf.condition, mv)
+            val elseIfConditionType = context.getType(elseIf.condition.evalType)
+            context.compileExpression(elseIf.condition, mv, elseIfConditionType)
             mv.visitJumpInsn(Opcodes.IFEQ, nextLabel)
             
             val elseIfScope = context.getStatementScope(elseIf)

@@ -180,10 +180,10 @@ object ArithmeticOperationHelper {
         mv.visitInsn(Opcodes.DUP)
         mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false)
         
-        context.compileExpression(expr.left, mv)
+        context.compileExpression(expr.left, mv, leftType)
         appendToStringBuilder(leftType, mv)
         
-        context.compileExpression(expr.right, mv)
+        context.compileExpression(expr.right, mv, rightType)
         appendToStringBuilder(rightType, mv)
         
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false)
@@ -277,8 +277,8 @@ object ArithmeticOperationHelper {
         operandTypeName: String,
         targetTypeName: String
     ) {
-        context.compileExpression(operand, mv)
-        if (operandType is ClassTypeRef && operandType.isNullable && CoercionUtil.isPrimitiveType(operandType.type)) {
+        context.compileExpression(operand, mv, operandType)
+        if (operandType is ClassTypeRef && operandType.isNullable && CoercionUtil.isPrimitiveType(operandType)) {
             CoercionUtil.emitUnboxing(operandTypeName, mv)
         }
         TypeConversionUtil.emitConversion(operandTypeName, targetTypeName, mv)

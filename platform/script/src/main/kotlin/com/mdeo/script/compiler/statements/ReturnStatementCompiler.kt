@@ -7,7 +7,6 @@ import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.ast.types.VoidType
-import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.StatementCompiler
 import org.objectweb.asm.MethodVisitor
@@ -60,14 +59,11 @@ class ReturnStatementCompiler : StatementCompiler {
      * @param mv The method visitor for emitting bytecode.
      */
     private fun compileValueReturn(returnValue: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
-        context.compileExpression(returnValue, mv)
-        
-        val exprType = context.getType(returnValue.evalType)
         val functionReturnType = context.getFunctionReturnType()
+        val exprType = context.getType(returnValue.evalType)
         
-        if (functionReturnType != null) {
-            CoercionUtil.emitCoercion(exprType, functionReturnType, returnValue, mv)
-        }
+        // Compile the expression with coercion to the function return type
+        context.compileExpression(returnValue, mv, functionReturnType ?: exprType)
         
         emitTypedReturn(functionReturnType ?: exprType, mv)
     }

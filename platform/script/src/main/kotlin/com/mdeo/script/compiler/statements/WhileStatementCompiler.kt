@@ -63,9 +63,9 @@ class WhileStatementCompiler : StatementCompiler {
         
         mv.visitLabel(loopStart)
         
-        context.compileExpression(whileStmt.condition, mv)
-        
         val conditionType = context.getType(whileStmt.condition.evalType)
+        context.compileExpression(whileStmt.condition, mv, conditionType)
+        
         emitBooleanJump(conditionType, loopEnd, mv)
         
         val whileScope = context.getStatementScope(whileStmt)

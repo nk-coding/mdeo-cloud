@@ -29,55 +29,6 @@ class GlobalFunctionEdgeCasesTest {
     private val helper = CompilerTestHelper()
 
     @Nested
-    inner class OverloadKeyMismatch {
-
-        /**
-         * Test that empty overload key (DEFAULT_SIGNATURE from TypeScript) works correctly.
-         * This is the expected behavior since we now register functions with empty string keys.
-         */
-        @Test
-        fun `empty overload key finds registered default signature`() {
-            val registry = GlobalFunctionRegistry.GLOBAL
-            
-            // This is what TypeScript sends using DEFAULT_SIGNATURE = ""
-            val method = registry.lookupMethod("println", "")
-            
-            // Should find the registered method
-            assertNotNull(method, "Empty overload key should match registered default overload")
-            assertEquals("println", method.jvmMethodName)
-        }
-
-        /**
-         * Test that the actual registered overload key for println is empty string (default).
-         */
-        @Test
-        fun `println has correctly registered overload key`() {
-            val registry = GlobalFunctionRegistry.GLOBAL
-            val func = registry.getFunction("println")
-            
-            assertNotNull(func)
-            val overloads = func.getOverloads()
-            assertEquals(1, overloads.size)
-            assertEquals("", overloads[0].overloadKey)
-        }
-
-        /**
-         * Test that listOf has correctly registered varargs overload key.
-         */
-        @Test
-        fun `listOf has correctly registered varargs overload key`() {
-            val registry = GlobalFunctionRegistry.GLOBAL
-            val func = registry.getFunction("listOf")
-            
-            assertNotNull(func)
-            val overloads = func.getOverloads()
-            assertEquals(1, overloads.size)
-            assertEquals("", overloads[0].overloadKey)
-            assertTrue(overloads[0].isVarArgs)
-        }
-    }
-
-    @Nested
     inner class NullValueHandling {
 
         /**

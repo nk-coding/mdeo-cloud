@@ -49,7 +49,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
      * @param context The compilation context containing type information and utilities.
      * @param mv The method visitor used to emit bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val memberCall = expression as TypedMemberCallExpression
         val targetType = context.getType(memberCall.expression.evalType)
         val resultType = context.getType(memberCall.evalType)
@@ -78,14 +78,14 @@ class MemberCallCompiler : AbstractCallCompiler() {
         val nullLabel = Label()
         val endLabel = Label()
 
-        context.compileExpression(memberCall.expression, mv)
+        context.compileExpression(memberCall.expression, mv, targetType)
 
         mv.visitInsn(Opcodes.DUP)
         mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
         emitMemberCall(memberCall, context, mv, targetType, resultType)
 
-        if (resultType is ClassTypeRef && resultType.isNullable && CoercionUtil.isPrimitiveType(resultType.type)) {
+        if (resultType is ClassTypeRef && resultType.isNullable && CoercionUtil.isPrimitiveType(resultType)) {
             CoercionUtil.emitBoxing(resultType.type, mv)
         }
 
@@ -108,7 +108,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
         targetType: ReturnType,
         resultType: ReturnType
     ) {
-        context.compileExpression(memberCall.expression, mv)
+        context.compileExpression(memberCall.expression, mv, targetType)
         emitMemberCall(memberCall, context, mv, targetType, resultType)
     }
 
@@ -211,7 +211,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
             return false
         }
 
-        if (!CoercionUtil.isPrimitiveType(targetType.type)) {
+        if (!CoercionUtil.isPrimitiveType(targetType)) {
             return false
         }
 

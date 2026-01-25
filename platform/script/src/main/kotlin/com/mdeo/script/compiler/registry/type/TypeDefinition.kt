@@ -1,5 +1,7 @@
 package com.mdeo.script.compiler.registry.type
 
+import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.ast.types.ValueType
 import org.objectweb.asm.MethodVisitor
 
 /**
@@ -121,18 +123,19 @@ interface MethodDefinition {
         get() = false
 
     /**
-     * The parameter type names for type coercion (excluding receiver for static methods).
-     * Example: ["builtin.int", "builtin.string"]
+     * The parameter types for type coercion (excluding receiver for static methods).
+     *
+     * Each element is a ValueType representing the expected type of the corresponding parameter.
      */
-    val parameterTypes: List<String>
-        get() = emptyList()
+    val parameterTypes: List<ValueType>
 
     /**
-     * The return type name for type coercion.
-     * Example: "builtin.int", "void", "builtin.string?"
+     * The return type for type coercion.
+     *
+     * Represents the expected return type of the method.
+     * Use VoidType for methods that don't return a value.
      */
-    val returnType: String?
-        get() = null
+    val returnType: ReturnType
 
     /**
      * Emits the method invocation bytecode.

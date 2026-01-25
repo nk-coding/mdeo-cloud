@@ -12,7 +12,7 @@ import org.objectweb.asm.Opcodes
  * Compiler for double literal expressions.
  * Generates bytecode to push a double constant onto the operand stack.
  */
-class DoubleLiteralCompiler : ExpressionCompiler {
+class DoubleLiteralCompiler : ExpressionCompiler() {
     
     /**
      * Checks if this compiler can handle the given expression.
@@ -36,7 +36,7 @@ class DoubleLiteralCompiler : ExpressionCompiler {
      * @param mv The method visitor to emit bytecode to.
      * @return Unit.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val doubleExpr = expression as TypedDoubleLiteralExpression
         val value = doubleExpr.value.toDouble()
         

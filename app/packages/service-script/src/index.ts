@@ -52,7 +52,8 @@ const scriptServicePlugin: ServicePluginDefinition = {
                     "var",
                     "true",
                     "false",
-                    "null"
+                    "null",
+                    "in"
                 ]
             })
         }

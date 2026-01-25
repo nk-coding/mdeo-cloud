@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -14,175 +15,167 @@ fun createIntType(): TypeDefinition {
 
         staticMethod("abs") {
             overload(
-                "",
-                "(I)I",
-                INT_HELPER
+                "", "(I)I", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.INT
             )
         }
 
         staticMethod("ceiling") {
             overload(
-                "",
-                "(I)I",
-                INT_HELPER
+                "", "(I)I", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.INT
             )
         }
 
         staticMethod("floor") {
             overload(
-                "",
-                "(I)I",
-                INT_HELPER
+                "", "(I)I", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.INT
             )
         }
 
         staticMethod("log") {
             overload(
-                "",
-                "(I)F",
-                INT_HELPER
+                "", "(I)F", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.FLOAT
             )
         }
 
         staticMethod("log10") {
             overload(
-                "",
-                "(I)F",
-                INT_HELPER
+                "", "(I)F", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.FLOAT
             )
         }
 
         staticMethod("max") {
             overload(
-                "int",
-                "(II)I",
-                INT_HELPER,
-                "max"
+                "int", "(II)I", INT_HELPER, "max",
+                parameterTypes = listOf(BuiltinTypes.INT),
+                returnType = BuiltinTypes.INT
             )
             overload(
-                "long",
-                "(IJ)J",
-                INT_HELPER,
-                "max"
+                "long", "(IJ)J", INT_HELPER, "max",
+                parameterTypes = listOf(BuiltinTypes.LONG),
+                returnType = BuiltinTypes.LONG
             )
             overload(
-                "float",
-                "(IF)F",
-                INT_HELPER,
-                "max"
+                "float", "(IF)F", INT_HELPER, "max",
+                parameterTypes = listOf(BuiltinTypes.FLOAT),
+                returnType = BuiltinTypes.FLOAT
             )
             overload(
-                "double",
-                "(ID)D",
-                INT_HELPER,
-                "max"
+                "double", "(ID)D", INT_HELPER, "max",
+                parameterTypes = listOf(BuiltinTypes.DOUBLE),
+                returnType = BuiltinTypes.DOUBLE
             )
         }
 
         staticMethod("min") {
             overload(
-                "int",
-                "(II)I",
-                INT_HELPER,
-                "min"
+                "int", "(II)I", INT_HELPER, "min",
+                parameterTypes = listOf(BuiltinTypes.INT),
+                returnType = BuiltinTypes.INT
             )
             overload(
-                "long",
-                "(IJ)J",
-                INT_HELPER,
-                "min"
+                "long", "(IJ)J", INT_HELPER, "min",
+                parameterTypes = listOf(BuiltinTypes.LONG),
+                returnType = BuiltinTypes.LONG
             )
             overload(
-                "float",
-                "(IF)F",
-                INT_HELPER,
-                "min"
+                "float", "(IF)F", INT_HELPER, "min",
+                parameterTypes = listOf(BuiltinTypes.FLOAT),
+                returnType = BuiltinTypes.FLOAT
             )
             overload(
-                "double",
-                "(ID)D",
-                INT_HELPER,
-                "min"
+                "double", "(ID)D", INT_HELPER, "min",
+                parameterTypes = listOf(BuiltinTypes.DOUBLE),
+                returnType = BuiltinTypes.DOUBLE
             )
         }
 
         staticMethod("pow") {
             overload(
-                "",
-                "(ID)D",
-                INT_HELPER
+                "", "(ID)D", INT_HELPER,
+                parameterTypes = listOf(BuiltinTypes.DOUBLE),
+                returnType = BuiltinTypes.DOUBLE
             )
         }
 
         staticMethod("round") {
             overload(
-                "",
-                "(I)I",
-                INT_HELPER
+                "", "(I)I", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.INT
             )
         }
 
         staticMethod("iota") {
             overload(
-                "",
-                "(III)Lcom/mdeo/script/stdlib/impl/collections/ScriptList;",
-                INT_HELPER
+                "", "(III)Lcom/mdeo/script/stdlib/impl/collections/ScriptList;", INT_HELPER,
+                parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.INT),
+                returnType = BuiltinTypes.LIST
             )
         }
 
         staticMethod("mod") {
             overload(
-                "",
-                "(II)I",
-                INT_HELPER
+                "", "(II)I", INT_HELPER,
+                parameterTypes = listOf(BuiltinTypes.INT),
+                returnType = BuiltinTypes.INT
             )
         }
 
         staticMethod("to") {
             overload(
-                "",
-                "(II)Lcom/mdeo/script/stdlib/impl/collections/ScriptList;",
-                INT_HELPER
+                "", "(II)Lcom/mdeo/script/stdlib/impl/collections/ScriptList;", INT_HELPER,
+                parameterTypes = listOf(BuiltinTypes.INT),
+                returnType = BuiltinTypes.LIST
             )
         }
 
         staticMethod("toBinary") {
             overload(
-                "",
-                "(I)Ljava/lang/String;",
-                INT_HELPER
+                "", "(I)Ljava/lang/String;", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.STRING
             )
         }
 
         staticMethod("toHex") {
             overload(
-                "",
-                "(I)Ljava/lang/String;",
-                INT_HELPER
+                "", "(I)Ljava/lang/String;", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.STRING
             )
         }
 
         staticMethod("asString") {
             overload(
-                "",
-                "(I)Ljava/lang/String;",
-                INT_HELPER
+                "", "(I)Ljava/lang/String;", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.STRING
             )
         }
 
         staticMethod("asDouble") {
             overload(
-                "",
-                "(I)D",
-                INT_HELPER
+                "", "(I)D", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.DOUBLE
             )
         }
 
         staticMethod("asFloat") {
             overload(
-                "",
-                "(I)F",
-                INT_HELPER
+                "", "(I)F", INT_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.FLOAT
             )
         }
     }

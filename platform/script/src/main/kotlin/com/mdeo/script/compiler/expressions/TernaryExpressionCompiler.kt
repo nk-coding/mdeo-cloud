@@ -3,8 +3,6 @@ package com.mdeo.script.compiler.expressions
 import com.mdeo.script.ast.TypedExpressionKind
 import com.mdeo.script.ast.expressions.TypedExpression
 import com.mdeo.script.ast.expressions.TypedTernaryExpression
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.Label
@@ -30,7 +28,7 @@ import org.objectweb.asm.Opcodes
  * The result of the ternary expression is the value of either trueExpr or falseExpr
  * left on the stack.
  */
-class TernaryExpressionCompiler : ExpressionCompiler {
+class TernaryExpressionCompiler : ExpressionCompiler() {
     
     /**
      * Determines if this compiler can handle the given expression.
@@ -52,43 +50,27 @@ class TernaryExpressionCompiler : ExpressionCompiler {
      * @param context The compilation context providing access to type information and expression compilation.
      * @param mv The method visitor used to emit bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val ternaryExpr = expression as TypedTernaryExpression
         val resultType = context.getType(ternaryExpr.evalType)
         
         val falseLabel = Label()
         val endLabel = Label()
         
-        context.compileExpression(ternaryExpr.condition, mv)
+        val conditionType = context.getType(ternaryExpr.condition.evalType)
+        context.compileExpression(ternaryExpr.condition, mv, conditionType)
         mv.visitJumpInsn(Opcodes.IFEQ, falseLabel)
         
-        compileBranchWithCoercion(ternaryExpr.trueExpression, resultType, context, mv)
+        // Compile true branch with coercion to result type
+        context.compileExpression(ternaryExpr.trueExpression, mv, resultType)
         
         mv.visitJumpInsn(Opcodes.GOTO, endLabel)
         
         mv.visitLabel(falseLabel)
         
-        compileBranchWithCoercion(ternaryExpr.falseExpression, resultType, context, mv)
+        // Compile false branch with coercion to result type
+        context.compileExpression(ternaryExpr.falseExpression, mv, resultType)
         
         mv.visitLabel(endLabel)
-    }
-    
-    /**
-     * Compiles a branch expression and coerces its result to the target type.
-     *
-     * @param branchExpression The expression representing either the true or false branch.
-     * @param targetType The type to coerce the branch result to.
-     * @param context The compilation context.
-     * @param mv The method visitor used to emit bytecode instructions.
-     */
-    private fun compileBranchWithCoercion(
-        branchExpression: TypedExpression,
-        targetType: ReturnType,
-        context: CompilationContext,
-        mv: MethodVisitor
-    ) {
-        context.compileExpression(branchExpression, mv)
-        val branchType = context.getType(branchExpression.evalType)
-        CoercionUtil.emitCoercion(branchType, targetType, branchExpression, mv)
     }
 }

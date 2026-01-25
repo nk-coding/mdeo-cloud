@@ -1,5 +1,9 @@
 package com.mdeo.script.compiler.registry.type
 
+import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.ast.types.ValueType
+import com.mdeo.script.ast.types.VoidType
+
 /**
  * DSL for building type definitions.
  *
@@ -14,15 +18,12 @@ package com.mdeo.script.compiler.registry.type
  *
  *     // Non-overloaded method: use empty string as overload key
  *     staticMethod("abs") {
- *         overload("", "(I)I", INT_HELPER)
+ *         overload("", "(I)I", INT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.INT)
  *     }
  *
  *     // Overloaded method: use type identifier as overload key
  *     staticMethod("max") {
- *         overload("int", "(II)I", INT_HELPER, "max")
- *         overload("long", "(IJ)J", INT_HELPER, "max")
- *         overload("float", "(IF)F", INT_HELPER, "max")
- *         overload("double", "(ID)D", INT_HELPER, "max")
+ *         overload("int", "(II)I", INT_HELPER, "max", parameterTypes = listOf(BuiltinTypes.INT), returnType = BuiltinTypes.INT)
  *     }
  * }
  * ```
@@ -131,8 +132,8 @@ class StaticMethodBuilder(private val name: String) {
         val descriptor: String,
         val ownerClass: String,
         val isVarArgs: Boolean = false,
-        val parameterTypes: List<String> = emptyList(),
-        val returnType: String? = null
+        val parameterTypes: List<ValueType>,
+        val returnType: ReturnType
     )
 
     /**
@@ -143,8 +144,8 @@ class StaticMethodBuilder(private val name: String) {
      * @param ownerClass The JVM internal class name.
      * @param jvmMethodName Optional custom JVM method name (defaults to [name]).
      * @param isVarArgs Whether this method uses varargs.
-     * @param parameterTypes The parameter type names for coercion.
-     * @param returnType The return type name for coercion.
+     * @param parameterTypes The parameter types for coercion (required).
+     * @param returnType The return type for coercion (required).
      */
     fun overload(
         overloadKey: String = "",
@@ -152,8 +153,8 @@ class StaticMethodBuilder(private val name: String) {
         ownerClass: String,
         jvmMethodName: String = name,
         isVarArgs: Boolean = false,
-        parameterTypes: List<String> = emptyList(),
-        returnType: String? = null
+        parameterTypes: List<ValueType>,
+        returnType: ReturnType
     ) {
         overloads.add(OverloadInfo(overloadKey, jvmMethodName, descriptor, ownerClass, isVarArgs, parameterTypes, returnType))
     }
@@ -191,8 +192,8 @@ class InstanceMethodBuilder(private val name: String) {
         val ownerClass: String,
         val isInterface: Boolean,
         val isVarArgs: Boolean = false,
-        val parameterTypes: List<String> = emptyList(),
-        val returnType: String? = null
+        val parameterTypes: List<ValueType>,
+        val returnType: ReturnType
     )
 
     /**
@@ -204,8 +205,8 @@ class InstanceMethodBuilder(private val name: String) {
      * @param isInterface Whether to use INVOKEINTERFACE.
      * @param jvmMethodName Optional custom JVM method name (defaults to [name]).
      * @param isVarArgs Whether this method uses varargs.
-     * @param parameterTypes The parameter type names for coercion.
-     * @param returnType The return type name for coercion.
+     * @param parameterTypes The parameter types for coercion (required).
+     * @param returnType The return type for coercion (required).
      */
     fun overload(
         overloadKey: String = "",
@@ -214,8 +215,8 @@ class InstanceMethodBuilder(private val name: String) {
         isInterface: Boolean = false,
         jvmMethodName: String = name,
         isVarArgs: Boolean = false,
-        parameterTypes: List<String> = emptyList(),
-        returnType: String? = null
+        parameterTypes: List<ValueType>,
+        returnType: ReturnType
     ) {
         overloads.add(OverloadInfo(overloadKey, jvmMethodName, descriptor, ownerClass, isInterface, isVarArgs, parameterTypes, returnType))
     }

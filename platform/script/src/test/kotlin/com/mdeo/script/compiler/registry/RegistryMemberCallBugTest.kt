@@ -306,6 +306,7 @@ class RegistryMemberCallBugTest {
             // val x: Int? = 5
             // x?.asBoolean() should return true (boxed Boolean)
             val ast = buildTypedAst {
+                val intType = intType()
                 val intNullableType = intNullableType()
                 val boolNullableType = booleanNullableType()
                 
@@ -313,7 +314,7 @@ class RegistryMemberCallBugTest {
                     name = "testFunction",
                     returnType = boolNullableType,
                     body = listOf(
-                        varDecl("x", intNullableType, intLiteral(5, intNullableType)),
+                        varDecl("x", intNullableType, intLiteral(5, intType)),
                         returnStmt(
                             memberCall(
                                 expression = identifier("x", intNullableType, 3),

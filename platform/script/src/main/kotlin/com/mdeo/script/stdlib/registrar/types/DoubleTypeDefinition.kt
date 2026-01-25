@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -13,121 +14,49 @@ fun createDoubleType(): TypeDefinition {
         extends("builtin.any")
 
         staticMethod("abs") {
-            overload(
-                "",
-                "(D)D",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
         }
 
         staticMethod("ceiling") {
-            overload(
-                "",
-                "(D)J",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)J", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.LONG)
         }
 
         staticMethod("floor") {
-            overload(
-                "",
-                "(D)J",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)J", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.LONG)
         }
 
         staticMethod("log") {
-            overload(
-                "",
-                "(D)D",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
         }
 
         staticMethod("log10") {
-            overload(
-                "",
-                "(D)D",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
         }
 
         staticMethod("max") {
-            overload(
-                "int",
-                "(DI)D",
-                DOUBLE_HELPER,
-                "max"
-            )
-            overload(
-                "long",
-                "(DJ)D",
-                DOUBLE_HELPER,
-                "max"
-            )
-            overload(
-                "float",
-                "(DF)D",
-                DOUBLE_HELPER,
-                "max"
-            )
-            overload(
-                "double",
-                "(DD)D",
-                DOUBLE_HELPER,
-                "max"
-            )
+            overload("int", "(DI)D", DOUBLE_HELPER, "max", parameterTypes = listOf(BuiltinTypes.INT), returnType = BuiltinTypes.DOUBLE)
+            overload("long", "(DJ)D", DOUBLE_HELPER, "max", parameterTypes = listOf(BuiltinTypes.LONG), returnType = BuiltinTypes.DOUBLE)
+            overload("float", "(DF)D", DOUBLE_HELPER, "max", parameterTypes = listOf(BuiltinTypes.FLOAT), returnType = BuiltinTypes.DOUBLE)
+            overload("double", "(DD)D", DOUBLE_HELPER, "max", parameterTypes = listOf(BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
         }
 
         staticMethod("min") {
-            overload(
-                "int",
-                "(DI)D",
-                DOUBLE_HELPER,
-                "min"
-            )
-            overload(
-                "long",
-                "(DJ)D",
-                DOUBLE_HELPER,
-                "min"
-            )
-            overload(
-                "float",
-                "(DF)D",
-                DOUBLE_HELPER,
-                "min"
-            )
-            overload(
-                "double",
-                "(DD)D",
-                DOUBLE_HELPER,
-                "min"
-            )
+            overload("int", "(DI)D", DOUBLE_HELPER, "min", parameterTypes = listOf(BuiltinTypes.INT), returnType = BuiltinTypes.DOUBLE)
+            overload("long", "(DJ)D", DOUBLE_HELPER, "min", parameterTypes = listOf(BuiltinTypes.LONG), returnType = BuiltinTypes.DOUBLE)
+            overload("float", "(DF)D", DOUBLE_HELPER, "min", parameterTypes = listOf(BuiltinTypes.FLOAT), returnType = BuiltinTypes.DOUBLE)
+            overload("double", "(DD)D", DOUBLE_HELPER, "min", parameterTypes = listOf(BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
         }
 
         staticMethod("pow") {
-            overload(
-                "",
-                "(DD)D",
-                DOUBLE_HELPER
-            )
+            overload("", "(DD)D", DOUBLE_HELPER, parameterTypes = listOf(BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
         }
 
         staticMethod("round") {
-            overload(
-                "",
-                "(D)J",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)J", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.LONG)
         }
 
         staticMethod("asString") {
-            overload(
-                "",
-                "(D)Ljava/lang/String;",
-                DOUBLE_HELPER
-            )
+            overload("", "(D)Ljava/lang/String;", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }
     }
 }

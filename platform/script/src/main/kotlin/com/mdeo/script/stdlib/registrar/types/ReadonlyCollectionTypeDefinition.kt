@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -16,406 +17,208 @@ fun createReadonlyCollectionType(): TypeDefinition {
         extends("builtin.any")
 
         instanceMethod("size") {
-            overload(
-                "",
-                "()I",
-                READONLY_COLLECTION,
-                isInterface = true
-            )
+            overload("", "()I", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.INT)
         }
 
         instanceMethod("isEmpty") {
-            overload(
-                "",
-                "()Z",
-                READONLY_COLLECTION,
-                isInterface = true
-            )
+            overload("", "()Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("notEmpty") {
-            overload(
-                "",
-                "()Z",
-                READONLY_COLLECTION,
-                isInterface = true
-            )
+            overload("", "()Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("includes") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.any?")
-            )
+            overload("", "(Ljava/lang/Object;)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("excludes") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.any?")
-            )
+            overload("", "(Ljava/lang/Object;)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("count") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)I",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.any?")
-            )
+            overload("", "(Ljava/lang/Object;)I", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
         }
 
         instanceMethod("sum") {
-            overload(
-                "",
-                "()D",
-                READONLY_COLLECTION,
-                isInterface = true
-            )
+            overload("", "()D", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
         }
 
         instanceMethod("concat") {
-            overload(
-                "nosep",
-                "()Ljava/lang/String;",
-                READONLY_COLLECTION,
-                isInterface = true
-            )
-            overload(
-                "sep",
-                "(Ljava/lang/String;)Ljava/lang/String;",
-                READONLY_COLLECTION,
-                isInterface = true
-            )
+            overload("nosep", "()Ljava/lang/String;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
+            overload("sep", "(Ljava/lang/String;)Ljava/lang/String;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.STRING), returnType = BuiltinTypes.STRING)
         }
 
         instanceMethod("including") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.any?"),
-                returnType = "builtin.ReadonlyCollection"
-            )
+            overload("", "(Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
         instanceMethod("excluding") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.any?"),
-                returnType = "builtin.ReadonlyCollection"
-            )
+            overload("", "(Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
         instanceMethod("asList") {
-            overload(
-                "",
-                "()Lcom/mdeo/script/stdlib/impl/collections/ScriptList;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.List"
-            )
+            overload("", "()Lcom/mdeo/script/stdlib/impl/collections/ScriptList;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.LIST)
         }
 
         instanceMethod("asSet") {
-            overload(
-                "",
-                "()Lcom/mdeo/script/stdlib/impl/collections/ScriptSet;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.Set"
-            )
+            overload("", "()Lcom/mdeo/script/stdlib/impl/collections/ScriptSet;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.SET)
         }
 
         instanceMethod("asBag") {
-            overload(
-                "",
-                "()Lcom/mdeo/script/stdlib/impl/collections/Bag;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.Bag"
-            )
+            overload("", "()Lcom/mdeo/script/stdlib/impl/collections/Bag;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.BAG)
         }
 
         instanceMethod("asOrderedSet") {
-            overload(
-                "",
-                "()Lcom/mdeo/script/stdlib/impl/collections/OrderedSet;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.OrderedSet"
-            )
+            overload("", "()Lcom/mdeo/script/stdlib/impl/collections/OrderedSet;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.ORDERED_SET)
         }
 
         instanceMethod("includesAll") {
-            overload(
-                "",
-                "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.ReadonlyCollection"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Z",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.READONLY_COLLECTION), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("excludesAll") {
-            overload(
-                "",
-                "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.ReadonlyCollection"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Z",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.READONLY_COLLECTION), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("includingAll") {
-            overload(
-                "",
-                "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.ReadonlyCollection"),
-                returnType = "builtin.ReadonlyCollection"
-            )
+            overload("", "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.READONLY_COLLECTION), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
         instanceMethod("excludingAll") {
-            overload(
-                "",
-                "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.ReadonlyCollection"),
-                returnType = "builtin.ReadonlyCollection"
-            )
+            overload("", "(Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.READONLY_COLLECTION), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
         instanceMethod("flatten") {
-            overload(
-                "",
-                "()Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.ReadonlyCollection"
-            )
+            overload("", "()Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
         instanceMethod("random") {
-            overload(
-                "",
-                "()Ljava/lang/Object;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.any?"
-            )
+            overload("", "()Ljava/lang/Object;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.NULLABLE_ANY)
         }
 
         instanceMethod("clone") {
-            overload(
-                "",
-                "()Lcom/mdeo/script/stdlib/impl/collections/Collection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                returnType = "builtin.Collection"
-            )
+            overload("", "()Lcom/mdeo/script/stdlib/impl/collections/Collection;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.COLLECTION)
         }
 
         instanceMethod("atLeastNMatch") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;I)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda", "builtin.int"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;I)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate(), BuiltinTypes.INT), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("atMostNMatch") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;I)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda", "builtin.int"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;I)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate(), BuiltinTypes.INT), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("aggregate") {
-            overload(
-                "",
-                "(Ljava/util/function/Function;)Lcom/mdeo/script/stdlib/impl/collections/ScriptMap;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.Map"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/ScriptMap;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.MAP)
         }
 
         instanceMethod("map") {
-            overload(
-                "",
-                "(Ljava/util/function/Function;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.ReadonlyCollection"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
         instanceMethod("exists") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("forEach") {
-            overload(
-                "",
-                "(Ljava/util/function/Consumer;)V",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda")
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Action1;)V", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.consumer()), returnType = BuiltinTypes.VOID)
         }
 
         instanceMethod("associate") {
-            overload(
-                "",
-                "(Ljava/util/function/Function;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyMap;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.ReadonlyMap"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyMap;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.READONLY_MAP)
         }
 
         instanceMethod("nMatch") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;I)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda", "builtin.int"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;I)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate(), BuiltinTypes.INT), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("none") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("one") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("reject") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.Collection"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.COLLECTION)
         }
 
         instanceMethod("rejectOne") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.Collection"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.COLLECTION)
         }
 
         instanceMethod("filter") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.Collection"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.COLLECTION)
         }
 
         instanceMethod("all") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Z",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.boolean"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Z", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.BOOLEAN)
         }
 
         instanceMethod("find") {
-            overload(
-                "",
-                "(Ljava/util/function/Predicate;)Ljava/lang/Object;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.any?"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)Ljava/lang/Object;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.NULLABLE_ANY)
         }
 
         instanceMethod("sortedBy") {
-            overload(
-                "",
-                "(Ljava/util/function/Function;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyOrderedCollection;",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.ReadonlyOrderedCollection"
-            )
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyOrderedCollection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.READONLY_ORDERED_COLLECTION)
         }
 
         instanceMethod("count") {
-            overload(
-                "lambda",
-                "(Ljava/util/function/Predicate;)I",
-                READONLY_COLLECTION,
-                isInterface = true,
-                parameterTypes = listOf("builtin.lambda"),
-                returnType = "builtin.int"
-            )
+            overload("lambda", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)I", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.INT)
         }
     }
 }

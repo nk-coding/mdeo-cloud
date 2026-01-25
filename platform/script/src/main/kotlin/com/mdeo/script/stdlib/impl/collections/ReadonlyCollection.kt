@@ -1,8 +1,8 @@
 package com.mdeo.script.stdlib.impl.collections
 
-import java.util.function.Consumer
-import java.util.function.Function
-import java.util.function.Predicate
+import com.mdeo.script.runtime.interfaces.Action1
+import com.mdeo.script.runtime.interfaces.Func1
+import com.mdeo.script.runtime.interfaces.Predicate1
 
 /**
  * A readonly collection that provides query operations without modification capabilities.
@@ -67,7 +67,7 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      *
      * @param predicate the predicate to apply to each element
      */
-    fun count(predicate: Predicate<@UnsafeVariance T>): Int
+    fun count(predicate: Predicate1<@UnsafeVariance T>): Int
 
     /**
      * Returns a new collection containing all elements except the specified item.
@@ -157,7 +157,7 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      * @param predicate the predicate to apply
      * @param n the minimum number of matches required
      */
-    fun atLeastNMatch(predicate: Predicate<@UnsafeVariance T>, n: Int): Boolean
+    fun atLeastNMatch(predicate: Predicate1<@UnsafeVariance T>, n: Int): Boolean
 
     /**
      * Returns true if at most n elements match the given predicate.
@@ -165,42 +165,49 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      * @param predicate the predicate to apply
      * @param n the maximum number of matches allowed
      */
-    fun atMostNMatch(predicate: Predicate<@UnsafeVariance T>, n: Int): Boolean
+    fun atMostNMatch(predicate: Predicate1<@UnsafeVariance T>, n: Int): Boolean
 
     /**
      * Groups elements by a key function.
      *
      * @param keyMapper the function to extract the key from each element
      */
-    fun aggregate(keyMapper: Function<@UnsafeVariance T, Any?>): ScriptMap<Any?, ScriptList<@UnsafeVariance T>>
+    fun aggregate(keyMapper: Func1<@UnsafeVariance T, Any?>): ScriptMap<Any?, ScriptList<@UnsafeVariance T>>
 
     /**
      * Maps each element to a new value.
      *
      * @param mapper the mapping function
      */
-    fun <U> map(mapper: Function<@UnsafeVariance T, U>): ReadonlyCollection<U>
+    fun <U> map(mapper: Func1<@UnsafeVariance T, U>): ReadonlyCollection<U>
 
     /**
      * Returns true if at least one element matches the predicate.
      *
      * @param predicate the predicate to apply
      */
-    fun exists(predicate: Predicate<@UnsafeVariance T>): Boolean
+    fun exists(predicate: Predicate1<@UnsafeVariance T>): Boolean
+
+    /**
+     * Performs the given action for each element in this collection.
+     *
+     * @param action the action to be performed for each element
+     */
+    fun forEach(action: Action1<@UnsafeVariance T>)
 
     /**
      * Returns true if all elements match the predicate.
      *
      * @param predicate the predicate to apply
      */
-    fun all(predicate: Predicate<@UnsafeVariance T>): Boolean
+    fun all(predicate: Predicate1<@UnsafeVariance T>): Boolean
 
     /**
      * Creates a map by associating each element with a computed value.
      *
      * @param valueMapper the function to compute the value for each element
      */
-    fun <U> associate(valueMapper: Function<@UnsafeVariance T, U>): ReadonlyMap<@UnsafeVariance T, U>
+    fun <U> associate(valueMapper: Func1<@UnsafeVariance T, U>): ReadonlyMap<@UnsafeVariance T, U>
 
     /**
      * Returns true if exactly n elements match the predicate.
@@ -208,35 +215,35 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      * @param predicate the predicate to apply
      * @param n the exact number of matches required
      */
-    fun nMatch(predicate: Predicate<@UnsafeVariance T>, n: Int): Boolean
+    fun nMatch(predicate: Predicate1<@UnsafeVariance T>, n: Int): Boolean
 
     /**
      * Returns true if no elements match the predicate.
      *
      * @param predicate the predicate to apply
      */
-    fun none(predicate: Predicate<@UnsafeVariance T>): Boolean
+    fun none(predicate: Predicate1<@UnsafeVariance T>): Boolean
 
     /**
      * Returns true if exactly one element matches the predicate.
      *
      * @param predicate the predicate to apply
      */
-    fun one(predicate: Predicate<@UnsafeVariance T>): Boolean
+    fun one(predicate: Predicate1<@UnsafeVariance T>): Boolean
 
     /**
      * Returns a new collection containing only elements that don't match the predicate.
      *
      * @param predicate the predicate to apply
      */
-    fun reject(predicate: Predicate<@UnsafeVariance T>): Collection<@UnsafeVariance T>
+    fun reject(predicate: Predicate1<@UnsafeVariance T>): Collection<@UnsafeVariance T>
 
     /**
      * Returns a new collection with the first matching element removed.
      *
      * @param predicate the predicate to apply
      */
-    fun rejectOne(predicate: Predicate<@UnsafeVariance T>): Collection<@UnsafeVariance T>
+    fun rejectOne(predicate: Predicate1<@UnsafeVariance T>): Collection<@UnsafeVariance T>
 
     /**
      * Returns a new collection containing only elements that match the predicate.
@@ -244,7 +251,7 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      *
      * @param predicate the predicate to apply
      */
-    fun filter(predicate: Predicate<@UnsafeVariance T>): Collection<@UnsafeVariance T>
+    fun filter(predicate: Predicate1<@UnsafeVariance T>): Collection<@UnsafeVariance T>
 
     /**
      * Finds the first element matching the predicate.
@@ -252,12 +259,12 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      * @param predicate the predicate to apply
      * @return the first matching element or null if not found
      */
-    fun find(predicate: Predicate<@UnsafeVariance T>): T?
+    fun find(predicate: Predicate1<@UnsafeVariance T>): T?
 
     /**
      * Returns an ordered collection sorted by the given key extractor.
      *
      * @param keyExtractor the function to extract the sort key
      */
-    fun <U : Comparable<U>> sortedBy(keyExtractor: Function<@UnsafeVariance T, U>): ReadonlyOrderedCollection<@UnsafeVariance T>
+    fun <U : Comparable<U>> sortedBy(keyExtractor: Func1<@UnsafeVariance T, U>): ReadonlyOrderedCollection<@UnsafeVariance T>
 }

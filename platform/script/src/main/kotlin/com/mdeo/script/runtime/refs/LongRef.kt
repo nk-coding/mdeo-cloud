@@ -1,11 +1,11 @@
-package com.mdeo.script.runtime
+package com.mdeo.script.runtime.refs
 
 /**
- * Mutable wrapper for int values.
+ * Mutable wrapper for long values.
  * Used when local variables need to be modified from within lambdas.
  *
  * This class provides a simple mutable container that can be captured
  * by lambda expressions, allowing the lambda to modify the original
  * variable's value.
  */
-class IntRef(@JvmField var value: Int = 0)
+class LongRef(@JvmField var value: Long = 0L)

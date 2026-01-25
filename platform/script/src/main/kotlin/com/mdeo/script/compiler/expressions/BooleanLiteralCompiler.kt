@@ -12,7 +12,7 @@ import org.objectweb.asm.Opcodes
  * Compiler for boolean literal expressions.
  * Generates bytecode to push a boolean constant (0 or 1) onto the operand stack.
  */
-class BooleanLiteralCompiler : ExpressionCompiler {
+class BooleanLiteralCompiler : ExpressionCompiler() {
     
     /**
      * Checks if this compiler can handle the given expression.
@@ -32,7 +32,7 @@ class BooleanLiteralCompiler : ExpressionCompiler {
      * @param context The compilation context with type information and utilities.
      * @param mv The method visitor to emit bytecode to.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val boolExpr = expression as TypedBooleanLiteralExpression
         
         if (boolExpr.value) {

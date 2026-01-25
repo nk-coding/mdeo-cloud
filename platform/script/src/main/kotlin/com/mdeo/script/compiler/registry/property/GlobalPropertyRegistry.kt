@@ -52,19 +52,4 @@ class GlobalPropertyRegistry {
         return properties[name]
     }
 
-    /**
-     * Gets a global property definition by name, falling back to the global registry.
-     *
-     * @param name The property name.
-     * @return The property definition, or null if not found.
-     */
-    fun getPropertyOrGlobal(name: String): GlobalPropertyDefinition? {
-        return properties[name] ?: (if (this !== GLOBAL) GLOBAL.getProperty(name) else null)
-    }
-
-    /**
-     * Gets all property names registered in this registry (not including global).
-     */
-    val propertyNames: Set<String>
-        get() = properties.keys
 }

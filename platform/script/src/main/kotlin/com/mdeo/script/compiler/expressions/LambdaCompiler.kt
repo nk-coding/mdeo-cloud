@@ -10,6 +10,7 @@ import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
+import com.mdeo.script.compiler.LambdaInterfaceRegistry
 import com.mdeo.script.compiler.LocalVariableIndexAssigner
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.Scope
@@ -19,44 +20,19 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
 /**
- * Represents information about a captured variable in a lambda.
- */
-data class CapturedVariable(
-    /**
-     * The name of the variable.
-     */
-    val name: String,
-
-    /**
-     * The type of the variable.
-     */
-    val type: ReturnType,
-
-    /**
-     * Whether this variable is wrapped in a Ref.
-     */
-    val isRef: Boolean,
-
-    /**
-     * The slot index in the enclosing function where this variable is stored.
-     */
-    val outerSlotIndex: Int,
-
-    /**
-     * The scope level where the variable was declared.
-     */
-    val scopeLevel: Int
-)
-
-/**
  * Compiles lambda expressions to bytecode using invokedynamic.
  * 
  * Lambda expressions are compiled using the invokedynamic instruction with
  * LambdaMetafactory as the bootstrap method. Custom functional interfaces
  * (Lambda$Int$Int, etc.) are generated to avoid boxing overhead.
  * The method in interfaces is always named "call".
+ * 
+ * This compiler overrides [compile] instead of [compileInternal] to handle
+ * expected type coercion directly. When the expected type is a different lambda
+ * type, this compiler adapts the generated lambda to match the expected signature,
+ * avoiding unnecessary wrapper lambdas.
  */
-class LambdaCompiler : ExpressionCompiler {
+class LambdaCompiler : ExpressionCompiler() {
 
     /**
      * Checks if this compiler can compile the given expression.
@@ -69,34 +45,53 @@ class LambdaCompiler : ExpressionCompiler {
     }
 
     /**
-     * Compiles a lambda expression to bytecode using invokedynamic.
+     * Compiles a lambda expression to bytecode, adapting to the expected type.
      *
-     * This method generates a private static synthetic method in the current class,
-     * analyzes captured variables, registers the method name, and emits an invokedynamic
-     * instruction to create the lambda instance at runtime.
+     * This method overrides the base compile to handle lambda type coercion directly.
+     * When expectedType is a LambdaType different from the lambda's natural type,
+     * this method generates the lambda with the expected signature, handling:
+     * - Extra parameters (reserved but not registered)
+     * - Parameter type coercion (expected → actual)
+     * - Return type coercion (actual → expected)
      *
      * @param expression The lambda expression to compile.
      * @param context The compilation context containing type information and scope.
      * @param mv The method visitor for emitting bytecode.
+     * @param expectedType The type the lambda should conform to.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compile(
+        expression: TypedExpression,
+        context: CompilationContext,
+        mv: MethodVisitor,
+        expectedType: ReturnType
+    ) {
         val lambda = expression as TypedLambdaExpression
-        val lambdaType = context.getType(lambda.evalType) as LambdaType
+        val actualLambdaType = context.getType(lambda.evalType) as LambdaType
+
+        val effectiveLambdaType = expectedType as? LambdaType ?: actualLambdaType
+
+        val registry = context.getLambdaInterfaceRegistry()
+        val normalizedKey = registry.createKey(effectiveLambdaType)
 
         val capturedVariables = analyzeCapturedVariables(lambda, context)
-
         val methodName = context.generateLambdaMethodName()
 
         generateSyntheticMethod(
             methodName,
             lambda,
-            lambdaType,
+            actualLambdaType,
+            effectiveLambdaType,
             capturedVariables,
             context
         )
 
-        emitInvokeDynamic(methodName, lambdaType, capturedVariables, context, mv)
+        emitInvokeDynamic(methodName, effectiveLambdaType, normalizedKey, capturedVariables, context, mv)
     }
+
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+        throw IllegalStateException("LambdaCompiler uses compile() directly, not compileInternal()")
+    }
+
 
     /**
      * Analyzes the lambda body to determine which outer variables are captured.
@@ -138,18 +133,10 @@ class LambdaCompiler : ExpressionCompiler {
         lambdaBodyScope: Scope,
         context: CompilationContext
     ): List<CapturedVariable> {
-        /* 
-         * The lambda params scope is the parent of the body scope.
-         * Variables declared at levels less than the params scope level are captured.
-         */
         val lambdaParamsLevel = lambdaBodyScope.parent?.level ?: lambdaBodyScope.level
         val capturedPairs = lambdaBodyScope.collectCapturedVariables(lambdaParamsLevel)
 
         return capturedPairs.mapNotNull { (name, declarationLevel) ->
-            /* 
-             * Look up the variable in the current scope.
-             * The scope tree knows where variables are declared and whether they're Ref-wrapped.
-             */
             val variable = context.currentScope?.lookupVariable(name, declarationLevel)
 
             if (variable != null) {
@@ -173,29 +160,25 @@ class LambdaCompiler : ExpressionCompiler {
      * descriptor includes captured variables followed by lambda parameters. The method body
      * compiles the lambda statements using existing statement compilers.
      *
-     * This now uses the regular scope tree that was created by ScopeBuilder. It:
-     * 1. Gets the lambda params scope and body scope from the scope tree
-     * 2. Adds captured variables to the params scope
-     * 3. Assigns slots to all variables (captured + params + locals)
-     * 4. Uses the regular scope tree for all variable lookups
-     *
      * @param methodName The name of the synthetic method.
      * @param lambda The lambda expression to compile.
-     * @param lambdaType The type information for the lambda.
+     * @param actualLambdaType The lambda's natural type from its expression.
+     * @param effectiveLambdaType The type to generate (may differ from actual).
      * @param capturedVariables The list of captured variables that become method parameters.
      * @param context The compilation context from the enclosing scope.
      */
     private fun generateSyntheticMethod(
         methodName: String,
         lambda: TypedLambdaExpression,
-        lambdaType: LambdaType,
+        actualLambdaType: LambdaType,
+        effectiveLambdaType: LambdaType,
         capturedVariables: List<CapturedVariable>,
         context: CompilationContext
     ) {
         val cw = context.classWriter
             ?: throw IllegalStateException("ClassWriter required for lambda compilation")
 
-        val methodDescriptor = buildSyntheticMethodDescriptor(lambdaType, capturedVariables, context)
+        val methodDescriptor = buildSyntheticMethodDescriptor(effectiveLambdaType, capturedVariables, context)
 
         val mv = cw.visitMethod(
             Opcodes.ACC_PRIVATE or Opcodes.ACC_STATIC or Opcodes.ACC_SYNTHETIC,
@@ -222,20 +205,26 @@ class LambdaCompiler : ExpressionCompiler {
             varInfo.isWrittenByLambda = captured.isRef
         }
 
-        for ((index, paramName) in lambda.parameters.withIndex()) {
-            val paramType = lambdaType.parameters[index].type
+        for ((index, param) in effectiveLambdaType.parameters.withIndex()) {
+            val paramName = if (index < lambda.parameters.size) {
+                lambda.parameters[index]
+            } else {
+                "\$unused_param_$index"
+            }
+            val paramType = if (index < actualLambdaType.parameters.size) {
+                actualLambdaType.parameters[index].type
+            } else {
+                param.type
+            }
             lambdaParamsScope.declareVariable(paramName, paramType)
         }
 
-
         assignLambdaSlots(lambdaParamsScope, context)
 
-        val returnTypeIndex = findReturnTypeIndex(lambdaType.returnType, context)
+        emitParameterCoercion(lambda, actualLambdaType, effectiveLambdaType, lambdaParamsScope, mv)
 
-        /* 
-         * Create a new compilation context for the lambda method.
-         * Use the lambda params scope as the function params scope.
-         */
+        val returnTypeIndex = findReturnTypeIndex(effectiveLambdaType.returnType, context)
+
         val lambdaCompilationContext = context.withLambdaContext(
             functionReturnTypeIndex = returnTypeIndex,
             functionParamsScope = lambdaParamsScope
@@ -249,10 +238,51 @@ class LambdaCompiler : ExpressionCompiler {
 
         lambdaCompilationContext.exitScope()
 
-        emitDefaultReturn(lambdaType.returnType, mv)
+        if (effectiveLambdaType.returnType is VoidType) {
+            mv.visitInsn(Opcodes.RETURN)
+        }
 
         mv.visitMaxs(0, 0)
         mv.visitEnd()
+    }
+
+    /**
+     * Emits coercion for parameters from effective types to actual types.
+     * 
+     * Loads each ACTUAL parameter from its slot, coerces it from the effective type
+     * to the actual type, and stores it back. Extra parameters are not coerced.
+     * 
+     * @param lambda The lambda expression (for parameter names)
+     * @param actualLambdaType The lambda's natural type
+     * @param effectiveLambdaType The type we're generating for
+     * @param lambdaParamsScope The scope with parameter declarations
+     * @param mv The method visitor for emitting bytecode
+     */
+    private fun emitParameterCoercion(
+        lambda: TypedLambdaExpression,
+        actualLambdaType: LambdaType,
+        effectiveLambdaType: LambdaType,
+        lambdaParamsScope: Scope,
+        mv: MethodVisitor
+    ) {
+        for (index in lambda.parameters.indices) {
+            if (index >= effectiveLambdaType.parameters.size) {
+                break
+            }
+
+            val actualType = actualLambdaType.parameters[index].type
+            val effectiveType = effectiveLambdaType.parameters[index].type
+            val paramName = lambda.parameters[index]
+
+            if (actualType != effectiveType) {
+                val varInfo = lambdaParamsScope.lookupVariable(paramName, lambdaParamsScope.level)
+                    ?: continue
+
+                mv.visitVarInsn(ASMUtil.getLoadOpcode(effectiveType), varInfo.slotIndex)
+                CoercionUtil.emitCoercion(effectiveType, actualType, mv)
+                mv.visitVarInsn(ASMUtil.getStoreOpcode(actualType), varInfo.slotIndex)
+            }
+        }
     }
 
     /**
@@ -304,7 +334,6 @@ class LambdaCompiler : ExpressionCompiler {
     }
 
 
-
     /**
      * Emits an invokedynamic instruction to create the lambda instance.
      *
@@ -313,7 +342,8 @@ class LambdaCompiler : ExpressionCompiler {
      * method dynamically creates a lambda instance implementing the functional interface.
      *
      * @param methodName The name of the synthetic method implementing the lambda.
-     * @param lambdaType The type information for the lambda.
+     * @param lambdaType The type information for the lambda (actual type used for synthetic method).
+     * @param normalizedKey The normalized lambda type key (used for interface signature).
      * @param capturedVariables The list of captured variables to pass to the lambda.
      * @param context The compilation context.
      * @param mv The method visitor for emitting bytecode.
@@ -321,6 +351,7 @@ class LambdaCompiler : ExpressionCompiler {
     private fun emitInvokeDynamic(
         methodName: String,
         lambdaType: LambdaType,
+        normalizedKey: LambdaType,
         capturedVariables: List<CapturedVariable>,
         context: CompilationContext,
         mv: MethodVisitor
@@ -335,11 +366,11 @@ class LambdaCompiler : ExpressionCompiler {
         }
 
         val functionalInterface = getFunctionalInterface(lambdaType, context)
-        val interfaceMethodInfo = getInterfaceMethodInfo(functionalInterface, lambdaType, context)
+        val interfaceMethodInfo = getInterfaceMethodInfo(functionalInterface, normalizedKey, context)
 
         val invokeDynamicDescriptor = buildInvokeDynamicDescriptor(lambdaType, capturedVariables, context)
 
-        val samMethodType = buildSAMMethodType(lambdaType, context)
+        val samMethodType = buildSAMMethodType(normalizedKey, context)
 
         val implMethodDescriptor = buildSyntheticMethodDescriptor(lambdaType, capturedVariables, context)
         val implMethodHandle = org.objectweb.asm.Handle(
@@ -394,26 +425,21 @@ class LambdaCompiler : ExpressionCompiler {
 
     /**
      * Builds the SAM method type for the bootstrap method.
+     * Uses the actual types from the normalized key.
      *
-     * For custom interfaces, this is the same as the interface method descriptor
-     * using primitive types directly (no generics, no boxing).
-     *
-     * @param lambdaType The lambda type.
+     * @param normalizedKey The normalized lambda type key.
      * @param context The compilation context.
      * @return The Type object representing the SAM method type.
      */
-    private fun buildSAMMethodType(lambdaType: LambdaType, context: CompilationContext): org.objectweb.asm.Type {
-        val descriptor = buildInterfaceMethodDescriptor(lambdaType, context)
+    private fun buildSAMMethodType(normalizedKey: LambdaType, context: CompilationContext): org.objectweb.asm.Type {
+        val descriptor = buildInterfaceMethodDescriptor(normalizedKey, context)
         return org.objectweb.asm.Type.getMethodType(descriptor)
     }
 
     /**
      * Builds the instantiated method type for the bootstrap method.
      *
-     * For custom interfaces without generics, this is the same as the SAM method type.
-     * Uses primitive types directly without boxing.
-     *
-     * @param lambdaType The lambda type.
+     * @param lambdaType The actual lambda type (not normalized).
      * @param context The compilation context.
      * @return The Type object representing the instantiated method type.
      */
@@ -425,46 +451,27 @@ class LambdaCompiler : ExpressionCompiler {
         return org.objectweb.asm.Type.getMethodType(descriptor)
     }
 
-
     /**
      * Determines the appropriate functional interface for a lambda type.
      *
-     * Generates custom functional interfaces to avoid boxing overhead.
-     * Interface names follow the pattern: Lambda$ReturnType$ParamType1$ParamType2...
-     * 
-     * Examples:
-     * - () => void: Lambda$Void$0
-     * - () => int: Lambda$Int$0
-     * - (int) => int: Lambda$Int$Int
-     * - (int, double) => void: Lambda$Void$Int$Double
+     * First checks the lambda interface registry for a matching predefined interface
+     * (Func0-3, Action0-3, Predicate1). If no predefined interface matches, uses
+     * the registry to generate a new interface name with simple counting (Lambda$0, Lambda$1, etc.).
      *
      * @param lambdaType The lambda type to map to a functional interface.
-     * @param context The compilation context containing the generated interfaces.
+     * @param context The compilation context containing the interface registry.
      * @return The fully qualified internal name of the functional interface.
      */
     private fun getFunctionalInterface(lambdaType: LambdaType, context: CompilationContext): String {
-        val interfaceName = buildInterfaceName(lambdaType)
+        val registry = context.getLambdaInterfaceRegistry()
+        val lookupResult = registry.getInterfaceForLambdaType(lambdaType)
 
-        if (!context.hasInterface(interfaceName)) {
-            val bytecode = generateFunctionalInterface(interfaceName, lambdaType, context)
-            context.registerInterface(interfaceName, bytecode)
+        if (lookupResult.isNewlyGenerated) {
+            val bytecode = generateFunctionalInterface(lookupResult.interfaceName, lambdaType, context)
+            context.registerInterface(lookupResult.interfaceName, bytecode)
         }
 
-        return interfaceName
-    }
-
-    /**
-     * Builds the interface name for a lambda type.
-     * 
-     * Uses the centralized CoercionUtil.getFunctionalInterfaceName to ensure
-     * consistent naming across all lambda-related compilers.
-     * 
-     * @param lambdaType The lambda type.
-     * @return The interface name (e.g., "Lambda$Int$Double").
-     */
-    private fun buildInterfaceName(lambdaType: LambdaType): String {
-        val parameterTypes = lambdaType.parameters.map { it.type }
-        return CoercionUtil.getFunctionalInterfaceName(lambdaType.returnType, parameterTypes)
+        return lookupResult.interfaceName
     }
 
     /**
@@ -543,69 +550,6 @@ class LambdaCompiler : ExpressionCompiler {
     }
 
     /**
-     * Emits a default return instruction if needed.
-     *
-     * Generates the appropriate return instruction and default value
-     * based on the return type (void, primitive, or reference).
-     *
-     * @param returnType The return type of the lambda.
-     * @param mv The method visitor for emitting bytecode.
-     */
-    private fun emitDefaultReturn(returnType: ReturnType, mv: MethodVisitor) {
-        when {
-            returnType is VoidType -> mv.visitInsn(Opcodes.RETURN)
-            returnType is ClassTypeRef -> {
-                if (returnType.isNullable) {
-                    mv.visitInsn(Opcodes.ACONST_NULL)
-                    mv.visitInsn(Opcodes.ARETURN)
-                } else {
-                    when (returnType.type) {
-                        "builtin.int", "builtin.boolean" -> {
-                            mv.visitInsn(Opcodes.ICONST_0)
-                            mv.visitInsn(Opcodes.IRETURN)
-                        }
-
-                        "builtin.long" -> {
-                            mv.visitInsn(Opcodes.LCONST_0)
-                            mv.visitInsn(Opcodes.LRETURN)
-                        }
-
-                        "builtin.float" -> {
-                            mv.visitInsn(Opcodes.FCONST_0)
-                            mv.visitInsn(Opcodes.FRETURN)
-                        }
-
-                        "builtin.double" -> {
-                            mv.visitInsn(Opcodes.DCONST_0)
-                            mv.visitInsn(Opcodes.DRETURN)
-                        }
-
-                        else -> {
-                            mv.visitInsn(Opcodes.ACONST_NULL)
-                            mv.visitInsn(Opcodes.ARETURN)
-                        }
-                    }
-                }
-            }
-
-            else -> {
-                mv.visitInsn(Opcodes.ACONST_NULL)
-                mv.visitInsn(Opcodes.ARETURN)
-            }
-        }
-    }
-
-
-    /**
-     * Information about a functional interface method.
-     */
-    private data class InterfaceMethodInfo(
-        val name: String,
-        val descriptor: String,
-        val parameterTypes: List<String>
-    )
-
-    /**
      * Gets information about the interface method to implement.
      * 
      * For custom interfaces, the method is always named "call" and uses
@@ -630,3 +574,42 @@ class LambdaCompiler : ExpressionCompiler {
 
 
 }
+
+/**
+ * Represents information about a captured variable in a lambda.
+ */
+private data class CapturedVariable(
+    /**
+     * The name of the variable.
+     */
+    val name: String,
+
+    /**
+     * The type of the variable.
+     */
+    val type: ReturnType,
+
+    /**
+     * Whether this variable is wrapped in a Ref.
+     */
+    val isRef: Boolean,
+
+    /**
+     * The slot index in the enclosing function where this variable is stored.
+     */
+    val outerSlotIndex: Int,
+
+    /**
+     * The scope level where the variable was declared.
+     */
+    val scopeLevel: Int
+)
+
+/**
+ * Information about a functional interface method.
+ */
+private data class InterfaceMethodInfo(
+    val name: String,
+    val descriptor: String,
+    val parameterTypes: List<String>
+)

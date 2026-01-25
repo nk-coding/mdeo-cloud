@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -20,7 +21,9 @@ fun createOrderedCollectionType(): TypeDefinition {
                 "",
                 "(I)Ljava/lang/Object;",
                 ORDERED_COLLECTION,
-                isInterface = true
+                isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.INT),
+                returnType = BuiltinTypes.NULLABLE_ANY
             )
         }
 
@@ -30,7 +33,8 @@ fun createOrderedCollectionType(): TypeDefinition {
                 "(Lcom/mdeo/script/api/Function;)Lcom/mdeo/script/stdlib/impl/collections/OrderedCollection;",
                 ORDERED_COLLECTION,
                 isInterface = true,
-                parameterTypes = listOf("builtin.function")
+                parameterTypes = listOf(BuiltinTypes.function(BuiltinTypes.NULLABLE_ANY, BuiltinTypes.NULLABLE_ANY)),
+                returnType = BuiltinTypes.ORDERED_COLLECTION
             )
         }
     }

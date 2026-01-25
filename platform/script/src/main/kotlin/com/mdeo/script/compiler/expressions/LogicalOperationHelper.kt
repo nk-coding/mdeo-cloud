@@ -55,10 +55,12 @@ object LogicalOperationHelper {
         val falseLabel = Label()
         val endLabel = Label()
 
-        context.compileExpression(expr.left, mv)
+        val leftType = context.getType(expr.left.evalType)
+        context.compileExpression(expr.left, mv, leftType)
         mv.visitJumpInsn(Opcodes.IFEQ, falseLabel)
 
-        context.compileExpression(expr.right, mv)
+        val rightType = context.getType(expr.right.evalType)
+        context.compileExpression(expr.right, mv, rightType)
         mv.visitJumpInsn(Opcodes.IFEQ, falseLabel)
 
         mv.visitInsn(Opcodes.ICONST_1)
@@ -103,10 +105,12 @@ object LogicalOperationHelper {
         val trueLabel = Label()
         val endLabel = Label()
 
-        context.compileExpression(expr.left, mv)
+        val leftType = context.getType(expr.left.evalType)
+        context.compileExpression(expr.left, mv, leftType)
         mv.visitJumpInsn(Opcodes.IFNE, trueLabel)
 
-        context.compileExpression(expr.right, mv)
+        val rightType = context.getType(expr.right.evalType)
+        context.compileExpression(expr.right, mv, rightType)
         mv.visitJumpInsn(Opcodes.IFNE, trueLabel)
 
         mv.visitInsn(Opcodes.ICONST_0)

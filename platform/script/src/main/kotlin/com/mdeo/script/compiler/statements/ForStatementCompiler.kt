@@ -138,7 +138,8 @@ class ForStatementCompiler : StatementCompiler {
         mv: MethodVisitor,
         iteratorSlot: Int
     ): Int {
-        context.compileExpression(forStmt.iterable, mv)
+        val iterableType = context.getType(forStmt.iterable.evalType)
+        context.compileExpression(forStmt.iterable, mv, iterableType)
         
         mv.visitMethodInsn(
             Opcodes.INVOKEINTERFACE,

@@ -1,5 +1,8 @@
 package com.mdeo.script.compiler.registry.function
 
+import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.ast.types.ValueType
+import com.mdeo.script.ast.types.VoidType
 import com.mdeo.script.compiler.registry.property.GlobalPropertyDefinition
 import com.mdeo.script.compiler.registry.property.StaticGlobalPropertyDefinition
 
@@ -9,10 +12,12 @@ import com.mdeo.script.compiler.registry.property.StaticGlobalPropertyDefinition
  * Example usage:
  * ```kotlin
  * globalFunction("println") {
- *     staticOverload("println(builtin.string):void") {
+ *     staticOverload("") {
  *         descriptor = "(Ljava/lang/String;)V"
  *         owner = "com/mdeo/script/stdlib/globals/GlobalFunctions"
  *         jvmMethod = "println"
+ *         parameterTypes = listOf(BuiltinTypes.STRING)
+ *         returnType = BuiltinTypes.VOID
  *     }
  * }
  * ```
@@ -111,16 +116,14 @@ class StaticOverloadBuilder(
     lateinit var jvmMethod: String
 
     /**
-     * The parameter type names for coercion.
-     * Optional - defaults to empty list.
+     * The parameter types for coercion (required).
      */
-    var parameterTypes: List<String> = emptyList()
+    lateinit var parameterTypes: List<ValueType>
 
     /**
-     * The return type name for coercion.
-     * Optional - null for void return type.
+     * The return type for coercion (required).
      */
-    var returnType: String? = null
+    lateinit var returnType: ReturnType
 
     /**
      * Builds the function signature definition.

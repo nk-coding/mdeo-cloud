@@ -1,5 +1,6 @@
 package com.mdeo.script.compiler.registry
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.InstanceMethodDefinition
 import com.mdeo.script.compiler.registry.type.InstancePropertyDefinition
 import com.mdeo.script.compiler.registry.type.StaticMethodDefinition
@@ -70,7 +71,7 @@ class TypeRegistryTest {
         fun `can lookup method by overload key`() {
             val typeDef = typeDefinition("test.Type") {
                 staticMethod("doSomething") {
-                    overload("", "(I)I", "test/Helper")
+                    overload("", "(I)I", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(typeDef)
@@ -93,8 +94,8 @@ class TypeRegistryTest {
         fun `can lookup method with parameters`() {
             val typeDef = typeDefinition("test.Type") {
                 staticMethod("add") {
-                    overload("", "(II)I", "test/Helper")
-                    overload("", "(ID)D", "test/Helper")
+                    overload("", "(II)I", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.INT), returnType = BuiltinTypes.INT)
+                    overload("", "(ID)D", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
                 }
             }
             registry.register(typeDef)
@@ -112,7 +113,7 @@ class TypeRegistryTest {
         fun `can lookup instance method`() {
             val typeDef = typeDefinition("test.Type") {
                 instanceMethod("getValue") {
-                    overload("", "()I", "test/Type")
+                    overload("", "()I", "test/Type", parameterTypes = emptyList(), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(typeDef)
@@ -126,9 +127,9 @@ class TypeRegistryTest {
         fun `can lookup all overloads of a method`() {
             val typeDef = typeDefinition("test.Type") {
                 staticMethod("add") {
-                    overload("", "(II)I", "test/Helper")
-                    overload("", "(ID)D", "test/Helper")
-                    overload("", "(ILjava/lang/String;)Ljava/lang/String;", "test/Helper")
+                    overload("", "(II)I", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.INT), returnType = BuiltinTypes.INT)
+                    overload("", "(ID)D", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
+                    overload("", "(ILjava/lang/String;)Ljava/lang/String;", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.STRING), returnType = BuiltinTypes.STRING)
                 }
             }
             registry.register(typeDef)
@@ -146,7 +147,7 @@ class TypeRegistryTest {
             // Parent type
             val parentDef = typeDefinition("base.Parent") {
                 staticMethod("parentMethod") {
-                    overload("", "(Ljava/lang/Object;)I", "base/ParentHelper")
+                    overload("", "(Ljava/lang/Object;)I", "base/ParentHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(parentDef)
@@ -155,7 +156,7 @@ class TypeRegistryTest {
             val childDef = typeDefinition("child.Child") {
                 extends("base.Parent")
                 staticMethod("childMethod") {
-                    overload("", "(Ljava/lang/Object;)I", "child/ChildHelper")
+                    overload("", "(Ljava/lang/Object;)I", "child/ChildHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(childDef)
@@ -170,7 +171,7 @@ class TypeRegistryTest {
         fun `child method overrides parent method`() {
             val parentDef = typeDefinition("base.Parent") {
                 staticMethod("getValue") {
-                    overload("", "(Ljava/lang/Object;)I", "base/ParentHelper")
+                    overload("", "(Ljava/lang/Object;)I", "base/ParentHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(parentDef)
@@ -178,7 +179,7 @@ class TypeRegistryTest {
             val childDef = typeDefinition("child.Child") {
                 extends("base.Parent")
                 staticMethod("getValue") {
-                    overload("", "(Ljava/lang/Object;)I", "child/ChildHelper")
+                    overload("", "(Ljava/lang/Object;)I", "child/ChildHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(childDef)
@@ -193,7 +194,7 @@ class TypeRegistryTest {
         fun `multi-level inheritance works`() {
             val grandparentDef = typeDefinition("base.Grandparent") {
                 staticMethod("grandparentMethod") {
-                    overload("", "(Ljava/lang/Object;)I", "base/GrandparentHelper")
+                    overload("", "(Ljava/lang/Object;)I", "base/GrandparentHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(grandparentDef)

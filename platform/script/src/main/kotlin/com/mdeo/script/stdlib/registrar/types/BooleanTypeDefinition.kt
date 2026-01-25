@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -14,9 +15,9 @@ fun createBooleanType(): TypeDefinition {
 
         staticMethod("asString") {
             overload(
-                "",
-                "(Z)Ljava/lang/String;",
-                BOOLEAN_HELPER
+                "", "(Z)Ljava/lang/String;", BOOLEAN_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.STRING
             )
         }
     }

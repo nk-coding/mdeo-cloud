@@ -1314,4 +1314,498 @@ class LambdaCompilerTest {
         assertNotNull(result)
         assertTrue(result.isNotEmpty())
     }
+    
+    // =============== Lambda Type Coercion Tests ===============
+    
+    @Test
+    fun `lambda with fewer params adapts to expected type with more params`() {
+        // Lambda expression takes 1 param, but expected type takes 2 params
+        // The lambda ignores the second param
+        // val f: (int, int) => int = (x) => x + 10
+        // return f(5, 100)  // second param ignored, should return 15
+        val ast = buildTypedAst {
+            val intType = intType()
+            // Actual lambda type: (int) => int
+            val actualLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", false)
+            )
+            // Expected lambda type: (int, int) => int
+            val expectedLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "a" to ClassTypeRef("builtin.int", false),
+                "b" to ClassTypeRef("builtin.int", false)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    // Declare variable with expected type, but assign lambda with actual type
+                    varDecl("f", expectedLambdaType, lambdaExpr(
+                        parameters = listOf("x"),  // Only 1 param
+                        body = listOf(
+                            returnStmt(
+                                binaryExpr(
+                                    identifier("x", intType, 4),
+                                    "+",
+                                    intLiteral(10, intType),
+                                    intType
+                                )
+                            )
+                        ),
+                        lambdaTypeIndex = actualLambdaType
+                    )),
+                    // Call with 2 params - second is ignored
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("f", expectedLambdaType, 3),
+                            arguments = listOf(
+                                intLiteral(5, intType),
+                                intLiteral(100, intType)  // This is ignored
+                            ),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(15, result)
+    }
+    
+    @Test
+    fun `lambda with parameter type coercion - boxed to primitive`() {
+        // Lambda expects primitive int, but expected type provides nullable Int (boxed)
+        // val f: (int?) => int = (x) => x + 1  -- actual lambda unboxes
+        val ast = buildTypedAst {
+            val intType = intType()
+            val intNullable = intNullableType()
+            // Actual lambda type: (int) => int
+            val actualLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", false)
+            )
+            // Expected lambda type: (int?) => int
+            val expectedLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", true)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    varDecl("f", expectedLambdaType, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(
+                                binaryExpr(
+                                    identifier("x", intType, 4),
+                                    "+",
+                                    intLiteral(1, intType),
+                                    intType
+                                )
+                            )
+                        ),
+                        lambdaTypeIndex = actualLambdaType
+                    )),
+                    // Call with a boxed int (simulated by passing primitive, runtime will box)
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("f", expectedLambdaType, 3),
+                            arguments = listOf(intLiteral(41, intType)),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    @Test
+    fun `lambda with return type coercion - primitive to boxed`() {
+        // Lambda returns primitive int, but expected type expects nullable Int (boxed)
+        // val f: () => int? = () => 42
+        val ast = buildTypedAst {
+            val intType = intType()
+            val intNullable = intNullableType()
+            // Actual lambda type: () => int
+            val actualLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false)
+            )
+            // Expected lambda type: () => int?
+            val expectedLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", true)
+            )
+            function(
+                name = "testFunction",
+                returnType = intNullable,
+                body = listOf(
+                    varDecl("f", expectedLambdaType, lambdaExpr(
+                        parameters = emptyList(),
+                        body = listOf(
+                            returnStmt(intLiteral(42, intType))
+                        ),
+                        lambdaTypeIndex = actualLambdaType
+                    )),
+                    // Call - result should be boxed
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("f", expectedLambdaType, 3),
+                            arguments = emptyList(),
+                            resultTypeIndex = intNullable
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    @Test
+    fun `lambda with combined param count and type coercion`() {
+        // Lambda takes 1 int param, expected takes 2 params (int?, int)
+        // Tests both extra params and parameter type coercion
+        val ast = buildTypedAst {
+            val intType = intType()
+            val intNullable = intNullableType()
+            // Actual: (int) => int
+            val actualLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", false)
+            )
+            // Expected: (int?, int) => int
+            val expectedLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "a" to ClassTypeRef("builtin.int", true),
+                "b" to ClassTypeRef("builtin.int", false)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    varDecl("f", expectedLambdaType, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(
+                                binaryExpr(
+                                    identifier("x", intType, 4),
+                                    "*",
+                                    intLiteral(2, intType),
+                                    intType
+                                )
+                            )
+                        ),
+                        lambdaTypeIndex = actualLambdaType
+                    )),
+                    // Call with boxed first param (will be unboxed), second param ignored
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("f", expectedLambdaType, 3),
+                            arguments = listOf(
+                                intLiteral(21, intType),
+                                intLiteral(999, intType)  // ignored
+                            ),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    // =============== Lambda Coercion via Variable Reassignment Tests ===============
+    // These tests verify that lambda type coercion works when a lambda is assigned to
+    // a variable of a different compatible type. This goes through ExpressionCompiler.compile()
+    // which now uses CoercionUtil.emitCoercion with lambda coercion support.
+    
+    @Test
+    fun `reassigning lambda to variable with different parameter count`() {
+        // Test that a lambda with fewer params can be assigned to a variable
+        // expecting more params, and the result is correctly wrapped.
+        // val source: (int) => int = (x) => x * 2
+        // val target: (int, int) => int = source  // wrapped to accept extra param
+        // return target(21, 999)  // second param ignored, should return 42
+        val ast = buildTypedAst {
+            val intType = intType()
+            // Source lambda type: (int) => int
+            val sourceLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", false)
+            )
+            // Target lambda type: (int, int) => int
+            val targetLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "a" to ClassTypeRef("builtin.int", false),
+                "b" to ClassTypeRef("builtin.int", false)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    // Declare source lambda
+                    varDecl("source", sourceLambdaType, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(
+                                binaryExpr(
+                                    identifier("x", intType, 4),
+                                    "*",
+                                    intLiteral(2, intType),
+                                    intType
+                                )
+                            )
+                        ),
+                        lambdaTypeIndex = sourceLambdaType
+                    )),
+                    // Assign source lambda to target variable with different type
+                    // This should trigger lambda coercion through ExpressionCompiler
+                    varDecl("target", targetLambdaType, 
+                        identifier("source", sourceLambdaType, 3)
+                    ),
+                    // Call target with 2 params (second is ignored)
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("target", targetLambdaType, 3),
+                            arguments = listOf(
+                                intLiteral(21, intType),
+                                intLiteral(999, intType)  // ignored
+                            ),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    @Test
+    fun `reassigning lambda with parameter type coercion`() {
+        // Test that a lambda with primitive param can be assigned to a variable
+        // expecting boxed param type, with proper coercion applied.
+        // val source: (int) => int = (x) => x + 1
+        // val target: (int?) => int = source  // wrapped to accept boxed then unbox
+        // return target(41)  // should return 42
+        val ast = buildTypedAst {
+            val intType = intType()
+            val intNullable = intNullableType()
+            // Source lambda type: (int) => int
+            val sourceLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", false)
+            )
+            // Target lambda type: (int?) => int
+            val targetLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "a" to ClassTypeRef("builtin.int", true)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    // Declare source lambda
+                    varDecl("source", sourceLambdaType, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(
+                                binaryExpr(
+                                    identifier("x", intType, 4),
+                                    "+",
+                                    intLiteral(1, intType),
+                                    intType
+                                )
+                            )
+                        ),
+                        lambdaTypeIndex = sourceLambdaType
+                    )),
+                    // Assign source lambda to target variable with boxed param type
+                    varDecl("target", targetLambdaType, 
+                        identifier("source", sourceLambdaType, 3)
+                    ),
+                    // Call target with a boxed int
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("target", targetLambdaType, 3),
+                            arguments = listOf(intLiteral(41, intType)),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    @Test
+    fun `reassigning lambda with return type coercion`() {
+        // Test that a lambda returning primitive can be assigned to a variable
+        // expecting boxed return type, with proper coercion applied.
+        // val source: () => int = () => 42
+        // val target: () => int? = source  // wrapped to box return value
+        // return target()  // should return boxed 42
+        val ast = buildTypedAst {
+            val intType = intType()
+            val intNullable = intNullableType()
+            // Source lambda type: () => int
+            val sourceLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false)
+            )
+            // Target lambda type: () => int?
+            val targetLambdaType = lambdaType(
+                ClassTypeRef("builtin.int", true)
+            )
+            function(
+                name = "testFunction",
+                returnType = intNullable,
+                body = listOf(
+                    // Declare source lambda
+                    varDecl("source", sourceLambdaType, lambdaExpr(
+                        parameters = emptyList(),
+                        body = listOf(
+                            returnStmt(intLiteral(42, intType))
+                        ),
+                        lambdaTypeIndex = sourceLambdaType
+                    )),
+                    // Assign source lambda to target variable with boxed return type
+                    varDecl("target", targetLambdaType, 
+                        identifier("source", sourceLambdaType, 3)
+                    ),
+                    // Call target - result should be boxed
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("target", targetLambdaType, 3),
+                            arguments = emptyList(),
+                            resultTypeIndex = intNullable
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    @Test
+    fun `chained lambda reassignments with different types`() {
+        // Test multiple chained reassignments with increasing parameter counts
+        // val a: (int) => int = (x) => x
+        // val b: (int, int) => int = a
+        // val c: (int, int, int) => int = b
+        // return c(42, 10, 20)  // only first param used, should return 42
+        val ast = buildTypedAst {
+            val intType = intType()
+            // Lambda type with 1 param
+            val type1 = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.int", false)
+            )
+            // Lambda type with 2 params
+            val type2 = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "a" to ClassTypeRef("builtin.int", false),
+                "b" to ClassTypeRef("builtin.int", false)
+            )
+            // Lambda type with 3 params
+            val type3 = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "a" to ClassTypeRef("builtin.int", false),
+                "b" to ClassTypeRef("builtin.int", false),
+                "c" to ClassTypeRef("builtin.int", false)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    // val a: (int) => int = (x) => x
+                    varDecl("a", type1, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(identifier("x", intType, 4))
+                        ),
+                        lambdaTypeIndex = type1
+                    )),
+                    // val b: (int, int) => int = a
+                    varDecl("b", type2, 
+                        identifier("a", type1, 3)
+                    ),
+                    // val c: (int, int, int) => int = b
+                    varDecl("c", type3, 
+                        identifier("b", type2, 3)
+                    ),
+                    // return c(42, 10, 20) - only first param used
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("c", type3, 3),
+                            arguments = listOf(
+                                intLiteral(42, intType),
+                                intLiteral(10, intType),
+                                intLiteral(20, intType)
+                            ),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
+    
+    @Test
+    fun `lambda with string parameter type assignment`() {
+        // Tests lambda variable assignment with specific types
+        // var takesString: (string) => int = (x) => 42
+        // return takesString("test")
+        val ast = buildTypedAst {
+            val intType = intType()
+            val stringType = stringType()
+            
+            // Lambda type: (string) => int
+            val lambdaType = lambdaType(
+                ClassTypeRef("builtin.int", false),
+                "x" to ClassTypeRef("builtin.string", false)
+            )
+            
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    // var takesString: (string) => int = (x) => 42
+                    varDecl("takesString", lambdaType, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(intLiteral(42, intType))
+                        ),
+                        lambdaTypeIndex = lambdaType
+                    )),
+                    // return takesString("test")
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("takesString", lambdaType, 3),
+                            arguments = listOf(stringLiteral("test", stringType)),
+                            resultTypeIndex = intType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals(42, result)
+    }
 }

@@ -2,9 +2,9 @@ package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.util.function.Consumer
-import java.util.function.Predicate
-import java.util.function.Function
+import com.mdeo.script.runtime.interfaces.Action1
+import com.mdeo.script.runtime.interfaces.Predicate1
+import com.mdeo.script.runtime.interfaces.Func1
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
@@ -226,7 +226,7 @@ class SetImplTest {
     @Test
     fun `map transforms elements`() {
         val set = SetImpl.of(1, 2, 3)
-        val mapped = set.map(Function { it * 2 })
+        val mapped = set.map(Func1 { it * 2 })
         assertTrue(mapped.includes(2))
         assertTrue(mapped.includes(4))
         assertTrue(mapped.includes(6))
@@ -235,28 +235,28 @@ class SetImplTest {
     @Test
     fun `map returns set type`() {
         val set = SetImpl.of(1, 2, 3)
-        val mapped = set.map(Function { it * 2 })
+        val mapped = set.map(Func1 { it * 2 })
         assertTrue(mapped is ReadonlySet)
     }
 
     @Test
     fun `map on empty set returns empty`() {
         val set = SetImpl<Int>()
-        val mapped = set.map(Function { it * 2 })
+        val mapped = set.map(Func1 { it * 2 })
         assertTrue(mapped.isEmpty())
     }
 
     @Test
     fun `map can collapse duplicates`() {
         val set = SetImpl.of(1, 2, 3, 4)
-        val mapped = set.map(Function { it % 2 })
+        val mapped = set.map(Func1 { it % 2 })
         assertEquals(2, mapped.size())
     }
 
     @Test
     fun `map can change type`() {
         val set = SetImpl.of(1, 2, 3)
-        val mapped = set.map(Function { it.toString() })
+        val mapped = set.map(Func1 { it.toString() })
         assertTrue(mapped.includes("1"))
     }
 
@@ -264,7 +264,7 @@ class SetImplTest {
     @Test
     fun `filter keeps matching elements`() {
         val set = SetImpl.of(1, 2, 3, 4, 5)
-        val result = set.filter(Predicate { it > 3 })
+        val result = set.filter(Predicate1 { it > 3 })
         assertEquals(2, result.size())
         assertTrue(result.includes(4))
         assertTrue(result.includes(5))
@@ -273,28 +273,28 @@ class SetImplTest {
     @Test
     fun `reject removes matching elements`() {
         val set = SetImpl.of(1, 2, 3, 4, 5)
-        val result = set.reject(Predicate { it > 3 })
+        val result = set.reject(Predicate1 { it > 3 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `filter returns set type`() {
         val set = SetImpl.of(1, 2, 3)
-        val result = set.filter(Predicate { it > 1 })
+        val result = set.filter(Predicate1 { it > 1 })
         assertTrue(result is ScriptSet)
     }
 
     @Test
     fun `reject returns set type`() {
         val set = SetImpl.of(1, 2, 3)
-        val result = set.reject(Predicate { it > 1 })
+        val result = set.reject(Predicate1 { it > 1 })
         assertTrue(result is ScriptSet)
     }
 
     @Test
     fun `rejectOne removes first matching only`() {
         val set = SetImpl.of(1, 2, 3, 4)
-        val result = set.rejectOne(Predicate { it > 2 })
+        val result = set.rejectOne(Predicate1 { it > 2 })
         assertEquals(3, result.size())
     }
 
@@ -372,50 +372,50 @@ class SetImplTest {
     @Test
     fun `exists returns true when element matches`() {
         val set = SetImpl.of(1, 2, 3)
-        assertTrue(set.exists(Predicate { it > 2 }))
+        assertTrue(set.exists(Predicate1 { it > 2 }))
     }
 
     @Test
     fun `forEach executes for all elements`() {
         val set = SetImpl.of(2, 4, 6)
         var count = 0
-        set.forEach(Consumer { count++ })
+        set.forEach(Action1 { count++ })
         assertEquals(3, count)
     }
 
     @Test
     fun `none returns true when no matches`() {
         val set = SetImpl.of(1, 2, 3)
-        assertTrue(set.none(Predicate { it > 10 }))
+        assertTrue(set.none(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `all returns true when all elements match`() {
         val set = SetImpl.of(2, 4, 6)
-        assertTrue(set.all(Predicate { it % 2 == 0 }))
+        assertTrue(set.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns false when at least one element does not match`() {
         val set = SetImpl.of(2, 4, 5)
-        assertFalse(set.all(Predicate { it % 2 == 0 }))
+        assertFalse(set.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns true for empty set`() {
         val set = SetImpl<Int>()
-        assertTrue(set.all(Predicate { it < 0 }))
+        assertTrue(set.all(Predicate1 { it < 0 }))
     }
 
     @Test
     fun `one returns true for exactly one match`() {
         val set = SetImpl.of(1, 2, 3)
-        assertTrue(set.one(Predicate { it == 2 }))
+        assertTrue(set.one(Predicate1 { it == 2 }))
     }
 
     @Test
     fun `find returns matching element`() {
         val set = SetImpl.of(1, 2, 3)
-        assertNotNull(set.find(Predicate { it > 2 }))
+        assertNotNull(set.find(Predicate1 { it > 2 }))
     }
 }

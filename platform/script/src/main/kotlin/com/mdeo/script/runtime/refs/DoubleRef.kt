@@ -1,13 +1,11 @@
-package com.mdeo.script.runtime
+package com.mdeo.script.runtime.refs
 
 /**
- * Mutable wrapper for object references.
+ * Mutable wrapper for double values.
  * Used when local variables need to be modified from within lambdas.
  *
  * This class provides a simple mutable container that can be captured
  * by lambda expressions, allowing the lambda to modify the original
  * variable's value.
- *
- * @param T The type of the wrapped object.
  */
-class ObjectRef<T>(@JvmField var value: T? = null)
+class DoubleRef(@JvmField var value: Double = 0.0)

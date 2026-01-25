@@ -19,7 +19,7 @@ import org.objectweb.asm.Opcodes
  * 
  * The result type is the same as the operand type for numeric negation.
  */
-class UnaryExpressionCompiler : ExpressionCompiler {
+class UnaryExpressionCompiler : ExpressionCompiler() {
     
     /**
      * Checks if this compiler can handle the given expression.
@@ -42,7 +42,7 @@ class UnaryExpressionCompiler : ExpressionCompiler {
      * @param mv the method visitor to emit bytecode to
      * @throws IllegalArgumentException if the unary operator is not supported
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val unaryExpr = expression as TypedUnaryExpression
         val operandType = context.getType(unaryExpr.expression.evalType)
         
@@ -74,7 +74,7 @@ class UnaryExpressionCompiler : ExpressionCompiler {
         val typeName = TypeConversionUtil.getNumericTypeName(operandType)
             ?: throw IllegalArgumentException("Operand must be numeric for negation")
         
-        context.compileExpression(expr.expression, mv)
+        context.compileExpression(expr.expression, mv, operandType)
         
         val negOpcode = TypeConversionUtil.getNegOpcode(typeName)
         mv.visitInsn(negOpcode)
@@ -95,7 +95,8 @@ class UnaryExpressionCompiler : ExpressionCompiler {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        context.compileExpression(expr.expression, mv)
+        val operandType = context.getType(expr.expression.evalType)
+        context.compileExpression(expr.expression, mv, operandType)
         
         val trueLabel = Label()
         val endLabel = Label()

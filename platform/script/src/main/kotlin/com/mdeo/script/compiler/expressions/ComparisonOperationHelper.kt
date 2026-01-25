@@ -170,10 +170,12 @@ object ComparisonOperationHelper {
         rightTypeName: String,
         promotedType: String
     ) {
-        context.compileExpression(expr.left, mv)
+        val leftType = context.getType(expr.left.evalType)
+        context.compileExpression(expr.left, mv, leftType)
         TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
         
-        context.compileExpression(expr.right, mv)
+        val rightType = context.getType(expr.right.evalType)
+        context.compileExpression(expr.right, mv, rightType)
         TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
     }
 

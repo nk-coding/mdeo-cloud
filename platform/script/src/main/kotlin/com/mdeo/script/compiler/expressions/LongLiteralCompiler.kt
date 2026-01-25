@@ -12,7 +12,7 @@ import org.objectweb.asm.Opcodes
  * Compiler for long literal expressions.
  * Generates bytecode to push a long constant onto the operand stack.
  */
-class LongLiteralCompiler : ExpressionCompiler {
+class LongLiteralCompiler : ExpressionCompiler() {
     
     /**
      * Checks if this compiler can handle the given expression.
@@ -34,7 +34,7 @@ class LongLiteralCompiler : ExpressionCompiler {
      * @param context The compilation context containing compiler state.
      * @param mv The method visitor used to generate bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val longExpr = expression as TypedLongLiteralExpression
         val value = longExpr.value.toLong()
         

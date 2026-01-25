@@ -2,9 +2,9 @@ package com.mdeo.script.stdlib.impl.collections
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.util.function.Consumer
-import java.util.function.Predicate
-import java.util.function.Function
+import com.mdeo.script.runtime.interfaces.Action1
+import com.mdeo.script.runtime.interfaces.Predicate1
+import com.mdeo.script.runtime.interfaces.Func1
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
@@ -303,31 +303,31 @@ class ListImplTest {
     @Test
     fun `count with predicate returns 0 when no match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertEquals(0, list.count(Predicate { it > 10 }))
+        assertEquals(0, list.count(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `count with predicate returns correct count`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertEquals(3, list.count(Predicate { it > 2 }))
+        assertEquals(3, list.count(Predicate1 { it > 2 }))
     }
 
     @Test
     fun `count with predicate returns size when all match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertEquals(3, list.count(Predicate { it > 0 }))
+        assertEquals(3, list.count(Predicate1 { it > 0 }))
     }
 
     @Test
     fun `count with predicate returns 0 for empty list`() {
         val list = ListImpl<Int>()
-        assertEquals(0, list.count(Predicate { true }))
+        assertEquals(0, list.count(Predicate1 { true }))
     }
 
     @Test
     fun `count with predicate works with complex predicate`() {
         val list = ListImpl.of("apple", "banana", "cherry", "apricot")
-        assertEquals(2, list.count(Predicate { it.startsWith("a") }))
+        assertEquals(2, list.count(Predicate1 { it.startsWith("a") }))
     }
 
     // ==================== add() tests ====================
@@ -746,7 +746,7 @@ class ListImplTest {
     @Test
     fun `sortBy sorts in place`() {
         val list = ListImpl.of(3, 1, 2)
-        list.sortBy(Function { it })
+        list.sortBy(Func1 { it })
         assertEquals(1, list.at(0))
         assertEquals(2, list.at(1))
         assertEquals(3, list.at(2))
@@ -755,14 +755,14 @@ class ListImplTest {
     @Test
     fun `sortBy returns same list`() {
         val list = ListImpl.of(3, 1, 2)
-        val sorted = list.sortBy(Function { it })
+        val sorted = list.sortBy(Func1 { it })
         assertTrue(sorted === list)
     }
 
     @Test
     fun `sortBy with custom key extractor`() {
         val list = ListImpl.of("apple", "cat", "banana")
-        list.sortBy(Function { it.length })
+        list.sortBy(Func1 { it.length })
         assertEquals("cat", list.first())
         assertEquals("banana", list.last())
     }
@@ -770,14 +770,14 @@ class ListImplTest {
     @Test
     fun `sortBy handles empty list`() {
         val list = ListImpl<Int>()
-        list.sortBy(Function { it })
+        list.sortBy(Func1 { it })
         assertTrue(list.isEmpty())
     }
 
     @Test
     fun `sortBy handles single element`() {
         val list = ListImpl.of(1)
-        list.sortBy(Function { it })
+        list.sortBy(Func1 { it })
         assertEquals(1, list.first())
     }
 
@@ -785,7 +785,7 @@ class ListImplTest {
     @Test
     fun `sortedBy returns new sorted collection`() {
         val list = ListImpl.of(3, 1, 2)
-        val sorted = list.sortedBy(Function { it })
+        val sorted = list.sortedBy(Func1 { it })
         assertEquals(1, sorted.at(0))
         assertEquals(3, list.at(0)) // Original unchanged
     }
@@ -793,28 +793,28 @@ class ListImplTest {
     @Test
     fun `sortedBy does not modify original`() {
         val list = ListImpl.of(3, 1, 2)
-        list.sortedBy(Function { it })
+        list.sortedBy(Func1 { it })
         assertEquals(3, list.first())
     }
 
     @Test
     fun `sortedBy with custom key extractor`() {
         val list = ListImpl.of("apple", "cat", "banana")
-        val sorted = list.sortedBy(Function { it.length })
+        val sorted = list.sortedBy(Func1 { it.length })
         assertEquals("cat", sorted.first())
     }
 
     @Test
     fun `sortedBy handles empty list`() {
         val list = ListImpl<Int>()
-        val sorted = list.sortedBy(Function { it })
+        val sorted = list.sortedBy(Func1 { it })
         assertTrue(sorted.isEmpty())
     }
 
     @Test
     fun `sortedBy handles duplicates`() {
         val list = ListImpl.of(2, 1, 2, 1)
-        val sorted = list.sortedBy(Function { it })
+        val sorted = list.sortedBy(Func1 { it })
         assertEquals(4, sorted.size())
         assertEquals(1, sorted.at(0))
         assertEquals(1, sorted.at(1))
@@ -1330,76 +1330,76 @@ class ListImplTest {
     @Test
     fun `atLeastNMatch returns true when n elements match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atLeastNMatch(Predicate { it > 2 }, 3))
+        assertTrue(list.atLeastNMatch(Predicate1 { it > 2 }, 3))
     }
 
     @Test
     fun `atLeastNMatch returns true when more than n elements match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atLeastNMatch(Predicate { it > 2 }, 2))
+        assertTrue(list.atLeastNMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `atLeastNMatch returns false when fewer than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.atLeastNMatch(Predicate { it > 4 }, 3))
+        assertFalse(list.atLeastNMatch(Predicate1 { it > 4 }, 3))
     }
 
     @Test
     fun `atLeastNMatch with n equals 0 always returns true`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.atLeastNMatch(Predicate { false }, 0))
+        assertTrue(list.atLeastNMatch(Predicate1 { false }, 0))
     }
 
     @Test
     fun `atLeastNMatch on empty list returns false for n greater than 0`() {
         val list = ListImpl<Int>()
-        assertFalse(list.atLeastNMatch(Predicate { true }, 1))
+        assertFalse(list.atLeastNMatch(Predicate1 { true }, 1))
     }
 
     // ==================== atMostNMatch() tests ====================
     @Test
     fun `atMostNMatch returns true when n elements match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atMostNMatch(Predicate { it > 3 }, 2))
+        assertTrue(list.atMostNMatch(Predicate1 { it > 3 }, 2))
     }
 
     @Test
     fun `atMostNMatch returns true when fewer than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.atMostNMatch(Predicate { it > 4 }, 2))
+        assertTrue(list.atMostNMatch(Predicate1 { it > 4 }, 2))
     }
 
     @Test
     fun `atMostNMatch returns false when more than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.atMostNMatch(Predicate { it > 2 }, 2))
+        assertFalse(list.atMostNMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `atMostNMatch with n equals 0 returns true when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.atMostNMatch(Predicate { it > 10 }, 0))
+        assertTrue(list.atMostNMatch(Predicate1 { it > 10 }, 0))
     }
 
     @Test
     fun `atMostNMatch on empty list always returns true`() {
         val list = ListImpl<Int>()
-        assertTrue(list.atMostNMatch(Predicate { true }, 0))
+        assertTrue(list.atMostNMatch(Predicate1 { true }, 0))
     }
 
     // ==================== aggregate() tests ====================
     @Test
     fun `aggregate groups by key`() {
         val list = ListImpl.of("apple", "banana", "apricot", "cherry")
-        val grouped = list.aggregate(Function { it[0].toString() })
+        val grouped = list.aggregate(Func1 { it[0].toString() })
         assertEquals(3, grouped.size())
     }
 
     @Test
     fun `aggregate returns correct groups`() {
         val list = ListImpl.of(1, 2, 3, 4, 5, 6)
-        val grouped = list.aggregate(Function { it % 2 })
+        val grouped = list.aggregate(Func1 { it % 2 })
         assertEquals(2, grouped.size())
         assertEquals(3, grouped.get(0)?.size())
         assertEquals(3, grouped.get(1)?.size())
@@ -1408,7 +1408,7 @@ class ListImplTest {
     @Test
     fun `aggregate on empty list returns empty map`() {
         val list = ListImpl<Int>()
-        val grouped = list.aggregate(Function { it })
+        val grouped = list.aggregate(Func1 { it })
         assertTrue(grouped.isEmpty())
     }
 
@@ -1417,14 +1417,14 @@ class ListImplTest {
         val list = ListImpl<String?>()
         list.add(null)
         list.add("a")
-        val grouped = list.aggregate(Function { it })
+        val grouped = list.aggregate(Func1 { it })
         assertEquals(2, grouped.size())
     }
 
     @Test
     fun `aggregate preserves all elements`() {
         val list = ListImpl.of(1, 2, 3)
-        val grouped = list.aggregate(Function { "all" })
+        val grouped = list.aggregate(Func1 { "all" })
         assertEquals(3, grouped.get("all")?.size())
     }
 
@@ -1432,7 +1432,7 @@ class ListImplTest {
     @Test
     fun `map transforms elements`() {
         val list = ListImpl.of(1, 2, 3)
-        val mapped = list.map(Function { it * 2 })
+        val mapped = list.map(Func1 { it * 2 })
         assertEquals(2, mapped.first())
         assertEquals(6, mapped.last())
     }
@@ -1440,7 +1440,7 @@ class ListImplTest {
     @Test
     fun `map preserves order`() {
         val list = ListImpl.of("a", "bb", "ccc")
-        val mapped = list.map(Function { it.length })
+        val mapped = list.map(Func1 { it.length })
         assertEquals(1, mapped.first())
         assertEquals(3, mapped.last())
     }
@@ -1448,21 +1448,21 @@ class ListImplTest {
     @Test
     fun `map on empty list returns empty`() {
         val list = ListImpl<Int>()
-        val mapped = list.map(Function { it * 2 })
+        val mapped = list.map(Func1 { it * 2 })
         assertTrue(mapped.isEmpty())
     }
 
     @Test
     fun `map preserves duplicates`() {
         val list = ListImpl.of(1, 1, 2)
-        val mapped = list.map(Function { it * 2 })
+        val mapped = list.map(Func1 { it * 2 })
         assertEquals(3, mapped.size())
     }
 
     @Test
     fun `map can change element type`() {
         val list = ListImpl.of(1, 2, 3)
-        val mapped = list.map(Function { it.toString() })
+        val mapped = list.map(Func1 { it.toString() })
         assertEquals("1", mapped.first())
     }
 
@@ -1470,26 +1470,26 @@ class ListImplTest {
     @Test
     fun `exists returns true when element matches`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.exists(Predicate { it > 3 }))
+        assertTrue(list.exists(Predicate1 { it > 3 }))
     }
 
     @Test
     fun `exists returns false when no element matches`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.exists(Predicate { it > 10 }))
+        assertFalse(list.exists(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `exists returns false for empty list`() {
         val list = ListImpl<Int>()
-        assertFalse(list.exists(Predicate { true }))
+        assertFalse(list.exists(Predicate1 { true }))
     }
 
     @Test
     fun `exists short-circuits on first match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
         var count = 0
-        list.exists(Predicate { count++; it == 2 })
+        list.exists(Predicate1 { count++; it == 2 })
         assertEquals(2, count) // Should stop after finding 2
     }
 
@@ -1498,7 +1498,7 @@ class ListImplTest {
         val list = ListImpl<String?>()
         list.add(null)
         list.add("a")
-        assertTrue(list.exists(Predicate { it == null }))
+        assertTrue(list.exists(Predicate1 { it == null }))
     }
 
     // ==================== forEach() tests ====================
@@ -1506,7 +1506,7 @@ class ListImplTest {
     fun `forEach executes for all elements`() {
         val list = ListImpl.of(2, 4, 6, 8)
         var count = 0
-        list.forEach(Consumer { count++ })
+        list.forEach(Action1 { count++ })
         assertEquals(4, count)
     }
 
@@ -1514,7 +1514,7 @@ class ListImplTest {
     fun `forEach executes action for each element`() {
         val list = ListImpl.of(2, 4, 5, 8)
         val results = mutableListOf<Int>()
-        list.forEach(Consumer { results.add(it * 2) })
+        list.forEach(Action1 { results.add(it * 2) })
         assertEquals(listOf(4, 8, 10, 16), results)
     }
 
@@ -1522,7 +1522,7 @@ class ListImplTest {
     fun `forEach handles empty list`() {
         val list = ListImpl<Int>()
         var count = 0
-        list.forEach(Consumer { count++ })
+        list.forEach(Action1 { count++ })
         assertEquals(0, count)
     }
 
@@ -1530,7 +1530,7 @@ class ListImplTest {
     fun `forEach executes for all elements unconditionally`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
         var count = 0
-        list.forEach(Consumer { count++ })
+        list.forEach(Action1 { count++ })
         assertEquals(5, count)
     }
 
@@ -1538,7 +1538,7 @@ class ListImplTest {
     fun `forEach handles single element`() {
         val list = ListImpl.of(5)
         var sum = 0
-        list.forEach(Consumer { sum += it })
+        list.forEach(Action1 { sum += it })
         assertEquals(5, sum)
     }
 
@@ -1546,38 +1546,38 @@ class ListImplTest {
     @Test
     fun `all returns true when all elements match predicate`() {
         val list = ListImpl.of(2, 4, 6, 8)
-        assertTrue(list.all(Predicate { it % 2 == 0 }))
+        assertTrue(list.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns false when at least one element does not match`() {
         val list = ListImpl.of(2, 4, 5, 8)
-        assertFalse(list.all(Predicate { it % 2 == 0 }))
+        assertFalse(list.all(Predicate1 { it % 2 == 0 }))
     }
 
     @Test
     fun `all returns true for empty list`() {
         val list = ListImpl<Int>()
-        assertTrue(list.all(Predicate { it < 0 }))
+        assertTrue(list.all(Predicate1 { it < 0 }))
     }
 
     @Test
     fun `all returns false when first element does not match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.all(Predicate { it > 1 }))
+        assertFalse(list.all(Predicate1 { it > 1 }))
     }
 
     @Test
     fun `all returns false when last element does not match`() {
         val list = ListImpl.of(2, 4, 6, 8, 9)
-        assertFalse(list.all(Predicate { it % 2 == 0 }))
+        assertFalse(list.all(Predicate1 { it % 2 == 0 }))
     }
 
     // ==================== associate() tests ====================
     @Test
     fun `associate creates map from elements to values`() {
         val list = ListImpl.of("a", "bb", "ccc")
-        val map = list.associate(Function { it.length })
+        val map = list.associate(Func1 { it.length })
         assertEquals(1, map.get("a"))
         assertEquals(3, map.get("ccc"))
     }
@@ -1585,28 +1585,28 @@ class ListImplTest {
     @Test
     fun `associate on empty list returns empty map`() {
         val list = ListImpl<String>()
-        val map = list.associate(Function { it.length })
+        val map = list.associate(Func1 { it.length })
         assertTrue(map.isEmpty())
     }
 
     @Test
     fun `associate handles duplicate keys by keeping last`() {
         val list = ListImpl.of("a", "b", "c")
-        val map = list.associate(Function { it.uppercase() })
+        val map = list.associate(Func1 { it.uppercase() })
         assertEquals(3, map.size())
     }
 
     @Test
     fun `associate with null values`() {
         val list = ListImpl.of(1, 2)
-        val map = list.associate(Function { if (it == 1) null else "value" })
+        val map = list.associate(Func1 { if (it == 1) null else "value" })
         assertNull(map.get(1))
     }
 
     @Test
     fun `associate preserves element as key`() {
         val list = ListImpl.of(1, 2, 3)
-        val map = list.associate(Function { it * 10 })
+        val map = list.associate(Func1 { it * 10 })
         assertEquals(10, map.get(1))
         assertEquals(30, map.get(3))
     }
@@ -1615,96 +1615,96 @@ class ListImplTest {
     @Test
     fun `nMatch returns true when exactly n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.nMatch(Predicate { it > 3 }, 2))
+        assertTrue(list.nMatch(Predicate1 { it > 3 }, 2))
     }
 
     @Test
     fun `nMatch returns false when more than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.nMatch(Predicate { it > 2 }, 2))
+        assertFalse(list.nMatch(Predicate1 { it > 2 }, 2))
     }
 
     @Test
     fun `nMatch returns false when fewer than n match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.nMatch(Predicate { it > 4 }, 2))
+        assertFalse(list.nMatch(Predicate1 { it > 4 }, 2))
     }
 
     @Test
     fun `nMatch with n equals 0 returns true when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.nMatch(Predicate { it > 10 }, 0))
+        assertTrue(list.nMatch(Predicate1 { it > 10 }, 0))
     }
 
     @Test
     fun `nMatch on empty list returns true for n equals 0`() {
         val list = ListImpl<Int>()
-        assertTrue(list.nMatch(Predicate { true }, 0))
+        assertTrue(list.nMatch(Predicate1 { true }, 0))
     }
 
     // ==================== none() tests ====================
     @Test
     fun `none returns true when no elements match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertTrue(list.none(Predicate { it > 10 }))
+        assertTrue(list.none(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `none returns false when some elements match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.none(Predicate { it > 2 }))
+        assertFalse(list.none(Predicate1 { it > 2 }))
     }
 
     @Test
     fun `none returns true for empty list`() {
         val list = ListImpl<Int>()
-        assertTrue(list.none(Predicate { true }))
+        assertTrue(list.none(Predicate1 { true }))
     }
 
     @Test
     fun `none short-circuits on first match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
         var count = 0
-        list.none(Predicate { count++; it == 2 })
+        list.none(Predicate1 { count++; it == 2 })
         assertEquals(2, count)
     }
 
     @Test
     fun `none returns false when all match`() {
         val list = ListImpl.of(2, 4, 6)
-        assertFalse(list.none(Predicate { it % 2 == 0 }))
+        assertFalse(list.none(Predicate1 { it % 2 == 0 }))
     }
 
     // ==================== one() tests ====================
     @Test
     fun `one returns true when exactly one matches`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertTrue(list.one(Predicate { it == 3 }))
+        assertTrue(list.one(Predicate1 { it == 3 }))
     }
 
     @Test
     fun `one returns false when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertFalse(list.one(Predicate { it > 10 }))
+        assertFalse(list.one(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `one returns false when multiple match`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertFalse(list.one(Predicate { it > 3 }))
+        assertFalse(list.one(Predicate1 { it > 3 }))
     }
 
     @Test
     fun `one returns false for empty list`() {
         val list = ListImpl<Int>()
-        assertFalse(list.one(Predicate { true }))
+        assertFalse(list.one(Predicate1 { true }))
     }
 
     @Test
     fun `one short-circuits on second match`() {
         val list = ListImpl.of(1, 2, 3, 2, 5)
         var count = 0
-        list.one(Predicate { count++; it == 2 })
+        list.one(Predicate1 { count++; it == 2 })
         assertEquals(4, count) // Should stop at second 2
     }
 
@@ -1712,35 +1712,35 @@ class ListImplTest {
     @Test
     fun `reject removes matching elements`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.reject(Predicate { it > 3 })
+        val result = list.reject(Predicate1 { it > 3 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `reject returns new collection`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.reject(Predicate { it > 2 })
+        val result = list.reject(Predicate1 { it > 2 })
         assertEquals(3, list.size())
     }
 
     @Test
     fun `reject returns empty when all match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.reject(Predicate { it > 0 })
+        val result = list.reject(Predicate1 { it > 0 })
         assertTrue(result.isEmpty())
     }
 
     @Test
     fun `reject returns all when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.reject(Predicate { it > 10 })
+        val result = list.reject(Predicate1 { it > 10 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `reject on empty list returns empty`() {
         val list = ListImpl<Int>()
-        val result = list.reject(Predicate { true })
+        val result = list.reject(Predicate1 { true })
         assertTrue(result.isEmpty())
     }
 
@@ -1748,7 +1748,7 @@ class ListImplTest {
     @Test
     fun `rejectOne removes first matching element`() {
         val list = ListImpl.of(1, 2, 3, 2, 5)
-        val result = list.rejectOne(Predicate { it == 2 })
+        val result = list.rejectOne(Predicate1 { it == 2 })
         assertEquals(4, result.size())
         assertTrue(result.includes(2))
     }
@@ -1756,28 +1756,28 @@ class ListImplTest {
     @Test
     fun `rejectOne returns new collection`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.rejectOne(Predicate { it == 2 })
+        val result = list.rejectOne(Predicate1 { it == 2 })
         assertEquals(3, list.size())
     }
 
     @Test
     fun `rejectOne returns all when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.rejectOne(Predicate { it > 10 })
+        val result = list.rejectOne(Predicate1 { it > 10 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `rejectOne on empty list returns empty`() {
         val list = ListImpl<Int>()
-        val result = list.rejectOne(Predicate { true })
+        val result = list.rejectOne(Predicate1 { true })
         assertTrue(result.isEmpty())
     }
 
     @Test
     fun `rejectOne only removes one occurrence`() {
         val list = ListImpl.of(2, 2, 2)
-        val result = list.rejectOne(Predicate { it == 2 })
+        val result = list.rejectOne(Predicate1 { it == 2 })
         assertEquals(2, result.size())
     }
 
@@ -1785,35 +1785,35 @@ class ListImplTest {
     @Test
     fun `filter keeps matching elements`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        val result = list.filter(Predicate { it > 3 })
+        val result = list.filter(Predicate1 { it > 3 })
         assertEquals(2, result.size())
     }
 
     @Test
     fun `filter returns new collection`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.filter(Predicate { it > 1 })
+        val result = list.filter(Predicate1 { it > 1 })
         assertEquals(3, list.size())
     }
 
     @Test
     fun `filter returns all when all match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.filter(Predicate { it > 0 })
+        val result = list.filter(Predicate1 { it > 0 })
         assertEquals(3, result.size())
     }
 
     @Test
     fun `filter returns empty when none match`() {
         val list = ListImpl.of(1, 2, 3)
-        val result = list.filter(Predicate { it > 10 })
+        val result = list.filter(Predicate1 { it > 10 })
         assertTrue(result.isEmpty())
     }
 
     @Test
     fun `filter on empty list returns empty`() {
         val list = ListImpl<Int>()
-        val result = list.filter(Predicate { true })
+        val result = list.filter(Predicate1 { true })
         assertTrue(result.isEmpty())
     }
 
@@ -1821,25 +1821,25 @@ class ListImplTest {
     @Test
     fun `find returns first matching element`() {
         val list = ListImpl.of(1, 2, 3, 4, 5)
-        assertEquals(3, list.find(Predicate { it > 2 }))
+        assertEquals(3, list.find(Predicate1 { it > 2 }))
     }
 
     @Test
     fun `find returns null when no match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertNull(list.find(Predicate { it > 10 }))
+        assertNull(list.find(Predicate1 { it > 10 }))
     }
 
     @Test
     fun `find returns null for empty list`() {
         val list = ListImpl<Int>()
-        assertNull(list.find(Predicate { true }))
+        assertNull(list.find(Predicate1 { true }))
     }
 
     @Test
     fun `find returns first element when all match`() {
         val list = ListImpl.of(1, 2, 3)
-        assertEquals(1, list.find(Predicate { it > 0 }))
+        assertEquals(1, list.find(Predicate1 { it > 0 }))
     }
 
     @Test
@@ -1847,7 +1847,7 @@ class ListImplTest {
         val list = ListImpl<String?>()
         list.add(null)
         list.add("a")
-        assertNull(list.find(Predicate { it == null }))
+        assertNull(list.find(Predicate1 { it == null }))
     }
 
     // ==================== iterator tests ====================

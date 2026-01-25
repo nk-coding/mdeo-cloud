@@ -1,7 +1,7 @@
 package com.mdeo.script.stdlib.impl.collections
 
-import java.util.function.Function
-import java.util.function.Predicate
+import com.mdeo.script.runtime.interfaces.Func1
+import com.mdeo.script.runtime.interfaces.Predicate1
 
 /**
  * Implementation of [ScriptSet] backed by a HashSet.
@@ -66,29 +66,29 @@ class SetImpl<T> : AbstractCollection<T, HashSet<T>>, ScriptSet<T> {
         return SetImpl(result)
     }
 
-    override fun <U> map(mapper: Function<T, U>): ReadonlySet<U> {
+    override fun <U> map(mapper: Func1<T, U>): ReadonlySet<U> {
         val result = HashSet<U>()
         for (element in backing) {
-            result.add(mapper.apply(element))
+            result.add(mapper.call(element))
         }
         return SetImpl(result)
     }
 
-    override fun reject(predicate: Predicate<T>): ScriptSet<T> {
+    override fun reject(predicate: Predicate1<T>): ScriptSet<T> {
         val result = HashSet<T>()
         for (element in backing) {
-            if (!predicate.test(element)) {
+            if (!predicate.call(element)) {
                 result.add(element)
             }
         }
         return SetImpl(result)
     }
 
-    override fun rejectOne(predicate: Predicate<T>): ScriptSet<T> {
+    override fun rejectOne(predicate: Predicate1<T>): ScriptSet<T> {
         val result = HashSet<T>()
         var removed = false
         for (element in backing) {
-            if (!removed && predicate.test(element)) {
+            if (!removed && predicate.call(element)) {
                 removed = true
             } else {
                 result.add(element)
@@ -97,10 +97,10 @@ class SetImpl<T> : AbstractCollection<T, HashSet<T>>, ScriptSet<T> {
         return SetImpl(result)
     }
 
-    override fun filter(predicate: Predicate<T>): ScriptSet<T> {
+    override fun filter(predicate: Predicate1<T>): ScriptSet<T> {
         val result = HashSet<T>()
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 result.add(element)
             }
         }

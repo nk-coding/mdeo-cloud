@@ -7,11 +7,9 @@ import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.StatementCompiler
-import com.mdeo.script.compiler.util.TypeConversionUtil
 import com.mdeo.script.compiler.VariableInfo
 import com.mdeo.script.compiler.util.ASMUtil
 import org.objectweb.asm.MethodVisitor
@@ -126,13 +124,8 @@ class AssignmentCompiler : StatementCompiler {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        context.compileExpression(assignment.right, mv)
-
-        val exprType = context.getType(assignment.right.evalType)
-
-        if (!CoercionUtil.emitCoercion(exprType, targetType, assignment.right, mv)) {
-            TypeConversionUtil.emitConversionIfNeeded(exprType, targetType, mv)
-        }
+        // Compile expression with coercion to target type
+        context.compileExpression(assignment.right, mv, targetType)
 
         val storeOpcode = ASMUtil.getStoreOpcode(targetType)
         mv.visitVarInsn(storeOpcode, variable.slotIndex)
@@ -160,13 +153,8 @@ class AssignmentCompiler : StatementCompiler {
     ) {
         mv.visitVarInsn(Opcodes.ALOAD, variable.slotIndex)
 
-        context.compileExpression(assignment.right, mv)
-
-        val exprType = context.getType(assignment.right.evalType)
-
-        if (!CoercionUtil.emitCoercion(exprType, targetType, assignment.right, mv)) {
-            TypeConversionUtil.emitConversionIfNeeded(exprType, targetType, mv)
-        }
+        // Compile expression with coercion to target type
+        context.compileExpression(assignment.right, mv, targetType)
 
         val refClassName = RefTypeUtil.getRefClassName(targetType)
         val valueDescriptor = RefTypeUtil.getRefValueDescriptor(targetType)
@@ -193,15 +181,10 @@ class AssignmentCompiler : StatementCompiler {
         val targetObjectType = context.getType(left.expression.evalType)
         val propertyType = context.getType(left.evalType)
 
-        context.compileExpression(left.expression, mv)
+        context.compileExpression(left.expression, mv, targetObjectType)
 
-        context.compileExpression(assignment.right, mv)
-
-        val exprType = context.getType(assignment.right.evalType)
-
-        if (!CoercionUtil.emitCoercion(exprType, propertyType, assignment.right, mv)) {
-            TypeConversionUtil.emitConversionIfNeeded(exprType, propertyType, mv)
-        }
+        // Compile expression with coercion to property type
+        context.compileExpression(assignment.right, mv, propertyType)
 
         emitPropertySet(context, left.member, targetObjectType, propertyType, mv)
     }

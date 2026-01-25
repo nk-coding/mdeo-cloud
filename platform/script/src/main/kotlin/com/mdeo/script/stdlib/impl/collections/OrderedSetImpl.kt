@@ -1,7 +1,7 @@
 package com.mdeo.script.stdlib.impl.collections
 
-import java.util.function.Function
-import java.util.function.Predicate
+import com.mdeo.script.runtime.interfaces.Func1
+import com.mdeo.script.runtime.interfaces.Predicate1
 
 /**
  * Implementation of [OrderedSet] backed by a LinkedHashSet.
@@ -101,17 +101,17 @@ class OrderedSetImpl<T> : AbstractCollection<T, LinkedHashSet<T>>, OrderedSet<T>
         throw IndexOutOfBoundsException("Index: $index, Size: ${backing.size}")
     }
 
-    override fun <U : Comparable<U>> sortBy(keyExtractor: Function<T, U>): OrderedCollection<T> {
+    override fun <U : Comparable<U>> sortBy(keyExtractor: Func1<T, U>): OrderedCollection<T> {
         val sorted = ArrayList(backing)
-        sorted.sortWith { a, b -> keyExtractor.apply(a).compareTo(keyExtractor.apply(b)) }
+        sorted.sortWith { a, b -> keyExtractor.call(a).compareTo(keyExtractor.call(b)) }
         backing.clear()
         backing.addAll(sorted)
         return this
     }
 
-    override fun <U : Comparable<U>> sortedBy(keyExtractor: Function<T, U>): ReadonlyOrderedCollection<T> {
+    override fun <U : Comparable<U>> sortedBy(keyExtractor: Func1<T, U>): ReadonlyOrderedCollection<T> {
         val sorted = ArrayList(backing)
-        sorted.sortWith { a, b -> keyExtractor.apply(a).compareTo(keyExtractor.apply(b)) }
+        sorted.sortWith { a, b -> keyExtractor.call(a).compareTo(keyExtractor.call(b)) }
         return OrderedSetImpl(sorted)
     }
 
@@ -147,29 +147,29 @@ class OrderedSetImpl<T> : AbstractCollection<T, LinkedHashSet<T>>, OrderedSet<T>
         return OrderedSetImpl(result)
     }
 
-    override fun <U> map(mapper: Function<T, U>): ReadonlyOrderedSet<U> {
+    override fun <U> map(mapper: Func1<T, U>): ReadonlyOrderedSet<U> {
         val result = LinkedHashSet<U>()
         for (element in backing) {
-            result.add(mapper.apply(element))
+            result.add(mapper.call(element))
         }
         return OrderedSetImpl(result)
     }
 
-    override fun reject(predicate: Predicate<T>): OrderedSet<T> {
+    override fun reject(predicate: Predicate1<T>): OrderedSet<T> {
         val result = LinkedHashSet<T>()
         for (element in backing) {
-            if (!predicate.test(element)) {
+            if (!predicate.call(element)) {
                 result.add(element)
             }
         }
         return OrderedSetImpl(result)
     }
 
-    override fun rejectOne(predicate: Predicate<T>): OrderedSet<T> {
+    override fun rejectOne(predicate: Predicate1<T>): OrderedSet<T> {
         val result = LinkedHashSet<T>()
         var removed = false
         for (element in backing) {
-            if (!removed && predicate.test(element)) {
+            if (!removed && predicate.call(element)) {
                 removed = true
             } else {
                 result.add(element)
@@ -178,10 +178,10 @@ class OrderedSetImpl<T> : AbstractCollection<T, LinkedHashSet<T>>, OrderedSet<T>
         return OrderedSetImpl(result)
     }
 
-    override fun filter(predicate: Predicate<T>): OrderedSet<T> {
+    override fun filter(predicate: Predicate1<T>): OrderedSet<T> {
         val result = LinkedHashSet<T>()
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 result.add(element)
             }
         }

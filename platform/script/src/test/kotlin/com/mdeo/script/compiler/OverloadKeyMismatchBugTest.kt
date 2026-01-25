@@ -49,16 +49,4 @@ class OverloadKeyMismatchBugTest {
         helper.compileAndInvoke(ast)
     }
 
-    /**
-     * Tests that the global registry properly handles the empty overload key.
-     */
-    @Test
-    fun `global registry lookup with empty key succeeds`() {
-        val registry = GlobalFunctionRegistry.GLOBAL
-        
-        // println is registered with empty string overload key
-        val method = registry.lookupMethod("println", "")
-        kotlin.test.assertNotNull(method)
-        assertEquals("println", method.jvmMethodName)
-    }
 }

@@ -1,5 +1,7 @@
 package com.mdeo.script.compiler.registry.type
 
+import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.ast.types.ValueType
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -66,8 +68,8 @@ class TypeDefinitionImpl(
  * @param ownerClass The helper class containing the static method.
  * @param jvmMethodName The actual JVM method name (may differ from [name]).
  * @param isVarArgs Whether this method uses varargs.
- * @param parameterTypes The parameter type names for coercion (excluding receiver).
- * @param returnType The return type name for coercion.
+ * @param parameterTypes The parameter types for coercion (excluding receiver).
+ * @param returnType The return type for coercion.
  */
 class StaticMethodDefinition(
     override val name: String,
@@ -76,8 +78,8 @@ class StaticMethodDefinition(
     override val ownerClass: String,
     override val jvmMethodName: String = name,
     override val isVarArgs: Boolean = false,
-    override val parameterTypes: List<String> = emptyList(),
-    override val returnType: String? = null
+    override val parameterTypes: List<ValueType>,
+    override val returnType: ReturnType
 ) : MethodDefinition {
 
     override val isStatic: Boolean = true
@@ -106,8 +108,8 @@ class StaticMethodDefinition(
  * @param isInterface Whether to use INVOKEINTERFACE.
  * @param jvmMethodName The actual JVM method name (may differ from [name]).
  * @param isVarArgs Whether this method uses varargs.
- * @param parameterTypes The parameter type names for coercion.
- * @param returnType The return type name for coercion.
+ * @param parameterTypes The parameter types for coercion.
+ * @param returnType The return type for coercion.
  */
 class InstanceMethodDefinition(
     override val name: String,
@@ -117,8 +119,8 @@ class InstanceMethodDefinition(
     override val isInterface: Boolean = false,
     override val jvmMethodName: String = name,
     override val isVarArgs: Boolean = false,
-    override val parameterTypes: List<String> = emptyList(),
-    override val returnType: String? = null
+    override val parameterTypes: List<ValueType>,
+    override val returnType: ReturnType
 ) : MethodDefinition {
 
     override val isStatic: Boolean = false

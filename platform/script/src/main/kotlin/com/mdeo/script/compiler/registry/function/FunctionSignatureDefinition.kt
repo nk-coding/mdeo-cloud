@@ -1,5 +1,8 @@
 package com.mdeo.script.compiler.registry.function
 
+import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.script.ast.types.ValueType
+import com.mdeo.script.ast.types.VoidType
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -42,18 +45,20 @@ interface FunctionSignatureDefinition {
     val isVarArgs: Boolean
 
     /**
-     * The parameter type names for type coercion.
-     * Example: ["builtin.string", "builtin.int"]
-     * Empty list for varargs methods (all args boxed to Object).
+     * The parameter types for type coercion.
+     *
+     * Each element is a ValueType representing the expected type of the corresponding parameter.
+     * For varargs methods, this list may be empty as all args are boxed to Object.
      */
-    val parameterTypes: List<String>
+    val parameterTypes: List<ValueType>
 
     /**
-     * The return type name for type coercion.
-     * Example: "builtin.int", "void", "builtin.string?"
-     * Null for void return type.
+     * The return type for type coercion.
+     *
+     * Represents the expected return type of the function.
+     * Use VoidType for functions that don't return a value.
      */
-    val returnType: String?
+    val returnType: ReturnType
 
     /**
      * Emits the method invocation bytecode.
@@ -76,8 +81,8 @@ interface FunctionSignatureDefinition {
  * @param ownerClass The owner class internal name.
  * @param jvmMethodName The JVM method name to invoke.
  * @param isVarArgs Whether this is a varargs method.
- * @param parameterTypes The parameter type names for coercion.
- * @param returnType The return type name for coercion (null for void).
+ * @param parameterTypes The parameter types for coercion.
+ * @param returnType The return type for coercion.
  */
 class StaticFunctionSignatureDefinition(
     override val overloadKey: String,
@@ -85,8 +90,8 @@ class StaticFunctionSignatureDefinition(
     override val ownerClass: String,
     override val jvmMethodName: String,
     override val isVarArgs: Boolean = false,
-    override val parameterTypes: List<String> = emptyList(),
-    override val returnType: String? = null
+    override val parameterTypes: List<ValueType>,
+    override val returnType: ReturnType
 ) : FunctionSignatureDefinition {
 
     override fun emitInvocation(mv: MethodVisitor) {

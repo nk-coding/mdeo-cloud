@@ -1,5 +1,6 @@
 package com.mdeo.script.compiler
 
+import com.mdeo.script.ast.types.BuiltinTypes.consumer
 import com.mdeo.script.ast.types.ClassTypeRef
 import com.mdeo.script.stdlib.impl.collections.Bag
 import com.mdeo.script.stdlib.impl.collections.OrderedSet
@@ -643,6 +644,82 @@ class BagAndOrderedSetIntegrationTest {
 
             val result = helper.compileAndInvoke(ast)
             assertEquals(10, result)
+        }
+    }
+
+    @Nested
+    inner class SetTests {
+
+        /**
+         * Test: setOf(1, 2, 3).forEach((element) => { sum = sum + element })
+         * This test verifies that forEach with a lambda expression works correctly on Set.
+         */
+        @Test
+        fun `set forEach with lambda expression`() {
+            val ast = buildTypedAst {
+                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val intTypeIndex = intType()
+                val voidTypeIndex = voidType()
+                
+                // Create consumer lambda type: (int) -> void
+                val consumerLambdaType = addType(consumer(ClassTypeRef("builtin.int", false)))
+                
+                function(
+                    name = "testFunction",
+                    returnType = intTypeIndex,
+                    body = listOf(
+                        // var sum = 0
+                        varDecl("sum", intTypeIndex, intLiteral(0, intTypeIndex)),
+                        
+                        // val mySet = setOf(1, 2, 3)
+                        varDecl("mySet", setType,
+                            functionCall(
+                                name = "setOf",
+                                overload = "",
+                                arguments = listOf(
+                                    intLiteral(1, intTypeIndex),
+                                    intLiteral(2, intTypeIndex),
+                                    intLiteral(3, intTypeIndex)
+                                ),
+                                resultTypeIndex = setType
+                            )
+                        ),
+                        
+                        // mySet.forEach((element) => { sum = sum + element })
+                        exprStmt(
+                            memberCall(
+                                expression = identifier("mySet", setType, 3),
+                                member = "forEach",
+                                overload = "",
+                                arguments = listOf(
+                                    lambdaExpr(
+                                        parameters = listOf("element"),
+                                        body = listOf(
+                                            assignment(
+                                                identifier("sum", intTypeIndex, 3),
+                                                binaryExpr(
+                                                    identifier("sum", intTypeIndex, 3),
+                                                    "+",
+                                                    identifier("element", intTypeIndex, 4),  // Lambda param at scope 4
+                                                    intTypeIndex
+                                                )
+                                            )
+                                        ),
+                                        lambdaTypeIndex = consumerLambdaType
+                                    )
+                                ),
+                                resultTypeIndex = voidTypeIndex
+                            )
+                        ),
+                        
+                        // return sum (should be 1 + 2 + 3 = 6)
+                        returnStmt(identifier("sum", intTypeIndex, 3))
+                    )
+                )
+            }
+            
+            val result = helper.compileAndInvoke(ast)
+            assertEquals(6, result)  // 1 + 2 + 3 = 6
         }
     }
 }

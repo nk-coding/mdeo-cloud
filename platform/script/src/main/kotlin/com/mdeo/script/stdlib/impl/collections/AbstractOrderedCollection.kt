@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.impl.collections
 
-import java.util.function.Function
+import com.mdeo.script.runtime.interfaces.Func1
 
 /**
  * Abstract base class for ordered collections that maintain element order.
@@ -50,14 +50,14 @@ abstract class AbstractOrderedCollection<T, C : MutableList<T>>(
         return backing.removeAt(index)
     }
 
-    override fun <U : Comparable<U>> sortBy(keyExtractor: Function<T, U>): OrderedCollection<T> {
-        backing.sortWith { a, b -> keyExtractor.apply(a).compareTo(keyExtractor.apply(b)) }
+    override fun <U : Comparable<U>> sortBy(keyExtractor: Func1<T, U>): OrderedCollection<T> {
+        backing.sortWith { a, b -> keyExtractor.call(a).compareTo(keyExtractor.call(b)) }
         return this
     }
 
-    override fun <U : Comparable<U>> sortedBy(keyExtractor: Function<T, U>): ReadonlyOrderedCollection<T> {
+    override fun <U : Comparable<U>> sortedBy(keyExtractor: Func1<T, U>): ReadonlyOrderedCollection<T> {
         val sorted = ArrayList(backing)
-        sorted.sortWith { a, b -> keyExtractor.apply(a).compareTo(keyExtractor.apply(b)) }
+        sorted.sortWith { a, b -> keyExtractor.call(a).compareTo(keyExtractor.call(b)) }
         return ListImpl(sorted)
     }
 

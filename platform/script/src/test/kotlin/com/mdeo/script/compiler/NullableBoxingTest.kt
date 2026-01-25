@@ -43,11 +43,12 @@ class NullableBoxingTest {
     @Test
     fun `return non-null int from nullable int function requires boxing - BUG missing boxing`() {
         val ast = buildTypedAst {
+            val intType = intType()
             val nullableIntType = intNullableType()
             function(
                 name = "testFunction",
                 returnType = nullableIntType,
-                body = listOf(returnStmt(intLiteral(42, nullableIntType)))
+                body = listOf(returnStmt(intLiteral(42, intType)))
             )
         }
         
@@ -62,11 +63,12 @@ class NullableBoxingTest {
     @Test
     fun `return non-null long from nullable long function requires boxing - BUG missing boxing`() {
         val ast = buildTypedAst {
+            val longType = longType()
             val nullableLongType = longNullableType()
             function(
                 name = "testFunction",
                 returnType = nullableLongType,
-                body = listOf(returnStmt(longLiteral(123456789012L, nullableLongType)))
+                body = listOf(returnStmt(longLiteral(123456789012L, longType)))
             )
         }
         
@@ -77,11 +79,12 @@ class NullableBoxingTest {
     @Test
     fun `return non-null float from nullable float function requires boxing - BUG missing boxing`() {
         val ast = buildTypedAst {
+            val floatType = floatType()
             val nullableFloatType = floatNullableType()
             function(
                 name = "testFunction",
                 returnType = nullableFloatType,
-                body = listOf(returnStmt(floatLiteral(3.14f, nullableFloatType)))
+                body = listOf(returnStmt(floatLiteral(3.14f, floatType)))
             )
         }
         
@@ -92,11 +95,12 @@ class NullableBoxingTest {
     @Test
     fun `return non-null double from nullable double function requires boxing - BUG missing boxing`() {
         val ast = buildTypedAst {
+            val doubleType = doubleType()
             val nullableDoubleType = doubleNullableType()
             function(
                 name = "testFunction",
                 returnType = nullableDoubleType,
-                body = listOf(returnStmt(doubleLiteral(2.71828, nullableDoubleType)))
+                body = listOf(returnStmt(doubleLiteral(2.71828, doubleType)))
             )
         }
         
@@ -107,11 +111,12 @@ class NullableBoxingTest {
     @Test
     fun `return non-null boolean from nullable boolean function requires boxing - BUG missing boxing`() {
         val ast = buildTypedAst {
+            val boolType = booleanType()
             val nullableBoolType = booleanNullableType()
             function(
                 name = "testFunction",
                 returnType = nullableBoolType,
-                body = listOf(returnStmt(booleanLiteral(true, nullableBoolType)))
+                body = listOf(returnStmt(booleanLiteral(true, boolType)))
             )
         }
         

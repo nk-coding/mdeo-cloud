@@ -122,9 +122,8 @@ object EqualityOperationHelper {
         val endLabel = Label()
         
         val nonNullExpr = if (leftIsNull) expr.right else expr.left
-        context.compileExpression(nonNullExpr, mv)
-        
         val exprType = context.getType(nonNullExpr.evalType)
+        context.compileExpression(nonNullExpr, mv, exprType)
         if (CoercionUtil.producesStackPrimitive(exprType, nonNullExpr)) {
             popValue(exprType, mv)
             mv.visitInsn(if (isEquals) Opcodes.ICONST_0 else Opcodes.ICONST_1)
@@ -185,8 +184,8 @@ object EqualityOperationHelper {
         val rightMayBeNull = rightType is ClassTypeRef && rightType.isNullable
         
         if (leftMayBeNull || rightMayBeNull) {
-            context.compileExpression(expr.left, mv)
-            context.compileExpression(expr.right, mv)
+            context.compileExpression(expr.left, mv, leftType)
+            context.compileExpression(expr.right, mv, rightType)
             mv.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
                 "java/util/Objects",
@@ -195,8 +194,8 @@ object EqualityOperationHelper {
                 false
             )
         } else {
-            context.compileExpression(expr.left, mv)
-            context.compileExpression(expr.right, mv)
+            context.compileExpression(expr.left, mv, leftType)
+            context.compileExpression(expr.right, mv, rightType)
             mv.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
                 "java/lang/String",
@@ -236,11 +235,11 @@ object EqualityOperationHelper {
         val rightIsNullable = rightType is ClassTypeRef && rightType.isNullable
         
         if (leftIsNullable || rightIsNullable) {
-            context.compileExpression(expr.left, mv)
+            context.compileExpression(expr.left, mv, leftType)
             if (!leftIsNullable) {
                 CoercionUtil.emitBoxing("builtin.boolean", mv)
             }
-            context.compileExpression(expr.right, mv)
+            context.compileExpression(expr.right, mv, rightType)
             if (!rightIsNullable) {
                 CoercionUtil.emitBoxing("builtin.boolean", mv)
             }
@@ -256,8 +255,8 @@ object EqualityOperationHelper {
                 invertBoolean(mv)
             }
         } else {
-            context.compileExpression(expr.left, mv)
-            context.compileExpression(expr.right, mv)
+            context.compileExpression(expr.left, mv, leftType)
+            context.compileExpression(expr.right, mv, rightType)
             
             val trueLabel = Label()
             val endLabel = Label()
@@ -332,10 +331,10 @@ object EqualityOperationHelper {
         val rightTypeName = (rightType as ClassTypeRef).type
         val promotedType = TypeConversionUtil.getPromotedType(leftTypeName, rightTypeName)
         
-        context.compileExpression(expr.left, mv)
+        context.compileExpression(expr.left, mv, leftType)
         TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
         
-        context.compileExpression(expr.right, mv)
+        context.compileExpression(expr.right, mv, rightType)
         TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
         
         val trueLabel = Label()
@@ -426,8 +425,8 @@ object EqualityOperationHelper {
         val notEqualLabel = Label()
         val endLabel = Label()
         
-        context.compileExpression(expr.left, mv)
-        context.compileExpression(expr.right, mv)
+        context.compileExpression(expr.left, mv, leftType)
+        context.compileExpression(expr.right, mv, rightType)
         
         mv.visitInsn(Opcodes.SWAP)
         mv.visitInsn(Opcodes.DUP)
@@ -508,14 +507,16 @@ object EqualityOperationHelper {
             val trueLabel = Label()
             val endLabel = Label()
             
-            context.compileExpression(expr.left, mv)
+            val leftType = context.getType(expr.left.evalType)
+            context.compileExpression(expr.left, mv, leftType)
             mv.visitInsn(Opcodes.DUP)
             mv.visitJumpInsn(Opcodes.IFNULL, falseLabel)
             
             CoercionUtil.emitUnboxing(leftTypeName, mv)
             TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
             
-            context.compileExpression(expr.right, mv)
+            val rightType = context.getType(expr.right.evalType)
+            context.compileExpression(expr.right, mv, rightType)
             TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
             
             emitPrimitiveComparison(promotedType, if (isEquals) Opcodes.IFEQ else Opcodes.IFNE, trueLabel, mv)
@@ -537,14 +538,16 @@ object EqualityOperationHelper {
             val trueLabel = Label()
             val endLabel = Label()
             
-            context.compileExpression(expr.right, mv)
+            val rightType = context.getType(expr.right.evalType)
+            context.compileExpression(expr.right, mv, rightType)
             mv.visitInsn(Opcodes.DUP)
             mv.visitJumpInsn(Opcodes.IFNULL, falseLabel)
             
             CoercionUtil.emitUnboxing(rightTypeName, mv)
             TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
             
-            context.compileExpression(expr.left, mv)
+            val leftType = context.getType(expr.left.evalType)
+            context.compileExpression(expr.left, mv, leftType)
             TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
             
             emitSwap(promotedType, mv)
@@ -637,8 +640,10 @@ object EqualityOperationHelper {
         mv: MethodVisitor,
         isEquals: Boolean
     ) {
-        context.compileExpression(expr.left, mv)
-        context.compileExpression(expr.right, mv)
+        val leftType = context.getType(expr.left.evalType)
+        val rightType = context.getType(expr.right.evalType)
+        context.compileExpression(expr.left, mv, leftType)
+        context.compileExpression(expr.right, mv, rightType)
         
         val trueLabel = Label()
         val endLabel = Label()

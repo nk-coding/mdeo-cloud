@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.impl.collections
 
-import java.util.function.Function
+import com.mdeo.script.runtime.interfaces.Func1
 
 /**
  * A mutable ordered collection that maintains element order and provides modification operations.
@@ -25,5 +25,5 @@ interface OrderedCollection<T> : ReadonlyOrderedCollection<T>, Collection<T> {
      * @param keyExtractor the function to extract the sort key
      * @return this collection after sorting
      */
-    fun <U : Comparable<U>> sortBy(keyExtractor: Function<T, U>): OrderedCollection<T>
+    fun <U : Comparable<U>> sortBy(keyExtractor: Func1<T, U>): OrderedCollection<T>
 }

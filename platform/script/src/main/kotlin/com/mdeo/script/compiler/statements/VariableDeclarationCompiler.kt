@@ -3,14 +3,11 @@ package com.mdeo.script.compiler.statements
 import com.mdeo.script.ast.statements.TypedStatement
 import com.mdeo.script.ast.statements.TypedVariableDeclarationStatement
 import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
 import com.mdeo.script.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
-import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.StatementCompiler
-import com.mdeo.script.compiler.util.TypeConversionUtil
 import com.mdeo.script.compiler.VariableInfo
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -91,13 +88,8 @@ class VariableDeclarationCompiler : StatementCompiler {
         mv: MethodVisitor
     ) {
         if (declaration.initialValue != null) {
-            context.compileExpression(declaration.initialValue, mv)
-            
-            val exprType = context.getType(declaration.initialValue.evalType)
-            
-            if (!CoercionUtil.emitCoercion(exprType, type, declaration.initialValue, mv)) {
-                TypeConversionUtil.emitConversionIfNeeded(exprType, type, mv)
-            }
+            // Compile expression with coercion to target type
+            context.compileExpression(declaration.initialValue, mv, type)
         } else {
             emitDefaultValue(type, mv)
         }
@@ -168,10 +160,8 @@ class VariableDeclarationCompiler : StatementCompiler {
         mv.visitInsn(Opcodes.DUP)
         
         if (declaration.initialValue != null) {
-            context.compileExpression(declaration.initialValue, mv)
-            
-            val exprType = context.getType(declaration.initialValue.evalType)
-            TypeConversionUtil.emitConversionIfNeeded(exprType, type, mv)
+            // Compile expression with coercion to target type
+            context.compileExpression(declaration.initialValue, mv, type)
             
             val constructorDescriptor = getRefConstructorDescriptor(type)
             mv.visitMethodInsn(Opcodes.INVOKESPECIAL, refClassName, "<init>", constructorDescriptor, false)

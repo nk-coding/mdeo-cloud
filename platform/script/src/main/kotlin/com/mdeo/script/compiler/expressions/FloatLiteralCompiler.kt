@@ -12,7 +12,7 @@ import org.objectweb.asm.Opcodes
  * Compiler for float literal expressions.
  * Generates bytecode to push a float constant onto the operand stack.
  */
-class FloatLiteralCompiler : ExpressionCompiler {
+class FloatLiteralCompiler : ExpressionCompiler() {
 
     /**
      * Checks if this compiler can handle the given expression.
@@ -36,7 +36,7 @@ class FloatLiteralCompiler : ExpressionCompiler {
      * @param context The compilation context.
      * @param mv The method visitor to emit bytecode instructions.
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val floatExpr = expression as TypedFloatLiteralExpression
         val value = floatExpr.value.toFloat()
 

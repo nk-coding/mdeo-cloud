@@ -1,9 +1,9 @@
 package com.mdeo.script.stdlib.impl.collections
 
 import org.apache.commons.collections4.bag.HashBag
-import java.util.function.Consumer
-import java.util.function.Function
-import java.util.function.Predicate
+import com.mdeo.script.runtime.interfaces.Action1
+import com.mdeo.script.runtime.interfaces.Func1
+import com.mdeo.script.runtime.interfaces.Predicate1
 import java.util.concurrent.ThreadLocalRandom
 
 /**
@@ -79,10 +79,10 @@ class BagImpl<T> : Bag<T> {
         return backing.getCount(item as T)
     }
 
-    override fun count(predicate: Predicate<T>): Int {
+    override fun count(predicate: Predicate1<T>): Int {
         var count = 0
         for (element in backing.uniqueSet()) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 count += backing.getCount(element)
             }
         }
@@ -195,10 +195,10 @@ class BagImpl<T> : Bag<T> {
 
     override fun clone(): Bag<T> = BagImpl(backing)
 
-    override fun atLeastNMatch(predicate: Predicate<T>, n: Int): Boolean {
+    override fun atLeastNMatch(predicate: Predicate1<T>, n: Int): Boolean {
         var count = 0
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 count++
                 if (count >= n) {
                     return true
@@ -208,10 +208,10 @@ class BagImpl<T> : Bag<T> {
         return count >= n
     }
 
-    override fun atMostNMatch(predicate: Predicate<T>, n: Int): Boolean {
+    override fun atMostNMatch(predicate: Predicate1<T>, n: Int): Boolean {
         var count = 0
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 count++
                 if (count > n) {
                     return false
@@ -221,10 +221,10 @@ class BagImpl<T> : Bag<T> {
         return true
     }
 
-    override fun aggregate(keyMapper: Function<T, Any?>): ScriptMap<Any?, ScriptList<T>> {
+    override fun aggregate(keyMapper: Func1<T, Any?>): ScriptMap<Any?, ScriptList<T>> {
         val groups = LinkedHashMap<Any?, MutableList<T>>()
         for (element in backing) {
-            val key = keyMapper.apply(element)
+            val key = keyMapper.call(element)
             groups.computeIfAbsent(key) { ArrayList() }.add(element)
         }
         val result = MapImpl<Any?, ScriptList<T>>()
@@ -234,44 +234,50 @@ class BagImpl<T> : Bag<T> {
         return result
     }
 
-    override fun <U> map(mapper: Function<T, U>): ReadonlyCollection<U> {
+    override fun <U> map(mapper: Func1<T, U>): ReadonlyCollection<U> {
         val result = HashBag<U>()
         for (element in backing) {
-            result.add(mapper.apply(element))
+            result.add(mapper.call(element))
         }
         return BagImpl(result)
     }
 
-    override fun exists(predicate: Predicate<T>): Boolean {
+    override fun exists(predicate: Predicate1<T>): Boolean {
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 return true
             }
         }
         return false
     }
 
-    override fun all(predicate: Predicate<T>): Boolean {
+    override fun forEach(action: Action1<T>) {
         for (element in backing) {
-            if (!predicate.test(element)) {
+            action.call(element)
+        }
+    }
+
+    override fun all(predicate: Predicate1<T>): Boolean {
+        for (element in backing) {
+            if (!predicate.call(element)) {
                 return false
             }
         }
         return true
     }
 
-    override fun <U> associate(valueMapper: Function<T, U>): ReadonlyMap<T, U> {
+    override fun <U> associate(valueMapper: Func1<T, U>): ReadonlyMap<T, U> {
         val result = MapImpl<T, U>()
         for (element in backing.uniqueSet()) {
-            result.put(element, valueMapper.apply(element))
+            result.put(element, valueMapper.call(element))
         }
         return result
     }
 
-    override fun nMatch(predicate: Predicate<T>, n: Int): Boolean {
+    override fun nMatch(predicate: Predicate1<T>, n: Int): Boolean {
         var count = 0
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 count++
                 if (count > n) {
                     return false
@@ -281,19 +287,19 @@ class BagImpl<T> : Bag<T> {
         return count == n
     }
 
-    override fun none(predicate: Predicate<T>): Boolean {
+    override fun none(predicate: Predicate1<T>): Boolean {
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 return false
             }
         }
         return true
     }
 
-    override fun one(predicate: Predicate<T>): Boolean {
+    override fun one(predicate: Predicate1<T>): Boolean {
         var found = false
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 if (found) {
                     return false
                 }
@@ -303,21 +309,21 @@ class BagImpl<T> : Bag<T> {
         return found
     }
 
-    override fun reject(predicate: Predicate<T>): Bag<T> {
+    override fun reject(predicate: Predicate1<T>): Bag<T> {
         val result = HashBag<T>()
         for (element in backing) {
-            if (!predicate.test(element)) {
+            if (!predicate.call(element)) {
                 result.add(element)
             }
         }
         return BagImpl(result)
     }
 
-    override fun rejectOne(predicate: Predicate<T>): Bag<T> {
+    override fun rejectOne(predicate: Predicate1<T>): Bag<T> {
         val result = HashBag<T>()
         var removed = false
         for (element in backing) {
-            if (!removed && predicate.test(element)) {
+            if (!removed && predicate.call(element)) {
                 removed = true
             } else {
                 result.add(element)
@@ -326,31 +332,31 @@ class BagImpl<T> : Bag<T> {
         return BagImpl(result)
     }
 
-    override fun filter(predicate: Predicate<T>): Bag<T> {
+    override fun filter(predicate: Predicate1<T>): Bag<T> {
         val result = HashBag<T>()
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 result.add(element)
             }
         }
         return BagImpl(result)
     }
 
-    override fun find(predicate: Predicate<T>): T? {
+    override fun find(predicate: Predicate1<T>): T? {
         for (element in backing) {
-            if (predicate.test(element)) {
+            if (predicate.call(element)) {
                 return element
             }
         }
         return null
     }
 
-    override fun <U : Comparable<U>> sortedBy(keyExtractor: Function<T, U>): ReadonlyOrderedCollection<T> {
+    override fun <U : Comparable<U>> sortedBy(keyExtractor: Func1<T, U>): ReadonlyOrderedCollection<T> {
         val sorted = ArrayList<T>()
         for (element in backing) {
             sorted.add(element)
         }
-        sorted.sortWith { a, b -> keyExtractor.apply(a).compareTo(keyExtractor.apply(b)) }
+        sorted.sortWith { a, b -> keyExtractor.call(a).compareTo(keyExtractor.call(b)) }
         return ListImpl(sorted)
     }
 

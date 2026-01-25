@@ -27,11 +27,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box int to nullable Int - literal value`() {
             val ast = buildTypedAst {
+                val intType = intType()
                 val nullableIntType = intNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableIntType,
-                    body = listOf(returnStmt(intLiteral(42, nullableIntType)))
+                    body = listOf(returnStmt(intLiteral(42, intType)))
                 )
             }
             
@@ -42,11 +43,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box int to nullable Int - zero value`() {
             val ast = buildTypedAst {
+                val intType = intType()
                 val nullableIntType = intNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableIntType,
-                    body = listOf(returnStmt(intLiteral(0, nullableIntType)))
+                    body = listOf(returnStmt(intLiteral(0, intType)))
                 )
             }
             
@@ -57,11 +59,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box int to nullable Int - negative value`() {
             val ast = buildTypedAst {
+                val intType = intType()
                 val nullableIntType = intNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableIntType,
-                    body = listOf(returnStmt(intLiteral(-100, nullableIntType)))
+                    body = listOf(returnStmt(intLiteral(-100, intType)))
                 )
             }
             
@@ -72,11 +75,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box int to nullable Int - max value`() {
             val ast = buildTypedAst {
+                val intType = intType()
                 val nullableIntType = intNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableIntType,
-                    body = listOf(returnStmt(intLiteral(Int.MAX_VALUE, nullableIntType)))
+                    body = listOf(returnStmt(intLiteral(Int.MAX_VALUE, intType)))
                 )
             }
             
@@ -87,11 +91,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box int to nullable Int - min value`() {
             val ast = buildTypedAst {
+                val intType = intType()
                 val nullableIntType = intNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableIntType,
-                    body = listOf(returnStmt(intLiteral(Int.MIN_VALUE, nullableIntType)))
+                    body = listOf(returnStmt(intLiteral(Int.MIN_VALUE, intType)))
                 )
             }
             
@@ -206,11 +211,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box long to nullable Long - literal value`() {
             val ast = buildTypedAst {
+                val longType = longType()
                 val nullableLongType = longNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableLongType,
-                    body = listOf(returnStmt(longLiteral(9999999999L, nullableLongType)))
+                    body = listOf(returnStmt(longLiteral(9999999999L, longType)))
                 )
             }
             
@@ -221,11 +227,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box long to nullable Long - zero value`() {
             val ast = buildTypedAst {
+                val longType = longType()
                 val nullableLongType = longNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableLongType,
-                    body = listOf(returnStmt(longLiteral(0L, nullableLongType)))
+                    body = listOf(returnStmt(longLiteral(0L, longType)))
                 )
             }
             
@@ -236,11 +243,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box long to nullable Long - negative value`() {
             val ast = buildTypedAst {
+                val longType = longType()
                 val nullableLongType = longNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableLongType,
-                    body = listOf(returnStmt(longLiteral(-5000000000L, nullableLongType)))
+                    body = listOf(returnStmt(longLiteral(-5000000000L, longType)))
                 )
             }
             
@@ -314,11 +322,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box float to nullable Float - literal value`() {
             val ast = buildTypedAst {
+                val floatType = floatType()
                 val nullableFloatType = floatNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableFloatType,
-                    body = listOf(returnStmt(floatLiteral(3.14f, nullableFloatType)))
+                    body = listOf(returnStmt(floatLiteral(3.14f, floatType)))
                 )
             }
             
@@ -329,11 +338,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box float to nullable Float - zero value`() {
             val ast = buildTypedAst {
+                val floatType = floatType()
                 val nullableFloatType = floatNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableFloatType,
-                    body = listOf(returnStmt(floatLiteral(0.0f, nullableFloatType)))
+                    body = listOf(returnStmt(floatLiteral(0.0f, floatType)))
                 )
             }
             
@@ -344,11 +354,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box float to nullable Float - negative value`() {
             val ast = buildTypedAst {
+                val floatType = floatType()
                 val nullableFloatType = floatNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableFloatType,
-                    body = listOf(returnStmt(floatLiteral(-2.5f, nullableFloatType)))
+                    body = listOf(returnStmt(floatLiteral(-2.5f, floatType)))
                 )
             }
             
@@ -422,11 +433,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box double to nullable Double - literal value`() {
             val ast = buildTypedAst {
+                val doubleType = doubleType()
                 val nullableDoubleType = doubleNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableDoubleType,
-                    body = listOf(returnStmt(doubleLiteral(2.71828, nullableDoubleType)))
+                    body = listOf(returnStmt(doubleLiteral(2.71828, doubleType)))
                 )
             }
             
@@ -437,11 +449,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box double to nullable Double - zero value`() {
             val ast = buildTypedAst {
+                val doubleType = doubleType()
                 val nullableDoubleType = doubleNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableDoubleType,
-                    body = listOf(returnStmt(doubleLiteral(0.0, nullableDoubleType)))
+                    body = listOf(returnStmt(doubleLiteral(0.0, doubleType)))
                 )
             }
             
@@ -452,11 +465,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box double to nullable Double - negative value`() {
             val ast = buildTypedAst {
+                val doubleType = doubleType()
                 val nullableDoubleType = doubleNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableDoubleType,
-                    body = listOf(returnStmt(doubleLiteral(-100.001, nullableDoubleType)))
+                    body = listOf(returnStmt(doubleLiteral(-100.001, doubleType)))
                 )
             }
             
@@ -530,11 +544,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box boolean true to nullable Boolean`() {
             val ast = buildTypedAst {
+                val boolType = booleanType()
                 val nullableBoolType = booleanNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableBoolType,
-                    body = listOf(returnStmt(booleanLiteral(true, nullableBoolType)))
+                    body = listOf(returnStmt(booleanLiteral(true, boolType)))
                 )
             }
             
@@ -545,11 +560,12 @@ class BoxingUnboxingCompilerTest {
         @Test
         fun `box boolean false to nullable Boolean`() {
             val ast = buildTypedAst {
+                val boolType = booleanType()
                 val nullableBoolType = booleanNullableType()
                 function(
                     name = "testFunction",
                     returnType = nullableBoolType,
-                    body = listOf(returnStmt(booleanLiteral(false, nullableBoolType)))
+                    body = listOf(returnStmt(booleanLiteral(false, boolType)))
                 )
             }
             

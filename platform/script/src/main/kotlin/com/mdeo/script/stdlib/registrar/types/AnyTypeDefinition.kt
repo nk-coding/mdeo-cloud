@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -16,7 +17,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;)Z",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.BOOLEAN
             )
         }
 
@@ -24,7 +27,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;)I",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.INT
             )
         }
 
@@ -32,7 +37,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;)D",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.DOUBLE
             )
         }
 
@@ -40,7 +47,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;)D",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.DOUBLE
             )
         }
 
@@ -48,7 +57,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;)F",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.FLOAT
             )
         }
 
@@ -56,7 +67,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;)Ljava/lang/String;",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.STRING
             )
         }
 
@@ -64,7 +77,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = listOf(BuiltinTypes.STRING),
+                returnType = BuiltinTypes.STRING
             )
         }
 
@@ -72,7 +87,9 @@ fun createAnyType(): TypeDefinition {
             overload(
                 "",
                 "(Ljava/lang/Object;Ljava/lang/String;)Z",
-                ANY_HELPER
+                ANY_HELPER,
+                parameterTypes = listOf(BuiltinTypes.STRING),
+                returnType = BuiltinTypes.BOOLEAN
             )
         }
     }

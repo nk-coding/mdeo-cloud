@@ -533,7 +533,7 @@ class LocalVariableIndexAssigner(
      * For static methods, slot 0 is available (no 'this').
      * 
      * @param paramsScope The function parameters scope.
-     * @param nextSlot The starting slot index (e.g. 0 for static, 1 for instance methods).
+     * @param isStatic Whether this is a static method (slot 0 available).
      */
     fun assignIndices(paramsScope: Scope, isStatic: Boolean = true) {
         nextSlot = if (isStatic) 0 else 1
@@ -601,14 +601,14 @@ object RefTypeUtil {
     fun getRefClassName(type: ReturnType): String {
         if (type is ClassTypeRef) {
             return when (type.type) {
-                "builtin.int" -> "com/mdeo/script/runtime/IntRef"
-                "builtin.long" -> "com/mdeo/script/runtime/LongRef"
-                "builtin.float" -> "com/mdeo/script/runtime/FloatRef"
-                "builtin.double" -> "com/mdeo/script/runtime/DoubleRef"
-                else -> "com/mdeo/script/runtime/ObjectRef"
+                "builtin.int" -> "com/mdeo/script/runtime/refs/IntRef"
+                "builtin.long" -> "com/mdeo/script/runtime/refs/LongRef"
+                "builtin.float" -> "com/mdeo/script/runtime/refs/FloatRef"
+                "builtin.double" -> "com/mdeo/script/runtime/refs/DoubleRef"
+                else -> "com/mdeo/script/runtime/refs/ObjectRef"
             }
         }
-        return "com/mdeo/script/runtime/ObjectRef"
+        return "com/mdeo/script/runtime/refs/ObjectRef"
     }
 
     /**

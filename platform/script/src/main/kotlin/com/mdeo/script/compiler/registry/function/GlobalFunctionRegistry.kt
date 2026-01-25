@@ -47,52 +47,13 @@ class GlobalFunctionRegistry : FunctionRegistry {
     }
 
     /**
-     * Gets a global function definition by name from this registry.
-     * Does not fall back to the global registry.
-     *
-     * @param name The function name.
-     * @return The function definition, or null if not found.
-     */
-    fun getFunction(name: String): FunctionDefinition? {
-        return functions[name]
-    }
-
-    /**
-     * Gets a global function definition by name, falling back to the global registry.
-     *
-     * @param name The function name.
-     * @return The function definition, or null if not found.
-     */
-    fun getFunctionOrGlobal(name: String): FunctionDefinition? {
-        return functions[name] ?: (if (this !== GLOBAL) GLOBAL.getFunction(name) else null)
-    }
-
-    /**
-     * Looks up a method overload by function name and overload key.
-     *
-     * @param name The function name.
-     * @param overloadKey The overload key that identifies this specific overload.
-     * @return The function signature definition, or null if not found.
-     */
-    fun lookupMethod(name: String, overloadKey: String): FunctionSignatureDefinition? {
-        val function = getFunctionOrGlobal(name) ?: return null
-        return function.getOverload(overloadKey)
-    }
-
-    /**
-     * Gets all function names registered in this registry (not including global).
-     */
-    val functionNames: Set<String>
-        get() = functions.keys
-
-    /**
      * Looks up a function by name.
      *
      * @param name The function name to look up.
      * @return The function definition, or null if not found.
      */
     override fun lookupFunction(name: String): FunctionDefinition? {
-        return getFunctionOrGlobal(name)
+        return functions[name]
     }
 
     /**

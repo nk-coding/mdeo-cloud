@@ -50,7 +50,6 @@ class BackendApiService(private val baseUrl: String) {
             }
 
             if (response.status == HttpStatusCode.OK) {
-                println(response.body<String>())
                 val result = response.body<TypedAstFileDataResponse>()
                 result.data
             } else {
@@ -108,6 +107,6 @@ class BackendApiService(private val baseUrl: String) {
  */
 @Serializable
 data class TypedAstFileDataResponse(
-    val data: TypedAst,
+    val data: TypedAst?,
     val version: Int? = null
 )

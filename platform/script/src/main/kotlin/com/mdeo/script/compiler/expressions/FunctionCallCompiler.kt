@@ -43,7 +43,7 @@ class FunctionCallCompiler : AbstractCallCompiler() {
      *
      * @throws IllegalStateException if function is not found in registry
      */
-    override fun compile(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
+    override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val functionCall = expression as TypedFunctionCallExpression
         
         val funcDef = context.functionRegistry.lookupFunction(functionCall.name)

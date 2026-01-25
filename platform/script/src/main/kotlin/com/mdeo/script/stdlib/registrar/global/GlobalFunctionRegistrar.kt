@@ -1,5 +1,6 @@
 package com.mdeo.script.stdlib.registrar.global
 
+import com.mdeo.script.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.function.FunctionDefinition
 import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
 import com.mdeo.script.compiler.registry.function.globalFunction
@@ -42,8 +43,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "(Ljava/lang/String;)V"
                 owner = GLOBAL_HELPER
                 jvmMethod = "println"
-                parameterTypes = listOf("builtin.string")
-                returnType = null
+                parameterTypes = listOf(BuiltinTypes.STRING)
+                returnType = BuiltinTypes.VOID
             }
         }
     }
@@ -59,7 +60,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "([Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/ScriptList;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "listOf"
-                returnType = "builtin.List"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.LIST
             }
         }
     }
@@ -75,7 +77,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "([Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/ScriptSet;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "setOf"
-                returnType = "builtin.Set"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.SET
             }
         }
     }
@@ -91,7 +94,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "([Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/Bag;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "bagOf"
-                returnType = "builtin.Bag"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.BAG
             }
         }
     }
@@ -107,7 +111,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "([Ljava/lang/Object;)Lcom/mdeo/script/stdlib/impl/collections/OrderedSet;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "orderedSetOf"
-                returnType = "builtin.OrderedSet"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.ORDERED_SET
             }
         }
     }
@@ -123,7 +128,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "()Lcom/mdeo/script/stdlib/impl/collections/ScriptList;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "emptyList"
-                returnType = "builtin.List"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.LIST
             }
         }
     }
@@ -139,7 +145,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "()Lcom/mdeo/script/stdlib/impl/collections/ScriptSet;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "emptySet"
-                returnType = "builtin.Set"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.SET
             }
         }
     }
@@ -155,7 +162,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "()Lcom/mdeo/script/stdlib/impl/collections/Bag;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "emptyBag"
-                returnType = "builtin.Bag"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.BAG
             }
         }
     }
@@ -171,7 +179,8 @@ object GlobalFunctionRegistrar {
                 descriptor = "()Lcom/mdeo/script/stdlib/impl/collections/OrderedSet;"
                 owner = GLOBAL_HELPER
                 jvmMethod = "emptyOrderedSet"
-                returnType = "builtin.OrderedSet"
+                parameterTypes = emptyList()
+                returnType = BuiltinTypes.ORDERED_SET
             }
         }
     }
