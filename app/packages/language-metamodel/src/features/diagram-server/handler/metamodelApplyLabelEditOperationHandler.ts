@@ -1,9 +1,13 @@
 import { BaseApplyLabelEditOperationHandler, parseIdentifier, sharedImport } from "@mdeo/language-shared";
 import {
     Class,
-    ClassImport,
+    ClassOrEnumImport,
     Property,
+    Enum,
+    EnumEntry,
+    MetamodelPrimitiveTypes,
     type PropertyType,
+    type PropertyTypeValueType,
     type SingleMultiplicityType,
     type RangeMultiplicityType,
     type MultiplicityType,
@@ -28,19 +32,32 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
         operation: ApplyLabelEditOperation
     ): Promise<WorkspaceEdit | undefined> {
         if (this.reflection.isInstance(node, Class)) {
-            const nameNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
-            if (nameNode != undefined) {
-                return this.createRenameWorkspaceEdit(nameNode, operation.text.trim());
-            }
-        } else if (this.reflection.isInstance(node, ClassImport)) {
-            const nameNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
-            if (nameNode != undefined) {
-                return this.createRenameWorkspaceEdit(nameNode, operation.text.trim());
-            }
+            return this.createNameEdit(node, operation.text);
+        } else if (this.reflection.isInstance(node, ClassOrEnumImport)) {
+            return this.createNameEdit(node, operation.text);
+        } else if (this.reflection.isInstance(node, Enum)) {
+            return this.createNameEdit(node, operation.text);
+        } else if (this.reflection.isInstance(node, EnumEntry)) {
+            return this.createNameEdit(node, operation.text);
         } else if (this.reflection.isInstance(node, Property)) {
             return await this.createRenamePropertyEdit(node, operation.text);
         } else if (this.reflection.isInstance(node, AssociationEnd)) {
             return await this.createRenameAssociationEndEdit(node, operation);
+        }
+        return undefined;
+    }
+
+    /**
+     * Creates a workspace edit for renaming an element's name property.
+     *
+     * @param node the node with a name property
+     * @param text the new name text
+     * @returns a workspace edit for renaming, or undefined if no name node found
+     */
+    private createNameEdit(node: AstNode, text: string): WorkspaceEdit | undefined {
+        const nameNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
+        if (nameNode != undefined) {
+            return this.createRenameWorkspaceEdit(nameNode, text.trim());
         }
         return undefined;
     }
@@ -68,25 +85,15 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
             }
         }
 
-        if (parsed.multiplicity != undefined) {
-            const multiplicityAst = this.parseMultiplicity(parsed.multiplicity);
-            if (multiplicityAst == undefined) {
-                throw new Error("Invalid multiplicity format.");
-            }
+        const typeEdit = await this.createPropertyTypeEdit(node, parsed.type);
+        if (typeEdit != undefined) {
+            edits.push(typeEdit);
+        }
 
-            if (node.multiplicity != undefined) {
-                const multiplicityNode = GrammarUtils.findNodeForProperty(node.$cstNode, "multiplicity");
-                if (multiplicityNode == undefined) {
-                    throw new Error("Multiplicity CST node not found.");
-                }
-                edits.push(await this.replaceCstNode(multiplicityNode, multiplicityAst));
-            } else {
-                const typeNode = GrammarUtils.findNodeForProperty(node.$cstNode, "type");
-                if (typeNode != undefined) {
-                    const serializedMultiplicity = await this.serializeNode(multiplicityAst);
-                    const newTypeText = typeNode.text + serializedMultiplicity;
-                    edits.push(await this.replaceCstNode(typeNode, newTypeText));
-                }
+        if (parsed.multiplicity != undefined) {
+            const multiplicityEdit = await this.createMultiplicityEdit(node, parsed.multiplicity);
+            if (multiplicityEdit != undefined) {
+                edits.push(multiplicityEdit);
             }
         } else if (node.multiplicity != undefined) {
             const multiplicityNode = GrammarUtils.findNodeForProperty(node.$cstNode, "multiplicity");
@@ -96,6 +103,78 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
         }
 
         return this.mergeWorkspaceEdits(edits);
+    }
+
+    /**
+     * Creates a workspace edit for changing the property type.
+     * Handles both primitive types and enum type references.
+     *
+     * @param node the property node
+     * @param typeName the new type name
+     * @returns a workspace edit for changing the type
+     */
+    private async createPropertyTypeEdit(node: PropertyType, typeName: string): Promise<WorkspaceEdit | undefined> {
+        const typeNode = GrammarUtils.findNodeForProperty(node.$cstNode, "type");
+        if (typeNode == undefined) {
+            return undefined;
+        }
+
+        const newTypeAst = this.createPropertyTypeAst(typeName);
+        return await this.replaceCstNode(typeNode, newTypeAst);
+    }
+
+    /**
+     * Creates an AST node for a property type value.
+     * Returns a PrimitiveType for primitive type names, or an EnumTypeReference otherwise.
+     *
+     * @param typeName the type name string
+     * @returns the property type value AST node
+     */
+    private createPropertyTypeAst(typeName: string): PropertyTypeValueType {
+        const primitiveTypes = Object.values(MetamodelPrimitiveTypes) as string[];
+        if (primitiveTypes.includes(typeName)) {
+            return {
+                $type: "PrimitiveType",
+                name: typeName as MetamodelPrimitiveTypes
+            };
+        }
+        return {
+            $type: "EnumTypeReference",
+            enum: { $refText: typeName }
+        } as PropertyTypeValueType;
+    }
+
+    /**
+     * Creates a workspace edit for changing the multiplicity.
+     *
+     * @param node the property node
+     * @param multiplicityText the new multiplicity text
+     * @returns a workspace edit for changing the multiplicity
+     */
+    private async createMultiplicityEdit(
+        node: PropertyType,
+        multiplicityText: string
+    ): Promise<WorkspaceEdit | undefined> {
+        const multiplicityAst = this.parseMultiplicity(multiplicityText);
+        if (multiplicityAst == undefined) {
+            throw new Error("Invalid multiplicity format.");
+        }
+
+        if (node.multiplicity != undefined) {
+            const multiplicityNode = GrammarUtils.findNodeForProperty(node.$cstNode, "multiplicity");
+            if (multiplicityNode == undefined) {
+                throw new Error("Multiplicity CST node not found.");
+            }
+            return await this.replaceCstNode(multiplicityNode, multiplicityAst);
+        } else {
+            const typeNode = GrammarUtils.findNodeForProperty(node.$cstNode, "type");
+            if (typeNode != undefined) {
+                const serializedMultiplicity = await this.serializeNode(multiplicityAst);
+                const newTypeText = typeNode.text + serializedMultiplicity;
+                return await this.replaceCstNode(typeNode, newTypeText);
+            }
+        }
+        return undefined;
     }
 
     /**

@@ -10,7 +10,7 @@ import type {
 } from "langium";
 import type { FileScopingConfig } from "./config.js";
 import type { ASTType, BaseType } from "@mdeo/language-common";
-import type { FileImportType } from "./types.js";
+import type { FileImportType, ImportType } from "./types.js";
 import { sharedImport } from "../sharedImport.js";
 import { resolveRelativePath } from "./util.js";
 
@@ -102,17 +102,21 @@ export function getExportetEntitiesFromRelativeFile<T extends AstNode>(
  * @param fileImports Array of all import statements in the current file
  * @param nameProvider Service for retrieving the canonical name of AST nodes
  * @param descriptions Provider for creating AST node descriptions
- *
+ * @param filter Optional filter function to include only specific imports
  * @returns A scope containing descriptions of all imported entities accessible in the current file
  */
 export function getImportedEntitiesFromCurrentFile<T extends AstNode>(
     fileImports: ASTType<FileImportType<T>>[],
     nameProvider: NameProvider,
-    descriptions: AstNodeDescriptionProvider
+    descriptions: AstNodeDescriptionProvider,
+    filter: (imp: ASTType<ImportType<T>>) => boolean = () => true
 ): Scope {
     const importDescriptions = fileImports
         .flatMap((fileImport) =>
             fileImport.imports.map((entityImport) => {
+                if (!filter(entityImport)) {
+                    return undefined;
+                }
                 if (entityImport.name != undefined) {
                     return descriptions.createDescription(entityImport, entityImport.name);
                 }

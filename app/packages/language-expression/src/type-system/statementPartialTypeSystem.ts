@@ -342,7 +342,7 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
         const isInsideLoop =
             AstUtils.getContainerOfType(
                 node,
-                (n: AstNode): n is AstNode =>
+                (n: AstNode) =>
                     this.astReflection.isInstance(n, this.types.forStatementType) ||
                     this.astReflection.isInstance(n, this.types.whileStatementType)
             ) !== undefined;

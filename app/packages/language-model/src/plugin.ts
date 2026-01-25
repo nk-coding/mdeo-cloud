@@ -12,11 +12,13 @@ import {
     NewlineAwareTokenBuilder,
     SerializerFormatter,
     DefaultActionProvider,
-    ActionHandlerRegistry
+    ActionHandlerRegistry,
+    registerDefaultTokenSerializers
 } from "@mdeo/language-shared";
 import { ModelScopeProvider } from "./features/modelScopeProvider.js";
 import { ModelExternalReferenceCollector } from "./features/modelExternalReferenceCollector.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
+import { registerModelSerializers } from "./features/modelSerializers.js";
 
 export type ModelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
@@ -50,6 +52,8 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
         }
     },
     postCreate(services) {
+        registerDefaultTokenSerializers(services);
+        registerModelSerializers(services);
         addExternalReferenceCollectionPhase(services);
     }
 };

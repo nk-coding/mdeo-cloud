@@ -31,17 +31,14 @@ export function isActiveState(state: ExecutionState): boolean {
  * @returns True if the transition is valid
  */
 export function isValidStateTransition(fromState: ExecutionState, toState: ExecutionState): boolean {
-    // Cannot transition from terminal states
     if (isTerminalState(fromState)) {
         return false;
     }
 
-    // Can always transition to terminal states
     if (isTerminalState(toState)) {
         return true;
     }
 
-    // Define valid non-terminal transitions
     const validTransitions: Record<string, ExecutionState[]> = {
         submitted: [ExecutionState.INITIALIZING, ExecutionState.RUNNING],
         initializing: [ExecutionState.RUNNING],

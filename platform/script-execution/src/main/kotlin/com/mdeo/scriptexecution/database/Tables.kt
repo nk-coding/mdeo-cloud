@@ -76,4 +76,3 @@ object ExecutionsTable : Table("script_executions") {
     }
 }
 
-// ExecutionState is centralized in `com.mdeo.common.model.ExecutionState`.

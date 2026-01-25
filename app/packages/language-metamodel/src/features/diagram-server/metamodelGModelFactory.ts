@@ -1,30 +1,35 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
-import { sharedImport, BaseGModelFactory } from "@mdeo/language-shared";
+import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } from "@mdeo/language-shared";
 import type { GraphMetadata, ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 import { ID, type PartialAstNode } from "@mdeo/language-common";
 import type { SingleMultiplicityType, RangeMultiplicityType } from "../../grammar/metamodelTypes.js";
+import { Class, MetamodelAssociationOperators } from "../../grammar/metamodelTypes.js";
 import type {
     PartialMetaModel,
     PartialClass,
     PartialAssociation,
     PartialMultiplicity,
-    PartialClassImport,
+    PartialClassOrEnumImport,
     PartialClassExtension,
-    PartialAssociationEnd
+    PartialAssociationEnd,
+    PartialEnum
 } from "../../grammar/metamodelPartialTypes.js";
 import { GClassNode } from "./model/classNode.js";
+import { GEnumNode } from "./model/enumNode.js";
 import { GInheritanceEdge } from "./model/inheritanceEdge.js";
 import { GAssociationEdge } from "./model/associationEdge.js";
 import { GClassLabel } from "./model/classLabel.js";
+import { GEnumLabel } from "./model/enumLabel.js";
+import { GEnumEntryLabel } from "./model/enumEntryLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";
 import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
 import { GAssociationMultiplicityNode } from "./model/associationMultiplicityNode.js";
 import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
 import { GAssociationMultiplicityLabel } from "./model/associationMultiplicityLabel.js";
-import { GClassCompartment } from "./model/classCompartment.js";
-import { GClassDivider } from "./model/classDivider.js";
+import { GEnumTitleCompartment } from "./model/enumTitleCompartment.js";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
+import { AssociationEndKind, MetamodelElementType } from "./model/elementTypes.js";
 
 const { injectable } = sharedImport("inversify");
 const { GGraph } = sharedImport("@eclipse-glsp/server");
@@ -34,41 +39,45 @@ type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
 /**
  * Factory for creating GLSP graph models from metamodel AST.
  * Transforms the metamodel source model into a visual graph representation
- * with nodes for classes and edges for relationships.
+ * with nodes for classes, enums, and edges for relationships.
  */
 @injectable()
 export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> {
     override createModelInternal(sourceModel: PartialMetaModel, idRegistry: ModelIdRegistry): GModelRoot {
         const graph = GGraph.builder().id("metamodel-graph").addCssClass("editor-metamodel").build();
 
-        const { classes, associations, imports } = this.extractClassesAndAssociations(sourceModel);
-        this.createClassNodes(graph, classes, idRegistry);
-        this.createClassNodesFromImports(graph, imports, idRegistry);
-        this.createInheritanceEdges(graph, classes, idRegistry);
-        this.createAssociationEdges(graph, associations, idRegistry);
+        const extracted = this.extractElements(sourceModel);
+        this.createClassNodes(graph, extracted.classes, idRegistry);
+        this.createClassNodesFromImports(graph, extracted.imports, idRegistry);
+        this.createEnumNodes(graph, extracted.enums, idRegistry);
+        this.createInheritanceEdges(graph, extracted.classes, idRegistry);
+        this.createAssociationEdges(graph, extracted.associations, idRegistry);
 
         return graph;
     }
 
     /**
-     * Extracts and separates classes, associations, and imports from the metamodel.
+     * Extracts and separates classes, enums, associations, and imports from the metamodel.
      *
-     * @param metamodel The metamodel containing classes, associations, and imports
-     * @returns An object containing separate arrays of classes, associations, and imports
+     * @param metamodel The metamodel containing elements and imports
+     * @returns An object containing separate arrays of each element type
      */
-    private extractClassesAndAssociations(metamodel: PartialMetaModel): {
+    private extractElements(metamodel: PartialMetaModel): {
         classes: PartialClass[];
+        enums: PartialEnum[];
         associations: PartialAssociation[];
-        imports: PartialClassImport[];
+        imports: PartialClassOrEnumImport[];
     } {
         const classes: PartialClass[] = [];
+        const enums: PartialEnum[] = [];
         const associations: PartialAssociation[] = [];
-        const imports: PartialClassImport[] = [];
-
-        const items = metamodel.classesAndAssociations ?? [];
+        const imports: PartialClassOrEnumImport[] = [];
+        const items = metamodel.elements ?? [];
         for (const item of items) {
             if (item?.$type === "Class") {
                 classes.push(item as PartialClass);
+            } else if (item?.$type === "Enum") {
+                enums.push(item as PartialEnum);
             } else if (item?.$type === "Association") {
                 associations.push(item as PartialAssociation);
             }
@@ -76,15 +85,15 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
         const fileImports = metamodel.imports ?? [];
         for (const fileImport of fileImports) {
-            const classImports = fileImport?.imports ?? [];
-            for (const classImport of classImports) {
-                if (classImport != undefined) {
-                    imports.push(classImport as PartialClassImport);
+            const classOrEnumImports = fileImport?.imports ?? [];
+            for (const classOrEnumImport of classOrEnumImports) {
+                if (classOrEnumImport != undefined) {
+                    imports.push(classOrEnumImport as PartialClassOrEnumImport);
                 }
             }
         }
 
-        return { classes, associations, imports };
+        return { classes, enums, associations, imports };
     }
 
     /**
@@ -133,39 +142,150 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      */
     private createClassNodesFromImports(
         graph: GGraphType,
-        imports: PartialClassImport[],
+        imports: PartialClassOrEnumImport[],
         idRegistry: ModelIdRegistry
     ): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
-        for (const classImport of imports) {
-            if (classImport == undefined) {
+        for (const classOrEnumImport of imports) {
+            if (classOrEnumImport == undefined) {
                 continue;
             }
 
-            const importedClass = classImport.entity?.ref;
-            if (importedClass == undefined) {
+            const importedClassOrEnum = classOrEnumImport.entity?.ref;
+            if (importedClassOrEnum == undefined) {
                 continue;
             }
 
-            const nodeId = idRegistry.getId(classImport);
+            const nodeId = idRegistry.getId(classOrEnumImport);
             const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
-            const displayName = classImport.name ?? importedClass.name ?? "Unnamed";
+            const displayName = classOrEnumImport.name ?? importedClassOrEnum.name ?? "Unnamed";
 
-            const node = GClassNode.builder()
-                .id(nodeId)
-                .name(displayName)
-                .isAbstract(importedClass.isAbstract ?? false)
-                .meta(metadata)
-                .build();
+            if (this.modelState.languageServices.shared.AstReflection.isInstance(importedClassOrEnum, Class)) {
+                const node = GClassNode.builder()
+                    .id(nodeId)
+                    .name(displayName)
+                    .isAbstract(importedClassOrEnum.isAbstract ?? false)
+                    .meta(metadata)
+                    .build();
+
+                node.children.push(
+                    ...this.createClassTitle(nodeId, displayName, classOrEnumImport.name == undefined),
+                    ...this.createClassProperties(nodeId, importedClassOrEnum, idRegistry, true)
+                );
+
+                graph.children.push(node);
+            } else {
+                const node = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata).build();
+
+                node.children.push(
+                    ...this.createEnumTitle(nodeId, displayName, classOrEnumImport.name == undefined),
+                    ...this.createEnumEntries(nodeId, importedClassOrEnum, idRegistry, true)
+                );
+
+                graph.children.push(node);
+            }
+        }
+    }
+
+    /**
+     * Creates visual nodes for all enums with their entries.
+     *
+     * @param graph The graph to add nodes to
+     * @param enums Array of enums to create nodes for
+     * @param idRegistry The ID registry for AST node ID generation
+     */
+    private createEnumNodes(graph: GGraphType, enums: PartialEnum[], idRegistry: ModelIdRegistry): void {
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+
+        for (const enumDef of enums) {
+            if (enumDef == undefined) {
+                continue;
+            }
+
+            const nodeId = idRegistry.getId(enumDef);
+            const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
+            const displayName = enumDef.name ?? "Unnamed";
+
+            const node = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata).build();
 
             node.children.push(
-                ...this.createClassTitle(nodeId, displayName, classImport.name == undefined),
-                ...this.createClassProperties(nodeId, importedClass, idRegistry, true)
+                ...this.createEnumTitle(nodeId, displayName, false),
+                ...this.createEnumEntries(nodeId, enumDef, idRegistry, false)
             );
 
             graph.children.push(node);
         }
+    }
+
+    /**
+     * Creates the title compartment containing the enum name label.
+     *
+     * @param nodeId The ID of the enum node
+     * @param name The name of the enum
+     * @param readonly Whether the label should be readonly
+     * @returns An array with the title compartment GModelElement
+     */
+    private createEnumTitle(nodeId: string, name: string | undefined, readonly: boolean): GModelElement[] {
+        const titleCompartment = GEnumTitleCompartment.builder().id(`${nodeId}#title-compartment`).build();
+
+        const nameLabel = GEnumLabel.builder()
+            .id(`${nodeId}#name`)
+            .text(name ?? "Unnamed")
+            .readonly(readonly)
+            .build();
+
+        titleCompartment.children.push(nameLabel);
+        return [titleCompartment];
+    }
+
+    /**
+     * Creates the entries compartment (and divider) for an enum node.
+     *
+     * @param nodeId The ID of the enum node
+     * @param enumDef The enum containing the entries
+     * @param idRegistry The ID registry for AST node ID generation
+     * @param readonly Whether the entry labels should be readonly
+     * @returns An array of GModelElements representing the entries compartment
+     */
+    private createEnumEntries(
+        nodeId: string,
+        enumDef: PartialEnum,
+        idRegistry: ModelIdRegistry,
+        readonly: boolean
+    ): GModelElement[] {
+        const children: GModelElement[] = [];
+        const entries = enumDef.entries ?? [];
+        if (entries.length === 0) {
+            return children;
+        }
+
+        const divider = GHorizontalDivider.builder().type(MetamodelElementType.DIVIDER).id(`${nodeId}#divider`).build();
+        children.push(divider);
+
+        const entriesCompartment = GCompartment.builder()
+            .type(MetamodelElementType.COMPARTMENT)
+            .id(`${nodeId}#entries-compartment`)
+            .build();
+
+        for (const entry of entries) {
+            if (entry == undefined) {
+                continue;
+            }
+
+            const entryId = readonly ? idRegistry.getIdOrUnresolved(entry) : idRegistry.getId(entry);
+            const entryName = entry.name ?? "unnamed";
+
+            const entryLabel = GEnumEntryLabel.builder()
+                .id(`${entryId}#label`)
+                .text(entryName)
+                .readonly(readonly)
+                .build();
+            entriesCompartment.children.push(entryLabel);
+        }
+
+        children.push(entriesCompartment);
+        return children;
     }
 
     /**
@@ -177,7 +297,10 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @returns An array with the title compartment GModelElement
      */
     private createClassTitle(nodeId: string, name: string | undefined, readonly: boolean): GModelElement[] {
-        const titleCompartment = GClassCompartment.builder().id(`${nodeId}#title-compartment`).build();
+        const titleCompartment = GCompartment.builder()
+            .type(MetamodelElementType.COMPARTMENT)
+            .id(`${nodeId}#title-compartment`)
+            .build();
 
         const nameLabel = GClassLabel.builder()
             .id(`${nodeId}#name`)
@@ -210,10 +333,13 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             return children;
         }
 
-        const divider = GClassDivider.builder().id(`${nodeId}#divider`).build();
+        const divider = GHorizontalDivider.builder().type(MetamodelElementType.DIVIDER).id(`${nodeId}#divider`).build();
         children.push(divider);
 
-        const propertiesCompartment = GClassCompartment.builder().id(`${nodeId}#properties-compartment`).build();
+        const propertiesCompartment = GCompartment.builder()
+            .type(MetamodelElementType.COMPARTMENT)
+            .id(`${nodeId}#properties-compartment`)
+            .build();
 
         for (const prop of properties) {
             if (prop == undefined) {
@@ -229,7 +355,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
                 ID
             );
 
-            const typeName = prop.type?.name ?? "unknown";
+            const typeName = this.getPropertyTypeName(prop.type);
             const propText = `${propName}: ${typeName}${multiplicityStr}`;
 
             const propLabel = GPropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(readonly).build();
@@ -238,6 +364,26 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
         children.push(propertiesCompartment);
         return children;
+    }
+
+    /**
+     * Gets the display name for a property type.
+     *
+     * @param propertyType The property type value (PrimitiveType or EnumTypeReference)
+     * @returns The type name string
+     */
+    private getPropertyTypeName(propertyType: unknown): string {
+        if (propertyType == undefined || typeof propertyType !== "object") {
+            return "unknown";
+        }
+        const pt = propertyType as { $type?: string; name?: string; enum?: { ref?: { name?: string } } };
+        if (pt.$type === "PrimitiveType") {
+            return pt.name ?? "unknown";
+        }
+        if (pt.$type === "EnumTypeReference") {
+            return pt.enum?.ref?.name ?? "unknown";
+        }
+        return "unknown";
     }
 
     /**
@@ -357,11 +503,14 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         const sourceId = idRegistry.getId(sourceClass);
         const targetId = idRegistry.getId(targetClass);
         const metadata = validatedMetadata.edges[edgeId];
+        const { sourceKind, targetKind } = this.getAssociationEndKinds(assoc.operator);
         const edge = GAssociationEdge.builder()
             .id(edgeId)
             .sourceId(sourceId)
             .targetId(targetId)
             .operator(assoc.operator ?? "--")
+            .sourceKind(sourceKind)
+            .targetKind(targetKind)
             .build();
 
         this.applyRoutingPoints(edge, metadata);
@@ -479,5 +628,48 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         }
 
         return "";
+    }
+
+    /**
+     * Determines the source and target end kinds based on the association operator.
+     *
+     * @param operator The association operator string
+     * @returns Object with sourceKind and targetKind
+     */
+    private getAssociationEndKinds(operator: string | undefined): {
+        sourceKind: AssociationEndKind;
+        targetKind: AssociationEndKind;
+    } {
+        let sourceKind = AssociationEndKind.NONE;
+        let targetKind = AssociationEndKind.NONE;
+
+        switch (operator) {
+            case MetamodelAssociationOperators.NAVIGABLE_TO_TARGET:
+                targetKind = AssociationEndKind.ARROW;
+                break;
+            case MetamodelAssociationOperators.NAVIGABLE_TO_SOURCE:
+                sourceKind = AssociationEndKind.ARROW;
+                break;
+            case MetamodelAssociationOperators.BIDIRECTIONAL:
+                sourceKind = AssociationEndKind.ARROW;
+                targetKind = AssociationEndKind.ARROW;
+                break;
+            case MetamodelAssociationOperators.COMPOSITION_SOURCE_NAVIGABLE_TARGET:
+                sourceKind = AssociationEndKind.COMPOSITION;
+                targetKind = AssociationEndKind.ARROW;
+                break;
+            case MetamodelAssociationOperators.COMPOSITION_SOURCE:
+                sourceKind = AssociationEndKind.COMPOSITION;
+                break;
+            case MetamodelAssociationOperators.COMPOSITION_TARGET_NAVIGABLE_SOURCE:
+                sourceKind = AssociationEndKind.ARROW;
+                targetKind = AssociationEndKind.COMPOSITION;
+                break;
+            case MetamodelAssociationOperators.COMPOSITION_TARGET:
+                targetKind = AssociationEndKind.COMPOSITION;
+                break;
+        }
+
+        return { sourceKind, targetKind };
     }
 }

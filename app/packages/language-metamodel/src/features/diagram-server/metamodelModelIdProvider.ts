@@ -6,10 +6,12 @@ import {
     Association,
     AssociationEnd,
     MetaModel,
-    ClassImport,
+    ClassOrEnumImport,
     ClassExtension,
     SingleMultiplicity,
     RangeMultiplicity,
+    Enum,
+    EnumEntry,
     type SingleMultiplicityType,
     type RangeMultiplicityType
 } from "../../grammar/metamodelTypes.js";
@@ -19,8 +21,10 @@ import type {
     PartialAssociation,
     PartialAssociationEnd,
     PartialMetaModel,
-    PartialClassImport,
-    PartialClassExtension
+    PartialClassOrEnumImport,
+    PartialClassExtension,
+    PartialEnum,
+    PartialEnumEntry
 } from "../../grammar/metamodelPartialTypes.js";
 import type { AstReflection } from "@mdeo/language-common";
 
@@ -43,8 +47,12 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
             return this.getMetaModelName(node);
         } else if (this.reflection.isInstance(node, Class)) {
             return this.getClassName(node);
-        } else if (this.reflection.isInstance(node, ClassImport)) {
-            return this.getClassImportName(node);
+        } else if (this.reflection.isInstance(node, ClassOrEnumImport)) {
+            return this.getClassOrEnumImportName(node);
+        } else if (this.reflection.isInstance(node, Enum)) {
+            return this.getEnumName(node);
+        } else if (this.reflection.isInstance(node, EnumEntry)) {
+            return this.getEnumEntryName(node);
         } else if (this.reflection.isInstance(node, Property)) {
             return this.getPropertyName(node);
         } else if (this.reflection.isInstance(node, Association)) {
@@ -63,10 +71,10 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
     }
 
     override getAdditional(node: AstNode): AstNode[] {
-        if (this.reflection.isInstance(node, ClassImport)) {
-            const importedClass = node.entity?.ref;
-            if (importedClass != undefined) {
-                return [importedClass];
+        if (this.reflection.isInstance(node, ClassOrEnumImport)) {
+            const importedClassOrEnum = node.entity?.ref;
+            if (importedClassOrEnum != undefined) {
+                return [importedClassOrEnum];
             }
         }
         return [];
@@ -89,8 +97,28 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
     /**
      * Generates ID for ClassImport node based on the imported class name or alias.
      */
-    private getClassImportName(node: PartialClassImport): string {
+    private getClassOrEnumImportName(node: PartialClassOrEnumImport): string {
         return node.name ?? node.entity?.ref?.name ?? "unnamed";
+    }
+
+    /**
+     * Generates ID for Enum node based on enum name.
+     */
+    private getEnumName(node: PartialEnum): string {
+        return node.name ?? "unnamed";
+    }
+
+    /**
+     * Generates ID for EnumEntry node based on parent enum and entry name.
+     */
+    private getEnumEntryName(node: PartialEnumEntry): string {
+        const entryName = node.name ?? "unnamed";
+        const parent = node.$container;
+        if (parent != undefined && this.reflection.isInstance(parent, Enum)) {
+            const parentEnum = parent as PartialEnum;
+            return `${parentEnum.name ?? "unnamed"}_entry_${entryName}`;
+        }
+        return entryName;
     }
 
     /**
@@ -152,8 +180,8 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
             return this.getClassName(resolved);
         }
 
-        if (this.reflection.isInstance(resolved, ClassImport)) {
-            return this.getClassImportName(resolved);
+        if (this.reflection.isInstance(resolved, ClassOrEnumImport)) {
+            return this.getClassOrEnumImportName(resolved);
         }
 
         return "unknown";

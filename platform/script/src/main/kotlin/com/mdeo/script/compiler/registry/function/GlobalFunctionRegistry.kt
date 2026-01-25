@@ -32,7 +32,6 @@ class GlobalFunctionRegistry : FunctionRegistry {
          */
         private fun createStdlibRegistry(): GlobalFunctionRegistry {
             val registry = GlobalFunctionRegistry()
-            // Import from stdlib package
             com.mdeo.script.stdlib.registrar.global.GlobalFunctionRegistrar.registerAll(registry)
             return registry
         }

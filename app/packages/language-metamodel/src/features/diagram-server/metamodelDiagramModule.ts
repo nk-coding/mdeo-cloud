@@ -14,6 +14,7 @@ import { MetamodelMetadataManager } from "./metamodelMetadataManager.js";
 import { MetamodelApplyLabelEditOperationHandler } from "./handler/metamodelApplyLabelEditOperationHandler.js";
 import { MetamodelReconnectEdgeOperationHandler } from "./handler/metamodelReconnectEdgeOperationHandler.js";
 import { CreateClassOperationHandler } from "./handler/createClassOperationHandler.js";
+import { CreateEnumOperationHandler } from "./handler/createEnumOperationHandler.js";
 import { MetamodelDeleteNodeOperationHandler } from "./handler/metamodelDeleteElementOperationHandler.js";
 import { MetamodelLabelEditValidator } from "./metamodelLabelEditValidator.js";
 import { MetamodelToolPaletteItemProvider } from "./metamodelToolPaletteItemProvider.js";
@@ -47,6 +48,7 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
         binding.add(MetamodelApplyLabelEditOperationHandler);
         binding.add(MetamodelReconnectEdgeOperationHandler);
         binding.add(CreateClassOperationHandler);
+        binding.add(CreateEnumOperationHandler);
         binding.add(MetamodelDeleteNodeOperationHandler);
     }
 

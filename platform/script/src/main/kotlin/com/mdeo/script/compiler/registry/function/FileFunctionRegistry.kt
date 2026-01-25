@@ -137,13 +137,10 @@ class FileFunctionRegistry(
             globalRegistry: FunctionRegistry,
             classNameResolver: (String) -> String
         ): Map<String, FileFunctionRegistry> {
-            // Create all registries first with a placeholder empty map for imports.
-            // We'll link them together after all are created.
             val registries = mutableMapOf<String, FileFunctionRegistry>()
 
             for ((uri, ast) in files) {
                 val className = classNameResolver(uri)
-                // Initially create with empty import map - will be updated below
                 val registry = FileFunctionRegistry(globalRegistry, emptyMap())
 
                 for (func in ast.functions) {
@@ -157,16 +154,10 @@ class FileFunctionRegistry(
                 registries[uri] = registry
             }
 
-            // Now create the final linked registries that reference each other.
-            // This allows transitive import resolution to work correctly.
             val linkedRegistries = mutableMapOf<String, FileFunctionRegistry>()
             
-            // First pass: create all linked registries with the linkedRegistries map
-            // Since we're building linkedRegistries iteratively, each registry will
-            // see the final complete map due to reference semantics.
             for ((uri, ast) in files) {
                 val className = classNameResolver(uri)
-                // Pass linkedRegistries itself - it will be populated as we iterate
                 val linkedRegistry = FileFunctionRegistry(globalRegistry, linkedRegistries)
 
                 for (func in ast.functions) {

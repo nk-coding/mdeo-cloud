@@ -28,7 +28,6 @@ class GlobalPropertyRegistry {
          */
         private fun createStdlibRegistry(): GlobalPropertyRegistry {
             val registry = GlobalPropertyRegistry()
-            // Properties can be registered here or via GlobalFunctionRegistrar
             return registry
         }
     }

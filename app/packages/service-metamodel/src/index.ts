@@ -40,7 +40,7 @@ const metamodelServicePlugin: ServicePluginDefinition = {
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: serializeMonarchTokensProvider({
                 ...defaultMonarchTokenProvider,
-                keywords: ["class", "extends", "abstract", "import", "from", "as"]
+                keywords: ["class", "extends", "abstract", "import", "from", "as", "enum"]
             })
         }
     },

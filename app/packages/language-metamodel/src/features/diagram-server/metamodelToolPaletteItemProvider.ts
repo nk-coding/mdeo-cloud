@@ -14,7 +14,7 @@ const { OperationHandlerRegistry: OperationHandlerRegistrySymbol, ModelState: Mo
  * Custom tool palette item provider for the metamodel diagram.
  * Provides palette items organized into two sections:
  * - Create: Contains class creation items (with and without property)
- * - Import: Contains an import class action that triggers the workbench
+ * - Import: Contains import class and import enum actions that trigger the workbench
  */
 @injectable()
 export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider {
@@ -119,7 +119,7 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
 
     /**
      * Gets a descriptive label for a trigger action.
-     * Appends " (with Property)" if the action includes a property.
+     * Appends context-specific suffixes based on action arguments.
      *
      * @param action The trigger node creation action
      * @param baseLabel The base label from the handler
@@ -128,6 +128,9 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
     protected getLabelForAction(action: TriggerNodeCreationActionType, baseLabel: string): string {
         if (action.args?.includeProperty === true) {
             return `${baseLabel} (with Property)`;
+        }
+        if (action.args?.includeEntry === true) {
+            return `${baseLabel} (with Entry)`;
         }
         return baseLabel;
     }
@@ -151,7 +154,7 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
 
     /**
      * Creates palette items for import operations.
-     * Currently includes an "Import Class" item that triggers an action on the workbench.
+     * Includes "Import Class" and "Import Enum" items that trigger actions on the workbench.
      *
      * @returns Array of palette items for import operations
      */
@@ -168,15 +171,34 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
             isOperation: true
         };
 
+        const importEnumOperation: TriggerActionOperation = {
+            kind: "triggerAction",
+            actionType: "import-enum",
+            languageId,
+            data: {
+                uri: this.modelState.sourceUri ?? ""
+            },
+            isOperation: true
+        };
+
         this.counter++;
-        return [
-            {
-                id: `palette-item-${this.counter}`,
-                sortString: "A",
-                label: "Import Class",
-                icon: "cloud-download",
-                actions: [importClassOperation]
-            }
-        ];
+        const importClassItem = {
+            id: `palette-item-${this.counter}`,
+            sortString: "A",
+            label: "Import Class",
+            icon: "cloud-download",
+            actions: [importClassOperation]
+        };
+
+        this.counter++;
+        const importEnumItem = {
+            id: `palette-item-${this.counter}`,
+            sortString: "B",
+            label: "Import Enum",
+            icon: "cloud-download",
+            actions: [importEnumOperation]
+        };
+
+        return [importClassItem, importEnumItem];
     }
 }

@@ -11,7 +11,5 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
 fun createListType(): TypeDefinition {
     return typeDefinition("builtin.List") {
         extends("builtin.OrderedCollection")
-
-        // List inherits all methods from OrderedCollection
     }
 }

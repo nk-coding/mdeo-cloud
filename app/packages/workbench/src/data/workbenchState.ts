@@ -391,7 +391,6 @@ export class WorkbenchState {
             fileTree: undefined,
             isLoadingTree: false
         });
-        // start time is provided by the execution itself (startedAt)
         if (!this.sidebarCollapsed.value) {
             this.activeSidebar.value = "executions";
         }
@@ -585,10 +584,8 @@ export class WorkbenchState {
         });
         this.languageClient.value = languageClient;
 
-        // Register file system request handlers
         this.registerFileSystemHandlers(languageClient);
 
-        // Register action notification handlers
         this.registerActionHandlers(languageClient);
 
         languageClient.start();

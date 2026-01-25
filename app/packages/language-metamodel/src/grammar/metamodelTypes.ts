@@ -16,6 +16,27 @@ export enum MetamodelPrimitiveTypes {
 }
 
 /**
+ * Enumeration of association operators supported in the metamodel.
+ * Supports navigability (arrows) and composition (stars).
+ */
+export enum MetamodelAssociationOperators {
+    /** Navigable from source to target */
+    NAVIGABLE_TO_TARGET = "-->",
+    /** Navigable from target to source */
+    NAVIGABLE_TO_SOURCE = "<--",
+    /** Bidirectional navigability */
+    BIDIRECTIONAL = "<-->",
+    /** Composition at source, navigable to target */
+    COMPOSITION_SOURCE_NAVIGABLE_TARGET = "*-->",
+    /** Composition at source */
+    COMPOSITION_SOURCE = "*--",
+    /** Composition at target, navigable to source */
+    COMPOSITION_TARGET_NAVIGABLE_SOURCE = "<--*",
+    /** Composition at target */
+    COMPOSITION_TARGET = "--*"
+}
+
+/**
  * Primitive type for metamodel properties.
  * Represents basic data types that can be used in metamodel class properties.
  */
@@ -34,6 +55,33 @@ export const PrimitiveType = createInterface("PrimitiveType").attrs({
  * Type representing a PrimitiveType AST node.
  */
 export type PrimitiveTypeType = ASTType<typeof PrimitiveType>;
+
+/**
+ * Enum entry definition.
+ * Represents a single entry (literal) within an enum.
+ */
+export const EnumEntry = createInterface("EnumEntry").attrs({
+    name: String
+});
+
+/**
+ * Type representing an EnumEntry AST node.
+ */
+export type EnumEntryType = ASTType<typeof EnumEntry>;
+
+/**
+ * Enum definition.
+ * Represents an enumeration type with a name and list of entries.
+ */
+export const Enum = createInterface("Enum").attrs({
+    name: String,
+    entries: [EnumEntry]
+});
+
+/**
+ * Type representing an Enum AST node.
+ */
+export type EnumType = ASTType<typeof Enum>;
 
 /**
  * Single multiplicity specification.
@@ -76,12 +124,36 @@ export const Multiplicity = createType("Multiplicity").types(SingleMultiplicity,
 export type MultiplicityType = ASTType<typeof Multiplicity>;
 
 /**
+ * Enum type reference for property types.
+ * Allows referencing an enum type in a property definition.
+ */
+export const EnumTypeReference = createInterface("EnumTypeReference").attrs({
+    enum: Ref(() => EnumOrImport)
+});
+
+/**
+ * Type representing an EnumTypeReference AST node.
+ */
+export type EnumTypeReferenceType = ASTType<typeof EnumTypeReference>;
+
+/**
+ * Union type for property type values.
+ * A property type can be either a primitive type or a reference to an enum.
+ */
+export const PropertyTypeValue = createType("PropertyTypeValue").types(PrimitiveType, EnumTypeReference);
+
+/**
+ * Type representing a PropertyTypeValue AST node.
+ */
+export type PropertyTypeValueType = ASTType<typeof PropertyTypeValue>;
+
+/**
  * Property definition for metamodel classes.
- * Represents an attribute with a name, primitive type, and optional multiplicity.
+ * Represents an attribute with a name, type (primitive or enum), and optional multiplicity.
  */
 export const Property = createInterface("Property").attrs({
     name: String,
-    type: PrimitiveType,
+    type: PropertyTypeValue,
     multiplicity: Optional(Multiplicity)
 });
 
@@ -133,33 +205,59 @@ export const Class = createInterface("Class").attrs({
 export type ClassType = ASTType<typeof Class>;
 
 /**
+ * Union type for Class or Enum.
+ */
+export const ClassOrEnum = createType("ClassOrEnum").types(Class, Enum);
+
+/**
+ * Type representing ClassOrEnum AST node.
+ */
+export type ClassOrEnumType = ASTType<typeof ClassOrEnum>;
+
+/**
  * File scoping configuration for classes.
  * Enables cross-file references and imports for classes.
  */
-export const metamodelFileScopingConfig = new FileScopingConfig<ClassType>("Class", Class);
+export const metamodelFileScopingConfig = new FileScopingConfig<ClassOrEnumType>("ClassOrEnum", ClassOrEnum);
 
 /**
  * Import types for classes.
  * Generated types for importing classes from other files.
  */
-export const { importType: ClassImport, fileImportType: ClassFileImport } =
+export const { importType: ClassOrEnumImport, fileImportType: FileImport } =
     generateImportTypes(metamodelFileScopingConfig);
 
 /**
- * Union type for Class or ClassImport.
- * Used for references that can point to either a locally defined or imported class.
+ * Type representing ClassOrEnumImport AST node.
  */
-export const ClassOrImport: BaseType<AstNode> = createType("ClassOrImport").types(Class, ClassImport);
+export type ClassOrEnumImportType = ASTType<typeof ClassOrEnumImport>;
 
 /**
- * Type representing ClassImport AST node.
+ * Type representing FileImport AST node.
  */
-export type ClassImportType = ASTType<typeof ClassImport>;
+export type FileImportType = ASTType<typeof FileImport>;
+
+/**
+ * Union type for Class or ClassOrEnumImport.
+ * Used for references that can point to either a locally defined or imported class.
+ */
+export const ClassOrImport: BaseType<AstNode> = createType("ClassOrImport").types(Class, ClassOrEnumImport);
 
 /**
  * Type representing ClassOrImport AST node.
  */
 export type ClassOrImportType = ASTType<typeof ClassOrImport>;
+
+/**
+ * Union type for Class or ClassOrEnumImport.
+ * Used for references that can point to either a locally defined or imported class.
+ */
+export const EnumOrImport: BaseType<AstNode> = createType("EnumOrImport").types(Enum, ClassOrEnumImport);
+
+/**
+ * Type representing EnumOrImport AST node.
+ */
+export type EnumOrImportType = ASTType<typeof EnumOrImport>;
 
 /**
  * Association end definition.
@@ -179,11 +277,20 @@ export type AssociationEndType = ASTType<typeof AssociationEnd>;
 /**
  * Association definition.
  * Represents a relationship between two classes.
- * Can be a regular association (--), composition from start (*--), or composition from target (--*).
+ * Supports 7 operators: -->, <--, <-->, *-->, *--, <--*, --*
+ * Star (*) indicates composition, arrow (>) indicates navigability.
  */
 export const Association = createInterface("Association").attrs({
     source: AssociationEnd,
-    operator: Union("--", "*--", "--*"),
+    operator: Union(
+        MetamodelAssociationOperators.NAVIGABLE_TO_TARGET,
+        MetamodelAssociationOperators.NAVIGABLE_TO_SOURCE,
+        MetamodelAssociationOperators.BIDIRECTIONAL,
+        MetamodelAssociationOperators.COMPOSITION_SOURCE_NAVIGABLE_TARGET,
+        MetamodelAssociationOperators.COMPOSITION_SOURCE,
+        MetamodelAssociationOperators.COMPOSITION_TARGET_NAVIGABLE_SOURCE,
+        MetamodelAssociationOperators.COMPOSITION_TARGET
+    ),
     target: AssociationEnd
 });
 
@@ -193,17 +300,23 @@ export const Association = createInterface("Association").attrs({
 export type AssociationType = ASTType<typeof Association>;
 
 /**
- * Union type for Class or Association.
+ * Union type for Class, Enum, or Association.
+ * Used to represent any top-level element in the metamodel body.
  */
-export const ClassOrAssociation = createType("ClassOrAssociation").types(Class, Association);
+export const ClassEnumOrAssociation = createType("ClassEnumOrAssociation").types(Class, Enum, Association);
+
+/**
+ * Type representing ClassEnumOrAssociation AST node.
+ */
+export type ClassEnumOrAssociationType = ASTType<typeof ClassEnumOrAssociation>;
 
 /**
  * The root MetaModel type.
- * Contains imports, class definitions, and associations.
+ * Contains imports, class definitions, enums, and associations.
  */
 export const MetaModel = createInterface("MetaModel").attrs({
-    imports: [ClassFileImport],
-    classesAndAssociations: [ClassOrAssociation]
+    imports: [FileImport],
+    elements: [ClassEnumOrAssociation]
 });
 
 /**

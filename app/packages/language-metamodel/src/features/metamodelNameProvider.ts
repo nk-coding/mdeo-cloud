@@ -1,7 +1,7 @@
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
-import { ClassImport } from "../grammar/metamodelTypes.js";
+import { ClassOrEnumImport } from "../grammar/metamodelTypes.js";
 
 const { DefaultNameProvider } = sharedImport("langium");
 
@@ -22,7 +22,7 @@ export class MetamodelNameProvider extends DefaultNameProvider {
         if (name != undefined) {
             return name;
         }
-        if (this.reflection.isInstance(node, ClassImport)) {
+        if (this.reflection.isInstance(node, ClassOrEnumImport)) {
             return node.name ?? node.entity.$refText;
         }
         return undefined;

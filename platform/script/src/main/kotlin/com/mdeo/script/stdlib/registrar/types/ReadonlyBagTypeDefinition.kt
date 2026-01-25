@@ -11,7 +11,5 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
 fun createReadonlyBagType(): TypeDefinition {
     return typeDefinition("builtin.ReadonlyBag") {
         extends("builtin.ReadonlyCollection")
-
-        // ReadonlyBag inherits all methods from ReadonlyCollection
     }
 }

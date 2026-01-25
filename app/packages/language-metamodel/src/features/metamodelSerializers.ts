@@ -13,8 +13,11 @@ import {
     AssociationEnd,
     Association,
     MetaModel,
-    ClassImport,
-    ClassFileImport,
+    ClassOrEnumImport,
+    FileImport,
+    Enum,
+    EnumEntry,
+    EnumTypeReference,
     type PrimitiveTypeType,
     type SingleMultiplicityType,
     type RangeMultiplicityType,
@@ -23,7 +26,10 @@ import {
     type ClassExtensionsType,
     type AssociationEndType,
     type AssociationType,
-    type MetaModelType
+    type MetaModelType,
+    type EnumType,
+    type EnumEntryType,
+    type EnumTypeReferenceType
 } from "../grammar/metamodelTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -38,14 +44,17 @@ export function registerMetamodelSerializers(services: LangiumCoreServices & Ast
     const { AstSerializer } = services;
 
     AstSerializer.registerNodeSerializer(PrimitiveType, (ctx) => printPrimitiveType(ctx));
+    AstSerializer.registerNodeSerializer(EnumTypeReference, (ctx) => printEnumTypeReference(ctx));
     AstSerializer.registerNodeSerializer(SingleMultiplicity, (ctx) => printSingleMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(RangeMultiplicity, (ctx) => printRangeMultiplicity(ctx));
     AstSerializer.registerNodeSerializer(Property, (ctx) => printProperty(ctx));
     AstSerializer.registerNodeSerializer(Class, (ctx) => printClass(ctx));
     AstSerializer.registerNodeSerializer(ClassExtensions, (ctx) => printClassExtensions(ctx));
+    AstSerializer.registerNodeSerializer(EnumEntry, (ctx) => printEnumEntry(ctx));
+    AstSerializer.registerNodeSerializer(Enum, (ctx) => printEnum(ctx));
     AstSerializer.registerNodeSerializer(AssociationEnd, (ctx) => printAssociationEnd(ctx));
     AstSerializer.registerNodeSerializer(Association, (ctx) => printAssociation(ctx));
-    registerImportSerializers(services, doc.builders, ClassImport, ClassFileImport);
+    registerImportSerializers(services, doc.builders, ClassOrEnumImport, FileImport);
     AstSerializer.registerNodeSerializer(MetaModel, (ctx) => printMetaModel(ctx));
 }
 
@@ -169,8 +178,8 @@ function printClassExtensions(context: PrintContext<ClassExtensionsType>): Doc {
  * @returns The formatted association end
  */
 function printAssociationEnd(context: PrintContext<AssociationEndType>): Doc {
-    const { ctx, path, print, printPrimitive, getPrimitive } = context;
-    const docs: Doc[] = [path.call(print, "class", "ref")];
+    const { ctx, path, print, printPrimitive, getPrimitive, printReference } = context;
+    const docs: Doc[] = [path.call((ref) => printReference(ref, ID), "class")];
 
     if (ctx.name != undefined) {
         docs.push(".");
@@ -206,5 +215,51 @@ function printAssociation(context: PrintContext<AssociationType>): Doc {
  * @returns The formatted metamodel
  */
 function printMetaModel(context: PrintContext<MetaModelType>): Doc {
-    return serializeNewlineSep(context, ["imports", "classesAndAssociations"], doc.builders);
+    return serializeNewlineSep(context, ["imports", "elements"], doc.builders);
+}
+
+/**
+ * Prints an enum type reference node.
+ *
+ * @param context The print context
+ * @returns The formatted enum type reference
+ */
+function printEnumTypeReference(context: PrintContext<EnumTypeReferenceType>): Doc {
+    const { path, printReference } = context;
+    return path.call((ref) => printReference(ref, ID), "enum");
+}
+
+/**
+ * Prints an enum entry node.
+ *
+ * @param context The print context
+ * @returns The formatted enum entry
+ */
+function printEnumEntry(context: PrintContext<EnumEntryType>): Doc {
+    const { ctx, printPrimitive, getPrimitive } = context;
+    return printPrimitive(getPrimitive(ctx, "name"), ID);
+}
+
+/**
+ * Prints an enum node.
+ *
+ * @param context The print context
+ * @returns The formatted enum
+ */
+function printEnum(context: PrintContext<EnumType>): Doc {
+    const { ctx, printPrimitive, getPrimitive } = context;
+    const docs: Doc[] = [];
+
+    docs.push("enum ");
+    docs.push(printPrimitive(getPrimitive(ctx, "name"), ID));
+    docs.push(" {");
+
+    const content = serializeNewlineSep(context, ["entries"], doc.builders);
+    if (content.length > 0) {
+        docs.push(indent([hardline, content]), hardline);
+    }
+
+    docs.push("}");
+
+    return group(docs);
 }

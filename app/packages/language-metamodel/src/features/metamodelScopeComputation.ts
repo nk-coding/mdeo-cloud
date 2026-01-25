@@ -20,10 +20,10 @@ export class MetamodelScopeComputation extends DefaultScopeComputation {
             (root) => {
                 const result: AstNode[] = [];
                 const metamodelRoot = root as MetaModelType;
-                for (const cls of metamodelRoot.classesAndAssociations) {
-                    result.push(cls);
+                for (const element of metamodelRoot.elements ?? []) {
+                    result.push(element);
                 }
-                for (const imp of metamodelRoot.imports) {
+                for (const imp of metamodelRoot.imports ?? []) {
                     result.push(...imp.imports);
                 }
                 return result;

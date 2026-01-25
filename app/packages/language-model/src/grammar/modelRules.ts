@@ -11,10 +11,24 @@ import {
     WS,
     ML_COMMENT,
     SL_COMMENT,
-    HIDDEN_NEWLINE
+    HIDDEN_NEWLINE,
+    optional,
+    group
 } from "@mdeo/language-common";
-import { ClassOrImport, Property } from "@mdeo/language-metamodel";
-import { LiteralValue, PropertyAssignment, ObjectInstance, Model, MetamodelFileImport } from "./modelTypes.js";
+import { ClassOrImport, EnumEntry, Property } from "@mdeo/language-metamodel";
+import {
+    SimpleValue,
+    EnumValue,
+    SingleValue,
+    ListValue,
+    LiteralValue,
+    PropertyAssignment,
+    ObjectInstance,
+    Model,
+    MetamodelFileImport,
+    LinkEnd,
+    Link
+} from "./modelTypes.js";
 
 /**
  * Boolean literal rule.
@@ -25,14 +39,50 @@ const BOOLEAN = createRule("BOOLEAN")
     .as(() => [or("true", "false")]);
 
 /**
- * Literal value rule.
+ * Simple value rule.
  * Matches string, number, or boolean literals.
  */
-export const LiteralValueRule = createRule("LiteralValueRule")
-    .returns(LiteralValue)
+export const SimpleValueRule = createRule("SimpleValueRule")
+    .returns(SimpleValue)
     .as(({ set }) => [
         or(set("stringValue", STRING), set("numberValue", FLOAT), set("numberValue", INT), set("booleanValue", BOOLEAN))
     ]);
+
+/**
+ * Enum value rule.
+ * Matches a reference to an enum entry identifier.
+ */
+export const EnumValueRule = createRule("EnumValueRule")
+    .returns(EnumValue)
+    .as(({ set }) => [set("value", ref(EnumEntry, ID))]);
+
+/**
+ * Single value rule.
+ * Matches either a simple value or an enum value.
+ */
+export const SingleValueRule = createRule("SingleValueRule")
+    .returns(SingleValue)
+    .as(() => [or(SimpleValueRule, EnumValueRule)]);
+
+/**
+ * List value rule.
+ * Matches values in square brackets with comma separation.
+ */
+export const ListValueRule = createRule("ListValueRule")
+    .returns(ListValue)
+    .as(({ add }) => [
+        "[",
+        optional(group(add("values", SingleValueRule), many(",", add("values", SingleValueRule)))),
+        "]"
+    ]);
+
+/**
+ * Literal value rule.
+ * Matches any value type: simple, enum, or list.
+ */
+export const LiteralValueRule = createRule("LiteralValueRule")
+    .returns(LiteralValue)
+    .as(() => [or(ListValueRule, SimpleValueRule, EnumValueRule)]);
 
 /**
  * Property assignment rule.
@@ -58,6 +108,25 @@ export const ObjectInstanceRule = createRule("ObjectInstanceRule")
     ]);
 
 /**
+ * Link end rule.
+ * Matches an object reference with optional property specification.
+ */
+export const LinkEndRule = createRule("LinkEndRule")
+    .returns(LinkEnd)
+    .as(({ set }) => [
+        set("object", ref(ObjectInstance, ID)),
+        optional(group(".", set("property", ref(Property, ID))))
+    ]);
+
+/**
+ * Link rule.
+ * Matches links between object instances: objectId1[.property] -- objectId2[.property]
+ */
+export const LinkRule = createRule("LinkRule")
+    .returns(Link)
+    .as(({ set }) => [set("source", LinkEndRule), "--", set("target", LinkEndRule)]);
+
+/**
  * Metamodel file import rule.
  * Matches "using" statements for importing metamodel files.
  */
@@ -74,7 +143,7 @@ export const ModelRule = createRule("ModelRule")
     .as(({ add, set }) => [
         many(NEWLINE),
         set("import", MetamodelFileImportRule),
-        many(or(add("objects", ObjectInstanceRule), NEWLINE))
+        many(or(add("objects", ObjectInstanceRule), add("links", LinkRule), NEWLINE))
     ]);
 
 /**

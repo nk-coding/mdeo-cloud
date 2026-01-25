@@ -10,7 +10,14 @@ import type {
     MultiplicityType,
     SingleMultiplicityType,
     RangeMultiplicityType,
-    ClassImportType
+    ClassOrEnumImportType,
+    EnumType,
+    EnumEntryType,
+    EnumTypeReferenceType,
+    PropertyTypeValueType,
+    PrimitiveTypeType,
+    ClassEnumOrAssociationType,
+    FileImportType
 } from "./metamodelTypes.js";
 
 /**
@@ -21,7 +28,7 @@ export type PartialMetaModel = PartialAstNode<MetaModelType>;
 /**
  * Partial class import type with optional domain properties.
  */
-export type PartialClassImport = PartialAstNode<ClassImportType>;
+export type PartialClassOrEnumImport = PartialAstNode<ClassOrEnumImportType>;
 
 /**
  * Partial class type with optional domain properties.
@@ -67,3 +74,38 @@ export type PartialSingleMultiplicity = PartialAstNode<SingleMultiplicityType>;
  * Partial range multiplicity type with optional domain properties.
  */
 export type PartialRangeMultiplicity = PartialAstNode<RangeMultiplicityType>;
+
+/**
+ * Partial enum type with optional domain properties.
+ */
+export type PartialEnum = PartialAstNode<EnumType>;
+
+/**
+ * Partial enum entry type with optional domain properties.
+ */
+export type PartialEnumEntry = PartialAstNode<EnumEntryType>;
+
+/**
+ * Partial enum type reference type with optional domain properties.
+ */
+export type PartialEnumTypeReference = PartialAstNode<EnumTypeReferenceType>;
+
+/**
+ * Partial property type value type with optional domain properties.
+ */
+export type PartialPropertyTypeValue = PartialAstNode<PropertyTypeValueType>;
+
+/**
+ * Partial primitive type type with optional domain properties.
+ */
+export type PartialPrimitiveType = PartialAstNode<PrimitiveTypeType>;
+
+/**
+ * Partial file import type with optional domain properties.
+ */
+export type PartialFileImport = PartialAstNode<FileImportType>;
+
+/**
+ * Partial class, enum, or association type with optional domain properties.
+ */
+export type PartialClassEnumOrAssociation = PartialAstNode<ClassEnumOrAssociationType>;

@@ -239,7 +239,6 @@ function closeTabsToRight(tab: EditorTab) {
     const tabsToClose = currentTabs.slice(index + 1);
     tabs.value = currentTabs.slice(0, index + 1);
 
-    // If active tab was closed, switch to the rightmost remaining tab
     if (activeTab.value && tabsToClose.includes(activeTab.value)) {
         activeTab.value = tabs.value[tabs.value.length - 1];
     }

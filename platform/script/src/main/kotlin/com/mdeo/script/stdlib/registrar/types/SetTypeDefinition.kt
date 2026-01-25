@@ -11,7 +11,5 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
 fun createSetType(): TypeDefinition {
     return typeDefinition("builtin.Set") {
         extends("builtin.Collection")
-
-        // Set inherits all methods from Collection
     }
 }

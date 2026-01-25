@@ -344,7 +344,6 @@ class ScopeBuilder(
                 val forParamsScope = scope.createChild()
                 val varType = context.getType(statement.variableType)
                 forParamsScope.declareVariable(statement.variableName, varType)
-                // Iterator variable - use a standard Java Iterator type
                 val iteratorType = ClassTypeRef("java.util.Iterator", false)
                 forParamsScope.declareVariable("\$iterator\$${statement.variableName}", iteratorType)
                 collectFromExpression(statement.iterable, scope)
@@ -412,9 +411,7 @@ class ScopeBuilder(
                 val lambdaParamsScope = scope.createChild(isStaticallyNested = false)
                 
                 val lambdaType = context.getType(expression.evalType) as? LambdaType
-                // do not declare variables for params as this will be handled by the LambdaCompiler
-                // to put captured variables first
-                
+
                 val lambdaBodyScope = lambdaParamsScope.createChild()
                 statementScopes[expression] = lambdaBodyScope
                 for (bodyStmt in expression.body.body) {

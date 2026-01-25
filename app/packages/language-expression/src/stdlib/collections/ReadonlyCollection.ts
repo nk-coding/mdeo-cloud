@@ -237,12 +237,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     )
     .method("forEach", (m) =>
         m.signature((s) =>
-            s
-                .param(
-                    "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(voidType())
-                )
-                .returns(voidType())
+            s.param("iterator", lambdaType().param("it", genericTypeRef("T")).returns(voidType())).returns(voidType())
         )
     )
     .method("associate", (m) =>

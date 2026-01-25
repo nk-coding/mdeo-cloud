@@ -12,12 +12,13 @@ import type { NodeAttributes, EdgeAttributes, Attributes } from "@mdeo/language-
 import type { AstNode } from "langium";
 import { MetamodelElementType } from "./model/elementTypes.js";
 import type {
-    PartialClassImport,
     PartialMetaModel,
     PartialClass,
-    PartialAssociation
+    PartialAssociation,
+    PartialClassOrEnumImport,
+    PartialEnum
 } from "../../grammar/metamodelPartialTypes.js";
-import { Association, Class, ClassImport } from "../../grammar/metamodelTypes.js";
+import { Association, Class, ClassOrEnumImport, Enum } from "../../grammar/metamodelTypes.js";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 
 const { injectable, inject } = sharedImport("inversify");
@@ -131,9 +132,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         const edges: Record<string, EdgeMetadata> = {};
 
         const idRegistry = new ModelIdRegistry(sourceModel, this.modelIdProvider);
-        const { classes, associations, imports } = this.extractClassesAndAssociations(sourceModel);
+        const { classes, enums, associations, imports } = this.extractClassesAndAssociations(sourceModel);
 
         this.extractClassMetadata(classes, idRegistry, nodes);
+        this.extractEnumMetadata(enums, idRegistry, nodes);
         this.extractClassImportMetadata(imports, idRegistry, nodes);
         this.extractInheritanceMetadata(classes, idRegistry, edges);
         this.extractAssociationMetadata(associations, idRegistry, nodes, edges);
@@ -165,14 +167,37 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     }
 
     /**
-     * Extracts metadata for all imported classes.
+     * Extracts metadata for all enums.
      *
-     * @param imports list of class imports in the metamodel
+     * @param enums list of enums in the metamodel
+     * @param idRegistry model ID registry
+     * @param nodes record to populate with node metadata
+     */
+    private extractEnumMetadata(
+        enums: PartialEnum[],
+        idRegistry: ModelIdRegistry,
+        nodes: Record<string, NodeMetadata>
+    ): void {
+        for (const enumeration of enums) {
+            const nodeId = idRegistry.getId(enumeration);
+            if (nodeId) {
+                nodes[nodeId] = {
+                    type: MetamodelElementType.NODE_ENUM,
+                    attrs: this.createEnumAttributes(enumeration)
+                };
+            }
+        }
+    }
+
+    /**
+     * Extracts metadata for all imported classes or enums.
+     *
+     * @param imports list of class or enum imports in the metamodel
      * @param idRegistry model ID registry
      * @param nodes record to populate with node metadata
      */
     private extractClassImportMetadata(
-        imports: PartialClassImport[],
+        imports: PartialClassOrEnumImport[],
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>
     ): void {
@@ -324,45 +349,47 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
      * Extracts classes, associations, and imports from the metamodel.
      *
      * @param metamodel the metamodel source model
-     * @returns extracted classes, associations, and imports
+     * @returns extracted classes, enums,  associations, and imports
      */
     private extractClassesAndAssociations(metamodel: PartialMetaModel): {
         classes: PartialClass[];
+        enums: PartialEnum[];
         associations: PartialAssociation[];
-        imports: PartialClassImport[];
+        imports: PartialClassOrEnumImport[];
     } {
         const classes: PartialClass[] = [];
+        const enums: PartialEnum[] = [];
         const associations: PartialAssociation[] = [];
-        const imports: PartialClassImport[] = [];
+        const imports: PartialClassOrEnumImport[] = [];
 
-        if (!metamodel.classesAndAssociations) {
-            return { classes, associations, imports };
+        if (!metamodel.elements) {
+            return { classes, enums, associations, imports };
         }
 
-        for (const item of metamodel.classesAndAssociations) {
+        for (const item of metamodel.elements) {
             if (!item) {
                 continue;
             }
 
             if (this.reflection.isInstance(item, Class)) {
                 classes.push(item);
+            } else if (this.reflection.isInstance(item, Enum)) {
+                enums.push(item);
             } else if (this.reflection.isInstance(item, Association)) {
                 associations.push(item);
             }
         }
 
-        // Extract imports from file imports
         const fileImports = metamodel.imports ?? [];
         for (const fileImport of fileImports) {
-            const classImports = fileImport?.imports ?? [];
-            for (const classImport of classImports) {
-                if (classImport) {
-                    imports.push(classImport as PartialClassImport);
+            for (const imp of fileImport?.imports ?? []) {
+                if (imp) {
+                    imports.push(imp as PartialClassOrEnumImport);
                 }
             }
         }
 
-        return { classes, associations, imports };
+        return { classes, enums, associations, imports };
     }
 
     /**
@@ -381,10 +408,10 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             return idRegistry.getId(classNode);
         }
 
-        if (this.reflection.isInstance(classNode, ClassImport)) {
-            const importNode = classNode as PartialClassImport;
+        if (this.reflection.isInstance(classNode, ClassOrEnumImport)) {
+            const importNode = classNode as PartialClassOrEnumImport;
             const referencedClass = importNode.entity?.ref;
-            if (referencedClass) {
+            if (this.reflection.isInstance(referencedClass, Class)) {
                 return idRegistry.getId(referencedClass);
             }
         }
@@ -406,6 +433,22 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             name: cls.name ?? "",
             isAbstract: cls.isAbstract ?? false,
             properties
+        };
+    }
+
+    /**
+     * Creates enum attributes for an enumeration.
+     * Includes entry names for similarity comparison.
+     *
+     * @param enumeration the enum definition
+     * @returns enum attributes
+     */
+    private createEnumAttributes(enumeration: PartialEnum): Attributes {
+        const entries = enumeration.entries?.filter((e) => e?.name).map((e) => e.name!) ?? [];
+
+        return {
+            name: enumeration.name ?? "",
+            entries
         };
     }
 

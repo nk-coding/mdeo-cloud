@@ -51,7 +51,6 @@ class ScriptClassLoader(
     override fun findClass(name: String): Class<*> {
         val internalName = name.replace(".", "/")
         
-        // First, check if it's a generated interface
         val interfaceBytecode = program.generatedInterfaces[internalName]
         if (interfaceBytecode != null) {
             return loadedInterfaces.getOrPut(internalName) {
@@ -59,7 +58,6 @@ class ScriptClassLoader(
             }
         }
         
-        // Otherwise, look for it in the compiled classes
         val compiledClass = program.classes.values.find { it.className == internalName }
             ?: throw ClassNotFoundException(name)
         

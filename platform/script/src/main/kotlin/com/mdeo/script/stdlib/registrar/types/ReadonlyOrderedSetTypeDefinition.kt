@@ -11,7 +11,5 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
 fun createReadonlyOrderedSetType(): TypeDefinition {
     return typeDefinition("builtin.ReadonlyOrderedSet") {
         extends("builtin.ReadonlyOrderedCollection")
-
-        // ReadonlyOrderedSet inherits all methods from ReadonlyOrderedCollection
     }
 }

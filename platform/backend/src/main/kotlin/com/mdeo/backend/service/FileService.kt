@@ -105,7 +105,6 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         val now = Instant.now()
         
         return transaction {
-            // Check project lock before modifying files
             checkProjectLock(projectId)?.let { return@transaction it }
             val existing = FilesTable.selectAll()
                 .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
@@ -168,7 +167,6 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         val now = Instant.now()
         
         return transaction {
-            // Check project lock before modifying files
             checkProjectLock(projectId)?.let { return@transaction it }
             
             val existing = FilesTable.selectAll()
@@ -299,7 +297,6 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         val normalizedPath = normalizePath(path)
         
         return transaction {
-            // Check project lock before modifying files
             checkProjectLock(projectId)?.let { return@transaction it }
             
             val row = FilesTable.selectAll()
@@ -353,7 +350,6 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         val now = Instant.now()
         
         return transaction {
-            // Check project lock before modifying files
             checkProjectLock(projectId)?.let { return@transaction it }
             
             val sourceRow = FilesTable.selectAll()
@@ -471,7 +467,6 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
      * @param now The timestamp to use for the update
      */
     private fun addChildToDirectory(projectId: UUID, dirPath: String, childName: String, childType: Int, now: Instant) {
-        // Check if child already exists
         val existingChild = FileChildrenTable.selectAll()
             .where { 
                 (FileChildrenTable.projectId eq projectId) and 

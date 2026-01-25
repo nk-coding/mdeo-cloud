@@ -72,19 +72,16 @@ export function getFileName(uri: Uri): string {
 
 export function getRelativePath(uri: Uri): string {
     const pathSegments = uri.path.split("/").filter((s) => s.length > 0);
-    // Handle new URI structure: /projectId/files/path
-    // Skip projectId and "files" prefix, then exclude the last segment (filename)
+
     if (pathSegments.length <= 2) {
         return "";
     }
-    // If second segment is "files", skip projectId and "files"
     if (pathSegments[1] === "files") {
         if (pathSegments.length <= 3) {
             return "";
         }
         return pathSegments.slice(2, -1).join("/");
     }
-    // Fallback for other URI structures
     return pathSegments.slice(1, -1).join("/");
 }
 

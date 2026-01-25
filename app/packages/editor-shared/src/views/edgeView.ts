@@ -145,7 +145,6 @@ export abstract class GEdgeView implements IView {
         if (!isSelected(model)) {
             rootClasses["cursor-pointer"] = true;
         }
-        // Add pointer-events-none when reconnecting to prevent edge from interfering with target detection
         if (model.reconnectData) {
             rootClasses["pointer-events-none"] = true;
         }

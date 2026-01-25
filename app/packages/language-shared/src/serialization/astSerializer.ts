@@ -257,7 +257,7 @@ export class DefaultAstSerializer implements AstSerializer {
     }
 
     async serializeNode(node: AstNode, document: LangiumDocument, options: FormattingOptions): Promise<string> {
-        const text = document.textDocument.getText();
+        const text = document.textDocument.getText() + "// trailing comment to avoid empty file issues";
         const pluginGenerator = this.createPrettierPluginGenerator(text);
         const plugin = pluginGenerator.generate(
             node,

@@ -4,29 +4,26 @@ import {
     Class,
     Association,
     ClassExtension,
-    ClassFileImport,
-    ClassImport,
     SingleMultiplicity,
     RangeMultiplicity,
     type ClassType,
     type AssociationType,
     type ClassExtensionType,
     type ClassExtensionsType,
-    type ClassImportType,
     type AssociationEndType,
-    type MultiplicityType
+    type MultiplicityType,
+    type FileImportType,
+    ClassOrEnumImport,
+    type ClassOrEnumImportType,
+    FileImport,
+    type EnumType,
+    Enum
 } from "../../../grammar/metamodelTypes.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import type { ASTType } from "@mdeo/language-common";
 
 const { injectable } = sharedImport("inversify");
 const { AstUtils } = sharedImport("langium");
-
-/**
- * Type for ClassFileImport AST node
- */
-type ClassFileImportType = ASTType<typeof ClassFileImport>;
 
 /**
  * Operation handler for deleting nodes in the metamodel diagram.
@@ -74,19 +71,19 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
      */
     private formTransitiveClosure(elements: AstNode[]): Set<AstNode> {
         const result = new Set<AstNode>(elements);
-        const deletedClassIds = new Set<string>();
+        const deletedClassOrEnumIds = new Set<string>();
 
         for (const element of elements) {
             if (this.reflection.isInstance(element, Class)) {
                 const cls = element as ClassType;
                 if (cls.name != undefined) {
-                    deletedClassIds.add(cls.name);
+                    deletedClassOrEnumIds.add(cls.name);
                 }
-            } else if (this.reflection.isInstance(element, ClassImport)) {
-                const classImport = element as ClassImportType;
-                const importName = classImport.name ?? classImport.entity?.$refText;
+            } else if (this.reflection.isInstance(element, ClassOrEnumImport)) {
+                const classOrEnumImport = element as ClassOrEnumImportType;
+                const importName = classOrEnumImport.name ?? classOrEnumImport.entity?.$refText;
                 if (importName != undefined) {
-                    deletedClassIds.add(importName);
+                    deletedClassOrEnumIds.add(importName);
                 }
             }
         }
@@ -103,7 +100,7 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 const targetName = extension.class?.$refText;
 
                 if (owner?.name != undefined && targetName != undefined) {
-                    if (deletedClassIds.has(owner.name) || deletedClassIds.has(targetName)) {
+                    if (deletedClassOrEnumIds.has(owner.name) || deletedClassOrEnumIds.has(targetName)) {
                         result.add(extension);
                     }
                 }
@@ -115,8 +112,8 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 const targetClassName = association.target?.class?.$refText;
 
                 if (
-                    (sourceClassName != undefined && deletedClassIds.has(sourceClassName)) ||
-                    (targetClassName != undefined && deletedClassIds.has(targetClassName))
+                    (sourceClassName != undefined && deletedClassOrEnumIds.has(sourceClassName)) ||
+                    (targetClassName != undefined && deletedClassOrEnumIds.has(targetClassName))
                 ) {
                     result.add(association);
                 }
@@ -220,21 +217,22 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
     private async createDeleteWorkspaceEdit(elements: Set<AstNode>): Promise<WorkspaceEdit> {
         const edits: WorkspaceEdit[] = [];
 
-        const classes: ClassType[] = [];
-        const associations: AssociationType[] = [];
+        const nodesToDelete: (ClassType | EnumType | AssociationType)[] = [];
         const extensions: ClassExtensionType[] = [];
-        const classImports: ClassImportType[] = [];
+        const classOrEnumImports: ClassOrEnumImportType[] = [];
         const multiplicities: MultiplicityType[] = [];
 
         for (const element of elements) {
-            if (this.reflection.isInstance(element, Class)) {
-                classes.push(element as ClassType);
-            } else if (this.reflection.isInstance(element, Association)) {
-                associations.push(element as AssociationType);
+            if (
+                this.reflection.isInstance(element, Class) ||
+                this.reflection.isInstance(element, Enum) ||
+                this.reflection.isInstance(element, Association)
+            ) {
+                nodesToDelete.push(element as ClassType);
             } else if (this.reflection.isInstance(element, ClassExtension)) {
                 extensions.push(element as ClassExtensionType);
-            } else if (this.reflection.isInstance(element, ClassImport)) {
-                classImports.push(element as ClassImportType);
+            } else if (this.reflection.isInstance(element, ClassOrEnumImport)) {
+                classOrEnumImports.push(element as ClassOrEnumImportType);
             } else if (
                 this.reflection.isInstance(element, SingleMultiplicity) ||
                 this.reflection.isInstance(element, RangeMultiplicity)
@@ -243,21 +241,15 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
             }
         }
 
-        for (const cls of classes) {
-            if (cls.$cstNode != undefined) {
-                edits.push(this.deleteCstNode(cls.$cstNode));
-            }
-        }
-
-        for (const association of associations) {
-            if (association.$cstNode != undefined) {
-                edits.push(this.deleteCstNode(association.$cstNode));
+        for (const node of nodesToDelete) {
+            if (node.$cstNode != undefined) {
+                edits.push(this.deleteCstNode(node.$cstNode));
             }
         }
 
         edits.push(...(await this.createDeleteExtensionsEdits(extensions)));
 
-        edits.push(...(await this.createDeleteClassImportsEdits(classImports)));
+        edits.push(...(await this.createDeleteClassOrEnumImportsEdits(classOrEnumImports)));
 
         edits.push(...(await this.createDeleteMultiplicitiesEdits(multiplicities)));
 
@@ -368,24 +360,26 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
     }
 
     /**
-     * Creates workspace edits for deleting class imports.
-     * Groups deleted class imports by their containing file import and reserializes import lists.
+     * Creates workspace edits for deleting class or enum imports.
+     * Groups deleted class or enum imports by their containing file import and reserializes import lists.
      *
-     * @param classImports ClassImport nodes being deleted
+     * @param classOrEnumImports ClassImport nodes being deleted
      * @returns Array of workspace edits
      */
-    private async createDeleteClassImportsEdits(classImports: ClassImportType[]): Promise<WorkspaceEdit[]> {
+    private async createDeleteClassOrEnumImportsEdits(
+        classOrEnumImports: ClassOrEnumImportType[]
+    ): Promise<WorkspaceEdit[]> {
         const edits: WorkspaceEdit[] = [];
-        const importsByFileImport = new Map<ClassFileImportType, ClassImportType[]>();
+        const importsByFileImport = new Map<FileImportType, ClassOrEnumImportType[]>();
 
-        for (const classImport of classImports) {
-            const fileImport = classImport.$container;
-            if (fileImport != undefined && this.reflection.isInstance(fileImport, ClassFileImport)) {
-                const fileImportTyped = fileImport as ClassFileImportType;
+        for (const classOrEnumImport of classOrEnumImports) {
+            const fileImport = classOrEnumImport.$container;
+            if (fileImport != undefined && this.reflection.isInstance(fileImport, FileImport)) {
+                const fileImportTyped = fileImport as FileImportType;
                 if (!importsByFileImport.has(fileImportTyped)) {
                     importsByFileImport.set(fileImportTyped, []);
                 }
-                importsByFileImport.get(fileImportTyped)!.push(classImport);
+                importsByFileImport.get(fileImportTyped)!.push(classOrEnumImport);
             }
         }
 
@@ -397,7 +391,7 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 if (remainingImports.length === 0) {
                     edits.push(this.deleteCstNode(fileImport.$cstNode));
                 } else {
-                    const newFileImport: ClassFileImportType = {
+                    const newFileImport: FileImportType = {
                         $type: fileImport.$type,
                         file: fileImport.file,
                         imports: remainingImports

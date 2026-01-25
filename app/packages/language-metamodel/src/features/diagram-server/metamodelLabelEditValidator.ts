@@ -2,9 +2,20 @@ import { BaseLabelEditValidator, parseIdentifier, sharedImport, type GModelIndex
 import type { GModelElement, ValidationStatus as ValidationStatusType } from "@eclipse-glsp/server";
 import { MetamodelElementType } from "./model/elementTypes.js";
 import type { GClassNode } from "./model/classNode.js";
+import type { GEnumNode } from "./model/enumNode.js";
 import type { GClassLabel } from "./model/classLabel.js";
+import type { GEnumLabel } from "./model/enumLabel.js";
+import type { GEnumEntryLabel } from "./model/enumEntryLabel.js";
 import type { GPropertyLabel } from "./model/propertyLabel.js";
-import { Class, type PropertyType, type ClassType, MetamodelPrimitiveTypes } from "../../grammar/metamodelTypes.js";
+import {
+    Class,
+    Enum,
+    EnumEntry,
+    type PropertyType,
+    type ClassType,
+    type EnumType,
+    MetamodelPrimitiveTypes
+} from "../../grammar/metamodelTypes.js";
 import { resolveClassChain } from "../../features/semanticInformation.js";
 
 const { injectable, inject } = sharedImport("inversify");
@@ -24,7 +35,21 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         if (element.type === MetamodelElementType.LABEL_CLASS_NAME) {
             return (
                 this.validateIdentifier(label, "Class name") ??
-                this.validateClassName(label, element as GClassLabel) ??
+                this.validateElementName(label, element as GClassLabel) ??
+                ValidationStatus.NONE
+            );
+        }
+        if (element.type === MetamodelElementType.LABEL_ENUM_NAME) {
+            return (
+                this.validateIdentifier(label, "Enum name") ??
+                this.validateElementName(label, element as GEnumLabel) ??
+                ValidationStatus.NONE
+            );
+        }
+        if (element.type === MetamodelElementType.LABEL_ENUM_ENTRY) {
+            return (
+                this.validateIdentifier(label, "Enum entry") ??
+                this.validateEnumEntry(label, element as GEnumEntryLabel) ??
                 ValidationStatus.NONE
             );
         }
@@ -41,24 +66,69 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
     }
 
     /**
-     * Validates that the given class name is unique within the model.
+     * Validates that the given element name (class or enum) is unique within the model.
+     * Both classes and enums share the same namespace.
      *
-     * @param name the class name to validate
+     * @param name the element name to validate
+     * @param element the label element being edited
      * @returns a validation status if the name is not unique, undefined otherwise
      */
-    private validateClassName(name: string, element: GClassLabel): ValidationStatusType | undefined {
+    private validateElementName(name: string, element: GClassLabel | GEnumLabel): ValidationStatusType | undefined {
         const trimmedName = name.trim();
         if (element.text === trimmedName) {
             return undefined;
         }
-        if (
-            this.modelState.root.children.some(
-                (element) =>
-                    element.type === MetamodelElementType.NODE_CLASS && (element as GClassNode).name === trimmedName
-            )
-        ) {
+        const conflictingClass = this.modelState.root.children.some(
+            (el) => el.type === MetamodelElementType.NODE_CLASS && (el as GClassNode).name === trimmedName
+        );
+        const conflictingEnum = this.modelState.root.children.some(
+            (el) => el.type === MetamodelElementType.NODE_ENUM && (el as GEnumNode).name === trimmedName
+        );
+
+        if (conflictingClass) {
             return this.error(`A class with the name '${trimmedName}' already exists.`);
         }
+        if (conflictingEnum) {
+            return this.error(`An enum with the name '${trimmedName}' already exists.`);
+        }
+        return undefined;
+    }
+
+    /**
+     * Validates that the given enum entry name is unique within the enum.
+     *
+     * @param name the entry name to validate
+     * @param element the enum entry label element
+     * @returns a validation status if the entry is not unique, undefined otherwise
+     */
+    private validateEnumEntry(name: string, element: GEnumEntryLabel): ValidationStatusType | undefined {
+        const trimmedName = name.trim();
+        if (element.text === trimmedName) {
+            return undefined;
+        }
+
+        const entryNode = this.index.getAstNode(element);
+        if (entryNode == undefined) {
+            return undefined;
+        }
+
+        const reflection = this.modelState.languageServices.shared.AstReflection;
+        if (!reflection.isInstance(entryNode, EnumEntry)) {
+            return undefined;
+        }
+
+        const parentEnum = entryNode.$container;
+        if (parentEnum == undefined || !reflection.isInstance(parentEnum, Enum)) {
+            return undefined;
+        }
+
+        const enumType = parentEnum as EnumType;
+        for (const entry of enumType.entries ?? []) {
+            if (entry.name === trimmedName) {
+                return this.error(`An entry with the name '${trimmedName}' already exists in this enum.`);
+            }
+        }
+
         return undefined;
     }
 
@@ -130,13 +200,23 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * @returns a validation status if the type is invalid, undefined otherwise
      */
     private validatePropertyType(type: string): ValidationStatusType | undefined {
-        const validTypes: string[] = [...Object.values(MetamodelPrimitiveTypes)];
+        const primitiveTypes: string[] = [...Object.values(MetamodelPrimitiveTypes)];
 
-        if (!validTypes.includes(type)) {
-            return this.error(`Invalid property type '${type}'. Valid types are: ${validTypes.join(", ")}.`);
+        if (primitiveTypes.includes(type)) {
+            return undefined;
         }
 
-        return undefined;
+        const isEnumType = this.modelState.root.children.some(
+            (el) => el.type === MetamodelElementType.NODE_ENUM && (el as GEnumNode).name === type
+        );
+
+        if (isEnumType) {
+            return undefined;
+        }
+
+        return this.error(
+            `Invalid property type '${type}'. Valid types are: ${primitiveTypes.join(", ")}, or an enum name.`
+        );
     }
 
     /**

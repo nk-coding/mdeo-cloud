@@ -70,17 +70,13 @@ export class JwtAuthMiddleware {
 
             const token = authHeader.substring(7);
 
-            // Verify the JWT using the backend's public keys
             const { payload } = await jwtVerify<JwtClaims>(token, this.jwks, {
                 issuer: this.issuer,
                 algorithms: ["RS256"]
             });
 
-            // Attach the validated claims to the request for use in route handlers
             (request as any).jwtClaims = payload;
         } catch (error) {
-            // Security: Log errors internally but don't expose details to client
-            // This prevents information leakage about JWT internals
             if (error instanceof Error) {
                 request.log.warn(`JWT verification failed: ${error.message}`);
             } else {

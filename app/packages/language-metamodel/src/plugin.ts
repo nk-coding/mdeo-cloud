@@ -27,6 +27,7 @@ import { MetamodelNameProvider } from "./features/metamodelNameProvider.js";
 import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.js";
 import { MetamodelExternalReferenceCollector } from "./features/metamodelExternalReferenceCollector.js";
 import { ImportClassActionHandler } from "./action-handlers/importClassActionHandler.js";
+import { ImportEnumActionHandler } from "./action-handlers/importEnumActionHandler.js";
 
 /**
  * The additional services for the Metamodel language.
@@ -59,6 +60,7 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
             ActionHandlerRegistry: (services) => {
                 const registry = new ActionHandlerRegistry();
                 registry.register("import-class", new ImportClassActionHandler(services));
+                registry.register("import-enum", new ImportEnumActionHandler(services));
                 return registry;
             },
             ActionProvider: () => new DefaultActionProvider()

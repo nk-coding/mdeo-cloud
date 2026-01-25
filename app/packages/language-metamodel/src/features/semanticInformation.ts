@@ -1,5 +1,5 @@
 import type { AstReflection } from "@mdeo/language-common";
-import { Class, ClassImport, type ClassOrImportType, type ClassType } from "../grammar/metamodelTypes.js";
+import { Class, ClassOrEnumImport, type ClassOrImportType, type ClassType } from "../grammar/metamodelTypes.js";
 
 /**
  * Resolves the full class chain including all extended classes for a given class or class import.
@@ -19,8 +19,8 @@ export function resolveClassChain(classOrImport: ClassOrImportType, reflection: 
         let currentClass: ClassType;
         if (reflection.isInstance(current, Class)) {
             currentClass = current;
-        } else if (reflection.isInstance(current, ClassImport)) {
-            currentClass = current.entity.ref!;
+        } else if (reflection.isInstance(current, ClassOrEnumImport)) {
+            currentClass = current.entity.ref! as ClassType;
         } else {
             throw new Error("Unexpected type in class chain resolution");
         }

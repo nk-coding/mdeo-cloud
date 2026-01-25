@@ -16,7 +16,6 @@ object StdlibRegistrar {
      * @param registry The registry to add types to.
      */
     fun registerAll(registry: TypeRegistry) {
-        // Primitive types
         registry.register(createAnyType())
         registry.register(createIntType())
         registry.register(createLongType())
@@ -25,7 +24,6 @@ object StdlibRegistrar {
         registry.register(createBooleanType())
         registry.register(createStringType())
 
-        // Collection types
         registry.register(createReadonlyCollectionType())
         registry.register(createCollectionType())
         registry.register(createReadonlyOrderedCollectionType())

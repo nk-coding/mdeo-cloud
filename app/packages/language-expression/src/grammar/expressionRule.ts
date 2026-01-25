@@ -152,28 +152,7 @@ export function generateExpressionRules(
 
     const memberAccessAndCallExpressionRule = createRule(config.memberAccessAndCallExpressionRuleName)
         .returns(types.baseExpressionType)
-        .as(() => [
-            primaryExpressionRule,
-            many(
-                // or(
-                //     treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
-                //         or(flag("isNullChaining", "?."), "."),
-                //         set("member", ID)
-                //     ]),
-                //     treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
-                //         set("genericArgs", callExpressionGenericArgsRule),
-                //         "(",
-                //         ...manySep(
-                //             add("arguments", () => expressionRule),
-                //             ",",
-                //             LeadingTrailing.TRAILING
-                //         ),
-                //         ")"
-                //     ])
-                // )
-                memberAccessOrCallFragment
-            )
-        ]);
+        .as(() => [primaryExpressionRule, many(memberAccessOrCallFragment)]);
 
     const callExpressionGenericArgsRule = createRule(config.callExpressionGenericArgsRuleName)
         .returns(types.callExpressionGenericArgsType)

@@ -220,12 +220,10 @@ export class MultiGraph {
         for (const [source, sourceAdj] of this._adj) {
             for (const [target, edgeMap] of sourceAdj) {
                 for (const key of edgeMap.keys()) {
-                    // Create canonical form for undirected edges
                     const canonicalKey = source <= target ? `${source}-${target}-${key}` : `${target}-${source}-${key}`;
 
                     if (!seen.has(canonicalKey)) {
                         seen.add(canonicalKey);
-                        // Store in canonical order
                         if (source <= target) {
                             result.push([source, target, key]);
                         } else {

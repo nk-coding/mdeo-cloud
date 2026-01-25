@@ -13,7 +13,5 @@ fun createOrderedSetType(): TypeDefinition {
     return typeDefinition("builtin.OrderedSet") {
         extends("builtin.ReadonlyOrderedSet")
         extends("builtin.OrderedCollection")
-
-        // OrderedSet inherits all methods from ReadonlyOrderedSet and OrderedCollection
     }
 }

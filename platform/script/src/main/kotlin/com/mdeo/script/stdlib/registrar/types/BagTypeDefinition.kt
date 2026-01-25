@@ -12,7 +12,5 @@ fun createBagType(): TypeDefinition {
     return typeDefinition("builtin.Bag") {
         extends("builtin.ReadonlyBag")
         extends("builtin.Collection")
-
-        // Bag inherits all methods from ReadonlyBag and Collection
     }
 }

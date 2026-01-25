@@ -22,7 +22,6 @@ export function registerImportSerializers<T extends AstNode>(
     fileImportType: FileImportType<T>
 ): void {
     const { AstSerializer } = services;
-
     AstSerializer.registerNodeSerializer(importType, (ctx) => printImport(ctx));
     AstSerializer.registerNodeSerializer(fileImportType, (ctx) => printFileImport(ctx, builders));
 }

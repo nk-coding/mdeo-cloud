@@ -192,8 +192,6 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
      * @return Map representing the JWKS structure
      */
     fun getJwks(): Map<String, Any> {
-        // Fix: Strip leading 0x00 byte from BigInteger.toByteArray() to comply with RFC 7518
-        // BigInteger.toByteArray() includes a sign bit which must be removed for proper Base64url encoding
         val modulusBytes = publicKey.modulus.toByteArray()
         val modulusStripped = if (modulusBytes[0] == 0.toByte() && modulusBytes.size > 1) {
             modulusBytes.copyOfRange(1, modulusBytes.size)
@@ -211,7 +209,6 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
         val modulusBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(modulusStripped)
         val exponentBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(exponentStripped)
         
-        // Generate a stable key ID based on the modulus (for key rotation support)
         val keyId = "mdeo-key-1"
         
         val key = mapOf(

@@ -132,7 +132,6 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
     ): ApiResult<Execution> {
         val normalizedPath = normalizePath(filePath)
 
-        // Get file info and verify it exists
         val fileInfo = transaction {
             FilesTable.selectAll()
                 .where {
@@ -149,7 +148,6 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
         }
 
-        // Find the plugin for this file
         val pluginInfo = pluginService.findPluginForFile(projectId, normalizedPath)
             ?: return executionFailure(
                 ErrorCodes.FILE_DATA_NO_PLUGIN_FOUND,
@@ -377,7 +375,6 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
         val execution = (executionResult as ApiResult.Success).value
 
-        // Only fetch tree for completed executions
         if (execution.state != ExecutionState.COMPLETED) {
             return success(ExecutionWithTree(execution, null))
         }
@@ -555,7 +552,6 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         return try {
             callPluginDelete(pluginUrl, executionId, projectId)
 
-            // Delete from database
             transaction {
                 ExecutionsTable.deleteWhere { ExecutionsTable.id eq executionId }
             }

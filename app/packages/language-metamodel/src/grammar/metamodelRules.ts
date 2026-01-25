@@ -13,9 +13,15 @@ import {
     Association,
     MetaModel,
     ClassOrImport,
-    ClassImport,
-    ClassFileImport,
-    MetamodelPrimitiveTypes
+    ClassOrEnumImport,
+    MetamodelPrimitiveTypes,
+    MetamodelAssociationOperators,
+    Enum,
+    EnumEntry,
+    EnumOrImport,
+    EnumTypeReference,
+    PropertyTypeValue,
+    FileImport
 } from "./metamodelTypes.js";
 import { metamodelFileScopingConfig } from "./metamodelTypes.js";
 
@@ -62,15 +68,31 @@ export const MultiplicityRule = createRule("MultiplicityRule")
     .as(() => ["[", or(SingleMultiplicityRule, RangeMultiplicityRule), "]"]);
 
 /**
+ * Enum type reference rule.
+ * Matches a reference to an enum type for use in property definitions.
+ */
+export const EnumTypeReferenceRule = createRule("EnumTypeReferenceRule")
+    .returns(EnumTypeReference)
+    .as(({ set }) => [set("enum", ref(EnumOrImport, ID))]);
+
+/**
+ * Property type value rule.
+ * Matches either a primitive type or an enum type reference.
+ */
+export const PropertyTypeValueRule = createRule("PropertyTypeValueRule")
+    .returns(PropertyTypeValue)
+    .as(() => [or(PrimitiveTypeRule, EnumTypeReferenceRule)]);
+
+/**
  * Property rule.
- * Matches a property definition with name, type, and optional multiplicity.
+ * Matches a property definition with name, type (primitive or enum), and optional multiplicity.
  */
 export const PropertyRule = createRule("PropertyRule")
     .returns(Property)
     .as(({ set }) => [
         set("name", ID),
         ":",
-        set("type", PrimitiveTypeRule),
+        set("type", PropertyTypeValueRule),
         optional(set("multiplicity", MultiplicityRule))
     ]);
 
@@ -111,6 +133,22 @@ export const ClassRule = createRule("ClassRule")
     ]);
 
 /**
+ * Enum entry rule.
+ * Matches a single entry (literal) within an enum definition.
+ */
+export const EnumEntryRule = createRule("EnumEntryRule")
+    .returns(EnumEntry)
+    .as(({ set }) => [set("name", ID)]);
+
+/**
+ * Enum rule.
+ * Matches an enum definition with a name and list of entries.
+ */
+export const EnumRule = createRule("EnumRule")
+    .returns(Enum)
+    .as(({ set, add }) => ["enum", set("name", ID), "{", many(or(add("entries", EnumEntryRule), NEWLINE)), "}"]);
+
+/**
  * Association end rule with property.
  * Matches an association end that specifies a property name (e.g., "Class.property[*]").
  */
@@ -140,96 +178,51 @@ export const AssociationEndRule = createRule("AssociationEndRule")
     .as(() => [or(AssociationEndWithPropertyRule, AssociationEndWithoutPropertyRule)]);
 
 /**
- * Composition end rule.
- * Matches the composite end of a composition relationship (must have a property).
+ * Association rule.
+ * Matches any association with source end, operator, and target end.
+ * Supports 7 operators: -->, <--, <-->, *-->, *--, <--*, --*
  */
-export const CompositionEndRule = createRule("CompositionEndRule")
-    .returns(AssociationEnd)
-    .as(({ set }) => [
-        set("class", ref(ClassOrImport, ID)),
-        ".",
-        set("name", ID),
-        optional(set("multiplicity", MultiplicityRule))
-    ]);
-
-/**
- * Regular association rule with property on start.
- * Matches an association where the start end specifies a property.
- */
-export const RegularAssociationStartWithPropertyRule = createRule("RegularAssociationStartWithPropertyRule")
+export const AssociationRule = createRule("AssociationRule")
     .returns(Association)
     .as(({ set }) => [
-        set("source", AssociationEndWithPropertyRule),
-        set("operator", "--"),
+        set("source", AssociationEndRule),
+        set(
+            "operator",
+            MetamodelAssociationOperators.NAVIGABLE_TO_TARGET,
+            MetamodelAssociationOperators.NAVIGABLE_TO_SOURCE,
+            MetamodelAssociationOperators.BIDIRECTIONAL,
+            MetamodelAssociationOperators.COMPOSITION_SOURCE_NAVIGABLE_TARGET,
+            MetamodelAssociationOperators.COMPOSITION_SOURCE,
+            MetamodelAssociationOperators.COMPOSITION_TARGET_NAVIGABLE_SOURCE,
+            MetamodelAssociationOperators.COMPOSITION_TARGET
+        ),
         set("target", AssociationEndRule)
     ]);
 
 /**
- * Regular association rule with property on target.
- * Matches an association where the target end specifies a property.
+ * Import rules for classes or enums.
+ * Generates import and file import rules for class or enum references.
  */
-export const RegularAssociationTargetWithPropertyRule = createRule("RegularAssociationTargetWithPropertyRule")
-    .returns(Association)
-    .as(({ set }) => [
-        set("source", AssociationEndWithoutPropertyRule),
-        set("operator", "--"),
-        set("target", AssociationEndWithPropertyRule)
-    ]);
-
-/**
- * Regular association rule.
- * Matches a regular bidirectional association (not a composition).
- */
-export const RegularAssociationRule = createRule("RegularAssociationRule")
-    .returns(Association)
-    .as(() => [or(RegularAssociationStartWithPropertyRule, RegularAssociationTargetWithPropertyRule)]);
-
-/**
- * Composition from start rule.
- * Matches a composition relationship where the start is the composite (*--).
- */
-export const CompositionFromStartRule = createRule("CompositionFromStartRule")
-    .returns(Association)
-    .as(({ set }) => [set("source", CompositionEndRule), set("operator", "*--"), set("target", AssociationEndRule)]);
-
-/**
- * Composition from target rule.
- * Matches a composition relationship where the target is the composite (--*).
- */
-export const CompositionFromTargetRule = createRule("CompositionFromTargetRule")
-    .returns(Association)
-    .as(({ set }) => [set("source", AssociationEndRule), set("operator", "--*"), set("target", CompositionEndRule)]);
-
-/**
- * Association rule.
- * Matches any type of association: regular, composition from start, or composition from target.
- */
-export const AssociationRule = createRule("AssociationRule")
-    .returns(Association)
-    .as(() => [or(RegularAssociationRule, CompositionFromStartRule, CompositionFromTargetRule)]);
-
-/**
- * Import rules for classes.
- */
-export const { importRule: ClassImportRule, fileImportRule: ClassFileImportRule } = generateImportRules(
+export const { importRule: ImportRule, fileImportRule: FileImportRule } = generateImportRules(
     metamodelFileScopingConfig,
-    ClassImport,
-    ClassFileImport,
+    ClassOrEnumImport,
+    FileImport,
     ID
 );
 
 /**
  * The MetaModel entry rule.
- * Defines the structure: imports first, then classes and associations.
+ * Defines the structure: imports, classes, enums, and associations.
  */
 export const MetaModelRule = createRule("MetaModelRule")
     .returns(MetaModel)
     .as(({ add }) => [
         many(
             or(
-                add("imports", ClassFileImportRule),
-                add("classesAndAssociations", ClassRule),
-                add("classesAndAssociations", AssociationRule),
+                add("imports", FileImportRule),
+                add("elements", ClassRule),
+                add("elements", EnumRule),
+                add("elements", AssociationRule),
                 NEWLINE
             )
         )

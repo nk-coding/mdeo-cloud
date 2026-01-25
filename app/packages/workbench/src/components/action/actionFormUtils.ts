@@ -246,7 +246,6 @@ export function verifyAndFix(value: unknown, schema: ActionSchema): unknown {
     }
 
     if (isEnumForm(schema)) {
-        // Check if value is valid enum option
         if (schema.enum.includes(value as never)) {
             return value;
         }

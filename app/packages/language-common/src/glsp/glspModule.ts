@@ -103,7 +103,6 @@ function createLauncher(services: LangiumSharedGLSPServices, context: PluginCont
     const { injectable, ContainerModule } = inversify;
     const { container, serverModule } = services.glsp;
 
-    // Create the JsonrpcGLSPClient with the context
     const JsonrpcGLSPClient = createJsonrpcGLSPClient(context["vscode-jsonrpc"]);
 
     /**
