@@ -65,7 +65,7 @@ fun Application.module(appConfig: AppConfig) {
     configureSerialization()
     configureStatusPages()
     
-    configureJwtAuth(appConfig.backendApiUrl)
+    configureJwtAuth(appConfig.backendApiUrl, appConfig.jwtIssuer)
     
     routing {
         healthRoutes()

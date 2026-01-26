@@ -1,11 +1,11 @@
 package com.mdeo.script.compiler
 
 import com.mdeo.script.ast.TypedAst
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.statements.TypedStatement
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.registry.function.FunctionRegistry
 import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
 import com.mdeo.script.compiler.registry.property.GlobalPropertyRegistry

@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.expressions.TypedBinaryExpression
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.util.TypeConversionUtil
 import org.objectweb.asm.Label

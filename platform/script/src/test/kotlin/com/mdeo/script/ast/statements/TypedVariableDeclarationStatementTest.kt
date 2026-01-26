@@ -1,9 +1,17 @@
 package com.mdeo.script.ast.statements
 
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.script.ast.expressions.TypedStringLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedNullLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedVariableDeclarationStatement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -14,7 +22,13 @@ import kotlin.test.assertNull
  */
 class TypedVariableDeclarationStatementTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize variable declaration without initial value`() {
@@ -26,7 +40,7 @@ class TypedVariableDeclarationStatementTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedVariableDeclarationStatement>(result)
-        assertEquals(TypedStatementKind.VariableDeclaration, result.kind)
+        assertEquals("variableDeclaration", result.kind)
         assertEquals("count", result.name)
         assertEquals(0, result.type)
         assertNull(result.initialValue)
@@ -83,6 +97,6 @@ class TypedVariableDeclarationStatementTest {
         assertEquals("nullableVar", result.name)
         
         val initialValue = result.initialValue
-        assertIs<com.mdeo.script.ast.expressions.TypedNullLiteralExpression>(initialValue)
+        assertIs<TypedNullLiteralExpression>(initialValue)
     }
 }

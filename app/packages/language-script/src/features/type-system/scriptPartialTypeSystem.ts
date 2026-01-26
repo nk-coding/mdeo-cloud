@@ -176,7 +176,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
             return this.typir.factory.CustomFunctions.create({
                 definition: {
                     signatures: {
-                        default: {
+                        "": {
                             returnType: returnType.definition,
                             parameters: parameters
                         }

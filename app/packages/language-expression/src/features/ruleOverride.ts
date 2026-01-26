@@ -13,7 +13,7 @@ import { ID } from "@mdeo/language-common";
  */
 export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOverride {
     return (rule, impl, parser) => {
-        if (rule.name !== config.memberAccessAndCallExpressionRuleName) {
+        if (rule.name !== config.postfixExpressionRuleName) {
             return impl;
         }
         if (rule.$type !== "ParserRule") {
@@ -34,13 +34,13 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
 
         return (args) => {
             baseExpressionRule ??= parser.getRule(config.primaryExpressionRuleName)!;
-            fragmentRule ??= parser.getRule(config.memberAccessOrCallFragmentRuleName)!;
+            fragmentRule ??= parser.getRule(config.postfixFragmentRuleName)!;
 
             parser.subrule(0, baseExpressionRule, false, elements[0], args);
             parser.many(0, {
                 GATE: () => {
                     const first = lookahead(1);
-                    if (first.image === "(" || first.image === ".") {
+                    if (first.image === "(" || first.image === "." || first.image === "?." || first.image === "!!") {
                         return true;
                     }
                     if (first.image !== "<") {

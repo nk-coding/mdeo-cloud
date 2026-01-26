@@ -1,6 +1,6 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.script.compiler.CompilationContext
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor

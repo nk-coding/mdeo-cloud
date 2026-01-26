@@ -1,6 +1,17 @@
 package com.mdeo.script.ast.types
 
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+import com.mdeo.expression.ast.types.Parameter
+import com.mdeo.expression.ast.types.ReturnTypeSerializer
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.GenericTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.VoidType
+
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +22,12 @@ import kotlin.test.assertNull
  */
 class TypesTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+        }
+    }
     
     @Test
     fun `deserialize VoidType`() {
@@ -36,7 +52,7 @@ class TypesTest {
     @Test
     fun `deserialize ClassTypeRef with type arguments`() {
         val jsonString = """{
-            "type": "builtin.list",
+            "type": "builtin.List",
             "isNullable": false,
             "typeArgs": {
                 "T": {"type": "builtin.string", "isNullable": false}
@@ -45,7 +61,7 @@ class TypesTest {
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
         
         assertIs<ClassTypeRef>(result)
-        assertEquals("builtin.list", result.type)
+        assertEquals("builtin.List", result.type)
         assertEquals(false, result.isNullable)
         assertEquals(1, result.typeArgs?.size)
         
@@ -135,7 +151,7 @@ class TypesTest {
             "isNullable": false,
             "typeArgs": {
                 "K": {"type": "builtin.string", "isNullable": false},
-                "V": {"type": "builtin.list", "isNullable": false, "typeArgs": {"T": {"type": "builtin.int", "isNullable": false}}}
+                "V": {"type": "builtin.List", "isNullable": false, "typeArgs": {"T": {"type": "builtin.int", "isNullable": false}}}
             }
         }"""
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
@@ -150,7 +166,7 @@ class TypesTest {
         
         val vType = result.typeArgs?.get("V")
         assertIs<ClassTypeRef>(vType)
-        assertEquals("builtin.list", vType.type)
+        assertEquals("builtin.List", vType.type)
         
         val innerT = vType.typeArgs?.get("T")
         assertIs<ClassTypeRef>(innerT)

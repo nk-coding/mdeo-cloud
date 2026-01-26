@@ -22,6 +22,8 @@ tasks.test {
 }
 
 dependencies {
+    implementation(project(":common"))
+    implementation(project(":expression"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     
     // Apache Commons Collections for Bag implementation

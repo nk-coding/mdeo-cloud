@@ -1,8 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedDoubleLiteralExpression
-import com.mdeo.script.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedDoubleLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.MethodVisitor
@@ -21,7 +20,7 @@ class DoubleLiteralCompiler : ExpressionCompiler() {
      * @return True if the expression is a double literal, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.DoubleLiteral
+        return expression.kind == "doubleLiteral"
     }
     
     /**

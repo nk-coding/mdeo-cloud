@@ -1,11 +1,10 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedMemberAccessExpression
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
@@ -38,7 +37,7 @@ class MemberAccessCompiler : ExpressionCompiler() {
      * @return True if the expression is a member access expression, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.MemberAccess
+        return expression.kind == "memberAccess"
     }
 
     /**

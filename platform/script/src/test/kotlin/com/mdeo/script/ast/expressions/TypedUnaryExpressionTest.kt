@@ -1,7 +1,15 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedUnaryExpression
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +19,12 @@ import kotlin.test.assertIs
  */
 class TypedUnaryExpressionTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+        }
+    }
     
     @Test
     fun `deserialize negation unary expression`() {
@@ -24,7 +37,7 @@ class TypedUnaryExpressionTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedUnaryExpression>(result)
-        assertEquals(TypedExpressionKind.Unary, result.kind)
+        assertEquals("unary", result.kind)
         assertEquals(0, result.evalType)
         assertEquals("-", result.operator)
         

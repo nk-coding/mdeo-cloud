@@ -1,8 +1,8 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.expressions.TypedBinaryExpression
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
@@ -15,8 +15,10 @@ import org.objectweb.asm.Opcodes
  * Helper for compiling equality binary operations.
  * 
  * Handles the following equality operators:
- * - Equals (==)
- * - Not equals (!=)
+ * - Structural equality (==): Uses .equals() for objects (Kotlin semantics)
+ * - Structural inequality (!=): Negation of ==
+ * - Strict/reference equality (===): Reference comparison for objects
+ * - Strict/reference inequality (!==): Negation of ===
  * 
  * Equality comparisons are context-sensitive based on operand types:
  * - Null literals: compile-time evaluation when both are null
@@ -24,7 +26,8 @@ import org.objectweb.asm.Opcodes
  * - Strings: uses String.equals() or Objects.equals() for nullable strings
  * - Booleans: XOR for primitives, Objects.equals() for nullable
  * - Numerics: type promotion and primitive comparison
- * - References: reference equality using IF_ACMPEQ/IF_ACMPNE
+ * - References (==, !=): uses Objects.equals() for null-safe .equals() comparison
+ * - References (===, !==): reference equality using IF_ACMPEQ/IF_ACMPNE
  * 
  * Special handling for nullable numeric types:
  * - Objects.equals() doesn't work correctly for mixed numeric types
@@ -37,9 +40,10 @@ import org.objectweb.asm.Opcodes
 object EqualityOperationHelper {
 
     /**
-     * Compiles an equality (==) or inequality (!=) operation.
+     * Compiles a structural equality (==) or inequality (!=) operation.
      * 
-     * Dispatches to the appropriate specialized method based on operand types.
+     * Uses .equals() for object comparison (Kotlin semantics).
+     * Dispatches to specialized methods based on operand types.
      * 
      * @param expr The binary expression AST node
      * @param context The compilation context
@@ -84,7 +88,66 @@ object EqualityOperationHelper {
             return
         }
         
+        compileObjectEquality(expr, context, mv, isEquals)
+    }
+
+    /**
+     * Compiles a strict/reference equality (===) or inequality (!==) operation.
+     * 
+     * Uses reference comparison for objects (like Java's ==).
+     * Dispatches to specialized methods based on operand types.
+     * 
+     * @param expr The binary expression AST node
+     * @param context The compilation context
+     * @param mv The ASM method visitor
+     * @param leftType The resolved type of the left operand
+     * @param rightType The resolved type of the right operand
+     * @param isEquals true for ===, false for !==
+     */
+    fun compileStrictEquality(
+        expr: TypedBinaryExpression,
+        context: CompilationContext,
+        mv: MethodVisitor,
+        leftType: ReturnType,
+        rightType: ReturnType,
+        isEquals: Boolean
+    ) {
+        val leftIsNull = CoercionUtil.isNullLiteral(expr.left)
+        val rightIsNull = CoercionUtil.isNullLiteral(expr.right)
+        
+        if (leftIsNull && rightIsNull) {
+            mv.visitInsn(if (isEquals) Opcodes.ICONST_1 else Opcodes.ICONST_0)
+            return
+        }
+        
+        if (leftIsNull || rightIsNull) {
+            compileNullComparison(expr, context, mv, leftIsNull, isEquals)
+            return
+        }
+        
+        if (TypeConversionUtil.isBooleanType(leftType) && TypeConversionUtil.isBooleanType(rightType) &&
+            !isNullableType(leftType) && !isNullableType(rightType)) {
+            compileBooleanEquality(expr, context, mv, leftType, rightType, isEquals)
+            return
+        }
+        
+        if (isNumericOrNullableNumeric(leftType) && isNumericOrNullableNumeric(rightType) &&
+            !isNullableType(leftType) && !isNullableType(rightType)) {
+            compileNumericEquality(expr, context, mv, leftType, rightType, isEquals)
+            return
+        }
+        
         compileReferenceEquality(expr, context, mv, isEquals)
+    }
+
+    /**
+     * Checks if a type is nullable.
+     *
+     * @param type The type to check
+     * @return true if the type is nullable
+     */
+    private fun isNullableType(type: ReturnType): Boolean {
+        return type is ClassTypeRef && type.isNullable
     }
 
     /**
@@ -621,6 +684,41 @@ object EqualityOperationHelper {
             else -> {
                 mv.visitInsn(Opcodes.SWAP)
             }
+        }
+    }
+
+    /**
+     * Compiles object equality using .equals() method.
+     *
+     * Uses Objects.equals() for null-safe comparison that calls the object's
+     * equals() method. This implements Kotlin's == semantics for objects.
+     *
+     * @param expr The binary expression AST node
+     * @param context The compilation context
+     * @param mv The ASM method visitor
+     * @param isEquals true for ==, false for !=
+     */
+    private fun compileObjectEquality(
+        expr: TypedBinaryExpression,
+        context: CompilationContext,
+        mv: MethodVisitor,
+        isEquals: Boolean
+    ) {
+        val leftType = context.getType(expr.left.evalType)
+        val rightType = context.getType(expr.right.evalType)
+        context.compileExpression(expr.left, mv, leftType)
+        context.compileExpression(expr.right, mv, rightType)
+        
+        mv.visitMethodInsn(
+            Opcodes.INVOKESTATIC,
+            "java/util/Objects",
+            "equals",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+            false
+        )
+        
+        if (!isEquals) {
+            invertBoolean(mv)
         }
     }
 

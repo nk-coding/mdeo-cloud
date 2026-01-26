@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.registrar.global
 
-import com.mdeo.script.ast.types.BuiltinTypes
+import com.mdeo.expression.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.function.FunctionDefinition
 import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
 import com.mdeo.script.compiler.registry.function.globalFunction

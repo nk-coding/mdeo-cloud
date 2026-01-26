@@ -1,9 +1,9 @@
 package com.mdeo.script.compiler.statements
 
-import com.mdeo.script.ast.statements.TypedForStatement
-import com.mdeo.script.ast.statements.TypedStatement
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.statements.TypedForStatement
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LoopLabels

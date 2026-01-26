@@ -1,8 +1,8 @@
 package com.mdeo.script.compiler.registry.type
 
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.ValueType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ValueType
+import com.mdeo.expression.ast.types.VoidType
 
 /**
  * DSL for building type definitions.
@@ -44,6 +44,9 @@ class TypeDefinitionBuilder(private val typeName: String) {
     private val extends = mutableListOf<String>()
     private val methods = mutableListOf<MethodDefinition>()
     private val properties = mutableListOf<PropertyDefinition>()
+    private var jvmClassName: String? = null
+    private var primitiveDescriptor: String? = null
+    private var wrapperClassName: String? = null
 
     /**
      * Specifies that this type extends another type.
@@ -52,6 +55,33 @@ class TypeDefinitionBuilder(private val typeName: String) {
      */
     fun extends(parentTypeName: String) {
         extends.add(parentTypeName)
+    }
+
+    /**
+     * Sets the JVM class name for this type.
+     *
+     * @param className The JVM internal class name (e.g., "java/lang/String").
+     */
+    fun jvmClass(className: String) {
+        jvmClassName = className
+    }
+
+    /**
+     * Sets the JVM primitive descriptor for this type.
+     *
+     * @param descriptor The JVM primitive descriptor (e.g., "I", "J", "D").
+     */
+    fun primitiveDesc(descriptor: String) {
+        primitiveDescriptor = descriptor
+    }
+
+    /**
+     * Sets the JVM wrapper class name for primitive types.
+     *
+     * @param className The JVM wrapper class name (e.g., "java/lang/Integer").
+     */
+    fun wrapperClass(className: String) {
+        wrapperClassName = className
     }
 
     /**
@@ -106,7 +136,7 @@ class TypeDefinitionBuilder(private val typeName: String) {
      * Builds the type definition.
      */
     fun build(): TypeDefinition {
-        val typeDef = TypeDefinitionImpl(typeName, extends)
+        val typeDef = TypeDefinitionImpl(typeName, extends, jvmClassName, primitiveDescriptor, wrapperClassName)
         methods.forEach { typeDef.addMethod(it) }
         properties.forEach { typeDef.addProperty(it) }
         return typeDef

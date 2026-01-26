@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler.statements
 
-import com.mdeo.script.ast.statements.TypedContinueStatement
-import com.mdeo.script.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedContinueStatement
+import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.CompilationException
 import com.mdeo.script.compiler.StatementCompiler

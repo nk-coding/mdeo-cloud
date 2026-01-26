@@ -1,11 +1,10 @@
 package com.mdeo.script.compiler.util
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LambdaInterfaceRegistry
 import org.objectweb.asm.ClassWriter
@@ -83,11 +82,11 @@ object CoercionUtil {
      */
     private fun isLiteralExpression(expression: TypedExpression): Boolean {
         return expression.kind in setOf(
-            TypedExpressionKind.IntLiteral,
-            TypedExpressionKind.LongLiteral,
-            TypedExpressionKind.FloatLiteral,
-            TypedExpressionKind.DoubleLiteral,
-            TypedExpressionKind.BooleanLiteral
+            "intLiteral",
+            "longLiteral",
+            "floatLiteral",
+            "doubleLiteral",
+            "booleanLiteral"
         )
     }
     
@@ -98,7 +97,7 @@ object CoercionUtil {
      * @return true if the expression is a null literal.
      */
     fun isNullLiteral(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.NullLiteral
+        return expression.kind == "nullLiteral"
     }
     
     /**
@@ -494,75 +493,6 @@ object CoercionUtil {
     }
     
     /**
-     * Gets the type name component for functional interface naming.
-     * 
-     * Converts a ReturnType to a string suitable for use in functional interface
-     * names. For nullable types, uses wrapper class names (Integer, Long, etc.).
-     * For non-nullable primitives, uses short names (Int, Long, etc.).
-     * 
-     * @param type The type to get the name for.
-     * @return The type name (e.g., "Int", "Long", "Void", "Object").
-     */
-    fun getTypeNameForInterface(type: ReturnType): String {
-        return when (type) {
-            is com.mdeo.script.ast.types.VoidType -> "Void"
-            is ClassTypeRef -> {
-                if (type.isNullable) {
-                    when (type.type) {
-                        "builtin.int" -> "Integer"
-                        "builtin.long" -> "Long"
-                        "builtin.float" -> "Float"
-                        "builtin.double" -> "Double"
-                        "builtin.boolean" -> "Boolean"
-                        "builtin.string" -> "String"
-                        else -> "Object"
-                    }
-                } else {
-                    when (type.type) {
-                        "builtin.int" -> "Int"
-                        "builtin.long" -> "Long"
-                        "builtin.float" -> "Float"
-                        "builtin.double" -> "Double"
-                        "builtin.boolean" -> "Boolean"
-                        "builtin.string" -> "String"
-                        else -> "Object"
-                    }
-                }
-            }
-            else -> "Object"
-        }
-    }
-    
-    /**
-     * Builds the functional interface name for a lambda type.
-     * 
-     * Interface names follow the pattern: Lambda$ReturnType$ParamType1$ParamType2...
-     * 
-     * Examples:
-     * - () => void: Lambda$Void$0
-     * - () => int: Lambda$Int$0
-     * - (int) => int: Lambda$Int$Int
-     * - (int, double) => void: Lambda$Void$Int$Double
-     * 
-     * @param returnType The return type of the lambda.
-     * @param parameterTypes The parameter types of the lambda.
-     * @return The functional interface name (e.g., "Lambda$Int$Double").
-     */
-    fun getFunctionalInterfaceName(returnType: ReturnType, parameterTypes: List<ReturnType>): String {
-        val returnPart = getTypeNameForInterface(returnType)
-        
-        val paramParts = if (parameterTypes.isEmpty()) {
-            "0"
-        } else {
-            parameterTypes.joinToString("\$") { paramType ->
-                getTypeNameForInterface(paramType)
-            }
-        }
-        
-        return "Lambda\$$returnPart\$$paramParts"
-    }
-    
-    /**
      * Emits lambda type coercion bytecode.
      * 
      * When the source is a lambda type and the target is a different lambda type,
@@ -649,10 +579,8 @@ object CoercionUtil {
     ) {
         val sourceInterfaceName = getInterfaceForLambdaType(sourceType, context)
         
-        // Load source lambda (first parameter, slot 0)
         mv.visitVarInsn(Opcodes.ALOAD, 0)
         
-        // Load and coerce each parameter from target types to source types
         var paramSlot = 1
         for (i in sourceType.parameters.indices) {
             val sourceParamType = sourceType.parameters[i].type
@@ -664,7 +592,6 @@ object CoercionUtil {
             paramSlot += ASMUtil.getSlotsForType(targetParamType)
         }
         
-        // Invoke the source lambda's call method
         val sourceMethodDescriptor = buildLambdaCallDescriptor(sourceType, context)
         mv.visitMethodInsn(
             Opcodes.INVOKEINTERFACE,
@@ -674,10 +601,8 @@ object CoercionUtil {
             true
         )
         
-        // Coerce return value from source to target type
         emitCoercion(sourceType.returnType, targetType.returnType, mv)
         
-        // Return with appropriate instruction
         emitReturnInstruction(targetType.returnType, mv)
     }
     
@@ -694,7 +619,6 @@ object CoercionUtil {
         params.append("L").append(sourceInterfaceName).append(";")
         
         for (i in 0 until targetType.parameters.size.coerceAtMost(
-            // Only include params that the source lambda actually uses
             targetType.parameters.size
         )) {
             val paramType = targetType.parameters[i].type
@@ -729,7 +653,6 @@ object CoercionUtil {
         val sourceInterfaceName = getInterfaceForLambdaType(sourceType, context)
         val targetInterfaceName = getInterfaceForLambdaType(targetType, context)
         
-        // The source lambda is already on the stack, it will be captured
         val capturedDesc = "L${sourceInterfaceName};"
         val invokeDynamicDesc = "(${capturedDesc})L${targetInterfaceName};"
         
@@ -823,10 +746,8 @@ object CoercionUtil {
         val isPredefined = lookupResult.interfaceName.startsWith("com/mdeo/script/runtime")
         
         val descriptor = if (isPredefined) {
-            // Predefined interfaces use erased Object types for generics
             buildErasedMethodDescriptor(lambdaType)
         } else {
-            // Generated interfaces use actual types
             buildLambdaCallDescriptor(lambdaType, context)
         }
         return Type.getMethodType(descriptor)
@@ -860,10 +781,8 @@ object CoercionUtil {
         val isPredefined = lookupResult.interfaceName.startsWith("com/mdeo/script/runtime")
         
         val descriptor = if (isPredefined) {
-            // For predefined interfaces, use boxed types (Integer for int, etc.)
             buildBoxedMethodDescriptor(lambdaType)
         } else {
-            // For generated interfaces, use actual types
             buildLambdaCallDescriptor(lambdaType, context)
         }
         return Type.getMethodType(descriptor)

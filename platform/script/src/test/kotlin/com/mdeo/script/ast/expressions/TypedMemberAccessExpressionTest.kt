@@ -1,7 +1,14 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +18,12 @@ import kotlin.test.assertIs
  */
 class TypedMemberAccessExpressionTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+        }
+    }
     
     @Test
     fun `deserialize simple member access`() {
@@ -25,7 +37,7 @@ class TypedMemberAccessExpressionTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedMemberAccessExpression>(result)
-        assertEquals(TypedExpressionKind.MemberAccess, result.kind)
+        assertEquals("memberAccess", result.kind)
         assertEquals(0, result.evalType)
         assertEquals("field", result.member)
         assertEquals(false, result.isNullChaining)

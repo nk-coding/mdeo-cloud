@@ -63,14 +63,14 @@ export class ExpressionConfig {
     readonly memberAccessExpressionTypeName: string;
 
     /**
-     * The name for the MemberAccessAndCallExpression rule.
+     * The name for the PostfixFragment rule.
      */
-    readonly memberAccessOrCallFragmentRuleName: string;
+    readonly postfixFragmentRuleName: string;
 
     /**
-     * The name for the MemberAccessExpression rule.
+     * The name for the PostfixExpression rule.
      */
-    readonly memberAccessAndCallExpressionRuleName: string;
+    readonly postfixExpressionRuleName: string;
 
     /**
      * The name for the IdentifierExpression type.
@@ -173,6 +173,41 @@ export class ExpressionConfig {
     readonly assignableExpressionRuleName: string;
 
     /**
+     * The name for the TypeCastExpression type.
+     */
+    readonly typeCastExpressionTypeName: string;
+
+    /**
+     * The name for the TypeCheckExpression type.
+     */
+    readonly typeCheckExpressionTypeName: string;
+
+    /**
+     * The name for the AssertNonNullExpression type.
+     */
+    readonly assertNonNullExpressionTypeName: string;
+
+    /**
+     * The name for the TypeCastExpression rule.
+     */
+    readonly typeCastExpressionRuleName: string;
+
+    /**
+     * The name for the TypeCheckExpression rule.
+     */
+    readonly typeCheckExpressionRuleName: string;
+
+    /**
+     * The name for the lower precedence BinaryExpression rule (comparison operators).
+     */
+    readonly binaryExpressionLowerRuleName: string;
+
+    /**
+     * The name for the higher precedence BinaryExpression rule (additive and above).
+     */
+    readonly binaryExpressionUpperRuleName: string;
+
+    /**
      * Creates a new ExpressionConfig.
      * @param prefix Prefix for naming generated rules and types.
      */
@@ -189,8 +224,8 @@ export class ExpressionConfig {
         this.callExpressionGenericArgsTypeName = prefix + "CallExpressionGenericArgs";
         this.callExpressionGenericArgsRuleName = prefix + "CallExpressionGenericArgsRule";
         this.memberAccessExpressionTypeName = prefix + "MemberAccessExpression";
-        this.memberAccessAndCallExpressionRuleName = prefix + "MemberAccessAndCallExpressionRule";
-        this.memberAccessOrCallFragmentRuleName = prefix + "MemberAccessOrCallFragmentRule";
+        this.postfixExpressionRuleName = prefix + "PostfixExpressionRule";
+        this.postfixFragmentRuleName = prefix + "PostfixFragmentRule";
         this.identifierExpressionTypeName = prefix + "IdentifierExpression";
         this.identifierExpressionRuleName = prefix + "IdentifierExpressionRule";
         this.stringLiteralExpressionTypeName = prefix + "StringLiteralExpression";
@@ -211,5 +246,12 @@ export class ExpressionConfig {
         this.expressionRuleName = prefix + "ExpressionRule";
         this.assignableExpressionTypeName = prefix + "AssignableExpression";
         this.assignableExpressionRuleName = prefix + "AssignableExpressionRule";
+        this.typeCastExpressionTypeName = prefix + "TypeCastExpression";
+        this.typeCheckExpressionTypeName = prefix + "TypeCheckExpression";
+        this.assertNonNullExpressionTypeName = prefix + "AssertNonNullExpression";
+        this.typeCastExpressionRuleName = prefix + "TypeCastExpressionRule";
+        this.typeCheckExpressionRuleName = prefix + "TypeCheckExpressionRule";
+        this.binaryExpressionLowerRuleName = prefix + "BinaryExpressionLower";
+        this.binaryExpressionUpperRuleName = prefix + "BinaryExpressionUpper";
     }
 }

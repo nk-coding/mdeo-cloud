@@ -1,9 +1,7 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.statements.TypedStatement
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.junit.jupiter.api.Test
@@ -112,7 +110,7 @@ class CompilationContextTest {
         val context = CompilationContext(ast, "test/Test", emptyList(), emptyList())
         
         val unsupportedExpression = object : TypedExpression {
-            override val kind = TypedExpressionKind.Binary
+            override val kind = "binary"
             override val evalType = 0
         }
         
@@ -127,7 +125,7 @@ class CompilationContextTest {
         val context = CompilationContext(ast, "test/Test", emptyList(), emptyList())
         
         val unsupportedStatement = object : TypedStatement {
-            override val kind = TypedStatementKind.While
+            override val kind = "while"
         }
         
         assertThrows<CompilationException> {

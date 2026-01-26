@@ -1,6 +1,6 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.types.*
+import com.mdeo.expression.ast.types.*
 
 /**
  * Registry for lambda functional interfaces.
@@ -12,15 +12,6 @@ import com.mdeo.script.ast.types.*
  * Boxing/unboxing is determined by the actual types:
  * - Non-nullable primitives (int, long, float, double, boolean) → no boxing
  * - Nullable types (int?, Any?) or Any → needs boxing
- *
- * Usage example:
- * ```kotlin
- * val registry = LambdaInterfaceRegistry()
- * val (interfaceName, isNewlyGenerated) = registry.getInterfaceForLambdaType(lambdaType)
- * if (isNewlyGenerated) {
- *     // Generate the interface bytecode
- * }
- * ```
  */
 class LambdaInterfaceRegistry {
 
@@ -36,7 +27,6 @@ class LambdaInterfaceRegistry {
     private var interfaceCounter: Int = 0
 
     init {
-        // Pre-populate with predefined runtime interfaces
         initializePredefinedInterfaces()
     }
 
@@ -53,7 +43,6 @@ class LambdaInterfaceRegistry {
         val nullableAny = ClassTypeRef("builtin.any", isNullable = true)
         val voidType = VoidType()
         
-        // Action interfaces (void return)
         registerPredefined(
             createLambdaType(voidType, emptyList()),
             "$basePackage/interfaces/Action0"
@@ -71,14 +60,12 @@ class LambdaInterfaceRegistry {
             "$basePackage/interfaces/Action3"
         )
 
-        // Predicate interface (boolean return with 1 param)
         val nonNullBoolean = ClassTypeRef("builtin.boolean", isNullable = false)
         registerPredefined(
             createLambdaType(nonNullBoolean, listOf(nullableAny)),
             "$basePackage/interfaces/Predicate1"
         )
 
-        // Func interfaces (non-void return)
         registerPredefined(
             createLambdaType(nullableAny, emptyList()),
             "$basePackage/interfaces/Func0"
@@ -147,7 +134,7 @@ class LambdaInterfaceRegistry {
             is GenericTypeRef -> nullableAny
             is VoidType -> type
             is ClassTypeRef -> type
-            is LambdaType -> createKey(type)  // Recursively normalize nested lambdas
+            is LambdaType -> createKey(type)
             else -> type
         }
     }
@@ -175,7 +162,6 @@ class LambdaInterfaceRegistry {
     fun getInterfaceForLambdaType(lambdaType: LambdaType): InterfaceLookupResult {
         val key = createKey(lambdaType)
         
-        // Check if interface already exists
         interfaceMap[key]?.let { interfaceName ->
             return InterfaceLookupResult(
                 interfaceName = interfaceName,
@@ -183,7 +169,6 @@ class LambdaInterfaceRegistry {
             )
         }
 
-        // Generate a new interface name with simple counting
         val newInterfaceName = "Lambda$${interfaceCounter++}"
         interfaceMap[key] = newInterfaceName
 

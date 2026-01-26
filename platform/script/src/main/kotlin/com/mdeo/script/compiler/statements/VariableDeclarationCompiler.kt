@@ -1,9 +1,10 @@
 package com.mdeo.script.compiler.statements
 
-import com.mdeo.script.ast.statements.TypedStatement
-import com.mdeo.script.ast.statements.TypedVariableDeclarationStatement
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedVariableDeclarationStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
@@ -87,9 +88,10 @@ class VariableDeclarationCompiler : StatementCompiler {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        if (declaration.initialValue != null) {
+        val init = declaration.initialValue
+        if (init != null) {
             // Compile expression with coercion to target type
-            context.compileExpression(declaration.initialValue, mv, type)
+            context.compileExpression(init as TypedExpression, mv, type)
         } else {
             emitDefaultValue(type, mv)
         }
@@ -159,9 +161,10 @@ class VariableDeclarationCompiler : StatementCompiler {
         mv.visitTypeInsn(Opcodes.NEW, refClassName)
         mv.visitInsn(Opcodes.DUP)
         
-        if (declaration.initialValue != null) {
+        val init = declaration.initialValue
+        if (init != null) {
             // Compile expression with coercion to target type
-            context.compileExpression(declaration.initialValue, mv, type)
+            context.compileExpression(init as TypedExpression, mv, type)
             
             val constructorDescriptor = getRefConstructorDescriptor(type)
             mv.visitMethodInsn(Opcodes.INVOKESPECIAL, refClassName, "<init>", constructorDescriptor, false)

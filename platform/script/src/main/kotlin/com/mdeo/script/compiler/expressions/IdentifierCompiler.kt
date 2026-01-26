@@ -1,9 +1,9 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.CompilationException
@@ -47,49 +47,6 @@ class IdentifierCompiler : ExpressionCompiler() {
     override fun canCompile(expression: TypedExpression): Boolean {
         return expression is TypedIdentifierExpression
     }
-
-    /**
-     * Compiles an identifier expression to bytecode with proper coercion.
-     *
-     * Overrides the base compile method to use the variable's actual type (from scope)
-     * for coercion, rather than the expression's evalType. This is necessary because
-     * lambda parameters may have a different type in scope (e.g., any?) than what
-     * the expression claims (e.g., int).
-     *
-     * @param expression The identifier expression to compile.
-     * @param context The compilation context.
-     * @param mv The method visitor for emitting bytecode.
-     * @param expectedType The expected type to coerce to.
-     */
-    // override fun compile(
-    //     expression: TypedExpression,
-    //     context: CompilationContext,
-    //     mv: MethodVisitor,
-    //     expectedType: ReturnType
-    // ) {
-    //     val identifier = expression as TypedIdentifierExpression
-
-    //     // Handle global properties first
-    //     if (identifier.scope == 0) {
-    //         val globalProperty = context.globalPropertyRegistry.getProperty(identifier.name)
-    //         if (globalProperty != null) {
-    //             globalProperty.emitAccess(mv)
-    //             // For global properties, use the expression's evalType for coercion
-    //             val actualType = context.getType(expression.evalType)
-    //             CoercionUtil.emitCoercion(actualType, expectedType, mv, context)
-    //             return
-    //         }
-    //     }
-
-    //     val variable = context.currentScope?.lookupVariable(identifier.name, identifier.scope)
-    //         ?: throw IllegalStateException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
-
-    //     // Load the variable
-    //     compileVariableLoad(variable, variable.type, mv)
-
-    //     // Coerce from the VARIABLE's actual type to the expected type
-    //     CoercionUtil.emitCoercion(variable.type, expectedType, mv, context)
-    // }
 
     /**
      * Not used - this compiler overrides [compile] directly.
@@ -144,7 +101,7 @@ class IdentifierCompiler : ExpressionCompiler() {
      */
     private fun compileRefWrappedVariableLoad(
         slotIndex: Int,
-        type: com.mdeo.script.ast.types.ReturnType,
+        type: com.mdeo.expression.ast.types.ReturnType,
         mv: MethodVisitor
     ) {
         mv.visitVarInsn(Opcodes.ALOAD, slotIndex)

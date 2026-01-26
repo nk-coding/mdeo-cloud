@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler.util
 
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.VoidType
 import org.junit.jupiter.api.Test
 import org.objectweb.asm.Opcodes
 import kotlin.test.assertEquals

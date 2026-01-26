@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
-import com.mdeo.script.ast.types.BuiltinTypes
+import com.mdeo.expression.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -12,6 +12,8 @@ private const val DOUBLE_HELPER = "com/mdeo/script/stdlib/impl/primitives/Double
 fun createDoubleType(): TypeDefinition {
     return typeDefinition("builtin.double") {
         extends("builtin.any")
+        primitiveDesc("D")
+        wrapperClass("java/lang/Double")
 
         staticMethod("abs") {
             overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)

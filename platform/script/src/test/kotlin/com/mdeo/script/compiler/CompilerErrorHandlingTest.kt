@@ -1,7 +1,6 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertTrue
@@ -20,7 +19,7 @@ class CompilerErrorHandlingTest {
             
             // Create a custom expression that is not supported
             val unsupportedExpr = object : TypedExpression {
-                override val kind = TypedExpressionKind.Lambda // Lambda is not implemented
+                override val kind = "unsupportedKind" // This kind doesn't exist
                 override val evalType = intType
             }
             
@@ -35,7 +34,7 @@ class CompilerErrorHandlingTest {
             helper.compileAndInvoke(ast)
         }
         
-        assertTrue(exception.message?.contains("Lambda") == true,
+        assertTrue(exception.message?.contains("unsupportedKind") == true,
             "Exception should mention the unsupported expression kind")
     }
     

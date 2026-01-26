@@ -39,6 +39,9 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         this.registerUnaryExpressionRules();
         this.registerBinaryExpressionRules();
         this.registerTernaryExpressionRules();
+        this.registerTypeCheckRules();
+        this.registerTypeCastRules();
+        this.registerAssertNonNullRules();
     }
 
     /**
@@ -239,7 +242,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                 return {
                     $problem: this.inferenceProblem,
                     languageNode: node,
-                    location: `Binary operators require two custom value types.`,
+                    location: `Binary operators require two class or lambda types.`,
                     subProblems: []
                 };
             }
@@ -296,8 +299,11 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                     location: `Operator '${operator}' requires two booleans.`,
                     subProblems: []
                 };
-            } else if (operator === "==" || operator === "!=") {
+            } else if (operator === "==" || operator === "!=" || operator === "===" || operator === "!==") {
                 return this.primitiveTypes.boolean;
+            } else if (operator === "??") {
+                const commonType = findCommonParentType(leftType.asNonNullable, rightType, this.typir);
+                return commonType;
             } else {
                 assertUnreachable(operator);
             }
@@ -382,6 +388,123 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                     severity: "error",
                     languageNode: node.falseExpression,
                     message: `False expression must evaluate to a value type. Type '${falseType.getName()}' is not a value type.`,
+                    subProblems: []
+                });
+            }
+        });
+    }
+
+    /**
+     * Registers type inference and validation rules for type-check expressions.
+     */
+    private registerTypeCheckRules(): void {
+        this.registerInferenceRule(this.types.typeCheckExpressionType, () => this.primitiveTypes.boolean);
+
+        this.registerValidationRule(this.types.typeCheckExpressionType, (node, accept) => {
+            const expressionType = this.inference.inferType(node.expression);
+            if (Array.isArray(expressionType)) {
+                return;
+            }
+            const targetType = this.inference.inferType(node.checkType);
+            if (Array.isArray(targetType)) {
+                return;
+            }
+            if (!isCustomValueType(expressionType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node.expression,
+                    message: `Type-check expression requires a class or lambda type.`,
+                    subProblems: []
+                });
+            }
+            if (!isCustomValueType(targetType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node.checkType,
+                    message: `Type-check target type must be a class or lambda type.`,
+                    subProblems: []
+                });
+            }
+        });
+    }
+
+    /**
+     * Registers type inference and validation rules for type-cast expressions.
+     * Handles both safe and unsafe type casts.
+     */
+    private registerTypeCastRules(): void {
+        this.registerInferenceRule(this.types.typeCastExpressionType, (node) => {
+            const targetType = this.inference.inferType(node.targetType);
+            if (Array.isArray(targetType)) {
+                return targetType[0];
+            }
+            return targetType;
+        });
+
+        this.registerValidationRule(this.types.typeCastExpressionType, (node, accept) => {
+            const expressionType = this.inference.inferType(node.expression);
+            if (Array.isArray(expressionType)) {
+                return;
+            }
+            const targetType = this.inference.inferType(node.targetType);
+            if (Array.isArray(targetType)) {
+                return;
+            }
+            if (!isCustomValueType(expressionType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node.expression,
+                    message: `Can only cast from class or lambda types.`,
+                    subProblems: []
+                });
+            }
+            if (!isCustomValueType(targetType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node.targetType,
+                    message: `Can only cast to class or lambda types.`,
+                    subProblems: []
+                });
+            }
+        });
+    }
+
+    /**
+     * Registers type inference and validation rules for assert-non-null expressions.
+     * Handles the non-null assertion operator (!!).
+     */
+    private registerAssertNonNullRules(): void {
+        this.registerInferenceRule(this.types.assertNonNullExpressionType, (node) => {
+            const expressionType = this.inference.inferType(node.expression);
+            if (Array.isArray(expressionType)) {
+                return expressionType[0];
+            }
+            if (isCustomValueType(expressionType)) {
+                return expressionType.asNonNullable;
+            } else {
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `Assert-non-null operator requires a class or lambda type.`,
+                    subProblems: []
+                };
+            }
+        });
+        this.registerValidationRule(this.types.assertNonNullExpressionType, (node, accept) => {
+            const expressionType = this.inference.inferType(node.expression);
+            if (Array.isArray(expressionType)) {
+                return;
+            }
+            if (!isCustomValueType(expressionType)) {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node,
+                    message: `Assert-non-null operator requires a class or lambda type.`,
                     subProblems: []
                 });
             }

@@ -1,9 +1,19 @@
 package com.mdeo.script.ast.statements
 
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.expressions.TypedMemberCallExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.statements.TypedBreakStatement
+import com.mdeo.expression.ast.statements.TypedContinueStatement
+import com.mdeo.expression.ast.statements.TypedExpressionStatement
+import com.mdeo.expression.ast.statements.TypedForStatement
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -13,7 +23,13 @@ import kotlin.test.assertIs
  */
 class TypedForStatementTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize simple for statement`() {
@@ -27,7 +43,7 @@ class TypedForStatementTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedForStatement>(result)
-        assertEquals(TypedStatementKind.For, result.kind)
+        assertEquals("for", result.kind)
         assertEquals("item", result.variableName)
         assertEquals(0, result.variableType)
         

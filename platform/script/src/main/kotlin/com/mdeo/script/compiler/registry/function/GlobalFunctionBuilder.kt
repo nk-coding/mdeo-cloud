@@ -1,8 +1,8 @@
 package com.mdeo.script.compiler.registry.function
 
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.ValueType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ValueType
+import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.registry.property.GlobalPropertyDefinition
 import com.mdeo.script.compiler.registry.property.StaticGlobalPropertyDefinition
 

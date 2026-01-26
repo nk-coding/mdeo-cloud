@@ -4,27 +4,33 @@ import type { ExpressionTypes, BinaryExpressionType, BaseExpressionType } from "
  * Precedence levels for expressions (lower number = higher precedence/binds tighter).
  * Based on the grammar rules in expressionRule.ts:
  * - Primary expressions (literals, identifiers, parenthesized expressions): 0
- * - Member access and call expressions: 1
+ * - Postfix expressions (member access, call, assert non-null): 1
  * - Unary expressions (!, -): 2
- * - Multiplicative binary operators (*, /, %): 3
- * - Additive binary operators (+, -): 4
- * - Relational binary operators (<, >, <=, >=): 5
- * - Equality binary operators (==, !=): 6
- * - Logical AND (&&): 7
- * - Logical OR (||): 8
- * - Ternary conditional (?:): 9
+ * - Type cast expressions: 3
+ * - Multiplicative binary operators (*, /, %): 4
+ * - Additive binary operators (+, -): 5
+ * - Null-coalescing binary operator (??): 6
+ * - Type check expressions (is, as): 7
+ * - Relational binary operators (<, >, <=, >=): 8
+ * - Equality binary operators (==, !=): 9
+ * - Logical AND (&&): 10
+ * - Logical OR (||): 11
+ * - Ternary conditional (?:): 12
  */
 export const enum Precedence {
     PRIMARY = 0,
-    MEMBER_CALL = 1,
+    POSTFIX = 1,
     UNARY = 2,
-    MULTIPLICATIVE = 3,
-    ADDITIVE = 4,
-    RELATIONAL = 5,
-    EQUALITY = 6,
-    LOGICAL_AND = 7,
-    LOGICAL_OR = 8,
-    TERNARY = 9
+    TYPE_CAST = 3,
+    MULTIPLICATIVE = 4,
+    ADDITIVE = 5,
+    NULL_COALESCING = 6,
+    TYPE_CHECK = 7,
+    RELATIONAL = 8,
+    EQUALITY = 9,
+    LOGICAL_AND = 10,
+    LOGICAL_OR = 11,
+    TERNARY = 12
 }
 
 /**
@@ -83,12 +89,24 @@ export function getExpressionPrecedence<T extends BaseExpressionType>(node: T, t
         return Precedence.PRIMARY;
     }
 
-    if (nodeType === types.memberAccessExpressionType.name || nodeType === types.callExpressionType.name) {
-        return Precedence.MEMBER_CALL;
+    if (
+        nodeType === types.memberAccessExpressionType.name ||
+        nodeType === types.callExpressionType.name ||
+        nodeType === types.assertNonNullExpressionType.name
+    ) {
+        return Precedence.POSTFIX;
     }
 
     if (nodeType === types.unaryExpressionType.name) {
         return Precedence.UNARY;
+    }
+
+    if (nodeType === types.typeCastExpressionType.name) {
+        return Precedence.TYPE_CAST;
+    }
+
+    if (nodeType === types.typeCheckExpressionType.name) {
+        return Precedence.TYPE_CHECK;
     }
 
     if (nodeType === types.binaryExpressionType.name) {

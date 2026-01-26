@@ -70,12 +70,6 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
             
             privateKey = keyPair.private as RSAPrivateKey
             publicKey = keyPair.public as RSAPublicKey
-            
-            val privateKeyEncoded = (privateKey as java.security.Key).encoded
-            val publicKeyEncoded = (publicKey as java.security.Key).encoded
-            
-            logger.info("Generated JWT keys - Private key: ${Base64.getEncoder().encodeToString(privateKeyEncoded)}")
-            logger.info("Generated JWT keys - Public key: ${Base64.getEncoder().encodeToString(publicKeyEncoded)}")
         }
         
         algorithm = Algorithm.RSA256(publicKey, privateKey)

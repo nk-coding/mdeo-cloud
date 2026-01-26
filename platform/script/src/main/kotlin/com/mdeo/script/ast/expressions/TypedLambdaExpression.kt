@@ -1,7 +1,7 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedCallableBody
-import com.mdeo.script.ast.TypedExpressionKind
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.TypedCallableBody
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TypedLambdaExpression(
-    override val kind: TypedExpressionKind = TypedExpressionKind.Lambda,
+    override val kind: String = "lambda",
     override val evalType: Int,
     val parameters: List<String>,
     val body: TypedCallableBody

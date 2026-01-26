@@ -1,6 +1,6 @@
 package com.mdeo.script.runtime
 
-import com.mdeo.script.ast.statements.TypedExpressionStatement
+import com.mdeo.expression.ast.statements.TypedExpressionStatement
 import com.mdeo.script.compiler.CompilationInput
 import com.mdeo.script.compiler.ScriptCompiler
 import com.mdeo.script.compiler.buildTypedAst

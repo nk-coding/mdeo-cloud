@@ -1,8 +1,8 @@
 package com.mdeo.script.compiler
 
 import com.mdeo.script.ast.TypedParameter
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.VoidType
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

@@ -548,4 +548,101 @@ class MemberCallEdgeCasesTest {
         val result = helper.compileAndInvoke(ast)
         assertEquals(0, result)
     }
+    
+    // ==================== Nullable Primitive Base Expression Bug ====================
+    
+    @Test
+    fun `null-safe member call on nullable int with non-null value`() {
+        val ast = buildTypedAst {
+            val intType = intType()
+            val intNullableType = intNullableType()
+            val stringNullableType = stringNullableType()
+            
+            // val x: Int? = 42
+            // x?.asString() should return "42"
+            function(
+                name = "testFunction",
+                returnType = stringNullableType,
+                body = listOf(
+                    varDecl("x", intNullableType, intLiteral(42, intType)),
+                    returnStmt(
+                        memberCall(
+                            expression = identifier("x", intNullableType, 3),
+                            member = "asString",
+                            overload = "",
+                            arguments = emptyList(),
+                            isNullChaining = true,
+                            resultTypeIndex = stringNullableType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals("42", result)
+    }
+    
+    @Test
+    fun `null-safe member call on nullable int with null value`() {
+        val ast = buildTypedAst {
+            val intNullableType = intNullableType()
+            val stringNullableType = stringNullableType()
+            
+            // val x: Int? = null
+            // x?.asString() should return null
+            function(
+                name = "testFunction",
+                returnType = stringNullableType,
+                body = listOf(
+                    varDecl("x", intNullableType, nullLiteral(intNullableType)),
+                    returnStmt(
+                        memberCall(
+                            expression = identifier("x", intNullableType, 3),
+                            member = "asString",
+                            overload = "",
+                            arguments = emptyList(),
+                            isNullChaining = true,
+                            resultTypeIndex = stringNullableType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertNull(result)
+    }
+    
+    @Test
+    fun `null-safe member call on nullable boolean with non-null value`() {
+        val ast = buildTypedAst {
+            val boolType = booleanType()
+            val boolNullableType = booleanNullableType()
+            val stringNullableType = stringNullableType()
+            
+            // val b: Boolean? = true
+            // b?.asString() should return "true"
+            function(
+                name = "testFunction",
+                returnType = stringNullableType,
+                body = listOf(
+                    varDecl("b", boolNullableType, booleanLiteral(true, boolType)),
+                    returnStmt(
+                        memberCall(
+                            expression = identifier("b", boolNullableType, 3),
+                            member = "asString",
+                            overload = "",
+                            arguments = emptyList(),
+                            isNullChaining = true,
+                            resultTypeIndex = stringNullableType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        assertEquals("true", result)
+    }
 }

@@ -1,12 +1,11 @@
 package com.mdeo.script.compiler.statements
 
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.statements.TypedReturnStatement
-import com.mdeo.script.ast.statements.TypedStatement
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedReturnStatement
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.StatementCompiler
 import org.objectweb.asm.MethodVisitor
@@ -25,7 +24,7 @@ class ReturnStatementCompiler : StatementCompiler {
      * @return True if the statement is a return statement, false otherwise.
      */
     override fun canCompile(statement: TypedStatement): Boolean {
-        return statement.kind == TypedStatementKind.Return
+        return statement.kind == "return"
     }
     
     /**

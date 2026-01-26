@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler.registry.type
 
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.ValueType
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ValueType
 import org.objectweb.asm.MethodVisitor
 
 /**
@@ -21,6 +21,27 @@ interface TypeDefinition {
      * Members from parent types are inherited and can be looked up.
      */
     val extends: List<String>
+
+    /**
+     * The JVM internal class name for this type (e.g., "java/lang/String", "java/util/List").
+     * Null for primitive types on the stack (use primitiveDescriptor instead).
+     */
+    val jvmClassName: String?
+        get() = null
+
+    /**
+     * The JVM primitive descriptor for this type (e.g., "I", "J", "D").
+     * Null for reference types.
+     */
+    val primitiveDescriptor: String?
+        get() = null
+
+    /**
+     * The JVM wrapper class name for primitive types (e.g., "java/lang/Integer").
+     * Null for non-primitive types.
+     */
+    val wrapperClassName: String?
+        get() = null
 
     /**
      * Gets all method definitions for a given method name.

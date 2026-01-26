@@ -1,11 +1,10 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedExpressionCallExpression
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LambdaInterfaceRegistry
 import com.mdeo.script.compiler.util.CoercionUtil
@@ -38,7 +37,7 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
      * @return True if this is an expression call expression, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.ExpressionCall
+        return expression.kind == "call"
     }
     
     /**
@@ -70,12 +69,10 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
         
         val lookupResult = registry.getInterfaceForLambdaType(calleeType)
         val functionalInterface = lookupResult.interfaceName
-        val isPredefined = functionalInterface.startsWith("com/mdeo/script/runtime")
         
-        compileArguments(exprCall, calleeType, context, mv, isPredefined)
+        compileArguments(exprCall, calleeType, context, mv)
         
-        // Use calleeType for generated interfaces (actual types), normalizedKey for predefined (erased types)
-        val methodDescriptor = buildMethodDescriptor(if (isPredefined) normalizedKey else calleeType, context)
+        val methodDescriptor = buildMethodDescriptor(calleeType, context)
         
         mv.visitMethodInsn(
             Opcodes.INVOKEINTERFACE,
@@ -84,11 +81,6 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
             methodDescriptor,
             true
         )
-        
-        // Unbox return value only if the interface returns Object (uses predefined generic interface)
-        if (isPredefined) {
-            emitUnboxingIfNeeded(calleeType.returnType, mv)
-        }
     }
     
     /**
@@ -102,25 +94,18 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
      * @param calleeType The actual lambda type being called.
      * @param context The compilation context.
      * @param mv The method visitor for emitting bytecode.
-     * @param isPredefinedInterface Whether the interface is a predefined runtime interface.
      */
     private fun compileArguments(
         exprCall: TypedExpressionCallExpression,
         calleeType: LambdaType,
         context: CompilationContext,
-        mv: MethodVisitor,
-        isPredefinedInterface: Boolean
+        mv: MethodVisitor
     ) {
         val parameterTypes = calleeType.parameters.map { it.type }
         for ((index, arg) in exprCall.arguments.withIndex()) {
             val argType = context.getType(arg.evalType)
             val targetType = if (index < parameterTypes.size) parameterTypes[index] else argType
             context.compileExpression(arg, mv, targetType)
-            
-            // Only box primitives if using a predefined interface that expects Object
-            if (isPredefinedInterface) {
-                emitBoxingIfNeeded(targetType, mv)
-            }
         }
     }
     
@@ -139,14 +124,11 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
         val registry = context.getLambdaInterfaceRegistry()
         val lookupResult = registry.getInterfaceForLambdaType(lambdaType)
         
-        // Check if this is a predefined interface (in the runtime package)
         val isPredefined = lookupResult.interfaceName.startsWith("com/mdeo/script/runtime")
         
         return if (isPredefined) {
-            // Predefined interfaces use erased Object types
             buildErasedMethodDescriptor(lambdaType)
         } else {
-            // Generated interfaces use actual types with boxed wrappers
             val parameterTypes = lambdaType.parameters.map { it.type }
             MethodDescriptorUtil.buildDescriptor(parameterTypes, lambdaType.returnType)
         }
@@ -162,146 +144,11 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
      */
     private fun buildErasedMethodDescriptor(lambdaType: LambdaType): String {
         val params = lambdaType.parameters.joinToString("") { "Ljava/lang/Object;" }
-        val returnDesc = if (lambdaType.returnType is com.mdeo.script.ast.types.VoidType) {
+        val returnDesc = if (lambdaType.returnType is com.mdeo.expression.ast.types.VoidType) {
             "V"
         } else {
             "Ljava/lang/Object;"
         }
         return "($params)$returnDesc"
-    }
-
-    /**
-     * Compiles arguments with boxing when needed for predefined interfaces.
-     *
-     * @param arguments The argument expressions to compile.
-     * @param parameterTypes The actual parameter types from the lambda.
-     * @param normalizedParamTypes The normalized parameter types (from the interface).
-     * @param context The compilation context.
-     * @param mv The method visitor.
-     * @param needsBoxing Whether ANY arguments need to be boxed (determines descriptor type).
-     */
-    private fun compileArgumentsWithBoxing(
-        arguments: List<TypedExpression>,
-        parameterTypes: List<ReturnType>,
-        normalizedParamTypes: List<ReturnType>,
-        context: CompilationContext,
-        mv: MethodVisitor,
-        needsBoxing: Boolean
-    ) {
-        for ((index, arg) in arguments.withIndex()) {
-            val argType = context.getType(arg.evalType)
-            val targetType = if (index < parameterTypes.size) parameterTypes[index] else argType
-            context.compileExpression(arg, mv, targetType)
-            if (index < normalizedParamTypes.size && needsBoxing) {
-                // Only box if the NORMALIZED parameter type needs boxing
-                if (LambdaInterfaceRegistry.needsBoxing(normalizedParamTypes[index])) {
-                    emitBoxingIfNeeded(targetType, mv)
-                }
-            }
-        }
-    }
-
-    /**
-     * Emits boxing instructions for primitive types when calling generic interfaces.
-     *
-     * Only boxes non-nullable primitive types. Nullable types are already boxed
-     * by the coercion step.
-     *
-     * @param type The type to box if primitive (must be non-nullable).
-     * @param mv The method visitor.
-     */
-    private fun emitBoxingIfNeeded(type: ReturnType, mv: MethodVisitor) {
-        if (type !is ClassTypeRef) return
-        if (type.isNullable) return
-        
-        when (type.type) {
-            "builtin.int" -> mv.visitMethodInsn(
-                Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false
-            )
-            "builtin.long" -> mv.visitMethodInsn(
-                Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false
-            )
-            "builtin.float" -> mv.visitMethodInsn(
-                Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false
-            )
-            "builtin.double" -> mv.visitMethodInsn(
-                Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false
-            )
-            "builtin.boolean" -> mv.visitMethodInsn(
-                Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false
-            )
-        }
-    }
-
-    /**
-     * Emits unboxing instructions for the return value of generic interfaces.
-     *
-     * Only unboxes to non-nullable primitive types. For nullable types, only does
-     * a CHECKCAST to the expected boxed type.
-     *
-     * @param returnType The return type to unbox if non-nullable primitive.
-     * @param mv The method visitor.
-     */
-    private fun emitUnboxingIfNeeded(returnType: ReturnType, mv: MethodVisitor) {
-        if (returnType is com.mdeo.script.ast.types.VoidType) return
-        if (returnType !is ClassTypeRef) return
-        
-        if (returnType.isNullable) {
-            emitNullableCheckCast(returnType, mv)
-            return
-        }
-        
-        when (returnType.type) {
-            "builtin.int" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
-                mv.visitMethodInsn(
-                    Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false
-                )
-            }
-            "builtin.long" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
-                mv.visitMethodInsn(
-                    Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false
-                )
-            }
-            "builtin.float" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
-                mv.visitMethodInsn(
-                    Opcodes.INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false
-                )
-            }
-            "builtin.double" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
-                mv.visitMethodInsn(
-                    Opcodes.INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false
-                )
-            }
-            "builtin.boolean" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
-                mv.visitMethodInsn(
-                    Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false
-                )
-            }
-            "builtin.string" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String")
-            }
-        }
-    }
-
-    /**
-     * Emits a CHECKCAST for nullable types.
-     * 
-     * @param returnType The nullable return type.
-     * @param mv The method visitor.
-     */
-    private fun emitNullableCheckCast(returnType: ClassTypeRef, mv: MethodVisitor) {
-        when (returnType.type) {
-            "builtin.int" -> mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
-            "builtin.long" -> mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
-            "builtin.float" -> mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
-            "builtin.double" -> mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
-            "builtin.boolean" -> mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
-            "builtin.string" -> mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String")
-        }
     }
 }

@@ -19,7 +19,10 @@ import type {
     FloatLiteralExpressionType,
     DoubleLiteralExpressionType,
     BooleanLiteralExpressionType,
-    BaseExpressionType
+    BaseExpressionType,
+    AssertNonNullExpressionType,
+    TypeCastExpressionType,
+    TypeCheckExpressionType
 } from "../grammar/expressionTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -49,6 +52,11 @@ export function registerExpressionSerializers(
         printMemberAccessExpression(ctx, types)
     );
     AstSerializer.registerNodeSerializer(types.identifierExpressionType, (ctx) => printIdentifierExpression(ctx));
+    AstSerializer.registerNodeSerializer(types.assertNonNullExpressionType, (ctx) =>
+        printAssertNonNullExpression(ctx, types)
+    );
+    AstSerializer.registerNodeSerializer(types.typeCastExpressionType, (ctx) => printTypeCastExpression(ctx, types));
+    AstSerializer.registerNodeSerializer(types.typeCheckExpressionType, (ctx) => printTypeCheckExpression(ctx, types));
     AstSerializer.registerNodeSerializer(types.stringLiteralExpressionType, (ctx) => printStringLiteralExpression(ctx));
     AstSerializer.registerNodeSerializer(types.intLiteralExpressionType, (ctx) => printIntLiteralExpression(ctx));
     AstSerializer.registerNodeSerializer(types.longLiteralExpressionType, (ctx) => printLongLiteralExpression(ctx));
@@ -191,7 +199,7 @@ function printCallExpressionGenericArgs(context: PrintContext<CallExpressionGene
 function printCallExpression(context: PrintContext<CallExpressionType>, types: ExpressionTypes): Doc {
     const { ctx, path, print } = context;
 
-    const docs: Doc[] = [path.call((p) => printWithPrec(p, Precedence.MEMBER_CALL, print, types), "expression")];
+    const docs: Doc[] = [path.call((p) => printWithPrec(p, Precedence.POSTFIX, print, types), "expression")];
 
     if (ctx.genericArgs != undefined) {
         docs.push(path.call(print, "genericArgs"));
@@ -212,7 +220,7 @@ function printCallExpression(context: PrintContext<CallExpressionType>, types: E
 function printMemberAccessExpression(context: PrintContext<MemberAccessExpressionType>, types: ExpressionTypes): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
 
-    const expression = path.call((p) => printWithPrec(p, Precedence.MEMBER_CALL, print, types), "expression");
+    const expression = path.call((p) => printWithPrec(p, Precedence.POSTFIX, print, types), "expression");
     const operator = ctx.isNullChaining ? "?." : ".";
     const member = printPrimitive(getPrimitive(ctx, "member"), ID);
     return [expression, operator, member];
@@ -227,6 +235,47 @@ function printMemberAccessExpression(context: PrintContext<MemberAccessExpressio
 function printIdentifierExpression(context: PrintContext<IdentifierExpressionType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
     return printPrimitive(getPrimitive(ctx, "name"), ID);
+}
+
+/**
+ * Prints an assert non-null expression node.
+ *
+ * @param context The print context
+ * @param types The generated expression types
+ * @returns The formatted assert non-null expression
+ */
+function printAssertNonNullExpression(context: PrintContext<AssertNonNullExpressionType>, types: ExpressionTypes): Doc {
+    const { path, print } = context;
+    const expression = path.call((p) => printWithPrec(p, Precedence.UNARY, print, types), "expression");
+    return [expression, "!!"];
+}
+
+/**
+ * Prints a type cast expression node.
+ *
+ * @param context The print context
+ * @param types The generated expression types
+ * @returns The formatted type cast expression
+ */
+function printTypeCastExpression(context: PrintContext<TypeCastExpressionType>, types: ExpressionTypes): Doc {
+    const { ctx, path, print } = context;
+    const expression = path.call((p) => printWithPrec(p, Precedence.TYPE_CAST, print, types), "expression");
+    const typeNode = path.call(print, "targetType");
+    return [expression, ctx.isSafe ? " as? " : " as ", typeNode];
+}
+
+/**
+ * Prints a type check expression node.
+ *
+ * @param context The print context
+ * @param types The generated expression types
+ * @returns The formatted type check expression
+ */
+function printTypeCheckExpression(context: PrintContext<TypeCheckExpressionType>, types: ExpressionTypes): Doc {
+    const { ctx, path, print } = context;
+    const expression = path.call((p) => printWithPrec(p, Precedence.TYPE_CHECK, print, types), "expression");
+    const typeNode = path.call(print, "checkType");
+    return [expression, ctx.isNegated ? " !is " : " is ", typeNode];
 }
 
 /**

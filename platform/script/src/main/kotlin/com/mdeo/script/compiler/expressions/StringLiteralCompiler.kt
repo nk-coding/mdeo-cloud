@@ -1,8 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedStringLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.MethodVisitor
@@ -20,7 +19,7 @@ class StringLiteralCompiler : ExpressionCompiler() {
      * @return true if the expression is a string literal, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.StringLiteral
+        return expression.kind == "stringLiteral"
     }
 
     /**

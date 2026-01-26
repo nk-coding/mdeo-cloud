@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler.registry.type
 
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.ValueType
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ValueType
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -11,10 +11,16 @@ import org.objectweb.asm.Opcodes
  *
  * @param typeName The unique name of this type.
  * @param extends The names of types this type extends.
+ * @param jvmClassName The JVM internal class name (e.g., "java/lang/String").
+ * @param primitiveDescriptor The JVM primitive descriptor (e.g., "I", "J").
+ * @param wrapperClassName The JVM wrapper class name for primitives (e.g., "java/lang/Integer").
  */
 class TypeDefinitionImpl(
     override val typeName: String,
-    override val extends: List<String> = emptyList()
+    override val extends: List<String> = emptyList(),
+    override val jvmClassName: String? = null,
+    override val primitiveDescriptor: String? = null,
+    override val wrapperClassName: String? = null
 ) : TypeDefinition {
 
     private val methods: MutableMap<String, MutableList<MethodDefinition>> = mutableMapOf()

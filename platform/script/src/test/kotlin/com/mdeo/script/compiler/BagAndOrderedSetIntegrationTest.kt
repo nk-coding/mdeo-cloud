@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.types.BuiltinTypes.consumer
-import com.mdeo.script.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.BuiltinTypes.consumer
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.script.stdlib.impl.collections.Bag
 import com.mdeo.script.stdlib.impl.collections.OrderedSet
 import org.junit.jupiter.api.Nested

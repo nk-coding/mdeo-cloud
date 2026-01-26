@@ -21,11 +21,13 @@ private val logger = LoggerFactory.getLogger("JwtAuth")
  * - Much simpler than manual JWKS fetching and RSA key construction
  * 
  * @param backendUrl The base URL of the backend service (e.g., "http://localhost:8080")
+ * @param issuer The expected JWT issuer
  * 
  * @see <a href="https://ktor.io/docs/server-jwt.html">Ktor JWT Authentication Guide</a>
  */
 fun Application.configureJwtAuth(
-    backendUrl: String
+    backendUrl: String,
+    issuer: String
 ) {
     logger.info("Configuring JWT authentication with backend URL: $backendUrl")
     logger.info("JWKS endpoint: $backendUrl/.well-known/jwks.json")
@@ -37,7 +39,7 @@ fun Application.configureJwtAuth(
 
     install(Authentication) {
         jwt(AUTH_JWT) {
-            verifier(jwkProvider, backendUrl) {
+            verifier(jwkProvider, issuer) {
                 acceptLeeway(3)
             }
 

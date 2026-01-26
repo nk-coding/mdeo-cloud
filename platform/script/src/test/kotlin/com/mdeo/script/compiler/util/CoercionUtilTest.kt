@@ -1,9 +1,8 @@
 package com.mdeo.script.compiler.util
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.script.ast.expressions.TypedNullLiteralExpression
-import com.mdeo.script.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedNullLiteralExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Nested
 import kotlin.test.assertEquals

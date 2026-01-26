@@ -1,6 +1,8 @@
 package com.mdeo.script.stdlib.registrar.types
 
+import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.TypeRegistry
+import com.mdeo.script.compiler.registry.type.typeDefinition
 
 /**
  * Registers all stdlib type definitions in the registry.

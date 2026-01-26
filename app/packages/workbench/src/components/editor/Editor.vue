@@ -198,7 +198,7 @@ onMounted(() => {
     editor.value = monacoEditor;
     monacoApi.openEditorFunc = async (createModelReference, options) => {
         openTab(createModelReference.object.textEditorModel.uri, options?.pinned !== true);
-        return monacoEditor;
+        return undefined;
     };
 });
 

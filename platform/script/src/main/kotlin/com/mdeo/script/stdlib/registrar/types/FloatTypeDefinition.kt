@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
-import com.mdeo.script.ast.types.BuiltinTypes
+import com.mdeo.expression.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -12,6 +12,8 @@ private const val FLOAT_HELPER = "com/mdeo/script/stdlib/impl/primitives/FloatHe
 fun createFloatType(): TypeDefinition {
     return typeDefinition("builtin.float") {
         extends("builtin.any")
+        primitiveDesc("F")
+        wrapperClass("java/lang/Float")
 
         staticMethod("abs") {
             overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)

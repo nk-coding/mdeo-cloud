@@ -2,9 +2,10 @@ package com.mdeo.script.compiler
 
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.ast.TypedFunction
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
+import com.mdeo.script.compiler.expressions.AssertNonNullCompiler
 import com.mdeo.script.compiler.expressions.BinaryExpressionCompiler
 import com.mdeo.script.compiler.expressions.BooleanLiteralCompiler
 import com.mdeo.script.compiler.expressions.DoubleLiteralCompiler
@@ -20,6 +21,8 @@ import com.mdeo.script.compiler.expressions.MemberAccessCompiler
 import com.mdeo.script.compiler.expressions.MemberCallCompiler
 import com.mdeo.script.compiler.expressions.StringLiteralCompiler
 import com.mdeo.script.compiler.expressions.TernaryExpressionCompiler
+import com.mdeo.script.compiler.expressions.TypeCastCompiler
+import com.mdeo.script.compiler.expressions.TypeCheckCompiler
 import com.mdeo.script.compiler.expressions.UnaryExpressionCompiler
 import com.mdeo.script.compiler.registry.function.FileFunctionRegistry
 import com.mdeo.script.compiler.registry.function.FunctionRegistry
@@ -65,7 +68,10 @@ class ScriptCompiler {
         FunctionCallCompiler(),
         MemberCallCompiler(),
         ExpressionCallCompiler(),
-        LambdaCompiler()
+        LambdaCompiler(),
+        AssertNonNullCompiler(),
+        TypeCastCompiler(),
+        TypeCheckCompiler()
     )
 
     /**

@@ -1,5 +1,6 @@
 package com.mdeo.script.ast
 
+import com.mdeo.expression.ast.TypedCallableBody
 import kotlinx.serialization.Serializable
 
 /**

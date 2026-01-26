@@ -64,7 +64,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         backendUrl: config.backendApiUrl
     });
 
-    const jwtAuth = new JwtAuthMiddleware(config.backendApiUrl);
+    const jwtAuth = new JwtAuthMiddleware(config.backendApiUrl, config.jwtIssuer);
 
     const manifest = buildManifest(config.plugin);
 

@@ -1,9 +1,31 @@
 package com.mdeo.script.ast
 
-import com.mdeo.script.ast.expressions.*
-import com.mdeo.script.ast.statements.*
-import com.mdeo.script.ast.types.*
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedExtensionCallExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+import com.mdeo.script.ast.expressions.TypedLambdaExpression
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.expressions.TypedUnaryExpression
+import com.mdeo.expression.ast.statements.TypedAssignmentStatement
+import com.mdeo.expression.ast.statements.TypedForStatement
+import com.mdeo.expression.ast.statements.TypedIfStatement
+import com.mdeo.expression.ast.statements.TypedReturnStatement
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedVariableDeclarationStatement
+import com.mdeo.expression.ast.statements.TypedWhileStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.GenericTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.ReturnTypeSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
@@ -16,7 +38,13 @@ import kotlin.test.assertNull
  */
 class EdgeCaseDeserializationTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
 
     // ============================================================
     // Issue 1: Test if statement with elseBlock field completely absent (not null)
@@ -319,7 +347,7 @@ class EdgeCaseDeserializationTest {
             "typeArgs": {
                 "K": {"type": "builtin.string", "isNullable": false},
                 "V": {
-                    "type": "builtin.list",
+                    "type": "builtin.List",
                     "isNullable": true,
                     "typeArgs": {
                         "T": {
@@ -341,7 +369,7 @@ class EdgeCaseDeserializationTest {
         
         val vType = result.typeArgs?.get("V")
         assertIs<ClassTypeRef>(vType)
-        assertEquals("builtin.list", vType.type)
+        assertEquals("builtin.List", vType.type)
         assertEquals(true, vType.isNullable)
         
         val innerT = vType.typeArgs?.get("T")
@@ -382,7 +410,7 @@ class EdgeCaseDeserializationTest {
     @Test
     fun `deserialize ClassTypeRef with lambda type argument`() {
         val jsonString = """{
-            "type": "builtin.list",
+            "type": "builtin.List",
             "isNullable": false,
             "typeArgs": {
                 "T": {

@@ -1,8 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedLongLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.MethodVisitor
@@ -21,7 +20,7 @@ class LongLiteralCompiler : ExpressionCompiler() {
      * @return True if the expression is a long literal, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.LongLiteral
+        return expression.kind == "longLiteral"
     }
     
     /**

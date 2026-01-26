@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler.statements
 
-import com.mdeo.script.ast.statements.TypedIfStatement
-import com.mdeo.script.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedIfStatement
+import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.Scope
 import com.mdeo.script.compiler.StatementCompiler

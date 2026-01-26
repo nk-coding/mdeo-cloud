@@ -1,8 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedFunctionCallExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
 import com.mdeo.script.compiler.CompilationContext
 import org.objectweb.asm.MethodVisitor
 
@@ -32,7 +31,7 @@ class FunctionCallCompiler : AbstractCallCompiler() {
      * Checks if this compiler can handle the given expression.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.FunctionCall
+        return expression.kind == "functionCall"
     }
 
     /**

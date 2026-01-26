@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
-import com.mdeo.script.ast.types.BuiltinTypes
+import com.mdeo.expression.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -12,6 +12,7 @@ private const val STRING_HELPER = "com/mdeo/script/stdlib/impl/primitives/String
 fun createStringType(): TypeDefinition {
     return typeDefinition("builtin.string") {
         extends("builtin.any")
+        jvmClass("java/lang/String")
 
         staticMethod("characterAt") {
             overload(

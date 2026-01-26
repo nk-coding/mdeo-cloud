@@ -155,7 +155,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         val (pluginId, languagePlugin) = pluginInfo
-        val pluginUrl = pluginService.getPluginUrl(pluginId)
+        val pluginUrl = pluginService.getPluginUrl(pluginId, useInternal = true)
             ?: return executionFailure(
                 ErrorCodes.PLUGIN_NOT_FOUND,
                 "Plugin URL not found"
@@ -280,6 +280,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Sends a WebSocket notification for an execution state change.
      *
      * @param execution The updated execution
+     * @return Unit
      */
     private suspend fun notifyExecutionStateChange(execution: Execution) {
         val projectId = try {
@@ -649,16 +650,26 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
     /**
      * Gets the plugin URL for an execution based on its language.
+     *
+     * @param execution The execution to get the plugin URL for
+     * @return The plugin URL, or null if not found
      */
     private fun getPluginUrlForExecution(execution: Execution): String? {
         val projectId = UUID.fromString(execution.projectId)
         val pluginInfo = pluginService.findPluginByLanguage(projectId, execution.languageId)
             ?: return null
-        return pluginService.getPluginUrl(pluginInfo.first)
+        return pluginService.getPluginUrl(pluginInfo.first, useInternal = true)
     }
 
     /**
      * Calls the plugin to create an execution.
+     *
+     * @param pluginUrl The base URL of the plugin
+     * @param executionId The UUID of the execution
+     * @param projectId The UUID of the project
+     * @param filePath The path to the file to execute
+     * @param data Arbitrary JSON data for the execution
+     * @return The CreateExecutionResponse from the plugin
      */
     private suspend fun callPluginCreateExecution(
         pluginUrl: String,
@@ -701,6 +712,11 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
     /**
      * Calls the plugin to get the file tree for an execution.
+     *
+     * @param pluginUrl The base URL of the plugin
+     * @param executionId The UUID of the execution
+     * @param projectId The UUID of the project
+     * @return A list of file entries representing the execution's file tree
      */
     private suspend fun callPluginGetFileTree(
         pluginUrl: String,
@@ -734,6 +750,11 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
     /**
      * Calls the plugin to get the summary for an execution.
+     *
+     * @param pluginUrl The base URL of the plugin
+     * @param executionId The UUID of the execution
+     * @param projectId The UUID of the project
+     * @return The execution summary as a string
      */
     private suspend fun callPluginGetSummary(
         pluginUrl: String,
@@ -767,6 +788,12 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
     /**
      * Calls the plugin to get a result file for an execution.
+     *
+     * @param pluginUrl The base URL of the plugin
+     * @param executionId The UUID of the execution
+     * @param projectId The UUID of the project
+     * @param path The path to the requested file
+     * @return The file contents as a byte array
      */
     private suspend fun callPluginGetFile(
         pluginUrl: String,
@@ -802,6 +829,11 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
     /**
      * Calls the plugin to cancel an execution.
+     *
+     * @param pluginUrl The base URL of the plugin
+     * @param executionId The UUID of the execution
+     * @param projectId The UUID of the project
+     * @return Unit
      */
     private suspend fun callPluginCancel(
         pluginUrl: String,
@@ -833,6 +865,11 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
     /**
      * Calls the plugin to delete an execution.
+     *
+     * @param pluginUrl The base URL of the plugin
+     * @param executionId The UUID of the execution
+     * @param projectId The UUID of the project
+     * @return Unit
      */
     private suspend fun callPluginDelete(
         pluginUrl: String,

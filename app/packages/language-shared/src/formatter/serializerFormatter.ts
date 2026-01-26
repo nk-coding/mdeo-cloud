@@ -26,7 +26,7 @@ export class SerializerFormatter implements Formatter {
     async formatDocument(
         document: LangiumDocument,
         params: DocumentFormattingParams,
-        cancelToken?: CancellationToken
+        _cancelToken?: CancellationToken
     ): Promise<TextEditType[]> {
         const parseResult = document.parseResult;
         if (parseResult.lexerErrors.length > 0 || parseResult.parserErrors.length > 0) {
@@ -37,17 +37,17 @@ export class SerializerFormatter implements Formatter {
     }
 
     async formatDocumentRange(
-        document: LangiumDocument,
-        params: DocumentRangeFormattingParams,
-        cancelToken?: CancellationToken
+        _document: LangiumDocument,
+        _params: DocumentRangeFormattingParams,
+        _cancelToken?: CancellationToken
     ): Promise<TextEditType[]> {
         throw new Error("Not implemented.");
     }
 
     formatDocumentOnType(
-        document: LangiumDocument,
-        params: DocumentOnTypeFormattingParams,
-        cancelToken?: CancellationToken
+        _document: LangiumDocument,
+        _params: DocumentOnTypeFormattingParams,
+        _cancelToken?: CancellationToken
     ): MaybePromise<TextEditType[]> {
         throw new Error("Not supported.");
     }

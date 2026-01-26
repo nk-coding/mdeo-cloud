@@ -189,4 +189,71 @@ class TypeRegistry {
      */
     val typeNames: Set<String>
         get() = types.keys
+
+    /**
+     * Checks if sourceType is a subtype of targetType.
+     *
+     * This traverses the type hierarchy via `extends` relationships.
+     *
+     * @param sourceTypeName The source type name.
+     * @param targetTypeName The target type name.
+     * @return true if sourceType is a subtype of targetType (or the same type), false otherwise.
+     */
+    fun isSubtype(sourceTypeName: String, targetTypeName: String): Boolean {
+        if (sourceTypeName == targetTypeName) return true
+
+        return isSubtypeInHierarchy(sourceTypeName, targetTypeName, mutableSetOf())
+    }
+
+    /**
+     * Recursive helper to check subtype relationship in the type hierarchy.
+     */
+    private fun isSubtypeInHierarchy(
+        sourceTypeName: String,
+        targetTypeName: String,
+        visited: MutableSet<String>
+    ): Boolean {
+        if (sourceTypeName in visited) return false
+        visited.add(sourceTypeName)
+
+        if (sourceTypeName == targetTypeName) return true
+
+        val type = getTypeOrGlobal(sourceTypeName) ?: return false
+
+        for (parentName in type.extends) {
+            if (isSubtypeInHierarchy(parentName, targetTypeName, visited)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * Gets the JVM class name for instanceof/checkcast operations.
+     * Returns the wrapper class for nullable primitives, and the reference class for others.
+     *
+     * @param typeName The type name.
+     * @param isNullable Whether the type is nullable.
+     * @return The JVM internal class name, or null if not found.
+     */
+    fun getJvmClassName(typeName: String, isNullable: Boolean = false): String? {
+        val type = getTypeOrGlobal(typeName) ?: return null
+
+        return if (isNullable && type.wrapperClassName != null) {
+            type.wrapperClassName
+        } else {
+            type.jvmClassName ?: type.wrapperClassName
+        }
+    }
+
+    /**
+     * Gets the JVM wrapper class name for a primitive type.
+     *
+     * @param typeName The primitive type name.
+     * @return The JVM wrapper class name, or null if not a primitive or not found.
+     */
+    fun getWrapperClassName(typeName: String): String? {
+        return getTypeOrGlobal(typeName)?.wrapperClassName
+    }
 }

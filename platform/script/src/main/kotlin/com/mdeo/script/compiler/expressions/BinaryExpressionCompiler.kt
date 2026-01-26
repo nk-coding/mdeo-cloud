@@ -1,8 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedBinaryExpression
-import com.mdeo.script.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.MethodVisitor
@@ -19,8 +18,14 @@ import org.objectweb.asm.MethodVisitor
  * - **Comparison operations** (<, >, <=, >=): Handled by [ComparisonOperationHelper].
  *   Supports all numeric types with proper type promotion.
  * 
- * - **Equality operations** (==, !=): Handled by [EqualityOperationHelper].
- *   Handles null comparisons, strings, booleans, numerics, and references.
+ * - **Structural equality operations** (==, !=): Handled by [EqualityOperationHelper].
+ *   Uses .equals() for object comparison (Kotlin semantics).
+ * 
+ * - **Strict equality operations** (===, !==): Handled by [EqualityOperationHelper].
+ *   Uses reference comparison for objects.
+ * 
+ * - **Null coalescing** (??): Handled by [NullCoalescingHelper].
+ *   Returns left if non-null, otherwise right.
  * 
  * - **Logical operations** (&&, ||): Handled by [LogicalOperationHelper].
  *   Implements short-circuit evaluation.
@@ -34,6 +39,7 @@ import org.objectweb.asm.MethodVisitor
  * @see ArithmeticOperationHelper
  * @see ComparisonOperationHelper
  * @see EqualityOperationHelper
+ * @see NullCoalescingHelper
  * @see LogicalOperationHelper
  */
 class BinaryExpressionCompiler : ExpressionCompiler() {
@@ -45,7 +51,7 @@ class BinaryExpressionCompiler : ExpressionCompiler() {
      * @return `true` if the expression is a binary expression, `false` otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.Binary
+        return expression.kind == "binary"
     }
     
     /**
@@ -54,7 +60,9 @@ class BinaryExpressionCompiler : ExpressionCompiler() {
      * Dispatches to specialized helpers based on the operator type:
      * - Arithmetic (+, -, *, /, %) to [ArithmeticOperationHelper]
      * - Comparison (<, >, <=, >=) to [ComparisonOperationHelper]
-     * - Equality (==, !=) to [EqualityOperationHelper]
+     * - Structural equality (==, !=) to [EqualityOperationHelper.compileEquality]
+     * - Strict equality (===, !==) to [EqualityOperationHelper.compileStrictEquality]
+     * - Null coalescing (??) to [NullCoalescingHelper]
      * - Logical (&&, ||) to [LogicalOperationHelper]
      *
      * @param expression The binary expression to compile.
@@ -82,9 +90,16 @@ class BinaryExpressionCompiler : ExpressionCompiler() {
             "<=" -> ComparisonOperationHelper.compileLessThanOrEqual(binaryExpr, context, mv, leftType, rightType)
             ">=" -> ComparisonOperationHelper.compileGreaterThanOrEqual(binaryExpr, context, mv, leftType, rightType)
             
-            // Equality operations
+            // Structural equality operations (uses .equals())
             "==" -> EqualityOperationHelper.compileEquality(binaryExpr, context, mv, leftType, rightType, true)
             "!=" -> EqualityOperationHelper.compileEquality(binaryExpr, context, mv, leftType, rightType, false)
+            
+            // Strict/reference equality operations
+            "===" -> EqualityOperationHelper.compileStrictEquality(binaryExpr, context, mv, leftType, rightType, true)
+            "!==" -> EqualityOperationHelper.compileStrictEquality(binaryExpr, context, mv, leftType, rightType, false)
+            
+            // Null coalescing operator
+            "??" -> NullCoalescingHelper.compileNullCoalescing(binaryExpr, context, mv)
             
             // Logical operations
             "&&" -> LogicalOperationHelper.compileLogicalAnd(binaryExpr, context, mv)

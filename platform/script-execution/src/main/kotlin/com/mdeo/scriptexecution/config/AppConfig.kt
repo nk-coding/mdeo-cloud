@@ -6,12 +6,14 @@ package com.mdeo.scriptexecution.config
  * @property serverPort The port number on which the server will listen
  * @property database Database connection configuration
  * @property backendApiUrl Base URL for the backend API to fetch typed ASTs and JWKS
+ * @property jwtIssuer JWT issuer identifier
  * @property executionTimeoutMs Timeout for script execution in milliseconds
  */
 data class AppConfig(
     val serverPort: Int,
     val database: DatabaseConfig,
     val backendApiUrl: String,
+    val jwtIssuer: String,
     val executionTimeoutMs: Long
 ) {
     companion object {
@@ -31,6 +33,7 @@ data class AppConfig(
                     maxPoolSize = System.getenv("DATABASE_MAX_POOL_SIZE")?.toIntOrNull() ?: 10
                 ),
                 backendApiUrl = System.getenv("BACKEND_API_URL") ?: "http://localhost:8080/api",
+                jwtIssuer = System.getenv("JWT_ISSUER") ?: "mdeo-platform",
                 executionTimeoutMs = System.getenv("EXECUTION_TIMEOUT_MS")?.toLongOrNull() ?: 30000L
             )
         }

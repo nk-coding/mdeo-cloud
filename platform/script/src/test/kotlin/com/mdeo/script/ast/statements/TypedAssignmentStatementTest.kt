@@ -1,11 +1,18 @@
 package com.mdeo.script.ast.statements
 
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedBinaryExpression
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.script.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.statements.TypedAssignmentStatement
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.statements.TypedStatement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -15,7 +22,13 @@ import kotlin.test.assertIs
  */
 class TypedAssignmentStatementTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize simple identifier assignment`() {
@@ -27,7 +40,7 @@ class TypedAssignmentStatementTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedAssignmentStatement>(result)
-        assertEquals(TypedStatementKind.Assignment, result.kind)
+        assertEquals("assignment", result.kind)
         
         val left = result.left
         assertIs<TypedIdentifierExpression>(left)

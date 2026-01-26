@@ -1,9 +1,16 @@
 package com.mdeo.script.ast
 
-import com.mdeo.script.ast.statements.TypedReturnStatement
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.script.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.TypedCallableBody
+import com.mdeo.expression.ast.statements.TypedReturnStatement
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -13,7 +20,13 @@ import kotlin.test.assertIs
  */
 class TypedAstTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize TypedParameter`() {
@@ -162,7 +175,7 @@ class TypedAstTest {
         val result = json.decodeFromString(TypedAst.serializer(), jsonString)
         
         assertEquals(1, result.types.size)
-        assertIs<com.mdeo.script.ast.types.VoidType>(result.types[0])
+        assertIs<com.mdeo.expression.ast.types.VoidType>(result.types[0])
     }
     
     @Test
@@ -183,6 +196,6 @@ class TypedAstTest {
         val result = json.decodeFromString(TypedAst.serializer(), jsonString)
         
         assertEquals(1, result.types.size)
-        assertIs<com.mdeo.script.ast.types.LambdaType>(result.types[0])
+        assertIs<com.mdeo.expression.ast.types.LambdaType>(result.types[0])
     }
 }

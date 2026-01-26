@@ -48,6 +48,11 @@ export interface ServiceConfig<T = object> {
     backendApiUrl: string;
 
     /**
+     * Expected JWT issuer
+     */
+    jwtIssuer: string;
+
+    /**
      * Plugin definition for this service
      */
     plugin: ServicePluginDefinition;

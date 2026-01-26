@@ -1,7 +1,7 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.CoercionUtil
 import org.objectweb.asm.MethodVisitor
 

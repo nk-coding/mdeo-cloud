@@ -16,6 +16,12 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
 
     const baseExpressionType = createInterface(config.baseExpressionTypeName).attrs({});
 
+    const assertNonNullExpressionType = createInterface(config.assertNonNullExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            expression: baseExpressionType
+        });
+
     const unaryExpressionType = createInterface(config.unaryExpressionTypeName)
         .extends(baseExpressionType)
         .attrs({
@@ -26,7 +32,7 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
     const binaryExpressionType = createInterface(config.binaryExpressionTypeName)
         .extends(baseExpressionType)
         .attrs({
-            operator: Union("+", "-", "*", "/", "%", "&&", "||", "==", "!=", "<", ">", "<=", ">="),
+            operator: Union("+", "-", "*", "/", "%", "??", "&&", "||", "==", "!=", "===", "!==", "<", ">", "<=", ">="),
             left: baseExpressionType,
             right: baseExpressionType
         });
@@ -36,6 +42,22 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         trueExpression: baseExpressionType,
         falseExpression: baseExpressionType
     });
+
+    const typeCastExpressionType = createInterface(config.typeCastExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            expression: baseExpressionType,
+            targetType: baseTypeType,
+            isSafe: Boolean
+        });
+
+    const typeCheckExpressionType = createInterface(config.typeCheckExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            expression: baseExpressionType,
+            checkType: baseTypeType,
+            isNegated: Boolean
+        });
 
     const callExpressionGenericArgsType = createInterface(config.callExpressionGenericArgsTypeName).attrs({
         typeArguments: [baseTypeType]
@@ -127,7 +149,10 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         baseTypeType,
         classTypeType,
         lambdaTypeType,
-        assignableExpressionType
+        assignableExpressionType,
+        assertNonNullExpressionType,
+        typeCastExpressionType,
+        typeCheckExpressionType
     };
 }
 
@@ -215,3 +240,18 @@ export type NullLiteralExpressionType = ASTType<ExpressionTypes["nullLiteralExpr
  * Type representing the assignable expression
  */
 export type AssingableExpressionType = ASTType<ExpressionTypes["assignableExpressionType"]>;
+
+/**
+ * Type representing the assert non-null expression (!! postfix operator).
+ */
+export type AssertNonNullExpressionType = ASTType<ExpressionTypes["assertNonNullExpressionType"]>;
+
+/**
+ * Type representing the type cast expression (as / as?).
+ */
+export type TypeCastExpressionType = ASTType<ExpressionTypes["typeCastExpressionType"]>;
+
+/**
+ * Type representing the type check expression (is / !is).
+ */
+export type TypeCheckExpressionType = ASTType<ExpressionTypes["typeCheckExpressionType"]>;

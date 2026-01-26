@@ -3,6 +3,7 @@ package com.mdeo.script.runtime
 import com.mdeo.script.compiler.CompiledProgram
 import java.io.PrintStream
 import java.lang.reflect.Method
+import java.lang.reflect.InvocationTargetException
 
 /**
  * Environment for executing compiled script programs.
@@ -41,7 +42,11 @@ class ExecutionEnvironment(
             val method = findMethod(clazz, functionName, args)
                 ?: throw IllegalArgumentException("Function not found: $functionName in $fileUri")
             
-            method.invoke(null, *args)
+            try {
+                method.invoke(null, *args)
+            } catch (e: InvocationTargetException) {
+                throw e.cause ?: e
+            }
         }
     }
     

@@ -1,8 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedBooleanLiteralExpression
-import com.mdeo.script.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.MethodVisitor
@@ -21,7 +20,7 @@ class BooleanLiteralCompiler : ExpressionCompiler() {
      * @return true if the expression is a boolean literal, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.BooleanLiteral
+        return expression.kind == "booleanLiteral"
     }
     
     /**

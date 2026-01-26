@@ -1,5 +1,5 @@
-export * from "./action-handlers/importEntityActionHandler.js";
 export * from "./action-handlers/importClassActionHandler.js";
+export * from "./action-handlers/importEntityActionHandler.js";
 export * from "./action-handlers/importEnumActionHandler.js";
 export * from "./features/diagram-server/handler/createClassOperationHandler.js";
 export * from "./features/diagram-server/handler/createEnumOperationHandler.js";

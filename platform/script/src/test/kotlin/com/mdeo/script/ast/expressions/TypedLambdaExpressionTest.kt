@@ -1,8 +1,14 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.statements.TypedReturnStatement
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+
+import com.mdeo.expression.ast.statements.TypedReturnStatement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -12,7 +18,13 @@ import kotlin.test.assertIs
  */
 class TypedLambdaExpressionTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize simple lambda`() {
@@ -29,7 +41,7 @@ class TypedLambdaExpressionTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedLambdaExpression>(result)
-        assertEquals(TypedExpressionKind.Lambda, result.kind)
+        assertEquals("lambda", result.kind)
         assertEquals(0, result.evalType)
         assertEquals(1, result.parameters.size)
         assertEquals("x", result.parameters[0])

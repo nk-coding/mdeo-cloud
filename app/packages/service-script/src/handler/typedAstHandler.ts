@@ -6,9 +6,9 @@ import {
     type TypedFunction
 } from "@mdeo/language-script";
 import { hasErrors, type FileDataHandler } from "@mdeo/service-common";
-import { TypedAstConverter } from "./typedAstConverter.js";
+import { ScriptTypedAstConverter } from "./scriptTypedAstConverter.js";
 import type { ReturnType } from "@mdeo/language-expression";
-import { TypedAstMerger } from "./typedAstMerger.js";
+import { ScriptTypedAstMerger } from "./typedAstMerger.js";
 
 /**
  * Key for the typed AST handler.
@@ -83,7 +83,7 @@ export const typedAstHandler: FileDataHandler<TypedAst | TypedRootAst | null, Sc
         throw new Error("Document root is not a Script");
     }
 
-    const converter = new TypedAstConverter(instance.services.typir, reflection);
+    const converter = new ScriptTypedAstConverter(instance.services.typir, reflection);
     const typedRoot = converter.convertScript(script);
 
     return {
@@ -100,7 +100,7 @@ export const typedAstHandler: FileDataHandler<TypedAst | TypedRootAst | null, Sc
  */
 function createTypedRootAst(resolvedPlugins: ResolvedScriptContributionPlugins): TypedRootAst {
     const functions: TypedPluginFunction[] = [];
-    const merger = new TypedAstMerger();
+    const merger = new ScriptTypedAstMerger();
 
     for (const [functionName, resolvedFunction] of resolvedPlugins.functions.entries()) {
         const signatures: Record<string, TypedPluginFunctionSignature> = {};

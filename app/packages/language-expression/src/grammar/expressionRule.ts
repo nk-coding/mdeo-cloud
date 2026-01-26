@@ -129,7 +129,7 @@ export function generateExpressionRules(
             ];
         });
 
-    const memberAccessOrCallFragment = createFragmentRule(config.memberAccessOrCallFragmentRuleName)
+    const postfixFragment = createFragmentRule(config.postfixFragmentRuleName)
         .returns(types.baseExpressionType)
         .as(() => [
             or(
@@ -146,13 +146,14 @@ export function generateExpressionRules(
                         LeadingTrailing.TRAILING
                     ),
                     ")"
-                ])
+                ]),
+                treeRewriteAction(types.assertNonNullExpressionType, "expression", "=", () => ["!!"])
             )
         ]);
 
-    const memberAccessAndCallExpressionRule = createRule(config.memberAccessAndCallExpressionRuleName)
+    const postfixExpressionRule = createRule(config.postfixExpressionRuleName)
         .returns(types.baseExpressionType)
-        .as(() => [primaryExpressionRule, many(memberAccessOrCallFragment)]);
+        .as(() => [primaryExpressionRule, many(postfixFragment)]);
 
     const callExpressionGenericArgsRule = createRule(config.callExpressionGenericArgsRuleName)
         .returns(types.callExpressionGenericArgsType)
@@ -164,24 +165,58 @@ export function generateExpressionRules(
         .returns(types.baseExpressionType)
         .as(() => [
             or(
-                memberAccessAndCallExpressionRule,
+                postfixExpressionRule,
                 action(types.unaryExpressionType, ({ set }) => [
                     set("operator", "!", "-"),
-                    set("expression", memberAccessAndCallExpressionRule)
+                    set("expression", postfixExpressionRule)
                 ])
             )
         ]);
 
-    const binaryExpressionRule = createInfixRule(config.binaryExpressionRuleName)
-        .on(unaryExpressionRule)
+    const typeCastExpressionRule = createRule(config.typeCastExpressionRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [
+            unaryExpressionRule,
+            many(
+                treeRewriteAction(types.typeCastExpressionType, "expression", "=", ({ set, flag }) => [
+                    or(flag("isSafe", "as?"), "as"),
+                    set("targetType", typeRule)
+                ])
+            )
+        ]);
+
+    const binaryExpressionUpperRule = createInfixRule(config.binaryExpressionUpperRuleName)
+        .on(typeCastExpressionRule)
         .returns(types.binaryExpressionType)
         .operators("*", "/", "%")
         .operators("+", "-")
+        .operators("??")
+        .build();
+
+    const typeCheckExpressionRule = createRule(config.typeCheckExpressionRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [
+            binaryExpressionUpperRule,
+            many(
+                treeRewriteAction(types.typeCheckExpressionType, "expression", "=", ({ set, flag }) => [
+                    or(flag("isNegated", "!is"), "is"),
+                    set("checkType", typeRule)
+                ])
+            )
+        ]);
+
+    const binaryExpressionLowerRule = createInfixRule(config.binaryExpressionLowerRuleName)
+        .on(typeCheckExpressionRule)
+        .returns(types.binaryExpressionType)
         .operators("<", ">", "<=", ">=")
-        .operators("==", "!=")
+        .operators("===", "!==", "==", "!=")
         .operators("&&")
         .operators("||")
         .build();
+
+    const binaryExpressionRule = createRule(config.binaryExpressionRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [binaryExpressionLowerRule]);
 
     const ternaryExpressionRule = createRule(config.ternaryExpressionRuleName)
         .returns(types.ternaryExpressionType)
@@ -204,7 +239,7 @@ export function generateExpressionRules(
 
     const assignableExpressionRule = createRule(config.assignableExpressionRuleName)
         .returns(types.assignableExpressionType)
-        .as(() => [or(identifierExpressionRule, memberAccessAndCallExpressionRule)]);
+        .as(() => [or(identifierExpressionRule, postfixExpressionRule)]);
 
     return {
         expressionRule,
@@ -218,9 +253,13 @@ export function generateExpressionRules(
         nullLiteralExpressionRule,
         identifierExpressionRule,
         primaryExpressionRule,
-        memberAccessAndCallExpressionRule,
+        postfixExpressionRule,
         callExpressionGenericArgsRule,
         unaryExpressionRule,
+        typeCastExpressionRule,
+        binaryExpressionUpperRule,
+        typeCheckExpressionRule,
+        binaryExpressionLowerRule,
         binaryExpressionRule,
         ternaryExpressionRule
     };

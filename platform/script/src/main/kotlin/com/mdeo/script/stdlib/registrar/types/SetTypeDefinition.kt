@@ -10,6 +10,7 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  */
 fun createSetType(): TypeDefinition {
     return typeDefinition("builtin.Set") {
+        jvmClass("java/util/Set")
         extends("builtin.Collection")
     }
 }

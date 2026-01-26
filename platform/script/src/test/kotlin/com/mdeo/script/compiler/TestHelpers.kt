@@ -1,43 +1,46 @@
 package com.mdeo.script.compiler
 
 import com.mdeo.script.ast.TypedAst
-import com.mdeo.script.ast.TypedCallableBody
+import com.mdeo.expression.ast.TypedCallableBody
 import com.mdeo.script.ast.TypedFunction
 import com.mdeo.script.ast.TypedImport
 import com.mdeo.script.ast.TypedParameter
-import com.mdeo.script.ast.expressions.TypedBinaryExpression
-import com.mdeo.script.ast.expressions.TypedBooleanLiteralExpression
-import com.mdeo.script.ast.expressions.TypedDoubleLiteralExpression
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedExpressionCallExpression
-import com.mdeo.script.ast.expressions.TypedFloatLiteralExpression
-import com.mdeo.script.ast.expressions.TypedFunctionCallExpression
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedAssertNonNullExpression
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedDoubleLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
+import com.mdeo.expression.ast.expressions.TypedFloatLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.script.ast.expressions.TypedLambdaExpression
-import com.mdeo.script.ast.expressions.TypedLongLiteralExpression
-import com.mdeo.script.ast.expressions.TypedMemberAccessExpression
-import com.mdeo.script.ast.expressions.TypedMemberCallExpression
-import com.mdeo.script.ast.expressions.TypedNullLiteralExpression
-import com.mdeo.script.ast.expressions.TypedStringLiteralExpression
-import com.mdeo.script.ast.expressions.TypedTernaryExpression
-import com.mdeo.script.ast.expressions.TypedUnaryExpression
-import com.mdeo.script.ast.statements.TypedAssignmentStatement
-import com.mdeo.script.ast.statements.TypedBreakStatement
-import com.mdeo.script.ast.statements.TypedContinueStatement
-import com.mdeo.script.ast.statements.TypedElseIfClause
-import com.mdeo.script.ast.statements.TypedExpressionStatement
-import com.mdeo.script.ast.statements.TypedIfStatement
-import com.mdeo.script.ast.statements.TypedForStatement
-import com.mdeo.script.ast.statements.TypedReturnStatement
-import com.mdeo.script.ast.statements.TypedStatement
-import com.mdeo.script.ast.statements.TypedVariableDeclarationStatement
-import com.mdeo.script.ast.statements.TypedWhileStatement
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.ast.types.Parameter
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.expressions.TypedTypeCastExpression
+import com.mdeo.expression.ast.expressions.TypedTypeCheckExpression
+import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
+import com.mdeo.expression.ast.expressions.TypedNullLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedTernaryExpression
+import com.mdeo.expression.ast.expressions.TypedUnaryExpression
+import com.mdeo.expression.ast.statements.TypedAssignmentStatement
+import com.mdeo.expression.ast.statements.TypedBreakStatement
+import com.mdeo.expression.ast.statements.TypedContinueStatement
+import com.mdeo.expression.ast.statements.TypedElseIfClause
+import com.mdeo.expression.ast.statements.TypedExpressionStatement
+import com.mdeo.expression.ast.statements.TypedIfStatement
+import com.mdeo.expression.ast.statements.TypedForStatement
+import com.mdeo.expression.ast.statements.TypedReturnStatement
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedVariableDeclarationStatement
+import com.mdeo.expression.ast.statements.TypedWhileStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.Parameter
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.runtime.ExecutionEnvironment
 
 /**
@@ -134,14 +137,14 @@ class TypedAstBuilder {
     
     /**
      * Adds a non-nullable list type and returns its index.
-     * Uses builtin.list which maps to java.util.List at runtime.
+     * Uses builtin.List which maps to java.util.List at runtime.
      */
-    fun listType(): Int = addType(ClassTypeRef("builtin.list", false))
+    fun listType(): Int = addType(ClassTypeRef("builtin.List", false))
     
     /**
      * Adds a nullable list type and returns its index.
      */
-    fun listNullableType(): Int = addType(ClassTypeRef("builtin.list", true))
+    fun listNullableType(): Int = addType(ClassTypeRef("builtin.List", true))
     
     /**
      * Adds a lambda type and returns its index.
@@ -151,7 +154,7 @@ class TypedAstBuilder {
      * @return The index of the lambda type in the types array.
      */
     fun lambdaType(returnType: ReturnType, vararg parameters: Pair<String, ReturnType>): Int {
-        val paramList = parameters.map { (name, type) -> Parameter(name, type as com.mdeo.script.ast.types.ValueType) }
+        val paramList = parameters.map { (name, type) -> Parameter(name, type as com.mdeo.expression.ast.types.ValueType) }
         return addType(LambdaType(returnType, paramList, false))
     }
     
@@ -677,5 +680,70 @@ fun expressionCall(
         evalType = resultTypeIndex,
         expression = expression,
         arguments = arguments
+    )
+}
+
+/**
+ * Creates an assert non-null expression (!! operator).
+ * 
+ * Asserts that the expression is not null, throwing a NullPointerException if it is.
+ * 
+ * @param expression The expression to assert as non-null.
+ * @param resultTypeIndex The index of the result type in the types array (non-nullable version).
+ * @return The assert non-null expression.
+ */
+fun assertNonNull(
+    expression: TypedExpression,
+    resultTypeIndex: Int
+): TypedAssertNonNullExpression {
+    return TypedAssertNonNullExpression(
+        evalType = resultTypeIndex,
+        expression = expression
+    )
+}
+
+/**
+ * Creates a type cast expression (as operator).
+ *
+ * @param expression The expression to cast.
+ * @param targetTypeIndex The index of the target type in the types array.
+ * @param resultTypeIndex The index of the result type in the types array.
+ * @param isSafe Whether this is a safe cast (as?) that returns null instead of throwing.
+ * @return The type cast expression.
+ */
+fun typeCast(
+    expression: TypedExpression,
+    targetTypeIndex: Int,
+    resultTypeIndex: Int,
+    isSafe: Boolean = false
+): TypedTypeCastExpression {
+    return TypedTypeCastExpression(
+        evalType = resultTypeIndex,
+        expression = expression,
+        targetType = targetTypeIndex,
+        isSafe = isSafe
+    )
+}
+
+/**
+ * Creates a type check expression (is / !is operator).
+ *
+ * @param expression The expression to check.
+ * @param checkTypeIndex The index of the type to check against in the types array.
+ * @param resultTypeIndex The index of the result type (boolean) in the types array.
+ * @param isNegated Whether this is a negated check (!is).
+ * @return The type check expression.
+ */
+fun typeCheck(
+    expression: TypedExpression,
+    checkTypeIndex: Int,
+    resultTypeIndex: Int,
+    isNegated: Boolean = false
+): TypedTypeCheckExpression {
+    return TypedTypeCheckExpression(
+        evalType = resultTypeIndex,
+        expression = expression,
+        checkType = checkTypeIndex,
+        isNegated = isNegated
     )
 }

@@ -1,10 +1,20 @@
 package com.mdeo.script.ast.statements
 
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedFunctionCallExpression
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.statements.TypedBreakStatement
+import com.mdeo.expression.ast.statements.TypedContinueStatement
+import com.mdeo.expression.ast.statements.TypedExpressionStatement
+import com.mdeo.expression.ast.statements.TypedReturnStatement
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.statements.TypedStatement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -15,7 +25,13 @@ import kotlin.test.assertNull
  */
 class SimpleStatementsTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize expression statement`() {
@@ -34,7 +50,7 @@ class SimpleStatementsTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedExpressionStatement>(result)
-        assertEquals(TypedStatementKind.Expression, result.kind)
+        assertEquals("expression", result.kind)
         
         val expr = result.expression
         assertIs<TypedFunctionCallExpression>(expr)
@@ -62,7 +78,7 @@ class SimpleStatementsTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedBreakStatement>(result)
-        assertEquals(TypedStatementKind.Break, result.kind)
+        assertEquals("break", result.kind)
     }
     
     @Test
@@ -71,7 +87,7 @@ class SimpleStatementsTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedContinueStatement>(result)
-        assertEquals(TypedStatementKind.Continue, result.kind)
+        assertEquals("continue", result.kind)
     }
     
     @Test
@@ -80,7 +96,7 @@ class SimpleStatementsTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedReturnStatement>(result)
-        assertEquals(TypedStatementKind.Return, result.kind)
+        assertEquals("return", result.kind)
         assertNull(result.value)
     }
     
@@ -116,7 +132,7 @@ class SimpleStatementsTest {
         assertIs<TypedReturnStatement>(result)
         
         val value = result.value
-        assertIs<com.mdeo.script.ast.expressions.TypedBinaryExpression>(value)
+        assertIs<com.mdeo.expression.ast.expressions.TypedBinaryExpression>(value)
         assertEquals("*", value.operator)
     }
 }

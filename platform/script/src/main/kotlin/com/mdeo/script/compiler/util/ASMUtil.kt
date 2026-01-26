@@ -1,8 +1,8 @@
 package com.mdeo.script.compiler.util
 
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.VoidType
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 

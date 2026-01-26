@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.registrar.types
 
-import com.mdeo.script.ast.types.BuiltinTypes
+import com.mdeo.expression.ast.types.BuiltinTypes
 import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.typeDefinition
 
@@ -12,6 +12,8 @@ private const val LONG_HELPER = "com/mdeo/script/stdlib/impl/primitives/LongHelp
 fun createLongType(): TypeDefinition {
     return typeDefinition("builtin.long") {
         extends("builtin.any")
+        primitiveDesc("J")
+        wrapperClass("java/lang/Long")
 
         staticMethod("abs") {
             overload("", "(J)J", LONG_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.LONG)

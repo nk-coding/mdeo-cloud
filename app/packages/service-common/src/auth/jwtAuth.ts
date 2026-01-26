@@ -33,11 +33,12 @@ export class JwtAuthMiddleware {
     /**
      * Creates a new JWT authentication middleware.
      *
-     * @param backendUrl - Base URL of the backend (e.g., "http://localhost:8080/api")
+     * @param backendUrl Base URL of the backend (e.g., "http://localhost:8080/api")
+     * @param issuer Expected JWT issuer
      */
-    constructor(backendUrl: string) {
+    constructor(backendUrl: string, issuer: string) {
         this.jwks = createRemoteJWKSet(new URL(`${backendUrl}/.well-known/jwks.json`));
-        this.issuer = backendUrl;
+        this.issuer = issuer;
     }
 
     /**
@@ -47,12 +48,6 @@ export class JwtAuthMiddleware {
      * @param request - Fastify request object
      * @param reply - Fastify reply object
      * @throws Will send 401 response if authentication fails
-     *
-     * @example
-     * ```typescript
-     * const authMiddleware = new JwtAuthMiddleware("http://localhost:8080");
-     * fastify.addHook("preHandler", authMiddleware.authenticate.bind(authMiddleware));
-     * ```
      */
     async authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
         try {

@@ -32,8 +32,8 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
             isNullable: typeA.isNullable || typeB.isNullable
         });
     }
-    const superTypesA = findSuperTypesWithDistance(typeA, services);
-    const superTypesB = findSuperTypesWithDistance(typeB, services);
+    const superTypesA = findSuperTypesWithDistance(typeA.asNonNullable as CustomClassType, services);
+    const superTypesB = findSuperTypesWithDistance(typeB.asNonNullable as CustomClassType, services);
 
     let bestType: CustomClassType | undefined = undefined;
     let bestDistance = Number.MAX_SAFE_INTEGER;
@@ -48,13 +48,13 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
             }
         }
     }
-    return (
-        bestType ??
-        services.TypeDefinitions.resolveCustomClassOrLambdaType({
-            type: DefaultTypeNames.Any,
-            isNullable: typeA.isNullable || typeB.isNullable
-        })
-    );
+    if (bestType != undefined) {
+        return typeA.isNullable || typeB.isNullable ? bestType.asNullable : bestType.asNonNullable;
+    }
+    return services.TypeDefinitions.resolveCustomClassOrLambdaType({
+        type: DefaultTypeNames.Any,
+        isNullable: typeA.isNullable || typeB.isNullable
+    });
 }
 
 /**
@@ -153,7 +153,7 @@ export function findSuperTypesWithDistance<Specifics extends TypirSpecifics>(
         visited.add(currentIdentifier);
 
         const superTypes = current.type.details.definition.superTypes;
-        if (superTypes) {
+        if (superTypes != undefined) {
             for (const superTypeRef of superTypes) {
                 const superType = services.TypeDefinitions.resolveCustomClassOrLambdaType({
                     ...superTypeRef,

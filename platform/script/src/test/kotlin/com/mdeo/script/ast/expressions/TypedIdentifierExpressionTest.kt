@@ -1,7 +1,12 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +16,12 @@ import kotlin.test.assertIs
  */
 class TypedIdentifierExpressionTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+        }
+    }
     
     @Test
     fun `deserialize simple identifier`() {
@@ -24,7 +34,7 @@ class TypedIdentifierExpressionTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedIdentifierExpression>(result)
-        assertEquals(TypedExpressionKind.Identifier, result.kind)
+        assertEquals("identifier", result.kind)
         assertEquals(0, result.evalType)
         assertEquals("myVariable", result.name)
         assertEquals(2, result.scope)

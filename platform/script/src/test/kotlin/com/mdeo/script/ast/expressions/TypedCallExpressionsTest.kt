@@ -1,7 +1,18 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+
+import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
+import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
+import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +22,13 @@ import kotlin.test.assertIs
  */
 class TypedCallExpressionsTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize function call expression`() {
@@ -28,7 +45,7 @@ class TypedCallExpressionsTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedFunctionCallExpression>(result)
-        assertEquals(TypedExpressionKind.FunctionCall, result.kind)
+        assertEquals("functionCall", result.kind)
         assertEquals(0, result.evalType)
         assertEquals("add", result.name)
         assertEquals("", result.overload)
@@ -86,7 +103,7 @@ class TypedCallExpressionsTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedMemberCallExpression>(result)
-        assertEquals(TypedExpressionKind.MemberCall, result.kind)
+        assertEquals("memberCall", result.kind)
         assertEquals(0, result.evalType)
         assertEquals("size", result.member)
         assertEquals(false, result.isNullChaining)
@@ -148,7 +165,7 @@ class TypedCallExpressionsTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedExpressionCallExpression>(result)
-        assertEquals(TypedExpressionKind.ExpressionCall, result.kind)
+        assertEquals("call", result.kind)
         assertEquals(0, result.evalType)
         
         val expr = result.expression

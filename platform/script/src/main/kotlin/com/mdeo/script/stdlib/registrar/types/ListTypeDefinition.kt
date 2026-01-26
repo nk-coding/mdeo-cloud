@@ -10,6 +10,7 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  */
 fun createListType(): TypeDefinition {
     return typeDefinition("builtin.List") {
+        jvmClass("java/util/List")
         extends("builtin.OrderedCollection")
     }
 }

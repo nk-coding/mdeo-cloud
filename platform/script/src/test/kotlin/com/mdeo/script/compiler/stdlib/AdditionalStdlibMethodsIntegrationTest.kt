@@ -1,6 +1,6 @@
 package com.mdeo.script.compiler.stdlib
 
-import com.mdeo.script.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.script.compiler.*
 import com.mdeo.script.stdlib.impl.collections.ScriptList
 import org.junit.jupiter.api.Nested

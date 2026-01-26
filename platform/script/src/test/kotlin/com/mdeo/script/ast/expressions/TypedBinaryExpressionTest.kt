@@ -1,7 +1,14 @@
 package com.mdeo.script.ast.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +18,12 @@ import kotlin.test.assertIs
  */
 class TypedBinaryExpressionTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+        }
+    }
     
     @Test
     fun `deserialize addition binary expression`() {
@@ -25,7 +37,7 @@ class TypedBinaryExpressionTest {
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
         
         assertIs<TypedBinaryExpression>(result)
-        assertEquals(TypedExpressionKind.Binary, result.kind)
+        assertEquals("binary", result.kind)
         assertEquals(0, result.evalType)
         assertEquals("+", result.operator)
         
@@ -236,5 +248,99 @@ class TypedBinaryExpressionTest {
         val left = result.left
         assertIs<TypedBinaryExpression>(left)
         assertEquals("*", left.operator)
+    }
+    
+    @Test
+    fun `deserialize null coalescing binary expression`() {
+        val jsonString = """{
+            "kind": "binary",
+            "evalType": 0,
+            "operator": "??",
+            "left": {"kind": "identifier", "evalType": 1, "name": "x", "scope": 2},
+            "right": {"kind": "intLiteral", "evalType": 0, "value": "0"}
+        }"""
+        val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
+        
+        assertIs<TypedBinaryExpression>(result)
+        assertEquals("??", result.operator)
+    }
+    
+    @Test
+    fun `deserialize strict equality binary expression`() {
+        val jsonString = """{
+            "kind": "binary",
+            "evalType": 1,
+            "operator": "===",
+            "left": {"kind": "identifier", "evalType": 0, "name": "a", "scope": 2},
+            "right": {"kind": "identifier", "evalType": 0, "name": "b", "scope": 2}
+        }"""
+        val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
+        
+        assertIs<TypedBinaryExpression>(result)
+        assertEquals("===", result.operator)
+    }
+    
+    @Test
+    fun `deserialize strict inequality binary expression`() {
+        val jsonString = """{
+            "kind": "binary",
+            "evalType": 1,
+            "operator": "!==",
+            "left": {"kind": "identifier", "evalType": 0, "name": "x", "scope": 2},
+            "right": {"kind": "nullLiteral", "evalType": 1}
+        }"""
+        val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
+        
+        assertIs<TypedBinaryExpression>(result)
+        assertEquals("!==", result.operator)
+    }
+    
+    @Test
+    fun `deserialize null coalescing with nested expression`() {
+        val jsonString = """{
+            "kind": "binary",
+            "evalType": 0,
+            "operator": "??",
+            "left": {
+                "kind": "memberAccess",
+                "evalType": 1,
+                "expression": {"kind": "identifier", "evalType": 2, "name": "obj", "scope": 2},
+                "member": "value",
+                "isNullChaining": false
+            },
+            "right": {"kind": "stringLiteral", "evalType": 0, "value": "default"}
+        }"""
+        val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
+        
+        assertIs<TypedBinaryExpression>(result)
+        assertEquals("??", result.operator)
+        
+        val left = result.left
+        assertIs<TypedMemberAccessExpression>(left)
+    }
+    
+    @Test
+    fun `deserialize chained null coalescing`() {
+        val jsonString = """{
+            "kind": "binary",
+            "evalType": 0,
+            "operator": "??",
+            "left": {
+                "kind": "binary",
+                "evalType": 1,
+                "operator": "??",
+                "left": {"kind": "identifier", "evalType": 2, "name": "a", "scope": 2},
+                "right": {"kind": "identifier", "evalType": 1, "name": "b", "scope": 2}
+            },
+            "right": {"kind": "intLiteral", "evalType": 0, "value": "0"}
+        }"""
+        val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
+        
+        assertIs<TypedBinaryExpression>(result)
+        assertEquals("??", result.operator)
+        
+        val left = result.left
+        assertIs<TypedBinaryExpression>(left)
+        assertEquals("??", left.operator)
     }
 }

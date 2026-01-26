@@ -2,6 +2,10 @@ package com.mdeo.scriptexecution.service
 
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.common.model.ApiError
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+import com.mdeo.script.ast.statements.TypedStatementSerializer
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -12,6 +16,8 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import io.ktor.client.request.*
 
 /**
@@ -27,6 +33,10 @@ class BackendApiService(private val baseUrl: String) {
             json(Json {
                 ignoreUnknownKeys = true
                 isLenient = true
+                serializersModule = SerializersModule {
+                    contextual(TypedExpression::class, TypedExpressionSerializer)
+                    contextual(TypedStatement::class, TypedStatementSerializer)
+                }
             })
         }
     }

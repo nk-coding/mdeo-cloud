@@ -1,6 +1,6 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedStatement
 import org.objectweb.asm.MethodVisitor
 
 /**

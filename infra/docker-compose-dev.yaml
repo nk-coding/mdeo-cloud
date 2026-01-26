@@ -51,7 +51,7 @@ services:
       CORS_ALLOWED_HOSTS: localhost:4242,localhost:5173,127.0.0.1:4242,127.0.0.1:5173
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
-      PLUGIN_BASE_URL: "http://localhost:4242"
+      PLUGIN_BASE_URL: ""
       INTERNAL_PLUGIN_BASE_URL: "http://workbench:80"
       DEFAULT_PLUGIN_URLS: "/plugin/metamodel,/plugin/model,/plugin/script"
     depends_on:
@@ -90,7 +90,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -109,7 +109,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -128,7 +128,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       SCRIPT_EXECUTION_SERVICE_URL: "http://script-execution:8081"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
@@ -150,7 +150,7 @@ services:
       DATABASE_URL: "jdbc:postgresql://postgres-script:5432/mdeo"
       DATABASE_USER: "mdeo"
       DATABASE_PASSWORD: "mdeo"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       EXECUTION_TIMEOUT_MS: "300000"
     depends_on:
       postgres-script:

@@ -87,7 +87,7 @@ data class AppConfig(
                 jwt = JwtConfig(
                     expirationSeconds = System.getenv("JWT_EXPIRATION_SECONDS")?.toLongOrNull()
                         ?: TimeUnit.HOURS.toSeconds(1),
-                    issuer = System.getenv("JWT_ISSUER") ?: "mdeo-backend",
+                    issuer = System.getenv("JWT_ISSUER") ?: "mdeo-platform",
                     privateKey = System.getenv("JWT_PRIVATE_KEY"),
                     publicKey = System.getenv("JWT_PUBLIC_KEY")
                 ),

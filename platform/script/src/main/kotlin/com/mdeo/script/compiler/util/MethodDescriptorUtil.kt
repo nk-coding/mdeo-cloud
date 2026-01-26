@@ -1,6 +1,6 @@
 package com.mdeo.script.compiler.util
 
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
 
 /**

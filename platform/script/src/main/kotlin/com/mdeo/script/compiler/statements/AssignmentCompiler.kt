@@ -1,12 +1,12 @@
 package com.mdeo.script.compiler.statements
 
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.expressions.TypedMemberAccessExpression
-import com.mdeo.script.ast.statements.TypedAssignmentStatement
-import com.mdeo.script.ast.statements.TypedStatement
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.statements.TypedAssignmentStatement
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.StatementCompiler

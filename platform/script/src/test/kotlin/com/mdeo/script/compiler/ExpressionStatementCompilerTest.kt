@@ -1,6 +1,6 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.script.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ClassTypeRef
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 

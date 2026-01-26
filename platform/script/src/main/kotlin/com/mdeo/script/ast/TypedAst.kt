@@ -1,7 +1,7 @@
 package com.mdeo.script.ast
 
-import com.mdeo.script.ast.types.ReturnType
-import com.mdeo.script.ast.types.ReturnTypeSerializer
+import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ReturnTypeSerializer
 import kotlinx.serialization.Serializable
 
 /**

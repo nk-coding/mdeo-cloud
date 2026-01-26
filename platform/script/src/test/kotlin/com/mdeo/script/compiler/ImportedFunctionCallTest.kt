@@ -1,12 +1,12 @@
 package com.mdeo.script.compiler
 
 import com.mdeo.script.ast.TypedAst
-import com.mdeo.script.ast.TypedCallableBody
+import com.mdeo.expression.ast.TypedCallableBody
 import com.mdeo.script.ast.TypedFunction
 import com.mdeo.script.ast.TypedImport
 import com.mdeo.script.ast.TypedParameter
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.runtime.ExecutionEnvironment
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -964,7 +964,7 @@ class ImportedFunctionCallTest {
     // ==================== Helper for String Literal ====================
 
     private fun stringLiteral(value: String, typeIndex: Int) =
-        com.mdeo.script.ast.expressions.TypedStringLiteralExpression(
+        com.mdeo.expression.ast.expressions.TypedStringLiteralExpression(
             evalType = typeIndex,
             value = value
         )

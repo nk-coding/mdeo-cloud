@@ -1,10 +1,22 @@
 package com.mdeo.script.ast.statements
 
-import com.mdeo.script.ast.TypedStatementKind
-import com.mdeo.script.ast.expressions.TypedBooleanLiteralExpression
-import com.mdeo.script.ast.expressions.TypedIdentifierExpression
-import com.mdeo.script.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer
+
+import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.statements.TypedBreakStatement
+import com.mdeo.expression.ast.statements.TypedElseIfClause
+import com.mdeo.expression.ast.statements.TypedExpressionStatement
+import com.mdeo.expression.ast.statements.TypedIfStatement
+import com.mdeo.expression.ast.statements.TypedReturnStatement
+import com.mdeo.script.ast.statements.TypedStatementSerializer
+import com.mdeo.expression.ast.statements.TypedStatement
+import com.mdeo.expression.ast.statements.TypedVariableDeclarationStatement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -15,7 +27,13 @@ import kotlin.test.assertNull
  */
 class TypedIfStatementTest {
     
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TypedExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
     
     @Test
     fun `deserialize simple if statement`() {
@@ -30,7 +48,7 @@ class TypedIfStatementTest {
         val result = json.decodeFromString(TypedStatementSerializer, jsonString)
         
         assertIs<TypedIfStatement>(result)
-        assertEquals(TypedStatementKind.If, result.kind)
+        assertEquals("if", result.kind)
         
         val condition = result.condition
         assertIs<TypedBooleanLiteralExpression>(condition)
@@ -121,6 +139,6 @@ class TypedIfStatementTest {
         assertIs<TypedIfStatement>(result)
         val innerIf = result.thenBlock[0]
         assertIs<TypedIfStatement>(innerIf)
-        assertEquals(TypedStatementKind.If, innerIf.kind)
+        assertEquals("if", innerIf.kind)
     }
 }

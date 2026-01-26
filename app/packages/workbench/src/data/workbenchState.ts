@@ -270,7 +270,7 @@ export class WorkbenchState {
         });
 
         if (
-            execution.state === "completed" &&
+            (execution.state === "completed" || execution.state === "failed") &&
             execution.startedAt != undefined &&
             execution.finishedAt != undefined &&
             this.project.value != null

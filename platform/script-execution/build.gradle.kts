@@ -17,6 +17,7 @@ application {
 
 dependencies {
     implementation(project(":common"))
+    implementation(project(":expression"))
     implementation(project(":script"))
     
     // Ktor Server

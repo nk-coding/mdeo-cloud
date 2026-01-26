@@ -1,11 +1,10 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.script.ast.TypedExpressionKind
-import com.mdeo.script.ast.expressions.TypedExpression
-import com.mdeo.script.ast.expressions.TypedMemberCallExpression
-import com.mdeo.script.ast.types.ClassTypeRef
-import com.mdeo.script.ast.types.LambdaType
-import com.mdeo.script.ast.types.ReturnType
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.util.ASMUtil
@@ -39,7 +38,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
      * @return True if the expression is a member call expression, false otherwise.
      */
     override fun canCompile(expression: TypedExpression): Boolean {
-        return expression.kind == TypedExpressionKind.MemberCall
+        return expression.kind == "memberCall"
     }
 
     /**
@@ -67,6 +66,9 @@ class MemberCallCompiler : AbstractCallCompiler() {
      * If the expression is null, the result is null instead of throwing a NullPointerException.
      * For null-safe chaining, the result must be boxed if the underlying method returns a primitive,
      * since the expression result type is always nullable.
+     * 
+     * When the base expression is a nullable primitive (Int?, Boolean?, etc.), the value on the stack
+     * is boxed, so we must look up methods on builtin.any instead of the primitive type.
      */
     private fun compileNullSafeMemberCall(
         memberCall: TypedMemberCallExpression,
@@ -83,7 +85,13 @@ class MemberCallCompiler : AbstractCallCompiler() {
         mv.visitInsn(Opcodes.DUP)
         mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
-        emitMemberCall(memberCall, context, mv, targetType, resultType)
+        val effectiveTargetType = if (targetType is ClassTypeRef && targetType.isNullable && CoercionUtil.isPrimitiveType(targetType)) {
+            ClassTypeRef("builtin.any", false)
+        } else {
+            targetType
+        }
+
+        emitMemberCall(memberCall, context, mv, effectiveTargetType, resultType)
 
         if (resultType is ClassTypeRef && resultType.isNullable && CoercionUtil.isPrimitiveType(resultType)) {
             CoercionUtil.emitBoxing(resultType.type, mv)

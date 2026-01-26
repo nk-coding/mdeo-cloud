@@ -1,0 +1,818 @@
+import type {
+    IfStatementType,
+    ElseIfClauseType,
+    WhileStatementType,
+    ForStatementType,
+    VariableDeclarationStatementType,
+    AssignmentStatementType
+} from "../grammar/statementTypes.js";
+import type {
+    UnaryExpressionType,
+    BinaryExpressionType,
+    TernaryExpressionType,
+    AssertNonNullExpressionType,
+    TypeCastExpressionType,
+    TypeCheckExpressionType,
+    CallExpressionType,
+    MemberAccessExpressionType,
+    IdentifierExpressionType,
+    StringLiteralExpressionType,
+    IntLiteralExpressionType,
+    LongLiteralExpressionType,
+    FloatLiteralExpressionType,
+    DoubleLiteralExpressionType,
+    BooleanLiteralExpressionType
+} from "../grammar/expressionTypes.js";
+import type { ReturnType, ValueType, ClassTypeRef } from "../typir-extensions/config/type.js";
+import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
+import { isCustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
+import { isCustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
+import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
+import { isCustomNullType } from "../typir-extensions/kinds/custom-null/custom-null-type.js";
+import { getCallOverload } from "../typir-extensions/rules/getCallOverload.js";
+import { DefaultTypeNames } from "../type-system/typeSystemConfig.js";
+import type { AstNode } from "langium";
+import type { AstReflection } from "@mdeo/language-common";
+import type { Type } from "typir";
+import type { ExtendedTypirServices } from "../typir-extensions/service/extendedTypirServices.js";
+import {
+    type TypedStatement,
+    type TypedExpression,
+    type TypedIfStatement,
+    type TypedWhileStatement,
+    type TypedForStatement,
+    type TypedVariableDeclarationStatement,
+    type TypedAssignmentStatement,
+    type TypedExpressionStatement,
+    type TypedBreakStatement,
+    type TypedContinueStatement,
+    type TypedReturnStatement,
+    type TypedUnaryExpression,
+    type TypedBinaryExpression,
+    type TypedTernaryExpression,
+    type TypedMemberAccessExpression,
+    type TypedIdentifierExpression,
+    type TypedStringLiteralExpression,
+    type TypedIntLiteralExpression,
+    type TypedLongLiteralExpression,
+    type TypedFloatLiteralExpression,
+    type TypedDoubleLiteralExpression,
+    type TypedBooleanLiteralExpression,
+    type TypedNullLiteralExpression,
+    type TypedAssertNonNullExpression,
+    type TypedTypeCastExpression,
+    type TypedTypeCheckExpression,
+    type TypedCallableBody,
+    type TypedExpressionCallExpression,
+    type TypedFunctionCallExpression,
+    type TypedMemberCallExpression
+} from "./typedAst.js";
+
+/**
+ * Base converter for converting expression and statement ASTs to TypedAST.
+ * Handles type inference, scope resolution, and AST transformation for expressions and statements.
+ * Can be extended for language-specific conversion (e.g., script-specific features).
+ */
+export abstract class TypedAstConverter {
+    /**
+     * Lookup map to deduplicate types in the types array.
+     */
+    protected readonly typeLookup = new Map<Type, number>();
+
+    /**
+     * Array of all types used in the program.
+     */
+    protected readonly types: ReturnType[] = [];
+
+    /**
+     * The Any? type used for generic type parameter replacement.
+     */
+    protected readonly anyNullableType: ClassTypeRef = {
+        type: DefaultTypeNames.Any,
+        isNullable: true
+    };
+
+    /**
+     * Index for the void type in the types array.
+     */
+    protected voidTypeIndex: number;
+
+    /**
+     * Index for the string type in the types array.
+     */
+    protected stringTypeIndex: number;
+
+    /**
+     * Index for the double type in the types array.
+     */
+    protected doubleTypeIndex: number;
+
+    /**
+     * Index for the boolean type in the types array.
+     */
+    protected booleanTypeIndex: number;
+
+    /**
+     * Index for the null type in the types array.
+     */
+    protected nullTypeIndex: number;
+
+    /**
+     * Statement type identifiers for checking instance types.
+     */
+    protected abstract statementTypes: {
+        statementsScopeType: any;
+        ifStatementType: any;
+        whileStatementType: any;
+        forStatementType: any;
+        variableDeclarationStatementType: any;
+        assignmentStatementType: any;
+        expressionStatementType: any;
+        breakStatementType: any;
+        continueStatementType: any;
+        returnStatementType: any;
+    };
+
+    /**
+     * Expression type identifiers for checking instance types.
+     */
+    protected abstract expressionTypes: {
+        unaryExpressionType: any;
+        binaryExpressionType: any;
+        ternaryExpressionType: any;
+        assertNonNullExpressionType: any;
+        typeCastExpressionType: any;
+        typeCheckExpressionType: any;
+        callExpressionType: any;
+        memberAccessExpressionType: any;
+        identifierExpressionType: any;
+        stringLiteralExpressionType: any;
+        intLiteralExpressionType: any;
+        longLiteralExpressionType: any;
+        floatLiteralExpressionType: any;
+        doubleLiteralExpressionType: any;
+        booleanLiteralExpressionType: any;
+        nullLiteralExpressionType: any;
+    };
+
+    /**
+     * Creates a new TypedAstConverter.
+     *
+     * @param typir The Typir services for type inference
+     * @param reflection The AST reflection for type checking
+     */
+    constructor(
+        protected readonly typir: ExtendedTypirServices<any>,
+        protected readonly reflection: AstReflection
+    ) {
+        this.voidTypeIndex = this.getTypeIndexForType(typir.factory.CustomVoid.getOrCreate());
+        this.stringTypeIndex = this.getTypeIndexForType(
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.String, isNullable: false })
+        );
+        this.doubleTypeIndex = this.getTypeIndexForType(
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.Double, isNullable: false })
+        );
+        this.booleanTypeIndex = this.getTypeIndexForType(
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.Boolean, isNullable: false })
+        );
+        this.nullTypeIndex = this.getTypeIndexForType(typir.factory.CustomNull.getOrCreate());
+    }
+
+    /**
+     * Extracts statements from a callable body node.
+     *
+     * @param body The body node
+     * @returns Array of statement AST nodes
+     */
+    protected getStatementsFromBody(body: AstNode): AstNode[] {
+        if (this.reflection.isInstance(body, this.statementTypes.statementsScopeType)) {
+            return (body as any).statements ?? [];
+        }
+        return [];
+    }
+
+    /**
+     * Converts a callable body (function or lambda body) to a TypedCallableBody.
+     *
+     * @param body The statements scope node
+     * @returns The TypedCallableBody representation
+     */
+    protected convertCallableBody(body: AstNode): TypedCallableBody {
+        const statements = this.getStatementsFromBody(body);
+        return {
+            body: statements.map((statement) => this.convertStatement(statement))
+        };
+    }
+
+    /**
+     * Converts a statement AST node to a TypedStatement.
+     *
+     * @param statement The statement AST node
+     * @returns The TypedStatement representation
+     */
+    protected convertStatement(statement: AstNode): TypedStatement {
+        if (this.reflection.isInstance(statement, this.statementTypes.ifStatementType)) {
+            return this.convertIfStatement(statement as IfStatementType);
+        } else if (this.reflection.isInstance(statement, this.statementTypes.whileStatementType)) {
+            return this.convertWhileStatement(statement as WhileStatementType);
+        } else if (this.reflection.isInstance(statement, this.statementTypes.forStatementType)) {
+            return this.convertForStatement(statement as ForStatementType);
+        } else if (this.reflection.isInstance(statement, this.statementTypes.variableDeclarationStatementType)) {
+            return this.convertVariableDeclarationStatement(statement as VariableDeclarationStatementType);
+        } else if (this.reflection.isInstance(statement, this.statementTypes.assignmentStatementType)) {
+            return this.convertAssignmentStatement(statement as AssignmentStatementType);
+        } else if (this.reflection.isInstance(statement, this.statementTypes.expressionStatementType)) {
+            return this.convertExpressionStatement(statement as any);
+        } else if (this.reflection.isInstance(statement, this.statementTypes.breakStatementType)) {
+            return this.convertBreakStatement();
+        } else if (this.reflection.isInstance(statement, this.statementTypes.continueStatementType)) {
+            return this.convertContinueStatement();
+        } else if (this.reflection.isInstance(statement, this.statementTypes.returnStatementType)) {
+            return this.convertReturnStatement(statement);
+        } else {
+            throw new Error(`Unsupported statement type: ${statement}`);
+        }
+    }
+
+    /**
+     * Converts an if statement.
+     *
+     * @param statement The if statement AST node
+     * @returns The TypedIfStatement representation
+     */
+    protected convertIfStatement(statement: IfStatementType): TypedIfStatement {
+        return {
+            kind: "if",
+            condition: this.convertExpression(statement.condition),
+            thenBlock: this.getStatementsFromBody(statement.thenBlock).map((s) => this.convertStatement(s)),
+            elseIfs: (statement.elseIfs ?? []).map((elseIf: ElseIfClauseType) => ({
+                condition: this.convertExpression(elseIf.condition),
+                thenBlock: this.getStatementsFromBody(elseIf.thenBlock).map((s) => this.convertStatement(s))
+            })),
+            elseBlock: statement.elseBlock
+                ? this.getStatementsFromBody(statement.elseBlock).map((s) => this.convertStatement(s))
+                : undefined
+        };
+    }
+
+    /**
+     * Converts a while statement.
+     *
+     * @param statement The while statement AST node
+     * @returns The TypedWhileStatement representation
+     */
+    protected convertWhileStatement(statement: WhileStatementType): TypedWhileStatement {
+        return {
+            kind: "while",
+            condition: this.convertExpression(statement.condition),
+            body: this.getStatementsFromBody(statement.body).map((s) => this.convertStatement(s))
+        };
+    }
+
+    /**
+     * Converts a for statement.
+     *
+     * @param statement The for statement AST node
+     * @returns The TypedForStatement representation
+     */
+    protected convertForStatement(statement: ForStatementType): TypedForStatement {
+        return {
+            kind: "for",
+            variableName: statement.variable.name,
+            variableType: this.getTypeIndex(statement.variable),
+            iterable: this.convertExpression(statement.iterable),
+            body: this.getStatementsFromBody(statement.body).map((s) => this.convertStatement(s))
+        };
+    }
+
+    /**
+     * Converts a variable declaration statement.
+     *
+     * @param statement The variable declaration statement AST node
+     * @returns The TypedVariableDeclarationStatement representation
+     */
+    protected convertVariableDeclarationStatement(
+        statement: VariableDeclarationStatementType
+    ): TypedVariableDeclarationStatement {
+        return {
+            kind: "variableDeclaration",
+            name: statement.name,
+            type: this.getTypeIndex(statement),
+            initialValue:
+                statement.initialValue != undefined ? this.convertExpression(statement.initialValue) : undefined
+        };
+    }
+
+    /**
+     * Converts an assignment statement.
+     *
+     * @param statement The assignment statement AST node
+     * @returns The TypedAssignmentStatement representation
+     */
+    protected convertAssignmentStatement(statement: AssignmentStatementType): TypedAssignmentStatement {
+        const left = this.convertExpression(statement.left);
+        const right = this.convertExpression(statement.right);
+
+        if (left.kind !== "identifier" && left.kind !== "memberAccess") {
+            throw new Error("Assignment left side must be an identifier or member access");
+        }
+
+        return {
+            kind: "assignment",
+            left: left as TypedIdentifierExpression | TypedMemberAccessExpression,
+            right
+        };
+    }
+
+    /**
+     * Converts an expression statement.
+     *
+     * @param statement The expression statement AST node
+     * @returns The TypedExpressionStatement representation
+     */
+    protected convertExpressionStatement(statement: any): TypedExpressionStatement {
+        return {
+            kind: "expression",
+            expression: this.convertExpression(statement.expression)
+        };
+    }
+
+    /**
+     * Converts a break statement.
+     *
+     * @returns The TypedBreakStatement representation
+     */
+    protected convertBreakStatement(): TypedBreakStatement {
+        return {
+            kind: "break"
+        };
+    }
+
+    /**
+     * Converts a continue statement.
+     *
+     * @returns The TypedContinueStatement representation
+     */
+    protected convertContinueStatement(): TypedContinueStatement {
+        return {
+            kind: "continue"
+        };
+    }
+
+    /**
+     * Converts a return statement.
+     *
+     * @param statement The return statement AST node
+     * @returns The TypedReturnStatement representation
+     */
+    protected convertReturnStatement(statement: any): TypedReturnStatement {
+        return {
+            kind: "return",
+            value: statement.value ? this.convertExpression(statement.value) : undefined
+        };
+    }
+
+    /**
+     * Converts an expression AST node to a TypedExpression.
+     * This is an abstract method that must be implemented by subclasses to handle
+     * language-specific expression types (like lambdas, function calls, etc.).
+     *
+     * @param expr The expression AST node
+     * @returns The TypedExpression representation
+     */
+    protected convertExpression(expr: AstNode): TypedExpression {
+        if (this.reflection.isInstance(expr, this.expressionTypes.unaryExpressionType)) {
+            return this.convertUnaryExpression(expr as UnaryExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.binaryExpressionType)) {
+            return this.convertBinaryExpression(expr as BinaryExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.ternaryExpressionType)) {
+            return this.convertTernaryExpression(expr as TernaryExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.assertNonNullExpressionType)) {
+            return this.convertAssertNonNullExpression(expr as AssertNonNullExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.typeCastExpressionType)) {
+            return this.convertTypeCastExpression(expr as TypeCastExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.typeCheckExpressionType)) {
+            return this.convertTypeCheckExpression(expr as TypeCheckExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.callExpressionType)) {
+            return this.convertCallExpression(expr as CallExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.memberAccessExpressionType)) {
+            return this.convertMemberAccessExpression(expr as MemberAccessExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.identifierExpressionType)) {
+            return this.convertIdentifierExpression(expr as IdentifierExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.stringLiteralExpressionType)) {
+            return this.convertStringLiteral(expr as StringLiteralExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.intLiteralExpressionType)) {
+            return this.convertIntLiteral(expr as IntLiteralExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.longLiteralExpressionType)) {
+            return this.convertLongLiteral(expr as LongLiteralExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.floatLiteralExpressionType)) {
+            return this.convertFloatLiteral(expr as FloatLiteralExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.doubleLiteralExpressionType)) {
+            return this.convertDoubleLiteral(expr as DoubleLiteralExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.booleanLiteralExpressionType)) {
+            return this.convertBooleanLiteral(expr as BooleanLiteralExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.nullLiteralExpressionType)) {
+            return this.convertNullLiteral();
+        }
+        return this.convertAdditionalExpression(expr);
+    }
+
+    /**
+     * Hook for subclasses to handle additional expression types not covered by the base converter.
+     * Should throw an error if the expression type is not supported.
+     *
+     * @param expr The expression AST node
+     * @returns The TypedExpression representation
+     */
+    protected convertAdditionalExpression(expr: AstNode): TypedExpression {
+        throw new Error(`Unsupported expression type: ${expr}`);
+    }
+
+    /**
+     * Converts a unary expression.
+     *
+     * @param expr The unary expression AST node
+     * @returns The TypedUnaryExpression representation
+     */
+    protected convertUnaryExpression(expr: UnaryExpressionType): TypedUnaryExpression {
+        return {
+            kind: "unary",
+            evalType: this.getTypeIndex(expr),
+            operator: expr.operator as "-" | "!",
+            expression: this.convertExpression(expr.expression)
+        };
+    }
+
+    /**
+     * Converts a binary expression.
+     *
+     * @param expr The binary expression AST node
+     * @returns The TypedBinaryExpression representation
+     */
+    protected convertBinaryExpression(expr: BinaryExpressionType): TypedBinaryExpression {
+        return {
+            kind: "binary",
+            evalType: this.getTypeIndex(expr),
+            operator: expr.operator as TypedBinaryExpression["operator"],
+            left: this.convertExpression(expr.left),
+            right: this.convertExpression(expr.right)
+        };
+    }
+
+    /**
+     * Converts a ternary expression.
+     *
+     * @param expr The ternary expression AST node
+     * @returns The TypedTernaryExpression representation
+     */
+    protected convertTernaryExpression(expr: TernaryExpressionType): TypedTernaryExpression {
+        return {
+            kind: "ternary",
+            evalType: this.getTypeIndex(expr),
+            condition: this.convertExpression(expr.condition),
+            trueExpression: this.convertExpression(expr.trueExpression),
+            falseExpression: this.convertExpression(expr.falseExpression)
+        };
+    }
+
+    /**
+     * Converts an assert non-null expression (!! postfix operator).
+     *
+     * @param expr The assert non-null expression AST node
+     * @returns The TypedAssertNonNullExpression representation
+     */
+    protected convertAssertNonNullExpression(expr: AssertNonNullExpressionType): TypedAssertNonNullExpression {
+        return {
+            kind: "assertNonNull",
+            evalType: this.getTypeIndex(expr),
+            expression: this.convertExpression(expr.expression)
+        };
+    }
+
+    /**
+     * Converts a type cast expression (as / as? operators).
+     *
+     * @param expr The type cast expression AST node
+     * @returns The TypedTypeCastExpression representation
+     */
+    protected convertTypeCastExpression(expr: TypeCastExpressionType): TypedTypeCastExpression {
+        return {
+            kind: "typeCast",
+            evalType: this.getTypeIndex(expr),
+            expression: this.convertExpression(expr.expression),
+            targetType: this.getTypeIndex(expr.targetType),
+            isSafe: expr.isSafe
+        };
+    }
+
+    /**
+     * Converts a type check expression (is / !is operators).
+     *
+     * @param expr The type check expression AST node
+     * @returns The TypedTypeCheckExpression representation
+     */
+    protected convertTypeCheckExpression(expr: TypeCheckExpressionType): TypedTypeCheckExpression {
+        return {
+            kind: "typeCheck",
+            evalType: this.getTypeIndex(expr),
+            expression: this.convertExpression(expr.expression),
+            checkType: this.getTypeIndex(expr.checkType),
+            isNegated: expr.isNegated
+        };
+    }
+
+    /**
+     * Converts a call expression.
+     *
+     * @param expr The call expression AST node
+     * @returns The TypedCallExpression representation
+     */
+    protected convertCallExpression(
+        expr: CallExpressionType
+    ): TypedExpressionCallExpression | TypedFunctionCallExpression | TypedMemberCallExpression {
+        const expression = expr.expression;
+        const expressionType = this.typir.Inference.inferType(expression);
+        if (Array.isArray(expressionType)) {
+            throw new Error("Cannot infer type for call expression");
+        }
+        const args = expr.arguments.map((arg) => this.convertExpression(arg));
+        const evalType = this.getTypeIndex(expr);
+        if (isCustomFunctionType(expressionType)) {
+            return this.convertFunctionCallExpression(expr, args, evalType);
+        } else {
+            return {
+                kind: "call",
+                evalType,
+                expression: this.convertExpression(expr.expression),
+                arguments: args
+            };
+        }
+    }
+
+    /**
+     * Converts a function call expression.
+     * Only handles calls to named functions and member functions.
+     *
+     * @param expr The call expression AST node
+     * @param args The converted argument expressions
+     * @param evalType The evaluated type index of the call expression
+     * @returns The TypedFunctionCallExpression or TypedMemberCallExpression representation
+     */
+    protected convertFunctionCallExpression(
+        expr: CallExpressionType,
+        args: TypedExpression[],
+        evalType: number
+    ): TypedFunctionCallExpression | TypedMemberCallExpression {
+        const expression = expr.expression;
+        const overload = getCallOverload(
+            expr,
+            expr.expression,
+            expr.genericArgs?.typeArguments ?? [],
+            expr.arguments,
+            this.typir
+        );
+        if (overload == undefined) {
+            throw new Error("Could not determine overload for function call");
+        }
+        if (this.reflection.isInstance(expression, this.expressionTypes.memberAccessExpressionType)) {
+            const memberAccess = expression as MemberAccessExpressionType;
+            return {
+                kind: "memberCall",
+                evalType,
+                expression: this.convertExpression(memberAccess.expression),
+                member: memberAccess.member,
+                isNullChaining: memberAccess.isNullChaining ?? false,
+                arguments: args,
+                overload
+            };
+        } else if (this.reflection.isInstance(expression, this.expressionTypes.identifierExpressionType)) {
+            return {
+                kind: "functionCall",
+                evalType,
+                name: (expression as IdentifierExpressionType).name,
+                arguments: args,
+                overload
+            };
+        } else {
+            throw new Error("Unsupported function call expression type");
+        }
+    }
+
+    /**
+     * Converts a member access expression.
+     *
+     * @param expr The member access expression AST node
+     * @returns The TypedMemberAccessExpression representation
+     */
+    protected convertMemberAccessExpression(expr: MemberAccessExpressionType): TypedMemberAccessExpression {
+        return {
+            kind: "memberAccess",
+            evalType: this.getTypeIndex(expr),
+            expression: this.convertExpression(expr.expression),
+            member: expr.member,
+            isNullChaining: expr.isNullChaining ?? false
+        };
+    }
+
+    /**
+     * Converts an identifier expression.
+     *
+     * @param expr The identifier expression AST node
+     * @returns The TypedIdentifierExpression representation
+     */
+    protected convertIdentifierExpression(expr: IdentifierExpressionType): TypedIdentifierExpression {
+        const scope = this.typir.ScopeProvider.getScope(expr);
+        const entry = scope.getEntry(expr.name);
+
+        if (entry == undefined) {
+            throw new Error(`Identifier '${expr.name}' not found in scope`);
+        }
+
+        return {
+            kind: "identifier",
+            evalType: this.getTypeIndex(expr),
+            name: expr.name,
+            scope: entry?.definingScope.level
+        };
+    }
+
+    /**
+     * Converts a string literal expression.
+     *
+     * @param expr The string literal AST node
+     * @returns The TypedStringLiteralExpression representation
+     */
+    protected convertStringLiteral(expr: StringLiteralExpressionType): TypedStringLiteralExpression {
+        return {
+            kind: "stringLiteral",
+            evalType: this.stringTypeIndex,
+            value: expr.value
+        };
+    }
+
+    /**
+     * Converts an int literal expression.
+     *
+     * @param expr The int literal AST node
+     * @returns The TypedIntLiteralExpression representation
+     */
+    protected convertIntLiteral(expr: IntLiteralExpressionType): TypedIntLiteralExpression {
+        return {
+            kind: "intLiteral",
+            evalType: this.getTypeIndex(expr),
+            value: expr.value
+        };
+    }
+
+    /**
+     * Converts a long literal expression.
+     *
+     * @param expr The long literal AST node
+     * @returns The TypedLongLiteralExpression representation
+     */
+    protected convertLongLiteral(expr: LongLiteralExpressionType): TypedLongLiteralExpression {
+        return {
+            kind: "longLiteral",
+            evalType: this.getTypeIndex(expr),
+            value: expr.value
+        };
+    }
+
+    /**
+     * Converts a float literal expression.
+     *
+     * @param expr The float literal AST node
+     * @returns The TypedFloatLiteralExpression representation
+     */
+    protected convertFloatLiteral(expr: FloatLiteralExpressionType): TypedFloatLiteralExpression {
+        return {
+            kind: "floatLiteral",
+            evalType: this.getTypeIndex(expr),
+            value: expr.value
+        };
+    }
+
+    /**
+     * Converts a double literal expression.
+     *
+     * @param expr The double literal AST node
+     * @returns The TypedDoubleLiteralExpression representation
+     */
+    protected convertDoubleLiteral(expr: DoubleLiteralExpressionType): TypedDoubleLiteralExpression {
+        return {
+            kind: "doubleLiteral",
+            evalType: this.doubleTypeIndex,
+            value: expr.value
+        };
+    }
+
+    /**
+     * Converts a boolean literal expression.
+     *
+     * @param expr The boolean literal AST node
+     * @returns The TypedBooleanLiteralExpression representation
+     */
+    protected convertBooleanLiteral(expr: BooleanLiteralExpressionType): TypedBooleanLiteralExpression {
+        return {
+            kind: "booleanLiteral",
+            evalType: this.getTypeIndex(expr),
+            value: expr.value
+        };
+    }
+
+    /**
+     * Converts a null literal expression.
+     *
+     * @returns The TypedNullLiteralExpression representation
+     */
+    protected convertNullLiteral(): TypedNullLiteralExpression {
+        return {
+            kind: "nullLiteral",
+            evalType: this.nullTypeIndex
+        };
+    }
+
+    /**
+     * Gets the index of a type in the types array for the given AST node.
+     * Infers the type, erases generic parameters, and adds to the types array if not already present.
+     *
+     * @param node The AST node to get the type for
+     * @returns The index into the types array
+     */
+    protected getTypeIndex(node: AstNode): number {
+        const inferredType = this.typir.Inference.inferType(node);
+        if (Array.isArray(inferredType)) {
+            throw new Error("Cannot infer type");
+        }
+        return this.getTypeIndexForType(inferredType);
+    }
+
+    /**
+     * Gets the index of a type in the types array.
+     * Adds the type to the types array if not already present.
+     *
+     * @param type The type to get the index for
+     * @returns The index into the types array
+     */
+    protected getTypeIndexForType(type: Type): number {
+        if (this.typeLookup.has(type)) {
+            return this.typeLookup.get(type)!;
+        }
+
+        let returnType: ReturnType;
+        if (isCustomVoidType(type)) {
+            returnType = { kind: "void" };
+        } else if (isCustomClassType(type)) {
+            returnType = type.definition;
+        } else if (isCustomLambdaType(type)) {
+            returnType = type.definition;
+        } else if (isCustomNullType(type)) {
+            returnType = this.anyNullableType;
+        } else {
+            throw new Error("Unsupported type for indexing");
+        }
+
+        const erasedType = this.eraseGenericTypeParameters(returnType);
+        const newIndex = this.types.length;
+        this.types.push(erasedType);
+        this.typeLookup.set(type, newIndex);
+        return newIndex;
+    }
+
+    /**
+     * Erases generic type parameters from a type, replacing them with Any?.
+     *
+     * @param type The type to erase generics from
+     * @returns The type with generics erased
+     */
+    protected eraseGenericTypeParameters(type: ReturnType): ReturnType {
+        if ("kind" in type) {
+            return type;
+        } else if ("generic" in type) {
+            return this.anyNullableType;
+        } else if ("type" in type) {
+            return {
+                type: type.type,
+                isNullable: type.isNullable,
+                typeArgs:
+                    type.typeArgs != undefined
+                        ? Object.fromEntries(
+                              Object.entries(type.typeArgs).map(([argName, argType]) => [
+                                  argName,
+                                  this.eraseGenericTypeParameters(argType) as ValueType
+                              ])
+                          )
+                        : undefined
+            };
+        } else {
+            return {
+                isNullable: type.isNullable,
+                parameters: type.parameters.map((parameter) => ({
+                    name: parameter.name,
+                    type: this.eraseGenericTypeParameters(parameter.type) as ValueType
+                })),
+                returnType: this.eraseGenericTypeParameters(type.returnType) as ValueType
+            };
+        }
+    }
+}
