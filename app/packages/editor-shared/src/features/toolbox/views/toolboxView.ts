@@ -19,14 +19,14 @@ export function generateToolboxView(context: Toolbox): VNode {
         "div",
         {
             class: {
-                // Root container needs positioning to anchor the toolbox and error panel
-                // Positioned absolutely in top-right corner like hylimo
+                toolbox: true,
                 absolute: true,
                 "top-4": true,
                 "right-4": true,
                 flex: true,
                 "flex-col": true,
-                "z-50": true
+                "z-50": true,
+                "pointer-events-none": true
             }
         },
         generateToolboxInternal(context),
@@ -48,9 +48,15 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 flex: true,
                 "flex-col": true,
                 "gap-2": true,
+                "w-[calc(var(--editor-spacing)*68-2px)]": context.isOpen,
+                "h-[50vh]": context.isOpen,
                 "w-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
-                "max-h-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
-                "mb-2": !context.isOpen
+                "h-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
+                "mb-2": !context.isOpen,
+                "transition-all": true,
+                "duration-300": true,
+                "ease-in-out": true,
+                "pointer-events-none": true
             },
             on: {
                 keydown: (event: KeyboardEvent) => {

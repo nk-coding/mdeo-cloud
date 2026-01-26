@@ -78,7 +78,7 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
      * @param element The model element
      * @returns The bounds of the element
      */
-    protected override getBounds(elm: Node, element: GModelElement & BoundsAware): Bounds {
+    public override getBounds(elm: Node, element: GModelElement & BoundsAware): Bounds {
         if (!isSVGGraphicsElement(elm) || elm.nodeName !== "foreignObject") {
             return super.getBounds(elm, element);
         }

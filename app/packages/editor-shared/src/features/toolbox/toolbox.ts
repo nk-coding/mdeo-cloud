@@ -6,11 +6,13 @@ import { sharedImport } from "../../sharedImport.js";
 import { ToolState } from "./toolState.js";
 import { ToolType, type ToolDefinition, type ToolboxEditEntry, type ToolboxErrorState } from "./toolboxTypes.js";
 import { generateToolboxView } from "./views/toolboxView.js";
-import { enableTool, enableOrLockTool } from "./tools.js";
+import { enableTool } from "./tools.js";
+import { ScrollViewState } from "./views/scrollView.js";
+import { PreviewRenderer } from "./previewRenderer.js";
 
 const patcher = init([classModule, propsModule, styleModule, eventListenersModule, attributesModule]);
 
-const { injectable, inject, postConstruct } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES } = sharedImport("@eclipse-glsp/sprotty");
 const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction } = sharedImport("@eclipse-glsp/client");
 const MiniSearchLib = sharedImport("minisearch");
@@ -29,9 +31,15 @@ export class Toolbox extends ToolPalette {
     @inject(ToolState)
     public toolState!: ToolState;
 
+    @inject(PreviewRenderer)
+    public previewRenderer!: PreviewRenderer;
+
     protected currentVNode?: VNode;
     protected searchIndex?: MiniSearch<ToolboxEditEntry>;
     protected toolboxEntries: ToolboxEditEntry[] = [];
+
+    public detailsScrollState: ScrollViewState = new ScrollViewState();
+    public errorScrollState: ScrollViewState = new ScrollViewState();
 
     public isOpen: boolean = true;
     public isBottomPanelOpen: boolean = true;
@@ -47,11 +55,6 @@ export class Toolbox extends ToolPalette {
 
     override containerClass(): string {
         return "toolbox-wrapper";
-    }
-
-    @postConstruct()
-    override postConstruct(): void {
-        super.postConstruct();
     }
 
     /**
@@ -138,6 +141,17 @@ export class Toolbox extends ToolPalette {
         super.onBeforeShow(containerElement, root);
         this.buildToolboxEntries();
         this.update();
+    }
+
+    /**
+     * Reloads the palette body, refreshing items if dynamic and not readonly.
+     */
+    protected override async reloadPaletteBody(): Promise<void> {
+        if (!this.editorContext.isReadonly && this.dynamic) {
+            await this.setPaletteItems();
+            this.buildToolboxEntries();
+            this.update();
+        }
     }
 
     /**
@@ -234,15 +248,13 @@ export class Toolbox extends ToolPalette {
      * Updates the current tool.
      *
      * @param tool The tool type to set
-     * @param locked Whether the tool should be locked
      */
-    updateTool(tool: ToolType, locked: boolean): void {
-        if (this.toolState.toolType === tool && this.toolState.isLocked === locked) {
+    updateTool(tool: ToolType): void {
+        if (this.toolState.toolType === tool) {
             return;
         }
 
         this.toolState.toolType = tool;
-        this.toolState.isLocked = locked;
 
         const action = this.getToolAction(tool);
         if (action) {
@@ -281,8 +293,6 @@ export class Toolbox extends ToolPalette {
     onToolClick(tool: ToolDefinition): void {
         if (tool.id === ToolType.BOTTOM_PANEL_TOGGLE) {
             this.toggleBottomPanel();
-        } else if (tool.lockable) {
-            enableOrLockTool(this, tool.id);
         } else {
             enableTool(this, tool.id);
         }

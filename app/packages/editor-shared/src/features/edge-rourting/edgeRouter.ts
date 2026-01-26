@@ -122,6 +122,11 @@ export class EdgeRouter {
 
         const route = this.simplifyRoutingPoints([startPoint, ...normalizedPoints, endPoint]);
 
+        if (route.length >= 2) {
+            sourceAnchor = this.cleanupAnchor(sourceAnchor, route[0], route[1]);
+            targetAnchor = this.cleanupAnchor(targetAnchor, route.at(-1)!, route.at(-2)!);
+        }
+
         const defineAnchorInMeta = meta.sourceAnchor != undefined || meta.targetAnchor != undefined || route.length > 3;
 
         return {
@@ -134,6 +139,42 @@ export class EdgeRouter {
             sourceAnchor,
             targetAnchor
         };
+    }
+
+    /**
+     * Cleans up an anchor based on the edge orientation between two points.
+     * If the anchor is on a side that does not match the edge orientation,
+     * it is adjusted to be on the correct side with value 0 or 1.
+     *
+     * @param anchor the anchor to clean up
+     * @param point1 the point at the anchor's end
+     * @param point2 the next point in the route
+     * @returns the cleaned up anchor
+     */
+    protected cleanupAnchor(anchor: EdgeAnchor, point1: Point, point2: Point): EdgeAnchor {
+        if (anchor.value > 0 && anchor.value < 1) {
+            return anchor;
+        }
+        const isVertical = Math.abs(point1.x - point2.x) < Math.abs(point1.y - point2.y);
+        if (anchor.side === "top" || anchor.side === "bottom") {
+            if (isVertical) {
+                return anchor;
+            } else {
+                return {
+                    side: anchor.value <= 0 ? "left" : "right",
+                    value: anchor.side === "top" ? 0 : 1
+                };
+            }
+        } else {
+            if (!isVertical) {
+                return anchor;
+            } else {
+                return {
+                    side: anchor.value <= 0 ? "top" : "bottom",
+                    value: anchor.side === "left" ? 0 : 1
+                };
+            }
+        }
     }
 
     /**

@@ -114,22 +114,67 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
 
             const nodeId = idRegistry.getId(cls);
             const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
-            const displayName = cls.name ?? "Unnamed";
 
-            const node = GClassNode.builder()
-                .id(nodeId)
-                .name(displayName)
-                .isAbstract(cls.isAbstract ?? false)
-                .meta(metadata)
-                .build();
-
-            node.children.push(
-                ...this.createClassTitle(nodeId, displayName, false),
-                ...this.createClassProperties(nodeId, cls, idRegistry, false)
-            );
-
-            graph.children.push(node);
+            graph.children.push(this.createClassNode(cls, nodeId, metadata, idRegistry));
         }
+    }
+
+    /**
+     * Creates a visual node for a single class with its properties.
+     *
+     * @param cls the class AST node
+     * @param nodeId the unique node ID
+     * @param metadata the layout metadata for the node
+     * @param idRegistry The ID registry for AST node ID generation
+     * @returns The created GClassNode
+     */
+    createClassNode(
+        cls: PartialClass,
+        nodeId: string,
+        metadata: NodeLayoutMetadata,
+        idRegistry: ModelIdRegistry
+    ): GClassNode {
+        const displayName = cls.name ?? "Unnamed";
+
+        const node = GClassNode.builder()
+            .id(nodeId)
+            .name(displayName)
+            .isAbstract(cls.isAbstract ?? false)
+            .meta(metadata)
+            .build();
+
+        node.children.push(
+            ...this.createClassTitle(nodeId, displayName, false),
+            ...this.createClassProperties(nodeId, cls, idRegistry, false)
+        );
+        return node;
+    }
+
+    /**
+     * Creates a visual node for a single enum with its entries.
+     *
+     * @param enumDef the enum AST node
+     * @param nodeId the unique node ID
+     * @param metadata the layout metadata for the node
+     * @param idRegistry The ID registry for AST node ID generation
+     * @returns The created GEnumNode
+     */
+    createEnumNode(
+        enumDef: PartialEnum,
+        nodeId: string,
+        metadata: NodeLayoutMetadata,
+        idRegistry: ModelIdRegistry
+    ): GEnumNode {
+        const displayName = enumDef.name ?? "Unnamed";
+
+        const node = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata).build();
+
+        node.children.push(
+            ...this.createEnumTitle(nodeId, displayName, false),
+            ...this.createEnumEntries(nodeId, enumDef, idRegistry, false)
+        );
+
+        return node;
     }
 
     /**

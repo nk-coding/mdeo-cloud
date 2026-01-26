@@ -42,10 +42,6 @@ export interface ToolDefinition {
      * The title/tooltip text for the tool
      */
     title: string;
-    /**
-     * Whether this tool can be locked (stays active after use)
-     */
-    lockable?: boolean;
 }
 
 /**

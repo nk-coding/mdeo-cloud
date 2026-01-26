@@ -95,7 +95,9 @@ export abstract class ImportEntityActionHandler implements ActionHandler {
      *
      * @param services Langium services with workspace edit support
      */
-    constructor(services: LangiumLSPServices & WorkspaceEditAdditionalServices & ExtendedLangiumServices) {
+    constructor(
+        protected readonly services: LangiumLSPServices & WorkspaceEditAdditionalServices & ExtendedLangiumServices
+    ) {
         this.sharedServices = services.shared;
         this.workspaceEditService = services.workspace.WorkspaceEdit;
         this.reflection = services.shared.AstReflection;
@@ -288,44 +290,20 @@ export abstract class ImportEntityActionHandler implements ActionHandler {
             return null;
         }
 
-        const root = document.parseResult?.value as MetaModelType;
-        if (root == undefined) {
+        const exported = await this.services.references.ScopeComputation.collectExportedSymbols(document);
+        const existing = exported.find((description) => description.name === name);
+        if (existing == undefined) {
             return null;
         }
-
-        if (root.elements != undefined) {
-            for (const element of root.elements) {
-                if (this.reflection.isInstance(element, Class)) {
-                    if (element.name === name) {
-                        return `A class named "${name}" already exists in this file`;
-                    }
-                }
-                if (this.reflection.isInstance(element, Enum)) {
-                    if (element.name === name) {
-                        return `An enum named "${name}" already exists in this file`;
-                    }
-                }
-            }
+        if (existing.type === Class.name) {
+            return `A class named "${name}" already exists in this file`;
+        } else if (existing.type === Enum.name) {
+            return `An enum named "${name}" already exists in this file`;
+        } else if (existing.type === FileImport.name) {
+            return `An import named "${name}" already exists in this file`;
+        } else {
+            throw new Error(`Unexpected exported symbol type: ${existing.type}`);
         }
-
-        if (root.imports != undefined) {
-            for (const importStatement of root.imports) {
-                if (this.reflection.isInstance(importStatement, FileImport)) {
-                    if (importStatement.imports != undefined) {
-                        for (const imp of importStatement.imports) {
-                            if (imp.name !== undefined && imp.name === name) {
-                                return `An import with alias "${name}" already exists in this file`;
-                            }
-                            if (imp.name === undefined && imp.entity.$refText === name) {
-                                return `An import named "${name}" already exists in this file`;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
     }
 
     /**

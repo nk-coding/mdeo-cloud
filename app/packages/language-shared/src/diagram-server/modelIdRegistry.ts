@@ -6,10 +6,42 @@ const { AstUtils } = sharedImport("langium");
 
 /**
  * Registry for managing unique IDs for all AST nodes in a model.
- * This class generates IDs for all nodes at initialization time and handles
+ */
+export interface ModelIdRegistry {
+    /**
+     * Retrieves the ID for the given AST node.
+     *
+     * @param node The AST node to get the ID for
+     * @returns The ID
+     * @throws Error if the node does not have an assigned ID
+     */
+    getId(node: AstNode): string;
+
+    /**
+     * Retrieves the ID for the given AST node.
+     * If not found, constructs an "unresolved" ID based on the node type and a unique counter.
+     * Use with caution, as this may lead to non-deterministic IDs.
+     * This is mainly useful for ids for external entities where neigher edit nor metadata is available or required.
+     *
+     * @param node The AST node to get the ID for
+     * @returns The ID, or an "unresolved" ID if not assigned
+     */
+    getIdOrUnresolved(node: AstNode): string;
+
+    /**
+     * Checks if the given AST node has an assigned ID.
+     *
+     * @param node The AST node to check
+     * @returns True if the node has an ID, false otherwise
+     */
+    hasId(node: AstNode): boolean;
+}
+
+/**
+ * Default implementaiton for ModelIdRegistry that generates IDs for all nodes at initialization time and handles
  * uniqueness constraints by automatically appending counters when needed.
  */
-export class ModelIdRegistry {
+export class DefaultModelIdRegistry implements ModelIdRegistry {
     /**
      * Mapping from AST nodes to their assigned unique IDs.
      */
@@ -36,13 +68,6 @@ export class ModelIdRegistry {
         this.generateIds(rootNode);
     }
 
-    /**
-     * Retrieves the ID for the given AST node.
-     *
-     * @param node The AST node to get the ID for
-     * @returns The ID
-     * @throws Error if the node does not have an assigned ID
-     */
     getId(node: AstNode): string {
         const id = this.idMap.get(node);
         if (id == undefined) {
@@ -51,15 +76,6 @@ export class ModelIdRegistry {
         return id;
     }
 
-    /**
-     * Retrieves the ID for the given AST node.
-     * If not found, constructs an "unresolved" ID based on the node type and a unique counter.
-     * Use with caution, as this may lead to non-deterministic IDs.
-     * This is mainly useful for ids for external entities where neigher edit nor metadata is available or required.
-     *
-     * @param node The AST node to get the ID for
-     * @returns The ID, or an "unresolved" ID if not assigned
-     */
     getIdOrUnresolved(node: AstNode): string {
         const id = this.idMap.get(node);
         if (id == undefined) {
@@ -71,12 +87,6 @@ export class ModelIdRegistry {
         return id;
     }
 
-    /**
-     * Checks if the given AST node has an assigned ID.
-     *
-     * @param node The AST node to check
-     * @returns True if the node has an ID, false otherwise
-     */
     hasId(node: AstNode): boolean {
         return this.idMap.has(node);
     }
@@ -122,5 +132,45 @@ export class ModelIdRegistry {
         }
 
         return candidateId;
+    }
+}
+
+/**
+ * Placeholder implementation of ModelIdRegistry for virtual models
+ */
+export class PlaceholderModelIdRegistry implements ModelIdRegistry {
+    /**
+     * Mapping from AST nodes to their assigned unique IDs.
+     * Ensures that each node always returns the same placeholder ID.
+     */
+    private readonly idMap = new Map<AstNode, string>();
+
+    /**
+     * Counter for generating unique placeholder IDs.
+     */
+    private idCounter = 0;
+
+    /**
+     * Creates a new PlaceholderModelIdRegistry.
+     *
+     * @param prefix The prefix to use for placeholder IDs
+     */
+    constructor(readonly prefix: string) {}
+
+    getId(node: AstNode): string {
+        let id = this.idMap.get(node);
+        if (id == undefined) {
+            id = `${this.prefix}_${this.idCounter++}`;
+            this.idMap.set(node, id);
+        }
+        return id;
+    }
+
+    getIdOrUnresolved(node: AstNode): string {
+        return this.getId(node);
+    }
+
+    hasId(): boolean {
+        return true;
     }
 }

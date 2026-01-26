@@ -1,67 +1,116 @@
-import { BaseCreateNodeOperationHandler, sharedImport } from "@mdeo/language-shared";
-import type { CreateNodeResult } from "@mdeo/language-shared";
-import type {
-    CreateNodeOperation,
-    TriggerNodeCreationAction as TriggerNodeCreationActionType
-} from "@eclipse-glsp/protocol";
-import type { CreateNodeOperationHandler } from "@eclipse-glsp/server";
+import {
+    BaseCreateNodeOperationHandler,
+    MetadataManager,
+    PlaceholderModelIdRegistry,
+    sharedImport
+} from "@mdeo/language-shared";
+import type { CreateNodeResult, GroupedToolboxItem, ToolboxItemProvider } from "@mdeo/language-shared";
+import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
 import type { EnumType } from "../../../grammar/metamodelTypes.js";
+import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { MetamodelElementType } from "../model/elementTypes.js";
+import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
+import type { MetamodelMetadataManager } from "../metamodelMetadataManager.js";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 const { CreateNodeOperation: CreateNodeOperationKind, TriggerNodeCreationAction } =
     sharedImport("@eclipse-glsp/protocol");
+const { GModelFactory } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Operation handler for creating new Enum nodes in the metamodel diagram.
  * Creates enums with an optional default entry.
+ *
+ * This handler also implements ToolboxItemProvider to supply palette items
+ * with ghost element templates for visual preview during node creation.
  */
 @injectable()
-export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler implements CreateNodeOperationHandler {
+export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler implements ToolboxItemProvider {
     readonly operationType = CreateNodeOperationKind.KIND;
     override readonly label = "Enum";
     readonly elementTypeIds = [MetamodelElementType.NODE_ENUM];
 
-    /**
-     * Creates a new enum node based on the given operation.
-     *
-     * @param operation The create node operation
-     * @returns The result of the node creation including workspace edit
-     */
-    override async createNode(operation: CreateNodeOperation): Promise<CreateNodeResult | undefined> {
-        if (operation.elementTypeId !== MetamodelElementType.NODE_ENUM) {
-            return undefined;
-        }
-        const edit = await this.createEnumNode(operation);
-        const nodeId = "Enum_NewEnum";
-        return {
-            nodeId,
-            nodeType: MetamodelElementType.NODE_ENUM,
-            workspaceEdit: edit
-        };
-    }
+    @inject(GModelFactory)
+    protected gModelFactory!: MetamodelGModelFactory;
+    @inject(MetadataManager)
+    protected metadataManager!: MetamodelMetadataManager;
 
     /**
      * Returns the trigger actions for creating enum nodes.
      *
      * @returns Array of trigger actions for enum creation
      */
-    getTriggerActions(): TriggerNodeCreationActionType[] {
+
+    /**
+     * Returns the trigger actions for creating enum nodes.
+     *
+     * @returns Array of trigger actions for enum creation
+     */
+    /**
+     * Implements ToolboxItemProvider to supply grouped palette items.
+     *
+     * Returns two items: simple enum and enum with an entry.
+     */
+    async getToolboxItems(): Promise<GroupedToolboxItem[]> {
         return [
-            TriggerNodeCreationAction.create(MetamodelElementType.NODE_ENUM),
-            TriggerNodeCreationAction.create(MetamodelElementType.NODE_ENUM, { args: { includeEntry: true } })
+            {
+                item: {
+                    id: `create-enum-1`,
+                    sortString: "E",
+                    label: "Enum",
+                    actions: [
+                        TriggerNodeCreationAction.create(MetamodelElementType.NODE_ENUM, {
+                            ghostElement: await this.createGhostElement(false)
+                        })
+                    ]
+                },
+                groupId: "create-group"
+            },
+            {
+                item: {
+                    id: `create-enum-2`,
+                    sortString: "E",
+                    label: "Enum with entry",
+                    actions: [
+                        TriggerNodeCreationAction.create(MetamodelElementType.NODE_ENUM, {
+                            args: { includeEntry: true },
+                            ghostElement: await this.createGhostElement(true)
+                        })
+                    ]
+                },
+                groupId: "create-group"
+            }
         ];
+    }
+
+    /**
+     * Creates a ghost element for visual preview during node creation.
+     *
+     * @param includeEntry Whether the ghost should include a default entry
+     * @returns A Promise resolving to a `GhostElement` containing the template
+     */
+    protected async createGhostElement(includeEntry: boolean): Promise<GhostElement> {
+        const enumAst = await this.createEnumAst(includeEntry);
+        const idRegistry = new PlaceholderModelIdRegistry("__ghost_enum");
+        const template = this.gModelFactory.createEnumNode(
+            enumAst,
+            idRegistry.getId(enumAst),
+            this.metadataManager.getDefaultMetadata({ type: MetamodelElementType.NODE_ENUM }),
+            idRegistry
+        );
+        return {
+            template,
+            dynamic: true
+        };
     }
 
     /**
      * Creates a workspace edit for adding a new Enum node to the document.
      *
-     * @param operation The create operation
-     * @returns The workspace edit to perform the insertion
+     * @param enumNode The `EnumType` AST node to insert
+     * @returns A Promise resolving to the `WorkspaceEdit` that performs the insertion
      */
-    protected async createEnumNode(operation: CreateNodeOperation) {
-        const includeEntry = operation.args?.includeEntry === true;
-        const enumNode = this.createEnumAst(includeEntry);
+    protected async createEnumNode(enumNode: EnumType): Promise<WorkspaceEdit> {
         const serialized = await this.serializeNode(enumNode);
         const rootCstNode = this.modelState.sourceModel?.$cstNode;
 
@@ -76,15 +125,16 @@ export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler i
     }
 
     /**
-     * Creates an AST node for a new Enum.
+     * Creates an AST node for a new Enum and ensures a unique name.
      *
      * @param includeEntry Whether to include a default entry
-     * @returns The created Enum AST node
+     * @returns A Promise resolving to the created `EnumType` AST node
      */
-    protected createEnumAst(includeEntry: boolean): EnumType {
+    protected async createEnumAst(includeEntry: boolean): Promise<EnumType> {
+        const name = await this.findUniqueName("NewEnum");
         const enumNode: EnumType = {
             $type: "Enum",
-            name: "NewEnum",
+            name,
             entries: []
         };
 
@@ -96,5 +146,29 @@ export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler i
         }
 
         return enumNode;
+    }
+
+    /**
+     * Handles the create node operation for enums.
+     *
+     * Computes a unique name, builds the AST, serializes it and returns
+     * the corresponding workspace edit for insertion.
+     *
+     * @param operation The create node operation
+     * @returns The created node id, type and workspace edit or `undefined`
+     */
+    override async createNode(operation: CreateNodeOperation): Promise<CreateNodeResult | undefined> {
+        if (operation.elementTypeId !== MetamodelElementType.NODE_ENUM) {
+            return undefined;
+        }
+        const includeEntry = operation.args?.includeEntry === true;
+        const enumNode = await this.createEnumAst(includeEntry);
+        const edit = await this.createEnumNode(enumNode);
+        const nodeId = `Enum_${enumNode.name}`;
+        return {
+            nodeId,
+            nodeType: MetamodelElementType.NODE_ENUM,
+            workspaceEdit: edit
+        };
     }
 }

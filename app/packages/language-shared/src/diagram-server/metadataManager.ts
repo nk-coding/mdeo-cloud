@@ -137,6 +137,16 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
     }
 
     /**
+     * Provides default metadata for a node or edge when none is specified.
+     *
+     * @param meta The metadata without the 'meta' property
+     * @returns The default metadata object
+     */
+    getDefaultMetadata(meta: Omit<NodeMetadata | EdgeMetadata, "meta">): object {
+        return this.verifyMetadata(meta) ?? {};
+    }
+
+    /**
      * Merges two graph metadata objects, with the first having precedence.
      *
      * @param first the primary metadata

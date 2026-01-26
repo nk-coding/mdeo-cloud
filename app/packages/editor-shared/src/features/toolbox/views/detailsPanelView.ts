@@ -7,6 +7,8 @@ const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 import { generateSearchInputView } from "./searchInputView.js";
 import { generateToolboxItemView, generateToolboxItemGroupView } from "./toolboxItemView.js";
+import { generateScrollView } from "./scrollView.js";
+import { generatePreviewView } from "./previewView.js";
 
 /**
  * Generates the details panel view containing search and palette items.
@@ -15,33 +17,36 @@ import { generateToolboxItemView, generateToolboxItemGroupView } from "./toolbox
  * @returns The details panel VNode, always rendered with transition classes
  */
 export function generateDetailsPanelView(context: Toolbox): VNode {
-    const isVisible = context.isOpen && context.isBottomPanelOpen;
+    const isVisible = context.isBottomPanelOpen;
     return html(
         "div",
         {
             class: {
                 flex: true,
                 "flex-col": true,
-                "w-68": true,
                 "overflow-hidden": true,
                 "shadow-[0_8px_16px_rgba(0,0,0,0.12)]": true,
                 "rounded-md": true,
-                "max-h-0": !isVisible,
                 "opacity-0": !isVisible,
-                "max-h-[600px]": isVisible,
                 "opacity-100": isVisible,
                 "transition-all": isVisible,
-                "duration-300": isVisible
+                "duration-300": isVisible,
+                "pointer-events-auto": true
             }
         },
         html(
             "div",
             {
                 class: {
+                    "toolbox-details": true,
+                    // relative: true,
                     "rounded-md": true,
                     border: true,
                     "border-border": true,
-                    "bg-toolbox": true
+                    "bg-toolbox": true,
+                    flex: true,
+                    "flex-col": true,
+                    "h-full": true
                 }
             },
             html(
@@ -61,17 +66,40 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
                 "div",
                 {
                     class: {
-                        "toolbox-items-container": true,
-                        "flex-1": true,
-                        "overflow-y-auto": true,
-                        "px-1": true,
-                        "py-2": true
+                        "overflow-hidden": true
                     }
                 },
-                ...generatePaletteItemsList(context)
-            )
+                generateScrollView(context.detailsScrollState, () => generatePaletteItemsList(context), {
+                    "flex-1": true,
+                    "px-1": true,
+                    "py-2": true,
+                    "h-full": true
+                })
+            ),
+            generatePreviewForCurrentItem(context)
         )
     );
+}
+
+/**
+ * Generates the preview for the currently hovered item.
+ *
+ * @param context The toolbox context
+ * @returns The preview VNode or undefined
+ */
+function generatePreviewForCurrentItem(context: Toolbox): VNode | undefined {
+    if (!context.showPreviewFor) {
+        return undefined;
+    }
+
+    const items = context.getFilteredItems();
+    const currentItem = items.find((item) => item.id === context.showPreviewFor);
+
+    if (!currentItem) {
+        return undefined;
+    }
+
+    return generatePreviewView(context, currentItem);
 }
 
 /**

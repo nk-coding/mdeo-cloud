@@ -18,8 +18,7 @@ export const toolboxTools: ToolDefinition[] = [
     {
         id: ToolType.POINTER,
         icon: MousePointer,
-        title: "Select (V)",
-        lockable: true
+        title: "Select (V)"
     },
     {
         id: ToolType.MARQUEE,
@@ -29,8 +28,7 @@ export const toolboxTools: ToolDefinition[] = [
     {
         id: ToolType.CREATE_EDGE,
         icon: ArrowUpRight,
-        title: "Create Edge",
-        lockable: true
+        title: "Create Edge"
     },
     {
         id: ToolType.LAYOUT,
@@ -52,20 +50,6 @@ export const toolboxTools: ToolDefinition[] = [
  */
 export function enableTool(context: Toolbox, tool: ToolType): void {
     if (context.toolState.toolType !== tool) {
-        context.updateTool(tool, false);
-    }
-}
-
-/**
- * Enables a tool, or toggles its locked state if already enabled.
- *
- * @param context The toolbox context
- * @param tool The tool type to enable or lock
- */
-export function enableOrLockTool(context: Toolbox, tool: ToolType): void {
-    if (context.toolState.toolType !== tool) {
-        context.updateTool(tool, false);
-    } else {
-        context.updateTool(tool, !context.toolState.isLocked);
+        context.updateTool(tool);
     }
 }

@@ -15,7 +15,7 @@ export interface ToolTypeProvider {
 
 /**
  * Injectable class that manages the current tool state in the toolbox.
- * Tracks the currently selected tool and whether it's locked.
+ * Tracks the currently selected tool
  */
 @injectable()
 export class ToolState implements ToolTypeProvider {
@@ -25,15 +25,9 @@ export class ToolState implements ToolTypeProvider {
     toolType: ToolType = ToolType.POINTER;
 
     /**
-     * Whether the current tool is locked (stays active after use)
-     */
-    isLocked: boolean = false;
-
-    /**
      * Resets the tool state to defaults.
      */
     reset(): void {
         this.toolType = ToolType.POINTER;
-        this.isLocked = false;
     }
 }

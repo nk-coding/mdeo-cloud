@@ -1,32 +1,46 @@
-import { BaseCreateNodeOperationHandler, sharedImport } from "@mdeo/language-shared";
-import type { CreateNodeResult } from "@mdeo/language-shared";
-import type {
-    CreateNodeOperation,
-    TriggerNodeCreationAction as TriggerNodeCreationActionType
-} from "@eclipse-glsp/protocol";
-import type { CreateNodeOperationHandler } from "@eclipse-glsp/server";
+import {
+    BaseCreateNodeOperationHandler,
+    MetadataManager,
+    PlaceholderModelIdRegistry,
+    sharedImport
+} from "@mdeo/language-shared";
+import type { CreateNodeResult, GroupedToolboxItem, ToolboxItemProvider } from "@mdeo/language-shared";
+import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
 import type { ClassType } from "../../../grammar/metamodelTypes.js";
 import { MetamodelPrimitiveTypes } from "../../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "../model/elementTypes.js";
+import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
+import type { MetamodelMetadataManager } from "../metamodelMetadataManager.js";
+import type { WorkspaceEdit } from "vscode-languageserver-types";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 const { CreateNodeOperation: CreateNodeOperationKind, TriggerNodeCreationAction } =
     sharedImport("@eclipse-glsp/protocol");
+const { GModelFactory } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Operation handler for creating new nodes in the metamodel diagram.
  * Currently supports creating Class nodes.
+ *
+ * This handler also implements ToolboxItemProvider to supply palette items
+ * with ghost element templates for visual preview during node creation.
  */
 @injectable()
-export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler implements CreateNodeOperationHandler {
+export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler implements ToolboxItemProvider {
     readonly operationType = CreateNodeOperationKind.KIND;
     override readonly label = "Class";
     readonly elementTypeIds = [MetamodelElementType.NODE_CLASS];
 
+    @inject(GModelFactory)
+    protected gModelFactory!: MetamodelGModelFactory;
+    @inject(MetadataManager)
+    protected metadataManager!: MetamodelMetadataManager;
+
     override async createNode(operation: CreateNodeOperation): Promise<CreateNodeResult | undefined> {
         if (operation.elementTypeId === "node:class") {
-            const edit = await this.createClassNode(operation);
-            const nodeId = "Class_NewClass";
+            const node = await this.createClassAst(operation.args?.includeProperty === true);
+            const edit = await this.createClassNode(node);
+            const nodeId = `Class_${node.name}`;
             return {
                 nodeId,
                 nodeType: MetamodelElementType.NODE_CLASS,
@@ -36,25 +50,72 @@ export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler 
         return undefined;
     }
 
-    getTriggerActions(): TriggerNodeCreationActionType[] {
+    /**
+     * Implements ToolboxItemProvider to supply grouped palette items.
+     *
+     * @returns Array of grouped toolbox items with ghost elements
+     */
+    async getToolboxItems(): Promise<GroupedToolboxItem[]> {
         return [
-            TriggerNodeCreationAction.create(MetamodelElementType.NODE_CLASS),
-            TriggerNodeCreationAction.create(MetamodelElementType.NODE_CLASS, { args: { includeProperty: true } })
+            {
+                item: {
+                    id: `create-class-1`,
+                    sortString: "C",
+                    label: "Class",
+                    actions: [
+                        TriggerNodeCreationAction.create(MetamodelElementType.NODE_CLASS, {
+                            ghostElement: await this.createGhostElement(false)
+                        })
+                    ]
+                },
+                groupId: "create-group"
+            },
+            {
+                item: {
+                    id: `create-class-2`,
+                    sortString: "C",
+                    label: "Class with property",
+                    actions: [
+                        TriggerNodeCreationAction.create(MetamodelElementType.NODE_CLASS, {
+                            args: { includeProperty: true },
+                            ghostElement: await this.createGhostElement(true)
+                        })
+                    ]
+                },
+                groupId: "create-group"
+            }
         ];
+    }
+
+    /**
+     * Creates a ghost element for visual preview during node creation.
+     *
+     * @param includeProperty Whether to include a property in the preview
+     * @returns Ghost element configuration with template schema
+     */
+    protected async createGhostElement(includeProperty: boolean): Promise<GhostElement> {
+        const classAst = await this.createClassAst(includeProperty);
+        const idRegistry = new PlaceholderModelIdRegistry("__ghost_class");
+        const template = this.gModelFactory.createClassNode(
+            classAst,
+            idRegistry.getId(classAst),
+            this.metadataManager.getDefaultMetadata({ type: MetamodelElementType.NODE_CLASS }),
+            idRegistry
+        );
+        return {
+            template,
+            dynamic: true
+        };
     }
 
     /**
      * Creates a workspace edit for adding a new Class node to the document.
      *
-     * @param operation The create operation
+     * @param node The Class AST node to insert
      * @returns The workspace edit to perform the insertion
      */
-    protected async createClassNode(operation: CreateNodeOperation) {
-        const includeProperty = operation.args?.includeProperty === true;
-
-        const classNode = this.createClassAst(includeProperty);
-
-        const serialized = await this.serializeNode(classNode);
+    protected async createClassNode(node: ClassType): Promise<WorkspaceEdit> {
+        const serialized = await this.serializeNode(node);
 
         const rootCstNode = this.modelState.sourceModel?.$cstNode;
         if (rootCstNode == undefined) {
@@ -73,10 +134,11 @@ export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler 
      * @param includeProperty Whether to include an example property
      * @returns The created Class AST node
      */
-    protected createClassAst(includeProperty: boolean): ClassType {
+    protected async createClassAst(includeProperty: boolean): Promise<ClassType> {
+        const name = await this.findUniqueName("NewClass");
         const classNode: ClassType = {
             $type: "Class",
-            name: "NewClass",
+            name,
             isAbstract: false,
             properties: [],
             extensions: undefined

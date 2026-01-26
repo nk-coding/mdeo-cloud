@@ -6,7 +6,7 @@ import type { ToolDefinition } from "../toolboxTypes.js";
 import { iconButtonClasses } from "./styles.js";
 
 const { html } = sharedImport("@eclipse-glsp/sprotty");
-const { Lock, X, PencilRuler } = sharedImport("lucide");
+const { X, PencilRuler } = sharedImport("lucide");
 
 import { generateIcon } from "./iconView.js";
 
@@ -33,7 +33,9 @@ export function generateToolbarView(context: Toolbox): VNode {
                 relative: true,
                 "box-content": true,
                 "flex-initial": true,
-                "shrink-0": true
+                "shrink-0": true,
+                "overflow-hidden": true,
+                "pointer-events-auto": true
             }
         },
         generateToolbarContent(context)
@@ -49,7 +51,6 @@ export function generateToolbarView(context: Toolbox): VNode {
  */
 function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
     const isActive = context.toolState.toolType === tool.id;
-    const isLocked = isActive && context.toolState.isLocked;
 
     return html(
         "button",
@@ -64,11 +65,7 @@ function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
                 "cursor-pointer": true,
                 "transition-all": true,
                 "duration-300": true,
-                "opacity-0": !context.isOpen,
-                "scale-95": !context.isOpen,
-                "pointer-events-none": !context.isOpen,
-                "opacity-100": context.isOpen,
-                "scale-100": context.isOpen
+                "pointer-events-none": !context.isOpen
             },
             attrs: {
                 title: tool.title,
@@ -81,24 +78,7 @@ function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
                 }
             }
         },
-        generateIcon(tool.icon, ["h-4", "w-4"]),
-        isLocked
-            ? html(
-                  "span",
-                  {
-                      class: {
-                          absolute: true,
-                          "-top-1": true,
-                          "-right-1": true,
-                          "text-primary": true
-                      },
-                      attrs: {
-                          "aria-hidden": "true"
-                      }
-                  },
-                  generateIcon(Lock, ["h-3", "w-3"])
-              )
-            : undefined
+        generateIcon(tool.icon, ["h-4", "w-4"])
     );
 }
 
@@ -118,7 +98,7 @@ function generateToolbarContent(context: Toolbox): VNode {
             "bg-border": true,
             "mx-1": true,
             "transition-all": true,
-            "duration-300": true,
+            "duration-30": true,
             "opacity-0": !context.isOpen,
             "pointer-events-none": !context.isOpen,
             "opacity-100": context.isOpen

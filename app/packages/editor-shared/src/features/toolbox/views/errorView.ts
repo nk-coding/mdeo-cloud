@@ -6,6 +6,7 @@ const { html } = sharedImport("@eclipse-glsp/sprotty");
 const { AlertTriangle } = sharedImport("lucide");
 
 import { generateIcon } from "./iconView.js";
+import { generateScrollView } from "./scrollView.js";
 
 /**
  * Generates the error display compartment for the toolbox.
@@ -72,7 +73,21 @@ function generateErrorContainer(context: Toolbox): VNode {
             }
         },
         generateErrorButton(),
-        generateErrorList(context)
+        generateScrollView(
+            context.errorScrollState,
+            () => context.errorState!.messages.map((message) => generateErrorItem(message)),
+            {
+                "text-destructive": true,
+                "text-sm": true,
+                "opacity-0": true,
+                "transition-opacity": true,
+                "duration-200": true,
+                "group-hover:opacity-100": true,
+                "w-full": true,
+                "px-2": true,
+                "py-2": true
+            }
+        )
     );
 }
 
@@ -102,35 +117,6 @@ function generateErrorButton(): VNode {
             }
         },
         generateIcon(AlertTriangle, ["h-4", "w-4"])
-    );
-}
-
-/**
- * Generates the error list that appears on hover.
- *
- * @param context The toolbox context
- * @returns The error list VNode
- */
-function generateErrorList(context: Toolbox): VNode {
-    return html(
-        "div",
-        {
-            class: {
-                "overflow-y-auto": true,
-                flex: true,
-                "flex-col": true,
-                "w-full": true,
-                "px-2": true,
-                "py-2": true,
-                "text-destructive": true,
-                "text-sm": true,
-                "opacity-0": true,
-                "transition-opacity": true,
-                "duration-200": true,
-                "group-hover:opacity-100": true
-            }
-        },
-        ...context.errorState!.messages.map((message) => generateErrorItem(message))
     );
 }
 

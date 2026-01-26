@@ -32,3 +32,11 @@
 @utility field-sizing-content {
     field-sizing: content;
 }
+
+@utility no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none; /* IE 10+ */
+    &::-webkit-scrollbar {
+        display: none; /* Chrome/Safari/Webkit */
+    }
+}

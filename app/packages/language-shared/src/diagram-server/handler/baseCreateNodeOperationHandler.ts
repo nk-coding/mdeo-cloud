@@ -82,4 +82,28 @@ export abstract class BaseCreateNodeOperationHandler extends BaseOperationHandle
             }
         };
     }
+
+    /**
+     * Finds a unique name by checking existing exported symbols in the source model.
+     *
+     * @param name The base name to check for uniqueness
+     * @returns The unique name, potentially with a numerical suffix appended
+     */
+    protected async findUniqueName(name: string): Promise<string> {
+        const document = this.modelState.sourceModel?.$document;
+        if (!document) {
+            return name;
+        }
+        const exported =
+            await this.modelState.languageServices.references.ScopeComputation.collectExportedSymbols(document);
+        const names = new Set(exported.map((description) => description.name));
+        if (!names.has(name)) {
+            return name;
+        }
+        let suffix = 1;
+        while (names.has(`${name}${suffix}`)) {
+            suffix++;
+        }
+        return name + suffix.toString();
+    }
 }

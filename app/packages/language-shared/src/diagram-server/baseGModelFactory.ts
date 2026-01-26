@@ -1,7 +1,7 @@
 import type { GModelFactory, GModelRoot } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import type { AstNode } from "langium";
-import { ModelIdRegistry } from "./modelIdRegistry.js";
+import { type ModelIdRegistry, DefaultModelIdRegistry } from "./modelIdRegistry.js";
 import { ModelIdProvider } from "./modelIdProvider.js";
 import type { ModelState } from "./modelState.js";
 import type { GModelIndex } from "./modelIndex.js";
@@ -38,7 +38,7 @@ export abstract class BaseGModelFactory<T extends AstNode> implements GModelFact
         if (sourceModel == undefined) {
             return;
         }
-        const idRegistry = new ModelIdRegistry(sourceModel, this.modelIdProvider);
+        const idRegistry = new DefaultModelIdRegistry(sourceModel, this.modelIdProvider);
         const gRoot = this.createModelInternal(sourceModel, idRegistry);
         this.modelIndex.indexSourceModelRoot(sourceModel, idRegistry);
         this.modelState.updateRoot(gRoot);

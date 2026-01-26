@@ -135,7 +135,9 @@ export abstract class GEdgeView implements IView {
         children.push(...this.renderAdditional(model, context, routeResult));
 
         const attachments = this.getEdgeAttachments(model, context);
-        children.push(...this.renderAttachments(attachments, routeResult));
+        const sourceElementOffset = sourceMarkerData?.elementOffset ?? 0;
+        const targetElementOffset = targetMarkerData?.elementOffset ?? 0;
+        children.push(...this.renderAttachments(attachments, routeResult, sourceElementOffset, targetElementOffset));
 
         if (isSelected(model) && route.length >= 2) {
             children.push(...this.renderReconnectHandles(model, route));
@@ -216,9 +218,16 @@ export abstract class GEdgeView implements IView {
      *
      * @param attachments The attachments to render
      * @param routeResult The route data
+     * @param sourceElementOffset Offset from the source element due to markers
+     * @param targetElementOffset Offset from the target element due to markers
      * @returns An array of VNodes for the attachments
      */
-    private renderAttachments(attachments: EdgeAttachment[], routeResult: RouteComputationResult): VNode[] {
+    private renderAttachments(
+        attachments: EdgeAttachment[],
+        routeResult: RouteComputationResult,
+        sourceElementOffset: number,
+        targetElementOffset: number
+    ): VNode[] {
         const vnodes: VNode[] = [];
 
         const groupedAttachments = new Map<EdgeAttachmentPosition, EdgeAttachment[]>();
@@ -229,7 +238,9 @@ export abstract class GEdgeView implements IView {
         }
 
         for (const [position, group] of groupedAttachments) {
-            vnodes.push(...this.renderAttachmentGroup(group, position, routeResult));
+            vnodes.push(
+                ...this.renderAttachmentGroup(group, position, routeResult, sourceElementOffset, targetElementOffset)
+            );
         }
 
         return vnodes;
@@ -241,12 +252,16 @@ export abstract class GEdgeView implements IView {
      * @param attachments The attachments in the group
      * @param position The position along the edge
      * @param routeResult The route data
+     * @param sourceElementOffset Offset from the source element due to markers
+     * @param targetElementOffset Offset from the target element due to markers
      * @returns An array of VNodes for the attachment group
      */
     private renderAttachmentGroup(
         attachments: EdgeAttachment[],
         position: EdgeAttachmentPosition,
-        routeResult: RouteComputationResult
+        routeResult: RouteComputationResult,
+        sourceElementOffset: number,
+        targetElementOffset: number
     ): VNode[] {
         const route = routeResult.route;
         if (route.length < 2) {
@@ -271,9 +286,14 @@ export abstract class GEdgeView implements IView {
         ) {
             const direction = this.getDirectionFromSide(anchorInfo.anchorSide);
             const distanceFromElement = this.attachmentDistanceFromElement;
+            const markerOffset =
+                position === EdgeAttachmentPosition.SOURCE_LEFT || position === EdgeAttachmentPosition.SOURCE_RIGHT
+                    ? sourceElementOffset
+                    : targetElementOffset;
+            const totalOffset = distanceFromElement + (markerOffset ?? 0);
             anchorPoint = {
-                x: anchorPoint.x + direction.x * distanceFromElement,
-                y: anchorPoint.y + direction.y * distanceFromElement
+                x: anchorPoint.x + direction.x * totalOffset,
+                y: anchorPoint.y + direction.y * totalOffset
             };
         }
 

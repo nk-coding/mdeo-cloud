@@ -147,7 +147,7 @@ export class GAssociationEdgeView extends GEdgeView {
         return {
             marker: diamond,
             strokeOffset: 20,
-            elementOffset: 20
+            elementOffset: 14
         };
     }
 
@@ -173,7 +173,7 @@ export class GAssociationEdgeView extends GEdgeView {
         return {
             marker: arrow,
             strokeOffset: 12,
-            elementOffset: 12
+            elementOffset: 6
         };
     }
 }

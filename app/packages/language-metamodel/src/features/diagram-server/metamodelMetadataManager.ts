@@ -4,7 +4,8 @@ import {
     type GraphMetadata,
     type NodeMetadata,
     type EdgeMetadata,
-    ModelIdRegistry,
+    type ModelIdRegistry,
+    DefaultModelIdRegistry,
     ModelIdProvider,
     type ModelIdProvider as ModelIdProviderType
 } from "@mdeo/language-shared";
@@ -33,7 +34,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     protected modelIdProvider!: ModelIdProviderType;
 
     protected override verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
-        if (model.type === MetamodelElementType.NODE_CLASS) {
+        if (model.type === MetamodelElementType.NODE_CLASS || model.type === MetamodelElementType.NODE_ENUM) {
             return NodeLayoutMetadataUtil.verify(model.meta, 250);
         }
 
@@ -131,7 +132,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         const nodes: Record<string, NodeMetadata> = {};
         const edges: Record<string, EdgeMetadata> = {};
 
-        const idRegistry = new ModelIdRegistry(sourceModel, this.modelIdProvider);
+        const idRegistry = new DefaultModelIdRegistry(sourceModel, this.modelIdProvider);
         const { classes, enums, associations, imports } = this.extractClassesAndAssociations(sourceModel);
 
         this.extractClassMetadata(classes, idRegistry, nodes);

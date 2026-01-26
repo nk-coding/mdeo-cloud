@@ -49,7 +49,22 @@ export abstract class BaseScopeProvider<
      * @returns The scope associated with the language node.
      */
     getScope(languageNode: Specifics["LanguageType"]): BoundScope<Specifics> {
-        const closestScope = this.findClosestScopeNode(languageNode);
+        return this.getScopeInternal(languageNode, undefined);
+    }
+
+    /**
+     * Retrieves the scope for a given language node.
+     *
+     * Traverses the AST hierarchy upward to find the closest scope-relevant node,
+     * then builds or retrieves the scope chain from the cache. If no scope-relevant
+     * node is found, returns the global scope.
+     *
+     * @param languageNode The language AST node for which to retrieve the scope.
+     * @param position The position within the node, if applicable.
+     * @returns The scope associated with the language node.
+     */
+    getScopeInternal(languageNode: Specifics["LanguageType"], position: number | undefined): BoundScope<Specifics> {
+        const closestScope = this.findClosestScopeNode(languageNode, position);
         if (closestScope == undefined) {
             return new DefaultBoundScope(this.typeSystemDefinition.globalScope, -1);
         }
@@ -60,7 +75,7 @@ export abstract class BaseScopeProvider<
         const parentScopeNode = closestScope.node.$container as Specifics["LanguageType"] | undefined;
         let parentScope: BoundScope<Specifics>;
         if (parentScopeNode != undefined) {
-            parentScope = this.getScope(parentScopeNode);
+            parentScope = this.getScopeInternal(parentScopeNode, closestScope.node.$containerIndex);
         } else {
             parentScope = new DefaultBoundScope(this.typeSystemDefinition.globalScope, -1);
         }
@@ -77,16 +92,20 @@ export abstract class BaseScopeProvider<
      * a scope-relevant node is found or the root is reached.
      *
      * @param node The starting language AST node.
+     * @param pos The position within the node, if applicable (used as position if the node is scope-relevant).
      * @returns The closest scope-relevant ancestor node, or undefined if none is found, and the previous node
      */
-    private findClosestScopeNode(node: Specifics["LanguageType"]):
+    private findClosestScopeNode(
+        node: Specifics["LanguageType"],
+        pos: number | undefined
+    ):
         | {
               node: Specifics["LanguageType"];
               position: number | undefined;
           }
         | undefined {
         let currentNode: Specifics["LanguageType"] | undefined = node;
-        let position: number | undefined = undefined;
+        let position: number | undefined = pos;
         while (currentNode != undefined) {
             if (this.isScopeRelevantNode(currentNode)) {
                 return {

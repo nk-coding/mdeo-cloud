@@ -1,52 +1,29 @@
-import type { Args, MaybePromise, PaletteItem } from "@eclipse-glsp/protocol";
-import type { CreateOperationHandler, OperationHandlerRegistry, ToolPaletteItemProvider } from "@eclipse-glsp/server";
-import type { TriggerNodeCreationAction as TriggerNodeCreationActionType } from "@eclipse-glsp/protocol";
+import type { Args, PaletteItem } from "@eclipse-glsp/protocol";
 import type { TriggerActionOperation } from "@mdeo/editor-protocol";
 import type { ModelState } from "@mdeo/language-shared";
-import { sharedImport } from "@mdeo/language-shared";
+import { BaseToolPaletteItemProvider, sharedImport } from "@mdeo/language-shared";
 
 const { injectable, inject } = sharedImport("inversify");
-const { CreateNodeOperation: CreateNodeOperationKind } = sharedImport("@eclipse-glsp/protocol");
-const { OperationHandlerRegistry: OperationHandlerRegistrySymbol, ModelState: ModelStateKey } =
-    sharedImport("@eclipse-glsp/server");
+const { ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Custom tool palette item provider for the metamodel diagram.
- * Provides palette items organized into two sections:
- * - Create: Contains class creation items (with and without property)
- * - Import: Contains import class and import enum actions that trigger the workbench
+ * Extends BaseToolPaletteItemProvider to inherit automatic handling of CreateOperationHandlers
+ * and ToolboxItemProviders, while adding custom import functionality.
+ *
+ * The palette is organized into sections:
+ * - Create: Automatically populated from CreateOperationHandlers (Class and Enum nodes)
+ * - Import: Custom import actions for importing classes and enums from other files
  */
 @injectable()
-export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider {
-    @inject(OperationHandlerRegistrySymbol)
-    protected operationHandlerRegistry!: OperationHandlerRegistry;
-
+export class MetamodelToolPaletteItemProvider extends BaseToolPaletteItemProvider {
     @inject(ModelStateKey)
     protected modelState!: ModelState;
 
     /**
-     * Counter for generating unique palette item IDs.
+     * Counter to generate unique IDs for palette items.
      */
-    protected counter: number = 0;
-
-    /**
-     * Returns the context ID for this provider.
-     *
-     * @returns The tool palette context identifier
-     */
-    get contextId(): string {
-        return "tool-palette";
-    }
-
-    /**
-     * Returns a list of labeled actions for the given editor context.
-     *
-     * @param _editorContext The editor context (unused)
-     * @returns A promise resolving to the palette items
-     */
-    async getActions(_editorContext: unknown): Promise<PaletteItem[]> {
-        return this.getItems();
-    }
+    private counter = 0;
 
     /**
      * Constructs the list of palette items for the metamodel diagram.
@@ -55,10 +32,10 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
      * @param _args Optional arguments (unused)
      * @returns Array of palette items organized by section
      */
-    getItems(_args?: Args): MaybePromise<PaletteItem[]> {
+    override async getItems(_args?: Args): Promise<PaletteItem[]> {
         this.counter = 0;
 
-        const createItems = this.createNodePaletteItems();
+        const items = await this.getGroupedItems();
         const importItems = this.createImportPaletteItems();
 
         return [
@@ -66,7 +43,7 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
                 id: "create-group",
                 label: "Create",
                 actions: [],
-                children: createItems,
+                children: items.get("create-group"),
                 icon: "add",
                 sortString: "A"
             },
@@ -82,73 +59,20 @@ export class MetamodelToolPaletteItemProvider implements ToolPaletteItemProvider
     }
 
     /**
-     * Creates palette items for node creation operations.
-     * Includes items for creating classes with and without properties.
+     * Creates the Import palette group with import actions.
      *
-     * @returns Array of palette items for class creation
+     * @returns A palette item representing the Import group
      */
-    protected createNodePaletteItems(): PaletteItem[] {
-        const handlers = this.operationHandlerRegistry
-            .getAll()
-            .filter(this.isCreateOperationHandler) as CreateOperationHandler[];
+    protected createImportGroup(): PaletteItem {
+        const importItems = this.createImportPaletteItems();
 
-        return handlers
-            .filter((handler) => handler.operationType === CreateNodeOperationKind.KIND)
-            .flatMap((handler) =>
-                handler
-                    .getTriggerActions()
-                    .map((action) => this.createPaletteItem(action, this.getLabelForAction(action, handler.label)))
-            )
-            .sort((a, b) => a.sortString.localeCompare(b.sortString));
-    }
-
-    /**
-     * Type guard to check if a handler is a CreateOperationHandler.
-     *
-     * @param handler The operation handler to check
-     * @returns True if the handler is a CreateOperationHandler
-     */
-    protected isCreateOperationHandler(handler: unknown): handler is CreateOperationHandler {
-        return (
-            typeof handler === "object" &&
-            handler !== null &&
-            "getTriggerActions" in handler &&
-            typeof (handler as CreateOperationHandler).getTriggerActions === "function"
-        );
-    }
-
-    /**
-     * Gets a descriptive label for a trigger action.
-     * Appends context-specific suffixes based on action arguments.
-     *
-     * @param action The trigger node creation action
-     * @param baseLabel The base label from the handler
-     * @returns The formatted label for the palette item
-     */
-    protected getLabelForAction(action: TriggerNodeCreationActionType, baseLabel: string): string {
-        if (action.args?.includeProperty === true) {
-            return `${baseLabel} (with Property)`;
-        }
-        if (action.args?.includeEntry === true) {
-            return `${baseLabel} (with Entry)`;
-        }
-        return baseLabel;
-    }
-
-    /**
-     * Creates a single palette item from a trigger action.
-     *
-     * @param action The trigger element creation action
-     * @param label The label for the palette item
-     * @returns A palette item configured with the action
-     */
-    protected createPaletteItem(action: TriggerNodeCreationActionType, label: string): PaletteItem {
-        this.counter++;
         return {
-            id: `palette-item-${this.counter}`,
-            sortString: label.charAt(0),
-            label,
-            actions: [action]
+            id: "import-group",
+            label: "Import",
+            actions: [],
+            children: importItems,
+            icon: "cloud-download",
+            sortString: "B"
         };
     }
 

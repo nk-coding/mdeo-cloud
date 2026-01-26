@@ -6,8 +6,6 @@ import { listItemClasses } from "./styles.js";
 
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
-import { generatePreviewView } from "./previewView.js";
-
 /**
  * Generates a single palette item view with optional preview.
  *
@@ -23,60 +21,49 @@ export function generateToolboxItemView(
     index: number = 0,
     isSelected: boolean = false
 ): VNode {
-    const isHovered = context.showPreviewFor === item.id;
-
     return html(
-        "div",
+        "button",
         {
             class: {
-                "toolbox-item-container": true,
-                relative: true
+                ...listItemClasses,
+                "toolbox-item": true,
+                "bg-accent": isSelected
+            },
+            attrs: {
+                "aria-label": `Create ${item.name}`,
+                role: "option",
+                "aria-selected": isSelected ? "true" : "false",
+                tabindex: isSelected ? "0" : "-1",
+                "data-item-index": index,
+                "data-item-id": item.id
+            },
+            on: {
+                click: (event: Event) => {
+                    event.preventDefault();
+                    context.onPaletteItemClick(item);
+                },
+                mouseenter: () => {
+                    context.showPreviewFor = item.id;
+                    context.update();
+                },
+                mouseleave: () => {
+                    context.showPreviewFor = undefined;
+                    context.update();
+                },
+                mousedown: (event: Event) => {
+                    event.preventDefault();
+                }
             }
         },
         html(
-            "button",
+            "span",
             {
                 class: {
-                    ...listItemClasses,
-                    "toolbox-item": true,
-                    "bg-accent": isSelected
-                },
-                attrs: {
-                    "aria-label": `Create ${item.name}`,
-                    role: "option",
-                    "aria-selected": isSelected ? "true" : "false",
-                    tabindex: isSelected ? "0" : "-1",
-                    "data-item-index": index
-                },
-                on: {
-                    click: (event: Event) => {
-                        event.preventDefault();
-                        context.onPaletteItemClick(item);
-                    },
-                    mouseenter: () => {
-                        context.showPreviewFor = item.id;
-                        context.update();
-                    },
-                    mouseleave: () => {
-                        context.showPreviewFor = undefined;
-                        context.update();
-                    },
-                    mousedown: (event: Event) => {
-                        event.preventDefault();
-                    }
+                    truncate: true
                 }
             },
-            html(
-                "span",
-                {
-                    class: {
-                        truncate: true
-                    }
-                },
-                item.name
-            )
-        ),
-        isHovered ? generatePreviewView(context, item) : undefined
+            item.name
+        )
     );
 }
 
