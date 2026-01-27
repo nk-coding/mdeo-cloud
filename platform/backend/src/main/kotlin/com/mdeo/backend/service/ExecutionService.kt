@@ -8,9 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.http.HttpClient
@@ -19,6 +19,9 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service for managing executions within projects.
@@ -59,7 +62,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         return transaction {
             ExecutionsTable
                 .selectAll()
-                .where { ExecutionsTable.projectId eq projectId }
+                .where { ExecutionsTable.projectId eq projectId.toKotlinUuid() }
                 .orderBy(ExecutionsTable.createdAt, SortOrder.DESC)
                 .map { row -> rowToExecution(row) }
         }
@@ -77,8 +80,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             val row = ExecutionsTable
                 .selectAll()
                 .where {
-                    (ExecutionsTable.id eq executionId) and
-                            (ExecutionsTable.projectId eq projectId)
+                    (ExecutionsTable.id eq executionId.toKotlinUuid()) and
+                            (ExecutionsTable.projectId eq projectId.toKotlinUuid())
                 }
                 .firstOrNull()
 
@@ -103,7 +106,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         return transaction {
             val row = ExecutionsTable
                 .selectAll()
-                .where { ExecutionsTable.id eq executionId }
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
                 .firstOrNull()
 
             if (row == null) {
@@ -135,7 +138,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         val fileInfo = transaction {
             FilesTable.selectAll()
                 .where {
-                    (FilesTable.projectId eq projectId) and
+                    (FilesTable.projectId eq projectId.toKotlinUuid()) and
                             (FilesTable.path eq normalizedPath)
                 }
                 .firstOrNull()
@@ -166,8 +169,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
         transaction {
             ExecutionsTable.insert {
-                it[id] = executionId
-                it[ExecutionsTable.projectId] = projectId
+                it[id] = executionId.toKotlinUuid()
+                it[ExecutionsTable.projectId] = projectId.toKotlinUuid()
                 it[name] = "Execution $executionId"
                 it[state] = ExecutionState.SUBMITTED
                 it[progressText] = null
@@ -195,7 +198,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         }
 
         transaction {
-            ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                 it[name] = createResponse.name
             }
         }
@@ -246,7 +249,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
     ): ApiResult<Execution> {
         return transaction {
             val existing = ExecutionsTable.selectAll()
-                .where { ExecutionsTable.id eq executionId }
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
                 .firstOrNull()
 
             if (existing == null) {
@@ -269,7 +272,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
             val row = ExecutionsTable
                 .selectAll()
-                .where { ExecutionsTable.id eq executionId }
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
                 .first()
 
             success(rowToExecution(row))
@@ -343,7 +346,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
     ) {
         val now = Instant.now()
 
-        ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+        ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
             it[state] = newState
             it[ExecutionsTable.progressText] = progressText
             it[updatedAt] = now
@@ -509,7 +512,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
 
             transaction {
                 val now = Instant.now()
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                     it[state] = ExecutionState.CANCELLED
                     it[updatedAt] = now
                     it[finishedAt] = now
@@ -554,7 +557,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             callPluginDelete(pluginUrl, executionId, projectId)
 
             transaction {
-                ExecutionsTable.deleteWhere { ExecutionsTable.id eq executionId }
+                ExecutionsTable.deleteWhere { ExecutionsTable.id eq executionId.toKotlinUuid() }
             }
 
             success(Unit)
@@ -620,7 +623,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         return transaction {
             ExecutionsTable.selectAll()
                 .where {
-                    (ExecutionsTable.projectId eq projectId) and
+                    (ExecutionsTable.projectId eq projectId.toKotlinUuid()) and
                             (ExecutionsTable.state eq ExecutionState.INITIALIZING)
                 }
                 .count() > 0
@@ -635,8 +638,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      */
     private fun rowToExecution(row: ResultRow): Execution {
         return Execution(
-            id = row[ExecutionsTable.id].toString(),
-            projectId = row[ExecutionsTable.projectId].toString(),
+            id = row[ExecutionsTable.id].toJavaUuid().toString(),
+            projectId = row[ExecutionsTable.projectId].toJavaUuid().toString(),
             filePath = row[ExecutionsTable.filePath],
             languageId = row[ExecutionsTable.languageId],
             name = row[ExecutionsTable.name],

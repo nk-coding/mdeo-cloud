@@ -8,9 +8,9 @@ import com.mdeo.common.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.http.HttpClient
@@ -19,6 +19,9 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Plugin manifest returned from plugin's GET / endpoint.
@@ -99,7 +102,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                     val description = row[PluginsTable.description]
                     val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
                     val default = row[PluginsTable.default]
-                    createBackendPlugin(id, resolvePluginUrl(url, useInternal = false), name, description, icon, default)
+                    createBackendPlugin(id.toJavaUuid(), resolvePluginUrl(url, useInternal = false), name, description, icon, default)
                 }
         }
     }
@@ -114,7 +117,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         return transaction {
             (ProjectPluginsTable innerJoin PluginsTable)
                 .selectAll()
-                .where { ProjectPluginsTable.projectId eq projectId }
+                .where { ProjectPluginsTable.projectId eq projectId.toKotlinUuid() }
                 .map { row ->
                     val id = row[PluginsTable.id]
                     val url = row[PluginsTable.url]
@@ -122,7 +125,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                     val description = row[PluginsTable.description]
                     val icon = json.parseToJsonElement(row[PluginsTable.icon]).jsonArray
                     val default = row[PluginsTable.default]
-                    createBackendPlugin(id, resolvePluginUrl(url, useInternal = false), name, description, icon, default)
+                    createBackendPlugin(id.toJavaUuid(), resolvePluginUrl(url, useInternal = false), name, description, icon, default)
                 }
         }
     }
@@ -136,7 +139,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun getPlugin(pluginId: UUID): ApiResult<BackendPlugin> {
         return transaction {
             val row = PluginsTable.selectAll()
-                .where { PluginsTable.id eq pluginId }
+                .where { PluginsTable.id eq pluginId.toKotlinUuid() }
                 .firstOrNull()
 
             if (row == null) {
@@ -190,7 +193,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             val now = Instant.now()
 
             PluginsTable.insert {
-                it[id] = pluginId
+                it[id] = pluginId.toKotlinUuid()
                 it[PluginsTable.url] = normalizedUrl
                 it[name] = manifest.name
                 it[description] = manifest.description
@@ -226,7 +229,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     suspend fun refreshPluginData(pluginId: UUID): ApiResult<Unit> {
         val url = transaction {
             PluginsTable.selectAll()
-                .where { PluginsTable.id eq pluginId }
+                .where { PluginsTable.id eq pluginId.toKotlinUuid() }
                 .firstOrNull()
                 ?.get(PluginsTable.url)
         } ?: return pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
@@ -244,15 +247,15 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         transaction {
             val now = Instant.now()
 
-            LanguagePluginsTable.deleteWhere { LanguagePluginsTable.pluginId eq pluginId }
+            LanguagePluginsTable.deleteWhere { LanguagePluginsTable.pluginId eq pluginId.toKotlinUuid() }
 
-            ContributionPluginsTable.deleteWhere { ContributionPluginsTable.pluginId eq pluginId }
+            ContributionPluginsTable.deleteWhere { ContributionPluginsTable.pluginId eq pluginId.toKotlinUuid() }
 
             storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
 
             storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
 
-            PluginsTable.update({ PluginsTable.id eq pluginId }) {
+            PluginsTable.update({ PluginsTable.id eq pluginId.toKotlinUuid() }) {
                 it[name] = manifest.name
                 it[description] = manifest.description
                 it[icon] = manifest.icon.toString()
@@ -295,7 +298,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         for (plugin in languagePlugins) {
             LanguagePluginsTable.insert {
                 it[id] = plugin.id
-                it[LanguagePluginsTable.pluginId] = pluginId
+                it[LanguagePluginsTable.pluginId] = pluginId.toKotlinUuid()
                 it[name] = plugin.name
                 it[extension] = plugin.extension
                 it[newFileAction] = plugin.newFileAction
@@ -324,8 +327,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             val serverPlugins = plugin["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
 
             ContributionPluginsTable.insert {
-                it[id] = UUID.randomUUID()
-                it[ContributionPluginsTable.pluginId] = pluginId
+                it[id] = UUID.randomUUID().toKotlinUuid()
+                it[ContributionPluginsTable.pluginId] = pluginId.toKotlinUuid()
                 it[ContributionPluginsTable.languageId] = languageId
                 it[ContributionPluginsTable.description] = description
                 it[ContributionPluginsTable.additionalKeywords] = Json.encodeToString(additionalKeywords)
@@ -348,7 +351,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         fileDataService.invalidatePluginData(pluginId)
         
         return transaction {
-            val deleted = PluginsTable.deleteWhere { PluginsTable.id eq pluginId }
+            val deleted = PluginsTable.deleteWhere { PluginsTable.id eq pluginId.toKotlinUuid() }
 
             if (deleted == 0) {
                 return@transaction pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
@@ -369,7 +372,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun addPluginToProject(projectId: UUID, pluginId: UUID): ApiResult<BackendPlugin> {
         val result = transaction {
             val pluginExists = PluginsTable.selectAll()
-                .where { PluginsTable.id eq pluginId }
+                .where { PluginsTable.id eq pluginId.toKotlinUuid() }
                 .count() > 0
 
             if (!pluginExists) {
@@ -378,8 +381,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
 
             val alreadyAdded = ProjectPluginsTable.selectAll()
                 .where {
-                    (ProjectPluginsTable.projectId eq projectId) and
-                            (ProjectPluginsTable.pluginId eq pluginId)
+                    (ProjectPluginsTable.projectId eq projectId.toKotlinUuid()) and
+                            (ProjectPluginsTable.pluginId eq pluginId.toKotlinUuid())
                 }
                 .count() > 0
 
@@ -391,8 +394,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             }
 
             ProjectPluginsTable.insert {
-                it[ProjectPluginsTable.projectId] = projectId
-                it[ProjectPluginsTable.pluginId] = pluginId
+                it[ProjectPluginsTable.projectId] = projectId.toKotlinUuid()
+                it[ProjectPluginsTable.pluginId] = pluginId.toKotlinUuid()
             }
 
             val plugin = when(val pluginResult = getPlugin(pluginId)) {
@@ -421,8 +424,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun removePluginFromProject(projectId: UUID, pluginId: UUID): ApiResult<Unit> {
         val result = transaction {
             val deleted = ProjectPluginsTable.deleteWhere {
-                (ProjectPluginsTable.projectId eq projectId) and
-                        (ProjectPluginsTable.pluginId eq pluginId)
+                (ProjectPluginsTable.projectId eq projectId.toKotlinUuid()) and
+                        (ProjectPluginsTable.pluginId eq pluginId.toKotlinUuid())
             }
 
             if (deleted == 0) {
@@ -451,7 +454,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      */
     fun updatePluginDefault(pluginId: UUID, default: Boolean): ApiResult<Unit> {
         return transaction {
-            val updated = PluginsTable.update({ PluginsTable.id eq pluginId }) {
+            val updated = PluginsTable.update({ PluginsTable.id eq pluginId.toKotlinUuid() }) {
                 it[PluginsTable.default] = default
                 it[updatedAt] = Instant.now()
             }
@@ -473,7 +476,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         return transaction {
             PluginsTable.selectAll()
                 .where { PluginsTable.default eq true }
-                .map { it[PluginsTable.id] }
+                .map { it[PluginsTable.id].toJavaUuid() }
         }
     }
 
@@ -509,7 +512,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                     val now = Instant.now()
 
                     PluginsTable.insert {
-                        it[id] = pluginId
+                        it[id] = pluginId.toKotlinUuid()
                         it[PluginsTable.url] = normalizedUrl
                         it[name] = manifest.name
                         it[description] = manifest.description
@@ -538,7 +541,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      */
     fun deleteAllForProject(projectId: UUID) {
         transaction {
-            ProjectPluginsTable.deleteWhere { ProjectPluginsTable.projectId eq projectId }
+            ProjectPluginsTable.deleteWhere { ProjectPluginsTable.projectId eq projectId.toKotlinUuid() }
         }
     }
 
@@ -558,7 +561,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
 
         return transaction {
             val projectPluginIds = ProjectPluginsTable.selectAll()
-                .where { ProjectPluginsTable.projectId eq projectId }
+                .where { ProjectPluginsTable.projectId eq projectId.toKotlinUuid() }
                 .map { it[ProjectPluginsTable.pluginId] }
 
             if (projectPluginIds.isEmpty()) return@transaction null
@@ -570,7 +573,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 }
                 .firstOrNull() ?: return@transaction null
 
-            val pluginId = result[LanguagePluginsTable.pluginId]
+            val pluginId = result[LanguagePluginsTable.pluginId].toJavaUuid()
             val pluginUrl = getPluginUrl(pluginId, useInternal = false) ?: return@transaction null
             val languagePlugin = rowToLanguagePlugin(result, pluginUrl)
             Pair(pluginId, languagePlugin)
@@ -587,7 +590,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun findPluginByLanguage(projectId: UUID, languageId: String): Pair<UUID, BackendLanguagePlugin>? {
         return transaction {
             val projectPluginIds = ProjectPluginsTable.selectAll()
-                .where { ProjectPluginsTable.projectId eq projectId }
+                .where { ProjectPluginsTable.projectId eq projectId.toKotlinUuid() }
                 .map { it[ProjectPluginsTable.pluginId] }
 
             if (projectPluginIds.isEmpty()) return@transaction null
@@ -599,7 +602,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 }
                 .firstOrNull() ?: return@transaction null
 
-            val pluginId = result[LanguagePluginsTable.pluginId]
+            val pluginId = result[LanguagePluginsTable.pluginId].toJavaUuid()
             val pluginUrl = getPluginUrl(pluginId, useInternal = false) ?: return@transaction null
             val languagePlugin = rowToLanguagePlugin(result, pluginUrl)
             Pair(pluginId, languagePlugin)
@@ -616,7 +619,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun getPluginUrl(pluginId: UUID, useInternal: Boolean = false): String? {
         return transaction {
             PluginsTable.selectAll()
-                .where { PluginsTable.id eq pluginId }
+                .where { PluginsTable.id eq pluginId.toKotlinUuid() }
                 .firstOrNull()
                 ?.get(PluginsTable.url)
                 ?.let { resolvePluginUrl(it, useInternal) }
@@ -633,7 +636,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun getContributionPluginsForLanguage(projectId: UUID, languageId: String): List<JsonObject> {
         return transaction {
             val projectPluginIds = ProjectPluginsTable.selectAll()
-                .where { ProjectPluginsTable.projectId eq projectId }
+                .where { ProjectPluginsTable.projectId eq projectId.toKotlinUuid() }
                 .map { it[ProjectPluginsTable.pluginId] }
 
             if (projectPluginIds.isEmpty()) return@transaction emptyList()
@@ -658,8 +661,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     fun getProjectsUsingPlugin(pluginId: UUID): List<UUID> {
         return transaction {
             ProjectPluginsTable.selectAll()
-                .where { ProjectPluginsTable.pluginId eq pluginId }
-                .map { it[ProjectPluginsTable.projectId] }
+                .where { ProjectPluginsTable.pluginId eq pluginId.toKotlinUuid() }
+                .map { it[ProjectPluginsTable.projectId].toJavaUuid() }
         }
     }
 
@@ -684,18 +687,18 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     ): BackendPlugin {
         val languagePlugins = transaction {
             LanguagePluginsTable.selectAll()
-                .where { LanguagePluginsTable.pluginId eq pluginId }
+                .where { LanguagePluginsTable.pluginId eq pluginId.toKotlinUuid() }
                 .map { rowToLanguagePlugin(it, url) }
         }
 
         val contributionPlugins = transaction {
             ContributionPluginsTable.selectAll()
-                .where { ContributionPluginsTable.pluginId eq pluginId }
+                .where { ContributionPluginsTable.pluginId eq pluginId.toKotlinUuid() }
                 .map { rowToContributionPlugin(it) }
         }
 
         return BackendPlugin(
-            id = pluginId.toString(),
+            id = pluginId.toKotlinUuid().toString(),
             url = url,
             name = name,
             description = description,
@@ -714,7 +717,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      */
     private fun rowToContributionPlugin(row: ResultRow): BackendContributionPlugin {
         return BackendContributionPlugin(
-            id = row[ContributionPluginsTable.id].toString(),
+            id = row[ContributionPluginsTable.id].toJavaUuid().toString(),
             languageId = row[ContributionPluginsTable.languageId],
             description = row[ContributionPluginsTable.description],
             additionalKeywords = json.decodeFromString<List<String>>(row[ContributionPluginsTable.additionalKeywords]),

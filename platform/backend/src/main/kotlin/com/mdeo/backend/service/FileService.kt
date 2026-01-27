@@ -6,12 +6,15 @@ import com.mdeo.backend.database.FilesTable
 import com.mdeo.backend.database.FileChildrenTable
 import com.mdeo.common.model.*
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
 import java.util.*
 import java.util.Base64
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service for managing files and directories within projects.
@@ -29,7 +32,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
     private fun isProjectLocked(projectId: UUID): Boolean {
         return ExecutionsTable.selectAll()
             .where {
-                (ExecutionsTable.projectId eq projectId) and
+                (ExecutionsTable.projectId eq projectId.toKotlinUuid()) and
                 (ExecutionsTable.state eq ExecutionState.INITIALIZING)
             }
             .count() > 0
@@ -66,7 +69,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         return transaction {
             val row = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (row == null) {
@@ -107,7 +110,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         return transaction {
             checkProjectLock(projectId)?.let { return@transaction it }
             val existing = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (existing != null) {
@@ -120,7 +123,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 
                 val currentVersion = existing[FilesTable.version]
                 val contentText = Base64.getEncoder().encodeToString(content)
-                FilesTable.update({ (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }) {
+                FilesTable.update({ (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }) {
                     it[FilesTable.content] = contentText
                     it[version] = currentVersion + 1
                     it[updatedAt] = now
@@ -140,7 +143,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 
                 val contentText = Base64.getEncoder().encodeToString(content)
                 FilesTable.insert {
-                    it[FilesTable.projectId] = projectId
+                    it[FilesTable.projectId] = projectId.toKotlinUuid()
                     it[FilesTable.path] = normalizedPath
                     it[fileType] = FileType.FILE
                     it[FilesTable.content] = contentText
@@ -170,7 +173,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             checkProjectLock(projectId)?.let { return@transaction it }
             
             val existing = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (existing != null) {
@@ -189,7 +192,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             FilesTable.insert {
-                it[FilesTable.projectId] = projectId
+                it[FilesTable.projectId] = projectId.toKotlinUuid()
                 it[FilesTable.path] = normalizedPath
                 it[fileType] = FileType.DIRECTORY
                 it[content] = null
@@ -213,7 +216,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         return transaction {
             val row = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (row == null) {
@@ -225,7 +228,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             val result = FileChildrenTable.selectAll()
-                .where { (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq normalizedPath) }
+                .where { (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq normalizedPath) }
                 .map { childRow ->
                     FileEntry(childRow[FileChildrenTable.childName], childRow[FileChildrenTable.childType])
                 }
@@ -246,7 +249,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         return transaction {
             val row = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (row == null) {
@@ -269,7 +272,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         return transaction {
             val row = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (row == null) {
@@ -300,7 +303,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             checkProjectLock(projectId)?.let { return@transaction it }
             
             val row = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
             
             if (row == null) {
@@ -309,7 +312,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             
             if (row[FilesTable.fileType] == FileType.DIRECTORY) {
                 val childrenCount = FileChildrenTable.selectAll()
-                    .where { (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq normalizedPath) }
+                    .where { (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq normalizedPath) }
                     .count()
                 
                 if (childrenCount > 0 && !recursive) {
@@ -327,7 +330,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             FilesTable.deleteWhere { 
-                (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) 
+                (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) 
             }
             
             success(Unit)
@@ -353,7 +356,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             checkProjectLock(projectId)?.let { return@transaction it }
             
             val sourceRow = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedFrom) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedFrom) }
                 .firstOrNull()
             
             if (sourceRow == null) {
@@ -361,7 +364,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             val destExists = FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedTo) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedTo) }
                 .count() > 0
             
             if (destExists && !overwrite) {
@@ -370,7 +373,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             
             if (destExists) {
                 FilesTable.deleteWhere { 
-                    (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedTo) 
+                    (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedTo) 
                 }
             }
             
@@ -391,7 +394,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             FilesTable.update({ 
-                (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedFrom) 
+                (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedFrom) 
             }) {
                 it[path] = normalizedTo
                 it[updatedAt] = now
@@ -408,8 +411,8 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
      */
     fun deleteAllForProject(projectId: UUID) {
         transaction {
-            FileChildrenTable.deleteWhere { FileChildrenTable.projectId eq projectId }
-            FilesTable.deleteWhere { FilesTable.projectId eq projectId }
+            FileChildrenTable.deleteWhere { FileChildrenTable.projectId eq projectId.toKotlinUuid() }
+            FilesTable.deleteWhere { FilesTable.projectId eq projectId.toKotlinUuid() }
         }
     }
     
@@ -435,7 +438,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         val parentPath = getParentPath(path) ?: return
         
         val parent = FilesTable.selectAll()
-            .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq parentPath) }
+            .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq parentPath) }
             .firstOrNull()
         
         if (parent == null) {
@@ -447,7 +450,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             FilesTable.insert {
-                it[FilesTable.projectId] = projectId
+                it[FilesTable.projectId] = projectId.toKotlinUuid()
                 it[FilesTable.path] = parentPath
                 it[fileType] = FileType.DIRECTORY
                 it[content] = null
@@ -469,7 +472,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
     private fun addChildToDirectory(projectId: UUID, dirPath: String, childName: String, childType: Int, now: Instant) {
         val existingChild = FileChildrenTable.selectAll()
             .where { 
-                (FileChildrenTable.projectId eq projectId) and 
+                (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and 
                 (FileChildrenTable.parentPath eq dirPath) and 
                 (FileChildrenTable.childName eq childName)
             }
@@ -477,7 +480,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         if (existingChild == null) {
             FileChildrenTable.insert {
-                it[FileChildrenTable.projectId] = projectId
+                it[FileChildrenTable.projectId] = projectId.toKotlinUuid()
                 it[FileChildrenTable.parentPath] = dirPath
                 it[FileChildrenTable.childName] = childName
                 it[FileChildrenTable.childType] = childType
@@ -494,7 +497,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
      */
     private fun removeChildFromDirectory(projectId: UUID, dirPath: String, childName: String) {
         FileChildrenTable.deleteWhere {
-            (FileChildrenTable.projectId eq projectId) and
+            (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and
             (FileChildrenTable.parentPath eq dirPath) and
             (FileChildrenTable.childName eq childName)
         }
@@ -508,24 +511,24 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
      */
     private fun deleteRecursive(projectId: UUID, path: String) {
         val row = FilesTable.selectAll()
-            .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq path) }
+            .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq path) }
             .firstOrNull() ?: return
         
         if (row[FilesTable.fileType] == FileType.DIRECTORY) {
             val children = FileChildrenTable.selectAll()
-                .where { (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq path) }
+                .where { (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq path) }
                 .map { it[FileChildrenTable.childName] }
             
             for (childName in children) {
                 val childPath = if (path.isEmpty()) childName else "$path/$childName"
                 deleteRecursive(projectId, childPath)
                 FilesTable.deleteWhere { 
-                    (FilesTable.projectId eq projectId) and (FilesTable.path eq childPath) 
+                    (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq childPath) 
                 }
             }
             
             FileChildrenTable.deleteWhere {
-                (FileChildrenTable.projectId eq projectId) and (FileChildrenTable.parentPath eq path)
+                (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq path)
             }
         }
     }
@@ -543,7 +546,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         FilesTable.selectAll()
             .where { 
-                (FilesTable.projectId eq projectId) and 
+                (FilesTable.projectId eq projectId.toKotlinUuid()) and 
                 (FilesTable.path like "$prefix%") 
             }
             .forEach { row ->
@@ -551,7 +554,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 val newChildPath = newPrefix + oldChildPath.substring(prefix.length)
                 
                 FilesTable.update({ 
-                    (FilesTable.projectId eq projectId) and (FilesTable.path eq oldChildPath) 
+                    (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq oldChildPath) 
                 }) {
                     it[path] = newChildPath
                     it[updatedAt] = Instant.now()
@@ -560,7 +563,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
         
         FileChildrenTable.selectAll()
             .where {
-                (FileChildrenTable.projectId eq projectId) and
+                (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and
                 (FileChildrenTable.parentPath like "$prefix%")
             }
             .forEach { row ->
@@ -568,7 +571,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 val newParentPath = newPrefix + oldParentPath.substring(prefix.length)
                 
                 FileChildrenTable.update({
-                    (FileChildrenTable.projectId eq projectId) and
+                    (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and
                     (FileChildrenTable.parentPath eq oldParentPath) and
                     (FileChildrenTable.childName eq row[FileChildrenTable.childName])
                 }) {

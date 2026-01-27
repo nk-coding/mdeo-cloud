@@ -5,7 +5,7 @@ import type {
     ToolPaletteItemProvider
 } from "@eclipse-glsp/server";
 import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
-import type { MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
+import type { BaseLayoutEngine, MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
 import { MetamodelGModelFactory } from "./metamodelGModelFactory.js";
 import { MetamodelDiagramConfiguration } from "./metamodelDiagramConfiguration.js";
@@ -18,6 +18,7 @@ import { CreateEnumOperationHandler } from "./handler/createEnumOperationHandler
 import { MetamodelDeleteNodeOperationHandler } from "./handler/metamodelDeleteElementOperationHandler.js";
 import { MetamodelLabelEditValidator } from "./metamodelLabelEditValidator.js";
 import { MetamodelToolPaletteItemProvider } from "./metamodelToolPaletteItemProvider.js";
+import { MetamodelLayoutEngine } from "./metamodelLayoutEngine.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -58,5 +59,9 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
 
     protected override bindToolPaletteItemProvider(): BindingTarget<ToolPaletteItemProvider> {
         return MetamodelToolPaletteItemProvider;
+    }
+
+    protected override bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine> {
+        return MetamodelLayoutEngine;
     }
 }

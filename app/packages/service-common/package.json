@@ -18,6 +18,7 @@
         "@mdeo/language-common": "^0.1.0",
         "@mdeo/language-shared": "^0.1.0",
         "@mdeo/plugin": "^0.1.0",
+        "elkjs": "^0.10.2",
         "fastify": "^5.7.1",
         "inversify": "^6.2.2",
         "jose": "^6.1.3",

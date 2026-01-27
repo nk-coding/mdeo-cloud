@@ -1,14 +1,14 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {
     implementation(project(":common"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(libs.kotlinx.serialization.json)
     
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit.jupiter.params)
 }

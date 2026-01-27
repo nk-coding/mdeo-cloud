@@ -11,14 +11,18 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonElement
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Merged service for managing and executing scripts.
@@ -63,8 +67,8 @@ class ExecutionService(
         val now = Instant.now()
         transaction {
             ExecutionsTable.insert {
-                it[id] = executionId
-                it[ExecutionsTable.projectId] = projectId
+                it[id] = executionId.toKotlinUuid()
+                it[ExecutionsTable.projectId] = projectId.toKotlinUuid()
                 it[ExecutionsTable.filePath] = filePath
                 it[state] = ExecutionState.SUBMITTED
                 it[progress] = null
@@ -216,7 +220,7 @@ class ExecutionService(
             val errorMessage = "Compilation error: ${e.message}"
             
             transaction {
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                     it[ExecutionsTable.error] = errorMessage
                 }
             }
@@ -243,7 +247,7 @@ class ExecutionService(
             val resultString = result?.toString() ?: "null"
 
             transaction {
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                     it[ExecutionsTable.result] = resultString
                     it[ExecutionsTable.output] = capturedOutput
                 }
@@ -264,7 +268,7 @@ class ExecutionService(
             val errorMessage = "${e.javaClass.simpleName}: ${e.message}"
 
             transaction {
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                     it[ExecutionsTable.output] = capturedOutput
                     it[ExecutionsTable.error] = errorMessage
                 }
@@ -298,13 +302,13 @@ class ExecutionService(
 
         val currentStartedAt = transaction {
             ExecutionsTable.selectAll()
-                .where { ExecutionsTable.id eq executionId }
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
                 .firstOrNull()
                 ?.get(ExecutionsTable.startedAt)
         }
 
         transaction {
-            ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                 it[ExecutionsTable.state] = state
                 it[progress] = progressText
 
@@ -342,7 +346,7 @@ class ExecutionService(
      */
     suspend fun cancelExecution(executionId: UUID) = withContext(Dispatchers.IO) {
         transaction {
-            ExecutionsTable.update({ ExecutionsTable.id eq executionId }) {
+            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                 it[state] = ExecutionState.CANCELLED
                 it[progress] = "Cancelled by user"
                 it[completedAt] = Instant.now()
@@ -358,7 +362,7 @@ class ExecutionService(
      */
     suspend fun deleteExecution(executionId: UUID) = withContext(Dispatchers.IO) {
         transaction {
-            ExecutionsTable.deleteWhere { id eq executionId }
+            ExecutionsTable.deleteWhere { id eq executionId.toKotlinUuid() }
         }
 
         logger.info("Deleted execution $executionId")
@@ -373,7 +377,7 @@ class ExecutionService(
     suspend fun getSummary(executionId: UUID): String? = withContext(Dispatchers.IO) {
         val execution = transaction {
             ExecutionsTable.selectAll()
-                .where { ExecutionsTable.id eq executionId }
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
                 .firstOrNull()
         } ?: return@withContext null
 

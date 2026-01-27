@@ -2,11 +2,14 @@ package com.mdeo.backend.service
 
 import com.mdeo.backend.database.*
 import com.mdeo.common.model.*
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service for managing projects and project ownership.
@@ -31,7 +34,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             } else {
                 (ProjectsTable innerJoin ProjectOwnersTable)
                     .selectAll()
-                    .where { ProjectOwnersTable.userId eq userId }
+                    .where { ProjectOwnersTable.userId eq userId.toKotlinUuid() }
                     .map { it.toProject() }
             }
         }
@@ -47,7 +50,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
         return transaction {
             (ProjectsTable innerJoin ProjectOwnersTable)
                 .selectAll()
-                .where { ProjectOwnersTable.userId eq userId }
+                .where { ProjectOwnersTable.userId eq userId.toKotlinUuid() }
                 .map { it.toProject() }
         }
     }
@@ -61,7 +64,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     fun getProject(projectId: UUID): Project? {
         return transaction {
             ProjectsTable.selectAll()
-                .where { ProjectsTable.id eq projectId }
+                .where { ProjectsTable.id eq projectId.toKotlinUuid() }
                 .firstOrNull()
                 ?.toProject()
         }
@@ -81,8 +84,8 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
         return transaction {
             ProjectOwnersTable.selectAll()
                 .where { 
-                    (ProjectOwnersTable.projectId eq projectId) and 
-                    (ProjectOwnersTable.userId eq userId) 
+                    (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
+                    (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
                 }
                 .count() > 0
         }
@@ -102,22 +105,22 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
 
         transaction {
             ProjectsTable.insert {
-                it[id] = projectId
+                it[id] = projectId.toKotlinUuid()
                 it[ProjectsTable.name] = name
                 it[createdAt] = now
                 it[updatedAt] = now
             }
 
             ProjectOwnersTable.insert {
-                it[ProjectOwnersTable.projectId] = projectId
-                it[userId] = creatorUserId
+                it[ProjectOwnersTable.projectId] = projectId.toKotlinUuid()
+                it[userId] = creatorUserId.toKotlinUuid()
             }
 
             val defaultPlugins = pluginService.getDefaultPlugins()
             for (pluginId in defaultPlugins) {
                 ProjectPluginsTable.insert {
-                    it[ProjectPluginsTable.projectId] = projectId
-                    it[ProjectPluginsTable.pluginId] = pluginId
+                    it[ProjectPluginsTable.projectId] = projectId.toKotlinUuid()
+                    it[ProjectPluginsTable.pluginId] = pluginId.toKotlinUuid()
                 }
             }
         }
@@ -139,7 +142,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
      */
     fun updateProject(projectId: UUID, updates: UpdateProjectRequest): Boolean {
         return transaction {
-            val updated = ProjectsTable.update({ ProjectsTable.id eq projectId }) {
+            val updated = ProjectsTable.update({ ProjectsTable.id eq projectId.toKotlinUuid() }) {
                 updates.name?.let { name -> it[ProjectsTable.name] = name }
                 it[updatedAt] = Instant.now()
             }
@@ -156,7 +159,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
      */
     fun deleteProject(projectId: UUID): Boolean {
         return transaction {
-            val deleted = ProjectsTable.deleteWhere { ProjectsTable.id eq projectId }
+            val deleted = ProjectsTable.deleteWhere { ProjectsTable.id eq projectId.toKotlinUuid() }
             deleted > 0
         }
     }
@@ -171,10 +174,10 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
         return transaction {
             (ProjectOwnersTable innerJoin UsersTable)
                 .selectAll()
-                .where { ProjectOwnersTable.projectId eq projectId }
+                .where { ProjectOwnersTable.projectId eq projectId.toKotlinUuid() }
                 .map { 
                     UserInfo(
-                        id = it[UsersTable.id].toString(),
+                        id = it[UsersTable.id].toJavaUuid().toString(),
                         username = it[UsersTable.username]
                     )
                 }
@@ -191,7 +194,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     fun addOwner(projectId: UUID, userId: UUID): AddOwnerResult {
         return transaction {
             val projectExists = ProjectsTable.selectAll()
-                .where { ProjectsTable.id eq projectId }
+                .where { ProjectsTable.id eq projectId.toKotlinUuid() }
                 .count() > 0
             
             if (!projectExists) {
@@ -199,7 +202,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             }
             
             val userExists = UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .count() > 0
             
             if (!userExists) {
@@ -208,8 +211,8 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             
             val alreadyOwner = ProjectOwnersTable.selectAll()
                 .where { 
-                    (ProjectOwnersTable.projectId eq projectId) and 
-                    (ProjectOwnersTable.userId eq userId) 
+                    (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
+                    (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
                 }
                 .count() > 0
             
@@ -218,8 +221,8 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             }
             
             ProjectOwnersTable.insert {
-                it[ProjectOwnersTable.projectId] = projectId
-                it[ProjectOwnersTable.userId] = userId
+                it[ProjectOwnersTable.projectId] = projectId.toKotlinUuid()
+                it[ProjectOwnersTable.userId] = userId.toKotlinUuid()
             }
             
             AddOwnerResult.SUCCESS
@@ -237,7 +240,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     fun removeOwner(projectId: UUID, userId: UUID): RemoveOwnerResult {
         return transaction {
             val projectExists = ProjectsTable.selectAll()
-                .where { ProjectsTable.id eq projectId }
+                .where { ProjectsTable.id eq projectId.toKotlinUuid() }
                 .count() > 0
             
             if (!projectExists) {
@@ -246,8 +249,8 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             
             val isOwner = ProjectOwnersTable.selectAll()
                 .where { 
-                    (ProjectOwnersTable.projectId eq projectId) and 
-                    (ProjectOwnersTable.userId eq userId) 
+                    (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
+                    (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
                 }
                 .count() > 0
             
@@ -256,7 +259,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             }
             
             val ownerCount = ProjectOwnersTable.selectAll()
-                .where { ProjectOwnersTable.projectId eq projectId }
+                .where { ProjectOwnersTable.projectId eq projectId.toKotlinUuid() }
                 .count()
             
             if (ownerCount <= 1) {
@@ -264,8 +267,8 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             }
             
             ProjectOwnersTable.deleteWhere { 
-                (ProjectOwnersTable.projectId eq projectId) and 
-                (ProjectOwnersTable.userId eq userId) 
+                (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
+                (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
             }
             
             RemoveOwnerResult.SUCCESS
@@ -274,7 +277,7 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     
     private fun ResultRow.toProject(): Project {
         return Project(
-            id = this[ProjectsTable.id].toString(),
+            id = this[ProjectsTable.id].toJavaUuid().toString(),
             name = this[ProjectsTable.name]
         )
     }

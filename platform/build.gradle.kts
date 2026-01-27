@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "2.3.0" apply false
-    kotlin("plugin.serialization") version "2.3.0" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }
 
 allprojects {
@@ -20,6 +20,7 @@ subprojects {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
             freeCompilerArgs.add("-Xjsr305=strict")
+            freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
         }
     }
 

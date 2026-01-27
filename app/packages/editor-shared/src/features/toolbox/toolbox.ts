@@ -9,6 +9,7 @@ import { generateToolboxView } from "./views/toolboxView.js";
 import { enableTool } from "./tools.js";
 import { ScrollViewState } from "./views/scrollView.js";
 import { PreviewRenderer } from "./previewRenderer.js";
+import { LayoutAction } from "./layoutAction.js";
 
 const patcher = init([classModule, propsModule, styleModule, eventListenersModule, attributesModule]);
 
@@ -239,9 +240,16 @@ export class Toolbox extends ToolPalette {
     /**
      * Toggles the bottom panel open/closed state.
      */
-    toggleBottomPanel(): void {
+    protected toggleBottomPanel(): void {
         this.isBottomPanelOpen = !this.isBottomPanelOpen;
         this.update();
+    }
+
+    /**
+     * Triggers diagram layout.
+     */
+    protected layoutDiagram(): void {
+        this.actionDispatcher.dispatch(LayoutAction.create());
     }
 
     /**
@@ -293,6 +301,8 @@ export class Toolbox extends ToolPalette {
     onToolClick(tool: ToolDefinition): void {
         if (tool.id === ToolType.BOTTOM_PANEL_TOGGLE) {
             this.toggleBottomPanel();
+        } else if (tool.id === ToolType.LAYOUT) {
+            this.layoutDiagram();
         } else {
             enableTool(this, tool.id);
         }

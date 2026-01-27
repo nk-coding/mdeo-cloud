@@ -444,10 +444,9 @@ class TypeCastCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<ClassCastException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<ClassCastException>(exception.cause)
         }
 
         @Test
@@ -466,10 +465,9 @@ class TypeCastCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<ClassCastException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<ClassCastException>(exception.cause)
         }
     }
 

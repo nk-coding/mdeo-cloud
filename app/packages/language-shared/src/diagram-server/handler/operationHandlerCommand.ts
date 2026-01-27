@@ -4,6 +4,14 @@ import type { ModelState } from "../modelState.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 
 /**
+ * Metadata edits to be applied to the model state.
+ */
+export interface MetadataEdits {
+    nodes?: Record<string, Partial<NodeMetadata> | null>;
+    edges?: Record<string, Partial<EdgeMetadata> | null>;
+}
+
+/**
  * Command to handle operations that modify the model state,
  * specifically applying text edits and metadata edits.
  */
@@ -17,12 +25,7 @@ export class OperationHandlerCommand implements Command {
     constructor(
         readonly state: ModelState,
         readonly workspaceEdit: WorkspaceEdit | undefined,
-        readonly metadataEdits:
-            | {
-                  nodes?: Record<string, Partial<NodeMetadata> | null>;
-                  edges?: Record<string, Partial<EdgeMetadata> | null>;
-              }
-            | undefined
+        readonly metadataEdits: MetadataEdits | undefined
     ) {}
 
     async execute(): Promise<void> {

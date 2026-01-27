@@ -160,10 +160,9 @@ class AssertNonNullEdgeCasesTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast, "testFunction", null)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
 
         @Test

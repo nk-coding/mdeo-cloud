@@ -12,6 +12,7 @@ import type * as inversify from "inversify";
 import type * as vscodeJsonrpc from "vscode-jsonrpc";
 import type * as vscodeLanguageserverTypes from "vscode-languageserver-types";
 import type * as vscodeLanguageserverProtocol from "vscode-languageserver-protocol";
+import type * as elkjs from "elkjs/lib/elk.bundled.js";
 
 /**
  * Context provided to plugins when they are initialized
@@ -31,4 +32,5 @@ export interface PluginContext {
     "vscode-jsonrpc": typeof vscodeJsonrpc;
     "vscode-languageserver-types": typeof vscodeLanguageserverTypes;
     "vscode-languageserver-protocol": typeof vscodeLanguageserverProtocol;
+    elkjs: typeof elkjs;
 }

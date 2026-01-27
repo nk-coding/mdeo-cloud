@@ -18,6 +18,7 @@ import * as inversify from "inversify";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import * as vscodeLanguageserverTypes from "vscode-languageserver-types";
 import * as vscodeLanguageserverProtocol from "vscode-languageserver-protocol";
+import * as elkjs from "elkjs/lib/elk.bundled.js";
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import type { DefaultSharedModuleContext } from "langium/lsp";
 import {
@@ -45,6 +46,9 @@ import { addActionHandlers } from "./actionHandlers";
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
 
+// @ts-expect-error define document because otherwise elkjs will not work in a webworker
+globalThis.document = null;
+
 const pluginContext = {
     langium,
     "langium/lsp": langiumLsp,
@@ -59,7 +63,8 @@ const pluginContext = {
     inversify,
     "vscode-jsonrpc": vscodeJsonrpc,
     "vscode-languageserver-types": vscodeLanguageserverTypes,
-    "vscode-languageserver-protocol": vscodeLanguageserverProtocol
+    "vscode-languageserver-protocol": vscodeLanguageserverProtocol,
+    elkjs
 };
 
 initializePluginContext(pluginContext);

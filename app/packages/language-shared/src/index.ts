@@ -29,6 +29,7 @@ export * from "./diagram-server/baseLabelEditValidator.js";
 export * from "./diagram-server/baseToolPaletteItemProvider.js";
 export * from "./diagram-server/contextEditValidationRegistry.js";
 export * from "./diagram-server/langiumServices.js";
+export * from "./diagram-server/layoutEngine.js";
 export * from "./diagram-server/metadata.js";
 export * from "./diagram-server/metadataManager.js";
 export * from "./diagram-server/modelIdProvider.js";

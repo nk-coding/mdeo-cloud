@@ -5,12 +5,15 @@ import com.mdeo.backend.database.UsersTable
 import com.mdeo.common.model.User
 import com.mdeo.common.model.UserInfo
 import com.mdeo.common.model.UserRoles
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service for managing user accounts and authentication.
@@ -37,7 +40,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
                 val passwordHash = hashPassword(password)
                 
                 UsersTable.insert {
-                    it[id] = UUID.randomUUID()
+                    it[id] = UUID.randomUUID().toKotlinUuid()
                     it[UsersTable.username] = username
                     it[UsersTable.passwordHash] = passwordHash
                     it[roles] = "${UserRoles.USER},${UserRoles.ADMIN}"
@@ -76,7 +79,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     fun findById(userId: UUID): User? {
         return transaction {
             UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .firstOrNull()
                 ?.toUser()
         }
@@ -91,9 +94,9 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     fun findUserInfoById(userId: UUID): UserInfo? {
         return transaction {
             UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .firstOrNull()
-                ?.let { UserInfo(it[UsersTable.id].toString(), it[UsersTable.username]) }
+                ?.let { UserInfo(it[UsersTable.id].toJavaUuid().toString(), it[UsersTable.username]) }
         }
     }
 
@@ -119,7 +122,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
             val passwordHash = hashPassword(password)
 
             UsersTable.insert {
-                it[id] = userId
+                it[id] = userId.toKotlinUuid()
                 it[UsersTable.username] = username
                 it[UsersTable.passwordHash] = passwordHash
                 it[roles] = UserRoles.USER
@@ -128,7 +131,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
             }
 
             UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .first()
                 .toUser()
         }
@@ -169,7 +172,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     fun changePassword(userId: UUID, currentPassword: String, newPassword: String): Boolean {
         return transaction {
             val row = UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .firstOrNull() ?: return@transaction false
             
             val storedHash = row[UsersTable.passwordHash]
@@ -180,7 +183,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             val newHash = hashPassword(newPassword)
-            UsersTable.update({ UsersTable.id eq userId }) {
+            UsersTable.update({ UsersTable.id eq userId.toKotlinUuid() }) {
                 it[passwordHash] = newHash
                 it[updatedAt] = Instant.now()
             }
@@ -199,7 +202,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     fun adminChangePassword(userId: UUID, newPassword: String): Boolean {
         return transaction {
             val exists = UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .count() > 0
             
             if (!exists) {
@@ -207,7 +210,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             val newHash = hashPassword(newPassword)
-            UsersTable.update({ UsersTable.id eq userId }) {
+            UsersTable.update({ UsersTable.id eq userId.toKotlinUuid() }) {
                 it[passwordHash] = newHash
                 it[updatedAt] = Instant.now()
             }
@@ -226,7 +229,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
             UsersTable.selectAll()
                 .map { 
                     UserInfo(
-                        id = it[UsersTable.id].toString(),
+                        id = it[UsersTable.id].toJavaUuid().toString(),
                         username = it[UsersTable.username],
                         isAdmin = it[UsersTable.roles].contains(UserRoles.ADMIN)
                     )
@@ -244,7 +247,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     fun updateUserAdmin(userId: UUID, isAdmin: Boolean): Boolean {
         return transaction {
             val row = UsersTable.selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.toKotlinUuid() }
                 .firstOrNull() ?: return@transaction false
             
             val currentRoles = row[UsersTable.roles].split(",").filter { it.isNotBlank() }.toMutableSet()
@@ -255,7 +258,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
                 currentRoles.remove(UserRoles.ADMIN)
             }
             
-            UsersTable.update({ UsersTable.id eq userId }) {
+            UsersTable.update({ UsersTable.id eq userId.toKotlinUuid() }) {
                 it[roles] = currentRoles.joinToString(",")
                 it[updatedAt] = Instant.now()
             }
@@ -270,7 +273,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     
     private fun ResultRow.toUser(): User {
         return User(
-            id = this[UsersTable.id].toString(),
+            id = this[UsersTable.id].toJavaUuid().toString(),
             username = this[UsersTable.username],
             roles = this[UsersTable.roles].split(",").filter { it.isNotBlank() }
         )

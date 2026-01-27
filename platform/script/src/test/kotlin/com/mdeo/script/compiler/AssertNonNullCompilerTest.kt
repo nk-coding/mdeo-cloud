@@ -175,10 +175,9 @@ class AssertNonNullCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
 
         @Test
@@ -196,10 +195,9 @@ class AssertNonNullCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
 
         @Test
@@ -217,10 +215,9 @@ class AssertNonNullCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
 
         @Test
@@ -238,10 +235,9 @@ class AssertNonNullCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
 
         @Test
@@ -259,10 +255,9 @@ class AssertNonNullCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
 
         @Test
@@ -280,10 +275,9 @@ class AssertNonNullCompilerTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<NullPointerException> {
                 helper.compileAndInvoke(ast)
             }
-            assertIs<NullPointerException>(exception.cause)
         }
     }
 

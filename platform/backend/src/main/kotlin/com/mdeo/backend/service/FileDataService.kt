@@ -11,9 +11,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonElement
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.http.HttpClient
@@ -22,6 +22,9 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service for computing and caching file data (e.g., AST) with dependency tracking.
@@ -73,7 +76,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
         val computingCheck = transaction {
             FileDataTable.selectAll()
                 .where {
-                    (FileDataTable.projectId eq projectId) and
+                    (FileDataTable.projectId eq projectId.toKotlinUuid()) and
                             (FileDataTable.path eq normalizedPath) and
                             (FileDataTable.dataKey eq key)
                 }
@@ -92,7 +95,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
 
         val fileRow = transaction {
             FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq normalizedPath) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedPath) }
                 .firstOrNull()
         } ?: return fileDataFailure(
             ErrorCodes.FILE_NOT_FOUND,
@@ -217,7 +220,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
 
         val currentVersion = transaction {
             FilesTable.selectAll()
-                .where { (FilesTable.projectId eq projectId) and (FilesTable.path eq path) }
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq path) }
                 .firstOrNull()
                 ?.get(FilesTable.version)
         } ?: return false
@@ -235,11 +238,11 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
                     FilesTable,
                     { FileDependenciesTable.dependencyPath },
                     { FilesTable.path },
-                    additionalConstraint = { FilesTable.projectId eq projectId }
+                    additionalConstraint = { FilesTable.projectId eq projectId.toKotlinUuid() }
                 )
                 .selectAll()
                 .where {
-                    (FileDependenciesTable.projectId eq projectId) and
+                    (FileDependenciesTable.projectId eq projectId.toKotlinUuid()) and
                             (FileDependenciesTable.path eq path) and
                             (FileDependenciesTable.dataKey eq dataKey)
                 }
@@ -305,11 +308,11 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
                     FilesTable,
                     { DataDependenciesTable.dependencyPath },
                     { FilesTable.path },
-                    additionalConstraint = { FilesTable.projectId eq projectId }
+                    additionalConstraint = { FilesTable.projectId eq projectId.toKotlinUuid() }
                 )
                 .selectAll()
                 .where {
-                    (DataDependenciesTable.projectId eq projectId) and
+                    (DataDependenciesTable.projectId eq projectId.toKotlinUuid()) and
                             (DataDependenciesTable.path eq path) and
                             (DataDependenciesTable.dataKey eq dataKey)
                 }
@@ -401,13 +404,13 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
 
         transaction {
             FileDataTable.deleteWhere {
-                (FileDataTable.projectId eq projectId) and
+                (FileDataTable.projectId eq projectId.toKotlinUuid()) and
                         (FileDataTable.path eq path) and
                         (FileDataTable.dataKey eq key)
             }
 
             FileDataTable.insert {
-                it[FileDataTable.projectId] = projectId
+                it[FileDataTable.projectId] = projectId.toKotlinUuid()
                 it[FileDataTable.path] = path
                 it[FileDataTable.dataKey] = key
                 it[FileDataTable.data] = response.data
@@ -418,7 +421,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
 
             for (fileDep in response.fileDependencies) {
                 FileDependenciesTable.insert {
-                    it[FileDependenciesTable.projectId] = projectId
+                    it[FileDependenciesTable.projectId] = projectId.toKotlinUuid()
                     it[FileDependenciesTable.path] = path
                     it[FileDependenciesTable.dataKey] = key
                     it[FileDependenciesTable.dependencyPath] = normalizePath(fileDep.path)
@@ -428,7 +431,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
 
             for (dataDep in response.dataDependencies) {
                 DataDependenciesTable.insert {
-                    it[DataDependenciesTable.projectId] = projectId
+                    it[DataDependenciesTable.projectId] = projectId.toKotlinUuid()
                     it[DataDependenciesTable.path] = path
                     it[DataDependenciesTable.dataKey] = key
                     it[DataDependenciesTable.dependencyPath] = normalizePath(dataDep.path)
@@ -445,7 +448,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
     private fun deleteFileData(projectId: UUID, path: String, key: String) {
         transaction {
             FileDataTable.deleteWhere {
-                (FileDataTable.projectId eq projectId) and
+                (FileDataTable.projectId eq projectId.toKotlinUuid()) and
                         (FileDataTable.path eq path) and
                         (FileDataTable.dataKey eq key)
             }
@@ -461,7 +464,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
     fun invalidateProjectData(projectId: UUID) {
         logger.info("Invalidating all file data for project $projectId")
         transaction {
-            FileDataTable.deleteWhere { FileDataTable.projectId eq projectId }
+            FileDataTable.deleteWhere { FileDataTable.projectId eq projectId.toKotlinUuid() }
         }
     }
 

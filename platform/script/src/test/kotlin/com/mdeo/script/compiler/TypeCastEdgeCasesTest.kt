@@ -570,10 +570,9 @@ class TypeCastEdgeCasesTest {
                 )
             }
             
-            val exception = assertFailsWith<java.lang.reflect.InvocationTargetException> {
+            assertFailsWith<ClassCastException> {
                 helper.compileAndInvoke(ast, "testFunction", 42)
             }
-            assertIs<ClassCastException>(exception.cause)
         }
     }
 

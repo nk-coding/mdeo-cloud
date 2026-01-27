@@ -15,9 +15,6 @@ const { ChangeBoundsOperation } = sharedImport("@eclipse-glsp/protocol");
  */
 @injectable()
 export class ChangeBoundsOperationHandler extends BaseOperationHandler {
-    /**
-     * The operation type this handler processes
-     */
     override readonly operationType = ChangeBoundsOperation.KIND;
 
     /**

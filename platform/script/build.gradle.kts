@@ -1,11 +1,11 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     jacoco
 }
 
 jacoco {
-    toolVersion = "0.8.11"
+    toolVersion = "0.8.14"
 }
 
 tasks.jacocoTestReport {
@@ -24,16 +24,16 @@ tasks.test {
 dependencies {
     implementation(project(":common"))
     implementation(project(":expression"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(libs.kotlinx.serialization.json)
     
     // Apache Commons Collections for Bag implementation
-    implementation("org.apache.commons:commons-collections4:4.4")
+    implementation(libs.commons.collections)
     
     // ASM for bytecode generation
-    implementation("org.ow2.asm:asm:9.6")
+    implementation(libs.asm)
     
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit.jupiter.params)
 }

@@ -21,9 +21,12 @@ import { MetadataManager } from "./metadataManager.js";
 import { UpdateClientOperationHandler } from "./handler/updateClientHandler.js";
 import { ExtendedContextEditValidatorRegistry } from "./contextEditValidationRegistry.js";
 import { ModelSubmissionHandler } from "./modelSubmissionHandler.js";
+import { BaseLayoutEngine } from "./layoutEngine.js";
+import { LayoutOperationHandler } from "./handler/layoutOperationHandler.js";
 
 const { injectable } = sharedImport("inversify");
-const { DiagramModule, bindOrRebind, applyBindingTarget } = sharedImport("@eclipse-glsp/server");
+const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =
+    sharedImport("@eclipse-glsp/server");
 
 /**
  * Abstract base class for diagram modules that integrate Langium services.
@@ -56,6 +59,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         bindOrRebind(context, AstReflectionKey).toConstantValue(this.services.shared.AstReflection);
         applyBindingTarget(context, ModelIdProvider, this.bindModelIdProvider()).inSingletonScope();
         applyBindingTarget(context, MetadataManager, this.bindMetadataManager()).inSingletonScope();
+        applyBindingTarget(context, BaseLayoutEngine, this.bindCustomLayoutEngine()).inSingletonScope();
         this.configureAdditional(context);
     }
 
@@ -87,12 +91,13 @@ export abstract class BaseDiagramModule extends DiagramModule {
     }
 
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
-        super.configureOperationHandlers(binding);
+        binding.add(CompoundOperationHandler);
         binding.add(UpdateClientOperationHandler);
         binding.add(ChangeBoundsOperationHandler);
         binding.add(PartialChangeBoundsOperationHandler);
         binding.add(TriggerActionOperationHandler);
         binding.add(UpdateRoutingInformationOperationHandler);
+        binding.add(LayoutOperationHandler);
     }
 
     /**
@@ -108,4 +113,11 @@ export abstract class BaseDiagramModule extends DiagramModule {
      * @returns The binding target for the MetadataManager
      */
     protected abstract bindMetadataManager(): BindingTarget<MetadataManager>;
+
+    /**
+     * Binds the layout engine for performing diagram layouting.
+     *
+     * @returns The binding target for the BaseLayoutEngine
+     */
+    protected abstract bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine>;
 }

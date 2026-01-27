@@ -1,0 +1,77 @@
+[versions]
+kotlin = "2.3.0"
+ktor = "3.4.0"
+exposed = "1.0.0"
+hikari = "6.3.0"
+postgresql = "42.7.7"
+logback = "1.5.26"
+bcrypt = "0.10.2"
+kotlinx-serialization = "1.10.0"
+kotlinx-coroutines = "1.10.2"
+junit = "6.0.2"
+auth0-jwt = "4.5.0"
+auth0-jwks = "0.22.2"
+mockk = "1.14.3"
+commons-collections = "4.5.0"
+asm = "9.9.1"
+jacoco = "0.8.14"
+shadow = "9.3.1"
+
+[libraries]
+# Ktor Server
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
+ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
+ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor" }
+ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
+ktor-server-double-receive = { module = "io.ktor:ktor-server-double-receive", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+
+# Ktor Client
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+
+# Exposed - JDBC
+exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
+exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
+exposed-java-time = { module = "org.jetbrains.exposed:exposed-java-time", version.ref = "exposed" }
+exposed-json = { module = "org.jetbrains.exposed:exposed-json", version.ref = "exposed" }
+
+# Database Drivers
+postgresql-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+
+# Security
+bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
+auth0-jwt = { module = "com.auth0:java-jwt", version.ref = "auth0-jwt" }
+auth0-jwks = { module = "com.auth0:jwks-rsa", version.ref = "auth0-jwks" }
+
+# Logging
+logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+# Kotlinx
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+
+# Testing
+kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+# Other
+commons-collections = { module = "org.apache.commons:commons-collections4", version.ref = "commons-collections" }
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

@@ -1,13 +1,13 @@
 package com.mdeo.backend.database
 
-import org.jetbrains.exposed.sql.ReferenceOption
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.json.json
+import org.jetbrains.exposed.v1.core.ReferenceOption
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.json.json
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import com.mdeo.common.model.ExecutionState
-import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.v1.javatime.timestamp
 
 /**
  * Users table schema for storing user accounts and authentication data.

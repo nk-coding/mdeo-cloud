@@ -3,8 +3,9 @@ import { sharedImport } from "../../sharedImport.js";
 import { Toolbox } from "./toolbox.js";
 import { ToolState } from "./toolState.js";
 import { DefaultPreviewRenderer, PreviewRenderer } from "./previewRenderer.js";
+import { LayoutCommand } from "./layoutAction.js";
 
-const { FeatureModule, configureActionHandler } = sharedImport("@eclipse-glsp/client");
+const { FeatureModule, configureActionHandler, configureCommand } = sharedImport("@eclipse-glsp/client");
 const { SetModelAction, UpdateModelAction } = sharedImport("@eclipse-glsp/sprotty");
 const { EnableDefaultToolsAction, ToolPalette } = sharedImport("@eclipse-glsp/client");
 
@@ -21,7 +22,11 @@ export const toolboxModule: ContainerModule = new FeatureModule((bind, _unbind, 
     bind(DefaultPreviewRenderer).toSelf().inSingletonScope();
     bind(PreviewRenderer).toService(DefaultPreviewRenderer);
 
-    configureActionHandler({ bind, isBound }, EnableDefaultToolsAction.KIND, Toolbox);
-    configureActionHandler({ bind, isBound }, UpdateModelAction.KIND, Toolbox);
-    configureActionHandler({ bind, isBound }, SetModelAction.KIND, Toolbox);
+    const context = { bind, isBound };
+
+    configureActionHandler(context, EnableDefaultToolsAction.KIND, Toolbox);
+    configureActionHandler(context, UpdateModelAction.KIND, Toolbox);
+    configureActionHandler(context, SetModelAction.KIND, Toolbox);
+
+    configureCommand(context, LayoutCommand);
 });

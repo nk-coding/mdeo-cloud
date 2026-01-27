@@ -4,11 +4,14 @@ import com.mdeo.backend.database.FileMetadataTable
 import com.mdeo.common.model.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
 import java.util.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service for managing file metadata within projects.
@@ -30,7 +33,7 @@ class MetadataService(services: InjectedServices) : BaseService(), InjectedServi
         return transaction {
             val row = FileMetadataTable.selectAll()
                 .where {
-                    (FileMetadataTable.projectId eq projectId) and
+                    (FileMetadataTable.projectId eq projectId.toKotlinUuid()) and
                     (FileMetadataTable.path eq normalizedPath)
                 }
                 .firstOrNull()
@@ -58,14 +61,14 @@ class MetadataService(services: InjectedServices) : BaseService(), InjectedServi
         return transaction {
             val existing = FileMetadataTable.selectAll()
                 .where { 
-                    (FileMetadataTable.projectId eq projectId) and 
+                    (FileMetadataTable.projectId eq projectId.toKotlinUuid()) and 
                     (FileMetadataTable.path eq normalizedPath) 
                 }
                 .firstOrNull()
             
             if (existing != null) {
                 FileMetadataTable.update({
-                    (FileMetadataTable.projectId eq projectId) and
+                    (FileMetadataTable.projectId eq projectId.toKotlinUuid()) and
                     (FileMetadataTable.path eq normalizedPath)
                 }) {
                     it[FileMetadataTable.metadata] = metadata
@@ -73,7 +76,7 @@ class MetadataService(services: InjectedServices) : BaseService(), InjectedServi
                 }
             } else {
                 FileMetadataTable.insert {
-                    it[FileMetadataTable.projectId] = projectId
+                    it[FileMetadataTable.projectId] = projectId.toKotlinUuid()
                     it[FileMetadataTable.path] = normalizedPath
                     it[FileMetadataTable.metadata] = metadata
                     it[createdAt] = now
@@ -92,7 +95,7 @@ class MetadataService(services: InjectedServices) : BaseService(), InjectedServi
      */
     fun deleteAllForProject(projectId: UUID) {
         transaction {
-            FileMetadataTable.deleteWhere { FileMetadataTable.projectId eq projectId }
+            FileMetadataTable.deleteWhere { FileMetadataTable.projectId eq projectId.toKotlinUuid() }
         }
     }
     
