@@ -26,10 +26,16 @@ export enum MetamodelElementType {
  * Represents the decoration at each end of an association edge.
  */
 export enum AssociationEndKind {
-    /** No decoration (plain line end) */
+    /**
+     * No decoration (plain line end)
+     */
     NONE = "none",
-    /** Composition (filled diamond) */
+    /**
+     * Composition (filled diamond)
+     */
     COMPOSITION = "composition",
-    /** Navigability (arrow) */
+    /**
+     * Navigability (arrow)
+     */
     ARROW = "arrow"
 }

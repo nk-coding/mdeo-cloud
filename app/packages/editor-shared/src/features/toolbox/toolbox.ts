@@ -1,6 +1,6 @@
 import type { VNode } from "snabbdom";
 import { init, classModule, propsModule, styleModule, eventListenersModule, attributesModule } from "snabbdom";
-import type { Action, IActionDispatcher, ICommand, GModelRoot, PaletteItem } from "@eclipse-glsp/sprotty";
+import type { Action, IActionDispatcher, GModelRoot, PaletteItem } from "@eclipse-glsp/sprotty";
 import type MiniSearch from "minisearch";
 import { sharedImport } from "../../sharedImport.js";
 import { ToolState } from "./toolState.js";
@@ -122,17 +122,6 @@ export class Toolbox extends ToolPalette {
     }
 
     /**
-     * Handles actions from the action dispatcher.
-     *
-     * @param action The action to handle
-     * @returns Command, Action, or void
-     */
-    override handle(action: Action): ICommand | Action | void {
-        super.handle(action);
-        this.update();
-    }
-
-    /**
      * Called before showing the toolbox.
      *
      * @param containerElement The container element
@@ -153,6 +142,14 @@ export class Toolbox extends ToolPalette {
             this.buildToolboxEntries();
             this.update();
         }
+    }
+
+    /**
+     * Sets the palette items and marks the toolbox as dynamic.
+     */
+    protected override async setPaletteItems(): Promise<void> {
+        await super.setPaletteItems();
+        this.dynamic = true;
     }
 
     /**

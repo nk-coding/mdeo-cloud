@@ -20,19 +20,33 @@ export enum MetamodelPrimitiveTypes {
  * Supports navigability (arrows) and composition (stars).
  */
 export enum MetamodelAssociationOperators {
-    /** Navigable from source to target */
+    /**
+     * Navigable from source to target
+     */
     NAVIGABLE_TO_TARGET = "-->",
-    /** Navigable from target to source */
+    /**
+     * Navigable from target to source
+     */
     NAVIGABLE_TO_SOURCE = "<--",
-    /** Bidirectional navigability */
+    /**
+     * Bidirectional navigability
+     */
     BIDIRECTIONAL = "<-->",
-    /** Composition at source, navigable to target */
+    /**
+     * Composition at source, navigable to target
+     */
     COMPOSITION_SOURCE_NAVIGABLE_TARGET = "*-->",
-    /** Composition at source */
+    /**
+     * Composition at source
+     */
     COMPOSITION_SOURCE = "*--",
-    /** Composition at target, navigable to source */
+    /**
+     * Composition at target, navigable to source
+     */
     COMPOSITION_TARGET_NAVIGABLE_SOURCE = "<--*",
-    /** Composition at target */
+    /**
+     * Composition at target
+     */
     COMPOSITION_TARGET = "--*"
 }
 

@@ -4,7 +4,17 @@ import type { GraphMetadata, ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 import { ID, type PartialAstNode } from "@mdeo/language-common";
 import type { SingleMultiplicityType, RangeMultiplicityType } from "../../grammar/metamodelTypes.js";
-import { Class, MetamodelAssociationOperators } from "../../grammar/metamodelTypes.js";
+import {
+    Association,
+    Class,
+    ClassOrEnumImport,
+    Enum,
+    EnumTypeReference,
+    MetamodelAssociationOperators,
+    PrimitiveType,
+    RangeMultiplicity,
+    SingleMultiplicity
+} from "../../grammar/metamodelTypes.js";
 import type {
     PartialMetaModel,
     PartialClass,
@@ -13,7 +23,8 @@ import type {
     PartialClassOrEnumImport,
     PartialClassExtension,
     PartialAssociationEnd,
-    PartialEnum
+    PartialEnum,
+    PartialPropertyTypeValue
 } from "../../grammar/metamodelPartialTypes.js";
 import { GClassNode } from "./model/classNode.js";
 import { GEnumNode } from "./model/enumNode.js";
@@ -74,11 +85,11 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         const imports: PartialClassOrEnumImport[] = [];
         const items = metamodel.elements ?? [];
         for (const item of items) {
-            if (item?.$type === "Class") {
+            if (this.reflection.isInstance(item, Class)) {
                 classes.push(item as PartialClass);
-            } else if (item?.$type === "Enum") {
+            } else if (this.reflection.isInstance(item, Enum)) {
                 enums.push(item as PartialEnum);
-            } else if (item?.$type === "Association") {
+            } else if (this.reflection.isInstance(item, Association)) {
                 associations.push(item as PartialAssociation);
             }
         }
@@ -206,7 +217,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
             const displayName = classOrEnumImport.name ?? importedClassOrEnum.name ?? "Unnamed";
 
-            if (this.modelState.languageServices.shared.AstReflection.isInstance(importedClassOrEnum, Class)) {
+            if (this.reflection.isInstance(importedClassOrEnum, Class)) {
                 const node = GClassNode.builder()
                     .id(nodeId)
                     .name(displayName)
@@ -417,16 +428,20 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param propertyType The property type value (PrimitiveType or EnumTypeReference)
      * @returns The type name string
      */
-    private getPropertyTypeName(propertyType: unknown): string {
+    private getPropertyTypeName(propertyType: PartialPropertyTypeValue | undefined): string {
         if (propertyType == undefined || typeof propertyType !== "object") {
             return "unknown";
         }
-        const pt = propertyType as { $type?: string; name?: string; enum?: { ref?: { name?: string } } };
-        if (pt.$type === "PrimitiveType") {
-            return pt.name ?? "unknown";
+        if (this.reflection.isInstance(propertyType, PrimitiveType)) {
+            return propertyType.name ?? "unknown";
         }
-        if (pt.$type === "EnumTypeReference") {
-            return pt.enum?.ref?.name ?? "unknown";
+        if (this.reflection.isInstance(propertyType, EnumTypeReference)) {
+            const enumType = propertyType.enum?.ref;
+            if (this.reflection.isInstance(enumType, Enum)) {
+                return enumType.name ?? "unknown";
+            } else if (this.reflection.isInstance(enumType, ClassOrEnumImport)) {
+                return enumType.name ?? enumType.entity?.ref?.name ?? "unknown";
+            }
         }
         return "unknown";
     }
@@ -657,7 +672,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @returns Formatted string like "*", "1", "0..1"
      */
     private formatMultiplicity(multiplicity: PartialMultiplicity): string {
-        if (multiplicity.$type === "SingleMultiplicity") {
+        if (this.reflection.isInstance(multiplicity, SingleMultiplicity)) {
             const single = multiplicity as PartialAstNode<SingleMultiplicityType>;
             if (single.value != undefined) {
                 return single.value;
@@ -665,7 +680,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             if (single.numericValue !== undefined && single.numericValue !== null) {
                 return single.numericValue.toString();
             }
-        } else if (multiplicity.$type === "RangeMultiplicity") {
+        } else if (this.reflection.isInstance(multiplicity, RangeMultiplicity)) {
             const range = multiplicity as PartialAstNode<RangeMultiplicityType>;
             const lower = range.lower ?? 0;
             const upper = range.upper ?? range.upperNumeric ?? "*";

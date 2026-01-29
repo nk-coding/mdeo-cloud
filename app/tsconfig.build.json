@@ -42,6 +42,9 @@
             "path": "packages/editor-metamodel"
         },
         {
+            "path": "packages/editor-model"
+        },
+        {
             "path": "packages/service-common"
         },
         {

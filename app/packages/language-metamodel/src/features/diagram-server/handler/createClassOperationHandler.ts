@@ -7,7 +7,7 @@ import {
 import type { CreateNodeResult, GroupedToolboxItem, ToolboxItemProvider } from "@mdeo/language-shared";
 import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
 import type { ClassType } from "../../../grammar/metamodelTypes.js";
-import { MetamodelPrimitiveTypes } from "../../../grammar/metamodelTypes.js";
+import { Class, MetamodelPrimitiveTypes, PrimitiveType, Property } from "../../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "../model/elementTypes.js";
 import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
 import type { MetamodelMetadataManager } from "../metamodelMetadataManager.js";
@@ -40,7 +40,7 @@ export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler 
         if (operation.elementTypeId === "node:class") {
             const node = await this.createClassAst(operation.args?.includeProperty === true);
             const edit = await this.createClassNode(node);
-            const nodeId = `Class_${node.name}`;
+            const nodeId = `${Class.name}_${node.name}`;
             return {
                 nodeId,
                 nodeType: MetamodelElementType.NODE_CLASS,
@@ -137,7 +137,7 @@ export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler 
     protected async createClassAst(includeProperty: boolean): Promise<ClassType> {
         const name = await this.findUniqueName("NewClass");
         const classNode: ClassType = {
-            $type: "Class",
+            $type: Class.name,
             name,
             isAbstract: false,
             properties: [],
@@ -146,10 +146,10 @@ export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler 
 
         if (includeProperty) {
             classNode.properties.push({
-                $type: "Property",
+                $type: Property.name,
                 name: "example",
                 type: {
-                    $type: "PrimitiveType",
+                    $type: PrimitiveType.name,
                     name: MetamodelPrimitiveTypes.STRING
                 },
                 multiplicity: undefined

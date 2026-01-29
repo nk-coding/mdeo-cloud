@@ -6,7 +6,7 @@ import {
 } from "@mdeo/language-shared";
 import type { CreateNodeResult, GroupedToolboxItem, ToolboxItemProvider } from "@mdeo/language-shared";
 import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
-import type { EnumType } from "../../../grammar/metamodelTypes.js";
+import { Enum, EnumEntry, type EnumType } from "../../../grammar/metamodelTypes.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { MetamodelElementType } from "../model/elementTypes.js";
 import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
@@ -133,14 +133,14 @@ export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler i
     protected async createEnumAst(includeEntry: boolean): Promise<EnumType> {
         const name = await this.findUniqueName("NewEnum");
         const enumNode: EnumType = {
-            $type: "Enum",
+            $type: Enum.name,
             name,
             entries: []
         };
 
         if (includeEntry) {
             enumNode.entries.push({
-                $type: "EnumEntry",
+                $type: EnumEntry.name,
                 name: "VALUE"
             });
         }
@@ -164,7 +164,7 @@ export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler i
         const includeEntry = operation.args?.includeEntry === true;
         const enumNode = await this.createEnumAst(includeEntry);
         const edit = await this.createEnumNode(enumNode);
-        const nodeId = `Enum_${enumNode.name}`;
+        const nodeId = `${Enum.name}_${enumNode.name}`;
         return {
             nodeId,
             nodeType: MetamodelElementType.NODE_ENUM,

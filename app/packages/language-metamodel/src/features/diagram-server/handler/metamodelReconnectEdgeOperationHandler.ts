@@ -11,6 +11,7 @@ import type { WorkspaceEdit } from "vscode-languageserver-types";
 import {
     Association,
     ClassExtension,
+    ClassExtensions,
     type AssociationType,
     type ClassExtensionsType,
     type ClassExtensionType,
@@ -310,9 +311,9 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
         } else {
             const remainingExtensions = extensions.filter((ext) => ext !== extension);
             const newClassExtensions: ClassExtensionsType = {
-                $type: "ClassExtensions",
+                $type: ClassExtensions.name,
                 extensions: remainingExtensions.map((ext) => ({
-                    $type: "ClassExtension",
+                    $type: ClassExtension.name,
                     class: {
                         $refText: ext.class.$refText,
                         ref: ext.class.ref
@@ -346,14 +347,14 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
 
         const allExtensions: ClassExtensionType[] = [
             ...existingExtensions.map((ext) => ({
-                $type: "ClassExtension",
+                $type: ClassExtension.name,
                 class: {
                     $refText: ext.class.$refText,
                     ref: ext.class.ref
                 }
             })),
             {
-                $type: "ClassExtension",
+                $type: ClassExtension.name,
                 class: {
                     $refText: targetName,
                     ref: undefined
@@ -362,7 +363,7 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
         ];
 
         const classExtensions: ClassExtensionsType = {
-            $type: "ClassExtensions",
+            $type: ClassExtensions.name,
             extensions: allExtensions
         };
 

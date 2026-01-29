@@ -1,0 +1,17 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "references": [
+        {
+            "path": "../editor-common"
+        },
+        {
+            "path": "../editor-shared"
+        }
+    ],
+    "include": ["src/**/*.ts"],
+    "exclude": ["dist", "node_modules"]
+}

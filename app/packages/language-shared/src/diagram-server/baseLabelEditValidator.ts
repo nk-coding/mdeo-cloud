@@ -1,6 +1,7 @@
 import type { ValidationStatus } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../sharedImport.js";
 import type { ModelState } from "./modelState.js";
+import type { AstReflection } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const {
@@ -18,6 +19,13 @@ export abstract class BaseLabelEditValidator extends LabelEditValidator {
      * The model state instance
      */
     @inject(ModelStateKey) protected readonly modelState!: ModelState;
+
+    /**
+     * The AST reflection utility
+     */
+    protected get reflection(): AstReflection {
+        return this.modelState.languageServices.shared.AstReflection;
+    }
 
     /**
      * Creates an error validation status with the given message

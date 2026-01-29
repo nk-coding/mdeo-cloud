@@ -5,6 +5,7 @@ import { type ModelIdRegistry, DefaultModelIdRegistry } from "./modelIdRegistry.
 import { ModelIdProvider } from "./modelIdProvider.js";
 import type { ModelState } from "./modelState.js";
 import type { GModelIndex } from "./modelIndex.js";
+import type { AstReflection } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -32,6 +33,13 @@ export abstract class BaseGModelFactory<T extends AstNode> implements GModelFact
      */
     @inject(GModelIndexKey)
     protected modelIndex!: GModelIndex;
+
+    /**
+     * AST reflection utilities
+     */
+    protected get reflection(): AstReflection {
+        return this.modelState.languageServices.shared.AstReflection;
+    }
 
     createModel(): void {
         const sourceModel = this.modelState.sourceModel;

@@ -12,7 +12,11 @@ import {
     type RangeMultiplicityType,
     type MultiplicityType,
     AssociationEnd,
-    type AssociationEndType
+    type AssociationEndType,
+    PrimitiveType,
+    EnumTypeReference,
+    RangeMultiplicity,
+    SingleMultiplicity
 } from "../../../grammar/metamodelTypes.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
@@ -134,12 +138,12 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
         const primitiveTypes = Object.values(MetamodelPrimitiveTypes) as string[];
         if (primitiveTypes.includes(typeName)) {
             return {
-                $type: "PrimitiveType",
+                $type: PrimitiveType.name,
                 name: typeName as MetamodelPrimitiveTypes
             };
         }
         return {
-            $type: "EnumTypeReference",
+            $type: EnumTypeReference.name,
             enum: { $refText: typeName }
         } as PropertyTypeValueType;
     }
@@ -205,13 +209,13 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
 
             if (upper === "*") {
                 return {
-                    $type: "RangeMultiplicity",
+                    $type: RangeMultiplicity.name,
                     lower: lowerNum,
                     upper: "*"
                 } as RangeMultiplicityType;
             } else if (/^\d+$/.test(upper)) {
                 return {
-                    $type: "RangeMultiplicity",
+                    $type: RangeMultiplicity.name,
                     lower: lowerNum,
                     upperNumeric: parseInt(upper, 10)
                 } as RangeMultiplicityType;
@@ -222,14 +226,14 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
 
         if (multiplicity === "*" || multiplicity === "+" || multiplicity === "?") {
             return {
-                $type: "SingleMultiplicity",
+                $type: SingleMultiplicity.name,
                 value: multiplicity
             } as SingleMultiplicityType;
         }
 
         if (/^\d+$/.test(multiplicity)) {
             return {
-                $type: "SingleMultiplicity",
+                $type: SingleMultiplicity.name,
                 numericValue: parseInt(multiplicity, 10)
             } as SingleMultiplicityType;
         }

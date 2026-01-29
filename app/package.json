@@ -9,7 +9,7 @@
         "build": "npm run build:packages && npm run build:css && npm run build:workbench",
         "build:packages": "tsc -b tsconfig.build.json",
         "build:workbench": "npm run -w @mdeo/workbench build",
-        "build:css": "npm run -w @mdeo/editor-metamodel build:css",
+        "build:css": "npm run -w @mdeo/editor-metamodel build:css && npm run -w @mdeo/editor-model build:css",
         "watch": "tsc -b tsconfig.build.json --watch",
         "dev": "npm run -w @mdeo/workbench dev",
         "format": "prettier --write .",

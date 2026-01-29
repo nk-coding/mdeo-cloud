@@ -17,7 +17,8 @@ import {
     type ClassOrEnumImportType,
     FileImport,
     type EnumType,
-    Enum
+    Enum,
+    ClassExtensions
 } from "../../../grammar/metamodelTypes.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
@@ -290,11 +291,11 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 edits.push(this.deleteCstNode(extensionsNode.$cstNode));
             } else {
                 const newClassExtensions: ClassExtensionsType = {
-                    $type: "ClassExtensions",
+                    $type: ClassExtensions.name,
                     extensions: remainingExtensions
                         .filter((ext) => ext.class != undefined)
                         .map((ext) => ({
-                            $type: "ClassExtension",
+                            $type: ClassExtension.name,
                             class: {
                                 $refText: ext.class.$refText,
                                 ref: ext.class.ref

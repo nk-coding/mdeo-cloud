@@ -335,7 +335,6 @@ export function parsePropertyLabel(label: string): ParsedPropertyLabel | undefin
         type = typeWithMultiplicity.substring(0, bracketIndex).trim();
         const multiplicityPart = typeWithMultiplicity.substring(bracketIndex);
 
-        // Check if brackets are matched and have content
         if (!multiplicityPart.startsWith("[") || !multiplicityPart.endsWith("]")) {
             return undefined;
         }

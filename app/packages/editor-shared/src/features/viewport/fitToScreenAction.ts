@@ -8,6 +8,6 @@ const { FitToScreenAction } = sharedImport("@eclipse-glsp/protocol");
  *
  * @param animate whether to animate the action
  */
-export function createFitToScreenAction(animate: boolean | undefined = undefined): Action {
-    return FitToScreenAction.create([], { padding: 50, maxZoom: 2, animate });
+export function createFitToScreenAction(animate: boolean | undefined = undefined, elementIds: string[]): Action {
+    return FitToScreenAction.create(elementIds, { padding: 50, maxZoom: 2, animate });
 }

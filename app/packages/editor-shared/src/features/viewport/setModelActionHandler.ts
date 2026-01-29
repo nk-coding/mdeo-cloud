@@ -1,4 +1,4 @@
-import type { Action } from "@eclipse-glsp/protocol";
+import type { Action, SetModelAction } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../../sharedImport.js";
 import type { IActionHandler, ICommand } from "@eclipse-glsp/sprotty";
 import { createFitToScreenAction } from "./fitToScreenAction.js";
@@ -10,7 +10,7 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class SetModelActionHandler implements IActionHandler {
-    handle(): ICommand | Action | void {
-        return createFitToScreenAction(false);
+    handle(action: SetModelAction): ICommand | Action | void {
+        return createFitToScreenAction(false, action.newRoot.children?.map((child) => child.id) ?? []);
     }
 }

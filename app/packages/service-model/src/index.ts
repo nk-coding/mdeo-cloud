@@ -57,7 +57,10 @@ const modelServicePlugin: ServicePluginDefinition = {
         serverPlugin: {
             import: "static/language.js"
         },
-        graphicalEditorPlugin: undefined,
+        graphicalEditorPlugin: {
+            import: "static/editor.js",
+            stylesUrl: "static/styles.css"
+        },
         textualEditorPlugin: {
             languageConfiguration: defaultLanguageConfiguration,
             monarchTokensProvider: serializeMonarchTokensProvider({

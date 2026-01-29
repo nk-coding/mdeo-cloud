@@ -1,0 +1,385 @@
+import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
+import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } from "@mdeo/language-shared";
+import type { ModelIdRegistry } from "@mdeo/language-shared";
+import type { NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/editor-protocol";
+import { ID } from "@mdeo/language-common";
+import type {
+    PartialModel,
+    PartialObjectInstance,
+    PartialLink,
+    PartialPropertyAssignment
+} from "../../grammar/modelPartialTypes.js";
+import { GObjectNode } from "./model/objectNode.js";
+import { GObjectNameLabel } from "./model/objectNameLabel.js";
+import { GPropertyLabel } from "./model/propertyLabel.js";
+import { GLinkEdge } from "./model/linkEdge.js";
+import { GLinkSourceLabel } from "./model/linkSourceLabel.js";
+import { GLinkTargetLabel } from "./model/linkTargetLabel.js";
+import { EdgeLayoutMetadataUtil } from "./metadataTypes.js";
+import { ModelElementType } from "./model/elementTypes.js";
+import {
+    EnumValue,
+    ListValue,
+    SimpleValue,
+    type EnumValueType,
+    type SingleValueType
+} from "../../grammar/modelTypes.js";
+
+const { injectable } = sharedImport("inversify");
+const { GGraph } = sharedImport("@eclipse-glsp/server");
+
+type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
+
+/**
+ * Factory for creating GLSP graph models from model AST.
+ * Transforms the model source into a visual graph representation
+ * with nodes for objects and edges for links.
+ */
+@injectable()
+export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
+    /**
+     * Creates the internal GModel from the source model.
+     *
+     * @param sourceModel The model AST
+     * @param idRegistry The ID registry for element ID generation
+     * @returns The created GModelRoot
+     */
+    override createModelInternal(sourceModel: PartialModel, idRegistry: ModelIdRegistry): GModelRoot {
+        const graph = GGraph.builder().id("model-graph").addCssClass("editor-model").build();
+
+        const extracted = this.extractElements(sourceModel);
+        this.createObjectNodes(graph, extracted.objects, idRegistry);
+        this.createLinkEdges(graph, extracted.links, idRegistry);
+
+        return graph;
+    }
+
+    /**
+     * Extracts objects and links from the model.
+     *
+     * @param model The model containing elements
+     * @returns An object containing separate arrays of objects and links
+     */
+    private extractElements(model: PartialModel): {
+        objects: PartialObjectInstance[];
+        links: PartialLink[];
+    } {
+        const objects: PartialObjectInstance[] = [];
+        const links: PartialLink[] = [];
+
+        for (const obj of model.objects ?? []) {
+            if (obj != undefined) {
+                objects.push(obj);
+            }
+        }
+
+        for (const link of model.links ?? []) {
+            if (link != undefined) {
+                links.push(link);
+            }
+        }
+
+        return { objects, links };
+    }
+
+    /**
+     * Creates visual nodes for all object instances.
+     *
+     * @param graph The graph to add nodes to
+     * @param objects Array of objects to create nodes for
+     * @param idRegistry The ID registry for AST node ID generation
+     */
+    private createObjectNodes(graph: GGraphType, objects: PartialObjectInstance[], idRegistry: ModelIdRegistry): void {
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+
+        for (const obj of objects) {
+            const nodeId = idRegistry.getId(obj);
+            const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
+
+            graph.children.push(this.createObjectNode(obj, nodeId, metadata, idRegistry));
+        }
+    }
+
+    /**
+     * Creates a visual node for a single object instance.
+     *
+     * @param obj The object instance AST node
+     * @param nodeId The unique node ID
+     * @param metadata The layout metadata for the node
+     * @param idRegistry The ID registry for AST node ID generation
+     * @returns The created GObjectNode
+     */
+    createObjectNode(
+        obj: PartialObjectInstance,
+        nodeId: string,
+        metadata: NodeLayoutMetadata,
+        idRegistry: ModelIdRegistry
+    ): GObjectNode {
+        const objectName = obj.name ?? "unnamed";
+        const classRef = obj.class;
+        const typeName = classRef?.$refText ?? (classRef?.ref as { name?: string } | undefined)?.name ?? "Unknown";
+
+        const node = GObjectNode.builder().id(nodeId).name(objectName).typeName(typeName).meta(metadata).build();
+
+        node.children.push(
+            ...this.createObjectHeader(nodeId, objectName, typeName),
+            ...this.createPropertyAssignments(nodeId, obj, idRegistry)
+        );
+
+        return node;
+    }
+
+    /**
+     * Creates the header compartment containing the combined name and type label.
+     *
+     * @param nodeId The ID of the object node
+     * @param name The name of the object
+     * @param typeName The type name of the object
+     * @returns Array of GModelElements for the header
+     */
+    private createObjectHeader(nodeId: string, name: string, typeName: string): GModelElement[] {
+        const headerCompartment = GCompartment.builder()
+            .type(ModelElementType.COMPARTMENT)
+            .id(`${nodeId}#header-compartment`)
+            .build();
+
+        const combinedLabel = GObjectNameLabel.builder().id(`${nodeId}#name`).text(`${name} : ${typeName}`).build();
+
+        headerCompartment.children.push(combinedLabel);
+        return [headerCompartment];
+    }
+
+    /**
+     * Creates the property assignments compartment for an object node.
+     *
+     * @param nodeId The ID of the object node
+     * @param obj The object containing property assignments
+     * @param idRegistry The ID registry for AST node ID generation
+     * @returns Array of GModelElements for the properties compartment
+     */
+    private createPropertyAssignments(
+        nodeId: string,
+        obj: PartialObjectInstance,
+        idRegistry: ModelIdRegistry
+    ): GModelElement[] {
+        const children: GModelElement[] = [];
+        const properties = obj.properties ?? [];
+
+        if (properties.length === 0) {
+            return children;
+        }
+
+        const divider = GHorizontalDivider.builder().type(ModelElementType.DIVIDER).id(`${nodeId}#divider`).build();
+        children.push(divider);
+
+        const propertiesCompartment = GCompartment.builder()
+            .type(ModelElementType.COMPARTMENT)
+            .id(`${nodeId}#properties-compartment`)
+            .build();
+
+        for (const prop of properties) {
+            if (prop == undefined) {
+                continue;
+            }
+
+            const propId = idRegistry.getId(prop);
+            const propLabel = this.createPropertyLabel(propId, prop);
+            propertiesCompartment.children.push(propLabel);
+        }
+
+        children.push(propertiesCompartment);
+        return children;
+    }
+
+    /**
+     * Creates a property assignment label.
+     *
+     * @param propId The ID for the property label
+     * @param prop The property assignment
+     * @returns The created GPropertyLabel
+     */
+    private createPropertyLabel(propId: string, prop: PartialPropertyAssignment): GPropertyLabel {
+        const rawPropName = prop.name?.$refText ?? prop.name?.ref?.name ?? "unknown";
+        const propName = this.modelState.languageServices.AstSerializer.serializePrimitive({ value: rawPropName }, ID);
+        const valueStr = this.formatPropertyValue(prop);
+
+        return GPropertyLabel.builder().id(`${propId}#label`).text(`${propName} = ${valueStr}`).build();
+    }
+
+    /**
+     * Formats a property value to a string representation.
+     *
+     * @param prop The property assignment
+     * @returns The formatted value string
+     */
+    private formatPropertyValue(prop: PartialPropertyAssignment): string {
+        const value = prop.value as
+            | {
+                  $type?: string;
+                  stringValue?: string;
+                  numberValue?: number;
+                  booleanValue?: boolean;
+                  value?: { $refText?: string };
+                  values?: unknown[];
+              }
+            | undefined;
+        if (value == undefined) {
+            return "?";
+        }
+
+        if (this.reflection.isInstance(value, SimpleValue)) {
+            return this.formatSimpleValue(value);
+        } else if (this.reflection.isInstance(value, EnumValue)) {
+            return this.formatEnumValue(value);
+        } else if (this.reflection.isInstance(value, ListValue)) {
+            const items = (value.values ?? []).map((value) => this.formatSingleValue(value));
+            return `[${items.join(", ")}]`;
+        }
+
+        return "?";
+    }
+
+    /**
+     * Formats a simple value (string, number, or boolean).
+     *
+     * @param value The simple value
+     * @returns The formatted string
+     */
+    private formatSimpleValue(value: { stringValue?: string; numberValue?: number; booleanValue?: boolean }): string {
+        if (value.stringValue !== undefined) {
+            return `"${value.stringValue}"`;
+        }
+        if (value.numberValue !== undefined) {
+            return String(value.numberValue);
+        }
+        if (value.booleanValue !== undefined) {
+            return String(value.booleanValue);
+        }
+        return "?";
+    }
+
+    /**
+     * Formats an enum value.
+     *
+     * @param value The enum value
+     * @returns The formatted string
+     */
+    private formatEnumValue(value: EnumValueType): string {
+        return this.modelState.languageServices.AstSerializer.serializePrimitive(
+            { value: value.value?.$refText ?? "?" },
+            ID
+        );
+    }
+
+    /**
+     * Formats a single value (simple or enum).
+     *
+     * @param value The single value
+     * @returns The formatted string
+     */
+    private formatSingleValue(value: SingleValueType | undefined): string {
+        if (value == undefined) {
+            return "?";
+        }
+        if (this.reflection.isInstance(value, SimpleValue)) {
+            return this.formatSimpleValue(value);
+        }
+        if (this.reflection.isInstance(value, EnumValue)) {
+            return this.formatEnumValue(value);
+        }
+        return "?";
+    }
+
+    /**
+     * Creates link edges for all links in the model.
+     *
+     * @param graph The graph to add edges to
+     * @param links Array of links to create edges for
+     * @param idRegistry The ID registry for AST node ID generation
+     */
+    private createLinkEdges(graph: GGraphType, links: PartialLink[], idRegistry: ModelIdRegistry): void {
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+
+        for (const link of links) {
+            const edgeId = idRegistry.getId(link);
+            const metadata = validatedMetadata.edges[edgeId]?.meta as EdgeLayoutMetadata | undefined;
+            const edgeMeta: EdgeLayoutMetadata = metadata ?? EdgeLayoutMetadataUtil.create();
+
+            const edge = this.createLinkEdge(link, edgeId, edgeMeta, idRegistry);
+            if (edge != undefined) {
+                graph.children.push(edge);
+            }
+        }
+    }
+
+    /**
+     * Creates a link edge between two objects.
+     *
+     * @param link The link AST node
+     * @param edgeId The unique edge ID
+     * @param metadata The edge layout metadata
+     * @param idRegistry The ID registry for AST node ID generation
+     * @returns The created GLinkEdge or undefined if invalid
+     */
+    private createLinkEdge(
+        link: PartialLink,
+        edgeId: string,
+        metadata: EdgeLayoutMetadata,
+        idRegistry: ModelIdRegistry
+    ): GLinkEdge | undefined {
+        const sourceObj = link.source?.object?.ref;
+        const targetObj = link.target?.object?.ref;
+
+        if (sourceObj == undefined || targetObj == undefined) {
+            return undefined;
+        }
+
+        const sourceId = idRegistry.getId(sourceObj);
+        const targetId = idRegistry.getId(targetObj);
+
+        const sourceProperty = link.source?.property?.$refText;
+        const targetProperty = link.target?.property?.$refText;
+
+        const edgeBuilder = GLinkEdge.builder().id(edgeId).sourceId(sourceId).targetId(targetId).meta(metadata);
+
+        if (sourceProperty) {
+            edgeBuilder.sourceProperty(sourceProperty);
+        }
+        if (targetProperty) {
+            edgeBuilder.targetProperty(targetProperty);
+        }
+
+        const edge = edgeBuilder.build();
+        this.addLinkLabels(edge, edgeId, sourceProperty, targetProperty);
+
+        return edge;
+    }
+
+    /**
+     * Adds source and target labels to a link edge if properties are specified.
+     *
+     * @param edge The link edge to add labels to
+     * @param edgeId The edge ID
+     * @param sourceProperty Optional source property name
+     * @param targetProperty Optional target property name
+     */
+    private addLinkLabels(edge: GLinkEdge, edgeId: string, sourceProperty?: string, targetProperty?: string): void {
+        if (sourceProperty) {
+            const sourceLabel = GLinkSourceLabel.builder()
+                .id(`${edgeId}#source-label`)
+                .text(sourceProperty)
+                .readonly(true)
+                .build();
+            edge.children.push(sourceLabel);
+        }
+
+        if (targetProperty) {
+            const targetLabel = GLinkTargetLabel.builder()
+                .id(`${edgeId}#target-label`)
+                .text(targetProperty)
+                .readonly(true)
+                .build();
+            edge.children.push(targetLabel);
+        }
+    }
+}

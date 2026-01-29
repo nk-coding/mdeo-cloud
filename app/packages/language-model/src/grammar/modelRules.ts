@@ -34,7 +34,7 @@ import {
  * Boolean literal rule.
  * Matches "true" or "false".
  */
-const BOOLEAN = createRule("BOOLEAN")
+export const BOOLEAN = createRule("BOOLEAN")
     .returns(Boolean)
     .as(() => [or("true", "false")]);
 

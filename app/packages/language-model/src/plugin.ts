@@ -13,12 +13,14 @@ import {
     SerializerFormatter,
     DefaultActionProvider,
     ActionHandlerRegistry,
-    registerDefaultTokenSerializers
+    registerDefaultTokenSerializers,
+    DefaultWorkspaceEditService
 } from "@mdeo/language-shared";
 import { ModelScopeProvider } from "./features/modelScopeProvider.js";
 import { ModelExternalReferenceCollector } from "./features/modelExternalReferenceCollector.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 import { registerModelSerializers } from "./features/modelSerializers.js";
+import { ModelDiagramModule } from "./features/diagram-server/modelDiagramModule.js";
 
 export type ModelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
@@ -49,11 +51,15 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
                 return registry;
             },
             ActionProvider: () => new DefaultActionProvider()
+        },
+        workspace: {
+            WorkspaceEdit: (services) => new DefaultWorkspaceEditService(services)
         }
     },
     postCreate(services) {
         registerDefaultTokenSerializers(services);
         registerModelSerializers(services);
+        services.shared.glsp.serverModule.configureDiagramModule(new ModelDiagramModule(services));
         addExternalReferenceCollectionPhase(services);
     }
 };
