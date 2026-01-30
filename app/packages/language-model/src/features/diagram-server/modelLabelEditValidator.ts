@@ -10,11 +10,14 @@ import {
     Enum,
     EnumTypeReference,
     PrimitiveType,
+    RangeMultiplicity,
+    SingleMultiplicity,
     MetamodelPrimitiveTypes,
     type PropertyType,
     type ClassType,
     type EnumType,
-    type EnumTypeReferenceType
+    type EnumTypeReferenceType,
+    type MultiplicityType
 } from "@mdeo/language-metamodel";
 import { PropertyAssignment, type ObjectInstanceType } from "../../grammar/modelTypes.js";
 import type { PartialPropertyAssignment } from "../../grammar/modelPartialTypes.js";
@@ -277,6 +280,7 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
 
     /**
      * Validates a property value against its property definition.
+     * Includes type checking and multiplicity count validation.
      *
      * @param valueTokens The value tokens to validate
      * @param propertyDef The property definition
@@ -296,11 +300,17 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
             }
 
             const innerTokens = valueTokens.slice(1, -1);
-            if (innerTokens.length === 0) {
-                return undefined;
+            const entries = this.extractListEntryTokens(innerTokens);
+
+            const multiplicityValidation = this.validateMultiplicityCount(
+                entries.length,
+                propertyDef.multiplicity,
+                propertyDef.name
+            );
+            if (multiplicityValidation != undefined) {
+                return multiplicityValidation;
             }
 
-            const entries = this.extractListEntryTokens(innerTokens);
             for (const entryTokens of entries) {
                 const entryValidation = this.validateSingleValueTokens(entryTokens, propertyDef);
                 if (entryValidation != undefined) {
@@ -314,6 +324,76 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
             }
             return this.validateSingleValueTokens(valueTokens, propertyDef);
         }
+    }
+
+    /**
+     * Validates that the count of values matches the multiplicity constraints.
+     *
+     * @param count The number of values provided
+     * @param multiplicity The multiplicity constraint
+     * @param propertyName The property name for error messages
+     * @returns A validation status if invalid, undefined otherwise
+     */
+    private validateMultiplicityCount(
+        count: number,
+        multiplicity: MultiplicityType | undefined,
+        propertyName: string | undefined
+    ): ValidationStatusType | undefined {
+        const bounds = this.getMultiplicityBounds(multiplicity);
+
+        if (count < bounds.lower) {
+            return this.error(
+                `Property '${propertyName ?? "unknown"}' requires at least ${bounds.lower} value(s), but ${count} were provided.`
+            );
+        }
+
+        if (bounds.upper !== undefined && count > bounds.upper) {
+            return this.error(
+                `Property '${propertyName ?? "unknown"}' allows at most ${bounds.upper} value(s), but ${count} were provided.`
+            );
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Gets the lower and upper bounds of a multiplicity.
+     *
+     * @param multiplicity The multiplicity to analyze
+     * @returns Object with lower and upper bounds (upper is undefined for unbounded)
+     */
+    private getMultiplicityBounds(multiplicity: MultiplicityType | undefined): { lower: number; upper: number | undefined } {
+        if (!multiplicity) {
+            return { lower: 1, upper: 1 };
+        }
+
+        const reflection = this.reflection;
+
+        if (reflection.isInstance(multiplicity, SingleMultiplicity)) {
+            const value = multiplicity.value;
+            const numericValue = multiplicity.numericValue;
+
+            if (value === "?") {
+                return { lower: 0, upper: 1 };
+            }
+            if (value === "*") {
+                return { lower: 0, upper: undefined };
+            }
+            if (value === "+") {
+                return { lower: 1, upper: undefined };
+            }
+            if (numericValue !== undefined) {
+                return { lower: numericValue, upper: numericValue };
+            }
+        }
+
+        if (reflection.isInstance(multiplicity, RangeMultiplicity)) {
+            const lower = multiplicity.lower;
+            const upper = multiplicity.upper === "*" ? undefined : multiplicity.upperNumeric;
+            return { lower, upper };
+        }
+
+        return { lower: 1, upper: 1 };
     }
 
     /**

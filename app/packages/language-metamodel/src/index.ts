@@ -38,3 +38,4 @@ export * from "./grammar/metamodelPartialTypes.js";
 export * from "./grammar/metamodelRules.js";
 export * from "./grammar/metamodelTypes.js";
 export * from "./plugin.js";
+export * from "./validation/metamodelValidator.js";

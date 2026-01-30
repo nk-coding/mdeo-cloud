@@ -26,4 +26,6 @@ export * from "./features/diagram-server/handler/modelReconnectEdgeOperationHand
 export * from "./grammar/modelPartialTypes.js";
 export * from "./grammar/modelRules.js";
 export * from "./grammar/modelTypes.js";
+export * from "./grammar/util.js";
 export * from "./plugin.js";
+export * from "./validation/modelValidator.js";

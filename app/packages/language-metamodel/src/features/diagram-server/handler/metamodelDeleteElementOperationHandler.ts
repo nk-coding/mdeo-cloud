@@ -229,16 +229,16 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 this.reflection.isInstance(element, Enum) ||
                 this.reflection.isInstance(element, Association)
             ) {
-                nodesToDelete.push(element as ClassType);
+                nodesToDelete.push(element);
             } else if (this.reflection.isInstance(element, ClassExtension)) {
-                extensions.push(element as ClassExtensionType);
+                extensions.push(element);
             } else if (this.reflection.isInstance(element, ClassOrEnumImport)) {
-                classOrEnumImports.push(element as ClassOrEnumImportType);
+                classOrEnumImports.push(element);
             } else if (
                 this.reflection.isInstance(element, SingleMultiplicity) ||
                 this.reflection.isInstance(element, RangeMultiplicity)
             ) {
-                multiplicities.push(element as MultiplicityType);
+                multiplicities.push(element);
             }
         }
 

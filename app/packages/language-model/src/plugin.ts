@@ -21,6 +21,7 @@ import { ModelExternalReferenceCollector } from "./features/modelExternalReferen
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 import { registerModelSerializers } from "./features/modelSerializers.js";
 import { ModelDiagramModule } from "./features/diagram-server/modelDiagramModule.js";
+import { registerModelValidationChecks } from "./validation/modelValidator.js";
 
 export type ModelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
@@ -59,6 +60,7 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
     postCreate(services) {
         registerDefaultTokenSerializers(services);
         registerModelSerializers(services);
+        registerModelValidationChecks(services);
         services.shared.glsp.serverModule.configureDiagramModule(new ModelDiagramModule(services));
         addExternalReferenceCollectionPhase(services);
     }

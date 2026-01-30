@@ -11,12 +11,14 @@ import {
     Class,
     Enum,
     EnumEntry,
+    Property,
     type PropertyType,
     type ClassType,
     type EnumType,
     MetamodelPrimitiveTypes
 } from "../../grammar/metamodelTypes.js";
 import { resolveClassChain } from "../../features/semanticInformation.js";
+import { collectAllPropertyNames } from "../../validation/metamodelValidator.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -243,6 +245,7 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
 
     /**
      * Validates that the property name is unique within the class and its superclass chain.
+     * Also considers properties from association ends.
      *
      * @param identifier the property identifier to validate
      * @param element the property label element
@@ -258,29 +261,32 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
 
         const reflection = this.modelState.languageServices.shared.AstReflection;
 
-        if (!reflection.isInstance(propertyNode, Class)) {
-            const originalProperty = propertyNode as PropertyType;
-            const originalParsedName = originalProperty.name;
+        if (!reflection.isInstance(propertyNode, Property)) {
+            return undefined;
+        }
 
-            if (parsedIdentifier === originalParsedName) {
-                return undefined;
-            }
+        const originalProperty = propertyNode as PropertyType;
+        const originalParsedName = originalProperty.name;
 
-            const parentClass = originalProperty.$container;
-            if (parentClass == undefined || !reflection.isInstance(parentClass, Class)) {
-                return undefined;
-            }
+        // If the name hasn't changed, no need to validate
+        if (parsedIdentifier === originalParsedName) {
+            return undefined;
+        }
 
-            const classChain = resolveClassChain(parentClass as ClassType, reflection);
+        const parentClass = originalProperty.$container;
+        if (parentClass == undefined || !reflection.isInstance(parentClass, Class)) {
+            return undefined;
+        }
 
-            for (const cls of classChain) {
-                for (const prop of cls.properties ?? []) {
-                    if (prop.name === parsedIdentifier) {
-                        return this.error(
-                            `A property with the name '${parsedIdentifier}' already exists in the class hierarchy.`
-                        );
-                    }
-                }
+        // Use the shared utility function to collect all property names
+        const allPropertyNames = collectAllPropertyNames(parentClass as ClassType, reflection);
+
+        // Check if the new name already exists (excluding the original name)
+        for (const name of allPropertyNames) {
+            if (name === parsedIdentifier && name !== originalParsedName) {
+                return this.error(
+                    `A property with the name '${parsedIdentifier}' already exists in the class hierarchy.`
+                );
             }
         }
 

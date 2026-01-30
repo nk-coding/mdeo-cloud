@@ -28,6 +28,7 @@ import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.
 import { MetamodelExternalReferenceCollector } from "./features/metamodelExternalReferenceCollector.js";
 import { ImportClassActionHandler } from "./action-handlers/importClassActionHandler.js";
 import { ImportEnumActionHandler } from "./action-handlers/importEnumActionHandler.js";
+import { registerMetamodelValidationChecks } from "./validation/metamodelValidator.js";
 
 /**
  * The additional services for the Metamodel language.
@@ -72,6 +73,7 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
     postCreate(services) {
         registerDefaultTokenSerializers(services);
         registerMetamodelSerializers(services);
+        registerMetamodelValidationChecks(services);
         services.shared.glsp.serverModule.configureDiagramModule(new MetamodelDiagramModule(services));
         addExternalReferenceCollectionPhase(services);
     }
