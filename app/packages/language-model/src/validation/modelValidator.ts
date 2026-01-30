@@ -259,36 +259,52 @@ export class ModelValidator {
             const count = listValue.values?.length ?? 0;
 
             if (!isMultiple && count > 1) {
-                accept("error", `Property '${property.name}' expects a single value, but ${count} values were provided.`, {
-                    node: propAssign,
-                    property: "value"
-                });
+                accept(
+                    "error",
+                    `Property '${property.name}' expects a single value, but ${count} values were provided.`,
+                    {
+                        node: propAssign,
+                        property: "value"
+                    }
+                );
                 return;
             }
 
             // Check bounds
             const bounds = this.getMultiplicityBounds(multiplicity);
             if (count < bounds.lower) {
-                accept("error", `Property '${property.name}' requires at least ${bounds.lower} value(s), but ${count} were provided.`, {
-                    node: propAssign,
-                    property: "value"
-                });
+                accept(
+                    "error",
+                    `Property '${property.name}' requires at least ${bounds.lower} value(s), but ${count} were provided.`,
+                    {
+                        node: propAssign,
+                        property: "value"
+                    }
+                );
             }
             if (bounds.upper !== undefined && count > bounds.upper) {
-                accept("error", `Property '${property.name}' allows at most ${bounds.upper} value(s), but ${count} were provided.`, {
-                    node: propAssign,
-                    property: "value"
-                });
+                accept(
+                    "error",
+                    `Property '${property.name}' allows at most ${bounds.upper} value(s), but ${count} were provided.`,
+                    {
+                        node: propAssign,
+                        property: "value"
+                    }
+                );
             }
         } else {
             // Single value
             if (isMultiple) {
                 const bounds = this.getMultiplicityBounds(multiplicity);
                 if (bounds.lower > 1) {
-                    accept("error", `Property '${property.name}' requires at least ${bounds.lower} values. Use list syntax: [value1, value2, ...].`, {
-                        node: propAssign,
-                        property: "value"
-                    });
+                    accept(
+                        "error",
+                        `Property '${property.name}' requires at least ${bounds.lower} values. Use list syntax: [value1, value2, ...].`,
+                        {
+                            node: propAssign,
+                            property: "value"
+                        }
+                    );
                 }
             }
         }
@@ -297,7 +313,10 @@ export class ModelValidator {
     /**
      * Gets the lower and upper bounds of a multiplicity.
      */
-    private getMultiplicityBounds(multiplicity: MultiplicityType | undefined): { lower: number; upper: number | undefined } {
+    private getMultiplicityBounds(multiplicity: MultiplicityType | undefined): {
+        lower: number;
+        upper: number | undefined;
+    } {
         if (!multiplicity) {
             return { lower: 1, upper: 1 };
         }
@@ -575,11 +594,10 @@ export class ModelValidator {
 
         const association = this.findAssociationForProperty(property);
         if (!association) {
-            accept(
-                "error",
-                `Property '${property.name}' is not an association end property.`,
-                { node: link, property: isSourceProperty ? "source" : "target" }
-            );
+            accept("error", `Property '${property.name}' is not an association end property.`, {
+                node: link,
+                property: isSourceProperty ? "source" : "target"
+            });
             return;
         }
 
@@ -653,43 +671,34 @@ export class ModelValidator {
         const targetAssociation = this.findAssociationForProperty(targetProperty);
 
         if (!sourceAssociation || !targetAssociation) {
-            accept(
-                "error",
-                `Link properties must be association end properties, not regular class properties.`,
-                { node: link }
-            );
+            accept("error", `Link properties must be association end properties, not regular class properties.`, {
+                node: link
+            });
             return;
         }
 
         if (sourceAssociation !== targetAssociation) {
-            accept(
-                "error",
-                `Source and target properties must be from the same association.`,
-                { node: link }
-            );
+            accept("error", `Source and target properties must be from the same association.`, { node: link });
         }
     }
 
     /**
      * Finds all associations between two classes (considering class chains).
      */
-    private findAssociationsBetweenClasses(
-        class1: ClassType,
-        class2: ClassType
-    ): AssociationType[] {
+    private findAssociationsBetweenClasses(class1: ClassType, class2: ClassType): AssociationType[] {
         const result: AssociationType[] = [];
         const class1Chain = resolveClassChain(class1, this.reflection);
         const class2Chain = resolveClassChain(class2, this.reflection);
 
         const metamodels = new Set<{ elements?: AstNode[] }>();
-        
+
         for (const cls of class1Chain) {
             const metaModel = this.getMetaModel(cls);
             if (metaModel) {
                 metamodels.add(metaModel);
             }
         }
-        
+
         for (const cls of class2Chain) {
             const metaModel = this.getMetaModel(cls);
             if (metaModel) {

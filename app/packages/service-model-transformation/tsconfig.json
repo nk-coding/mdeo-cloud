@@ -9,13 +9,16 @@
             "path": "../language-common"
         },
         {
-            "path": "../language-expression"
-        },
-        {
-            "path": "../language-model"
-        },
-        {
             "path": "../language-shared"
+        },
+        {
+            "path": "../language-model-transformation"
+        },
+        {
+            "path": "../plugin"
+        },
+        {
+            "path": "../service-common"
         }
     ],
     "include": ["src/**/*.ts"],

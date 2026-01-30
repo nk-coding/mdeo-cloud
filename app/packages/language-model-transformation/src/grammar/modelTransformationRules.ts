@@ -1,13 +1,381 @@
-import { createRule, WS, ML_COMMENT, SL_COMMENT, HIDDEN_NEWLINE } from "@mdeo/language-common";
-import { ModelTransformation } from "./modelTransformationTypes.js";
+import {
+    createRule,
+    WS,
+    ML_COMMENT,
+    SL_COMMENT,
+    HIDDEN_NEWLINE,
+    ID,
+    STRING,
+    NEWLINE,
+    or,
+    many,
+    optional,
+    ref,
+    group,
+    type ParserRule
+} from "@mdeo/language-common";
+import { generateExpressionRules, generateTypeRules, type BaseExpressionType } from "@mdeo/language-expression";
+import { ClassOrImport, Property } from "@mdeo/language-metamodel";
+import { LeadingTrailing, manySep } from "@mdeo/language-shared";
+import {
+    ModelTransformation,
+    MetamodelFileImport,
+    Pattern,
+    PatternVariable,
+    PatternObjectInstance,
+    PatternPropertyAssignment,
+    PatternLink,
+    PatternLinkEnd,
+    PatternModifier,
+    WhereClause,
+    MatchStatement,
+    IfMatchStatement,
+    WhileMatchStatement,
+    UntilMatchStatement,
+    ForMatchStatement,
+    IfExpressionStatement,
+    ElseIfBranch,
+    WhileExpressionStatement,
+    StopStatement,
+    StatementsScope,
+    LambdaExpression,
+    LambdaParameter,
+    LambdaParameters,
+    typeConfig,
+    typeTypes,
+    expressionConfig,
+    expressionTypes,
+    type ModelTransformationType
+} from "./modelTransformationTypes.js";
 
 /**
- * Minimal root rule for Model Transformation language.
- * TODO: Expand with actual grammar rules.
+ * Generates the Model Transformation language rules.
+ *
+ * @returns The root rule and additional expression rules for the transformation language.
  */
-export const ModelTransformationRule = createRule("ModelTransformationRule")
-    .returns(ModelTransformation)
-    .as(() => []);
+export function generateModelTransformationRules(): {
+    rule: ParserRule<ModelTransformationType>;
+} {
+    const { typeRule: TypeRule } = generateTypeRules(typeConfig, typeTypes);
+
+    const additionalExpressionRules: ParserRule<BaseExpressionType>[] = [];
+
+    /**
+     * Lambda parameter rule.
+     * Matches a single parameter name.
+     */
+    const LambdaParameterRule = createRule("LambdaParameterRule")
+        .returns(LambdaParameter)
+        .as(({ set }) => [set("name", ID)]);
+
+    /**
+     * Lambda parameters rule with parentheses.
+     * Format: (param1, param2, ...)
+     */
+    const LambdaParametersRule = createRule("LambdaParametersRule")
+        .returns(LambdaParameters)
+        .as(({ add }) => ["(", ...manySep(add("parameters", LambdaParameterRule), ",", LeadingTrailing.TRAILING), ")"]);
+
+    /**
+     * Lambda expression rule with expression body only.
+     * Format: (params) => expression
+     */
+    const LambdaExpressionRule = createRule("LambdaExpressionRule")
+        .returns(LambdaExpression)
+        .as(({ set }) => [set("parameterList", LambdaParametersRule), "=>", set("expression", () => ExpressionRule)]);
+
+    additionalExpressionRules.push(LambdaExpressionRule);
+
+    const expressionRules = generateExpressionRules(
+        expressionConfig,
+        expressionTypes,
+        TypeRule,
+        additionalExpressionRules
+    );
+
+    const ExpressionRule = expressionRules.expressionRule;
+
+    /**
+     * Pattern modifier rule.
+     * Matches create, delete, or forbid keywords.
+     */
+    const PatternModifierRule = createRule("PatternModifierRule")
+        .returns(PatternModifier)
+        .as(({ set }) => [or(set("modifier", "create"), set("modifier", "delete"), set("modifier", "forbid"))]);
+
+    /**
+     * Pattern variable rule.
+     * Format: var name: type
+     */
+    const PatternVariableRule = createRule("PatternVariableRule")
+        .returns(PatternVariable)
+        .as(({ set }) => ["var", set("name", ID), ":", set("type", TypeRule)]);
+
+    /**
+     * Pattern property assignment rule.
+     * Format: property = value or property == value
+     * Uses expression for value to support complex expressions.
+     */
+    const PatternPropertyAssignmentRule = createRule("PatternPropertyAssignmentRule")
+        .returns(PatternPropertyAssignment)
+        .as(({ set }) => [
+            set("name", ref(Property, ID)),
+            or(set("operator", "=="), set("operator", "=")),
+            set("value", ExpressionRule)
+        ]);
+
+    /**
+     * Pattern object instance rule.
+     * Format: [modifier] name: Class { properties }
+     */
+    const PatternObjectInstanceRule = createRule("PatternObjectInstanceRule")
+        .returns(PatternObjectInstance)
+        .as(({ set, add }) => [
+            optional(set("modifier", PatternModifierRule)),
+            set("name", ID),
+            ":",
+            set("class", ref(ClassOrImport, ID)),
+            "{",
+            many(or(add("properties", PatternPropertyAssignmentRule), NEWLINE)),
+            "}"
+        ]);
+
+    /**
+     * Pattern link end rule.
+     * Format: object[.property]
+     */
+    const PatternLinkEndRule = createRule("PatternLinkEndRule")
+        .returns(PatternLinkEnd)
+        .as(({ set }) => [
+            set("object", ref(PatternObjectInstance, ID)),
+            optional(group(".", set("property", ref(Property, ID))))
+        ]);
+
+    /**
+     * Pattern link rule.
+     * Format: [modifier] source -- target
+     */
+    const PatternLinkRule = createRule("PatternLinkRule")
+        .returns(PatternLink)
+        .as(({ set }) => [
+            optional(set("modifier", PatternModifierRule)),
+            set("source", PatternLinkEndRule),
+            "--",
+            set("target", PatternLinkEndRule)
+        ]);
+
+    /**
+     * Where clause rule.
+     * Format: where expression
+     */
+    const WhereClauseRule = createRule("WhereClauseRule")
+        .returns(WhereClause)
+        .as(({ set }) => ["where", set("expression", ExpressionRule)]);
+
+    /**
+     * Pattern rule containing pattern elements.
+     */
+    const PatternRule = createRule("PatternRule")
+        .returns(Pattern)
+        .as(({ add }) => [
+            "{",
+            many(
+                or(
+                    add("elements", PatternVariableRule),
+                    add("elements", PatternObjectInstanceRule),
+                    add("elements", PatternLinkRule),
+                    add("elements", WhereClauseRule),
+                    NEWLINE
+                )
+            ),
+            "}"
+        ]);
+
+    /**
+     * Statements scope rule containing transformation statements.
+     */
+    const StatementsScopeRule = createRule("StatementsScopeRule")
+        .returns(StatementsScope)
+        .as(({ add }) => [
+            "{",
+            many(
+                or(
+                    add("statements", () => StatementRule),
+                    NEWLINE
+                )
+            ),
+            "}"
+        ]);
+
+    /**
+     * Match statement rule.
+     * Format: match { pattern }
+     */
+    const MatchStatementRule = createRule("MatchStatementRule")
+        .returns(MatchStatement)
+        .as(({ set }) => ["match", set("pattern", PatternRule)]);
+
+    /**
+     * If-match statement rule.
+     * Format: if match { pattern } then { block } [else { block }]
+     */
+    const IfMatchStatementRule = createRule("IfMatchStatementRule")
+        .returns(IfMatchStatement)
+        .as(({ set }) => [
+            "if",
+            "match",
+            set("pattern", PatternRule),
+            "then",
+            set("thenBlock", () => StatementsScopeRule),
+            optional(
+                group(
+                    "else",
+                    set("elseBlock", () => StatementsScopeRule)
+                )
+            )
+        ]);
+
+    /**
+     * While-match statement rule.
+     * Format: while match { pattern } do { block }
+     */
+    const WhileMatchStatementRule = createRule("WhileMatchStatementRule")
+        .returns(WhileMatchStatement)
+        .as(({ set }) => [
+            "while",
+            "match",
+            set("pattern", PatternRule),
+            "do",
+            set("doBlock", () => StatementsScopeRule)
+        ]);
+
+    /**
+     * Until-match statement rule.
+     * Format: until match { pattern } do { block }
+     */
+    const UntilMatchStatementRule = createRule("UntilMatchStatementRule")
+        .returns(UntilMatchStatement)
+        .as(({ set }) => [
+            "until",
+            "match",
+            set("pattern", PatternRule),
+            "do",
+            set("doBlock", () => StatementsScopeRule)
+        ]);
+
+    /**
+     * For-match statement rule.
+     * Format: for match { pattern } do { block }
+     */
+    const ForMatchStatementRule = createRule("ForMatchStatementRule")
+        .returns(ForMatchStatement)
+        .as(({ set }) => [
+            "for",
+            "match",
+            set("pattern", PatternRule),
+            "do",
+            set("doBlock", () => StatementsScopeRule)
+        ]);
+
+    /**
+     * Else-if branch rule.
+     * Format: else if (condition) { block }
+     */
+    const ElseIfBranchRule = createRule("ElseIfBranchRule")
+        .returns(ElseIfBranch)
+        .as(({ set }) => [
+            "else",
+            "if",
+            "(",
+            set("condition", ExpressionRule),
+            ")",
+            set("block", () => StatementsScopeRule)
+        ]);
+
+    /**
+     * If-expression statement rule.
+     * Format: if (expression) { block } [[else if (expression) { block }]* else { block }]
+     */
+    const IfExpressionStatementRule = createRule("IfExpressionStatementRule")
+        .returns(IfExpressionStatement)
+        .as(({ set, add }) => [
+            "if",
+            "(",
+            set("condition", ExpressionRule),
+            ")",
+            set("thenBlock", () => StatementsScopeRule),
+            many(add("elseIfBranches", ElseIfBranchRule)),
+            optional(
+                group(
+                    "else",
+                    set("elseBlock", () => StatementsScopeRule)
+                )
+            )
+        ]);
+
+    /**
+     * While-expression statement rule.
+     * Format: while (expression) { block }
+     */
+    const WhileExpressionStatementRule = createRule("WhileExpressionStatementRule")
+        .returns(WhileExpressionStatement)
+        .as(({ set }) => [
+            "while",
+            "(",
+            set("condition", ExpressionRule),
+            ")",
+            set("block", () => StatementsScopeRule)
+        ]);
+
+    /**
+     * Stop statement rule.
+     * Format: kill or stop
+     */
+    const StopStatementRule = createRule("StopStatementRule")
+        .returns(StopStatement)
+        .as(({ set }) => [or(set("keyword", "kill"), set("keyword", "stop"))]);
+
+    /**
+     * Statement rule containing transformation statements.
+     */
+    const StatementRule = createRule("StatementRule")
+        .returns(StatementsScope)
+        .as(({ add }) => [
+            or(
+                add("statements", MatchStatementRule),
+                add("statements", IfMatchStatementRule),
+                add("statements", WhileMatchStatementRule),
+                add("statements", UntilMatchStatementRule),
+                add("statements", ForMatchStatementRule),
+                add("statements", IfExpressionStatementRule),
+                add("statements", WhileExpressionStatementRule),
+                add("statements", StopStatementRule)
+            )
+        ]);
+
+    /**
+     * Metamodel file import rule.
+     * Format: using "filename"
+     */
+    const MetamodelFileImportRule = createRule("MetamodelFileImportRule")
+        .returns(MetamodelFileImport)
+        .as(({ set }) => ["using", set("file", STRING)]);
+
+    /**
+     * Root rule for Model Transformation language.
+     */
+    const ModelTransformationRule = createRule("ModelTransformationRule")
+        .returns(ModelTransformation)
+        .as(({ add, set }) => [
+            many(NEWLINE),
+            set("import", MetamodelFileImportRule),
+            many(or(add("statements", StatementRule), NEWLINE))
+        ]);
+
+    return {
+        rule: ModelTransformationRule
+    };
+}
 
 /**
  * Additional terminals for the Model Transformation language.

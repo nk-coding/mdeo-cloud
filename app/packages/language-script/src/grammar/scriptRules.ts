@@ -59,8 +59,6 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
 } {
     const { typeRule: TypeRule, returnTypeRule: ReturnTypeRule } = generateTypeRules(typeConfig, typeTypes);
 
-    // eslint-disable-next-line prefer-const
-    let StatementsScopeRule: ParserRule<any> | undefined;
     const additionalExpressionRules: ParserRule<BaseExpressionType>[] = [];
 
     /**
@@ -130,7 +128,7 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
     /**
      * The statement rules.
      */
-    StatementsScopeRule = generateStatementRules(
+    const StatementsScopeRule = generateStatementRules(
         statementConfig,
         statementTypes,
         ExpressionRule,

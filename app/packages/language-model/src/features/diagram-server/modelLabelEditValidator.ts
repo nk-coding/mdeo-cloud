@@ -362,7 +362,10 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
      * @param multiplicity The multiplicity to analyze
      * @returns Object with lower and upper bounds (upper is undefined for unbounded)
      */
-    private getMultiplicityBounds(multiplicity: MultiplicityType | undefined): { lower: number; upper: number | undefined } {
+    private getMultiplicityBounds(multiplicity: MultiplicityType | undefined): {
+        lower: number;
+        upper: number | undefined;
+    } {
         if (!multiplicity) {
             return { lower: 1, upper: 1 };
         }

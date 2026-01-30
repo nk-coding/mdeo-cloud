@@ -88,12 +88,15 @@ export function resolveToEnum(enumOrImport: AstNode | undefined, reflection: Ast
 
 /**
  * Resolves a chain of ClassOrEnumImports to the actual Class or Enum.
- * 
+ *
  * @param node the starting ClassOrEnumImport node
  * @param reflection the AST reflection to check node types
  * @returns the resolved Class or Enum, or undefined if it cannot be resolved
  */
-export function resolveImport(node: ClassOrEnumImportType | undefined, reflection: AstReflection): ClassType | EnumType | undefined {
+export function resolveImport(
+    node: ClassOrEnumImportType | undefined,
+    reflection: AstReflection
+): ClassType | EnumType | undefined {
     let current = node;
     while (current != undefined) {
         const entityRef = current.entity?.ref;

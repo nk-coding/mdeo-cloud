@@ -26,7 +26,15 @@ export class TypeConfig {
      * The name for the LambdaType type.
      */
     readonly lambdaTypeParametersTypeName: string;
+
+    /**
+     * The name for the LambdaTypeParameters rule.
+     */
     readonly lambdaTypeParametersRuleName: string;
+
+    /**
+     * The name for the LambdaType type.
+     */
     readonly lambdaTypeTypeName: string;
 
     /**

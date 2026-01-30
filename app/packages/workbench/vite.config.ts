@@ -17,6 +17,12 @@ export default defineConfig({
         port: 4242,
         host: "127.0.0.1",
         proxy: {
+            "/plugin/model-transformation": {
+                target: "http://localhost:3003",
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/plugin\/model-transformation/, "")
+            },
             "/plugin/metamodel": {
                 target: "http://localhost:3000",
                 changeOrigin: true,

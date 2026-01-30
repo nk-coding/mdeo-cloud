@@ -2,7 +2,8 @@ import { Network } from "lucide";
 import {
     defaultLanguageConfiguration,
     defaultMonarchTokenProvider,
-    serializeMonarchTokensProvider
+    serializeMonarchTokensProvider,
+    type ActionIconNode
 } from "@mdeo/language-common";
 import {
     parseServiceConfigFromEnv,
@@ -16,6 +17,20 @@ import {
 import { convertIcon } from "@mdeo/language-common";
 import type { ModelServices } from "@mdeo/language-model";
 
+const icon: ActionIconNode = convertIcon(Network).map((entry) => {
+    if (entry[0] === "rect") {
+        return [
+            "rect",
+            {
+                ...entry[1],
+                fill: "currentColor"
+            }
+        ];
+    } else {
+        return entry;
+    }
+});
+
 /**
  * Plugin definition for the model service
  */
@@ -23,37 +38,13 @@ const modelServicePlugin: ServicePluginDefinition = {
     id: "model-service",
     name: "Model",
     description: "Language support for model definitions (.m files)",
-    icon: convertIcon(Network).map((entry) => {
-        if (entry[0] === "rect") {
-            return [
-                "rect",
-                {
-                    ...entry[1],
-                    fill: "currentColor"
-                }
-            ];
-        } else {
-            return entry;
-        }
-    }),
+    icon,
     languagePlugin: {
         id: "model",
         name: "Model",
         extension: ".m",
         newFileAction: true,
-        icon: convertIcon(Network).map((entry) => {
-            if (entry[0] === "rect") {
-                return [
-                    "rect",
-                    {
-                        ...entry[1],
-                        fill: "currentColor"
-                    }
-                ];
-            } else {
-                return entry;
-            }
-        }),
+        icon,
         serverPlugin: {
             import: "static/language.js"
         },
