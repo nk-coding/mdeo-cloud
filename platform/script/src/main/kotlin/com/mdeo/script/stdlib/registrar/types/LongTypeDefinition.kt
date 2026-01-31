@@ -79,7 +79,7 @@ fun createLongType(): TypeDefinition {
             overload("", "(J)Ljava/lang/String;", LONG_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload("", "(J)Ljava/lang/String;", LONG_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }
 

@@ -157,7 +157,7 @@ fun createIntType(): TypeDefinition {
             )
         }
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload(
                 "", "(I)Ljava/lang/String;", INT_HELPER,
                 parameterTypes = emptyList(),

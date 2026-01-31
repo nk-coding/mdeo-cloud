@@ -21,7 +21,8 @@ import type {
     LongLiteralExpressionType,
     FloatLiteralExpressionType,
     DoubleLiteralExpressionType,
-    BooleanLiteralExpressionType
+    BooleanLiteralExpressionType,
+    ListExpressionType
 } from "../grammar/expressionTypes.js";
 import type { ReturnType, ValueType, ClassTypeRef } from "../typir-extensions/config/type.js";
 import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
@@ -59,6 +60,7 @@ import {
     type TypedDoubleLiteralExpression,
     type TypedBooleanLiteralExpression,
     type TypedNullLiteralExpression,
+    type TypedListExpression,
     type TypedAssertNonNullExpression,
     type TypedTypeCastExpression,
     type TypedTypeCheckExpression,
@@ -153,6 +155,7 @@ export abstract class TypedAstConverter {
         doubleLiteralExpressionType: any;
         booleanLiteralExpressionType: any;
         nullLiteralExpressionType: any;
+        listExpressionType: any;
     };
 
     /**
@@ -413,6 +416,8 @@ export abstract class TypedAstConverter {
             return this.convertBooleanLiteral(expr as BooleanLiteralExpressionType);
         } else if (this.reflection.isInstance(expr, this.expressionTypes.nullLiteralExpressionType)) {
             return this.convertNullLiteral();
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.listExpressionType)) {
+            return this.convertListExpression(expr as ListExpressionType);
         }
         return this.convertAdditionalExpression(expr);
     }
@@ -729,6 +734,20 @@ export abstract class TypedAstConverter {
         return {
             kind: "nullLiteral",
             evalType: this.nullTypeIndex
+        };
+    }
+
+    /**
+     * Converts a list expression.
+     *
+     * @param expr The list expression AST node
+     * @returns The TypedListExpression representation
+     */
+    protected convertListExpression(expr: ListExpressionType): TypedListExpression {
+        return {
+            kind: "listLiteral",
+            evalType: this.getTypeIndex(expr),
+            elements: expr.elements.map((element) => this.convertExpression(element))
         };
     }
 

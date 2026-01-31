@@ -23,10 +23,10 @@ const {
 
 /**
  * Represents a mapping of primitive type names to their corresponding CustomClassType instances.
- * Excludes special type configuration keys like "additionalTypes", "lambdaSuperTypes", and "void".
+ * Excludes special type configuration keys like "additionalTypes", "lambdaSuperTypes", "Iterable", "List", and "createListType".
  */
 export type PrimitiveTypes = Record<
-    Exclude<keyof TypeSystemConfig, "additionalTypes" | "lambdaSuperTypes" | "Iterable">,
+    Exclude<keyof TypeSystemConfig, "additionalTypes" | "lambdaSuperTypes" | "Iterable" | "List" | "createListType">,
     CustomClassType
 >;
 

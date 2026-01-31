@@ -369,5 +369,5 @@ object StringHelper {
      * @return the string unchanged
      */
     @JvmStatic
-    fun asString(str: String): String = str
+    fun toString(str: String): String = str
 }

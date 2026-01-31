@@ -374,8 +374,8 @@ class RegistryMemberCallBugTest {
     inner class ShadowedMethodResolution {
 
         @Test
-        fun `int asString uses IntHelper not AnyHelper`() {
-            // 42.asString() should use IntHelper.asString(int), not AnyHelper.asString(Object)
+        fun `int toString uses IntHelper not AnyHelper`() {
+            // 42.toString() should use IntHelper.toString(int), not AnyHelper.toString(Object)
             val ast = buildTypedAst {
                 val intType = intType()
                 val stringType = stringType()
@@ -387,7 +387,7 @@ class RegistryMemberCallBugTest {
                         returnStmt(
                             memberCall(
                                 expression = intLiteral(42, intType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -402,8 +402,8 @@ class RegistryMemberCallBugTest {
         }
 
         @Test
-        fun `double asString uses DoubleHelper`() {
-            // 3.14.asString() should use DoubleHelper.asString(double)
+        fun `double toString uses DoubleHelper`() {
+            // 3.14.toString() should use DoubleHelper.toString(double)
             val ast = buildTypedAst {
                 val doubleType = doubleType()
                 val stringType = stringType()
@@ -415,7 +415,7 @@ class RegistryMemberCallBugTest {
                         returnStmt(
                             memberCall(
                                 expression = doubleLiteral(3.14, doubleType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -765,7 +765,7 @@ class RegistryMemberCallBugTest {
     inner class BooleanTypeMethods {
 
         @Test
-        fun `boolean asString returns true or false`() {
+        fun `boolean toString returns true or false`() {
             val ast = buildTypedAst {
                 val boolType = booleanType()
                 val stringType = stringType()
@@ -777,7 +777,7 @@ class RegistryMemberCallBugTest {
                         returnStmt(
                             memberCall(
                                 expression = booleanLiteral(true, boolType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType

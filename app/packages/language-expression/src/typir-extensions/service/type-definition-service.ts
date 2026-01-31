@@ -4,6 +4,9 @@ import { ClassTypeRef, GenericTypeRef, VoidType } from "../config/type.js";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
 import type { ExtendedTypirServices } from "./extendedTypirServices.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
+import { isCustomClassType } from "../kinds/custom-class/custom-class-type.js";
+import { isCustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
+import { isCustomVoidType } from "../kinds/custom-void/custom-void-type.js";
 
 /**
  * Listener interface for receiving notifications about class type changes.
@@ -112,6 +115,22 @@ export interface TypeDefinitionService {
     getLambdaSuperTypes(): BaseClassTypeRef[];
 
     /**
+     * Register the Any type identifier.
+     * This is used by findCommonParentType as the fallback type.
+     *
+     * @param anyType The Any type class reference
+     */
+    registerAnyType(anyType: ClassType): void;
+
+    /**
+     * Get the registered Any type.
+     *
+     * @param isNullable Whether the Any type should be nullable
+     * @returns The resolved Any type
+     */
+    getAnyType(isNullable: boolean): CustomValueType;
+
+    /**
      * Add a listener to receive notifications about class type changes.
      *
      * @param listener The listener to add
@@ -124,6 +143,15 @@ export interface TypeDefinitionService {
      * @param listener The listener to remove
      */
     removeListener(listener: TypeDefinitionListener): void;
+
+    /**
+     * Convert a CustomValueType back to its ValueType representation.
+     * This is useful when you need to use a type as a type argument for creating generic types.
+     *
+     * @param type The custom value type to convert
+     * @returns The ValueType representation
+     */
+    convertCustomTypeToValueType(type: CustomValueType): ValueType;
 }
 
 /**
@@ -145,6 +173,11 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
      * Super types that apply to all lambda types
      */
     private lambdaSuperTypes: BaseClassTypeRef[] = [];
+
+    /**
+     * The registered Any type definition
+     */
+    private anyType: ClassType | undefined;
 
     constructor(private readonly services: ExtendedTypirServices<Specifics>) {}
 
@@ -266,6 +299,20 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
         return this.lambdaSuperTypes;
     }
 
+    registerAnyType(anyType: ClassType): void {
+        this.anyType = anyType;
+    }
+
+    getAnyType(isNullable: boolean): CustomValueType {
+        if (this.anyType == undefined) {
+            throw new Error("Any type not registered. Call registerAnyType first.");
+        }
+        return this.resolveCustomClassOrLambdaType({
+            type: `${this.anyType.package}.${this.anyType.name}`,
+            isNullable
+        });
+    }
+
     addListener(listener: TypeDefinitionListener): void {
         this.listeners.push(listener);
     }
@@ -274,6 +321,36 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
         const index = this.listeners.indexOf(listener);
         if (index !== -1) {
             this.listeners.splice(index, 1);
+        }
+    }
+
+    convertCustomTypeToValueType(type: CustomValueType): ValueType {
+        if (isCustomClassType(type)) {
+            const definition = type.details.definition;
+            const identifier = `${definition.package}.${definition.name}`;
+            const typeArgs: Record<string, ValueType> = {};
+            for (const [key, value] of type.details.typeArgs.entries()) {
+                typeArgs[key] = this.convertCustomTypeToValueType(value);
+            }
+            return {
+                type: identifier,
+                isNullable: type.isNullable,
+                typeArgs: Object.keys(typeArgs).length > 0 ? typeArgs : undefined
+            };
+        } else if (isCustomLambdaType(type)) {
+            const returnType = type.details.returnType;
+            return {
+                returnType: isCustomVoidType(returnType)
+                    ? { kind: "void" as const }
+                    : this.convertCustomTypeToValueType(returnType as CustomValueType),
+                parameters: type.details.parameterTypes.map((param, index) => ({
+                    name: `p${index}`,
+                    type: this.convertCustomTypeToValueType(param)
+                })),
+                isNullable: type.isNullable
+            };
+        } else {
+            throw new Error(`Cannot convert type '${type.getName()}' to ValueType`);
         }
     }
 }

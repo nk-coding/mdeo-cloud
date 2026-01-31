@@ -49,6 +49,7 @@ export * from "./features/toolbox/views/toolbarView.js";
 export * from "./features/toolbox/views/toolboxItemView.js";
 export * from "./features/toolbox/views/toolboxView.js";
 export * from "./features/toolbox/featureModule.js";
+export * from "./features/toolbox/layoutAction.js";
 export * from "./features/toolbox/previewRenderer.js";
 export * from "./features/toolbox/toolState.js";
 export * from "./features/toolbox/toolbox.js";

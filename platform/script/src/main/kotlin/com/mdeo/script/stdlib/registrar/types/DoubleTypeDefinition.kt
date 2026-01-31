@@ -57,7 +57,7 @@ fun createDoubleType(): TypeDefinition {
             overload("", "(D)J", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.LONG)
         }
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload("", "(D)Ljava/lang/String;", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }
     }

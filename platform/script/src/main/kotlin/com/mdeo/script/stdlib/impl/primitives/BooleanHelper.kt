@@ -16,7 +16,7 @@ object BooleanHelper {
      * @return "true" or "false"
      */
     @JvmStatic
-    fun asString(value: Boolean): String = value.toString()
+    fun toString(value: Boolean): String = value.toString()
 
     /**
      * Converts a boolean to an integer (1 for true, 0 for false).

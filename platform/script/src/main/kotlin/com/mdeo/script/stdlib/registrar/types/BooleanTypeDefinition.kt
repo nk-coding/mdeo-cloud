@@ -15,7 +15,7 @@ fun createBooleanType(): TypeDefinition {
         primitiveDesc("Z")
         wrapperClass("java/lang/Boolean")
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload(
                 "", "(Z)Ljava/lang/String;", BOOLEAN_HELPER,
                 parameterTypes = emptyList(),

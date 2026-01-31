@@ -36,6 +36,7 @@ open class TypedExpressionSerializer : JsonContentPolymorphicSerializer<TypedExp
             "functionCall" -> TypedFunctionCallExpression.serializer()
             "memberCall" -> TypedMemberCallExpression.serializer()
             "extensionCall" -> TypedExtensionCallExpression.serializer()
+            "listLiteral" -> TypedListLiteralExpression.serializer()
             else -> throw IllegalArgumentException("Unknown expression kind: $kindValue")
         }
     }

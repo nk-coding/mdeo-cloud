@@ -10,6 +10,7 @@ export * from "./diagram-server/handler/baseDeleteElementOperationHandler.js";
 export * from "./diagram-server/handler/baseOperationHandler.js";
 export * from "./diagram-server/handler/baseReconnectEdgeOperationHandler.js";
 export * from "./diagram-server/handler/changeBoundsOperationHandler.js";
+export * from "./diagram-server/handler/layoutOperationHandler.js";
 export * from "./diagram-server/handler/operationHandlerCommand.js";
 export * from "./diagram-server/handler/partialChangeBoundsOperationHandler.js";
 export * from "./diagram-server/handler/triggerActionOperationHandler.js";

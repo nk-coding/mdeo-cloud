@@ -96,7 +96,7 @@ export class NewFileActionHandler implements ActionHandler {
             };
         }
 
-        const workspaceEdit = this.createImportStatementEdit(data.uri, metamodelPath);
+        const workspaceEdit = this.createUsingStatementEdit(data.uri, metamodelPath);
         const connection = this.sharedServices.lsp.Connection;
         await connection?.workspace.applyEdit(workspaceEdit);
 
@@ -150,21 +150,21 @@ export class NewFileActionHandler implements ActionHandler {
             description: "Choose the metamodel to use for this transformation file",
             schema,
             isLastPage: true,
-            submitButtonLabel: "Insert Import Statement"
+            submitButtonLabel: "Insert Using Statement"
         };
 
         return { kind: "page", page };
     }
 
     /**
-     * Creates a workspace edit for inserting an `import` statement at the beginning of the file.
+     * Creates a workspace edit for inserting a `using` statement at the beginning of the file.
      *
      * @param uri The URI of the file
      * @param relativePath Relative path to the selected metamodel
-     * @returns The workspace edit for inserting the import statement
+     * @returns The workspace edit for inserting the using statement
      */
-    private createImportStatementEdit(uri: string, relativePath: string): WorkspaceEdit {
-        const importStatement = `import "${relativePath}"\n\n`;
+    private createUsingStatementEdit(uri: string, relativePath: string): WorkspaceEdit {
+        const importStatement = `using "${relativePath}"\n\n`;
 
         return {
             changes: {

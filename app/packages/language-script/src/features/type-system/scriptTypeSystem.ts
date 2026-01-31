@@ -21,7 +21,8 @@ import {
     SetType,
     StatementPartialTypeSystem,
     stringType,
-    TypePartialTypeSystem
+    TypePartialTypeSystem,
+    typeRef
 } from "@mdeo/language-expression";
 import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
 import { expressionTypes, statementTypes, typeTypes } from "../../grammar/scriptTypes.js";
@@ -63,7 +64,8 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
                     OrderedSetType,
                     ReadonlyOrderedSetType
                 ],
-                lambdaSuperTypes: [{ type: AnyType.name }]
+                lambdaSuperTypes: [{ type: AnyType.name }],
+                createListType: (elementType) => typeRef("List").withTypeArgs({ T: elementType }).build()
             },
             expressionTypes,
             [

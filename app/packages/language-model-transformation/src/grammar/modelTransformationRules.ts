@@ -45,7 +45,8 @@ import {
     typeTypes,
     expressionConfig,
     expressionTypes,
-    type ModelTransformationType
+    type ModelTransformationType,
+    BaseTransformationStatement
 } from "./modelTransformationTypes.js";
 
 /**
@@ -339,17 +340,17 @@ export function generateModelTransformationRules(): {
      * Statement rule containing transformation statements.
      */
     const StatementRule = createRule("StatementRule")
-        .returns(StatementsScope)
-        .as(({ add }) => [
+        .returns(BaseTransformationStatement)
+        .as(() => [
             or(
-                add("statements", MatchStatementRule),
-                add("statements", IfMatchStatementRule),
-                add("statements", WhileMatchStatementRule),
-                add("statements", UntilMatchStatementRule),
-                add("statements", ForMatchStatementRule),
-                add("statements", IfExpressionStatementRule),
-                add("statements", WhileExpressionStatementRule),
-                add("statements", StopStatementRule)
+                MatchStatementRule,
+                IfMatchStatementRule,
+                WhileMatchStatementRule,
+                UntilMatchStatementRule,
+                ForMatchStatementRule,
+                IfExpressionStatementRule,
+                WhileExpressionStatementRule,
+                StopStatementRule
             )
         ]);
 

@@ -10,11 +10,26 @@ import {
     stringType,
     TypePartialTypeSystem,
     type PrimitiveTypes,
-    type ExpressionTypirServices
+    type ExpressionTypirServices,
+    typeRef
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import { expressionTypes, typeTypes } from "../../grammar/modelTransformationTypes.js";
 import { ModelTransformationPartialTypeSystem } from "./modelTransformationPartialTypeSystem.js";
+import {
+    ModelTransformationBagType,
+    ModelTransformationCollectionType,
+    ModelTransformationListType,
+    ModelTransformationOrderedCollectionType,
+    ModelTransformationOrderedSetType,
+    ModelTransformationReadonlyBagType,
+    ModelTransformationReadonlyCollectionType,
+    ModelTransformationReadonlyListType,
+    ModelTransformationReadonlyOrderedCollectionType,
+    ModelTransformationReadonlyOrderedSetType,
+    ModelTransformationReadonlySetType,
+    ModelTransformationSetType
+} from "../stdlib/collections.js";
 
 /**
  * Type system for the Model Transformation language.
@@ -35,8 +50,22 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
                 string: stringType,
                 boolean: booleanType,
                 Iterable: IterableType,
-                additionalTypes: [],
-                lambdaSuperTypes: [{ type: AnyType.name }]
+                additionalTypes: [
+                    ModelTransformationCollectionType,
+                    ModelTransformationReadonlyCollectionType,
+                    ModelTransformationOrderedCollectionType,
+                    ModelTransformationReadonlyOrderedCollectionType,
+                    ModelTransformationListType,
+                    ModelTransformationReadonlyListType,
+                    ModelTransformationSetType,
+                    ModelTransformationReadonlySetType,
+                    ModelTransformationBagType,
+                    ModelTransformationReadonlyBagType,
+                    ModelTransformationOrderedSetType,
+                    ModelTransformationReadonlyOrderedSetType
+                ],
+                lambdaSuperTypes: [{ type: AnyType.name }],
+                createListType: (elementType) => typeRef("List").withTypeArgs({ T: elementType }).build()
             },
             expressionTypes,
             []

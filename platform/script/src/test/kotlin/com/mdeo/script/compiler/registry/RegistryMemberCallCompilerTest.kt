@@ -96,11 +96,11 @@ class RegistryMemberCallCompilerTest {
         }
 
         @Test
-        fun `can lookup boolean asString method`() {
-            // Boolean doesn't have negate, but has asString
+        fun `can lookup boolean toString method`() {
+            // Boolean doesn't have negate, but has toString
             val method = TypeRegistry.GLOBAL.lookupMethod(
                 "builtin.boolean",
-                "asString",
+                "toString",
                 ""
             )
             assertNotNull(method)
@@ -111,20 +111,20 @@ class RegistryMemberCallCompilerTest {
     inner class InheritedMethods {
 
         @Test
-        fun `int inherits asString from any`() {
+        fun `int inherits toString from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
                 "builtin.int",
-                "asString",
+                "toString",
                 ""
             )
             assertNotNull(method)
         }
 
         @Test
-        fun `long inherits asString from any`() {
+        fun `long inherits toString from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
                 "builtin.long",
-                "asString",
+                "toString",
                 ""
             )
             assertNotNull(method)
@@ -264,7 +264,7 @@ class RegistryMemberCallCompilerTest {
         fun `inherited method from any has correct owner`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
                 "builtin.any",
-                "asString",
+                "toString",
                 ""
             )
             assertNotNull(method)

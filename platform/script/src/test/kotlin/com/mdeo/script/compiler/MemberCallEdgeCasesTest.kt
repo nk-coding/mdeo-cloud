@@ -559,7 +559,7 @@ class MemberCallEdgeCasesTest {
             val stringNullableType = stringNullableType()
             
             // val x: Int? = 42
-            // x?.asString() should return "42"
+            // x?.toString() should return "42"
             function(
                 name = "testFunction",
                 returnType = stringNullableType,
@@ -568,7 +568,7 @@ class MemberCallEdgeCasesTest {
                     returnStmt(
                         memberCall(
                             expression = identifier("x", intNullableType, 3),
-                            member = "asString",
+                            member = "toString",
                             overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
@@ -590,7 +590,7 @@ class MemberCallEdgeCasesTest {
             val stringNullableType = stringNullableType()
             
             // val x: Int? = null
-            // x?.asString() should return null
+            // x?.toString() should return null
             function(
                 name = "testFunction",
                 returnType = stringNullableType,
@@ -599,7 +599,7 @@ class MemberCallEdgeCasesTest {
                     returnStmt(
                         memberCall(
                             expression = identifier("x", intNullableType, 3),
-                            member = "asString",
+                            member = "toString",
                             overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,
@@ -622,7 +622,7 @@ class MemberCallEdgeCasesTest {
             val stringNullableType = stringNullableType()
             
             // val b: Boolean? = true
-            // b?.asString() should return "true"
+            // b?.toString() should return "true"
             function(
                 name = "testFunction",
                 returnType = stringNullableType,
@@ -631,7 +631,7 @@ class MemberCallEdgeCasesTest {
                     returnStmt(
                         memberCall(
                             expression = identifier("b", boolNullableType, 3),
-                            member = "asString",
+                            member = "toString",
                             overload = "",
                             arguments = emptyList(),
                             isNullChaining = true,

@@ -195,7 +195,7 @@ fun createStringType(): TypeDefinition {
             )
         }
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload(
                 "", "(Ljava/lang/String;)Ljava/lang/String;", STRING_HELPER,
                 parameterTypes = emptyList(),

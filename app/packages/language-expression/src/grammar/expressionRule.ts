@@ -110,6 +110,18 @@ export function generateExpressionRules(
         .returns(types.identifierExpressionType)
         .as(({ set }) => [set("name", ID)]);
 
+    const listExpressionRule = createRule(config.listExpressionRuleName)
+        .returns(types.listExpressionType)
+        .as(({ add }) => [
+            "[",
+            ...manySep(
+                add("elements", () => expressionRule),
+                ",",
+                LeadingTrailing.TRAILING
+            ),
+            "]"
+        ]);
+
     const primaryExpressionRule = createRule(config.primaryExpressionRuleName)
         .returns(types.baseExpressionType)
         .as(() => {
@@ -123,6 +135,7 @@ export function generateExpressionRules(
                     booleanLiteralExpressionRule,
                     nullLiteralExpressionRule,
                     identifierExpressionRule,
+                    listExpressionRule,
                     group("(", () => expressionRule, ")"),
                     ...additionalExpressionRules
                 )
@@ -252,6 +265,7 @@ export function generateExpressionRules(
         booleanLiteralExpressionRule,
         nullLiteralExpressionRule,
         identifierExpressionRule,
+        listExpressionRule,
         primaryExpressionRule,
         postfixExpressionRule,
         callExpressionGenericArgsRule,

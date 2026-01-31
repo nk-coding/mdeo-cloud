@@ -14,11 +14,11 @@ import kotlin.test.assertTrue
  * in the existing test files.
  *
  * This test file covers:
- * - Int/Long: iota, to, asString, asDouble, asFloat
- * - Float: asString, asDouble
- * - Double: asString
- * - Boolean: asString
- * - Any: asBoolean, asInteger, asReal, asDouble, asFloat, asString, format, hasProperty
+ * - Int/Long: iota, to, toString, asDouble, asFloat
+ * - Float: toString, asDouble
+ * - Double: toString
+ * - Boolean: toString
+ * - Any: asBoolean, asInteger, asReal, asDouble, asFloat, toString, format, hasProperty
  * - String: asInteger, asDouble
  * - Collection: count, removeAt
  */
@@ -107,7 +107,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class IntAsStringMethod {
 
         @Test
-        fun `int asString converts int to string`() {
+        fun `int toString converts int to string`() {
             val ast = buildTypedAst {
                 val intType = intType()
                 val stringType = stringType()
@@ -118,7 +118,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = intLiteral(42, intType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -132,7 +132,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         }
 
         @Test
-        fun `int asString converts negative int to string`() {
+        fun `int toString converts negative int to string`() {
             val ast = buildTypedAst {
                 val intType = intType()
                 val stringType = stringType()
@@ -143,7 +143,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = intLiteral(-123, intType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -298,7 +298,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class LongAsStringMethod {
 
         @Test
-        fun `long asString converts long to string`() {
+        fun `long toString converts long to string`() {
             val ast = buildTypedAst {
                 val longType = longType()
                 val stringType = stringType()
@@ -309,7 +309,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = longLiteral(9876543210L, longType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -360,7 +360,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class FloatAsStringMethod {
 
         @Test
-        fun `float asString converts float to string`() {
+        fun `float toString converts float to string`() {
             val ast = buildTypedAst {
                 val floatType = floatType()
                 val stringType = stringType()
@@ -371,7 +371,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = floatLiteral(3.14f, floatType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -422,7 +422,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class DoubleAsStringMethod {
 
         @Test
-        fun `double asString converts double to string`() {
+        fun `double toString converts double to string`() {
             val ast = buildTypedAst {
                 val doubleType = doubleType()
                 val stringType = stringType()
@@ -433,7 +433,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = doubleLiteral(3.14159, doubleType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -455,7 +455,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class BooleanAsStringMethod {
 
         @Test
-        fun `boolean asString converts true to string`() {
+        fun `boolean toString converts true to string`() {
             val ast = buildTypedAst {
                 val boolType = booleanType()
                 val stringType = stringType()
@@ -466,7 +466,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = booleanLiteral(true, boolType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -480,7 +480,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         }
 
         @Test
-        fun `boolean asString converts false to string`() {
+        fun `boolean toString converts false to string`() {
             val ast = buildTypedAst {
                 val boolType = booleanType()
                 val stringType = stringType()
@@ -491,7 +491,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = booleanLiteral(false, boolType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -734,7 +734,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class AnyAsStringMethod {
 
         @Test
-        fun `any asString converts object to string`() {
+        fun `any toString converts object to string`() {
             val ast = buildTypedAst {
                 val intType = intType()
                 val stringType = stringType()
@@ -745,7 +745,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = intLiteral(123, intType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType
@@ -937,7 +937,7 @@ class AdditionalStdlibMethodsIntegrationTest {
     inner class StringAsStringMethod {
 
         @Test
-        fun `string asString returns same string`() {
+        fun `string toString returns same string`() {
             val ast = buildTypedAst {
                 val stringType = stringType()
                 function(
@@ -947,7 +947,7 @@ class AdditionalStdlibMethodsIntegrationTest {
                         returnStmt(
                             memberCall(
                                 expression = stringLiteral("hello world", stringType),
-                                member = "asString",
+                                member = "toString",
                                 overload = "",
                                 arguments = emptyList(),
                                 resultTypeIndex = stringType

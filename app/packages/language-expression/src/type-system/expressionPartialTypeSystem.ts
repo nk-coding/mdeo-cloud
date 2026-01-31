@@ -1,5 +1,5 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
-import type { ExpressionTypes } from "../grammar/expressionTypes.js";
+import type { ExpressionTypes, ListExpressionType } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { PartialTypeSystem, type PrimitiveTypes } from "./partialTypeSystem.js";
@@ -10,6 +10,7 @@ import { validateCall } from "../typir-extensions/rules/validateCall.js";
 import { findCommonParentType } from "../typir-extensions/rules/commonParentType.js";
 import { assertUnreachable } from "@mdeo/language-common";
 import type { ExpressionTypirServices } from "./services.js";
+import type { TypeSystemConfig } from "./typeSystemConfig.js";
 
 /**
  * Partial type system implementation for expression-related type inference and validation.
@@ -26,7 +27,8 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         typir: ExpressionTypirServices<Specifics>,
         types: ExpressionTypes,
         protected readonly primitiveTypes: PrimitiveTypes,
-        protected readonly nullablePrimitiveTypes: PrimitiveTypes
+        protected readonly nullablePrimitiveTypes: PrimitiveTypes,
+        protected readonly typeSystemConfig: TypeSystemConfig
     ) {
         super(typir, types);
     }
@@ -42,6 +44,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         this.registerTypeCheckRules();
         this.registerTypeCastRules();
         this.registerAssertNonNullRules();
+        this.registerListExpressionRules();
     }
 
     /**
@@ -507,6 +510,78 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                     message: `Assert-non-null operator requires a class or lambda type.`,
                     subProblems: []
                 });
+            }
+        });
+    }
+
+    /**
+     * Registers type inference and validation rules for list expressions.
+     * Infers the list type based on the common parent type of all elements.
+     */
+    private registerListExpressionRules(): void {
+        this.registerInferenceRule(this.types.listExpressionType, (node) => {
+            const elements = node.elements;
+
+            if (elements.length === 0) {
+                const listType = this.typeSystemConfig.createListType({
+                    type: "builtin.Any",
+                    isNullable: true
+                });
+                return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(listType);
+            }
+
+            const firstElementType = this.inference.inferType(elements[0]);
+            if (Array.isArray(firstElementType)) {
+                return firstElementType[0];
+            }
+            if (!isCustomValueType(firstElementType)) {
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `List element must be a value type.`,
+                    subProblems: []
+                };
+            }
+
+            let commonType: CustomValueType = firstElementType;
+            for (let i = 1; i < elements.length; i++) {
+                const elementType = this.inference.inferType(elements[i]);
+                if (Array.isArray(elementType)) {
+                    return elementType[0];
+                }
+                if (!isCustomValueType(elementType)) {
+                    return {
+                        $problem: this.inferenceProblem,
+                        languageNode: elements[i],
+                        location: `List element must be a value type.`,
+                        subProblems: []
+                    };
+                }
+                const newCommonType = findCommonParentType(commonType, elementType, this.typir);
+                commonType = newCommonType;
+            }
+
+            const elementValueType = this.typir.TypeDefinitions.convertCustomTypeToValueType(commonType);
+            const listType = this.typeSystemConfig.createListType(elementValueType);
+            return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(listType);
+        });
+
+        this.registerValidationRule(this.types.listExpressionType, (node, accept) => {
+            const elements = node.elements;
+            for (const element of elements) {
+                const elementType = this.inference.inferType(element);
+                if (Array.isArray(elementType)) {
+                    continue;
+                }
+                if (!isCustomValueType(elementType)) {
+                    accept({
+                        $problem: this.validationProblem,
+                        severity: "error",
+                        languageNode: element,
+                        message: `List element must be a value type, got '${elementType.getName()}'.`,
+                        subProblems: []
+                    });
+                }
             }
         });
     }

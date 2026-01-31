@@ -24,6 +24,7 @@ import com.mdeo.script.compiler.expressions.TernaryExpressionCompiler
 import com.mdeo.script.compiler.expressions.TypeCastCompiler
 import com.mdeo.script.compiler.expressions.TypeCheckCompiler
 import com.mdeo.script.compiler.expressions.UnaryExpressionCompiler
+import com.mdeo.script.compiler.expressions.ListLiteralCompiler
 import com.mdeo.script.compiler.registry.function.FileFunctionRegistry
 import com.mdeo.script.compiler.registry.function.FunctionRegistry
 import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
@@ -71,7 +72,8 @@ class ScriptCompiler {
         LambdaCompiler(),
         AssertNonNullCompiler(),
         TypeCastCompiler(),
-        TypeCheckCompiler()
+        TypeCheckCompiler(),
+        ListLiteralCompiler()
     )
 
     /**

@@ -64,7 +64,7 @@ fun createAnyType(): TypeDefinition {
             )
         }
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload(
                 "",
                 "(Ljava/lang/Object;)Ljava/lang/String;",

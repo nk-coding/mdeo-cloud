@@ -103,7 +103,7 @@ object AnyHelper {
      * @return the string representation
      */
     @JvmStatic
-    fun asString(obj: Any?): String {
+    fun toString(obj: Any?): String {
         return obj?.toString() ?: "null"
     }
 

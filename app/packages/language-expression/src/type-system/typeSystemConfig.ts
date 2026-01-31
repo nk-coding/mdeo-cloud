@@ -6,7 +6,7 @@
  * reference the canonical runtime `ClassType` instances for core types
  * (int, long, float, double, string, boolean, void).
  */
-import type { BaseClassTypeRef, ClassType } from "../typir-extensions/config/type.js";
+import type { BaseClassTypeRef, ClassType, ClassTypeRef, ValueType } from "../typir-extensions/config/type.js";
 
 /**
  * DefaultTypeNames enumerates the canonical names of primitive and core types
@@ -69,4 +69,11 @@ export interface TypeSystemConfig {
      * Super types for lambda types
      */
     lambdaSuperTypes: BaseClassTypeRef[];
+    /**
+     * Creates a List type reference for the given element type.
+     *
+     * @param elementType The type of elements in the list
+     * @returns A ClassTypeRef representing List<elementType>
+     */
+    createListType(elementType: ValueType): ClassTypeRef;
 }

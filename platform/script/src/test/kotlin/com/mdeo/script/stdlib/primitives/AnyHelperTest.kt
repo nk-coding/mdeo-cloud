@@ -117,30 +117,30 @@ class AnyHelperTest {
         assertEquals(42.0f, AnyHelper.asFloat(42L))
     }
 
-    // ==================== asString() tests ====================
+    // ==================== toString() tests ====================
     @Test
-    fun `asString converts int to string`() {
-        assertEquals("42", AnyHelper.asString(42))
+    fun `toString converts int to string`() {
+        assertEquals("42", AnyHelper.toString(42))
     }
 
     @Test
-    fun `asString converts double to string`() {
-        assertTrue(AnyHelper.asString(42.5).startsWith("42.5"))
+    fun `toString converts double to string`() {
+        assertTrue(AnyHelper.toString(42.5).startsWith("42.5"))
     }
 
     @Test
-    fun `asString converts boolean to string`() {
-        assertEquals("true", AnyHelper.asString(true))
+    fun `toString converts boolean to string`() {
+        assertEquals("true", AnyHelper.toString(true))
     }
 
     @Test
-    fun `asString returns string as is`() {
-        assertEquals("hello", AnyHelper.asString("hello"))
+    fun `toString returns string as is`() {
+        assertEquals("hello", AnyHelper.toString("hello"))
     }
 
     @Test
-    fun `asString converts null to null string`() {
-        assertEquals("null", AnyHelper.asString(null))
+    fun `toString converts null to null string`() {
+        assertEquals("null", AnyHelper.toString(null))
     }
 
     // ==================== format() tests ====================

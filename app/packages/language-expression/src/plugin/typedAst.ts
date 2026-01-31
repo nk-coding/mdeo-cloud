@@ -392,6 +392,17 @@ export interface TypedNullLiteralExpression extends TypedExpression {
 }
 
 /**
+ * List expression (square brackets with comma separated values).
+ */
+export interface TypedListExpression extends TypedExpression {
+    kind: "listLiteral";
+    /**
+     * Array of element expressions in the list.
+     */
+    elements: TypedExpression[];
+}
+
+/**
  * Base interface for call expressions.
  */
 export interface TypedCallExpression extends TypedExpression {

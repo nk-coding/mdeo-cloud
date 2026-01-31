@@ -165,7 +165,7 @@ object DoubleHelper {
      * @return the string representation
      */
     @JvmStatic
-    fun asString(value: Double): String = value.toString()
+    fun toString(value: Double): String = value.toString()
 
     /**
      * Converts a double to a float.

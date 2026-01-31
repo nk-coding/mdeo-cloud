@@ -1276,8 +1276,8 @@ class LambdaCompilerTest {
     }
 
     @Test
-    fun `lambda asString returns string representation`() {
-        // Test that asString() works on lambdas (inherited from Any)
+    fun `lambda toString returns string representation`() {
+        // Test that toString() works on lambdas (inherited from Any)
         val ast = buildTypedAst {
             val stringType = stringType()
             val lambdaTypeIdx = lambdaType(
@@ -1295,11 +1295,11 @@ class LambdaCompilerTest {
                         ),
                         lambdaTypeIndex = lambdaTypeIdx
                     )),
-                    // Call asString() on the lambda
+                    // Call toString() on the lambda
                     returnStmt(
                         memberCall(
                             expression = identifier("f", lambdaTypeIdx, 3),
-                            member = "asString",
+                            member = "toString",
                             overload = "",
                             arguments = emptyList(),
                             resultTypeIndex = stringType

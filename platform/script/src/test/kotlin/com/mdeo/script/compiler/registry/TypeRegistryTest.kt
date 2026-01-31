@@ -289,8 +289,8 @@ class TypeRegistryTest {
 
         @Test
         fun `can lookup inherited method on int`() {
-            // Int should inherit asString from Any
-            val method = TypeRegistry.GLOBAL.lookupMethod("builtin.int", "asString", "")
+            // Int should inherit toString from Any
+            val method = TypeRegistry.GLOBAL.lookupMethod("builtin.int", "toString", "")
             assertNotNull(method)
         }
 

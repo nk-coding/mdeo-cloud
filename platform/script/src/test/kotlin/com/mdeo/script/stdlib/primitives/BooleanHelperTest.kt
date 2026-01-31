@@ -10,31 +10,31 @@ import kotlin.test.assertFalse
  */
 class BooleanHelperTest {
 
-    // ==================== asString() tests ====================
+    // ==================== toString() tests ====================
     @Test
-    fun `asString converts true to true string`() {
-        assertEquals("true", BooleanHelper.asString(true))
+    fun `toString converts true to true string`() {
+        assertEquals("true", BooleanHelper.toString(true))
     }
 
     @Test
-    fun `asString converts false to false string`() {
-        assertEquals("false", BooleanHelper.asString(false))
+    fun `toString converts false to false string`() {
+        assertEquals("false", BooleanHelper.toString(false))
     }
 
     @Test
-    fun `asString result is lowercase`() {
-        val result = BooleanHelper.asString(true)
+    fun `toString result is lowercase`() {
+        val result = BooleanHelper.toString(true)
         assertEquals(result, result.lowercase())
     }
 
     @Test
-    fun `asString returns consistent result for true`() {
-        assertEquals(BooleanHelper.asString(true), BooleanHelper.asString(true))
+    fun `toString returns consistent result for true`() {
+        assertEquals(BooleanHelper.toString(true), BooleanHelper.toString(true))
     }
 
     @Test
-    fun `asString returns consistent result for false`() {
-        assertEquals(BooleanHelper.asString(false), BooleanHelper.asString(false))
+    fun `toString returns consistent result for false`() {
+        assertEquals(BooleanHelper.toString(false), BooleanHelper.toString(false))
     }
 
     // ==================== asInteger() tests ====================

@@ -15,6 +15,7 @@ import com.mdeo.expression.ast.expressions.TypedFloatLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedListLiteralExpression
 import com.mdeo.script.ast.expressions.TypedLambdaExpression
 import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
@@ -261,6 +262,17 @@ fun stringLiteral(value: String, typeIndex: Int): TypedStringLiteralExpression {
  */
 fun nullLiteral(typeIndex: Int): TypedNullLiteralExpression {
     return TypedNullLiteralExpression(evalType = typeIndex)
+}
+
+/**
+ * Creates a typed list literal expression.
+ *
+ * @param elements The list of element expressions.
+ * @param typeIndex Index into the types array for the list type.
+ * @return A new TypedListLiteralExpression.
+ */
+fun listLiteral(elements: List<TypedExpression>, typeIndex: Int): TypedListLiteralExpression {
+    return TypedListLiteralExpression(evalType = typeIndex, elements = elements)
 }
 
 /**

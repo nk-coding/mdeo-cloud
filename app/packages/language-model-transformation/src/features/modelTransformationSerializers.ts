@@ -422,7 +422,7 @@ function printLambdaExpression(context: PrintContext<LambdaExpressionType>): Doc
  */
 function printMetamodelFileImport(context: PrintContext<MetamodelFileImportType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
-    return ["import ", printPrimitive(getPrimitive(ctx, "file"), STRING)];
+    return ["using ", printPrimitive(getPrimitive(ctx, "file"), STRING)];
 }
 
 /**

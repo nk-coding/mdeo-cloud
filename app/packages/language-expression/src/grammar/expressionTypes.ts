@@ -125,6 +125,12 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         .extends(baseExpressionType)
         .attrs({});
 
+    const listExpressionType = createInterface(config.listExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            elements: [baseExpressionType]
+        });
+
     const assignableExpressionType = createType(config.assignableExpressionTypeName).types(
         identifierExpressionType,
         memberAccessExpressionType
@@ -152,7 +158,8 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         assignableExpressionType,
         assertNonNullExpressionType,
         typeCastExpressionType,
-        typeCheckExpressionType
+        typeCheckExpressionType,
+        listExpressionType
     };
 }
 
@@ -255,3 +262,8 @@ export type TypeCastExpressionType = ASTType<ExpressionTypes["typeCastExpression
  * Type representing the type check expression (is / !is).
  */
 export type TypeCheckExpressionType = ASTType<ExpressionTypes["typeCheckExpressionType"]>;
+
+/**
+ * Type representing the list expression (square brackets with comma separated values).
+ */
+export type ListExpressionType = ASTType<ExpressionTypes["listExpressionType"]>;

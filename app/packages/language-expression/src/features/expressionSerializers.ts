@@ -22,7 +22,8 @@ import type {
     BaseExpressionType,
     AssertNonNullExpressionType,
     TypeCastExpressionType,
-    TypeCheckExpressionType
+    TypeCheckExpressionType,
+    ListExpressionType
 } from "../grammar/expressionTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -66,6 +67,7 @@ export function registerExpressionSerializers(
         printBooleanLiteralExpression(ctx)
     );
     AstSerializer.registerNodeSerializer(types.nullLiteralExpressionType, () => printNullLiteralExpression());
+    AstSerializer.registerNodeSerializer(types.listExpressionType, (ctx) => printListExpression(ctx));
 }
 
 /**
@@ -351,4 +353,18 @@ function printBooleanLiteralExpression(context: PrintContext<BooleanLiteralExpre
  */
 function printNullLiteralExpression(): Doc {
     return "null";
+}
+
+/**
+ * Prints a list expression node with square brackets and comma-separated elements.
+ *
+ * @param context The print context
+ * @returns The formatted list expression
+ */
+function printListExpression(context: PrintContext<ListExpressionType>): Doc {
+    const { ctx, path, print } = context;
+    if (ctx.elements.length === 0) {
+        return "[]";
+    }
+    return group(["[", indent([softline, join([",", line], path.map(print, "elements"))]), softline, "]"]);
 }

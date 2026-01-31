@@ -6,7 +6,6 @@ import type { ClassType, ValueType } from "../config/type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import type { TypirSpecifics } from "typir";
 import { getClassTypeIdentifier } from "./util.js";
-import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
 
 /**
  * Finds the closest common parent type between two class types.
@@ -15,7 +14,7 @@ import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
  * @param typeA First class type
  * @param typeB Second class type
  * @param services Extended Typir services for type operations
- * @returns The common parent type, or undefined if none exists
+ * @returns The common parent type, or the registered Any type if none exists
  */
 export function findCommonParentType<Specifics extends TypirSpecifics>(
     typeA: CustomValueType,
@@ -27,10 +26,7 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
     } else if (isCustomNullType(typeB)) {
         return typeA.asNullable;
     } else if (!isCustomClassType(typeA) || !isCustomClassType(typeB)) {
-        return services.TypeDefinitions.resolveCustomClassOrLambdaType({
-            type: DefaultTypeNames.Any,
-            isNullable: typeA.isNullable || typeB.isNullable
-        });
+        return services.TypeDefinitions.getAnyType(typeA.isNullable || typeB.isNullable);
     }
     const superTypesA = findSuperTypesWithDistance(typeA.asNonNullable as CustomClassType, services);
     const superTypesB = findSuperTypesWithDistance(typeB.asNonNullable as CustomClassType, services);
@@ -51,10 +47,7 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
     if (bestType != undefined) {
         return typeA.isNullable || typeB.isNullable ? bestType.asNullable : bestType.asNonNullable;
     }
-    return services.TypeDefinitions.resolveCustomClassOrLambdaType({
-        type: DefaultTypeNames.Any,
-        isNullable: typeA.isNullable || typeB.isNullable
-    });
+    return services.TypeDefinitions.getAnyType(typeA.isNullable || typeB.isNullable);
 }
 
 /**

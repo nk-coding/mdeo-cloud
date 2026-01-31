@@ -188,6 +188,16 @@ export class ExpressionConfig {
     readonly assertNonNullExpressionTypeName: string;
 
     /**
+     * The name for the ListExpression type.
+     */
+    readonly listExpressionTypeName: string;
+
+    /**
+     * The name for the ListExpression rule.
+     */
+    readonly listExpressionRuleName: string;
+
+    /**
      * The name for the TypeCastExpression rule.
      */
     readonly typeCastExpressionRuleName: string;
@@ -249,6 +259,8 @@ export class ExpressionConfig {
         this.typeCastExpressionTypeName = prefix + "TypeCastExpression";
         this.typeCheckExpressionTypeName = prefix + "TypeCheckExpression";
         this.assertNonNullExpressionTypeName = prefix + "AssertNonNullExpression";
+        this.listExpressionTypeName = prefix + "ListExpression";
+        this.listExpressionRuleName = prefix + "ListExpressionRule";
         this.typeCastExpressionRuleName = prefix + "TypeCastExpressionRule";
         this.typeCheckExpressionRuleName = prefix + "TypeCheckExpressionRule";
         this.binaryExpressionLowerRuleName = prefix + "BinaryExpressionLower";

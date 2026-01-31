@@ -245,7 +245,7 @@ object IntHelper {
      * @return the string representation
      */
     @JvmStatic
-    fun asString(value: Int): String = value.toString()
+    fun toString(value: Int): String = value.toString()
 
     /**
      * Converts an integer to a double.

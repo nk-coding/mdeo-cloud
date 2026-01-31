@@ -248,7 +248,7 @@ object LongHelper {
      * @return the string representation
      */
     @JvmStatic
-    fun asString(value: Long): String = value.toString()
+    fun toString(value: Long): String = value.toString()
 
     /**
      * Converts a long to a double.

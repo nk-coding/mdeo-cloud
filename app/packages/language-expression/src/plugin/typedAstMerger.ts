@@ -28,6 +28,7 @@ import type {
     TypedDoubleLiteralExpression,
     TypedBooleanLiteralExpression,
     TypedNullLiteralExpression,
+    TypedListExpression,
     TypedAssertNonNullExpression,
     TypedTypeCastExpression,
     TypedTypeCheckExpression
@@ -360,6 +361,8 @@ export abstract class TypedAstMerger {
                 return this.remapBooleanLiteralExpression(expr as TypedBooleanLiteralExpression, mapping);
             case "nullLiteral":
                 return this.remapNullLiteralExpression(expr as TypedNullLiteralExpression, mapping);
+            case "listLiteral":
+                return this.remapListExpression(expr as TypedListExpression, mapping);
         }
         return this.remapAdditionalExpression(expr, mapping);
     }
@@ -709,6 +712,21 @@ export abstract class TypedAstMerger {
         return {
             kind: "nullLiteral",
             evalType: mapping.get(expr.evalType)!
+        };
+    }
+
+    /**
+     * Remaps a list expression.
+     *
+     * @param expr The list expression to remap
+     * @param mapping The index mapping
+     * @returns A new list expression with remapped type indices
+     */
+    protected remapListExpression(expr: TypedListExpression, mapping: Map<number, number>): TypedListExpression {
+        return {
+            kind: "listLiteral",
+            evalType: mapping.get(expr.evalType)!,
+            elements: expr.elements.map((element) => this.remapExpression(element, mapping))
         };
     }
 }

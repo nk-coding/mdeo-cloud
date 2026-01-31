@@ -88,7 +88,8 @@ export class ExpressionTypeSystem<
             extendedTypir,
             this.expressionTypes,
             this.primitiveTypes,
-            this.nullablePrimitiveTypes
+            this.nullablePrimitiveTypes,
+            this.defaultTypeConfig
         );
         expressionPartialTypeSystem.registerRules();
         this.onInitializeExtended(extendedTypir);
@@ -164,6 +165,7 @@ export class ExpressionTypeSystem<
             typeDefinitions.addClassType(type);
         });
         typeDefinitions.registerLambdaSuperTypes(this.defaultTypeConfig.lambdaSuperTypes);
+        typeDefinitions.registerAnyType(this.defaultTypeConfig.Any);
     }
 
     /**

@@ -57,7 +57,7 @@ fun createFloatType(): TypeDefinition {
             overload("", "(F)I", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.INT)
         }
 
-        staticMethod("asString") {
+        staticMethod("toString") {
             overload("", "(F)Ljava/lang/String;", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }
 

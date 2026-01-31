@@ -10,7 +10,7 @@ export const AnyType = classType(DefaultTypeNames.Any)
     .method("asReal", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Double).build())))
     .method("asDouble", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Double).build())))
     .method("asFloat", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Float).build())))
-    .method("asString", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.String).build())))
+    .method("toString", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.String).build())))
     .method("format", (m) =>
         m.signature((s) =>
             s
