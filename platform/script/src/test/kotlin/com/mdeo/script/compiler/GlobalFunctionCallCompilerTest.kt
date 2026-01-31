@@ -55,7 +55,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            assertEquals(3, (result as ScriptList<*>).size())
+            assertEquals(3, result.size())
         }
 
         @Test
@@ -88,7 +88,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptSet<*>)
-            assertEquals(2, (result as ScriptSet<*>).size())
+            assertEquals(2, result.size())
         }
 
         @Test
@@ -121,7 +121,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is Bag<*>)
-            assertEquals(3, (result as Bag<*>).size())
+            assertEquals(3, result.size())
         }
 
         @Test
@@ -154,7 +154,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is OrderedSet<*>)
-            assertEquals(3, (result as OrderedSet<*>).size())
+            assertEquals(3, result.size())
         }
 
         @Test
@@ -183,7 +183,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            assertEquals(0, (result as ScriptList<*>).size())
+            assertEquals(0, result.size())
         }
     }
 
@@ -216,7 +216,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            assertEquals(0, (result as ScriptList<*>).size())
+            assertEquals(0, result.size())
         }
 
         @Test
@@ -245,7 +245,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptSet<*>)
-            assertEquals(0, (result as ScriptSet<*>).size())
+            assertEquals(0, result.size())
         }
 
         @Test
@@ -274,7 +274,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is Bag<*>)
-            assertEquals(0, (result as Bag<*>).size())
+            assertEquals(0, result.size())
         }
 
         @Test
@@ -303,7 +303,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is OrderedSet<*>)
-            assertEquals(0, (result as OrderedSet<*>).size())
+            assertEquals(0, result.size())
         }
     }
 
@@ -340,8 +340,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            val list = result as ScriptList<*>
-            assertEquals(3, list.size())
+            assertEquals(3, result.size())
         }
 
         @Test
@@ -375,8 +374,7 @@ class GlobalFunctionCallCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            val list = result as ScriptList<*>
-            assertEquals(3, list.size())
+            assertEquals(3, result.size())
         }
     }
 

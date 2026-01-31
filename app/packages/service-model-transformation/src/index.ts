@@ -133,6 +133,7 @@ const modelTransformationServicePlugin: ServicePluginDefinition = {
 initializePluginContext();
 
 const { modelTransformationPluginProvider } = await import("@mdeo/language-model-transformation");
+const { typedAstHandler, TYPED_AST_HANDLER_KEY } = await import("./handler/typedAstHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
 
@@ -141,7 +142,8 @@ const config: ServiceConfig<ModelTransformationServices> = {
     plugin: modelTransformationServicePlugin,
     languagePluginProvider: modelTransformationPluginProvider,
     handlers: {
-        [AST_HANDLER_KEY]: astHandler
+        [AST_HANDLER_KEY]: astHandler,
+        [TYPED_AST_HANDLER_KEY]: typedAstHandler
     }
 };
 

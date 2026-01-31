@@ -414,11 +414,10 @@ class GlobalFunctionEdgeCasesTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is OrderedSet<*>)
-            val orderedSet = result as OrderedSet<*>
-            assertEquals(3, orderedSet.size())
+            assertEquals(3, result.size())
             
             // Verify order: a, b, c (first occurrence of 'a')
-            val iterator = orderedSet.iterator()
+            val iterator = result.iterator()
             assertEquals("a", iterator.next())
             assertEquals("b", iterator.next())
             assertEquals("c", iterator.next())
@@ -459,8 +458,7 @@ class GlobalFunctionEdgeCasesTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is Bag<*>)
-            val bag = result as Bag<*>
-            assertEquals(3, bag.size())  // Bag should have 3 elements including duplicates
+            assertEquals(3, result.size())  // Bag should have 3 elements including duplicates
         }
     }
 

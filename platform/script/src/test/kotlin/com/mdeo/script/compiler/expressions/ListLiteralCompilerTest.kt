@@ -61,7 +61,7 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            assertEquals(0, (result as List<*>).size)
+            assertEquals(0, result.size)
         }
 
         /**
@@ -85,7 +85,7 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            assertTrue((result as List<*>).isEmpty())
+            assertTrue(result.isEmpty())
         }
     }
 
@@ -115,9 +115,8 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(1, list.size)
-            assertEquals(42, list[0])
+            assertEquals(1, result.size)
+            assertEquals(42, result[0])
         }
 
         /**
@@ -141,9 +140,8 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(1, list.size)
-            assertEquals("hello", list[0])
+            assertEquals(1, result.size)
+            assertEquals("hello", result[0])
         }
 
         /**
@@ -167,9 +165,8 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(1, list.size)
-            assertEquals(true, list[0])
+            assertEquals(1, result.size)
+            assertEquals(true, result[0])
         }
 
         /**
@@ -193,9 +190,8 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(1, list.size)
-            assertEquals(3.14, list[0])
+            assertEquals(1, result.size)
+            assertEquals(3.14, result[0])
         }
     }
 
@@ -234,11 +230,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(1, list[0])
-            assertEquals(2, list[1])
-            assertEquals(3, list[2])
+            assertEquals(3, result.size)
+            assertEquals(1, result[0])
+            assertEquals(2, result[1])
+            assertEquals(3, result[2])
         }
 
         /**
@@ -273,13 +268,12 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(5, list.size)
-            assertEquals("a", list[0])
-            assertEquals("b", list[1])
-            assertEquals("c", list[2])
-            assertEquals("d", list[3])
-            assertEquals("e", list[4])
+            assertEquals(5, result.size)
+            assertEquals("a", result[0])
+            assertEquals("b", result[1])
+            assertEquals("c", result[2])
+            assertEquals("d", result[3])
+            assertEquals("e", result[4])
         }
 
         /**
@@ -312,11 +306,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(true, list[0])
-            assertEquals(false, list[1])
-            assertEquals(true, list[2])
+            assertEquals(3, result.size)
+            assertEquals(true, result[0])
+            assertEquals(false, result[1])
+            assertEquals(true, result[2])
         }
 
         /**
@@ -350,12 +343,11 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(4, list.size)
-            assertEquals(1.1, list[0])
-            assertEquals(2.2, list[1])
-            assertEquals(3.3, list[2])
-            assertEquals(4.4, list[3])
+            assertEquals(4, result.size)
+            assertEquals(1.1, result[0])
+            assertEquals(2.2, result[1])
+            assertEquals(3.3, result[2])
+            assertEquals(4.4, result[3])
         }
 
         /**
@@ -381,10 +373,9 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(20, list.size)
+            assertEquals(20, result.size)
             for (i in 1..20) {
-                assertEquals(i, list[i - 1])
+                assertEquals(i, result[i - 1])
             }
         }
     }
@@ -429,15 +420,16 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val outerList = result as List<*>
-            assertEquals(2, outerList.size)
+            assertEquals(2, result.size)
 
-            val innerList1 = outerList[0] as List<*>
+            @Suppress("UNCHECKED_CAST")
+            val innerList1 = result[0] as List<*>
             assertEquals(2, innerList1.size)
             assertEquals(1, innerList1[0])
             assertEquals(2, innerList1[1])
 
-            val innerList2 = outerList[1] as List<*>
+            @Suppress("UNCHECKED_CAST")
+            val innerList2 = result[1] as List<*>
             assertEquals(2, innerList2.size)
             assertEquals(3, innerList2[0])
             assertEquals(4, innerList2[1])
@@ -481,15 +473,16 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val outerList = result as List<*>
-            assertEquals(2, outerList.size)
+            assertEquals(2, result.size)
 
-            val innerList1 = outerList[0] as List<*>
+            @Suppress("UNCHECKED_CAST")
+            val innerList1 = result[0] as List<*>
             assertEquals(2, innerList1.size)
             assertEquals("a", innerList1[0])
             assertEquals("b", innerList1[1])
 
-            val innerList2 = outerList[1] as List<*>
+            @Suppress("UNCHECKED_CAST")
+            val innerList2 = result[1] as List<*>
             assertEquals(1, innerList2.size)
             assertEquals("c", innerList2[0])
         }
@@ -530,12 +523,13 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val level1 = result as List<*>
-            assertEquals(1, level1.size)
+            assertEquals(1, result.size)
 
-            val level2 = level1[0] as List<*>
+            @Suppress("UNCHECKED_CAST")
+            val level2 = result[0] as List<*>
             assertEquals(1, level2.size)
 
+            @Suppress("UNCHECKED_CAST")
             val level3 = level2[0] as List<*>
             assertEquals(1, level3.size)
             assertEquals(1, level3[0])
@@ -568,9 +562,8 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(1, list.size)
-            assertNull(list[0])
+            assertEquals(1, result.size)
+            assertNull(result[0])
         }
 
         /**
@@ -603,11 +596,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertNull(list[0])
-            assertEquals("hello", list[1])
-            assertNull(list[2])
+            assertEquals(3, result.size)
+            assertNull(result[0])
+            assertEquals("hello", result[1])
+            assertNull(result[2])
         }
     }
 
@@ -646,11 +638,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(1L, list[0])
-            assertEquals(2L, list[1])
-            assertEquals(3L, list[2])
+            assertEquals(3, result.size)
+            assertEquals(1L, result[0])
+            assertEquals(2L, result[1])
+            assertEquals(3L, result[2])
         }
 
         /**
@@ -682,10 +673,9 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(2, list.size)
-            assertEquals(Long.MAX_VALUE, list[0])
-            assertEquals(Long.MIN_VALUE, list[1])
+            assertEquals(2, result.size)
+            assertEquals(Long.MAX_VALUE, result[0])
+            assertEquals(Long.MIN_VALUE, result[1])
         }
     }
 
@@ -724,11 +714,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(1.0f, list[0])
-            assertEquals(2.5f, list[1])
-            assertEquals(3.75f, list[2])
+            assertEquals(3, result.size)
+            assertEquals(1.0f, result[0])
+            assertEquals(2.5f, result[1])
+            assertEquals(3.75f, result[2])
         }
     }
 
@@ -770,11 +759,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(10, list[0])
-            assertEquals(20, list[1])
-            assertEquals(30, list[2])
+            assertEquals(3, result.size)
+            assertEquals(10, result[0])
+            assertEquals(20, result[1])
+            assertEquals(30, result[2])
         }
 
         /**
@@ -809,9 +797,8 @@ class ListLiteralCompilerTest {
 
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
-            assertTrue(result is java.util.List<*>)
-            val list = result as java.util.List<*>
-            assertEquals(5, list.size)
+            assertTrue(result is List<*>)
+            assertEquals(5, result.size)
         }
     }
 
@@ -1078,11 +1065,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(-1, list[0])
-            assertEquals(-100, list[1])
-            assertEquals(Int.MIN_VALUE, list[2])
+            assertEquals(3, result.size)
+            assertEquals(-1, result[0])
+            assertEquals(-100, result[1])
+            assertEquals(Int.MIN_VALUE, result[2])
         }
 
         /**
@@ -1115,11 +1101,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(0, list[0])
-            assertEquals(0, list[1])
-            assertEquals(0, list[2])
+            assertEquals(3, result.size)
+            assertEquals(0, result[0])
+            assertEquals(0, result[1])
+            assertEquals(0, result[2])
         }
 
         /**
@@ -1153,9 +1138,8 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(4, list.size)
-            list.forEach { assertEquals(5, it) }
+            assertEquals(4, result.size)
+            result.forEach { assertEquals(5, it) }
         }
 
         /**
@@ -1187,10 +1171,9 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(2, list.size)
-            assertEquals("", list[0])
-            assertEquals("", list[1])
+            assertEquals(2, result.size)
+            assertEquals("", result[0])
+            assertEquals("", result[1])
         }
 
         /**
@@ -1223,11 +1206,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals(Double.POSITIVE_INFINITY, list[0])
-            assertEquals(Double.NEGATIVE_INFINITY, list[1])
-            assertTrue((list[2] as Double).isNaN())
+            assertEquals(3, result.size)
+            assertEquals(Double.POSITIVE_INFINITY, result[0])
+            assertEquals(Double.NEGATIVE_INFINITY, result[1])
+            assertTrue((result[2] as Double).isNaN())
         }
 
         /**
@@ -1260,11 +1242,10 @@ class ListLiteralCompilerTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is List<*>)
-            val list = result as List<*>
-            assertEquals(3, list.size)
-            assertEquals("Hello 世界", list[0])
-            assertEquals("🌍🌎🌏", list[1])
-            assertEquals("αβγδ", list[2])
+            assertEquals(3, result.size)
+            assertEquals("Hello 世界", result[0])
+            assertEquals("🌍🌎🌏", result[1])
+            assertEquals("αβγδ", result[2])
         }
     }
 }

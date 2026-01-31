@@ -5,22 +5,20 @@ import com.mdeo.expression.ast.types.ReturnTypeSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Root of the TypedAST containing all program information.
+ * Root of the TypedAST containing all script program information.
+ *
+ * This is the top-level data structure that represents a complete script
+ * program after type checking. It contains type information, imports,
+ * and all function definitions.
+ *
+ * @param types Array of all types used in the program. Generics are replaced by Any? due to
+ *              type erasure. Types are indexed by typeIndex in expressions.
+ * @param imports All imports in the program.
+ * @param functions All top-level functions in the program.
  */
 @Serializable
 data class TypedAst(
-    /**
-     * Array of all types used in the program.
-     * Generics are replaced by Any? due to type erasure.
-     * Indexed by typeIndex in expressions.
-     */
     val types: List<@Serializable(with = ReturnTypeSerializer::class) ReturnType>,
-    /**
-     * All imports in the program.
-     */
     val imports: List<TypedImport>,
-    /**
-     * All top-level functions in the program.
-     */
     val functions: List<TypedFunction>
 )

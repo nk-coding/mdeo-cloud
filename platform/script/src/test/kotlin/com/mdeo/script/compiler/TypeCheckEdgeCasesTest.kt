@@ -126,7 +126,7 @@ class TypeCheckEdgeCasesTest {
         }
 
         @Test
-        fun `is check combined with || operator`() {
+        fun `is check combined with or operator`() {
             val ast = buildTypedAst {
                 val intType = intType()
                 val stringType = stringType()

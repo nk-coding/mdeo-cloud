@@ -63,7 +63,7 @@ class GlobalFunctionIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            assertEquals(3, (result as ScriptList<*>).size())
+            assertEquals(3, result.size())
             assertEquals(1, result.at(0))
             assertEquals(2, result.at(1))
             assertEquals(3, result.at(2))
@@ -102,7 +102,7 @@ class GlobalFunctionIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptSet<*>)
-            assertEquals(3, (result as ScriptSet<*>).size())
+            assertEquals(3, result.size())
         }
 
         /**
@@ -133,7 +133,7 @@ class GlobalFunctionIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptList<*>)
-            assertEquals(0, (result as ScriptList<*>).size())
+            assertEquals(0, result.size())
         }
 
         /**
@@ -164,7 +164,7 @@ class GlobalFunctionIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is ScriptSet<*>)
-            assertEquals(0, (result as ScriptSet<*>).size())
+            assertEquals(0, result.size())
         }
     }
 

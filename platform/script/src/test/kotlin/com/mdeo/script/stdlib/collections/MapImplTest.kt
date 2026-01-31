@@ -380,6 +380,7 @@ class MapImplTest {
     fun `keySet is readonly set`() {
         val map = MapImpl.of("a" to 1)
         val keys = map.keySet()
+        @Suppress("USELESS_IS_CHECK")
         assertTrue(keys is ReadonlySet)
     }
 
@@ -417,6 +418,7 @@ class MapImplTest {
     fun `values returns readonly bag`() {
         val map = MapImpl.of("a" to 1)
         val values = map.values()
+        @Suppress("USELESS_IS_CHECK")
         assertTrue(values is ReadonlyBag)
     }
 

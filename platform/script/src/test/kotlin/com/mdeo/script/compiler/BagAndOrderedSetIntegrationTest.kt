@@ -58,7 +58,7 @@ class BagAndOrderedSetIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is Bag<*>)
-            assertEquals(3, (result as Bag<*>).size())
+            assertEquals(3, result.size())
         }
 
         /**
@@ -88,7 +88,7 @@ class BagAndOrderedSetIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is Bag<*>)
-            assertEquals(0, (result as Bag<*>).size())
+            assertEquals(0, result.size())
         }
 
         /**
@@ -166,7 +166,7 @@ class BagAndOrderedSetIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is OrderedSet<*>)
-            assertEquals(3, (result as OrderedSet<*>).size())
+            assertEquals(3, result.size())
         }
 
         /**
@@ -196,7 +196,7 @@ class BagAndOrderedSetIntegrationTest {
             val result = helper.compileAndInvoke(ast)
             assertNotNull(result)
             assertTrue(result is OrderedSet<*>)
-            assertEquals(0, (result as OrderedSet<*>).size())
+            assertEquals(0, result.size())
         }
 
         /**

@@ -236,6 +236,7 @@ class BagImplTest {
     fun `excluding returns bag type`() {
         val bag = BagImpl.of(1, 2, 3)
         val result = bag.excluding(2)
+        @Suppress("USELESS_IS_CHECK")
         assertTrue(result is ReadonlyCollection)
     }
 
@@ -274,6 +275,7 @@ class BagImplTest {
     fun `map returns bag type`() {
         val bag = BagImpl.of(1, 2, 3)
         val mapped = bag.map(Func1 { it * 2 })
+        @Suppress("USELESS_IS_CHECK")
         assertTrue(mapped is ReadonlyCollection)
     }
 

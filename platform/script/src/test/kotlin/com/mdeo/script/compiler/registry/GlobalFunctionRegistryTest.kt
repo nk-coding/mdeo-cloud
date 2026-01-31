@@ -99,7 +99,7 @@ class GlobalFunctionRegistryTest {
 
             val retrieved = propertyRegistry.getProperty("PI")
             assertNotNull(retrieved)
-            assertEquals("PI", retrieved?.name)
+            assertEquals("PI", retrieved.name)
         }
 
         @Test

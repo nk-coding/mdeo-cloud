@@ -223,6 +223,7 @@ class TypeCastCompilerTest {
             
             val result = helper.compileAndInvoke(ast)
             assertEquals(42, result)
+            @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
             assertIs<Integer>(result)
         }
 
@@ -242,7 +243,7 @@ class TypeCastCompilerTest {
             
             val result = helper.compileAndInvoke(ast)
             assertEquals(42, result)
-            assertIs<Integer>(result)
+            assertIs<Int>(result)
         }
 
         @Test

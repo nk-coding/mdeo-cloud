@@ -8,4 +8,5 @@ export * from "./features/modelTransformationScopeProvider.js";
 export * from "./features/modelTransformationSerializers.js";
 export * from "./grammar/modelTransformationRules.js";
 export * from "./grammar/modelTransformationTypes.js";
+export * from "./plugin/typedAst.js";
 export * from "./plugin.js";

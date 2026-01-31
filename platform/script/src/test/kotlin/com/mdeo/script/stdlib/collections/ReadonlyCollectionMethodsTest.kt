@@ -878,7 +878,7 @@ class ReadonlyCollectionMethodsTest {
     fun `sortedBy does not modify original`() {
         val list = ListImpl.of(3, 1, 2)
         list.sortedBy(Func1 { it })
-        assertEquals(3, (list as ScriptList<Int>).at(0))
+        assertEquals(3, list.at(0))
     }
 
     @Test

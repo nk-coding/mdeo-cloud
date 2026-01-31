@@ -91,7 +91,7 @@ class VariableDeclarationCompiler : StatementCompiler {
         val init = declaration.initialValue
         if (init != null) {
             // Compile expression with coercion to target type
-            context.compileExpression(init as TypedExpression, mv, type)
+            context.compileExpression(init, mv, type)
         } else {
             emitDefaultValue(type, mv)
         }
@@ -164,7 +164,7 @@ class VariableDeclarationCompiler : StatementCompiler {
         val init = declaration.initialValue
         if (init != null) {
             // Compile expression with coercion to target type
-            context.compileExpression(init as TypedExpression, mv, type)
+            context.compileExpression(init, mv, type)
             
             val constructorDescriptor = getRefConstructorDescriptor(type)
             mv.visitMethodInsn(Opcodes.INVOKESPECIAL, refClassName, "<init>", constructorDescriptor, false)

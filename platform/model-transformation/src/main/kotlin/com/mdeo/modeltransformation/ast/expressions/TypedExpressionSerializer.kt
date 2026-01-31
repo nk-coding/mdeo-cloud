@@ -1,4 +1,4 @@
-package com.mdeo.script.ast.expressions
+package com.mdeo.modeltransformation.ast.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import kotlinx.serialization.DeserializationStrategy
@@ -7,13 +7,13 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Polymorphic serializer for TypedExpression in the script language.
+ * Polymorphic serializer for TypedExpression in the model transformation language.
  *
  * Extends the base expression serializer from the expression module to handle
- * script-specific expression types, such as lambda expressions.
+ * model transformation-specific expression types, such as lambda expressions.
  *
  * This serializer uses the "kind" field in the JSON to determine which concrete
- * expression type to deserialize to. It first checks for script-specific
+ * expression type to deserialize to. It first checks for model transformation-specific
  * kinds, then delegates to the base serializer for common expression types.
  */
 object TypedExpressionSerializer : com.mdeo.expression.ast.expressions.TypedExpressionSerializer() {

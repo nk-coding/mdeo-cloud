@@ -208,7 +208,7 @@ class AnyHelperTest {
     // ==================== isTypeOf() tests ====================
     @Test
     fun `isTypeOf returns true for matching type`() {
-        assertTrue(AnyHelper.isTypeOf(42, Integer::class.java))
+        assertTrue(AnyHelper.isTypeOf(42, Int::class.javaObjectType))
     }
 
     @Test
@@ -223,7 +223,7 @@ class AnyHelperTest {
 
     @Test
     fun `isTypeOf with boolean class`() {
-        assertTrue(AnyHelper.isTypeOf(true, java.lang.Boolean::class.java))
+        assertTrue(AnyHelper.isTypeOf(true, Boolean::class.javaObjectType))
     }
 
     @Test
@@ -235,7 +235,7 @@ class AnyHelperTest {
     // ==================== instanceOf() tests ====================
     @Test
     fun `instanceOf returns true for matching type`() {
-        assertTrue(AnyHelper.instanceOf(42, Integer::class.java))
+        assertTrue(AnyHelper.instanceOf(42, Int::class.javaObjectType))
     }
 
     @Test

@@ -400,3 +400,23 @@ export const ModelTransformation = createInterface("ModelTransformation").attrs(
  * Model Transformation AST type.
  */
 export type ModelTransformationType = ASTType<typeof ModelTransformation>;
+
+/**
+ * All statement types including Model Transformation-specific statements.
+ */
+export const statementTypes = {
+    baseTransformationStatementType: BaseTransformationStatement,
+    statementsScopeType: StatementsScope,
+    matchStatementType: MatchStatement,
+    ifMatchStatementType: IfMatchStatement,
+    whileMatchStatementType: WhileMatchStatement,
+    untilMatchStatementType: UntilMatchStatement,
+    forMatchStatementType: ForMatchStatement,
+    ifExpressionStatementType: IfExpressionStatement,
+    whileExpressionStatementType: WhileExpressionStatement,
+    stopStatementType: StopStatement,
+    patternVariableType: PatternVariable,
+    patternObjectInstanceType: PatternObjectInstance,
+    patternLinkType: PatternLink,
+    whereClauseType: WhereClause
+};

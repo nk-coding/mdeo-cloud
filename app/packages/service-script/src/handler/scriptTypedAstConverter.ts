@@ -25,17 +25,19 @@ import type {
     TypedExtensionCallArgument,
     TypedStringLiteralExpression,
     TypedDoubleLiteralExpression,
-    TypedBooleanLiteralExpression
+    TypedBooleanLiteralExpression,
+    TypedStatement
 } from "@mdeo/language-expression";
-import { TypedAstConverter, getCallOverload, isCustomFunctionType } from "@mdeo/language-expression";
+import { StatementTypedAstConverter, getCallOverload, isCustomFunctionType } from "@mdeo/language-expression";
 import { GrammarUtils, isAstNode, type AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
+import type { ReturnStatementType } from "@mdeo/language-script";
 
 /**
- * Script-specific extension of TypedAstConverter.
- * Handles script-specific features like functions, imports, lambdas, and extension calls.
+ * Script-specific extension of StatementTypedAstConverter.
+ * Handles script-specific features like functions, imports, lambdas, extension calls, and return statements.
  */
-export class ScriptTypedAstConverter extends TypedAstConverter {
+export class ScriptTypedAstConverter extends StatementTypedAstConverter {
     /**
      * Lookup of resolved contributed expressions by their type name
      */
@@ -135,6 +137,33 @@ export class ScriptTypedAstConverter extends TypedAstConverter {
             return this.convertExtensionExpression(expr);
         }
         return super.convertAdditionalExpression(expr);
+    }
+
+    /**
+     * Handles script-specific statement types (return statement).
+     * Overrides the base class hook for additional statements.
+     *
+     * @param statement The statement AST node
+     * @returns The TypedStatement representation
+     */
+    protected override convertAdditionalStatement(statement: AstNode): TypedStatement {
+        if (this.reflection.isInstance(statement, this.statementTypes.returnStatementType)) {
+            return this.convertReturnStatement(statement as ReturnStatementType);
+        }
+        return super.convertAdditionalStatement(statement);
+    }
+
+    /**
+     * Converts a return statement.
+     *
+     * @param statement The return statement AST node
+     * @returns The TypedReturnStatement representation
+     */
+    private convertReturnStatement(statement: ReturnStatementType): TypedReturnStatement {
+        return {
+            kind: "return",
+            value: statement.value ? this.convertExpression(statement.value) : undefined
+        };
     }
 
     /**
