@@ -1,4 +1,4 @@
-import { AstReflectionKey, BaseModelIdProvider, sharedImport } from "@mdeo/language-shared";
+import { AstReflectionKey, BaseModelIdProvider, LanguageServicesKey, sharedImport } from "@mdeo/language-shared";
 import type { AstNode, Reference } from "langium";
 import {
     Class,
@@ -6,7 +6,6 @@ import {
     Association,
     AssociationEnd,
     MetaModel,
-    ClassOrEnumImport,
     ClassExtension,
     SingleMultiplicity,
     RangeMultiplicity,
@@ -21,12 +20,12 @@ import type {
     PartialAssociation,
     PartialAssociationEnd,
     PartialMetaModel,
-    PartialClassOrEnumImport,
     PartialClassExtension,
     PartialEnum,
     PartialEnumEntry
 } from "../../grammar/metamodelPartialTypes.js";
-import type { AstReflection } from "@mdeo/language-common";
+import type { AstReflection, LanguageServices } from "@mdeo/language-common";
+import { collectImportedMetamodels } from "../importHelpers.js";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -42,13 +41,23 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
     @inject(AstReflectionKey)
     protected reflection!: AstReflection;
 
+    /**
+     * Injected metamodel language services.
+     */
+    @inject(LanguageServicesKey)
+    protected languageServices!: LanguageServices;
+
+    /**
+     * Gets the name/ID for an AST node.
+     *
+     * @param node The AST node to get the name for
+     * @returns The unique name/ID for the node, or undefined
+     */
     getName(node: AstNode): string | undefined {
         if (this.reflection.isInstance(node, MetaModel)) {
             return this.getMetaModelName(node);
         } else if (this.reflection.isInstance(node, Class)) {
             return this.getClassName(node);
-        } else if (this.reflection.isInstance(node, ClassOrEnumImport)) {
-            return this.getClassOrEnumImportName(node);
         } else if (this.reflection.isInstance(node, Enum)) {
             return this.getEnumName(node);
         } else if (this.reflection.isInstance(node, EnumEntry)) {
@@ -71,17 +80,14 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
     }
 
     override getAdditional(node: AstNode): AstNode[] {
-        if (this.reflection.isInstance(node, ClassOrEnumImport)) {
-            const importedClassOrEnum = node.entity?.ref;
-            if (importedClassOrEnum != undefined) {
-                return [importedClassOrEnum];
-            }
-        }
-        return [];
+        return collectImportedMetamodels(node.$document!, this.languageServices.shared.workspace.LangiumDocuments);
     }
 
     /**
      * Generates ID for MetaModel root node.
+     *
+     * @param _node The metamodel node
+     * @returns The fixed ID for the metamodel graph
      */
     private getMetaModelName(_node: PartialMetaModel): string {
         return "metamodel-graph";
@@ -89,16 +95,12 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
 
     /**
      * Generates ID for Class node based on class name.
+     *
+     * @param node The class node
+     * @returns The class name or "unnamed"
      */
     private getClassName(node: PartialClass): string {
         return node.name ?? "unnamed";
-    }
-
-    /**
-     * Generates ID for ClassImport node based on the imported class name or alias.
-     */
-    private getClassOrEnumImportName(node: PartialClassOrEnumImport): string {
-        return node.name ?? node.entity?.ref?.name ?? "unnamed";
     }
 
     /**
@@ -159,6 +161,9 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
 
     /**
      * Generates ID for ClassExtension based on parent class and extension name.
+     *
+     * @param node The class extension node
+     * @returns The formatted class extension ID
      */
     private getClassExtensionName(node: PartialClassExtension): string {
         const owningClass = node.$container?.$container as PartialClass | undefined;
@@ -169,6 +174,9 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
 
     /**
      * Resolves the class name from a class reference.
+     *
+     * @param clsReference The reference to a class
+     * @returns The resolved class name or a placeholder
      */
     private resolveClassName(clsReference: Reference<AstNode> | undefined): string {
         if (clsReference === undefined || clsReference.error != undefined) {
@@ -180,15 +188,14 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
             return this.getClassName(resolved);
         }
 
-        if (this.reflection.isInstance(resolved, ClassOrEnumImport)) {
-            return this.getClassOrEnumImportName(resolved);
-        }
-
         return "unknown";
     }
 
     /**
      * Generates ID for Multiplicity nodes.
+     *
+     * @param node The multiplicity node
+     * @returns The formatted multiplicity ID
      */
     private getMultiplicityName(node: SingleMultiplicityType | RangeMultiplicityType): string {
         const owning = node.$container;

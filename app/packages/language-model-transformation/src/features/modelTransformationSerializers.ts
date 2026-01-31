@@ -16,6 +16,7 @@ import {
     StatementsScope,
     MatchStatement,
     IfMatchStatement,
+    IfMatchConditionAndBlock,
     WhileMatchStatement,
     UntilMatchStatement,
     ForMatchStatement,
@@ -38,6 +39,7 @@ import {
     type PatternType,
     type MatchStatementType,
     type IfMatchStatementType,
+    type IfMatchConditionAndBlockType,
     type WhileMatchStatementType,
     type UntilMatchStatementType,
     type ForMatchStatementType,
@@ -102,6 +104,7 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     // Statements
     AstSerializer.registerNodeSerializer(StatementsScope, (ctx) => printStatementsScope(ctx));
     AstSerializer.registerNodeSerializer(MatchStatement, (ctx) => printMatchStatement(ctx));
+    AstSerializer.registerNodeSerializer(IfMatchConditionAndBlock, (ctx) => printIfMatchCondition(ctx));
     AstSerializer.registerNodeSerializer(IfMatchStatement, (ctx) => printIfMatchStatement(ctx));
     AstSerializer.registerNodeSerializer(WhileMatchStatement, (ctx) => printWhileMatchStatement(ctx));
     AstSerializer.registerNodeSerializer(UntilMatchStatement, (ctx) => printUntilMatchStatement(ctx));
@@ -129,7 +132,14 @@ export function registerModelTransformationSerializers(services: ModelTransforma
  */
 function printPatternVariable(context: PrintContext<PatternVariableType>): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
-    return ["var ", printPrimitive(getPrimitive(ctx, "name"), ID), ": ", path.call(print, "type")];
+    const docs: Doc[] = ["var ", printPrimitive(getPrimitive(ctx, "name"), ID)];
+
+    if (ctx.type != undefined) {
+        docs.push(": ", path.call(print, "type"));
+    }
+
+    docs.push(" = ", path.call(print, "value"));
+    return docs;
 }
 
 /**
@@ -277,6 +287,17 @@ function printMatchStatement(context: PrintContext<MatchStatementType>): Doc {
 }
 
 /**
+ * Prints an if-match condition node (inner node for scoping).
+ *
+ * @param context The print context.
+ * @returns The formatted match condition and then block.
+ */
+function printIfMatchCondition(context: PrintContext<IfMatchConditionAndBlockType>): Doc {
+    const { path, print } = context;
+    return ["match ", path.call(print, "pattern"), " then ", path.call(print, "thenBlock")];
+}
+
+/**
  * Prints an if-match statement node.
  *
  * @param context The print context.
@@ -286,7 +307,7 @@ function printIfMatchStatement(context: PrintContext<IfMatchStatementType>): Doc
     const { ctx, path, print } = context;
     const docs: Doc[] = [];
 
-    docs.push("if match ", path.call(print, "pattern"), " then ", path.call(print, "thenBlock"));
+    docs.push("if ", path.call(print, "ifBlock"));
 
     if (ctx.elseBlock != undefined) {
         docs.push(" else ", path.call(print, "elseBlock"));

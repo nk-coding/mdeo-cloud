@@ -1,9 +1,10 @@
 import type { GetFileActionsParams, GetFileActionsResponse, ActionIconNode } from "@mdeo/language-common";
 import { convertIcon, FileCategory, parseUri } from "@mdeo/language-common";
-import type { ActionProvider } from "@mdeo/language-shared";
+import { sharedImport, type ActionProvider } from "@mdeo/language-shared";
 import { ActionDisplayLocation } from "@mdeo/language-common";
 import { Play } from "lucide";
-import { URI } from "langium";
+
+const { URI } = sharedImport("langium");
 
 /**
  * Action provider for script files.

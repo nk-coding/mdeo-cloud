@@ -15,7 +15,7 @@ import { JwtAuthMiddleware } from "../auth/jwtAuth.js";
  * Extracts JWT token from the Authorization header of a request.
  * Assumes the request has already passed authentication middleware.
  *
- * @param request - The Fastify request object
+ * @param request The Fastify request object
  * @returns The JWT token string
  * @throws Error if Authorization header is missing or malformed
  */

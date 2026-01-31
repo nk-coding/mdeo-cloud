@@ -7,10 +7,11 @@ import type {
     ActionSubmitResponse,
     NewFileActionData
 } from "@mdeo/language-common";
-import { calculateRelativePath, type ActionHandler } from "@mdeo/language-shared";
+import { calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import { URI } from "langium";
+
+const { URI } = sharedImport("langium");
 
 /**
  * Input data collected from the dialog.

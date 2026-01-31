@@ -10,19 +10,20 @@ import {
     type ModelIdProvider as ModelIdProviderType
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes, Attributes } from "@mdeo/language-shared";
-import type { AstNode } from "langium";
+import type { AstNode, LangiumDocument } from "langium";
 import { MetamodelElementType } from "./model/elementTypes.js";
 import type {
     PartialMetaModel,
     PartialClass,
     PartialAssociation,
-    PartialClassOrEnumImport,
     PartialEnum
 } from "../../grammar/metamodelPartialTypes.js";
-import { Association, Class, ClassOrEnumImport, Enum } from "../../grammar/metamodelTypes.js";
+import { Association, Class, Enum } from "../../grammar/metamodelTypes.js";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
+import { getExportedEntitiesFromMetamodelFile } from "../importHelpers.js";
 
 const { injectable, inject } = sharedImport("inversify");
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Manages metadata validation and synchronization for metamodel diagrams.
@@ -133,15 +134,194 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         const edges: Record<string, EdgeMetadata> = {};
 
         const idRegistry = new DefaultModelIdRegistry(sourceModel, this.modelIdProvider);
-        const { classes, enums, associations, imports } = this.extractClassesAndAssociations(sourceModel);
+        const { localClasses, localEnums, localAssociations, importedClasses, importedEnums, importedAssociations } =
+            this.extractAllElements(sourceModel);
 
-        this.extractClassMetadata(classes, idRegistry, nodes);
-        this.extractEnumMetadata(enums, idRegistry, nodes);
-        this.extractClassImportMetadata(imports, idRegistry, nodes);
-        this.extractInheritanceMetadata(classes, idRegistry, edges);
-        this.extractAssociationMetadata(associations, idRegistry, nodes, edges);
+        const allClasses = [...localClasses, ...importedClasses];
+        const allEnums = [...localEnums, ...importedEnums];
+        const allAssociations = [...localAssociations, ...importedAssociations];
+
+        this.extractClassMetadata(allClasses, idRegistry, nodes);
+        this.extractEnumMetadata(allEnums, idRegistry, nodes);
+        this.extractInheritanceMetadata(allClasses, idRegistry, edges);
+        this.extractAssociationMetadata(allAssociations, idRegistry, nodes, edges);
 
         return { nodes, edges };
+    }
+
+    /**
+     * Extracts all elements including local and imported entities.
+     *
+     * @param metamodel the metamodel source model
+     * @returns object containing local and imported entities
+     */
+    private extractAllElements(metamodel: PartialMetaModel): {
+        localClasses: PartialClass[];
+        localEnums: PartialEnum[];
+        localAssociations: PartialAssociation[];
+        importedClasses: PartialClass[];
+        importedEnums: PartialEnum[];
+        importedAssociations: PartialAssociation[];
+    } {
+        const {
+            classes: localClasses,
+            enums: localEnums,
+            associations: localAssociations
+        } = this.extractClassesAndAssociations(metamodel);
+        const { importedClasses, importedEnums, importedAssociations } = this.extractImportedEntities(
+            metamodel,
+            localClasses,
+            localEnums,
+            localAssociations
+        );
+
+        return { localClasses, localEnums, localAssociations, importedClasses, importedEnums, importedAssociations };
+    }
+
+    /**
+     * Extracts imported classes, enums, and associations from imported files.
+     * Deduplicates entities that are already defined locally.
+     *
+     * @param metamodel The metamodel containing the imports
+     * @param localClasses Local classes to exclude from imported entities
+     * @param localEnums Local enums to exclude from imported entities
+     * @param localAssociations Local associations to exclude from imported entities
+     * @returns Object containing imported classes, enums, and associations
+     */
+    private extractImportedEntities(
+        metamodel: PartialMetaModel,
+        localClasses: PartialClass[],
+        localEnums: PartialEnum[],
+        localAssociations: PartialAssociation[]
+    ): { importedClasses: PartialClass[]; importedEnums: PartialEnum[]; importedAssociations: PartialAssociation[] } {
+        const document = this.getSourceDocument(metamodel);
+        if (document == undefined) {
+            return { importedClasses: [], importedEnums: [], importedAssociations: [] };
+        }
+
+        const exports = this.getExportsFromDocument(document);
+        const importedClasses = this.filterImportedClasses(exports, localClasses);
+        const importedEnums = this.filterImportedEnums(exports, localEnums);
+        const importedAssociations = this.filterImportedAssociations(exports, localAssociations);
+
+        return { importedClasses, importedEnums, importedAssociations };
+    }
+
+    /**
+     * Gets the Langium document for the source metamodel.
+     *
+     * @param metamodel The metamodel AST node
+     * @returns The Langium document or undefined
+     */
+    private getSourceDocument(metamodel: PartialMetaModel): LangiumDocument | undefined {
+        return AstUtils.getDocument(metamodel);
+    }
+
+    /**
+     * Gets exported entities from a document using the import helper.
+     *
+     * @param document The source document
+     * @returns The collected metamodel exports
+     */
+    private getExportsFromDocument(document: LangiumDocument) {
+        const documents = this.languageServices.shared.workspace.LangiumDocuments;
+        return getExportedEntitiesFromMetamodelFile(document, documents);
+    }
+
+    /**
+     * Filters imported classes to exclude locally defined ones.
+     *
+     * @param exports The metamodel exports
+     * @param localClasses Classes defined locally
+     * @returns Array of imported classes not in local scope
+     */
+    private filterImportedClasses(
+        exports: ReturnType<typeof getExportedEntitiesFromMetamodelFile>,
+        localClasses: PartialClass[]
+    ): PartialClass[] {
+        const localKeys = new Set(localClasses.map((c) => this.getNodeKey(c)));
+        const importedClasses: PartialClass[] = [];
+
+        for (const cls of exports.classes.values()) {
+            const key = this.getNodeKey(cls as PartialClass);
+            if (!localKeys.has(key)) {
+                importedClasses.push(cls as PartialClass);
+            }
+        }
+        return importedClasses;
+    }
+
+    /**
+     * Filters imported enums to exclude locally defined ones.
+     *
+     * @param exports The metamodel exports
+     * @param localEnums Enums defined locally
+     * @returns Array of imported enums not in local scope
+     */
+    private filterImportedEnums(
+        exports: ReturnType<typeof getExportedEntitiesFromMetamodelFile>,
+        localEnums: PartialEnum[]
+    ): PartialEnum[] {
+        const localKeys = new Set(localEnums.map((e) => this.getNodeKey(e)));
+        const importedEnums: PartialEnum[] = [];
+
+        for (const enumEntity of exports.enums.values()) {
+            const key = this.getNodeKey(enumEntity as PartialEnum);
+            if (!localKeys.has(key)) {
+                importedEnums.push(enumEntity as PartialEnum);
+            }
+        }
+        return importedEnums;
+    }
+
+    /**
+     * Filters imported associations to exclude locally defined ones.
+     *
+     * @param exports The metamodel exports
+     * @param localAssociations Associations defined locally
+     * @returns Array of imported associations not in local scope
+     */
+    private filterImportedAssociations(
+        exports: ReturnType<typeof getExportedEntitiesFromMetamodelFile>,
+        localAssociations: PartialAssociation[]
+    ): PartialAssociation[] {
+        const localKeys = new Set(localAssociations.map((a) => this.getAssociationKey(a)));
+        const importedAssociations: PartialAssociation[] = [];
+
+        for (const association of exports.associations.values()) {
+            const key = this.getAssociationKey(association as PartialAssociation);
+            if (!localKeys.has(key)) {
+                importedAssociations.push(association as PartialAssociation);
+            }
+        }
+        return importedAssociations;
+    }
+
+    /**
+     * Creates a unique key for an AST node based on its document path and name.
+     *
+     * @param node The class or enum node
+     * @returns A unique string key for deduplication
+     */
+    private getNodeKey(node: PartialClass | PartialEnum): string {
+        const document = AstUtils.getDocument(node);
+        const path = document.uri.path;
+        return `${path}#${node.name ?? ""}`;
+    }
+
+    /**
+     * Creates a unique key for an association based on its document path and involved classes.
+     *
+     * @param association The association node
+     * @returns A unique string key for deduplication
+     */
+    private getAssociationKey(association: PartialAssociation): string {
+        const document = AstUtils.getDocument(association);
+        const path = document.uri.path;
+        const sourceName = association.source?.class?.ref?.name ?? "";
+        const targetName = association.target?.class?.ref?.name ?? "";
+        const operator = association.operator ?? "";
+        return `${path}#${sourceName}${operator}${targetName}`;
     }
 
     /**
@@ -191,34 +371,6 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     }
 
     /**
-     * Extracts metadata for all imported classes or enums.
-     *
-     * @param imports list of class or enum imports in the metamodel
-     * @param idRegistry model ID registry
-     * @param nodes record to populate with node metadata
-     */
-    private extractClassImportMetadata(
-        imports: PartialClassOrEnumImport[],
-        idRegistry: ModelIdRegistry,
-        nodes: Record<string, NodeMetadata>
-    ): void {
-        for (const classImport of imports) {
-            const importedClass = classImport.entity?.ref;
-            if (!importedClass) {
-                continue;
-            }
-
-            const nodeId = idRegistry.getId(classImport);
-            if (nodeId) {
-                nodes[nodeId] = {
-                    type: MetamodelElementType.NODE_CLASS,
-                    attrs: this.createClassAttributes(importedClass as PartialClass)
-                };
-            }
-        }
-    }
-
-    /**
      * Extracts metadata for all inheritance relationships.
      *
      * @param classes list of classes in the metamodel
@@ -242,20 +394,23 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
                 }
 
                 const superClass = extendsDef.class.ref;
-                if (this.reflection.isInstance(superClass, Class)) {
-                    const sourceId = idRegistry.getId(cls);
-                    const targetId = idRegistry.getId(superClass as PartialClass);
-
-                    if (sourceId && targetId) {
-                        const edgeId = idRegistry.getId(extendsDef);
-                        edges[edgeId] = {
-                            type: MetamodelElementType.EDGE_INHERITANCE,
-                            from: sourceId,
-                            to: targetId,
-                            attrs: {}
-                        };
-                    }
+                if (!this.reflection.isInstance(superClass, Class)) {
+                    continue;
                 }
+                const sourceId = idRegistry.getId(cls);
+                const targetId = idRegistry.getId(superClass as PartialClass);
+
+                if (sourceId == undefined || targetId == undefined) {
+                    continue;
+                }
+
+                const edgeId = idRegistry.getId(extendsDef);
+                edges[edgeId] = {
+                    type: MetamodelElementType.EDGE_INHERITANCE,
+                    from: sourceId,
+                    to: targetId,
+                    attrs: {}
+                };
             }
         }
     }
@@ -282,22 +437,26 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             const startClass = assoc.source.class?.ref;
             const targetClass = assoc.target.class?.ref;
 
-            if (startClass && targetClass) {
-                const startId = this.getClassId(startClass, idRegistry);
-                const targetId = this.getClassId(targetClass, idRegistry);
-
-                if (startId && targetId) {
-                    const edgeId = idRegistry.getId(assoc);
-                    edges[edgeId] = {
-                        type: MetamodelElementType.EDGE_ASSOCIATION,
-                        from: startId,
-                        to: targetId,
-                        attrs: this.createAssociationAttributes(assoc)
-                    };
-
-                    this.extractAssociationLabelMetadata(assoc, idRegistry, nodes);
-                }
+            if (startClass == undefined || targetClass == undefined) {
+                continue;
             }
+
+            const startId = this.getClassId(startClass, idRegistry);
+            const targetId = this.getClassId(targetClass, idRegistry);
+
+            if (startId == undefined || targetId == undefined) {
+                continue;
+            }
+
+            const edgeId = idRegistry.getId(assoc);
+            edges[edgeId] = {
+                type: MetamodelElementType.EDGE_ASSOCIATION,
+                from: startId,
+                to: targetId,
+                attrs: this.createAssociationAttributes(assoc)
+            };
+
+            this.extractAssociationLabelMetadata(assoc, idRegistry, nodes);
         }
     }
 
@@ -347,24 +506,22 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     }
 
     /**
-     * Extracts classes, associations, and imports from the metamodel.
+     * Extracts classes, associations from the metamodel.
      *
      * @param metamodel the metamodel source model
-     * @returns extracted classes, enums,  associations, and imports
+     * @returns extracted classes, enums, and associations
      */
     private extractClassesAndAssociations(metamodel: PartialMetaModel): {
         classes: PartialClass[];
         enums: PartialEnum[];
         associations: PartialAssociation[];
-        imports: PartialClassOrEnumImport[];
     } {
         const classes: PartialClass[] = [];
         const enums: PartialEnum[] = [];
         const associations: PartialAssociation[] = [];
-        const imports: PartialClassOrEnumImport[] = [];
 
         if (!metamodel.elements) {
-            return { classes, enums, associations, imports };
+            return { classes, enums, associations };
         }
 
         for (const item of metamodel.elements) {
@@ -381,20 +538,11 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
             }
         }
 
-        const fileImports = metamodel.imports ?? [];
-        for (const fileImport of fileImports) {
-            for (const imp of fileImport?.imports ?? []) {
-                if (imp) {
-                    imports.push(imp as PartialClassOrEnumImport);
-                }
-            }
-        }
-
-        return { classes, enums, associations, imports };
+        return { classes, enums, associations };
     }
 
     /**
-     * Gets the ID for a class (handles both Class and ClassImport).
+     * Gets the ID for a class.
      *
      * @param classNode the class AST node
      * @param idRegistry model ID registry
@@ -407,14 +555,6 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
         if (this.reflection.isInstance(classNode, Class)) {
             return idRegistry.getId(classNode);
-        }
-
-        if (this.reflection.isInstance(classNode, ClassOrEnumImport)) {
-            const importNode = classNode as PartialClassOrEnumImport;
-            const referencedClass = importNode.entity?.ref;
-            if (this.reflection.isInstance(referencedClass, Class)) {
-                return idRegistry.getId(referencedClass);
-            }
         }
 
         return undefined;

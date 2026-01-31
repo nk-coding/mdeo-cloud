@@ -14,8 +14,8 @@ export class GObjectNodeView extends GRectangularNodeView {
     /**
      * Renders the content inside the object node by rendering all child elements.
      *
-     * @param model - The object node model being rendered
-     * @param context - The rendering context
+     * @param model The object node model being rendered
+     * @param context The rendering context
      * @returns An array of VNodes representing the node's children
      */
     protected renderNodeContent(model: Readonly<GObjectNode>, context: RenderingContext): VNode[] {

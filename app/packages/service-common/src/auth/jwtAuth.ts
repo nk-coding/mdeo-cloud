@@ -45,8 +45,8 @@ export class JwtAuthMiddleware {
      * Fastify hook that validates JWT tokens.
      * This can be used as a preHandler hook for routes that need authentication.
      *
-     * @param request - Fastify request object
-     * @param reply - Fastify reply object
+     * @param request Fastify request object
+     * @param reply Fastify reply object
      * @throws Will send 401 response if authentication fails
      */
     async authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -85,7 +85,7 @@ export class JwtAuthMiddleware {
      * Helper method to get JWT claims from an authenticated request.
      * This should only be called in routes protected by the authenticate middleware.
      *
-     * @param request - Fastify request object
+     * @param request Fastify request object
      * @returns The JWT claims, or undefined if not authenticated
      */
     static getClaims(request: FastifyRequest): JwtClaims | undefined {
@@ -95,8 +95,8 @@ export class JwtAuthMiddleware {
     /**
      * Checks if the JWT token has a specific scope/permission.
      *
-     * @param request - Fastify request object
-     * @param scope - The required scope to check for
+     * @param request Fastify request object
+     * @param scope The required scope to check for
      * @returns true if the token has the scope, false otherwise
      *
      * @example

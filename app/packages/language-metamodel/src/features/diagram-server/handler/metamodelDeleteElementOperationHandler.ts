@@ -12,10 +12,6 @@ import {
     type ClassExtensionsType,
     type AssociationEndType,
     type MultiplicityType,
-    type FileImportType,
-    ClassOrEnumImport,
-    type ClassOrEnumImportType,
-    FileImport,
     type EnumType,
     Enum,
     ClassExtensions
@@ -79,12 +75,6 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 const cls = element as ClassType;
                 if (cls.name != undefined) {
                     deletedClassOrEnumIds.add(cls.name);
-                }
-            } else if (this.reflection.isInstance(element, ClassOrEnumImport)) {
-                const classOrEnumImport = element as ClassOrEnumImportType;
-                const importName = classOrEnumImport.name ?? classOrEnumImport.entity?.$refText;
-                if (importName != undefined) {
-                    deletedClassOrEnumIds.add(importName);
                 }
             }
         }
@@ -220,7 +210,6 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
 
         const nodesToDelete: (ClassType | EnumType | AssociationType)[] = [];
         const extensions: ClassExtensionType[] = [];
-        const classOrEnumImports: ClassOrEnumImportType[] = [];
         const multiplicities: MultiplicityType[] = [];
 
         for (const element of elements) {
@@ -232,8 +221,6 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
                 nodesToDelete.push(element);
             } else if (this.reflection.isInstance(element, ClassExtension)) {
                 extensions.push(element);
-            } else if (this.reflection.isInstance(element, ClassOrEnumImport)) {
-                classOrEnumImports.push(element);
             } else if (
                 this.reflection.isInstance(element, SingleMultiplicity) ||
                 this.reflection.isInstance(element, RangeMultiplicity)
@@ -249,8 +236,6 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
         }
 
         edits.push(...(await this.createDeleteExtensionsEdits(extensions)));
-
-        edits.push(...(await this.createDeleteClassOrEnumImportsEdits(classOrEnumImports)));
 
         edits.push(...(await this.createDeleteMultiplicitiesEdits(multiplicities)));
 
@@ -358,61 +343,6 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
             return this.modelState.index.find(elementId);
         }
         return undefined;
-    }
-
-    /**
-     * Creates workspace edits for deleting class or enum imports.
-     * Groups deleted class or enum imports by their containing file import and reserializes import lists.
-     *
-     * @param classOrEnumImports ClassImport nodes being deleted
-     * @returns Array of workspace edits
-     */
-    private async createDeleteClassOrEnumImportsEdits(
-        classOrEnumImports: ClassOrEnumImportType[]
-    ): Promise<WorkspaceEdit[]> {
-        const edits: WorkspaceEdit[] = [];
-        const importsByFileImport = new Map<FileImportType, ClassOrEnumImportType[]>();
-
-        for (const classOrEnumImport of classOrEnumImports) {
-            const fileImport = classOrEnumImport.$container;
-            if (fileImport != undefined && this.reflection.isInstance(fileImport, FileImport)) {
-                const fileImportTyped = fileImport as FileImportType;
-                if (!importsByFileImport.has(fileImportTyped)) {
-                    importsByFileImport.set(fileImportTyped, []);
-                }
-                importsByFileImport.get(fileImportTyped)!.push(classOrEnumImport);
-            }
-        }
-
-        for (const [fileImport, importsToDelete] of importsByFileImport) {
-            const allImports = fileImport.imports ?? [];
-            const remainingImports = allImports.filter((imp) => !importsToDelete.includes(imp));
-
-            if (fileImport.$cstNode != undefined) {
-                if (remainingImports.length === 0) {
-                    edits.push(this.deleteCstNode(fileImport.$cstNode));
-                } else {
-                    const newFileImport: FileImportType = {
-                        $type: fileImport.$type,
-                        file: fileImport.file,
-                        imports: remainingImports
-                            .filter((imp) => imp?.entity != undefined)
-                            .map((imp) => ({
-                                $type: imp.$type,
-                                entity: {
-                                    $refText: imp.entity.$refText,
-                                    ref: imp.entity.ref
-                                },
-                                name: imp.name
-                            }))
-                    };
-
-                    edits.push(await this.replaceCstNode(fileImport.$cstNode, newFileImport));
-                }
-            }
-        }
-
-        return edits;
     }
 
     /**

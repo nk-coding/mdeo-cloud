@@ -66,6 +66,7 @@ const modelServicePlugin: ServicePluginDefinition = {
 initializePluginContext();
 
 const { modelPluginProvider } = await import("@mdeo/language-model");
+const { modelDataHandler, MODEL_DATA_HANDLER_KEY } = await import("./handler/modelDataHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
 
@@ -74,7 +75,8 @@ const config: ServiceConfig<ModelServices> = {
     plugin: modelServicePlugin,
     languagePluginProvider: modelPluginProvider,
     handlers: {
-        [AST_HANDLER_KEY]: astHandler
+        [AST_HANDLER_KEY]: astHandler,
+        [MODEL_DATA_HANDLER_KEY]: modelDataHandler
     }
 };
 

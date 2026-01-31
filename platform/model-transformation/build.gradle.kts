@@ -26,8 +26,12 @@ dependencies {
     implementation(project(":expression"))
     implementation(libs.kotlinx.serialization.json)
     
+    // Apache TinkerPop Gremlin
+    implementation("org.apache.tinkerpop:gremlin-core:3.8.0")
+    
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.junit.jupiter.params)
+    testImplementation("org.apache.tinkerpop:tinkergraph-gremlin:3.8.0")
 }

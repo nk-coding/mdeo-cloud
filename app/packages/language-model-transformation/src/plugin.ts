@@ -11,7 +11,6 @@ import {
     SerializerFormatter,
     registerDefaultTokenSerializers,
     sharedImport,
-    DefaultActionProvider,
     ActionHandlerRegistry,
     type ActionHandlerRegistryAdditionalServices
 } from "@mdeo/language-shared";
@@ -27,12 +26,16 @@ import type { AbstractAstReflection } from "langium";
 import { generateModelTransformationRules, ModelTransformationTerminals } from "./grammar/modelTransformationRules.js";
 import { expressionTypes, typeTypes } from "./grammar/modelTransformationTypes.js";
 import { ModelTransformationLangiumScopeProvider } from "./features/modelTransformationScopeProvider.js";
+import { ModelTransformationScopeComputation } from "./features/modelTransformationScopeComputation.js";
 import { ModelTransformationTypeSystem } from "./features/type-system/modelTransformationTypeSystem.js";
 import { ModelTransformationTypirScopeProvider } from "./features/type-system/modelTransformationTypirScopeProvider.js";
 import { registerModelTransformationSerializers } from "./features/modelTransformationSerializers.js";
 import { ModelTransformationExternalReferenceCollector } from "./features/modelTransformationExternalReferenceCollector.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
+import { RunModelTransformationActionHandler } from "./action-handlers/runModelTransformationActionHandler.js";
+import { ModelTransformationActionProvider } from "./features/modelTransformationActionProvider.js";
 import { addExternalReferenceCollectionPhase } from "@mdeo/language-shared";
+import { registerModelTransformationValidationChecks } from "./validation/modelTransformationValidator.js";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");
@@ -79,6 +82,7 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
             },
             references: {
                 ScopeProvider: (services) => new ModelTransformationLangiumScopeProvider(services),
+                ScopeComputation: (services) => new ModelTransformationScopeComputation(services),
                 ExternalReferenceCollector: () => new ModelTransformationExternalReferenceCollector()
             },
             typir: (services) =>
@@ -105,9 +109,10 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
                 ActionHandlerRegistry: (services) => {
                     const registry = new ActionHandlerRegistry();
                     registry.register("new-file", new NewFileActionHandler(services.shared));
+                    registry.register("run", new RunModelTransformationActionHandler(services.shared));
                     return registry;
                 },
-                ActionProvider: () => new DefaultActionProvider()
+                ActionProvider: () => new ModelTransformationActionProvider()
             }
         },
         postCreate(services) {
@@ -116,6 +121,7 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
             registerTypeSerializers(services, typeTypes);
             registerExpressionSerializers(services, expressionTypes);
             registerModelTransformationSerializers(services);
+            registerModelTransformationValidationChecks(services);
             addExternalReferenceCollectionPhase(services);
         }
     };

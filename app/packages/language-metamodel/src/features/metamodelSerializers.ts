@@ -1,8 +1,8 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
-import { ID, INT } from "@mdeo/language-common";
-import { serializeNewlineSep, registerImportSerializers, sharedImport } from "@mdeo/language-shared";
+import { ID, INT, STRING } from "@mdeo/language-common";
+import { serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -13,7 +13,6 @@ import {
     AssociationEnd,
     Association,
     MetaModel,
-    ClassOrEnumImport,
     FileImport,
     Enum,
     EnumEntry,
@@ -29,7 +28,8 @@ import {
     type MetaModelType,
     type EnumType,
     type EnumEntryType,
-    type EnumTypeReferenceType
+    type EnumTypeReferenceType,
+    type FileImportType
 } from "../grammar/metamodelTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -54,8 +54,19 @@ export function registerMetamodelSerializers(services: LangiumCoreServices & Ast
     AstSerializer.registerNodeSerializer(Enum, (ctx) => printEnum(ctx));
     AstSerializer.registerNodeSerializer(AssociationEnd, (ctx) => printAssociationEnd(ctx));
     AstSerializer.registerNodeSerializer(Association, (ctx) => printAssociation(ctx));
-    registerImportSerializers(services, doc.builders, ClassOrEnumImport, FileImport);
+    AstSerializer.registerNodeSerializer(FileImport, (ctx) => printFileImport(ctx));
     AstSerializer.registerNodeSerializer(MetaModel, (ctx) => printMetaModel(ctx));
+}
+
+/**
+ * Prints a file import statement.
+ *
+ * @param context The print context
+ * @returns The formatted import statement
+ */
+function printFileImport(context: PrintContext<FileImportType>): Doc {
+    const { ctx, printPrimitive, getPrimitive } = context;
+    return ["import ", printPrimitive(getPrimitive(ctx, "file"), STRING)];
 }
 
 /**

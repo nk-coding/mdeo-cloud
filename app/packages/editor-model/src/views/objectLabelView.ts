@@ -13,7 +13,7 @@ export class GObjectLabelView extends GLabelView {
     /**
      * Gets the CSS classes to apply to the object label.
      *
-     * @param model - The label model being rendered
+     * @param model The label model being rendered
      * @returns A record of CSS class names to boolean values
      */
     protected override getClasses(model: Readonly<GLabel>): Record<string, boolean> {

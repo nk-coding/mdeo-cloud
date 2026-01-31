@@ -1,6 +1,6 @@
 import { type AstReflection, type ExtendedLangiumServices } from "@mdeo/language-common";
-import { getExportetEntitiesFromRelativeFile, sharedImport } from "@mdeo/language-shared";
-import type { ReferenceInfo, Scope } from "langium";
+import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
+import type { AstNodeDescriptionProvider, LangiumDocuments, ReferenceInfo, Scope } from "langium";
 import {
     ObjectInstance,
     PropertyAssignment,
@@ -13,14 +13,10 @@ import {
     Model
 } from "../grammar/modelTypes.js";
 import {
-    Class,
-    ClassOrEnumImport,
-    Enum,
     EnumTypeReference,
+    getScopeFromMetamodelFile,
     resolveClassChain,
-    type ClassOrEnumImportType,
     type ClassType,
-    type EnumOrImportType,
     type EnumType,
     type PropertyType
 } from "@mdeo/language-metamodel";
@@ -44,6 +40,16 @@ export class ModelScopeProvider extends DefaultScopeProvider {
     private readonly associationEndCache: AssociationEndCache;
 
     /**
+     * The Langium documents service for accessing imported files.
+     */
+    private readonly documents: LangiumDocuments;
+
+    /**
+     * The description provider for creating AST node descriptions.
+     */
+    private readonly descriptionProvider: AstNodeDescriptionProvider;
+
+    /**
      * Constructs a new ModelScopeProvider.
      * @param services The extended Langium services.
      */
@@ -51,6 +57,8 @@ export class ModelScopeProvider extends DefaultScopeProvider {
         super(services);
         this.astReflection = services.shared.AstReflection;
         this.associationEndCache = new AssociationEndCache(services);
+        this.documents = services.shared.workspace.LangiumDocuments;
+        this.descriptionProvider = services.workspace.AstNodeDescriptionProvider;
     }
 
     /**
@@ -83,16 +91,29 @@ export class ModelScopeProvider extends DefaultScopeProvider {
 
     /**
      * Gets the scope for object class references.
+     * Resolves the imported metamodel file and returns a scope with all accessible classes.
+     *
+     * @param context The reference context
+     * @param document The current document
+     * @returns A scope containing all accessible classes from the imported metamodel
      */
     private getObjectClassScope(context: ReferenceInfo, document: any): Scope {
         const model = context.container.$container as ModelType;
         const metamodelImport = model.import;
-        return getExportetEntitiesFromRelativeFile<ClassType | ClassOrEnumImportType>(
-            document,
-            metamodelImport.file,
-            [Class, ClassOrEnumImport],
-            this.indexManager
-        );
+        const relativePath = metamodelImport?.file;
+
+        if (relativePath == undefined) {
+            return EMPTY_SCOPE;
+        }
+
+        const metamodelUri = resolveRelativePath(document, relativePath);
+        const metamodelDoc = this.documents.getDocument(metamodelUri);
+
+        if (metamodelDoc == undefined) {
+            return EMPTY_SCOPE;
+        }
+
+        return getScopeFromMetamodelFile(metamodelDoc, this.documents, this.descriptionProvider);
     }
 
     /**
@@ -106,7 +127,7 @@ export class ModelScopeProvider extends DefaultScopeProvider {
         if (this.astReflection.isInstance(objectInstance, PropertyAssignment)) {
             objectInstance = objectInstance.$container as ObjectInstanceType;
         }
-        const classRef = objectInstance?.class?.ref;
+        const classRef = objectInstance?.class?.ref as ClassType | undefined;
         if (!classRef) {
             return EMPTY_SCOPE;
         }
@@ -157,26 +178,23 @@ export class ModelScopeProvider extends DefaultScopeProvider {
      */
     private getLinkPropertyScope(context: ReferenceInfo): Scope {
         const linkEnd = context.container as LinkEndType;
-        const objectRef = linkEnd.object?.ref;
+        const objectRef = linkEnd.object?.ref as ObjectInstanceType | undefined;
 
         if (objectRef == undefined) {
             return EMPTY_SCOPE;
         }
 
-        const classRef = objectRef.class?.ref;
+        const classRef = objectRef.class?.ref as ClassType | undefined;
         if (classRef == undefined) {
             return EMPTY_SCOPE;
         }
 
-        // Get the full class chain (including superclasses)
         const classChain = resolveClassChain(classRef, this.astReflection);
 
-        // For each class in the chain, get all association ends that reference it
         const allAssociationEnds = classChain.flatMap((cls) => {
             return this.associationEndCache.getAssociationEndsForClass(cls);
         });
 
-        // Remove duplicates (same association end might be found through multiple paths)
         const uniqueAssociationEnds = Array.from(new Map(allAssociationEnds.map((end) => [end.name, end])).values());
 
         return this.createScopeForNodes(uniqueAssociationEnds);
@@ -198,32 +216,19 @@ export class ModelScopeProvider extends DefaultScopeProvider {
 
     /**
      * Gets enum entries from a property type.
+     * Since EnumTypeReference now directly references Enum (no imports),
+     * we can simply access the entries from the resolved enum.
+     *
+     * @param type The property type to get enum entries from
+     * @returns A scope containing the enum entries, or EMPTY_SCOPE if not an enum type
      */
     private getEnumEntriesFromType(type: any): Scope {
         if (this.astReflection.isInstance(type, EnumTypeReference)) {
-            const enumRef = type.enum?.ref as EnumOrImportType | undefined;
+            const enumRef = type.enum?.ref as EnumType | undefined;
             if (enumRef != undefined) {
-                const resolvedEnum = this.resolveEnum(enumRef);
-                if (resolvedEnum) {
-                    return this.createScopeForNodes(resolvedEnum.entries);
-                }
+                return this.createScopeForNodes(enumRef.entries);
             }
         }
         return EMPTY_SCOPE;
-    }
-
-    /**
-     * Resolves an enum reference to the actual enum.
-     *
-     * @param enumOrImport The enum or import reference
-     * @returns The resolved enum or undefined if not found
-     */
-    private resolveEnum(enumOrImport: EnumOrImportType): EnumType | undefined {
-        if (this.astReflection.isInstance(enumOrImport, Enum)) {
-            return enumOrImport;
-        } else {
-            const importRef = enumOrImport as ClassOrEnumImportType;
-            return importRef.entity?.ref as EnumType | undefined;
-        }
     }
 }

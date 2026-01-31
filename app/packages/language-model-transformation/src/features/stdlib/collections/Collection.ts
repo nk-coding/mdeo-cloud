@@ -1,0 +1,24 @@
+import { CollectionType, classTypeFrom } from "@mdeo/language-expression";
+import type { ClassType } from "@mdeo/language-expression";
+
+/**
+ * Immutable Collection type for model transformation.
+ */
+export const ModelTransformationCollectionType: ClassType = classTypeFrom(CollectionType)
+    .keepMembers(
+        "size",
+        "isEmpty",
+        "notEmpty",
+        "sum",
+        "first",
+        "last",
+        "filter",
+        "map",
+        "exists",
+        "all",
+        "none",
+        "one",
+        "find",
+        "reject"
+    )
+    .build();

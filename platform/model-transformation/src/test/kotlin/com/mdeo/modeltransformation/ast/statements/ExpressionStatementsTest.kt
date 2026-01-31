@@ -92,7 +92,7 @@ class ExpressionStatementsTest {
         val result = json.decodeFromString(TypedElseIfBranch.serializer(), jsonString)
         
         assertIs<TypedIntLiteralExpression>(result.condition)
-        assertEquals("42", (result.condition as TypedIntLiteralExpression).value)
+        assertEquals("42", result.condition.value)
     }
     
     // ========== TypedIfExpressionStatement Tests ==========
@@ -398,7 +398,7 @@ class ExpressionStatementsTest {
         val result = json.decodeFromString(TypedWhileExpressionStatement.serializer(), jsonString)
         
         assertIs<TypedIntLiteralExpression>(result.condition)
-        assertEquals("100", (result.condition as TypedIntLiteralExpression).value)
+        assertEquals("100", result.condition.value)
     }
     
     @Test
@@ -550,7 +550,7 @@ class ExpressionStatementsTest {
         for (i in 1..10) {
             val branch = result.elseIfBranches[i - 1]
             assertIs<TypedIntLiteralExpression>(branch.condition)
-            assertEquals("$i", (branch.condition as TypedIntLiteralExpression).value)
+            assertEquals("$i", branch.condition.value)
         }
     }
     

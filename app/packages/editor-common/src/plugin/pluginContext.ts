@@ -4,6 +4,7 @@ import type * as glspProtocol from "@eclipse-glsp/protocol";
 import type * as inversify from "inversify";
 import type * as miniSearch from "minisearch";
 import type * as lucide from "lucide";
+import type * as snabbdom from "snabbdom";
 
 /**
  * Context provided to plugins when they are initialized
@@ -15,4 +16,5 @@ export interface PluginContext {
     inversify: typeof inversify;
     minisearch: typeof miniSearch;
     lucide: typeof lucide;
+    snabbdom: typeof snabbdom;
 }

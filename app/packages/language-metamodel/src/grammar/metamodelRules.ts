@@ -1,5 +1,4 @@
-import { createRule, or, optional, many, ref, ID, INT, NEWLINE } from "@mdeo/language-common";
-import { generateImportRules } from "@mdeo/language-shared";
+import { createRule, or, optional, many, ref, ID, INT, STRING, NEWLINE } from "@mdeo/language-common";
 import {
     PrimitiveType,
     SingleMultiplicity,
@@ -12,18 +11,14 @@ import {
     AssociationEnd,
     Association,
     MetaModel,
-    ClassOrImport,
-    ClassOrEnumImport,
     MetamodelPrimitiveTypes,
     MetamodelAssociationOperators,
     Enum,
     EnumEntry,
-    EnumOrImport,
     EnumTypeReference,
     PropertyTypeValue,
     FileImport
 } from "./metamodelTypes.js";
-import { metamodelFileScopingConfig } from "./metamodelTypes.js";
 
 /**
  * Primitive type rule.
@@ -73,7 +68,7 @@ export const MultiplicityRule = createRule("MultiplicityRule")
  */
 export const EnumTypeReferenceRule = createRule("EnumTypeReferenceRule")
     .returns(EnumTypeReference)
-    .as(({ set }) => [set("enum", ref(EnumOrImport, ID))]);
+    .as(({ set }) => [set("enum", ref(Enum, ID))]);
 
 /**
  * Property type value rule.
@@ -102,7 +97,7 @@ export const PropertyRule = createRule("PropertyRule")
  */
 export const ClassExtensionRule = createRule("ClassExtensionRule")
     .returns(ClassExtension)
-    .as(({ set }) => [set("class", ref(ClassOrImport, ID))]);
+    .as(({ set }) => [set("class", ref(Class, ID))]);
 
 /**
  * Class extensions rule.
@@ -155,7 +150,7 @@ export const EnumRule = createRule("EnumRule")
 export const AssociationEndWithPropertyRule = createRule("AssociationEndWithPropertyRule")
     .returns(AssociationEnd)
     .as(({ set }) => [
-        set("class", ref(ClassOrImport, ID)),
+        set("class", ref(Class, ID)),
         ".",
         set("name", ID),
         optional(set("multiplicity", MultiplicityRule))
@@ -167,7 +162,7 @@ export const AssociationEndWithPropertyRule = createRule("AssociationEndWithProp
  */
 export const AssociationEndWithoutPropertyRule = createRule("AssociationEndWithoutPropertyRule")
     .returns(AssociationEnd)
-    .as(({ set }) => [set("class", ref(ClassOrImport, ID)), optional(set("multiplicity", MultiplicityRule))]);
+    .as(({ set }) => [set("class", ref(Class, ID)), optional(set("multiplicity", MultiplicityRule))]);
 
 /**
  * Association end rule.
@@ -200,15 +195,12 @@ export const AssociationRule = createRule("AssociationRule")
     ]);
 
 /**
- * Import rules for classes or enums.
- * Generates import and file import rules for class or enum references.
+ * File import rule.
+ * Matches a simple import statement: import "./relativePath"
  */
-export const { importRule: ImportRule, fileImportRule: FileImportRule } = generateImportRules(
-    metamodelFileScopingConfig,
-    ClassOrEnumImport,
-    FileImport,
-    ID
-);
+export const FileImportRule = createRule("FileImportRule")
+    .returns(FileImport)
+    .as(({ set }) => ["import", set("file", STRING)]);
 
 /**
  * The MetaModel entry rule.

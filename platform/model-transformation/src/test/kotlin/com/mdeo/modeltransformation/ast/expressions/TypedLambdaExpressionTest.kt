@@ -46,7 +46,7 @@ class TypedLambdaExpressionTest {
         assertEquals(0, result.evalType)
         assertEquals(0, result.parameters.size)
         assertIs<TypedIntLiteralExpression>(result.body)
-        assertEquals("0", (result.body as TypedIntLiteralExpression).value)
+        assertEquals("0", result.body.value)
     }
     
     @Test
@@ -92,7 +92,7 @@ class TypedLambdaExpressionTest {
         val result = json.decodeFromString(TypedLambdaExpression.serializer(), jsonString)
         
         assertIs<TypedIntLiteralExpression>(result.body)
-        assertEquals("42", (result.body as TypedIntLiteralExpression).value)
+        assertEquals("42", result.body.value)
     }
     
     // ========== Parameter Tests ==========
@@ -249,7 +249,7 @@ class TypedLambdaExpressionTest {
         val result = json.decodeFromString(TypedLambdaExpression.serializer(), jsonString)
         
         assertIs<TypedBinaryExpression>(result.body)
-        val binaryExpr = result.body as TypedBinaryExpression
+        val binaryExpr = result.body
         assertEquals("+", binaryExpr.operator)
     }
     
@@ -264,7 +264,7 @@ class TypedLambdaExpressionTest {
         val result = json.decodeFromString(TypedLambdaExpression.serializer(), jsonString)
         
         assertIs<TypedBooleanLiteralExpression>(result.body)
-        assertEquals(true, (result.body as TypedBooleanLiteralExpression).value)
+        assertEquals(true, result.body.value)
     }
     
     // ========== Polymorphic Deserialization Tests ==========
@@ -281,7 +281,7 @@ class TypedLambdaExpressionTest {
         
         assertIs<TypedLambdaExpression>(result)
         assertEquals("lambda", result.kind)
-        assertEquals(1, (result as TypedLambdaExpression).parameters.size)
+        assertEquals(1, result.parameters.size)
     }
     
     @Test
@@ -300,7 +300,7 @@ class TypedLambdaExpressionTest {
         val result = json.decodeFromString(TypedLambdaExpression.serializer(), jsonString)
         
         assertIs<TypedLambdaExpression>(result.body)
-        val innerLambda = result.body as TypedLambdaExpression
+        val innerLambda = result.body
         assertEquals("y", innerLambda.parameters[0])
         assertEquals(1, innerLambda.evalType)
         assertIs<TypedIntLiteralExpression>(innerLambda.body)

@@ -1,4 +1,4 @@
-import type { ReturnType } from "@mdeo/language-expression";
+import type { ReturnType, TypedClass } from "@mdeo/language-expression";
 import { type TypedExpression } from "@mdeo/language-expression";
 
 /**
@@ -16,6 +16,12 @@ export interface TypedAst {
      * URI of the imported metamodel file.
      */
     metamodelUri: string;
+
+    /**
+     * Array of metamodel classes with their type information.
+     * Each class contains properties, relations, and inheritance info.
+     */
+    classes: TypedClass[];
 
     /**
      * All top-level transformation statements.
@@ -43,9 +49,15 @@ export interface TypedPatternVariable {
     name: string;
 
     /**
-     * Index into the types array for the variable type.
+     * Optional index into the types array for the variable type.
+     * If undefined, the type is inferred from the value expression.
      */
-    type: number;
+    type?: number;
+
+    /**
+     * The value expression assigned to the variable.
+     */
+    value: TypedExpression;
 }
 
 /**
@@ -110,12 +122,20 @@ export interface TypedPatternLinkEnd {
 
 /**
  * Pattern link definition.
+ *
+ * Represents a link (reference/association) between two object instances in a pattern.
+ * The edge label can be computed from source and target property names.
  */
 export interface TypedPatternLink {
     /**
      * Optional modifier (create, delete, or forbid).
      */
     modifier?: string;
+
+    /**
+     * True if this is an outgoing edge from source to target, false for incoming.
+     */
+    isOutgoing: boolean;
 
     /**
      * Source end of the link.

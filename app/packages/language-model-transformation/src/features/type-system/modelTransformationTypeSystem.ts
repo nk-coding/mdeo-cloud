@@ -1,35 +1,56 @@
 import {
-    AnyType,
-    booleanType,
-    doubleType,
+    generateClassTypes,
     ExpressionTypeSystem,
-    floatType,
-    intType,
     IterableType,
-    longType,
-    stringType,
+    extractMetamodelClasses,
+    DefaultCollectionTypeFactory,
     TypePartialTypeSystem,
-    type PrimitiveTypes,
+    type ClassType,
     type ExpressionTypirServices,
-    typeRef
+    type MetamodelClassInfo,
+    type PrimitiveTypes,
+    typeRef,
+    MetamodelPartialTypeSystem
 } from "@mdeo/language-expression";
+import type { AstReflection } from "@mdeo/language-common";
 import type { TypirLangiumSpecifics } from "typir-langium";
-import { expressionTypes, typeTypes } from "../../grammar/modelTransformationTypes.js";
-import { ModelTransformationPartialTypeSystem } from "./modelTransformationPartialTypeSystem.js";
+import type { LangiumDocument, LangiumDocuments, URI } from "langium";
+import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
 import {
-    ModelTransformationBagType,
-    ModelTransformationCollectionType,
-    ModelTransformationListType,
-    ModelTransformationOrderedCollectionType,
-    ModelTransformationOrderedSetType,
-    ModelTransformationReadonlyBagType,
-    ModelTransformationReadonlyCollectionType,
-    ModelTransformationReadonlyListType,
-    ModelTransformationReadonlyOrderedCollectionType,
-    ModelTransformationReadonlyOrderedSetType,
-    ModelTransformationReadonlySetType,
-    ModelTransformationSetType
-} from "../stdlib/collections.js";
+    Class,
+    getExportedEntitiesFromMetamodelFile,
+    MetaModel,
+    type ClassType as MetamodelClassType,
+    type MetaModelType
+} from "@mdeo/language-metamodel";
+import {
+    expressionTypes,
+    ModelTransformation,
+    typeTypes,
+    type ModelTransformationType
+} from "../../grammar/modelTransformationTypes.js";
+import { ModelTransformationPartialTypeSystem } from "./modelTransformationPartialTypeSystem.js";
+import { ModelTransformationBagType } from "../stdlib/collections/Bag.js";
+import { ModelTransformationCollectionType } from "../stdlib/collections/Collection.js";
+import { ModelTransformationListType } from "../stdlib/collections/List.js";
+import { ModelTransformationOrderedCollectionType } from "../stdlib/collections/OrderedCollection.js";
+import { ModelTransformationOrderedSetType } from "../stdlib/collections/OrderedSet.js";
+import { ModelTransformationReadonlyBagType } from "../stdlib/collections/ReadonlyBag.js";
+import { ModelTransformationReadonlyCollectionType } from "../stdlib/collections/ReadonlyCollection.js";
+import { ModelTransformationReadonlyListType } from "../stdlib/collections/ReadonlyList.js";
+import { ModelTransformationReadonlyOrderedCollectionType } from "../stdlib/collections/ReadonlyOrderedCollection.js";
+import { ModelTransformationReadonlyOrderedSetType } from "../stdlib/collections/ReadonlyOrderedSet.js";
+import { ModelTransformationReadonlySetType } from "../stdlib/collections/ReadonlySet.js";
+import { ModelTransformationSetType } from "../stdlib/collections/Set.js";
+import { ModelTransformationAnyType } from "../stdlib/primitives/Any.js";
+import { modelTransformationBooleanType } from "../stdlib/primitives/boolean.js";
+import { modelTransformationDoubleType } from "../stdlib/primitives/double.js";
+import { modelTransformationFloatType } from "../stdlib/primitives/float.js";
+import { modelTransformationIntType } from "../stdlib/primitives/int.js";
+import { modelTransformationLongType } from "../stdlib/primitives/long.js";
+import { modelTransformationStringType } from "../stdlib/primitives/string.js";
+
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Type system for the Model Transformation language.
@@ -42,13 +63,13 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
     constructor() {
         super(
             {
-                Any: AnyType,
-                int: intType,
-                long: longType,
-                float: floatType,
-                double: doubleType,
-                string: stringType,
-                boolean: booleanType,
+                Any: ModelTransformationAnyType,
+                int: modelTransformationIntType,
+                long: modelTransformationLongType,
+                float: modelTransformationFloatType,
+                double: modelTransformationDoubleType,
+                string: modelTransformationStringType,
+                boolean: modelTransformationBooleanType,
                 Iterable: IterableType,
                 additionalTypes: [
                     ModelTransformationCollectionType,
@@ -64,7 +85,7 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
                     ModelTransformationOrderedSetType,
                     ModelTransformationReadonlyOrderedSetType
                 ],
-                lambdaSuperTypes: [{ type: AnyType.name }],
+                lambdaSuperTypes: [{ type: ModelTransformationAnyType.name }],
                 createListType: (elementType) => typeRef("List").withTypeArgs({ T: elementType }).build()
             },
             expressionTypes,
@@ -93,9 +114,111 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
             typeTypes,
             this.nullablePrimitiveTypes.Any
         );
-        typePartialTypeSystem.registerRules();
+        const modelTransformationPartialTypeSystem = new ModelTransformationPartialTypeSystem(
+            typir,
+            this.primitiveTypes
+        );
+        const metamodelPartialTypeSystem = new MetamodelPartialTypeSystem(typir, undefined);
 
-        const modelTransformationPartialTypeSystem = new ModelTransformationPartialTypeSystem(typir);
+        metamodelPartialTypeSystem.registerRules();
+        typePartialTypeSystem.registerRules();
         modelTransformationPartialTypeSystem.registerRules();
+    }
+
+    /**
+     * Called when a new AST node is encountered during document processing.
+     * Registers metamodel class types in Typir when processing a ModelTransformation root.
+     *
+     * @param languageNode The AST node being processed
+     * @param typir The extended Typir services instance
+     */
+    protected override onNewAstNodeExtended(
+        languageNode: TypirLangiumSpecifics["LanguageType"],
+        typir: ExpressionTypirServices<TypirLangiumSpecifics>
+    ): void {
+        const reflection = typir.langium.LangiumServices.AstReflection;
+        if (!reflection.isInstance(languageNode, ModelTransformation)) {
+            return;
+        }
+
+        const transformation = languageNode as ModelTransformationType;
+        const document = AstUtils.getDocument(transformation);
+
+        const metamodelDoc = this.loadMetamodelSync(document, transformation, typir);
+        if (metamodelDoc == undefined) {
+            return;
+        }
+        const { classes } = getExportedEntitiesFromMetamodelFile(
+            metamodelDoc,
+            typir.langium.LangiumServices.workspace.LangiumDocuments
+        );
+        const classInfos = extractMetamodelClasses([...classes], reflection, DefaultCollectionTypeFactory);
+        const classTypes = generateClassTypes(classInfos);
+
+        this.registerClassTypes(classTypes, typir);
+    }
+
+    /**
+     * Loads the metamodel document synchronously.
+     * Assumes the metamodel has been pre-loaded during external reference resolution.
+     *
+     * @param document The transformation document
+     * @param transformation The transformation AST node
+     * @param typir The Typir services for accessing shared Langium services
+     * @returns The metamodel AST or undefined if not found
+     */
+    private loadMetamodelSync(
+        document: LangiumDocument,
+        transformation: ModelTransformationType,
+        typir: ExpressionTypirServices<TypirLangiumSpecifics>
+    ): LangiumDocument | undefined {
+        const importFile = transformation.import?.file;
+        if (importFile == undefined) {
+            return undefined;
+        }
+
+        const metamodelUri = this.resolveMetamodelUri(document, importFile);
+        const documents = this.getDocuments(typir);
+        const metamodelDoc = documents.getDocument(metamodelUri);
+
+        return metamodelDoc;
+    }
+
+    /**
+     * Resolves the relative import path to an absolute URI.
+     *
+     * @param document The source document
+     * @param importPath The relative import path
+     * @returns The resolved URI
+     */
+    private resolveMetamodelUri(document: LangiumDocument, importPath: string): URI {
+        return resolveRelativePath(document, importPath);
+    }
+
+    /**
+     * Gets the LangiumDocuments service from the Typir services.
+     *
+     * @param typir The Typir services
+     * @returns The LangiumDocuments service
+     */
+    private getDocuments(typir: ExpressionTypirServices<TypirLangiumSpecifics>): LangiumDocuments {
+        return (typir.langium.LangiumServices as { workspace: { LangiumDocuments: LangiumDocuments } }).workspace
+            .LangiumDocuments;
+    }
+
+    /**
+     * Registers the generated class types in the Typir TypeDefinitions service.
+     *
+     * @param classTypes The ClassType definitions to register
+     * @param typir The Typir services
+     */
+    private registerClassTypes(classTypes: ClassType[], typir: ExpressionTypirServices<TypirLangiumSpecifics>): void {
+        const typeDefinitions = typir.TypeDefinitions;
+        for (const classType of classTypes) {
+            const identifier = `${classType.package}.${classType.name}`;
+            if (typeDefinitions.getClassTypeIfExisting(identifier) == undefined) {
+                typeDefinitions.addClassType(classType);
+            }
+        }
     }
 }

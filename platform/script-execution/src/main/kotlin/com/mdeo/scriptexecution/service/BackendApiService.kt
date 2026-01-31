@@ -110,6 +110,14 @@ class BackendApiService(private val baseUrl: String) {
             false
         }
     }
+
+    /**
+     * Closes the HTTP client and releases resources.
+     */
+    fun close() {
+        client.close()
+        logger.info("Backend API client closed")
+    }
 }
 
 /**

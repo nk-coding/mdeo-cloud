@@ -1,7 +1,6 @@
 import { BaseApplyLabelEditOperationHandler, parseIdentifier, sharedImport } from "@mdeo/language-shared";
 import {
     Class,
-    ClassOrEnumImport,
     Property,
     Enum,
     EnumEntry,
@@ -31,13 +30,18 @@ const { GrammarUtils } = sharedImport("langium");
  */
 @injectable()
 export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditOperationHandler {
+    /**
+     * Creates a workspace edit for a label edit operation.
+     *
+     * @param node The AST node being edited
+     * @param operation The label edit operation
+     * @returns The workspace edit or undefined
+     */
     override async createLabelEdit(
         node: AstNode,
         operation: ApplyLabelEditOperation
     ): Promise<WorkspaceEdit | undefined> {
         if (this.reflection.isInstance(node, Class)) {
-            return this.createNameEdit(node, operation.text);
-        } else if (this.reflection.isInstance(node, ClassOrEnumImport)) {
             return this.createNameEdit(node, operation.text);
         } else if (this.reflection.isInstance(node, Enum)) {
             return this.createNameEdit(node, operation.text);

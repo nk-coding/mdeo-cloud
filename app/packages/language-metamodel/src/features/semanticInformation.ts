@@ -1,32 +1,28 @@
 import type { AstReflection } from "@mdeo/language-common";
 import {
     Class,
-    ClassOrEnumImport,
-    Enum,
-    type ClassOrEnumImportType,
-    type ClassOrImportType,
+    RangeMultiplicity,
+    SingleMultiplicity,
     type ClassType,
-    type EnumType
+    type MultiplicityType
 } from "../grammar/metamodelTypes.js";
-import type { AstNode } from "langium";
 
 /**
- * Resolves the full class chain including all extended classes for a given class or class import.
+ * Resolves the full class chain including all extended classes for a given class.
  * Guarantees topological order (derived classes come after base classes).
  *
- * @param classOrImport the starting class or class import
- * @param reflection the AST reflection to check node types
- * @returns an array of classes in topological order
+ * @param startClass The starting class
+ * @param reflection The AST reflection to check node types
+ * @returns An array of classes in topological order
  */
-export function resolveClassChain(classOrImport: ClassOrImportType, reflection: AstReflection): ClassType[] {
+export function resolveClassChain(startClass: ClassType, reflection: AstReflection): ClassType[] {
     const result: ClassType[] = [];
     const resultSet = new Set<ClassType>();
-    const queue: ClassOrImportType[] = [classOrImport];
+    const queue: ClassType[] = [startClass];
 
     while (queue.length > 0) {
-        const current = queue.shift()!;
-        const currentClass = resolveToClass(current, reflection);
-        if (currentClass == undefined) {
+        const currentClass = queue.shift()!;
+        if (!reflection.isInstance(currentClass, Class)) {
             continue;
         }
         if (resultSet.has(currentClass)) {
@@ -45,71 +41,65 @@ export function resolveClassChain(classOrImport: ClassOrImportType, reflection: 
 }
 
 /**
- * Resolves a ClassOrImport to its actual Class.
+ * Checks if a multiplicity represents multiple values (> 1).
  *
- * @param classOrImport the class or import to resolve
- * @param reflection the AST reflection to check node types
- * @returns the resolved Class, or undefined if it cannot be resolved
+ * @param multiplicity The multiplicity to check
+ * @param reflection The AST reflection utility
+ * @returns True if the multiplicity allows multiple values
  */
-export function resolveToClass(classOrImport: AstNode | undefined, reflection: AstReflection): ClassType | undefined {
-    if (classOrImport == undefined) {
-        return undefined;
+export function isMultipleMultiplicity(multiplicity: MultiplicityType | undefined, reflection: AstReflection): boolean {
+    if (multiplicity == undefined) {
+        return false;
     }
-    if (reflection.isInstance(classOrImport, Class)) {
-        return classOrImport;
+
+    if (reflection.isInstance(multiplicity, SingleMultiplicity)) {
+        const value = multiplicity.value;
+        const numericValue = multiplicity.numericValue;
+
+        if (value === "*" || value === "+") {
+            return true;
+        }
+
+        if (numericValue !== undefined && numericValue > 1) {
+            return true;
+        }
+
+        return false;
     }
-    const resolved = resolveImport(classOrImport as ClassOrEnumImportType, reflection);
-    if (resolved != undefined && reflection.isInstance(resolved, Class)) {
-        return resolved;
+
+    if (reflection.isInstance(multiplicity, RangeMultiplicity)) {
+        const upper = multiplicity.upper;
+        const upperNumeric = multiplicity.upperNumeric;
+
+        if (upper === "*" || (upperNumeric !== undefined && upperNumeric > 1)) {
+            return true;
+        }
+
+        return false;
     }
-    return undefined;
+
+    return false;
 }
 
 /**
- * Resolves an EnumOrImport to its actual Enum.
+ * Checks if a multiplicity is optional (0..1).
  *
- * @param enumOrImport the enum or import to resolve
- * @param reflection the AST reflection to check node types
- * @returns the resolved Enum, or undefined if it cannot be resolved
+ * @param multiplicity The multiplicity to check
+ * @param reflection The AST reflection utility
+ * @returns True if the multiplicity is optional
  */
-export function resolveToEnum(enumOrImport: AstNode | undefined, reflection: AstReflection): EnumType | undefined {
-    if (enumOrImport == undefined) {
-        return undefined;
+export function isOptionalMultiplicity(multiplicity: MultiplicityType | undefined, reflection: AstReflection): boolean {
+    if (multiplicity == undefined) {
+        return false;
     }
-    if (reflection.isInstance(enumOrImport, Enum)) {
-        return enumOrImport;
-    }
-    const resolved = resolveImport(enumOrImport as ClassOrEnumImportType, reflection);
-    if (resolved != undefined && reflection.isInstance(resolved, Enum)) {
-        return resolved;
-    }
-    return undefined;
-}
 
-/**
- * Resolves a chain of ClassOrEnumImports to the actual Class or Enum.
- *
- * @param node the starting ClassOrEnumImport node
- * @param reflection the AST reflection to check node types
- * @returns the resolved Class or Enum, or undefined if it cannot be resolved
- */
-export function resolveImport(
-    node: ClassOrEnumImportType | undefined,
-    reflection: AstReflection
-): ClassType | EnumType | undefined {
-    let current = node;
-    while (current != undefined) {
-        const entityRef = current.entity?.ref;
-        if (entityRef == undefined) {
-            return undefined;
-        }
-        if (reflection.isInstance(entityRef, ClassOrEnumImport)) {
-            current = entityRef;
-        } else if (reflection.isInstance(entityRef, Class) || reflection.isInstance(entityRef, Enum)) {
-            return entityRef;
-        } else {
-            return undefined;
-        }
+    if (reflection.isInstance(multiplicity, SingleMultiplicity)) {
+        return multiplicity.value === "?";
     }
-    return undefined;
+
+    if (reflection.isInstance(multiplicity, RangeMultiplicity)) {
+        return multiplicity.lower === 0 && multiplicity.upperNumeric === 1;
+    }
+
+    return false;
 }

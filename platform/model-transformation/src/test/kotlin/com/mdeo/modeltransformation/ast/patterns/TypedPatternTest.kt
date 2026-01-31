@@ -43,7 +43,7 @@ class TypedPatternTest {
     fun `deserialize TypedPattern with single variable element`() {
         val jsonString = """{
             "elements": [
-                {"kind": "variable", "variable": {"name": "x", "type": 0}}
+                {"kind": "variable", "variable": {"name": "x", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "42"}}}
             ]
         }"""
         val result = json.decodeFromString(TypedPattern.serializer(), jsonString)
@@ -79,8 +79,14 @@ class TypedPatternTest {
                 {
                     "kind": "link",
                     "link": {
-                        "source": {"objectName": "a"},
-                        "target": {"objectName": "b"}
+            "name": "b",
+            "isOutgoing": true,
+                        "source": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "a"},
+                        "target": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "b"}
                     }
                 }
             ]
@@ -115,9 +121,9 @@ class TypedPatternTest {
     fun `deserialize TypedPattern with multiple variables`() {
         val jsonString = """{
             "elements": [
-                {"kind": "variable", "variable": {"name": "x", "type": 0}},
-                {"kind": "variable", "variable": {"name": "y", "type": 1}},
-                {"kind": "variable", "variable": {"name": "z", "type": 2}}
+                {"kind": "variable", "variable": {"name": "x", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "1"}}},
+                {"kind": "variable", "variable": {"name": "y", "type": 1, "value": {"kind": "intLiteral", "evalType": 0, "value": "2"}}},
+                {"kind": "variable", "variable": {"name": "z", "type": 2, "value": {"kind": "intLiteral", "evalType": 0, "value": "3"}}}
             ]
         }"""
         val result = json.decodeFromString(TypedPattern.serializer(), jsonString)
@@ -156,15 +162,33 @@ class TypedPatternTest {
             "elements": [
                 {
                     "kind": "link",
-                    "link": {"source": {"objectName": "a"}, "target": {"objectName": "b"}}
+                    "link": {
+            "name": "b",
+            "isOutgoing": true,"source": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "a"}, "target": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "b"}}
                 },
                 {
                     "kind": "link",
-                    "link": {"source": {"objectName": "b"}, "target": {"objectName": "c"}}
+                    "link": {
+            "name": "c",
+            "isOutgoing": true,"source": {
+            "name": "c",
+            "isOutgoing": true,"objectName": "b"}, "target": {
+            "name": "c",
+            "isOutgoing": true,"objectName": "c"}}
                 },
                 {
                     "kind": "link",
-                    "link": {"source": {"objectName": "c"}, "target": {"objectName": "a"}}
+                    "link": {
+            "name": "a",
+            "isOutgoing": true,"source": {
+            "name": "a",
+            "isOutgoing": true,"objectName": "c"}, "target": {
+            "name": "a",
+            "isOutgoing": true,"objectName": "a"}}
                 }
             ]
         }"""
@@ -200,14 +224,20 @@ class TypedPatternTest {
     fun `deserialize TypedPattern with mixed element types`() {
         val jsonString = """{
             "elements": [
-                {"kind": "variable", "variable": {"name": "x", "type": 0}},
+                {"kind": "variable", "variable": {"name": "x", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "42"}}},
                 {
                     "kind": "objectInstance",
                     "objectInstance": {"name": "obj", "className": "MyClass", "properties": []}
                 },
                 {
                     "kind": "link",
-                    "link": {"source": {"objectName": "obj"}, "target": {"objectName": "other"}}
+                    "link": {
+            "name": "other",
+            "isOutgoing": true,"source": {
+            "name": "other",
+            "isOutgoing": true,"objectName": "obj"}, "target": {
+            "name": "other",
+            "isOutgoing": true,"objectName": "other"}}
                 },
                 {
                     "kind": "whereClause",
@@ -239,8 +269,14 @@ class TypedPatternTest {
                 {
                     "kind": "link",
                     "link": {
-                        "source": {"objectName": "parent", "propertyName": "children"},
-                        "target": {"objectName": "child"}
+            "name": "child",
+            "isOutgoing": true,
+                        "source": {
+            "name": "child",
+            "isOutgoing": true,"objectName": "parent", "propertyName": "children"},
+                        "target": {
+            "name": "child",
+            "isOutgoing": true,"objectName": "child"}
                     }
                 }
             ]
@@ -271,6 +307,8 @@ class TypedPatternTest {
                     "kind": "link",
                     "link": {
                         "modifier": "delete",
+            "name": "old",
+            "isOutgoing": true,
                         "source": {"objectName": "parent"},
                         "target": {"objectName": "old"}
                     }
@@ -279,6 +317,8 @@ class TypedPatternTest {
                     "kind": "link",
                     "link": {
                         "modifier": "create",
+            "name": "new",
+            "isOutgoing": true,
                         "source": {"objectName": "parent"},
                         "target": {"objectName": "new"}
                     }
@@ -330,6 +370,8 @@ class TypedPatternTest {
                     "kind": "link",
                     "link": {
                         "modifier": "forbid",
+            "name": "forbidden",
+            "isOutgoing": true,
                         "source": {"objectName": "a"},
                         "target": {"objectName": "forbidden"}
                     }
@@ -348,7 +390,7 @@ class TypedPatternTest {
     @Test
     fun `deserialize TypedPattern with many elements`() {
         val elements = (1..10).map { i ->
-            """{"kind": "variable", "variable": {"name": "var$i", "type": $i}}"""
+            """{"kind": "variable", "variable": {"name": "var$i", "type": $i, "value": {"kind": "intLiteral", "evalType": 0, "value": "$i"}}}"""
         }.joinToString(",")
         
         val jsonString = """{"elements": [$elements]}"""
@@ -370,12 +412,48 @@ class TypedPatternTest {
                 {"kind": "objectInstance", "objectInstance": {"name": "n2", "className": "Node", "properties": []}},
                 {"kind": "objectInstance", "objectInstance": {"name": "n3", "className": "Node", "properties": []}},
                 {"kind": "objectInstance", "objectInstance": {"name": "n4", "className": "Node", "properties": []}},
-                {"kind": "link", "link": {"source": {"objectName": "n1"}, "target": {"objectName": "n2"}}},
-                {"kind": "link", "link": {"source": {"objectName": "n2"}, "target": {"objectName": "n3"}}},
-                {"kind": "link", "link": {"source": {"objectName": "n3"}, "target": {"objectName": "n4"}}},
-                {"kind": "link", "link": {"source": {"objectName": "n4"}, "target": {"objectName": "n1"}}},
-                {"kind": "link", "link": {"source": {"objectName": "n1"}, "target": {"objectName": "n3"}}},
-                {"kind": "link", "link": {"source": {"objectName": "n2"}, "target": {"objectName": "n4"}}},
+                {"kind": "link", "link": {
+            "name": "n2",
+            "isOutgoing": true,"source": {
+            "name": "n2",
+            "isOutgoing": true,"objectName": "n1"}, "target": {
+            "name": "n2",
+            "isOutgoing": true,"objectName": "n2"}}},
+                {"kind": "link", "link": {
+            "name": "n3",
+            "isOutgoing": true,"source": {
+            "name": "n3",
+            "isOutgoing": true,"objectName": "n2"}, "target": {
+            "name": "n3",
+            "isOutgoing": true,"objectName": "n3"}}},
+                {"kind": "link", "link": {
+            "name": "n4",
+            "isOutgoing": true,"source": {
+            "name": "n4",
+            "isOutgoing": true,"objectName": "n3"}, "target": {
+            "name": "n4",
+            "isOutgoing": true,"objectName": "n4"}}},
+                {"kind": "link", "link": {
+            "name": "n1",
+            "isOutgoing": true,"source": {
+            "name": "n1",
+            "isOutgoing": true,"objectName": "n4"}, "target": {
+            "name": "n1",
+            "isOutgoing": true,"objectName": "n1"}}},
+                {"kind": "link", "link": {
+            "name": "n3",
+            "isOutgoing": true,"source": {
+            "name": "n3",
+            "isOutgoing": true,"objectName": "n1"}, "target": {
+            "name": "n3",
+            "isOutgoing": true,"objectName": "n3"}}},
+                {"kind": "link", "link": {
+            "name": "n4",
+            "isOutgoing": true,"source": {
+            "name": "n4",
+            "isOutgoing": true,"objectName": "n2"}, "target": {
+            "name": "n4",
+            "isOutgoing": true,"objectName": "n4"}}},
                 {"kind": "whereClause", "whereClause": {"expression": {"kind": "booleanLiteral", "evalType": 0, "value": true}}}
             ]
         }"""
@@ -398,7 +476,7 @@ class TypedPatternTest {
     fun `deserialize TypedPattern with variable having zero type index`() {
         val jsonString = """{
             "elements": [
-                {"kind": "variable", "variable": {"name": "zero", "type": 0}}
+                {"kind": "variable", "variable": {"name": "zero", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "0"}}}
             ]
         }"""
         val result = json.decodeFromString(TypedPattern.serializer(), jsonString)
@@ -428,9 +506,15 @@ class TypedPatternTest {
     fun `deserialize TypedPattern preserves element order`() {
         val jsonString = """{
             "elements": [
-                {"kind": "variable", "variable": {"name": "first", "type": 0}},
+                {"kind": "variable", "variable": {"name": "first", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "1"}}},
                 {"kind": "objectInstance", "objectInstance": {"name": "second", "className": "C", "properties": []}},
-                {"kind": "link", "link": {"source": {"objectName": "a"}, "target": {"objectName": "b"}}},
+                {"kind": "link", "link": {
+            "name": "b",
+            "isOutgoing": true,"source": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "a"}, "target": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "b"}}},
                 {"kind": "whereClause", "whereClause": {"expression": {"kind": "booleanLiteral", "evalType": 0, "value": true}}}
             ]
         }"""

@@ -33,24 +33,26 @@ class PatternElementsTest {
     
     @Test
     fun `deserialize TypedPatternVariable`() {
-        val jsonString = """{"name": "x", "type": 0}"""
+        val jsonString = """{"name": "x", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "42"}}"""
         val result = json.decodeFromString(TypedPatternVariable.serializer(), jsonString)
         
         assertEquals("x", result.name)
         assertEquals(0, result.type)
+        assertIs<TypedIntLiteralExpression>(result.value)
     }
     
     @Test
     fun `deserialize TypedPatternVariable with empty name`() {
-        val jsonString = """{"name": "", "type": 0}"""
+        val jsonString = """{"name": "", "value": {"kind": "intLiteral", "evalType": 0, "value": "0"}}"""
         val result = json.decodeFromString(TypedPatternVariable.serializer(), jsonString)
         
         assertEquals("", result.name)
+        assertNull(result.type)
     }
     
     @Test
     fun `deserialize TypedPatternVariable with large type index`() {
-        val jsonString = """{"name": "var", "type": 99999}"""
+        val jsonString = """{"name": "var", "type": 99999, "value": {"kind": "intLiteral", "evalType": 0, "value": "1"}}"""
         val result = json.decodeFromString(TypedPatternVariable.serializer(), jsonString)
         
         assertEquals(99999, result.type)
@@ -58,7 +60,7 @@ class PatternElementsTest {
     
     @Test
     fun `deserialize TypedPatternVariable with special characters in name`() {
-        val jsonString = """{"name": "my_variable_123", "type": 5}"""
+        val jsonString = """{"name": "my_variable_123", "type": 5, "value": {"kind": "intLiteral", "evalType": 0, "value": "2"}}"""
         val result = json.decodeFromString(TypedPatternVariable.serializer(), jsonString)
         
         assertEquals("my_variable_123", result.name)
@@ -66,10 +68,20 @@ class PatternElementsTest {
     
     @Test
     fun `deserialize TypedPatternVariable with unicode name`() {
-        val jsonString = """{"name": "变量名", "type": 1}"""
+        val jsonString = """{"name": "变量名", "type": 1, "value": {"kind": "intLiteral", "evalType": 0, "value": "3"}}"""
         val result = json.decodeFromString(TypedPatternVariable.serializer(), jsonString)
         
         assertEquals("变量名", result.name)
+    }
+    
+    @Test
+    fun `deserialize TypedPatternVariable without type annotation`() {
+        val jsonString = """{"name": "inferred", "value": {"kind": "booleanLiteral", "evalType": 0, "value": true}}"""
+        val result = json.decodeFromString(TypedPatternVariable.serializer(), jsonString)
+        
+        assertEquals("inferred", result.name)
+        assertNull(result.type)
+        assertIs<TypedBooleanLiteralExpression>(result.value)
     }
     
     // ========== TypedPatternPropertyAssignment Tests ==========
@@ -112,7 +124,7 @@ class PatternElementsTest {
         
         assertEquals("isActive", result.propertyName)
         assertIs<TypedBooleanLiteralExpression>(result.value)
-        assertEquals(true, (result.value as TypedBooleanLiteralExpression).value)
+        assertEquals(true, result.value.value)
     }
     
     @Test
@@ -324,6 +336,7 @@ class PatternElementsTest {
     @Test
     fun `deserialize TypedPatternLink without modifier`() {
         val jsonString = """{
+            "isOutgoing": true,
             "source": {"objectName": "person1"},
             "target": {"objectName": "person2"}
         }"""
@@ -338,6 +351,7 @@ class PatternElementsTest {
     fun `deserialize TypedPatternLink with null modifier`() {
         val jsonString = """{
             "modifier": null,
+            "isOutgoing": true,
             "source": {"objectName": "a"},
             "target": {"objectName": "b"}
         }"""
@@ -350,6 +364,7 @@ class PatternElementsTest {
     fun `deserialize TypedPatternLink with create modifier`() {
         val jsonString = """{
             "modifier": "create",
+            "isOutgoing": true,
             "source": {"objectName": "person1"},
             "target": {"objectName": "person2"}
         }"""
@@ -362,6 +377,7 @@ class PatternElementsTest {
     fun `deserialize TypedPatternLink with delete modifier`() {
         val jsonString = """{
             "modifier": "delete",
+            "isOutgoing": true,
             "source": {"objectName": "person1"},
             "target": {"objectName": "person2"}
         }"""
@@ -374,6 +390,7 @@ class PatternElementsTest {
     fun `deserialize TypedPatternLink with forbid modifier`() {
         val jsonString = """{
             "modifier": "forbid",
+            "isOutgoing": true,
             "source": {"objectName": "person1"},
             "target": {"objectName": "person2"}
         }"""
@@ -385,6 +402,7 @@ class PatternElementsTest {
     @Test
     fun `deserialize TypedPatternLink with property names`() {
         val jsonString = """{
+            "isOutgoing": true,
             "source": {"objectName": "person", "propertyName": "spouse"},
             "target": {"objectName": "partner", "propertyName": "spouse"}
         }"""
@@ -397,6 +415,7 @@ class PatternElementsTest {
     @Test
     fun `deserialize TypedPatternLink with source property only`() {
         val jsonString = """{
+            "isOutgoing": true,
             "source": {"objectName": "parent", "propertyName": "children"},
             "target": {"objectName": "child"}
         }"""
@@ -409,6 +428,7 @@ class PatternElementsTest {
     @Test
     fun `deserialize TypedPatternLink with target property only`() {
         val jsonString = """{
+            "isOutgoing": true,
             "source": {"objectName": "child"},
             "target": {"objectName": "parent", "propertyName": "children"}
         }"""
@@ -428,7 +448,7 @@ class PatternElementsTest {
         val result = json.decodeFromString(TypedWhereClause.serializer(), jsonString)
         
         assertIs<TypedBooleanLiteralExpression>(result.expression)
-        assertEquals(true, (result.expression as TypedBooleanLiteralExpression).value)
+        assertEquals(true, result.expression.value)
     }
     
     @Test
@@ -439,7 +459,7 @@ class PatternElementsTest {
         val result = json.decodeFromString(TypedWhereClause.serializer(), jsonString)
         
         assertIs<TypedBooleanLiteralExpression>(result.expression)
-        assertEquals(false, (result.expression as TypedBooleanLiteralExpression).value)
+        assertEquals(false, result.expression.value)
     }
     
     @Test
@@ -450,7 +470,7 @@ class PatternElementsTest {
         val result = json.decodeFromString(TypedWhereClause.serializer(), jsonString)
         
         assertIs<TypedIntLiteralExpression>(result.expression)
-        assertEquals("100", (result.expression as TypedIntLiteralExpression).value)
+        assertEquals("100", result.expression.value)
     }
     
     // ========== Pattern Element Polymorphic Tests ==========
@@ -459,7 +479,7 @@ class PatternElementsTest {
     fun `deserialize TypedPatternVariableElement`() {
         val jsonString = """{
             "kind": "variable",
-            "variable": {"name": "x", "type": 0}
+            "variable": {"name": "x", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "42"}}
         }"""
         val result = json.decodeFromString(TypedPatternElementSerializer, jsonString)
         
@@ -467,6 +487,7 @@ class PatternElementsTest {
         assertEquals("variable", result.kind)
         assertEquals("x", result.variable.name)
         assertEquals(0, result.variable.type)
+        assertIs<TypedIntLiteralExpression>(result.variable.value)
     }
     
     @Test
@@ -511,6 +532,7 @@ class PatternElementsTest {
         val jsonString = """{
             "kind": "link",
             "link": {
+                "isOutgoing": true,
                 "source": {"objectName": "a"},
                 "target": {"objectName": "b"}
             }
@@ -529,6 +551,7 @@ class PatternElementsTest {
             "kind": "link",
             "link": {
                 "modifier": "delete",
+                "isOutgoing": true,
                 "source": {"objectName": "parent", "propertyName": "children"},
                 "target": {"objectName": "child", "propertyName": "parent"}
             }

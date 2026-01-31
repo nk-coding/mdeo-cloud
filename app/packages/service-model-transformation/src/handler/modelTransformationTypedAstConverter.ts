@@ -1,5 +1,14 @@
 import type { AstReflection } from "@mdeo/language-common";
-import { ExpressionTypedAstConverter, type TypedExpression } from "@mdeo/language-expression";
+import {
+    TypedAstConverter,
+    type TypedClass,
+    type TypedExpression,
+    extractMetamodelClasses,
+    TypedClassConverter,
+    DefaultCollectionTypeFactory,
+    type MetamodelClassInfo
+} from "@mdeo/language-expression";
+import { AssociationResolver } from "@mdeo/language-model";
 import {
     expressionTypes,
     type ModelTransformationTypirServices,
@@ -43,19 +52,31 @@ import {
     type LambdaExpressionType,
     type TypedLambdaExpression
 } from "@mdeo/language-model-transformation";
-
-import type { AstNode } from "langium";
+import {
+    Class,
+    MetaModel,
+    type MetaModelType,
+    type ClassType as MetamodelClassType,
+    type PropertyType
+} from "@mdeo/language-metamodel";
+import { resolveRelativePath } from "@mdeo/language-shared";
+import type { AstNode, LangiumDocument } from "langium";
 
 /**
  * Model Transformation-specific extension of ExpressionTypedAstConverter.
  * Handles transformation-specific features like patterns, match statements, and lambda expressions.
  * Does not use the base statement types as transformation statements are conceptually different.
  */
-export class ModelTransformationTypedAstConverter extends ExpressionTypedAstConverter {
+export class ModelTransformationTypedAstConverter extends TypedAstConverter {
     /**
      * Expression type identifiers for checking instance types.
      */
     protected expressionTypes = expressionTypes;
+
+    /**
+     * Resolver for associations between classes.
+     */
+    private readonly associationResolver: AssociationResolver;
 
     /**
      * Creates a new ModelTransformationTypedAstConverter.
@@ -68,15 +89,23 @@ export class ModelTransformationTypedAstConverter extends ExpressionTypedAstConv
         reflection: AstReflection
     ) {
         super(typir, reflection);
+        this.associationResolver = new AssociationResolver(reflection);
     }
 
     /**
      * Converts a ModelTransformation AST node to a TypedAst.
+     * This method is now async to support metamodel resolution.
      *
+     * @param document The transformation document
      * @param transformation The ModelTransformation AST node
      * @returns The TypedAst representation
      */
-    convertModelTransformation(transformation: ModelTransformationType): TypedAst {
+    async convertModelTransformation(
+        document: LangiumDocument,
+        transformation: ModelTransformationType
+    ): Promise<TypedAst> {
+        const classes = await this.extractTypedClassesFromMetamodel(document, transformation);
+
         const statements: TypedTransformationStatement[] = transformation.statements.map((stmt) =>
             this.convertTransformationStatement(stmt)
         );
@@ -84,8 +113,95 @@ export class ModelTransformationTypedAstConverter extends ExpressionTypedAstConv
         return {
             types: this.types,
             metamodelUri: transformation.import.file,
+            classes,
             statements
         };
+    }
+
+    /**
+     * Extracts TypedClasses from the metamodel referenced by a transformation.
+     * Resolves the metamodel file, extracts class information, and converts to TypedClasses.
+     *
+     * @param document The transformation document
+     * @param transformation The transformation AST node
+     * @returns Array of TypedClasses extracted from the metamodel
+     */
+    private async extractTypedClassesFromMetamodel(
+        document: LangiumDocument,
+        transformation: ModelTransformationType
+    ): Promise<TypedClass[]> {
+        const metamodel = await this.loadMetamodel(document, transformation);
+        if (metamodel == undefined) {
+            return [];
+        }
+
+        const classes = this.extractClasses(metamodel);
+        if (classes.length === 0) {
+            return [];
+        }
+
+        const classInfos = extractMetamodelClasses(classes, this.reflection, DefaultCollectionTypeFactory);
+
+        return this.convertToTypedClasses(classInfos);
+    }
+
+    /**
+     * Loads the metamodel document referenced by a transformation.
+     *
+     * @param document The transformation document
+     * @param transformation The transformation AST node
+     * @returns The metamodel AST or undefined if not found
+     */
+    private async loadMetamodel(
+        document: LangiumDocument,
+        transformation: ModelTransformationType
+    ): Promise<MetaModelType | undefined> {
+        const importFile = transformation.import?.file;
+        if (importFile == undefined) {
+            return undefined;
+        }
+
+        const metamodelUri = resolveRelativePath(document, importFile);
+        const documents = (this.typir.langium.LangiumServices as any).workspace.LangiumDocuments;
+        const metamodelDoc = await documents.getOrCreateDocument(metamodelUri);
+
+        const metamodelRoot = metamodelDoc.parseResult?.value;
+        if (metamodelRoot == undefined || !this.reflection.isInstance(metamodelRoot, MetaModel)) {
+            return undefined;
+        }
+
+        return metamodelRoot;
+    }
+
+    /**
+     * Extracts local classes from a metamodel.
+     * With the simplified import system, only Class nodes in the metamodel elements are collected.
+     *
+     * @param metamodel The metamodel AST
+     * @returns Array of classes
+     */
+    private extractClasses(metamodel: MetaModelType): MetamodelClassType[] {
+        const result: MetamodelClassType[] = [];
+
+        for (const element of metamodel.elements ?? []) {
+            if (this.reflection.isInstance(element, Class)) {
+                result.push(element);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Converts extracted class information to TypedClasses.
+     *
+     * @param classInfos The extracted class information
+     * @returns Array of TypedClasses
+     */
+    private convertToTypedClasses(classInfos: MetamodelClassInfo[]): TypedClass[] {
+        const typeDefinitions = this.typir.TypeDefinitions;
+        const typedClassConverter = new TypedClassConverter(typeDefinitions, this);
+        return typedClassConverter.convertToTypedClasses(classInfos);
     }
 
     /**
@@ -145,8 +261,8 @@ export class ModelTransformationTypedAstConverter extends ExpressionTypedAstConv
     private convertIfMatchStatement(stmt: IfMatchStatementType): TypedIfMatchStatement {
         return {
             kind: "ifMatch",
-            pattern: this.convertPattern(stmt.pattern),
-            thenBlock: stmt.thenBlock.statements.map((s) => this.convertTransformationStatement(s)),
+            pattern: this.convertPattern(stmt.ifBlock.pattern),
+            thenBlock: stmt.ifBlock.thenBlock.statements.map((s) => this.convertTransformationStatement(s)),
             elseBlock: stmt.elseBlock
                 ? stmt.elseBlock.statements.map((s) => this.convertTransformationStatement(s))
                 : undefined
@@ -303,7 +419,8 @@ export class ModelTransformationTypedAstConverter extends ExpressionTypedAstConv
     private convertPatternVariable(variable: PatternVariableType): TypedPatternVariable {
         return {
             name: variable.name,
-            type: this.getTypeIndex(variable.type)
+            type: variable.type ? this.getTypeIndex(variable.type) : undefined,
+            value: this.convertExpression(variable.value)
         };
     }
 
@@ -328,21 +445,103 @@ export class ModelTransformationTypedAstConverter extends ExpressionTypedAstConv
 
     /**
      * Converts a pattern link.
+     * Uses AssociationResolver to resolve both property names and determine link direction.
      *
      * @param link The PatternLink AST node
      * @returns The TypedPatternLink representation
      */
     private convertPatternLink(link: PatternLinkType): TypedPatternLink {
+        const { sourcePropertyName, targetPropertyName, isOutgoing } = this.resolvePatternLinkProperties(link);
+
         return {
             modifier: link.modifier?.modifier,
+            isOutgoing,
             source: {
                 objectName: link.source.object?.$refText ?? "",
-                propertyName: link.source.property?.$refText
+                propertyName: sourcePropertyName
             },
             target: {
                 objectName: link.target.object?.$refText ?? "",
-                propertyName: link.target.property?.$refText
+                propertyName: targetPropertyName
             }
+        };
+    }
+
+    /**
+     * Resolves both property names and direction for a pattern link.
+     * Uses AssociationResolver to find the association and determine property names.
+     *
+     * @param link The PatternLink AST node
+     * @returns Object containing source/target property names and isOutgoing flag
+     */
+    private resolvePatternLinkProperties(link: PatternLinkType): {
+        sourcePropertyName?: string;
+        targetPropertyName?: string;
+        isOutgoing: boolean;
+    } {
+        const sourceClass = this.getPatternLinkEndClass(link.source);
+        const targetClass = this.getPatternLinkEndClass(link.target);
+
+        if (!sourceClass || !targetClass) {
+            return this.buildFallbackLinkProperties(link);
+        }
+
+        const sourceProperty = link.source.property?.ref as PropertyType | undefined;
+        const targetProperty = link.target.property?.ref as PropertyType | undefined;
+
+        const resolved = this.associationResolver.resolveAssociation(
+            sourceClass,
+            targetClass,
+            sourceProperty,
+            targetProperty
+        );
+
+        if (!resolved) {
+            return this.buildFallbackLinkProperties(link);
+        }
+
+        return {
+            sourcePropertyName: resolved.sourcePropertyName,
+            targetPropertyName: resolved.targetPropertyName,
+            isOutgoing: resolved.matchesDirection
+        };
+    }
+
+    /**
+     * Gets the class type for a pattern link end by resolving the object instance reference.
+     *
+     * @param linkEnd The pattern link end
+     * @returns The class type or undefined if not resolvable
+     */
+    private getPatternLinkEndClass(linkEnd: { object?: { ref?: unknown } }): MetamodelClassType | undefined {
+        const objectInstance = linkEnd.object?.ref;
+        if (!objectInstance || typeof objectInstance !== "object") {
+            return undefined;
+        }
+
+        const classRef = (objectInstance as { class?: { ref?: unknown } }).class?.ref;
+        if (classRef && this.reflection.isInstance(classRef, Class)) {
+            return classRef;
+        }
+        return undefined;
+    }
+
+    /**
+     * Builds fallback link properties when association cannot be resolved.
+     * Uses the property names as specified in the source code.
+     *
+     * @param link The PatternLink AST node
+     * @returns Fallback properties with isOutgoing defaulting to true
+     */
+    private buildFallbackLinkProperties(link: PatternLinkType): {
+        sourcePropertyName?: string;
+        targetPropertyName?: string;
+        isOutgoing: boolean;
+    } {
+        return {
+            sourcePropertyName: link.source.property?.$refText,
+            targetPropertyName: link.target.property?.$refText,
+            isOutgoing: true
         };
     }
 

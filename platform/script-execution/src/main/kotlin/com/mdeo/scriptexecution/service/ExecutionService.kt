@@ -1,5 +1,6 @@
 package com.mdeo.scriptexecution.service
 
+import com.mdeo.execution.common.service.ExecutionService as CommonExecutionService
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.compiler.CompilationInput
 import com.mdeo.script.compiler.ScriptCompiler
@@ -34,7 +35,7 @@ import kotlin.uuid.toKotlinUuid
 class ExecutionService(
     private val backendApiService: BackendApiService,
     private val timeoutMs: Long
-) {
+) : CommonExecutionService {
     private val logger = LoggerFactory.getLogger(ExecutionService::class.java)
     private val compiler = ScriptCompiler()
     private val dependencyResolver = TypedAstDependencyResolver(backendApiService)
@@ -54,7 +55,7 @@ class ExecutionService(
      * @param jwtToken JWT token to pass through to backend
      * @return Display name for the execution
      */
-    suspend fun createAndStartExecution(
+    override suspend fun createAndStartExecution(
         executionId: UUID,
         projectId: UUID,
         filePath: String,
@@ -344,7 +345,7 @@ class ExecutionService(
      *
      * @param executionId UUID of the execution
      */
-    suspend fun cancelExecution(executionId: UUID) = withContext(Dispatchers.IO) {
+    override suspend fun cancelExecution(executionId: UUID) = withContext(Dispatchers.IO) {
         transaction {
             ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                 it[state] = ExecutionState.CANCELLED
@@ -360,7 +361,7 @@ class ExecutionService(
      *
      * @param executionId UUID of the execution
      */
-    suspend fun deleteExecution(executionId: UUID) = withContext(Dispatchers.IO) {
+    override suspend fun deleteExecution(executionId: UUID) = withContext(Dispatchers.IO) {
         transaction {
             ExecutionsTable.deleteWhere { id eq executionId.toKotlinUuid() }
         }
@@ -374,7 +375,7 @@ class ExecutionService(
      * @param executionId UUID of the execution
      * @return Markdown-formatted summary, or null if execution not found
      */
-    suspend fun getSummary(executionId: UUID): String? = withContext(Dispatchers.IO) {
+    override suspend fun getSummary(executionId: UUID): String? = withContext(Dispatchers.IO) {
         val execution = transaction {
             ExecutionsTable.selectAll()
                 .where { ExecutionsTable.id eq executionId.toKotlinUuid() }

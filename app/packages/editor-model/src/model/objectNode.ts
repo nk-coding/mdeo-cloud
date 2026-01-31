@@ -38,7 +38,7 @@ export class GObjectNode extends GRectangularNode {
 /**
  * Type guard to check if an element is an object node.
  *
- * @param element - The model element to check
+ * @param element The model element to check
  * @returns True if the element is a GObjectNode
  */
 export function isObjectNode(element: GModelElement): element is GObjectNode {

@@ -1,5 +1,5 @@
 import type { Point } from "@eclipse-glsp/protocol";
-import { type Bounds as BoundsType } from "@eclipse-glsp/protocol";
+import type { Bounds as BoundsType } from "@eclipse-glsp/protocol";
 import type { EdgeLayoutMetadata, AnchorSide, EdgeAnchor } from "@mdeo/editor-protocol";
 import type { GEdge, EdgeReconnectData } from "../../model/edge.js";
 import type { BoundsAware, ISnapper } from "@eclipse-glsp/sprotty";

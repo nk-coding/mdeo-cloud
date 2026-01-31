@@ -78,26 +78,16 @@ export class MetamodelToolPaletteItemProvider extends BaseToolPaletteItemProvide
 
     /**
      * Creates palette items for import operations.
-     * Includes "Import Class" and "Import Enum" items that trigger actions on the workbench.
+     * Includes a single "Import File" item that triggers the file import action.
      *
      * @returns Array of palette items for import operations
      */
     protected createImportPaletteItems(): PaletteItem[] {
         const languageId = this.modelState.languageServices.LanguageMetaData.languageId;
 
-        const importClassOperation: TriggerActionOperation = {
+        const importFileOperation: TriggerActionOperation = {
             kind: "triggerAction",
-            actionType: "import-class",
-            languageId,
-            data: {
-                uri: this.modelState.sourceUri ?? ""
-            },
-            isOperation: true
-        };
-
-        const importEnumOperation: TriggerActionOperation = {
-            kind: "triggerAction",
-            actionType: "import-enum",
+            actionType: "import-file",
             languageId,
             data: {
                 uri: this.modelState.sourceUri ?? ""
@@ -106,23 +96,14 @@ export class MetamodelToolPaletteItemProvider extends BaseToolPaletteItemProvide
         };
 
         this.counter++;
-        const importClassItem = {
+        const importFileItem: PaletteItem = {
             id: `palette-item-${this.counter}`,
             sortString: "A",
-            label: "Import Class",
+            label: "Import File",
             icon: "cloud-download",
-            actions: [importClassOperation]
+            actions: [importFileOperation]
         };
 
-        this.counter++;
-        const importEnumItem = {
-            id: `palette-item-${this.counter}`,
-            sortString: "B",
-            label: "Import Enum",
-            icon: "cloud-download",
-            actions: [importEnumOperation]
-        };
-
-        return [importClassItem, importEnumItem];
+        return [importFileItem];
     }
 }

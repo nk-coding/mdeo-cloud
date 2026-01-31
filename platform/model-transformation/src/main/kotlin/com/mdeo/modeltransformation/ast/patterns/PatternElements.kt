@@ -8,15 +8,19 @@ import kotlinx.serialization.Serializable
  * Pattern variable declaration within a transformation pattern.
  *
  * Pattern variables are used to bind values during pattern matching that can
- * be referenced in subsequent expressions or statements.
+ * be referenced in subsequent expressions or statements. The type annotation
+ * is optional - if not provided, the type is inferred from the value expression.
  *
  * @param name Name of the variable as declared in the pattern.
- * @param type Index into the types array for the variable's type.
+ * @param type Optional index into the types array for the variable's type.
+ *             If null, the type is inferred from the value expression.
+ * @param value The value expression assigned to the variable.
  */
 @Serializable
 data class TypedPatternVariable(
     val name: String,
-    val type: Int
+    val type: Int? = null,
+    @Contextual val value: TypedExpression
 )
 
 /**
@@ -78,15 +82,20 @@ data class TypedPatternLinkEnd(
  * Represents a link (reference/association) between two object instances in a pattern.
  * Links can be matched, created, or deleted similar to object instances.
  *
+ * The edge label can be computed from the source and target property names using
+ * [com.mdeo.modeltransformation.ast.EdgeLabelUtils.computeEdgeLabel].
+ *
  * @param modifier Optional modifier for the link: "create" to create a new link,
  *                 "delete" to delete a matched link, "forbid" to specify links that must not exist,
  *                 or null for simple matching.
+ * @param isOutgoing True if this is an outgoing edge from source to target, false for incoming.
  * @param source Source end of the link.
  * @param target Target end of the link.
  */
 @Serializable
 data class TypedPatternLink(
     val modifier: String? = null,
+    val isOutgoing: Boolean,
     val source: TypedPatternLinkEnd,
     val target: TypedPatternLinkEnd
 )

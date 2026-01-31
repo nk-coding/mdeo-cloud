@@ -1,5 +1,4 @@
 import type { VNode } from "snabbdom";
-import { init, classModule, propsModule, styleModule, eventListenersModule, attributesModule } from "snabbdom";
 import type { Action, IActionDispatcher, GModelRoot, PaletteItem } from "@eclipse-glsp/sprotty";
 import type MiniSearch from "minisearch";
 import { sharedImport } from "../../sharedImport.js";
@@ -11,12 +10,14 @@ import { ScrollViewState } from "./views/scrollView.js";
 import { PreviewRenderer } from "./previewRenderer.js";
 import { LayoutAction } from "./layoutAction.js";
 
-const patcher = init([classModule, propsModule, styleModule, eventListenersModule, attributesModule]);
-
 const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES } = sharedImport("@eclipse-glsp/sprotty");
 const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction } = sharedImport("@eclipse-glsp/client");
+const { init, classModule, propsModule, styleModule, eventListenersModule, attributesModule } =
+    sharedImport("snabbdom");
 const MiniSearchLib = sharedImport("minisearch");
+
+const patcher = init([classModule, propsModule, styleModule, eventListenersModule, attributesModule]);
 
 /**
  * Toolbox UI extension that provides tool selection and element palette functionality.

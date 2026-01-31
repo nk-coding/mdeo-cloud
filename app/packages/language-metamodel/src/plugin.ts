@@ -26,8 +26,7 @@ import { MetamodelDiagramModule } from "./features/diagram-server/metamodelDiagr
 import { MetamodelNameProvider } from "./features/metamodelNameProvider.js";
 import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.js";
 import { MetamodelExternalReferenceCollector } from "./features/metamodelExternalReferenceCollector.js";
-import { ImportClassActionHandler } from "./action-handlers/importClassActionHandler.js";
-import { ImportEnumActionHandler } from "./action-handlers/importEnumActionHandler.js";
+import { ImportFileActionHandler } from "./action-handlers/importFileActionHandler.js";
 import { registerMetamodelValidationChecks } from "./validation/metamodelValidator.js";
 
 /**
@@ -60,8 +59,7 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
         action: {
             ActionHandlerRegistry: (services) => {
                 const registry = new ActionHandlerRegistry();
-                registry.register("import-class", new ImportClassActionHandler(services));
-                registry.register("import-enum", new ImportEnumActionHandler(services));
+                registry.register("import-file", new ImportFileActionHandler(services));
                 return registry;
             },
             ActionProvider: () => new DefaultActionProvider()

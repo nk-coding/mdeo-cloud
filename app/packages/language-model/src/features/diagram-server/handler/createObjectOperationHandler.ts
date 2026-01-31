@@ -3,9 +3,11 @@ import {
     MetadataManager,
     PlaceholderModelIdRegistry,
     resolveRelativePath,
-    sharedImport
+    sharedImport,
+    type CreateNodeResult,
+    type GroupedToolboxItem,
+    type ToolboxItemProvider
 } from "@mdeo/language-shared";
-import type { CreateNodeResult, GroupedToolboxItem, ToolboxItemProvider } from "@mdeo/language-shared";
 import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
 import {
     EnumValue,
@@ -26,18 +28,17 @@ import type { WorkspaceEdit } from "vscode-languageserver-types";
 import type { PartialModel } from "../../../grammar/modelPartialTypes.js";
 import {
     Class,
-    ClassOrEnumImport,
-    type ClassOrEnumImportType,
     type ClassType,
-    type MetaModelType,
     type PropertyType,
     PrimitiveType,
     MetamodelPrimitiveTypes,
     EnumTypeReference,
-    Enum
+    Enum,
+    isMultipleMultiplicity,
+    isOptionalMultiplicity,
+    getExportedEntitiesFromMetamodelFile
 } from "@mdeo/language-metamodel";
 import type { AstReflection } from "@mdeo/language-common";
-import { isMultipleMultiplicity, isOptionalMultiplicity } from "../../../grammar/util.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { CreateNodeOperation: CreateNodeOperationKind, TriggerNodeCreationAction } =
@@ -121,11 +122,12 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
 
     /**
      * Gets available non-abstract classes from the imported metamodel.
+     * Uses the new simplified import system that transitively collects all classes
+     * from the imported metamodel file and its imports.
      *
      * @returns Array of objects with class names and ClassType for object creation
      */
     private async getAvailableNonAbstractClasses(): Promise<Array<{ name: string; classType: ClassType }>> {
-        const reflection = this.modelState.languageServices.shared.AstReflection;
         const sourceModel = this.modelState.sourceModel as PartialModel;
         const sourceModelDoc = sourceModel?.$document;
         const importedFile = sourceModel?.import?.file;
@@ -135,50 +137,19 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
         }
 
         const metamodelUri = resolveRelativePath(sourceModelDoc, importedFile);
-        const classes: Array<{ name: string; classType: ClassType }> = [];
         const documents = this.modelState.languageServices.shared.workspace.LangiumDocuments;
         const doc = await documents.getOrCreateDocument(metamodelUri);
 
-        const root = doc.parseResult?.value as MetaModelType;
-        for (const element of root.elements ?? []) {
-            if (reflection.isInstance(element, Class) && !element.isAbstract) {
-                const classType = element as ClassType;
+        const exports = getExportedEntitiesFromMetamodelFile(doc, documents);
+
+        const classes: Array<{ name: string; classType: ClassType }> = [];
+        for (const classType of exports.classes) {
+            if (!classType.isAbstract) {
                 classes.push({ name: classType.name ?? "Unknown", classType });
-            }
-        }
-        for (const fileImport of root.imports ?? []) {
-            for (const imp of fileImport.imports) {
-                const importedClass = this.resolveImportedClassname(imp, reflection);
-                if (importedClass != undefined && !importedClass.isAbstract) {
-                    classes.push({ name: imp.name ?? imp.entity.ref?.name ?? "Unknown", classType: importedClass });
-                }
             }
         }
 
         return classes;
-    }
-
-    /**
-     * Resolves an imported class from a ClassOrEnumImportType, following import chains.
-     *
-     * @param imp The ClassOrEnumImportType to resolve
-     * @param reflection The AST reflection service
-     * @returns The resolved ClassType or undefined if not found
-     */
-    private resolveImportedClassname(imp: ClassOrEnumImportType, reflection: AstReflection): ClassType | undefined {
-        let current: any = imp.entity?.ref;
-        while (current != undefined) {
-            if (reflection.isInstance(current, Class)) {
-                return current;
-            } else if (reflection.isInstance(current, ClassOrEnumImport)) {
-                const importNode = current as ClassOrEnumImportType;
-                current = importNode.entity?.ref;
-            } else {
-                return undefined;
-            }
-        }
-
-        return undefined;
     }
 
     /**

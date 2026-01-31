@@ -1,5 +1,5 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
-import type { ExpressionTypes, ListExpressionType } from "../grammar/expressionTypes.js";
+import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { PartialTypeSystem, type PrimitiveTypes } from "./partialTypeSystem.js";

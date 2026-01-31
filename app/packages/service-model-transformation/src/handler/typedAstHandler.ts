@@ -41,7 +41,7 @@ export const typedAstHandler: FileDataHandler<TypedAst | null, ModelTransformati
     }
 
     const converter = new ModelTransformationTypedAstConverter(instance.services.typir, reflection);
-    const typedRoot = converter.convertModelTransformation(transformation);
+    const typedRoot = await converter.convertModelTransformation(document, transformation);
 
     return {
         data: typedRoot,

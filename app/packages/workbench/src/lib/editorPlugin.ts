@@ -6,6 +6,7 @@ import * as glspSprotty from "@eclipse-glsp/sprotty";
 import * as glspProtocol from "@eclipse-glsp/protocol";
 import * as minisearch from "minisearch";
 import * as lucide from "lucide";
+import * as snabbdom from "snabbdom";
 import { initializeEditorPluginContext } from "@mdeo/editor-common";
 
 /**
@@ -25,7 +26,8 @@ export const editorPlugin: Plugin = {
             "@eclipse-glsp/sprotty": glspSprotty,
             "@eclipse-glsp/protocol": glspProtocol,
             minisearch,
-            lucide
+            lucide,
+            snabbdom
         };
 
         initializeEditorPluginContext(context);

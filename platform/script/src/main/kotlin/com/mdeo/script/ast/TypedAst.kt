@@ -2,6 +2,7 @@ package com.mdeo.script.ast
 
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ReturnTypeSerializer
+import com.mdeo.expression.ast.types.TypedClass
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,16 +10,18 @@ import kotlinx.serialization.Serializable
  *
  * This is the top-level data structure that represents a complete script
  * program after type checking. It contains type information, imports,
- * and all function definitions.
+ * metamodel class definitions, and all function definitions.
  *
  * @param types Array of all types used in the program. Generics are replaced by Any? due to
  *              type erasure. Types are indexed by typeIndex in expressions.
  * @param imports All imports in the program.
+ * @param classes List of metamodel classes with their properties and relations.
  * @param functions All top-level functions in the program.
  */
 @Serializable
 data class TypedAst(
     val types: List<@Serializable(with = ReturnTypeSerializer::class) ReturnType>,
     val imports: List<TypedImport>,
+    val classes: List<TypedClass> = emptyList(),
     val functions: List<TypedFunction>
 )

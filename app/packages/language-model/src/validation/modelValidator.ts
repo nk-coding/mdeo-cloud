@@ -1,21 +1,12 @@
 import type { ValidationAcceptor, ValidationChecks, AstNode } from "langium";
-import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
-import { MultiMap } from "langium";
+import type { ExtendedLangiumServices } from "@mdeo/language-common";
 import {
-    Class,
-    ClassOrEnumImport,
-    Enum,
     EnumTypeReference,
     PrimitiveType,
     Property,
     RangeMultiplicity,
     SingleMultiplicity,
     MetamodelPrimitiveTypes,
-    Association,
-    MetaModel,
-    type AssociationType,
-    type ClassType,
-    type EnumType,
     type EnumTypeReferenceType,
     type MultiplicityType,
     type PropertyType
@@ -31,9 +22,12 @@ import {
     type PropertyAssignmentType,
     type SimpleValueType,
     type EnumValueType,
-    type ListValueType,
-    type LinkEndType
+    type ListValueType
 } from "../grammar/modelTypes.js";
+import { BaseModelValidator } from "./baseModelValidator.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { MultiMap } = sharedImport("langium");
 
 /**
  * Interface mapping for model AST types used in validation checks.
@@ -67,11 +61,9 @@ export function registerModelValidationChecks(services: ExtendedLangiumServices)
 /**
  * Validator for model language constructs.
  */
-export class ModelValidator {
-    private readonly reflection: AstReflection;
-
+export class ModelValidator extends BaseModelValidator {
     constructor(private readonly services: ExtendedLangiumServices) {
-        this.reflection = services.shared.AstReflection;
+        super(services.shared.AstReflection);
     }
 
     /**
@@ -180,7 +172,7 @@ export class ModelValidator {
     /**
      * Checks if a property is required (multiplicity is not ? or 0..1).
      */
-    private isRequiredProperty(property: PropertyType): boolean {
+    protected override isRequiredProperty(property: PropertyType): boolean {
         const multiplicity = property.multiplicity;
 
         if (!multiplicity) {
@@ -313,7 +305,7 @@ export class ModelValidator {
     /**
      * Gets the lower and upper bounds of a multiplicity.
      */
-    private getMultiplicityBounds(multiplicity: MultiplicityType | undefined): {
+    protected override getMultiplicityBounds(multiplicity: MultiplicityType | undefined): {
         lower: number;
         upper: number | undefined;
     } {
@@ -351,7 +343,7 @@ export class ModelValidator {
     /**
      * Checks if a multiplicity allows multiple values.
      */
-    private isMultipleMultiplicity(multiplicity: MultiplicityType | undefined): boolean {
+    protected override isMultipleMultiplicity(multiplicity: MultiplicityType | undefined): boolean {
         if (!multiplicity) {
             return false;
         }
@@ -417,6 +409,25 @@ export class ModelValidator {
         } else if (this.reflection.isInstance(propertyType, EnumTypeReference)) {
             this.validateEnumValue(value, propertyType, property, propAssign, accept);
         }
+    }
+
+    /**
+     * Validates a link, including:
+     * - If neither end has a property: there must be exactly one association between the classes
+     * - If both ends have properties: they must be part of the same association
+     */
+    validateLink(link: LinkType, accept: ValidationAcceptor): void {
+        const source = link.source;
+        const target = link.target;
+
+        if (!source?.object?.ref || !target?.object?.ref) {
+            return;
+        }
+
+        const sourceObj = source.object.ref as ObjectInstanceType;
+        const targetObj = target.object.ref as ObjectInstanceType;
+
+        this.validateLinkBase(link, sourceObj, targetObj, accept);
     }
 
     /**
@@ -507,7 +518,7 @@ export class ModelValidator {
         const enumRef = enumTypeRef.enum?.ref;
 
         if (!enumRef) {
-            return; // Enum type not resolved
+            return;
         }
 
         const enumType = this.resolveToEnum(enumRef);
@@ -524,7 +535,6 @@ export class ModelValidator {
             return;
         }
 
-        // Check that the enum entry belongs to the correct enum
         const entryParent = valueRef.$container;
         if (entryParent !== enumType) {
             const validEntries = (enumType.entries ?? []).map((e) => e.name).filter((n) => n !== undefined);
@@ -534,271 +544,5 @@ export class ModelValidator {
                 { node: propAssign, property: "value" }
             );
         }
-    }
-
-    /**
-     * Validates a link, including:
-     * - If neither end has a property: there must be exactly one association between the classes
-     * - If both ends have properties: they must be part of the same association
-     */
-    validateLink(link: LinkType, accept: ValidationAcceptor): void {
-        const source = link.source;
-        const target = link.target;
-
-        if (!source?.object?.ref || !target?.object?.ref) {
-            return;
-        }
-
-        const sourceObj = source.object.ref as ObjectInstanceType;
-        const targetObj = target.object.ref as ObjectInstanceType;
-
-        const sourceClass = this.resolveToClass(sourceObj.class?.ref);
-        const targetClass = this.resolveToClass(targetObj.class?.ref);
-
-        if (!sourceClass || !targetClass) {
-            return;
-        }
-
-        const sourceHasProperty = !!source.property?.ref;
-        const targetHasProperty = !!target.property?.ref;
-
-        if (!sourceHasProperty && !targetHasProperty) {
-            this.validateUniqueAssociation(link, sourceClass, targetClass, accept);
-        } else if (sourceHasProperty && targetHasProperty) {
-            this.validateSameAssociation(link, source, target, accept);
-        } else {
-            this.validateSinglePropertyLink(link, source, target, sourceClass, targetClass, accept);
-        }
-    }
-
-    /**
-     * Validates a link where only one end has a property specified.
-     * Verifies that the property is a valid association end connecting the classes.
-     */
-    private validateSinglePropertyLink(
-        link: LinkType,
-        source: LinkEndType,
-        target: LinkEndType,
-        sourceClass: ClassType,
-        targetClass: ClassType,
-        accept: ValidationAcceptor
-    ): void {
-        const sourceProperty = source.property?.ref as PropertyType | undefined;
-        const targetProperty = target.property?.ref as PropertyType | undefined;
-        const property = sourceProperty ?? targetProperty;
-        const isSourceProperty = sourceProperty !== undefined;
-
-        if (property == undefined) {
-            return;
-        }
-
-        const association = this.findAssociationForProperty(property);
-        if (!association) {
-            accept("error", `Property '${property.name}' is not an association end property.`, {
-                node: link,
-                property: isSourceProperty ? "source" : "target"
-            });
-            return;
-        }
-
-        const assocSourceClass = this.resolveToClass(association.source?.class?.ref);
-        const assocTargetClass = this.resolveToClass(association.target?.class?.ref);
-
-        if (!assocSourceClass || !assocTargetClass) {
-            return;
-        }
-
-        const sourceChain = new Set(resolveClassChain(sourceClass, this.reflection));
-        const targetChain = new Set(resolveClassChain(targetClass, this.reflection));
-
-        const sourceMatches = sourceChain.has(assocSourceClass);
-        const targetMatches = targetChain.has(assocTargetClass);
-        const reverseSourceMatches = sourceChain.has(assocTargetClass);
-        const reverseTargetMatches = targetChain.has(assocSourceClass);
-
-        const connectsCorrectly = (sourceMatches && targetMatches) || (reverseSourceMatches && reverseTargetMatches);
-
-        if (!connectsCorrectly) {
-            accept(
-                "error",
-                `Property '${property.name}' belongs to an association that does not connect '${sourceClass.name}' and '${targetClass.name}'.`,
-                { node: link }
-            );
-        }
-    }
-
-    /**
-     * Validates that there is exactly one association between two classes when no properties are specified.
-     */
-    private validateUniqueAssociation(
-        link: LinkType,
-        sourceClass: ClassType,
-        targetClass: ClassType,
-        accept: ValidationAcceptor
-    ): void {
-        const associations = this.findAssociationsBetweenClasses(sourceClass, targetClass);
-
-        if (associations.length === 0) {
-            accept("error", `No association exists between '${sourceClass.name}' and '${targetClass.name}'.`, {
-                node: link
-            });
-        } else if (associations.length > 1) {
-            accept(
-                "error",
-                `Multiple associations exist between '${sourceClass.name}' and '${targetClass.name}'. Please specify which association to use by adding property names.`,
-                { node: link }
-            );
-        }
-    }
-
-    /**
-     * Validates that both ends of a link reference properties from the same association.
-     */
-    private validateSameAssociation(
-        link: LinkType,
-        source: LinkEndType,
-        target: LinkEndType,
-        accept: ValidationAcceptor
-    ): void {
-        const sourceProperty = source.property?.ref as PropertyType | undefined;
-        const targetProperty = target.property?.ref as PropertyType | undefined;
-
-        if (!sourceProperty || !targetProperty) {
-            return;
-        }
-
-        const sourceAssociation = this.findAssociationForProperty(sourceProperty);
-        const targetAssociation = this.findAssociationForProperty(targetProperty);
-
-        if (!sourceAssociation || !targetAssociation) {
-            accept("error", `Link properties must be association end properties, not regular class properties.`, {
-                node: link
-            });
-            return;
-        }
-
-        if (sourceAssociation !== targetAssociation) {
-            accept("error", `Source and target properties must be from the same association.`, { node: link });
-        }
-    }
-
-    /**
-     * Finds all associations between two classes (considering class chains).
-     */
-    private findAssociationsBetweenClasses(class1: ClassType, class2: ClassType): AssociationType[] {
-        const result: AssociationType[] = [];
-        const class1Chain = resolveClassChain(class1, this.reflection);
-        const class2Chain = resolveClassChain(class2, this.reflection);
-
-        const metamodels = new Set<{ elements?: AstNode[] }>();
-
-        for (const cls of class1Chain) {
-            const metaModel = this.getMetaModel(cls);
-            if (metaModel) {
-                metamodels.add(metaModel);
-            }
-        }
-
-        for (const cls of class2Chain) {
-            const metaModel = this.getMetaModel(cls);
-            if (metaModel) {
-                metamodels.add(metaModel);
-            }
-        }
-
-        const class1ChainSet = new Set(class1Chain);
-        const class2ChainSet = new Set(class2Chain);
-
-        for (const metaModel of metamodels) {
-            for (const element of metaModel.elements ?? []) {
-                if (!this.reflection.isInstance(element, Association)) {
-                    continue;
-                }
-
-                const assoc = element;
-                const sourceClass = this.resolveToClass(assoc.source?.class?.ref);
-                const targetClass = this.resolveToClass(assoc.target?.class?.ref);
-
-                if (!sourceClass || !targetClass) {
-                    continue;
-                }
-
-                const sourceInClass1 = class1ChainSet.has(sourceClass);
-                const sourceInClass2 = class2ChainSet.has(sourceClass);
-                const targetInClass1 = class1ChainSet.has(targetClass);
-                const targetInClass2 = class2ChainSet.has(targetClass);
-
-                if ((sourceInClass1 && targetInClass2) || (sourceInClass2 && targetInClass1)) {
-                    result.push(assoc);
-                }
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Finds the association that contains a given property (as an association end).
-     */
-    private findAssociationForProperty(property: PropertyType): AssociationType | undefined {
-        const container = property.$container;
-
-        if (container && this.reflection.isInstance(container, Association)) {
-            return container;
-        }
-
-        return undefined;
-    }
-
-    /**
-     * Gets the MetaModel containing a class.
-     */
-    private getMetaModel(classType: ClassType): { elements?: AstNode[] } | undefined {
-        let current: AstNode | undefined = classType;
-        while (current != undefined) {
-            if (this.reflection.isInstance(current, MetaModel)) {
-                return current as { elements?: AstNode[] };
-            }
-            current = current.$container;
-        }
-        return undefined;
-    }
-
-    /**
-     * Resolves a ClassOrImport to its actual Class.
-     */
-    private resolveToClass(classOrImport: AstNode | undefined): ClassType | undefined {
-        if (classOrImport == undefined) {
-            return undefined;
-        }
-        if (this.reflection.isInstance(classOrImport, Class)) {
-            return classOrImport;
-        }
-        if (this.reflection.isInstance(classOrImport, ClassOrEnumImport)) {
-            const entity = classOrImport.entity?.ref;
-            if (entity && this.reflection.isInstance(entity, Class)) {
-                return entity;
-            }
-        }
-        return undefined;
-    }
-
-    /**
-     * Resolves an EnumOrImport to its actual Enum.
-     */
-    private resolveToEnum(enumOrImport: AstNode | undefined): EnumType | undefined {
-        if (enumOrImport == undefined) {
-            return undefined;
-        }
-        if (this.reflection.isInstance(enumOrImport, Enum)) {
-            return enumOrImport;
-        }
-        if (this.reflection.isInstance(enumOrImport, ClassOrEnumImport)) {
-            const entity = enumOrImport.entity?.ref;
-            if (entity && this.reflection.isInstance(entity, Enum)) {
-                return entity;
-            }
-        }
-        return undefined;
     }
 }

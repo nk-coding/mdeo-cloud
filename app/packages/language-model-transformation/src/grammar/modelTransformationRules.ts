@@ -15,7 +15,7 @@ import {
     type ParserRule
 } from "@mdeo/language-common";
 import { generateExpressionRules, generateTypeRules, type BaseExpressionType } from "@mdeo/language-expression";
-import { ClassOrImport, Property } from "@mdeo/language-metamodel";
+import { Class, Property } from "@mdeo/language-metamodel";
 import { LeadingTrailing, manySep } from "@mdeo/language-shared";
 import {
     ModelTransformation,
@@ -30,6 +30,7 @@ import {
     WhereClause,
     MatchStatement,
     IfMatchStatement,
+    IfMatchConditionAndBlock,
     WhileMatchStatement,
     UntilMatchStatement,
     ForMatchStatement,
@@ -106,11 +107,17 @@ export function generateModelTransformationRules(): {
 
     /**
      * Pattern variable rule.
-     * Format: var name: type
+     * Format: var name[: type] = expression
      */
     const PatternVariableRule = createRule("PatternVariableRule")
         .returns(PatternVariable)
-        .as(({ set }) => ["var", set("name", ID), ":", set("type", TypeRule)]);
+        .as(({ set }) => [
+            "var",
+            set("name", ID),
+            optional(group(":", set("type", TypeRule))),
+            "=",
+            set("value", ExpressionRule)
+        ]);
 
     /**
      * Pattern property assignment rule.
@@ -135,7 +142,7 @@ export function generateModelTransformationRules(): {
             optional(set("modifier", PatternModifierRule)),
             set("name", ID),
             ":",
-            set("class", ref(ClassOrImport, ID)),
+            set("class", ref(Class, ID)),
             "{",
             many(or(add("properties", PatternPropertyAssignmentRule), NEWLINE)),
             "}"
@@ -217,6 +224,14 @@ export function generateModelTransformationRules(): {
         .as(({ set }) => ["match", set("pattern", PatternRule)]);
 
     /**
+     * If-match condition rule (inner node for scoping).
+     * Format: match { pattern } then { block }
+     */
+    const IfMatchConditionRule = createRule("IfMatchConditionRule")
+        .returns(IfMatchConditionAndBlock)
+        .as(({ set }) => ["match", set("pattern", PatternRule), "then", set("thenBlock", () => StatementsScopeRule)]);
+
+    /**
      * If-match statement rule.
      * Format: if match { pattern } then { block } [else { block }]
      */
@@ -224,10 +239,7 @@ export function generateModelTransformationRules(): {
         .returns(IfMatchStatement)
         .as(({ set }) => [
             "if",
-            "match",
-            set("pattern", PatternRule),
-            "then",
-            set("thenBlock", () => StatementsScopeRule),
+            set("ifBlock", IfMatchConditionRule),
             optional(
                 group(
                     "else",

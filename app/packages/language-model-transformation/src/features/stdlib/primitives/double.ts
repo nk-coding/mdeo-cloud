@@ -1,0 +1,9 @@
+import { doubleType, classTypeFrom } from "@mdeo/language-expression";
+import type { ClassType } from "@mdeo/language-expression";
+
+/**
+ * Double type for model transformation.
+ */
+export const modelTransformationDoubleType: ClassType = classTypeFrom(doubleType)
+    .keepMembers("abs", "floor", "ceiling", "round", "log", "log10", "pow", "max", "min")
+    .build();

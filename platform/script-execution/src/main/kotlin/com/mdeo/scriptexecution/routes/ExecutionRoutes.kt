@@ -1,9 +1,11 @@
 package com.mdeo.scriptexecution.routes
 
-import com.mdeo.scriptexecution.plugins.AUTH_JWT
-import com.mdeo.scriptexecution.plugins.getJwtPrincipal
-import com.mdeo.scriptexecution.plugins.getJwtToken
-import com.mdeo.scriptexecution.model.*
+import com.mdeo.execution.common.auth.*
+import com.mdeo.execution.common.routes.*
+import com.mdeo.execution.common.routes.ErrorResponses.respondBadRequest
+import com.mdeo.execution.common.routes.ErrorResponses.respondInternalError
+import com.mdeo.execution.common.routes.RouteUtils.getUuidParam
+import com.mdeo.execution.common.service.ExecutionScopes
 import com.mdeo.scriptexecution.service.ExecutionService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -12,190 +14,85 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.slf4j.LoggerFactory
-import java.util.*
+
+private val logger = LoggerFactory.getLogger("ExecutionRoutes")
 
 /**
- * Configures execution-related routes.
- * All routes require JWT authentication for security.
- * Routes match the backend's plugin API expectations.
+ * Configures all routes for the script execution service.
+ * Includes creation endpoint and inherits common routes from execution-common.
  *
  * @param executionService Service for execution operations
  */
 fun Route.executionRoutes(executionService: ExecutionService) {
-    val logger = LoggerFactory.getLogger("ExecutionRoutes")
+    baseExecutionRoutes(executionService = executionService)
     
     authenticate(AUTH_JWT) {
         route("/api/executions") {
-            post {
-                val principal = call.getJwtPrincipal()
-                if (principal == null) {
-                    call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
-                    return@post
-                }
-                
-                val jwtToken = call.getJwtToken()
-                if (jwtToken == null) {
-                    call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "JWT token required"))
-                    return@post
-                }
-                
-                if (!principal.scopes.contains("execution:write")) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
-                    return@post
-                }
-                
-                val request = try {
-                    call.receive<CreateExecutionRequest>()
-                } catch (e: Exception) {
-                    logger.error("Invalid request body", e)
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid request body"))
-                    return@post
-                }
-                
-                val executionId = try {
-                    UUID.fromString(request.executionId)
-                } catch (e: Exception) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid execution ID"))
-                    return@post
-                }
-                
-                val projectId = try {
-                    UUID.fromString(request.project)
-                } catch (e: Exception) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
-                    return@post
-                }
-                
-                if (principal.projectId != request.project) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token project mismatch"))
-                    return@post
-                }
-                
-                if (principal.executionId != null && principal.executionId != request.executionId) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token execution mismatch"))
-                    return@post
-                }
-                
-                try {
-                    val name = executionService.createAndStartExecution(
-                        executionId,
-                        projectId,
-                        request.filePath,
-                        request.data,
-                        jwtToken
-                    )
-                    call.respond(HttpStatusCode.Created, CreateExecutionResponse(name))
-                } catch (e: Exception) {
-                    logger.error("Failed to create execution", e)
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Internal error")))
-                }
-            }
-            
-            post("{id}/cancel") {
-                val principal = call.getJwtPrincipal()
-                if (principal == null) {
-                    call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
-                    return@post
-                }
-                
-                if (!principal.scopes.contains("plugin:execution:cancel")) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
-                    return@post
-                }
-                
-                val executionId = call.parameters["id"]?.let { 
-                    try { UUID.fromString(it) } catch (e: Exception) { null }
-                }
-                if (executionId == null) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid execution ID"))
-                    return@post
-                }
-                
-                if (principal.executionId != null && principal.executionId != executionId.toString()) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token execution mismatch"))
-                    return@post
-                }
-                
-                try {
-                    executionService.cancelExecution(executionId)
-                    call.respond(HttpStatusCode.NoContent)
-                } catch (e: Exception) {
-                    logger.error("Failed to cancel execution", e)
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Internal error")))
-                }
-            }
-            
-            delete("{id}") {
-                val principal = call.getJwtPrincipal()
-                if (principal == null) {
-                    call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
-                    return@delete
-                }
-                
-                if (!principal.scopes.contains("plugin:execution:delete")) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
-                    return@delete
-                }
-                
-                val executionId = call.parameters["id"]?.let { 
-                    try { UUID.fromString(it) } catch (e: Exception) { null }
-                }
-                if (executionId == null) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid execution ID"))
-                    return@delete
-                }
-                
-                if (principal.executionId != null && principal.executionId != executionId.toString()) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token execution mismatch"))
-                    return@delete
-                }
-                
-                try {
-                    executionService.deleteExecution(executionId)
-                    call.respond(HttpStatusCode.NoContent)
-                } catch (e: Exception) {
-                    logger.error("Failed to delete execution", e)
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Internal error")))
-                }
-            }
-            
-            get("{id}/summary") {
-                val principal = call.getJwtPrincipal()
-                if (principal == null) {
-                    call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
-                    return@get
-                }
-                
-                if (!principal.scopes.contains("plugin:execution:read")) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Insufficient permissions"))
-                    return@get
-                }
-                
-                val executionId = call.parameters["id"]?.let { 
-                    try { UUID.fromString(it) } catch (e: Exception) { null }
-                }
-                if (executionId == null) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid execution ID"))
-                    return@get
-                }
-                
-                if (principal.executionId != null && principal.executionId != executionId.toString()) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token execution mismatch"))
-                    return@get
-                }
-                
-                try {
-                    val summary = executionService.getSummary(executionId)
-                    if (summary == null) {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "Execution not found"))
-                    } else {
-                        call.respond(ExecutionSummaryResponse(summary))
-                    }
-                } catch (e: Exception) {
-                    logger.error("Failed to get summary", e)
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Internal error")))
-                }
-            }
+            createExecutionRoute(executionService)
+        }
+    }
+}
+
+/**
+ * Route handler for creating new script executions.
+ */
+private fun Route.createExecutionRoute(executionService: ExecutionService) {
+    post {
+        val authResult = call.requireScope(ExecutionScopes.EXECUTION_WRITE)
+        if (authResult is AuthorizationResult.Denied) {
+            call.respondAuthError(authResult)
+            return@post
+        }
+        val principal = (authResult as AuthorizationResult.Authorized).principal
+
+        val request = try {
+            call.receive<CreateExecutionRequest>()
+        } catch (e: Exception) {
+            logger.error("Invalid request body", e)
+            call.respondBadRequest("Invalid request body")
+            return@post
+        }
+
+        val executionId = RouteUtils.parseUuid(request.executionId)
+        val projectId = RouteUtils.parseUuid(request.project)
+
+        if (executionId == null || projectId == null) {
+            call.respondBadRequest("Invalid executionId or project UUID")
+            return@post
+        }
+
+        val projectMatch = validateProjectIdMatch(projectId.toString(), principal)
+        if (projectMatch is AuthorizationResult.Denied) {
+            call.respondAuthError(projectMatch)
+            return@post
+        }
+
+        val executionMatch = validateExecutionIdMatch(executionId.toString(), principal)
+        if (executionMatch is AuthorizationResult.Denied) {
+            call.respondAuthError(executionMatch)
+            return@post
+        }
+
+        val jwtToken = call.getJwtToken() ?: run {
+            call.respondBadRequest("Missing JWT token")
+            return@post
+        }
+
+        try {
+            val name = executionService.createAndStartExecution(
+                executionId,
+                projectId,
+                request.filePath,
+                request.data,
+                jwtToken
+            )
+            call.respond(HttpStatusCode.Created, CreateExecutionResponse(name))
+        } catch (e: IllegalArgumentException) {
+            logger.warn("Invalid request: ${e.message}")
+            call.respondBadRequest(e.message ?: "Invalid request")
+        } catch (e: Exception) {
+            logger.error("Failed to create execution", e)
+            call.respondInternalError(e.message ?: "Internal error")
         }
     }
 }

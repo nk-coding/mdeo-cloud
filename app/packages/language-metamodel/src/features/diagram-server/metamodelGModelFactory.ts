@@ -7,7 +7,6 @@ import type { SingleMultiplicityType, RangeMultiplicityType } from "../../gramma
 import {
     Association,
     Class,
-    ClassOrEnumImport,
     Enum,
     EnumTypeReference,
     MetamodelAssociationOperators,
@@ -15,12 +14,13 @@ import {
     RangeMultiplicity,
     SingleMultiplicity
 } from "../../grammar/metamodelTypes.js";
+import { getExportedEntitiesFromMetamodelFile } from "../importHelpers.js";
+import type { LangiumDocument } from "langium";
 import type {
     PartialMetaModel,
     PartialClass,
     PartialAssociation,
     PartialMultiplicity,
-    PartialClassOrEnumImport,
     PartialClassExtension,
     PartialAssociationEnd,
     PartialEnum,
@@ -44,8 +44,27 @@ import { AssociationEndKind, MetamodelElementType } from "./model/elementTypes.j
 
 const { injectable } = sharedImport("inversify");
 const { GGraph } = sharedImport("@eclipse-glsp/server");
+const { AstUtils } = sharedImport("langium");
 
 type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
+
+/**
+ * Extracted elements from a metamodel including local and imported entities.
+ */
+interface ExtractedElements {
+    /** Classes defined locally in this file */
+    localClasses: PartialClass[];
+    /** Enums defined locally in this file */
+    localEnums: PartialEnum[];
+    /** Associations defined locally in this file */
+    localAssociations: PartialAssociation[];
+    /** Classes imported from other files */
+    importedClasses: PartialClass[];
+    /** Enums imported from other files */
+    importedEnums: PartialEnum[];
+    /** Associations imported from other files */
+    importedAssociations: PartialAssociation[];
+}
 
 /**
  * Factory for creating GLSP graph models from metamodel AST.
@@ -54,35 +73,66 @@ type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
  */
 @injectable()
 export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> {
+    /**
+     * Creates the GLSP model from the metamodel source.
+     *
+     * @param sourceModel The metamodel source model
+     * @param idRegistry The ID registry for AST node ID generation
+     * @returns The created GLSP model root
+     */
     override createModelInternal(sourceModel: PartialMetaModel, idRegistry: ModelIdRegistry): GModelRoot {
         const graph = GGraph.builder().id("metamodel-graph").addCssClass("editor-metamodel").build();
 
         const extracted = this.extractElements(sourceModel);
-        this.createClassNodes(graph, extracted.classes, idRegistry);
-        this.createClassNodesFromImports(graph, extracted.imports, idRegistry);
-        this.createEnumNodes(graph, extracted.enums, idRegistry);
-        this.createInheritanceEdges(graph, extracted.classes, idRegistry);
-        this.createAssociationEdges(graph, extracted.associations, idRegistry);
+        this.createClassNodes(graph, extracted.localClasses, idRegistry, false);
+        this.createClassNodes(graph, extracted.importedClasses, idRegistry, true);
+        this.createEnumNodes(graph, extracted.localEnums, idRegistry, false);
+        this.createEnumNodes(graph, extracted.importedEnums, idRegistry, true);
+        const allClasses = [...extracted.localClasses, ...extracted.importedClasses];
+        const allAssociations = [...extracted.localAssociations, ...extracted.importedAssociations];
+        this.createInheritanceEdges(graph, allClasses, idRegistry);
+        this.createAssociationEdges(graph, allAssociations, idRegistry);
 
         return graph;
     }
 
     /**
-     * Extracts and separates classes, enums, associations, and imports from the metamodel.
+     * Extracts and separates classes, enums, and associations from the metamodel.
+     * Also collects imported classes and enums from imported files.
      *
-     * @param metamodel The metamodel containing elements and imports
-     * @returns An object containing separate arrays of each element type
+     * @param metamodel The metamodel containing elements
+     * @returns An object containing separate arrays of local and imported entities
      */
-    private extractElements(metamodel: PartialMetaModel): {
-        classes: PartialClass[];
-        enums: PartialEnum[];
-        associations: PartialAssociation[];
-        imports: PartialClassOrEnumImport[];
-    } {
-        const classes: PartialClass[] = [];
-        const enums: PartialEnum[] = [];
-        const associations: PartialAssociation[] = [];
-        const imports: PartialClassOrEnumImport[] = [];
+    private extractElements(metamodel: PartialMetaModel): ExtractedElements {
+        const localClasses: PartialClass[] = [];
+        const localEnums: PartialEnum[] = [];
+        const localAssociations: PartialAssociation[] = [];
+
+        this.extractLocalElements(metamodel, localClasses, localEnums, localAssociations);
+        const { importedClasses, importedEnums, importedAssociations } = this.extractImportedEntities(
+            metamodel,
+            localClasses,
+            localEnums,
+            localAssociations
+        );
+
+        return { localClasses, localEnums, localAssociations, importedClasses, importedEnums, importedAssociations };
+    }
+
+    /**
+     * Extracts local classes, enums, and associations from the metamodel.
+     *
+     * @param metamodel The metamodel containing elements
+     * @param classes Array to populate with local classes
+     * @param enums Array to populate with local enums
+     * @param associations Array to populate with local associations
+     */
+    private extractLocalElements(
+        metamodel: PartialMetaModel,
+        classes: PartialClass[],
+        enums: PartialEnum[],
+        associations: PartialAssociation[]
+    ): void {
         const items = metamodel.elements ?? [];
         for (const item of items) {
             if (this.reflection.isInstance(item, Class)) {
@@ -93,18 +143,122 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
                 associations.push(item as PartialAssociation);
             }
         }
+    }
 
-        const fileImports = metamodel.imports ?? [];
-        for (const fileImport of fileImports) {
-            const classOrEnumImports = fileImport?.imports ?? [];
-            for (const classOrEnumImport of classOrEnumImports) {
-                if (classOrEnumImport != undefined) {
-                    imports.push(classOrEnumImport as PartialClassOrEnumImport);
-                }
-            }
+    /**
+     * Extracts imported classes, enums, and associations from imported files.
+     * Deduplicates entities that are already defined locally.
+     *
+     * @param metamodel The metamodel containing the imports
+     * @param localClasses Local classes to exclude from imported entities
+     * @param localEnums Local enums to exclude from imported entities
+     * @param localAssociations Local associations to exclude from imported entities
+     * @returns Object containing imported classes, enums, and associations
+     */
+    private extractImportedEntities(
+        metamodel: PartialMetaModel,
+        localClasses: PartialClass[],
+        localEnums: PartialEnum[],
+        localAssociations: PartialAssociation[]
+    ): { importedClasses: PartialClass[]; importedEnums: PartialEnum[]; importedAssociations: PartialAssociation[] } {
+        const document = this.getSourceDocument(metamodel);
+        if (document == undefined) {
+            return { importedClasses: [], importedEnums: [], importedAssociations: [] };
         }
 
-        return { classes, enums, associations, imports };
+        const exports = this.getExportsFromDocument(document);
+        const importedClasses = this.filterImportedClasses(exports, localClasses);
+        const importedEnums = this.filterImportedEnums(exports, localEnums);
+        const importedAssociations = this.filterImportedAssociations(exports, localAssociations);
+
+        return { importedClasses, importedEnums, importedAssociations };
+    }
+
+    /**
+     * Gets the Langium document for the source metamodel.
+     *
+     * @param metamodel The metamodel AST node
+     * @returns The Langium document or undefined
+     */
+    private getSourceDocument(metamodel: PartialMetaModel): LangiumDocument | undefined {
+        return AstUtils.getDocument(metamodel);
+    }
+
+    /**
+     * Gets exported entities from a document using the import helper.
+     *
+     * @param document The source document
+     * @returns The collected metamodel exports
+     */
+    private getExportsFromDocument(document: LangiumDocument) {
+        const documents = this.modelState.languageServices.shared.workspace.LangiumDocuments;
+        return getExportedEntitiesFromMetamodelFile(document, documents);
+    }
+
+    /**
+     * Filters imported classes to exclude locally defined ones.
+     *
+     * @param exports The metamodel exports
+     * @param localClasses Classes defined locally
+     * @returns Array of imported classes not in local scope
+     */
+    private filterImportedClasses(
+        exports: ReturnType<typeof getExportedEntitiesFromMetamodelFile>,
+        localClasses: PartialClass[]
+    ): PartialClass[] {
+        const local = new Set(localClasses);
+        const importedClasses: PartialClass[] = [];
+
+        for (const cls of exports.classes.values()) {
+            if (!local.has(cls as PartialClass)) {
+                importedClasses.push(cls as PartialClass);
+            }
+        }
+        return importedClasses;
+    }
+
+    /**
+     * Filters imported enums to exclude locally defined ones.
+     *
+     * @param exports The metamodel exports
+     * @param localEnums Enums defined locally
+     * @returns Array of imported enums not in local scope
+     */
+    private filterImportedEnums(
+        exports: ReturnType<typeof getExportedEntitiesFromMetamodelFile>,
+        localEnums: PartialEnum[]
+    ): PartialEnum[] {
+        const local = new Set(localEnums);
+        const importedEnums: PartialEnum[] = [];
+
+        for (const enumEntity of exports.enums.values()) {
+            if (!local.has(enumEntity as PartialEnum)) {
+                importedEnums.push(enumEntity as PartialEnum);
+            }
+        }
+        return importedEnums;
+    }
+
+    /**
+     * Filters imported associations to exclude locally defined ones.
+     *
+     * @param exports The metamodel exports
+     * @param localAssociations Associations defined locally
+     * @returns Array of imported associations not in local scope
+     */
+    private filterImportedAssociations(
+        exports: ReturnType<typeof getExportedEntitiesFromMetamodelFile>,
+        localAssociations: PartialAssociation[]
+    ): PartialAssociation[] {
+        const local = new Set(localAssociations);
+        const importedAssociations: PartialAssociation[] = [];
+
+        for (const association of exports.associations.values()) {
+            if (!local.has(association as PartialAssociation)) {
+                importedAssociations.push(association as PartialAssociation);
+            }
+        }
+        return importedAssociations;
     }
 
     /**
@@ -114,8 +268,14 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param graph The graph to add nodes to
      * @param classes Array of classes to create nodes for
      * @param idRegistry The ID registry for AST node ID generation
+     * @param readonly Whether the nodes should be readonly (for imported entities)
      */
-    private createClassNodes(graph: GGraphType, classes: PartialClass[], idRegistry: ModelIdRegistry): void {
+    private createClassNodes(
+        graph: GGraphType,
+        classes: PartialClass[],
+        idRegistry: ModelIdRegistry,
+        readonly: boolean
+    ): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const cls of classes) {
@@ -124,9 +284,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             }
 
             const nodeId = idRegistry.getId(cls);
-            const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
+            const metadata = validatedMetadata.nodes[nodeId]?.meta as NodeLayoutMetadata;
+            if (metadata == undefined) {
+                continue;
+            }
 
-            graph.children.push(this.createClassNode(cls, nodeId, metadata, idRegistry));
+            graph.children.push(this.createClassNode(cls, nodeId, metadata, idRegistry, readonly));
         }
     }
 
@@ -137,26 +300,33 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param nodeId the unique node ID
      * @param metadata the layout metadata for the node
      * @param idRegistry The ID registry for AST node ID generation
+     * @param readonly Whether the node should be readonly (for imported entities)
      * @returns The created GClassNode
      */
     createClassNode(
         cls: PartialClass,
         nodeId: string,
         metadata: NodeLayoutMetadata,
-        idRegistry: ModelIdRegistry
+        idRegistry: ModelIdRegistry,
+        readonly: boolean = false
     ): GClassNode {
         const displayName = cls.name ?? "Unnamed";
 
-        const node = GClassNode.builder()
+        const nodeBuilder = GClassNode.builder()
             .id(nodeId)
             .name(displayName)
             .isAbstract(cls.isAbstract ?? false)
-            .meta(metadata)
-            .build();
+            .meta(metadata);
+
+        if (readonly) {
+            nodeBuilder.addCssClass("imported");
+        }
+
+        const node = nodeBuilder.build();
 
         node.children.push(
-            ...this.createClassTitle(nodeId, displayName, false),
-            ...this.createClassProperties(nodeId, cls, idRegistry, false)
+            ...this.createClassTitle(nodeId, displayName, readonly),
+            ...this.createClassProperties(nodeId, cls, idRegistry, readonly)
         );
         return node;
     }
@@ -168,80 +338,32 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param nodeId the unique node ID
      * @param metadata the layout metadata for the node
      * @param idRegistry The ID registry for AST node ID generation
+     * @param readonly Whether the node should be readonly (for imported entities)
      * @returns The created GEnumNode
      */
     createEnumNode(
         enumDef: PartialEnum,
         nodeId: string,
         metadata: NodeLayoutMetadata,
-        idRegistry: ModelIdRegistry
+        idRegistry: ModelIdRegistry,
+        readonly: boolean = false
     ): GEnumNode {
         const displayName = enumDef.name ?? "Unnamed";
 
-        const node = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata).build();
+        const nodeBuilder = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata);
+
+        if (readonly) {
+            nodeBuilder.addCssClass("imported");
+        }
+
+        const node = nodeBuilder.build();
 
         node.children.push(
-            ...this.createEnumTitle(nodeId, displayName, false),
-            ...this.createEnumEntries(nodeId, enumDef, idRegistry, false)
+            ...this.createEnumTitle(nodeId, displayName, readonly),
+            ...this.createEnumEntries(nodeId, enumDef, idRegistry, readonly)
         );
 
         return node;
-    }
-
-    /**
-     * Creates visual nodes for imported classes.
-     * Similar to createClassNodes but for ClassImport nodes with readonly labels.
-     *
-     * @param graph The graph to add nodes to
-     * @param imports Array of class imports to create nodes for
-     * @param idRegistry The ID registry for AST node ID generation
-     */
-    private createClassNodesFromImports(
-        graph: GGraphType,
-        imports: PartialClassOrEnumImport[],
-        idRegistry: ModelIdRegistry
-    ): void {
-        const validatedMetadata = this.modelState.getValidatedMetadata();
-
-        for (const classOrEnumImport of imports) {
-            if (classOrEnumImport == undefined) {
-                continue;
-            }
-
-            const importedClassOrEnum = classOrEnumImport.entity?.ref;
-            if (importedClassOrEnum == undefined) {
-                continue;
-            }
-
-            const nodeId = idRegistry.getId(classOrEnumImport);
-            const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
-            const displayName = classOrEnumImport.name ?? importedClassOrEnum.name ?? "Unnamed";
-
-            if (this.reflection.isInstance(importedClassOrEnum, Class)) {
-                const node = GClassNode.builder()
-                    .id(nodeId)
-                    .name(displayName)
-                    .isAbstract(importedClassOrEnum.isAbstract ?? false)
-                    .meta(metadata)
-                    .build();
-
-                node.children.push(
-                    ...this.createClassTitle(nodeId, displayName, classOrEnumImport.name == undefined),
-                    ...this.createClassProperties(nodeId, importedClassOrEnum, idRegistry, true)
-                );
-
-                graph.children.push(node);
-            } else {
-                const node = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata).build();
-
-                node.children.push(
-                    ...this.createEnumTitle(nodeId, displayName, classOrEnumImport.name == undefined),
-                    ...this.createEnumEntries(nodeId, importedClassOrEnum, idRegistry, true)
-                );
-
-                graph.children.push(node);
-            }
-        }
     }
 
     /**
@@ -250,8 +372,14 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
      * @param graph The graph to add nodes to
      * @param enums Array of enums to create nodes for
      * @param idRegistry The ID registry for AST node ID generation
+     * @param readonly Whether the nodes should be readonly (for imported entities)
      */
-    private createEnumNodes(graph: GGraphType, enums: PartialEnum[], idRegistry: ModelIdRegistry): void {
+    private createEnumNodes(
+        graph: GGraphType,
+        enums: PartialEnum[],
+        idRegistry: ModelIdRegistry,
+        readonly: boolean
+    ): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         for (const enumDef of enums) {
@@ -260,17 +388,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             }
 
             const nodeId = idRegistry.getId(enumDef);
-            const metadata = validatedMetadata.nodes[nodeId].meta as NodeLayoutMetadata;
-            const displayName = enumDef.name ?? "Unnamed";
+            const metadata = validatedMetadata.nodes[nodeId]?.meta as NodeLayoutMetadata;
+            if (metadata == undefined) {
+                continue;
+            }
 
-            const node = GEnumNode.builder().id(nodeId).name(displayName).meta(metadata).build();
-
-            node.children.push(
-                ...this.createEnumTitle(nodeId, displayName, false),
-                ...this.createEnumEntries(nodeId, enumDef, idRegistry, false)
-            );
-
-            graph.children.push(node);
+            graph.children.push(this.createEnumNode(enumDef, nodeId, metadata, idRegistry, readonly));
         }
     }
 
@@ -439,8 +562,6 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const enumType = propertyType.enum?.ref;
             if (this.reflection.isInstance(enumType, Enum)) {
                 return enumType.name ?? "unknown";
-            } else if (this.reflection.isInstance(enumType, ClassOrEnumImport)) {
-                return enumType.name ?? enumType.entity?.ref?.name ?? "unknown";
             }
         }
         return "unknown";

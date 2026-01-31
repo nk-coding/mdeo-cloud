@@ -9,10 +9,11 @@ import {
     parseUri,
     FileCategory
 } from "@mdeo/language-common";
-import type { ActionHandler } from "@mdeo/language-shared";
+import { sharedImport, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
-import { URI } from "langium";
 import { type ScriptType } from "../grammar/scriptTypes.js";
+
+const { URI } = sharedImport("langium");
 
 /**
  * Input data collected from the dialog.

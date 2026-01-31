@@ -1,7 +1,6 @@
 import { createInterface, createType, Optional, Ref, Union } from "@mdeo/language-common";
-import type { ASTType, BaseType } from "@mdeo/language-common";
-import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
-import type { AstNode } from "langium";
+import type { ASTType, Interface } from "@mdeo/language-common";
+import type { AstNode, Reference } from "langium";
 
 /**
  * Enumeration of primitive types supported in the metamodel.
@@ -142,7 +141,7 @@ export type MultiplicityType = ASTType<typeof Multiplicity>;
  * Allows referencing an enum type in a property definition.
  */
 export const EnumTypeReference = createInterface("EnumTypeReference").attrs({
-    enum: Ref(() => EnumOrImport)
+    enum: Ref(() => Enum)
 });
 
 /**
@@ -177,46 +176,56 @@ export const Property = createInterface("Property").attrs({
 export type PropertyType = ASTType<typeof Property>;
 
 /**
+ * Forward declaration for ClassType to break circular reference.
+ * This defines the shape of a Class AST node for use in Ref() types.
+ */
+export interface ClassType extends AstNode {
+    name: string;
+    isAbstract: boolean;
+    extensions: ClassExtensionsType | undefined;
+    properties: PropertyType[];
+}
+
+/**
+ * Forward declaration for ClassExtensionType to break circular reference.
+ */
+export interface ClassExtensionType extends AstNode {
+    class: Reference<ClassType>;
+}
+
+/**
+ * Forward declaration for ClassExtensionsType to break circular reference.
+ */
+export interface ClassExtensionsType extends AstNode {
+    extensions: ClassExtensionType[];
+}
+
+/**
  * Class extension definition.
  * Represents a reference to a parent class in an inheritance relationship.
  */
-export const ClassExtension = createInterface("ClassExtension").attrs({
-    class: Ref(() => ClassOrImport)
+export const ClassExtension: Interface<ClassExtensionType> = createInterface("ClassExtension").attrs({
+    class: Ref(() => Class)
 });
-
-/**
- * Type representing a ClassExtension AST node.
- */
-export type ClassExtensionType = ASTType<typeof ClassExtension>;
 
 /**
  * ClassExtensions definition.
  * Wraps the extends keyword and list of class extensions.
  */
-export const ClassExtensions = createInterface("ClassExtensions").attrs({
+export const ClassExtensions: Interface<ClassExtensionsType> = createInterface("ClassExtensions").attrs({
     extensions: [ClassExtension]
 });
-
-/**
- * Type representing a ClassExtensions AST node.
- */
-export type ClassExtensionsType = ASTType<typeof ClassExtensions>;
 
 /**
  * Class definition.
  * Represents a class in the metamodel with properties and inheritance relationships.
  */
-export const Class = createInterface("Class").attrs({
+export const Class: Interface<ClassType> = createInterface("Class").attrs({
     name: String,
     isAbstract: Boolean,
     extensions: Optional(ClassExtensions),
     properties: [Property]
 });
-
-/**
- * Type representing a Class AST node.
- */
-export type ClassType = ASTType<typeof Class>;
 
 /**
  * Union type for Class or Enum.
@@ -229,22 +238,12 @@ export const ClassOrEnum = createType("ClassOrEnum").types(Class, Enum);
 export type ClassOrEnumType = ASTType<typeof ClassOrEnum>;
 
 /**
- * File scoping configuration for classes.
- * Enables cross-file references and imports for classes.
+ * Simplified file import definition.
+ * Represents an import statement that imports an entire file.
  */
-export const metamodelFileScopingConfig = new FileScopingConfig<ClassOrEnumType>("ClassOrEnum", ClassOrEnum);
-
-/**
- * Import types for classes.
- * Generated types for importing classes from other files.
- */
-export const { importType: ClassOrEnumImport, fileImportType: FileImport } =
-    generateImportTypes(metamodelFileScopingConfig);
-
-/**
- * Type representing ClassOrEnumImport AST node.
- */
-export type ClassOrEnumImportType = ASTType<typeof ClassOrEnumImport>;
+export const FileImport = createInterface("FileImport").attrs({
+    file: String
+});
 
 /**
  * Type representing FileImport AST node.
@@ -252,33 +251,11 @@ export type ClassOrEnumImportType = ASTType<typeof ClassOrEnumImport>;
 export type FileImportType = ASTType<typeof FileImport>;
 
 /**
- * Union type for Class or ClassOrEnumImport.
- * Used for references that can point to either a locally defined or imported class.
- */
-export const ClassOrImport: BaseType<AstNode> = createType("ClassOrImport").types(Class, ClassOrEnumImport);
-
-/**
- * Type representing ClassOrImport AST node.
- */
-export type ClassOrImportType = ASTType<typeof ClassOrImport>;
-
-/**
- * Union type for Class or ClassOrEnumImport.
- * Used for references that can point to either a locally defined or imported class.
- */
-export const EnumOrImport: BaseType<AstNode> = createType("EnumOrImport").types(Enum, ClassOrEnumImport);
-
-/**
- * Type representing EnumOrImport AST node.
- */
-export type EnumOrImportType = ASTType<typeof EnumOrImport>;
-
-/**
  * Association end definition.
  * Represents one end of an association or composition relationship.
  */
 export const AssociationEnd = createInterface("AssociationEnd").attrs({
-    class: Ref(() => ClassOrImport),
+    class: Ref(() => Class),
     name: Optional(String),
     multiplicity: Optional(Multiplicity)
 });

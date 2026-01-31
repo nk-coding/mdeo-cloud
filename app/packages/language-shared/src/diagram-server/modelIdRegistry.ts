@@ -97,17 +97,17 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
      * @param rootNode The root node to start traversal from
      */
     private generateIds(rootNode: AstNode): void {
-        const stream = AstUtils.streamAllContents(rootNode);
+        const rootNodes = [rootNode, ...this.idProvider.getAdditional(rootNode)];
+        for (const root of rootNodes) {
+            const stream = AstUtils.streamAllContents(root);
 
-        for (const node of stream) {
-            const baseId = this.idProvider.getId(node);
-            if (baseId !== undefined) {
-                const uniqueId = this.ensureUnique(baseId);
-                this.idMap.set(node, uniqueId);
-                for (const additionalNode of this.idProvider.getAdditional(node)) {
-                    this.idMap.set(additionalNode, uniqueId);
+            for (const node of stream) {
+                const baseId = this.idProvider.getId(node);
+                if (baseId !== undefined) {
+                    const uniqueId = this.ensureUnique(baseId);
+                    this.idMap.set(node, uniqueId);
+                    this.usedIds.add(uniqueId);
                 }
-                this.usedIds.add(uniqueId);
             }
         }
     }

@@ -1,12 +1,16 @@
-import type { ValidationAcceptor, ValidationChecks, AstNode } from "langium";
+import type {
+    ValidationAcceptor,
+    ValidationChecks,
+    AstNode,
+    LangiumDocuments,
+    AstNodeDescriptionProvider,
+    LangiumDocument
+} from "langium";
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
-import { MultiMap } from "langium";
 import {
     Association,
     Class,
-    ClassOrEnumImport,
     Enum,
-    EnumTypeReference,
     MetaModel,
     RangeMultiplicity,
     SingleMultiplicity,
@@ -16,11 +20,16 @@ import {
     type ClassType,
     type EnumEntryType,
     type EnumType,
+    type FileImportType,
     type MetaModelType,
     type MultiplicityType,
     type PropertyType
 } from "../grammar/metamodelTypes.js";
-import { resolveClassChain, resolveImport, resolveToClass, resolveToEnum } from "../features/semanticInformation.js";
+import { resolveClassChain } from "../features/semanticInformation.js";
+import { sharedImport } from "@mdeo/language-shared";
+import { getExportedEntitiesFromMetamodelFile, resolveImportedDocument } from "../features/importHelpers.js";
+
+const { MultiMap, AstUtils } = sharedImport("langium");
 
 /**
  * Interface mapping for metamodel AST types used in validation checks.
@@ -58,98 +67,62 @@ export function registerMetamodelValidationChecks(services: ExtendedLangiumServi
  */
 export class MetamodelValidator {
     private readonly reflection: AstReflection;
+    private readonly documents: LangiumDocuments;
+    private readonly descriptionProvider: AstNodeDescriptionProvider;
 
     constructor(private readonly services: ExtendedLangiumServices) {
         this.reflection = services.shared.AstReflection;
+        this.documents = services.shared.workspace.LangiumDocuments;
+        this.descriptionProvider = services.workspace.AstNodeDescriptionProvider;
     }
 
     /**
-     * Validates the entire metamodel for class/enum name uniqueness.
+     * Validates the entire metamodel for class/enum name uniqueness and import cycles.
      * This validation considers:
      * - Classes/enums declared directly in the file
-     * - Imported classes/enums (using their alias if specified, otherwise the original name)
-     * - Enums used in properties of classes in the class chain
+     * - Imported classes/enums from all imported files (transitively)
+     *
+     * @param metaModel The metamodel to validate
+     * @param accept The validation acceptor for reporting errors
      */
     validateMetaModel(metaModel: MetaModelType, accept: ValidationAcceptor): void {
         this.validateClassEnumNameUniqueness(metaModel, accept);
+        this.validateNoCyclicImports(metaModel, accept);
     }
 
     /**
-     * Validates that class and enum names are unique.
-     * Collects names from:
-     * 1. Classes directly declared in the file
-     * 2. Enums directly declared in the file
-     * 3. Imported entities (using alias if provided)
-     * 4. Enums used in properties within the class chain (using import alias if imported under different name)
+     * Validates that class and enum names are unique within the metamodel.
+     * Checks for conflicts between local entities and imported entities.
+     *
+     * @param metaModel The metamodel to validate
+     * @param accept The validation acceptor for reporting errors
      */
     private validateClassEnumNameUniqueness(metaModel: MetaModelType, accept: ValidationAcceptor): void {
+        this.checkLocalNameConflicts(metaModel, accept);
+        this.checkImportedNameConflicts(metaModel, accept);
+    }
+
+    /**
+     * Checks for duplicate names among local classes and enums.
+     *
+     * @param metaModel The metamodel to validate
+     * @param accept The validation acceptor for reporting errors
+     * @returns Set of locally defined entity names
+     */
+    private checkLocalNameConflicts(metaModel: MetaModelType, accept: ValidationAcceptor): Set<string> {
         const nameToNodes = new MultiMap<string, AstNode>();
-        const importedClasses: ClassType[] = [];
-        const importedEnumes: Set<EnumType> = new Set();
-
-        for (const fileImport of metaModel.imports ?? []) {
-            for (const entityImport of fileImport.imports ?? []) {
-                const resolvedEntity = resolveImport(entityImport, this.reflection);
-                if (resolvedEntity == undefined) {
-                    continue;
-                }
-                nameToNodes.add(entityImport.name ?? entityImport.entity.$refText, entityImport);
-                if (this.reflection.isInstance(resolvedEntity, Class)) {
-                    importedClasses.push(resolvedEntity);
-                } else if (this.reflection.isInstance(resolvedEntity, Enum)) {
-                    importedEnumes.add(resolvedEntity);
-                }
-            }
-        }
-
-        const declaredClasses: ClassType[] = [];
-        const declaredEnums: EnumType[] = [];
+        const localNames = new Set<string>();
 
         for (const element of metaModel.elements ?? []) {
             if (this.reflection.isInstance(element, Class)) {
-                declaredClasses.push(element);
                 if (element.name) {
                     nameToNodes.add(element.name, element);
+                    localNames.add(element.name);
                 }
             } else if (this.reflection.isInstance(element, Enum)) {
-                declaredEnums.push(element);
                 if (element.name) {
                     nameToNodes.add(element.name, element);
-                }
-            }
-        }
-
-        const usedEnums = new Set<EnumType>();
-
-        for (const cls of [...declaredClasses, ...importedClasses]) {
-            const classChain = resolveClassChain(cls, this.reflection);
-            for (const chainClass of classChain) {
-                for (const property of chainClass.properties ?? []) {
-                    if (!this.reflection.isInstance(property.type, EnumTypeReference)) {
-                        continue;
-                    }
-                    const enumRef = property.type.enum?.ref;
-                    if (enumRef == undefined) {
-                        continue;
-                    }
-                    const resolvedEnum = resolveToEnum(enumRef, this.reflection);
-                    if (resolvedEnum == undefined || usedEnums.has(resolvedEnum)) {
-                        continue;
-                    }
-                    usedEnums.add(resolvedEnum);
-                    if (importedEnumes.has(resolvedEnum)) {
-                        continue;
-                    }
-
-                    const usedEnumMetaModel = getContainingMetaModel(resolvedEnum, this.reflection);
-                    const currentMetaModel = metaModel;
-                    if (usedEnumMetaModel === currentMetaModel) {
-                        continue;
-                    }
-
-                    if (resolvedEnum.name) {
-                        nameToNodes.add(resolvedEnum.name, cls);
-                    }
+                    localNames.add(element.name);
                 }
             }
         }
@@ -158,9 +131,6 @@ export class MetamodelValidator {
             if (nodes.length > 1) {
                 for (const node of nodes) {
                     const nodeType = this.getNodeTypeDescription(node);
-                    if (getContainingMetaModel(node, this.reflection) !== metaModel) {
-                        continue;
-                    }
                     accept("error", `Duplicate ${nodeType} name: '${name}'.`, {
                         node,
                         property: this.getNameProperty(node)
@@ -168,6 +138,279 @@ export class MetamodelValidator {
                 }
             }
         }
+
+        return localNames;
+    }
+
+    /**
+     * Checks for name conflicts between local entities and imported entities.
+     * Same entity imported through different paths is NOT a conflict (deduplicated by node).
+     * Different entities with the same name IS a conflict.
+     *
+     * @param metaModel The metamodel to validate
+     * @param accept The validation acceptor for reporting errors
+     */
+    private checkImportedNameConflicts(metaModel: MetaModelType, accept: ValidationAcceptor): void {
+        const document = AstUtils.getDocument(metaModel);
+        if (document == undefined) {
+            return;
+        }
+
+        const importedByName = this.collectImportedEntitiesByName(document, metaModel);
+
+        this.reportLocalImportConflicts(metaModel, importedByName, accept);
+        this.reportImportImportConflicts(importedByName, accept);
+    }
+
+    /**
+     * Collects all imported entities grouped by name.
+     * Uses a Map to deduplicate entities by their actual node identity.
+     *
+     * @param document The current document
+     * @param metaModel The metamodel containing imports
+     * @returns Map from entity name to Set of unique entities with that name
+     */
+    private collectImportedEntitiesByName(
+        document: LangiumDocument,
+        metaModel: MetaModelType
+    ): Map<string, Set<ClassType | EnumType>> {
+        const importedByName = new Map<string, Set<ClassType | EnumType>>();
+
+        for (const importStmt of metaModel.imports ?? []) {
+            const importedDoc = resolveImportedDocument(document, importStmt, this.documents);
+            if (importedDoc == undefined) {
+                continue;
+            }
+
+            const exports = getExportedEntitiesFromMetamodelFile(importedDoc, this.documents);
+
+            this.addExportsToNameMap(exports.classes, importedByName);
+            this.addExportsToNameMap(exports.enums, importedByName);
+        }
+
+        return importedByName;
+    }
+
+    /**
+     * Adds exported entities to a name-to-entities map.
+     *
+     * @param exports Set of exported entities
+     * @param nameMap Target map to add entities to
+     */
+    private addExportsToNameMap(
+        exports: Set<ClassType | EnumType>,
+        nameMap: Map<string, Set<ClassType | EnumType>>
+    ): void {
+        for (const entity of exports) {
+            const name = entity.name;
+            if (name == undefined) {
+                continue;
+            }
+
+            if (!nameMap.has(name)) {
+                nameMap.set(name, new Set());
+            }
+            nameMap.get(name)!.add(entity);
+        }
+    }
+
+    /**
+     * Reports conflicts between local entities and imported entities.
+     *
+     * @param metaModel The metamodel to validate
+     * @param importedByName Map of imported entity names to entities
+     * @param accept The validation acceptor
+     */
+    private reportLocalImportConflicts(
+        metaModel: MetaModelType,
+        importedByName: Map<string, Set<ClassType | EnumType>>,
+        accept: ValidationAcceptor
+    ): void {
+        for (const element of metaModel.elements ?? []) {
+            if (!this.reflection.isInstance(element, Class) && !this.reflection.isInstance(element, Enum)) {
+                continue;
+            }
+
+            const name = element.name;
+            if (name == undefined || !importedByName.has(name)) {
+                continue;
+            }
+
+            const nodeType = this.getNodeTypeDescription(element);
+            accept("error", `Local ${nodeType} '${name}' conflicts with an imported entity of the same name.`, {
+                node: element,
+                property: "name"
+            });
+        }
+    }
+
+    /**
+     * Reports conflicts where different imported entities have the same name.
+     *
+     * @param importedByName Map of imported entity names to entities
+     * @param accept The validation acceptor
+     */
+    private reportImportImportConflicts(
+        importedByName: Map<string, Set<ClassType | EnumType>>,
+        accept: ValidationAcceptor
+    ): void {
+        for (const [name, entities] of importedByName.entries()) {
+            if (entities.size <= 1) {
+                continue;
+            }
+
+            for (const entity of entities) {
+                const nodeType = this.reflection.isInstance(entity, Class) ? "class" : "enum";
+                accept(
+                    "error",
+                    `Imported ${nodeType} '${name}' conflicts with another imported entity of the same name.`,
+                    {
+                        node: entity,
+                        property: "name"
+                    }
+                );
+            }
+        }
+    }
+
+    /**
+     * Validates that there are no cyclic import dependencies.
+     * Cyclic imports are technically allowed for resolution but should warn users.
+     * Also validates that import paths are non-empty and resolvable.
+     *
+     * @param metaModel The metamodel to validate
+     * @param accept The validation acceptor
+     */
+    private validateNoCyclicImports(metaModel: MetaModelType, accept: ValidationAcceptor): void {
+        const document = AstUtils.getDocument(metaModel);
+        if (document == undefined) {
+            return;
+        }
+
+        const currentPath: string[] = [document.uri.toString()];
+        const visited = new Set<string>();
+
+        for (const importStmt of metaModel.imports ?? []) {
+            if (!this.validateImportPath(document, importStmt, accept)) {
+                continue;
+            }
+            this.detectCyclicImport(document, importStmt, currentPath, visited, accept);
+        }
+    }
+
+    /**
+     * Validates that an import path is non-empty and resolvable.
+     *
+     * @param document The document containing the import
+     * @param importStmt The import statement to validate
+     * @param accept The validation acceptor for reporting errors
+     * @returns True if the import path is valid and resolvable, false otherwise
+     */
+    private validateImportPath(
+        document: LangiumDocument,
+        importStmt: FileImportType,
+        accept: ValidationAcceptor
+    ): boolean {
+        if (!importStmt.file || importStmt.file.trim().length === 0) {
+            accept("error", "Import path cannot be empty", {
+                node: importStmt,
+                property: "file"
+            });
+            return false;
+        }
+
+        const importedDoc = resolveImportedDocument(document, importStmt, this.documents);
+        if (importedDoc == undefined) {
+            accept("error", `Cannot resolve import: '${importStmt.file}'`, {
+                node: importStmt,
+                property: "file"
+            });
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Recursively detects cyclic imports using DFS traversal.
+     *
+     * @param currentDocument The current document being traversed
+     * @param importStmt The import statement to follow
+     * @param currentPath Stack of URIs in the current traversal path
+     * @param visited Set of fully processed document URIs
+     * @param accept The validation acceptor
+     */
+    private detectCyclicImport(
+        currentDocument: LangiumDocument,
+        importStmt: FileImportType,
+        currentPath: string[],
+        visited: Set<string>,
+        accept: ValidationAcceptor
+    ): void {
+        const importedDoc = resolveImportedDocument(currentDocument, importStmt, this.documents);
+        if (importedDoc == undefined) {
+            return;
+        }
+
+        const importedUri = importedDoc.uri.toString();
+
+        if (currentPath.includes(importedUri)) {
+            this.reportCyclicImport(importStmt, currentPath, importedUri, accept);
+            return;
+        }
+
+        if (visited.has(importedUri)) {
+            return;
+        }
+
+        currentPath.push(importedUri);
+        const importedMetaModel = importedDoc.parseResult.value as MetaModelType;
+
+        if (importedMetaModel != undefined) {
+            for (const nestedImport of importedMetaModel.imports ?? []) {
+                this.detectCyclicImport(importedDoc, nestedImport, currentPath, visited, accept);
+            }
+        }
+
+        currentPath.pop();
+        visited.add(importedUri);
+    }
+
+    /**
+     * Reports a cyclic import warning with the cycle path.
+     *
+     * @param importStmt The import statement that creates the cycle
+     * @param currentPath The current path in the traversal
+     * @param cycleTarget The URI that completes the cycle
+     * @param accept The validation acceptor
+     */
+    private reportCyclicImport(
+        importStmt: FileImportType,
+        currentPath: string[],
+        cycleTarget: string,
+        accept: ValidationAcceptor
+    ): void {
+        const cycleStartIdx = currentPath.indexOf(cycleTarget);
+        const cyclePath = currentPath
+            .slice(cycleStartIdx)
+            .map((uri) => this.getFileNameFromUri(uri))
+            .concat(this.getFileNameFromUri(cycleTarget));
+
+        accept("warning", `Cyclic import detected: ${cyclePath.join(" → ")}`, {
+            node: importStmt,
+            property: "file"
+        });
+    }
+
+    /**
+     * Extracts the file name from a URI string.
+     *
+     * @param uri The URI string
+     * @returns The file name portion of the URI
+     */
+    private getFileNameFromUri(uri: string): string {
+        const parts = uri.split("/");
+        return parts[parts.length - 1] ?? uri;
     }
 
     /**
@@ -296,7 +539,7 @@ export class MetamodelValidator {
      */
     private validateAssociationPropertyUniqueness(association: AssociationType, accept: ValidationAcceptor): void {
         if (association.source?.name) {
-            const sourceClass = resolveToClass(association.source.class?.ref, this.reflection);
+            const sourceClass = association.source.class?.ref;
             if (sourceClass) {
                 const existingNames = this.collectPropertyNamesExcludingCurrentEnd(sourceClass, association, "source");
                 if (existingNames.includes(association.source.name)) {
@@ -310,7 +553,7 @@ export class MetamodelValidator {
         }
 
         if (association.target?.name) {
-            const targetClass = resolveToClass(association.target.class?.ref, this.reflection);
+            const targetClass = association.target.class?.ref;
             if (targetClass) {
                 const existingNames = this.collectPropertyNamesExcludingCurrentEnd(targetClass, association, "target");
                 if (existingNames.includes(association.target.name)) {
@@ -351,12 +594,12 @@ export class MetamodelValidator {
                         const isCurrentSourceEnd = assoc === currentAssociation && currentEnd === "source";
                         const isCurrentTargetEnd = assoc === currentAssociation && currentEnd === "target";
 
-                        const sourceClass = resolveToClass(assoc.source?.class?.ref, this.reflection);
+                        const sourceClass = assoc.source?.class?.ref;
                         if (sourceClass === cls && assoc.source?.name && !isCurrentSourceEnd) {
                             propertyNames.push(assoc.source.name);
                         }
 
-                        const targetClass = resolveToClass(assoc.target?.class?.ref, this.reflection);
+                        const targetClass = assoc.target?.class?.ref;
                         if (targetClass === cls && assoc.target?.name && !isCurrentTargetEnd) {
                             propertyNames.push(assoc.target.name);
                         }
@@ -537,7 +780,7 @@ export class MetamodelValidator {
         }
 
         if (sourceHasProperty && association.source?.class?.ref != undefined) {
-            if (resolveToClass(association.source.class.ref, this.reflection)?.$container !== association.$container) {
+            if (association.source.class.ref.$container !== association.$container) {
                 accept(
                     "error",
                     `Cannot define a property on an association end for imported class '${association.source.name}'.`,
@@ -549,7 +792,7 @@ export class MetamodelValidator {
             }
         }
         if (targetHasProperty && association.target?.class?.ref != undefined) {
-            if (resolveToClass(association.target.class.ref, this.reflection)?.$container !== association.$container) {
+            if (association.target.class.ref.$container !== association.$container) {
                 accept(
                     "error",
                     `Cannot define a property on an association end for imported class '${association.target.name}'.`,
@@ -610,7 +853,7 @@ export class MetamodelValidator {
             return;
         }
 
-        const oppositeClass = resolveToClass(oppositeEnd.class?.ref, this.reflection);
+        const oppositeClass = oppositeEnd.class?.ref;
         if (!oppositeClass) {
             return;
         }
@@ -643,7 +886,7 @@ export class MetamodelValidator {
             switch (operator) {
                 case MetamodelAssociationOperators.COMPOSITION_SOURCE:
                 case MetamodelAssociationOperators.COMPOSITION_SOURCE_NAVIGABLE_TARGET: {
-                    const targetCls = resolveToClass(assoc.target?.class?.ref, this.reflection);
+                    const targetCls = assoc.target?.class?.ref;
                     if (targetCls && targetClassChain.has(targetCls)) {
                         count++;
                     }
@@ -652,7 +895,7 @@ export class MetamodelValidator {
 
                 case MetamodelAssociationOperators.COMPOSITION_TARGET:
                 case MetamodelAssociationOperators.COMPOSITION_TARGET_NAVIGABLE_SOURCE: {
-                    const sourceCls = resolveToClass(assoc.source?.class?.ref, this.reflection);
+                    const sourceCls = assoc.source?.class?.ref;
                     if (sourceCls && targetClassChain.has(sourceCls)) {
                         count++;
                     }
@@ -766,6 +1009,9 @@ export class MetamodelValidator {
 
     /**
      * Gets a description of the node type for error messages.
+     *
+     * @param node The AST node to describe
+     * @returns A human-readable description of the node type
      */
     private getNodeTypeDescription(node: AstNode): string {
         if (this.reflection.isInstance(node, Class)) {
@@ -774,20 +1020,17 @@ export class MetamodelValidator {
         if (this.reflection.isInstance(node, Enum)) {
             return "enum";
         }
-        if (this.reflection.isInstance(node, ClassOrEnumImport)) {
-            return "imported entity";
-        }
         return "element";
     }
 
     /**
      * Gets the property to highlight for a given node.
+     *
+     * @param node The AST node
+     * @returns The property name to highlight, or undefined
      */
     private getNameProperty(node: AstNode): string | undefined {
         if (this.reflection.isInstance(node, Class) || this.reflection.isInstance(node, Enum)) {
-            return "name";
-        }
-        if (this.reflection.isInstance(node, ClassOrEnumImport)) {
             return "name";
         }
         return undefined;
@@ -821,12 +1064,12 @@ export function collectAllPropertyNames(classType: ClassType, reflection: AstRef
                 if (reflection.isInstance(element, Association)) {
                     const assoc = element;
 
-                    const sourceClass = resolveToClass(assoc.source?.class?.ref, reflection);
+                    const sourceClass = assoc.source?.class?.ref;
                     if (sourceClass === cls && assoc.source?.name) {
                         propertyNames.push(assoc.source.name);
                     }
 
-                    const targetClass = resolveToClass(assoc.target?.class?.ref, reflection);
+                    const targetClass = assoc.target?.class?.ref;
                     if (targetClass === cls && assoc.target?.name) {
                         propertyNames.push(assoc.target.name);
                     }

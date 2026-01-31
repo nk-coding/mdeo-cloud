@@ -11,6 +11,7 @@ application {
 
 dependencies {
     implementation(project(":common"))
+    implementation(project(":execution-common"))
     implementation(project(":expression"))
     implementation(project(":script"))
     
@@ -30,6 +31,7 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     
     // JWT for service-to-service authentication
+    // (provided by execution-common, but needed for compilation)
     implementation(libs.auth0.jwt)
     implementation(libs.auth0.jwks)
     

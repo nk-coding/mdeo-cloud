@@ -1,6 +1,6 @@
 import { createInterface, createType, Optional, Ref, type ASTType, type BaseType } from "@mdeo/language-common";
 import { ExpressionConfig, generateExpressionTypes, TypeConfig, generateTypeTypes } from "@mdeo/language-expression";
-import { ClassOrImport, Property } from "@mdeo/language-metamodel";
+import { Class, Property } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
 /**
@@ -42,11 +42,12 @@ export type PatternModifierType = ASTType<typeof PatternModifier>;
 
 /**
  * Variable declaration in a pattern.
- * Format: var name: type
+ * Format: var name[: type] = expression
  */
 export const PatternVariable = createInterface("PatternVariable").attrs({
     name: String,
-    type: typeTypes.baseTypeType
+    type: Optional(typeTypes.baseTypeType),
+    value: BaseExpression
 });
 
 /**
@@ -86,7 +87,7 @@ export type PatternPropertyAssignmentType = ASTType<typeof PatternPropertyAssign
 export const PatternObjectInstance = createInterface("PatternObjectInstance").attrs({
     modifier: Optional(PatternModifier),
     name: String,
-    class: Ref(() => ClassOrImport),
+    class: Ref(() => Class),
     properties: [PatternPropertyAssignment]
 });
 
@@ -200,14 +201,28 @@ export const MatchStatement = createInterface("MatchStatement").extends(BaseTran
 export type MatchStatementType = ASTType<typeof MatchStatement>;
 
 /**
+ * If-match condition scope containing the pattern and then block.
+ * This ensures the then block has the pattern in its parent scope.
+ * Format: match { pattern } then { block }
+ */
+export const IfMatchConditionAndBlock = createInterface("IfMatchConditionAndBlock").attrs({
+    pattern: Pattern,
+    thenBlock: StatementsScope
+});
+
+/**
+ * Type representing an IfMatchCondition AST node.
+ */
+export type IfMatchConditionAndBlockType = ASTType<typeof IfMatchConditionAndBlock>;
+
+/**
  * If-match statement with conditional pattern matching.
  * Format: if match { pattern } then { block } [else { block }]
  */
 export const IfMatchStatement = createInterface("IfMatchStatement")
     .extends(BaseTransformationStatement)
     .attrs({
-        pattern: Pattern,
-        thenBlock: StatementsScope,
+        ifBlock: IfMatchConditionAndBlock,
         elseBlock: Optional(StatementsScope)
     });
 
@@ -408,6 +423,7 @@ export const statementTypes = {
     baseTransformationStatementType: BaseTransformationStatement,
     statementsScopeType: StatementsScope,
     matchStatementType: MatchStatement,
+    ifMatchConditionType: IfMatchConditionAndBlock,
     ifMatchStatementType: IfMatchStatement,
     whileMatchStatementType: WhileMatchStatement,
     untilMatchStatementType: UntilMatchStatement,

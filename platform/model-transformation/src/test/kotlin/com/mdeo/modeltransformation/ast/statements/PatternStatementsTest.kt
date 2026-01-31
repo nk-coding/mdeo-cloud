@@ -50,7 +50,7 @@ class PatternStatementsTest {
             "kind": "match",
             "pattern": {
                 "elements": [
-                    {"kind": "variable", "variable": {"name": "x", "type": 0}},
+                    {"kind": "variable", "variable": {"name": "x", "type": 0, "value": {"kind": "intLiteral", "evalType": 0, "value": "42"}}},
                     {"kind": "objectInstance", "objectInstance": {"name": "obj", "className": "MyClass", "properties": []}}
                 ]
             }
@@ -303,7 +303,7 @@ class PatternStatementsTest {
             "kind": "untilMatch",
             "pattern": {
                 "elements": [
-                    {"kind": "variable", "variable": {"name": "done", "type": 0}}
+                    {"kind": "variable", "variable": {"name": "done", "type": 0, "value": {"kind": "booleanLiteral", "evalType": 0, "value": true}}}
                 ]
             },
             "doBlock": []
@@ -395,7 +395,13 @@ class PatternStatementsTest {
                 "elements": [
                     {"kind": "objectInstance", "objectInstance": {"name": "a", "className": "A", "properties": []}},
                     {"kind": "objectInstance", "objectInstance": {"name": "b", "className": "B", "properties": []}},
-                    {"kind": "link", "link": {"source": {"objectName": "a"}, "target": {"objectName": "b"}}},
+                    {"kind": "link", "link": {
+            "name": "b",
+            "isOutgoing": true,"source": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "a"}, "target": {
+            "name": "b",
+            "isOutgoing": true,"objectName": "b"}}},
                     {"kind": "whereClause", "whereClause": {"expression": {"kind": "booleanLiteral", "evalType": 0, "value": true}}}
                 ]
             },

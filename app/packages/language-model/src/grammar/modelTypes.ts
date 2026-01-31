@@ -1,5 +1,5 @@
 import { createInterface, createType, Optional, Ref, type ASTType, type BaseType } from "@mdeo/language-common";
-import { ClassOrImport, EnumEntry, Property } from "@mdeo/language-metamodel";
+import { Class, EnumEntry, Property } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
 /**
@@ -85,7 +85,7 @@ export type PropertyAssignmentType = ASTType<typeof PropertyAssignment>;
  */
 export const ObjectInstance = createInterface("ObjectInstance").attrs({
     name: String,
-    class: Ref(() => ClassOrImport),
+    class: Ref(() => Class),
     properties: [PropertyAssignment]
 });
 

@@ -1,0 +1,99 @@
+package com.mdeo.modeltransformation.stdlib.types
+
+import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
+import com.mdeo.modeltransformation.compiler.registry.gremlinType
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
+
+/**
+ * Creates the Float type definition.
+ *
+ * Float methods are implemented using Gremlin's `math()` step for pure
+ * traversal-based computation including floor, ceiling, and round.
+ */
+@Suppress("UNCHECKED_CAST")
+fun createFloatType(): GremlinTypeDefinition {
+    return gremlinType("builtin.float")
+        .extends("builtin.any")
+        .method("abs", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("abs(_)")
+            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("floor", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("floor(_)")
+            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("ceiling", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("ceil(_)")
+            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("round", "", 0) { receiver, _ ->
+            // Gremlin math doesn't have round, use floor(x + 0.5) as approximation
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("floor(_ + 0.5)")
+            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("log", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("log(_)")
+            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("log10", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("log10(_)")
+            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("pow", "", 1) { receiver, args ->
+            val expValue = args.firstOrNull()?.constantValue
+            val expr = if (expValue != null) "_ ^ $expValue" else "_ ^ exp"
+            val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
+            val result = if (expValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("max", "builtin.int", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("max(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("max", "builtin.long", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("max(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("max", "builtin.float", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("max(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("max", "builtin.double", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("max(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("min", "builtin.int", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("min(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("min", "builtin.long", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("min(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("min", "builtin.float", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("min(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .method("min", "builtin.double", 1) { receiver, args ->
+            val otherValue = args.firstOrNull()?.constantValue
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("min(_, ${otherValue ?: "other"})")
+            val result = if (otherValue == null && args.isNotEmpty()) traversal.by(args.first().traversal) else traversal
+            TraversalCompilationResult.of(result as GraphTraversal<Any, Any>)
+        }
+        .build()
+}

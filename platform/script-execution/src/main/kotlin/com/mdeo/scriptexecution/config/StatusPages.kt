@@ -1,21 +1,18 @@
+@file:Suppress("unused")
 package com.mdeo.scriptexecution.config
 
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.plugins.statuspages.*
-import io.ktor.server.response.*
+/**
+ * Re-exports status pages configuration from execution-common.
+ * This file maintains backward compatibility for existing imports.
+ *
+ * @see com.mdeo.execution.common.config.configureStatusPages
+ */
+
+import io.ktor.server.application.Application
+import com.mdeo.execution.common.config.configureStatusPages as commonConfigureStatusPages
 
 /**
  * Configures status pages for error handling.
+ * Delegates to execution-common implementation.
  */
-fun Application.configureStatusPages() {
-    install(StatusPages) {
-        exception<Throwable> { call, cause ->
-            call.application.environment.log.error("Unhandled exception", cause)
-            call.respond(
-                HttpStatusCode.InternalServerError,
-                mapOf("error" to (cause.message ?: "Internal server error"))
-            )
-        }
-    }
-}
+fun Application.configureStatusPages() = commonConfigureStatusPages()

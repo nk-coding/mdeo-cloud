@@ -134,8 +134,24 @@ initializePluginContext();
 
 const { modelTransformationPluginProvider } = await import("@mdeo/language-model-transformation");
 const { typedAstHandler, TYPED_AST_HANDLER_KEY } = await import("./handler/typedAstHandler.js");
+const { ModelTransformationExecutionHandler } = await import("./handler/modelTransformationExecutionHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
+
+/**
+ * URL of the model-transformation-execution backend service.
+ * Defaults to http://localhost:8082 if not specified.
+ */
+const modelTransformationExecutionServiceUrl =
+    process.env.MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL ?? "http://localhost:8082";
+
+/**
+ * Execution handler for model transformation executions.
+ * Forwards execution requests to the model-transformation-execution backend service.
+ */
+const modelTransformationExecutionHandler = new ModelTransformationExecutionHandler(
+    modelTransformationExecutionServiceUrl
+);
 
 const config: ServiceConfig<ModelTransformationServices> = {
     ...envConfig,
@@ -144,7 +160,8 @@ const config: ServiceConfig<ModelTransformationServices> = {
     handlers: {
         [AST_HANDLER_KEY]: astHandler,
         [TYPED_AST_HANDLER_KEY]: typedAstHandler
-    }
+    },
+    executionHandlers: [modelTransformationExecutionHandler]
 };
 
 await startLanguageService(config);

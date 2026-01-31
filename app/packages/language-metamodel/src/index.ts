@@ -1,6 +1,4 @@
-export * from "./action-handlers/importClassActionHandler.js";
-export * from "./action-handlers/importEntityActionHandler.js";
-export * from "./action-handlers/importEnumActionHandler.js";
+export * from "./action-handlers/importFileActionHandler.js";
 export * from "./features/diagram-server/handler/createClassOperationHandler.js";
 export * from "./features/diagram-server/handler/createEnumOperationHandler.js";
 export * from "./features/diagram-server/handler/metamodelApplyLabelEditOperationHandler.js";
@@ -29,6 +27,7 @@ export * from "./features/diagram-server/metamodelLayoutEngine.js";
 export * from "./features/diagram-server/metamodelMetadataManager.js";
 export * from "./features/diagram-server/metamodelModelIdProvider.js";
 export * from "./features/diagram-server/metamodelToolPaletteItemProvider.js";
+export * from "./features/importHelpers.js";
 export * from "./features/metamodelExternalReferenceCollector.js";
 export * from "./features/metamodelNameProvider.js";
 export * from "./features/metamodelScopeComputation.js";

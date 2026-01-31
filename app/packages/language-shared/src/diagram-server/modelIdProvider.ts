@@ -21,10 +21,9 @@ export interface ModelIdProvider {
     getId(node: AstNode): string | undefined;
 
     /**
-     * Gets additional AST nodes that should be assigned the same ID as the given node.
-     * This should be used when multiple AST nodes semantically represent the same entity.
+     * Gets called with the root node to provide additional (root) nodes to analyze and index
      *
-     * @param node The AST node to get additional nodes for
+     * @param node The root AST Node
      * @returns An array of additional AST nodes
      */
     getAdditional(node: AstNode): AstNode[];

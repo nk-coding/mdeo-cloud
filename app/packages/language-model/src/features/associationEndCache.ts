@@ -3,12 +3,9 @@ import { sharedImport } from "@mdeo/language-shared";
 import type { LangiumSharedCoreServices, URI, DocumentCache as DocumentCacheType } from "langium";
 import {
     Association,
-    Class,
-    ClassOrEnumImport,
     MetaModel,
     type AssociationEndType,
     type AssociationType,
-    type ClassOrImportType,
     type ClassType,
     type MetaModelType
 } from "@mdeo/language-metamodel";
@@ -66,31 +63,25 @@ export class AssociationEndCache {
      *
      * Results are cached per document to avoid repeated computation.
      *
-     * @param classOrImport The class or class import to find association ends for
+     * @param classType The class to find association ends for
      * @returns Array of association ends that reference this class
      */
-    getAssociationEndsForClass(classOrImport: ClassOrImportType): AssociationEndType[] {
-        // Resolve class import to actual class
-        const targetClass = this.resolveClass(classOrImport);
-        if (!targetClass) {
-            return [];
-        }
-
+    getAssociationEndsForClass(classType: ClassType): AssociationEndType[] {
         // Get the document containing the class
-        const document = AstUtils.getDocument(targetClass);
+        const document = AstUtils.getDocument(classType);
         if (!document) {
             return [];
         }
 
         // Try to get from cache first
-        const cachedResult = this.cache.get(document.uri, targetClass);
+        const cachedResult = this.cache.get(document.uri, classType);
         if (cachedResult !== undefined) {
             return cachedResult;
         }
 
         // Compute and cache the result
-        const associationEnds = this.computeAssociationEndsForClass(targetClass, document.uri);
-        this.cache.set(document.uri, targetClass, associationEnds);
+        const associationEnds = this.computeAssociationEndsForClass(classType, document.uri);
+        this.cache.set(document.uri, classType, associationEnds);
 
         return associationEnds;
     }
@@ -125,20 +116,16 @@ export class AssociationEndCache {
 
         // For each association, check if any end references our target class
         for (const association of associations) {
-            // Check source end
-            if (association.source?.class?.ref) {
-                const sourceClass = this.resolveClass(association.source.class.ref);
-                if (sourceClass === targetClass && association.source.name) {
-                    result.push(association.source);
-                }
+            // Check source end - association.source.class now directly references Class
+            const sourceClass = association.source?.class?.ref as ClassType | undefined;
+            if (sourceClass === targetClass && association.source.name) {
+                result.push(association.source);
             }
 
-            // Check target end
-            if (association.target?.class?.ref) {
-                const targetClassRef = this.resolveClass(association.target.class.ref);
-                if (targetClassRef === targetClass && association.target.name) {
-                    result.push(association.target);
-                }
+            // Check target end - association.target.class now directly references Class
+            const targetClassRef = association.target?.class?.ref as ClassType | undefined;
+            if (targetClassRef === targetClass && association.target.name) {
+                result.push(association.target);
             }
         }
 
@@ -161,24 +148,6 @@ export class AssociationEndCache {
         }
 
         return associations;
-    }
-
-    /**
-     * Resolves a class or class import to the actual class.
-     *
-     * @param classOrImport The class or class import to resolve
-     * @returns The resolved class, or undefined if resolution fails
-     */
-    private resolveClass(classOrImport: ClassOrImportType): ClassType | undefined {
-        if (this.astReflection.isInstance(classOrImport, Class)) {
-            return classOrImport;
-        } else if (this.astReflection.isInstance(classOrImport, ClassOrEnumImport)) {
-            const resolved = classOrImport.entity?.ref;
-            if (resolved && this.astReflection.isInstance(resolved, Class)) {
-                return resolved;
-            }
-        }
-        return undefined;
     }
 
     /**

@@ -86,6 +86,7 @@ export class ScriptTypedAstConverter extends StatementTypedAstConverter {
 
         return {
             types: this.types,
+            classes: [],
             imports,
             functions
         };

@@ -1,19 +1,18 @@
+@file:Suppress("unused")
 package com.mdeo.scriptexecution.config
 
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.application.*
-import io.ktor.server.plugins.contentnegotiation.*
-import kotlinx.serialization.json.Json
+import io.ktor.server.application.Application
+import com.mdeo.execution.common.config.configureSerialization as commonConfigureSerialization
+
+/**
+ * Re-exports serialization configuration from execution-common.
+ * This file maintains backward compatibility for existing imports.
+ *
+ * @see com.mdeo.execution.common.config.configureSerialization
+ */
 
 /**
  * Configures JSON serialization for the application.
+ * Delegates to execution-common implementation.
  */
-fun Application.configureSerialization() {
-    install(ContentNegotiation) {
-        json(Json {
-            prettyPrint = true
-            isLenient = true
-            ignoreUnknownKeys = true
-        })
-    }
-}
+fun Application.configureSerialization() = commonConfigureSerialization()

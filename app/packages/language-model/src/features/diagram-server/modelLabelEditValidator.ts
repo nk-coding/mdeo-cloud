@@ -13,6 +13,7 @@ import {
     RangeMultiplicity,
     SingleMultiplicity,
     MetamodelPrimitiveTypes,
+    isMultipleMultiplicity,
     type PropertyType,
     type ClassType,
     type EnumType,
@@ -25,7 +26,6 @@ import type { IToken } from "chevrotain";
 import { FLOAT, ID, INT, STRING } from "@mdeo/language-common";
 import { BOOLEAN } from "../../grammar/modelRules.js";
 import type { Lexer } from "langium";
-import { isMultipleMultiplicity } from "../../grammar/util.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");

@@ -15,7 +15,7 @@ import {
     optional,
     group
 } from "@mdeo/language-common";
-import { ClassOrImport, EnumEntry, Property } from "@mdeo/language-metamodel";
+import { Class, EnumEntry, Property } from "@mdeo/language-metamodel";
 import {
     SimpleValue,
     EnumValue,
@@ -101,7 +101,7 @@ export const ObjectInstanceRule = createRule("ObjectInstanceRule")
     .as(({ set, add }) => [
         set("name", ID),
         ":",
-        set("class", ref(ClassOrImport, ID)),
+        set("class", ref(Class, ID)),
         "{",
         many(or(add("properties", PropertyAssignmentRule), NEWLINE)),
         "}"

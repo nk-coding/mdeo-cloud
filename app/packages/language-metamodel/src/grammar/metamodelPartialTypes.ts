@@ -10,7 +10,6 @@ import type {
     MultiplicityType,
     SingleMultiplicityType,
     RangeMultiplicityType,
-    ClassOrEnumImportType,
     EnumType,
     EnumEntryType,
     EnumTypeReferenceType,
@@ -24,11 +23,6 @@ import type {
  * Partial metamodel type with optional domain properties.
  */
 export type PartialMetaModel = PartialAstNode<MetaModelType>;
-
-/**
- * Partial class import type with optional domain properties.
- */
-export type PartialClassOrEnumImport = PartialAstNode<ClassOrEnumImportType>;
 
 /**
  * Partial class type with optional domain properties.

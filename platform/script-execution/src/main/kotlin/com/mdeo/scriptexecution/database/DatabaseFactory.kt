@@ -1,19 +1,19 @@
 package com.mdeo.scriptexecution.database
 
-import com.mdeo.scriptexecution.config.DatabaseConfig
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import org.jetbrains.exposed.v1.jdbc.Database
+import com.mdeo.execution.common.config.DatabaseConfig
+import com.mdeo.execution.common.database.DatabaseFactory as CommonDatabaseFactory
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 
 /**
  * Factory object responsible for database connection management and schema initialization.
+ * Delegates core functionality to execution-common's DatabaseFactory while adding
+ * script-execution specific schema initialization.
  */
 object DatabaseFactory {
     private val logger = LoggerFactory.getLogger(DatabaseFactory::class.java)
-    private var dataSource: HikariDataSource? = null
+    private val commonFactory = CommonDatabaseFactory()
     
     /**
      * Initializes the database connection pool and creates tables.
@@ -21,26 +21,17 @@ object DatabaseFactory {
      * @param config Database configuration containing connection parameters
      */
     fun init(config: DatabaseConfig) {
-        logger.info("Initializing database connection to ${config.url}")
+        logger.info("Initializing script-execution database")
         
-        val hikariConfig = HikariConfig().apply {
-            jdbcUrl = config.url
-            username = config.user
-            password = config.password
-            maximumPoolSize = config.maxPoolSize
-            isAutoCommit = false
-            transactionIsolation = "TRANSACTION_READ_COMMITTED"
-            validate()
-        }
+        // Use execution-common's database factory for connection management
+        commonFactory.init(config)
         
-        dataSource = HikariDataSource(hikariConfig)
-        Database.connect(dataSource!!)
-        
+        // Create script-execution specific tables
         transaction {
             SchemaUtils.create(ExecutionsTable)
         }
         
-        logger.info("Database initialized successfully")
+        logger.info("Script-execution database initialized successfully")
     }
     
     /**
@@ -48,23 +39,10 @@ object DatabaseFactory {
      *
      * @return true if database is accessible, false otherwise
      */
-    fun checkConnection(): Boolean {
-        return try {
-            transaction {
-                exec("SELECT 1") { /* do nothing */ }
-            }
-            true
-        } catch (e: Exception) {
-            logger.error("Database health check failed", e)
-            false
-        }
-    }
+    fun checkConnection(): Boolean = commonFactory.checkConnection()
     
     /**
      * Closes the database connection pool.
      */
-    fun close() {
-        dataSource?.close()
-        logger.info("Database connection closed")
-    }
+    fun close() = commonFactory.close()
 }

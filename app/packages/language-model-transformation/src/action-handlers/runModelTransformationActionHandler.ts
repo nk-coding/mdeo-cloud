@@ -1,0 +1,313 @@
+import {
+    type ActionStartParams,
+    type ActionStartResponse,
+    type ActionSubmitParams,
+    type ActionSubmitResponse,
+    type ActionSchema,
+    type ActionExecutionRequest,
+    type FileMenuActionData,
+    parseUri,
+    FileCategory
+} from "@mdeo/language-common";
+import { sharedImport, type ActionHandler, resolveRelativePath, calculateRelativePath } from "@mdeo/language-shared";
+import type { LangiumSharedServices } from "langium/lsp";
+import type { ModelTransformationType } from "../grammar/modelTransformationTypes.js";
+import type { ModelType } from "@mdeo/language-model";
+
+const { URI, UriUtils } = sharedImport("langium");
+
+/**
+ * Input data collected from the model selection dialog.
+ */
+interface ModelSelectionInputs {
+    /**
+     * The selected model file path (relative to the transformation file).
+     */
+    modelPath: string;
+}
+
+/**
+ * Type guard to check if a value is ModelSelectionInputs.
+ *
+ * @param value The value to check
+ * @returns True if the value is ModelSelectionInputs
+ */
+function isModelSelectionInputs(value: unknown): value is ModelSelectionInputs {
+    return typeof value === "object" && value !== null && "modelPath" in value;
+}
+
+/**
+ * Handler for the "run" action in the Model Transformation language.
+ *
+ * This handler:
+ *  - Finds all model (.model) files in the workspace
+ *  - Filters to only show models that reference the same metamodel as the transformation
+ *  - Presents them as a dropdown selection
+ *  - When selected, creates an execution request with the model path
+ */
+export class RunModelTransformationActionHandler implements ActionHandler {
+    /**
+     * Shared Langium services for accessing workspace documents.
+     */
+    private readonly sharedServices: LangiumSharedServices;
+
+    /**
+     * Creates a new run model transformation action handler.
+     *
+     * @param sharedServices Shared Langium services
+     */
+    constructor(sharedServices: LangiumSharedServices) {
+        this.sharedServices = sharedServices;
+    }
+
+    /**
+     * Starts the run action dialog.
+     *
+     * This method:
+     *  - Parses the transformation file to get the metamodel reference
+     *  - Finds all model files that reference the same metamodel
+     *  - Presents those models in a dropdown
+     *
+     * @param params The action start parameters with file URI data
+     * @returns The dialog page with model selection or immediate completion
+     */
+    async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
+        const data = params.data as FileMenuActionData;
+
+        const metamodelUri = await this.getTransformationMetamodelUri(data.uri);
+        if (!metamodelUri) {
+            return this.createErrorPage("Could not determine metamodel from transformation file.");
+        }
+
+        const compatibleModels = await this.findCompatibleModels(data.uri, metamodelUri);
+
+        if (compatibleModels.length === 0) {
+            return this.createErrorPage(
+                "No compatible model files found. " +
+                    "Only models that reference the same metamodel as the transformation can be selected."
+            );
+        }
+
+        return this.createSelectionPage(compatibleModels);
+    }
+
+    /**
+     * Submits the dialog and returns the execution request.
+     *
+     * @param params The submit parameters with selected model
+     * @returns Completion response with execution request
+     */
+    async submitAction(params: ActionSubmitParams): Promise<ActionSubmitResponse> {
+        const data = params.config.data as FileMenuActionData;
+        const rawInputs = params.inputs[0];
+
+        if (!isModelSelectionInputs(rawInputs)) {
+            return {
+                kind: "validation",
+                errors: [{ path: "/modelPath", message: "Invalid input structure" }]
+            };
+        }
+
+        const modelPath = rawInputs.modelPath;
+
+        if (!modelPath) {
+            return {
+                kind: "validation",
+                errors: [{ path: "/modelPath", message: "Please select a model file to transform" }]
+            };
+        }
+
+        return this.createExecutionSubmit(data.uri, modelPath);
+    }
+
+    /**
+     * Gets the metamodel URI from the transformation file.
+     *
+     * @param uri URI of the transformation file
+     * @returns Absolute URI of the metamodel, or undefined if not found
+     */
+    private async getTransformationMetamodelUri(uri: string): Promise<string | undefined> {
+        const parsedUri = URI.parse(uri);
+        const document = this.sharedServices.workspace.LangiumDocuments.getDocument(parsedUri);
+
+        if (!document || document.parseResult.lexerErrors.length > 0 || document.parseResult.parserErrors.length > 0) {
+            return undefined;
+        }
+
+        const root = document.parseResult.value as ModelTransformationType;
+        const metamodelImport = root.import?.file;
+
+        if (!metamodelImport) {
+            return undefined;
+        }
+
+        return resolveRelativePath(document, metamodelImport).toString();
+    }
+
+    /**
+     * Gets the metamodel URI from a model file.
+     *
+     * @param modelUri URI of the model file
+     * @returns Absolute URI of the metamodel, or undefined if not found
+     */
+    private getModelMetamodelUri(modelUri: string): string | undefined {
+        const parsedUri = URI.parse(modelUri);
+        const document = this.sharedServices.workspace.LangiumDocuments.getDocument(parsedUri);
+
+        if (!document || document.parseResult.lexerErrors.length > 0 || document.parseResult.parserErrors.length > 0) {
+            return undefined;
+        }
+
+        const root = document.parseResult.value as ModelType;
+        const metamodelImport = root.import?.file;
+
+        if (!metamodelImport) {
+            return undefined;
+        }
+
+        return resolveRelativePath(document, metamodelImport).toString();
+    }
+
+    /**
+     * Finds all model files that reference the same metamodel as the transformation.
+     *
+     * @param transformationUri URI of the transformation file
+     * @param metamodelUri Absolute URI of the metamodel
+     * @returns Array of relative paths to compatible model files
+     */
+    private async findCompatibleModels(transformationUri: string, metamodelUri: string): Promise<string[]> {
+        const documents = this.sharedServices.workspace.LangiumDocuments.all.toArray();
+        const modelDocuments = documents.filter((doc) => doc.textDocument.languageId === "model");
+
+        const compatibleModels: string[] = [];
+        const transformationPath = URI.parse(transformationUri).path;
+
+        for (const doc of modelDocuments) {
+            const modelMetamodelUri = this.getModelMetamodelUri(doc.uri.toString());
+            if (modelMetamodelUri === metamodelUri) {
+                const relativePath = calculateRelativePath(transformationPath, doc.uri.path);
+                compatibleModels.push(relativePath);
+            }
+        }
+
+        return compatibleModels;
+    }
+
+    /**
+     * Creates the model selection dialog page.
+     *
+     * @param models The list of available compatible model files
+     * @returns The dialog page response
+     */
+    private createSelectionPage(models: string[]): ActionStartResponse {
+        const schema: ActionSchema = {
+            properties: {
+                modelPath: {
+                    enum: models,
+                    placeholder: "Select a model file to transform"
+                }
+            },
+            propertyLabels: {
+                modelPath: "Model File"
+            }
+        };
+
+        return {
+            kind: "page",
+            page: {
+                title: "Run Model Transformation",
+                description: "Select a model file to apply the transformation to.",
+                schema,
+                isLastPage: true,
+                submitButtonLabel: "Run"
+            }
+        };
+    }
+
+    /**
+     * Creates an error page response.
+     *
+     * @param message The error message to display
+     * @returns The error page response
+     */
+    private createErrorPage(message: string): ActionStartResponse {
+        return {
+            kind: "page",
+            page: {
+                title: "Run Model Transformation",
+                description: message,
+                schema: {
+                    properties: {}
+                },
+                isLastPage: true
+            }
+        };
+    }
+
+    /**
+     * Creates an execution request for the given model.
+     *
+     * @param transformationUri The URI of the transformation file
+     * @param modelPath The relative path to the model file
+     * @returns The execution request
+     */
+    private createExecutionRequest(transformationUri: string, modelPath: string): ActionExecutionRequest {
+        const parsedUri = parseUri(URI.parse(transformationUri));
+        if (parsedUri.category !== FileCategory.RegularFile) {
+            throw new Error("Invalid file category for transformation execution");
+        }
+        const filePath = parsedUri.path;
+
+        const absoluteModelPath = this.resolveModelPath(transformationUri, modelPath);
+
+        return {
+            filePath,
+            data: {
+                filePath,
+                modelPath: absoluteModelPath
+            }
+        };
+    }
+
+    /**
+     * Resolves a relative model path to an absolute path.
+     *
+     * @param transformationUri URI of the transformation file
+     * @param relativeModelPath Relative path to the model file
+     * @returns Absolute path to the model file
+     */
+    private resolveModelPath(transformationUri: string, relativeModelPath: string): string {
+        const transformationParsedUri = URI.parse(transformationUri);
+        const dirname = UriUtils.dirname(transformationParsedUri);
+        const absoluteUri = UriUtils.joinPath(dirname, relativeModelPath);
+
+        const parsedUri = parseUri(absoluteUri);
+        if (parsedUri.category !== FileCategory.RegularFile) {
+            throw new Error("Invalid model file path");
+        }
+
+        return parsedUri.path;
+    }
+
+    /**
+     * Creates an execution completion response for submitAction.
+     *
+     * @param transformationUri The URI of the transformation file
+     * @param modelPath The relative path to the model file
+     * @returns The submit completion response with execution request
+     */
+    private createExecutionSubmit(transformationUri: string, modelPath: string): ActionSubmitResponse {
+        try {
+            const executionRequest = this.createExecutionRequest(transformationUri, modelPath);
+            return {
+                kind: "completion",
+                executions: [executionRequest]
+            };
+        } catch {
+            return {
+                kind: "validation",
+                errors: [{ path: "/", message: "Failed to create execution request" }]
+            };
+        }
+    }
+}
