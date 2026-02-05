@@ -3,6 +3,7 @@ import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
 import { toolboxTools } from "../tools.js";
 import type { ToolDefinition } from "../toolboxTypes.js";
+import { ToolType } from "../toolboxTypes.js";
 import { iconButtonClasses } from "./styles.js";
 
 const { html } = sharedImport("@eclipse-glsp/sprotty");
@@ -51,6 +52,12 @@ export function generateToolbarView(context: Toolbox): VNode {
  */
 function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
     const isActive = context.toolState.toolType === tool.id;
+    const hasItems = context.hasToolboxItems();
+
+    const isDisabled =
+        (tool.id === ToolType.BOTTOM_PANEL_TOGGLE && !hasItems) ||
+        (tool.id === ToolType.CREATE_EDGE && context.isLayoutable);
+    const isInteractable = context.isOpen && !isDisabled;
 
     return html(
         "button",
@@ -62,19 +69,25 @@ function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
                 "bg-accent": isActive,
                 "text-accent-foreground": isActive,
                 "border-0": true,
-                "cursor-pointer": true,
+                "cursor-pointer": !isDisabled,
+                "cursor-not-allowed": isDisabled,
+                "opacity-50": isDisabled,
                 "transition-all": true,
                 "duration-300": true,
-                "pointer-events-none": !context.isOpen
+                "pointer-events-none": !isInteractable
             },
             attrs: {
                 title: tool.title,
                 "aria-label": tool.title,
-                "aria-pressed": isActive ? "true" : "false"
+                "aria-pressed": isActive ? "true" : "false",
+                "aria-disabled": isDisabled ? "true" : "false",
+                disabled: isDisabled
             },
             on: {
                 click: () => {
-                    context.onToolClick(tool);
+                    if (!isDisabled) {
+                        context.onToolClick(tool);
+                    }
                 }
             }
         },

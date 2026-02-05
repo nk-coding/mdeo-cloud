@@ -38,10 +38,15 @@ export class SourceModelStorage implements BaseSourceModelStorage {
         if (typeof sourceUri !== "string") {
             throw new Error("Source URI is missing in the request action.");
         }
-        this.initializeUpdateListener();
+
         const uri = URI.parse(sourceUri);
         const langiumDocument = await this.languageServices.shared.workspace.LangiumDocuments.getOrCreateDocument(uri);
-        await this.languageServices.shared.workspace.DocumentBuilder.waitUntil(DocumentState.Validated, uri);
+        if (langiumDocument.state < DocumentState.Validated) {
+            await this.languageServices.shared.workspace.DocumentBuilder.build([langiumDocument], { validation: true });
+        }
+
+        this.initializeUpdateListener();
+
         const root = langiumDocument.parseResult.value;
         const metadata = (await this.languageServices.shared.workspace.FileSystemProvider.readMetadata(
             uri
@@ -69,7 +74,7 @@ export class SourceModelStorage implements BaseSourceModelStorage {
                 }
                 const root = doc.parseResult.value;
                 this.modelState.sourceModel = root;
-                await this.actionDispatcher.dispatch(UpdateClientOperation.create());
+                this.actionDispatcher.dispatch(UpdateClientOperation.create());
             }
         });
     }

@@ -26,7 +26,7 @@
                 </ContextMenuTrigger>
                 <ContextMenuContent @close-auto-focus="$event.preventDefault()">
                     <ContextMenuItem
-                        v-for="fileType in fileTypePlugins"
+                        v-for="fileType in languagePlugins.filter((plugin) => !plugin.isGenerated)"
                         :key="fileType.id"
                         @click="() => handleCreateFileOfType(fileType)"
                     >
@@ -71,7 +71,7 @@ import type { EditorTab } from "@/data/tab/editorTab";
 import { FileCategory, parseUri } from "@mdeo/language-common";
 
 const workbenchState = inject(workbenchStateKey)!;
-const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins: fileTypePlugins, tabs } = workbenchState;
+const { fileTree: rootFolder, activeTab, monacoApi, languagePlugins, tabs } = workbenchState;
 
 const activeEntry = ref<FileSystemNode>();
 const expandedItems = ref<Set<FileSystemNode>>(new Set());

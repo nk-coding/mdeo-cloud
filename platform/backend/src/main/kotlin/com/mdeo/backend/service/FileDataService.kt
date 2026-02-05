@@ -152,7 +152,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
             val token = jwtService.generateProjectToken(projectId)
 
             val computedData =
-                computeFromPlugin(pluginUrl, key, projectId, fileSource, token, contributionPlugins)
+                computeFromPlugin(pluginUrl, languagePlugin.id, key, projectId, fileSource, token, contributionPlugins)
 
             storeFileData(projectId, normalizedPath, key, computedData, fileSource?.version)
 
@@ -346,6 +346,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
      * For directories, fileSource is null.
      *
      * @param pluginUrl Base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param key The data key to compute (e.g., "ast")
      * @param project Project UUID
      * @param fileSource Source data with version, content, and path (null for directories)
@@ -355,6 +356,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
      */
     private suspend fun computeFromPlugin(
         pluginUrl: String,
+        languageId: String,
         key: String,
         project: UUID,
         fileSource: FileSource?,
@@ -370,7 +372,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
                 )
             )
 
-            val dataUrl = URI.create(pluginUrl).resolve("data/$key")
+            val dataUrl = URI.create(pluginUrl).resolve("data/$languageId/$key")
 
             val request = HttpRequest.newBuilder()
                 .uri(dataUrl)

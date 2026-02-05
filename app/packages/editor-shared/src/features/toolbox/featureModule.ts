@@ -13,20 +13,23 @@ const { EnableDefaultToolsAction, ToolPalette } = sharedImport("@eclipse-glsp/cl
  * Feature module that provides the Toolbox UI extension.
  * Registers the Toolbox as a UI extension and action handler for model updates.
  */
-export const toolboxModule: ContainerModule = new FeatureModule((bind, _unbind, isBound, rebind) => {
-    bind(ToolState).toSelf().inSingletonScope();
+export const toolboxModule: ContainerModule = new FeatureModule(
+    (bind, _unbind, isBound, rebind) => {
+        bind(ToolState).toSelf().inSingletonScope();
 
-    bind(Toolbox).toSelf().inSingletonScope();
-    rebind(ToolPalette).toService(Toolbox);
+        bind(Toolbox).toSelf().inSingletonScope();
+        rebind(ToolPalette).toService(Toolbox);
 
-    bind(DefaultPreviewRenderer).toSelf().inSingletonScope();
-    bind(PreviewRenderer).toService(DefaultPreviewRenderer);
+        bind(DefaultPreviewRenderer).toSelf().inSingletonScope();
+        bind(PreviewRenderer).toService(DefaultPreviewRenderer);
 
-    const context = { bind, isBound };
+        const context = { bind, isBound };
 
-    configureActionHandler(context, EnableDefaultToolsAction.KIND, Toolbox);
-    configureActionHandler(context, UpdateModelAction.KIND, Toolbox);
-    configureActionHandler(context, SetModelAction.KIND, Toolbox);
+        configureActionHandler(context, EnableDefaultToolsAction.KIND, Toolbox);
+        configureActionHandler(context, UpdateModelAction.KIND, Toolbox);
+        configureActionHandler(context, SetModelAction.KIND, Toolbox);
 
-    configureCommand(context, LayoutCommand);
-});
+        configureCommand(context, LayoutCommand);
+    },
+    { featureId: Symbol("toolbox") }
+);

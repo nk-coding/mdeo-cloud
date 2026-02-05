@@ -90,7 +90,8 @@ data class BackendLanguagePlugin(
     val serverPlugin: LanguageServerPlugin,
     val graphicalEditorPlugin: LanguageGraphicalEditorPlugin? = null,
     val textualEditorPlugin: LanguageTextualEditorPlugin? = null,
-    val icon: JsonArray
+    val icon: JsonArray,
+    val isGenerated: Boolean = false
 )
 
 /**
@@ -109,11 +110,13 @@ data class LanguageServerPlugin(
  *
  * @property import Import path which resolves to the container configuration
  * @property stylesUrl URL to the CSS styles for this editor
+ * @property stylesCls CSS class name to apply to the editor container
  */
 @Serializable
 data class LanguageGraphicalEditorPlugin(
     val import: String,
-    val stylesUrl: String
+    val stylesUrl: String,
+    val stylesCls: String
 )
 
 /**

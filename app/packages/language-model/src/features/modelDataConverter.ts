@@ -8,12 +8,7 @@ import {
     type PropertyType
 } from "@mdeo/language-metamodel";
 import { AssociationResolver } from "./associationResolver.js";
-import type {
-    ModelData,
-    ModelDataInstance,
-    ModelDataLink,
-    ModelDataPropertyValue
-} from "./modelData.js";
+import type { ModelData, ModelDataInstance, ModelDataLink, ModelDataPropertyValue } from "./modelData.js";
 import {
     Model,
     SimpleValue,
@@ -107,7 +102,10 @@ export class ModelDataConverter {
      * @param classType The resolved class type, if available
      * @returns Record of property name to value
      */
-    private buildPropertyList(obj: ObjectInstanceType, classType: ClassType | undefined): Record<string, ModelDataPropertyValue | ModelDataPropertyValue[]> {
+    private buildPropertyList(
+        obj: ObjectInstanceType,
+        classType: ClassType | undefined
+    ): Record<string, ModelDataPropertyValue | ModelDataPropertyValue[]> {
         const assignedProperties = this.extractAssignedProperties(obj);
 
         if (!classType) {
@@ -123,7 +121,9 @@ export class ModelDataConverter {
      * @param obj The ObjectInstance AST node
      * @returns Map of property name to value
      */
-    private extractAssignedProperties(obj: ObjectInstanceType): Map<string, ModelDataPropertyValue | ModelDataPropertyValue[]> {
+    private extractAssignedProperties(
+        obj: ObjectInstanceType
+    ): Map<string, ModelDataPropertyValue | ModelDataPropertyValue[]> {
         const result = new Map<string, ModelDataPropertyValue | ModelDataPropertyValue[]>();
 
         for (const propAssign of obj.properties ?? []) {
@@ -181,7 +181,9 @@ export class ModelDataConverter {
      * @param value The LiteralValue AST node
      * @returns The ModelDataPropertyValue or array representation
      */
-    private convertPropertyValue(value: LiteralValueType | undefined): ModelDataPropertyValue | ModelDataPropertyValue[] {
+    private convertPropertyValue(
+        value: LiteralValueType | undefined
+    ): ModelDataPropertyValue | ModelDataPropertyValue[] {
         if (!value) {
             return null;
         }

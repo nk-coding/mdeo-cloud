@@ -9,10 +9,13 @@ const { TYPES } = sharedImport("@eclipse-glsp/sprotty");
  * Feature module that provides pointer event handling and pointer capture support.
  * Registers the pointer tool as a VNode postprocessor and sets up pointer capture listener.
  */
-export const pointerToolModule = new FeatureModule((bind) => {
-    bind(PointerTool).toSelf().inSingletonScope();
-    bind(TYPES.IVNodePostprocessor).toService(PointerTool);
+export const pointerToolModule = new FeatureModule(
+    (bind) => {
+        bind(PointerTool).toSelf().inSingletonScope();
+        bind(TYPES.IVNodePostprocessor).toService(PointerTool);
 
-    bind(PointerCapturePointerListener).toSelf().inSingletonScope();
-    bind(IPointerListener).toService(PointerCapturePointerListener);
-});
+        bind(PointerCapturePointerListener).toSelf().inSingletonScope();
+        bind(IPointerListener).toService(PointerCapturePointerListener);
+    },
+    { featureId: Symbol("pointer-tool") }
+);

@@ -2,7 +2,7 @@
  * Represents a property value in a model instance.
  * Can be a primitive value, an enum reference, or a list of values.
  */
-export type ModelDataPropertyValue = string | number | boolean | { enum: string } | null ;
+export type ModelDataPropertyValue = string | number | boolean | { enum: string } | null;
 
 /**
  * Represents an object instance in a model.

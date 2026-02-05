@@ -8,7 +8,10 @@ const { FeatureModule } = sharedImport("@eclipse-glsp/client");
 /**
  * Feature module for move related functionalities.
  */
-export const moveModule: ContainerModule = new FeatureModule((bind, unbind, isBound, rebind) => {
-    bind(MoveCommand).toSelf();
-    rebind(SprottyMoveCommand).toService(MoveCommand);
-});
+export const moveModule: ContainerModule = new FeatureModule(
+    (bind, unbind, isBound, rebind) => {
+        bind(MoveCommand).toSelf();
+        rebind(SprottyMoveCommand).toService(MoveCommand);
+    },
+    { featureId: Symbol("move") }
+);

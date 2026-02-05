@@ -8,12 +8,14 @@ import {
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
+    type LanguageServiceConfig,
     initializePluginContext,
     astHandler,
     AST_HANDLER_KEY,
     startLanguageService
 } from "@mdeo/service-common";
 import type { ModelTransformationServices } from "@mdeo/language-model-transformation";
+import type { LanguagePlugin } from "@mdeo/plugin";
 
 const icon: ActionIconNode = [
     [
@@ -82,6 +84,49 @@ const icon: ActionIconNode = [
 ];
 
 /**
+ * Language plugin definition for the model transformation language.
+ */
+const modelTransformationLanguagePlugin: LanguagePlugin = {
+    id: "model-transformation",
+    name: "Model Transformation",
+    extension: ".mt",
+    newFileAction: true,
+    icon,
+    serverPlugin: {
+        import: "static/language.js"
+    },
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: serializeMonarchTokensProvider({
+            ...defaultMonarchTokenProvider,
+            keywords: [
+                "using",
+                "match",
+                "if",
+                "then",
+                "else",
+                "while",
+                "until",
+                "for",
+                "do",
+                "var",
+                "create",
+                "delete",
+                "forbid",
+                "where",
+                "kill",
+                "stop",
+                "true",
+                "false",
+                "null"
+            ]
+        })
+    },
+    graphicalEditorPlugin: undefined,
+    isGenerated: false
+};
+
+/**
  * Plugin definition for the model transformation service.
  */
 const modelTransformationServicePlugin: ServicePluginDefinition = {
@@ -89,44 +134,7 @@ const modelTransformationServicePlugin: ServicePluginDefinition = {
     name: "Model Transformation",
     description: "Language support for model transformation definitions (.mt files)",
     icon,
-    languagePlugin: {
-        id: "model-transformation",
-        name: "Model Transformation",
-        extension: ".mt",
-        newFileAction: true,
-        icon,
-        serverPlugin: {
-            import: "static/language.js"
-        },
-        textualEditorPlugin: {
-            languageConfiguration: defaultLanguageConfiguration,
-            monarchTokensProvider: serializeMonarchTokensProvider({
-                ...defaultMonarchTokenProvider,
-                keywords: [
-                    "using",
-                    "match",
-                    "if",
-                    "then",
-                    "else",
-                    "while",
-                    "until",
-                    "for",
-                    "do",
-                    "var",
-                    "create",
-                    "delete",
-                    "forbid",
-                    "where",
-                    "kill",
-                    "stop",
-                    "true",
-                    "false",
-                    "null"
-                ]
-            })
-        },
-        graphicalEditorPlugin: undefined
-    },
+    languagePlugins: [modelTransformationLanguagePlugin],
     contributionPlugins: []
 };
 
@@ -153,15 +161,23 @@ const modelTransformationExecutionHandler = new ModelTransformationExecutionHand
     modelTransformationExecutionServiceUrl
 );
 
-const config: ServiceConfig<ModelTransformationServices> = {
-    ...envConfig,
-    plugin: modelTransformationServicePlugin,
+/**
+ * Language configuration for the model transformation language.
+ */
+const modelTransformationLanguageConfig: LanguageServiceConfig<ModelTransformationServices> = {
+    languagePlugin: modelTransformationLanguagePlugin,
     languagePluginProvider: modelTransformationPluginProvider,
     handlers: {
         [AST_HANDLER_KEY]: astHandler,
         [TYPED_AST_HANDLER_KEY]: typedAstHandler
     },
     executionHandlers: [modelTransformationExecutionHandler]
+};
+
+const config: ServiceConfig<ModelTransformationServices> = {
+    ...envConfig,
+    plugin: modelTransformationServicePlugin,
+    languages: [modelTransformationLanguageConfig]
 };
 
 await startLanguageService(config);

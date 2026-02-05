@@ -136,9 +136,11 @@ object LanguagePluginsTable : Table("language_plugins") {
     val serverPluginImport = varchar("server_plugin_import", 2048)
     val graphicalEditorPluginImport = varchar("graphical_editor_plugin_import", 2048).nullable()
     val graphicalEditorStylesUrl = varchar("graphical_editor_styles_url", 2048).nullable()
+    val graphicalEditorStylesCls = varchar("graphical_editor_styles_cls", 255).nullable()
     val textualEditorLanguageConfiguration = text("textual_editor_language_configuration").nullable()
     val textualEditorMonarchTokensProvider = text("textual_editor_monarch_tokens_provider").nullable()
     val icon = text("icon")
+    val isGenerated = bool("is_generated").default(false)
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 
@@ -280,4 +282,25 @@ object ExecutionsTable : Table("executions") {
     init {
         index(false, projectId)
     }
+}
+
+/**
+ * Execution file metadata table schema for storing additional metadata associated with execution result files.
+ */
+object ExecutionFileMetadataTable : Table("execution_file_metadata") {
+    val executionId = uuid("execution_id")
+    val path = varchar("path", 1024)
+    val metadata = json<JsonObject>("metadata", Json)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+
+    init {
+        foreignKey(
+            executionId,
+            target = ExecutionsTable.primaryKey,
+            onDelete = ReferenceOption.CASCADE
+        )
+    }
+
+    override val primaryKey = PrimaryKey(executionId, path)
 }

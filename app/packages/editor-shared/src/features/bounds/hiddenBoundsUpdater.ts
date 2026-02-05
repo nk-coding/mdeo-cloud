@@ -6,7 +6,6 @@ import type {
     GModelElement,
     RequestBoundsAction as RequestBoundsActionType
 } from "@eclipse-glsp/sprotty";
-import { findViewportZoom } from "../../base/findViewportZoom.js";
 import { sharedImport } from "../../sharedImport.js";
 
 const { injectable } = sharedImport("inversify");
@@ -88,12 +87,11 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
         }
         const bounds = firstChild.getBoundingClientRect();
         const foreignObjectBounds = (elm as SVGForeignObjectElement).getBBox();
-        const zoom = findViewportZoom(element);
         return {
             x: foreignObjectBounds.x,
             y: foreignObjectBounds.y,
-            width: bounds.width / zoom,
-            height: bounds.height / zoom
+            width: bounds.width,
+            height: bounds.height
         };
     }
 }

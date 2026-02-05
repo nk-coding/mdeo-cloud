@@ -14,7 +14,7 @@ export function buildManifest(plugin: ServicePluginDefinition): ServicePlugin {
         name: plugin.name,
         description: plugin.description,
         icon: plugin.icon,
-        languagePlugins: [plugin.languagePlugin],
+        languagePlugins: plugin.languagePlugins,
         contributionPlugins: plugin.contributionPlugins ?? []
     };
 }

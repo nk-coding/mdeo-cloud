@@ -12,7 +12,7 @@ const { isViewport } = sharedImport("@eclipse-glsp/sprotty");
 export function findViewportZoom(element: Readonly<GModelElement>): number {
     const viewport = element.root;
     if (isViewport(viewport)) {
-        return viewport.zoom;
+        return viewport.zoom || 1;
     }
     return 1;
 }

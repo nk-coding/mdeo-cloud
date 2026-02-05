@@ -8,7 +8,10 @@ const { SetBoundsFeedbackCommand: GLSPSetBoundsFeedbackCommand } = sharedImport(
 /**
  * Feature module for metadata related functionalities.
  */
-export const metadataModule: ContainerModule = new FeatureModule((bind, unbind, isBound, rebind) => {
-    bind(SetBoundsFeedbackCommand).toSelf();
-    rebind(GLSPSetBoundsFeedbackCommand).toService(SetBoundsFeedbackCommand);
-});
+export const metadataModule: ContainerModule = new FeatureModule(
+    (bind, unbind, isBound, rebind) => {
+        bind(SetBoundsFeedbackCommand).toSelf();
+        rebind(GLSPSetBoundsFeedbackCommand).toService(SetBoundsFeedbackCommand);
+    },
+    { featureId: Symbol("metadata") }
+);

@@ -184,6 +184,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         val createResponse = try {
             callPluginCreateExecution(
                 pluginUrl,
+                languagePlugin.id,
                 executionId,
                 projectId,
                 normalizedPath,
@@ -390,7 +391,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         val fileTree = try {
-            callPluginGetFileTree(pluginUrl, executionId, projectId)
+            callPluginGetFileTree(pluginUrl, execution.languageId, executionId, projectId)
         } catch (e: Exception) {
             logger.error("Failed to get file tree from plugin", e)
             return executionFailure(
@@ -427,7 +428,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            val summary = callPluginGetSummary(pluginUrl, executionId, projectId)
+            val summary = callPluginGetSummary(pluginUrl, execution.languageId, executionId, projectId)
             success(summary)
         } catch (e: Exception) {
             logger.error("Failed to get summary from plugin", e)
@@ -465,7 +466,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            val fileContent = callPluginGetFile(pluginUrl, executionId, projectId, path)
+            val fileContent = callPluginGetFile(pluginUrl, execution.languageId, executionId, projectId, path)
             success(fileContent)
         } catch (e: Exception) {
             logger.error("Failed to get file from plugin", e)
@@ -508,7 +509,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            callPluginCancel(pluginUrl, executionId, projectId)
+            callPluginCancel(pluginUrl, execution.languageId, executionId, projectId)
 
             transaction {
                 val now = Instant.now()
@@ -554,7 +555,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            callPluginDelete(pluginUrl, executionId, projectId)
+            callPluginDelete(pluginUrl, execution.languageId, executionId, projectId)
 
             transaction {
                 ExecutionsTable.deleteWhere { ExecutionsTable.id eq executionId.toKotlinUuid() }
@@ -668,6 +669,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Calls the plugin to create an execution.
      *
      * @param pluginUrl The base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param executionId The UUID of the execution
      * @param projectId The UUID of the project
      * @param filePath The path to the file to execute
@@ -676,6 +678,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      */
     private suspend fun callPluginCreateExecution(
         pluginUrl: String,
+        languageId: String,
         executionId: UUID,
         projectId: UUID,
         filePath: String,
@@ -694,7 +697,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 )
             )
 
-            val uri = URI.create(pluginUrl).resolve("executions")
+            val uri = URI.create(pluginUrl).resolve("$languageId/executions")
             val request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Content-Type", "application/json")
@@ -717,12 +720,14 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Calls the plugin to get the file tree for an execution.
      *
      * @param pluginUrl The base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param executionId The UUID of the execution
      * @param projectId The UUID of the project
      * @return A list of file entries representing the execution's file tree
      */
     private suspend fun callPluginGetFileTree(
         pluginUrl: String,
+        languageId: String,
         executionId: UUID,
         projectId: UUID
     ): List<FileEntry> {
@@ -732,7 +737,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 executionId,
                 listOf(JwtService.SCOPE_PLUGIN_EXECUTION_READ)
             )
-            val uri = URI.create(pluginUrl).resolve("executions/$executionId/files")
+            val uri = URI.create(pluginUrl).resolve("$languageId/executions/$executionId/files")
 
             val request = HttpRequest.newBuilder()
                 .uri(uri)
@@ -755,12 +760,14 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Calls the plugin to get the summary for an execution.
      *
      * @param pluginUrl The base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param executionId The UUID of the execution
      * @param projectId The UUID of the project
      * @return The execution summary as a string
      */
     private suspend fun callPluginGetSummary(
         pluginUrl: String,
+        languageId: String,
         executionId: UUID,
         projectId: UUID
     ): String {
@@ -770,7 +777,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 executionId,
                 listOf(JwtService.SCOPE_PLUGIN_EXECUTION_READ)
             )
-            val uri = URI.create(pluginUrl).resolve("executions/$executionId/summary")
+            val uri = URI.create(pluginUrl).resolve("$languageId/executions/$executionId/summary")
 
             val request = HttpRequest.newBuilder()
                 .uri(uri)
@@ -793,6 +800,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Calls the plugin to get a result file for an execution.
      *
      * @param pluginUrl The base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param executionId The UUID of the execution
      * @param projectId The UUID of the project
      * @param path The path to the requested file
@@ -800,6 +808,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      */
     private suspend fun callPluginGetFile(
         pluginUrl: String,
+        languageId: String,
         executionId: UUID,
         projectId: UUID,
         path: String
@@ -811,7 +820,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 listOf(JwtService.SCOPE_PLUGIN_EXECUTION_READ)
             )
             val normalizedPath = normalizePath(path)
-            val uri = URI.create(pluginUrl).resolve("executions/$executionId/files/$normalizedPath")
+            val uri = URI.create(pluginUrl).resolve("$languageId/executions/$executionId/files/$normalizedPath")
 
             val request = HttpRequest.newBuilder()
                 .uri(uri)
@@ -834,12 +843,14 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Calls the plugin to cancel an execution.
      *
      * @param pluginUrl The base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param executionId The UUID of the execution
      * @param projectId The UUID of the project
      * @return Unit
      */
     private suspend fun callPluginCancel(
         pluginUrl: String,
+        languageId: String,
         executionId: UUID,
         projectId: UUID
     ) {
@@ -849,7 +860,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 executionId,
                 listOf(JwtService.SCOPE_PLUGIN_EXECUTION_CANCEL)
             )
-            val uri = URI.create(pluginUrl).resolve("executions/$executionId/cancel")
+            val uri = URI.create(pluginUrl).resolve("$languageId/executions/$executionId/cancel")
 
             val request = HttpRequest.newBuilder()
                 .uri(uri)
@@ -870,12 +881,14 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
      * Calls the plugin to delete an execution.
      *
      * @param pluginUrl The base URL of the plugin
+     * @param languageId The language identifier for routing the request
      * @param executionId The UUID of the execution
      * @param projectId The UUID of the project
      * @return Unit
      */
     private suspend fun callPluginDelete(
         pluginUrl: String,
+        languageId: String,
         executionId: UUID,
         projectId: UUID
     ) {
@@ -885,7 +898,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 executionId,
                 listOf(JwtService.SCOPE_PLUGIN_EXECUTION_DELETE)
             )
-            val uri = URI.create(pluginUrl).resolve("executions/$executionId")
+            val uri = URI.create(pluginUrl).resolve("$languageId/executions/$executionId")
 
             val request = HttpRequest.newBuilder()
                 .uri(uri)

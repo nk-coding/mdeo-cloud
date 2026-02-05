@@ -9,8 +9,11 @@ const { DirectLabelEditTool } = sharedImport("@eclipse-glsp/client");
 /**
  * Feature module for edit label functionality.
  */
-export const editLabelModule: ContainerModule = new FeatureModule((bind, unbind, isBound, rebind) => {
-    bind(EditLabelTool).toSelf().inSingletonScope();
-    rebind(DirectLabelEditTool).toService(EditLabelTool);
-    configureCommand({ bind, isBound }, UpdateLabelEditCommand);
-});
+export const editLabelModule: ContainerModule = new FeatureModule(
+    (bind, unbind, isBound, rebind) => {
+        bind(EditLabelTool).toSelf().inSingletonScope();
+        rebind(DirectLabelEditTool).toService(EditLabelTool);
+        configureCommand({ bind, isBound }, UpdateLabelEditCommand);
+    },
+    { featureId: Symbol("edit-label") }
+);

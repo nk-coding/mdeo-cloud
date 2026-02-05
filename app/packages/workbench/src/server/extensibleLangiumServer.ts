@@ -32,6 +32,7 @@ import {
 import { type ResolvedServerLanguagePlugin } from "./types";
 import { GetPluginsRequest, ServerReadyNotification } from "./protocol";
 import type {
+    DeepPartial,
     LangiumCoreServices,
     LangiumGeneratedCoreServices,
     LangiumGeneratedSharedCoreServices,
@@ -42,6 +43,7 @@ import type {
 import { lspFileSystem } from "./lspFileSystem";
 import { NoopExternalReferenceResolver } from "./noopExternalReferenceResolver";
 import { addActionHandlers } from "./actionHandlers";
+import { ConcurrentLangiumDocuments } from "./concurrentLangiumDocuments";
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
@@ -124,11 +126,16 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
     );
     const generatedSharedModule: Module<
         LangiumSharedCoreServices,
-        LangiumGeneratedSharedCoreServices & ExternalReferenceSharedAdditionalServices
+        LangiumGeneratedSharedCoreServices &
+            ExternalReferenceSharedAdditionalServices &
+            DeepPartial<LangiumSharedCoreServices>
     > = {
         AstReflection: () => languageModule.reflection,
         references: {
             ExternalReferenceResolver: () => new NoopExternalReferenceResolver()
+        },
+        workspace: {
+            LangiumDocuments: (services) => new ConcurrentLangiumDocuments(services)
         }
     };
     const glspModule = createGLSPModule(pluginContext);

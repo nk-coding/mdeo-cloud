@@ -34,6 +34,7 @@ import type { LanguageContributionPlugin } from "@mdeo/plugin";
 import type { ServerPlugin } from "./plugin/serverPlugin";
 import { resolvePlugin } from "./plugin/resolvePlugin";
 import type { ActionStartParams } from "@mdeo/language-common";
+import { parseUri, FileCategory } from "@mdeo/language-common";
 import type { Execution } from "./execution/execution";
 import { buildExecutionFileTree } from "./execution/execution";
 import { showApiError } from "@/lib/notifications";
@@ -652,7 +653,19 @@ export class WorkbenchState {
 
         client.onRequest(ReadMetadataRequest.type, async (params: ReadMetadataParams): Promise<object> => {
             const uri = Uri.parse(params.uri);
-            const result = await this.backendApi.files.readMetadata(this.project.value!.id, this.extractPath(uri));
+            const parsed = parseUri(uri);
+
+            let result;
+            if (parsed.category === FileCategory.ExecutionResultFile) {
+                result = await this.backendApi.executions.readExecutionFileMetadata(
+                    parsed.projectId,
+                    parsed.executionId,
+                    parsed.path
+                );
+            } else {
+                result = await this.backendApi.files.readMetadata(this.project.value!.id, this.extractPath(uri));
+            }
+
             if (result.success) {
                 return result.value;
             }
@@ -661,11 +674,24 @@ export class WorkbenchState {
 
         client.onRequest(WriteMetadataRequest.type, async (params: WriteMetadataParams): Promise<void> => {
             const uri = Uri.parse(params.uri);
-            const result = await this.backendApi.files.writeMetadata(
-                this.project.value!.id,
-                this.extractPath(uri),
-                params.metadata
-            );
+            const parsed = parseUri(uri);
+
+            let result;
+            if (parsed.category === FileCategory.ExecutionResultFile) {
+                result = await this.backendApi.executions.writeExecutionFileMetadata(
+                    parsed.projectId,
+                    parsed.executionId,
+                    parsed.path,
+                    params.metadata
+                );
+            } else {
+                result = await this.backendApi.files.writeMetadata(
+                    this.project.value!.id,
+                    this.extractPath(uri),
+                    params.metadata
+                );
+            }
+
             if (!result.success) {
                 throw new Error("Failed to write metadata");
             }

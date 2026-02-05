@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformation.compiler.expressions
+package com.mdeo.modeltransformation.compiler.expressions.traversal
 
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
  * - Incoming associations: compiled to `.in(edgeLabel)`
  */
 @DisplayName("MemberAccessCompiler Integration Tests")
-class MemberAccessCompilerIntegrationTest {
+class MemberAccessTraversalCompilerIntegrationTest {
 
     private lateinit var graph: TinkerGraph
     private lateinit var registry: ExpressionCompilerRegistry

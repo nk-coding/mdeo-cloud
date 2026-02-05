@@ -13,11 +13,14 @@ const { FeatureModule, configureCommand, bindAsService, TYPES } = sharedImport("
  * Feature module for the edge edit tool.
  * Provides functionality for editing edge routes by dragging segments.
  */
-export const edgeEditToolModule = new FeatureModule((bind, unbind, isBound) => {
-    bindAsService({ bind }, TYPES.IDefaultTool, EdgeEditTool);
+export const edgeEditToolModule = new FeatureModule(
+    (bind, unbind, isBound) => {
+        bindAsService({ bind }, TYPES.IDefaultTool, EdgeEditTool);
 
-    configureCommand({ bind, isBound }, SetEdgeRoutingFeedbackCommand);
-    configureCommand({ bind, isBound }, StartEdgeReconnectFeedbackCommand);
-    configureCommand({ bind, isBound }, UpdateEdgeReconnectFeedbackCommand);
-    configureCommand({ bind, isBound }, StopEdgeReconnectFeedbackCommand);
-});
+        configureCommand({ bind, isBound }, SetEdgeRoutingFeedbackCommand);
+        configureCommand({ bind, isBound }, StartEdgeReconnectFeedbackCommand);
+        configureCommand({ bind, isBound }, UpdateEdgeReconnectFeedbackCommand);
+        configureCommand({ bind, isBound }, StopEdgeReconnectFeedbackCommand);
+    },
+    { featureId: Symbol("edge-edit-tool") }
+);

@@ -9,41 +9,50 @@ import {
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
+    type LanguageServiceConfig,
     initializePluginContext,
     astHandler,
     AST_HANDLER_KEY
 } from "@mdeo/service-common";
 import { convertIcon } from "@mdeo/language-common";
 import type { MetamodelServices } from "@mdeo/language-metamodel";
+import type { LanguagePlugin } from "@mdeo/plugin";
 
 /**
- * Plugin definition for the metamodel service
+ * Language plugin definition for the metamodel language.
+ */
+const metamodelLanguagePlugin: LanguagePlugin = {
+    id: "metamodel",
+    name: "Metamodel",
+    extension: ".mm",
+    icon: convertIcon(Network),
+    serverPlugin: {
+        import: "static/language.js"
+    },
+    graphicalEditorPlugin: {
+        import: "static/editor.js",
+        stylesUrl: "static/styles.css",
+        stylesCls: "editor-metamodel"
+    },
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: serializeMonarchTokensProvider({
+            ...defaultMonarchTokenProvider,
+            keywords: ["class", "extends", "abstract", "import", "from", "as", "enum"]
+        })
+    },
+    isGenerated: false
+};
+
+/**
+ * Plugin definition for the metamodel service.
  */
 const metamodelServicePlugin: ServicePluginDefinition = {
     id: "metamodel-service",
     name: "Metamodel",
     description: "Language support for metamodel definitions (.mm files)",
     icon: convertIcon(Network),
-    languagePlugin: {
-        id: "metamodel",
-        name: "Metamodel",
-        extension: ".mm",
-        icon: convertIcon(Network),
-        serverPlugin: {
-            import: "static/language.js"
-        },
-        graphicalEditorPlugin: {
-            import: "static/editor.js",
-            stylesUrl: "static/styles.css"
-        },
-        textualEditorPlugin: {
-            languageConfiguration: defaultLanguageConfiguration,
-            monarchTokensProvider: serializeMonarchTokensProvider({
-                ...defaultMonarchTokenProvider,
-                keywords: ["class", "extends", "abstract", "import", "from", "as", "enum"]
-            })
-        }
-    },
+    languagePlugins: [metamodelLanguagePlugin],
     contributionPlugins: []
 };
 
@@ -53,13 +62,21 @@ const { metamodelPluginProvider } = await import("@mdeo/language-metamodel");
 
 const envConfig = parseServiceConfigFromEnv();
 
-const config: ServiceConfig<MetamodelServices> = {
-    ...envConfig,
-    plugin: metamodelServicePlugin,
+/**
+ * Language configuration for the metamodel language.
+ */
+const metamodelLanguageConfig: LanguageServiceConfig<MetamodelServices> = {
+    languagePlugin: metamodelLanguagePlugin,
     languagePluginProvider: metamodelPluginProvider,
     handlers: {
         [AST_HANDLER_KEY]: astHandler
     }
+};
+
+const config: ServiceConfig<MetamodelServices> = {
+    ...envConfig,
+    plugin: metamodelServicePlugin,
+    languages: [metamodelLanguageConfig]
 };
 
 await startLanguageService(config);

@@ -15,7 +15,24 @@ export class GGraphView implements IView {
     }
 
     render(model: Readonly<GGraph>, context: RenderingContext): VNode | undefined {
-        const transform = `scale(${model.zoom}) translate(${-model.scroll.x},${-model.scroll.y})`;
+        const zoom = model.zoom > 0 && context.targetKind !== "hidden" ? model.zoom : 1;
+        const renderChildren = model.zoom > 0 || context.targetKind === "hidden";
+        const transform = `scale(${zoom}) translate(${-model.scroll.x},${-model.scroll.y})`;
+        const children = renderChildren
+            ? [
+                  svg("defs", null, this.renderBackgroundPattern(model, zoom)),
+                  this.renderBackground(),
+                  svg(
+                      "g",
+                      {
+                          attrs: {
+                              transform
+                          }
+                      },
+                      ...context.renderChildren(model)
+                  )
+              ]
+            : [];
         return svg(
             "svg",
             {
@@ -24,20 +41,15 @@ export class GGraphView implements IView {
                     "sprotty-graph": true
                 }
             },
-            svg("defs", null, this.renderBackgroundPattern(model)),
-            this.renderBackground(),
-            svg(
-                "g",
-                {
-                    attrs: {
-                        transform
-                    }
-                },
-                ...context.renderChildren(model)
-            )
+            ...children
         );
     }
 
+    /**
+     * Renders the background of the graph using a pattern defined in the SVG defs. The pattern creates a grid that scales with the zoom level to maintain a consistent appearance.
+     *
+     * @returns A VNode representing the SVG rectangle that fills the background with the defined pattern
+     */
     private renderBackground(): VNode | undefined {
         return svg("rect", {
             attrs: {
@@ -50,8 +62,15 @@ export class GGraphView implements IView {
         });
     }
 
-    private renderBackgroundPattern(model: Readonly<GGraph>): VNode | undefined {
-        const zoomNormalized = model.zoom / Math.pow(3, Math.floor(Math.log(model.zoom) / Math.log(3)));
+    /**
+     * Renders the background pattern for the graph. The pattern is a grid that scales with the zoom level to maintain a consistent appearance.
+     *
+     * @param model The graph model containing the scroll and zoom information
+     * @param zoom The current zoom level of the graph
+     * @returns A VNode representing the SVG pattern definition for the background grid
+     */
+    private renderBackgroundPattern(model: Readonly<GGraph>, zoom: number): VNode | undefined {
+        const zoomNormalized = zoom / Math.pow(3, Math.floor(Math.log(zoom) / Math.log(3)));
         const gridSize = 25 * zoomNormalized;
         return svg(
             "pattern",
@@ -60,8 +79,8 @@ export class GGraphView implements IView {
                     id: this.backgroundPatternId,
                     width: gridSize,
                     height: gridSize,
-                    x: (-model.scroll.x * model.zoom) % gridSize,
-                    y: (-model.scroll.y * model.zoom) % gridSize,
+                    x: (-model.scroll.x * zoom) % gridSize,
+                    y: (-model.scroll.y * zoom) % gridSize,
                     patternUnits: "userSpaceOnUse"
                 }
             },

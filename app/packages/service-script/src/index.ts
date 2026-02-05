@@ -9,56 +9,64 @@ import {
     parseServiceConfigFromEnv,
     type ServiceConfig,
     type ServicePluginDefinition,
+    type LanguageServiceConfig,
     initializePluginContext,
     AST_HANDLER_KEY,
     astHandler
 } from "@mdeo/service-common";
 import { convertIcon } from "@mdeo/language-common";
 import type { ScriptServices } from "@mdeo/language-script";
+import type { LanguagePlugin } from "@mdeo/plugin";
 
 /**
- * Plugin definition for the script service
+ * Language plugin definition for the script language.
+ */
+const scriptLanguagePlugin: LanguagePlugin = {
+    id: "script",
+    name: "Script",
+    extension: ".fn",
+    icon: convertIcon(FileCode),
+    serverPlugin: {
+        import: "static/language.js"
+    },
+    graphicalEditorPlugin: undefined,
+    textualEditorPlugin: {
+        languageConfiguration: defaultLanguageConfiguration,
+        monarchTokensProvider: serializeMonarchTokensProvider({
+            ...defaultMonarchTokenProvider,
+            keywords: [
+                "import",
+                "from",
+                "as",
+                "fun",
+                "return",
+                "if",
+                "else",
+                "while",
+                "for",
+                "break",
+                "continue",
+                "var",
+                "true",
+                "false",
+                "null",
+                "in",
+                "is"
+            ]
+        })
+    },
+    isGenerated: false
+};
+
+/**
+ * Plugin definition for the script service.
  */
 const scriptServicePlugin: ServicePluginDefinition = {
     id: "script-service",
     name: "Script",
     description: "Language support for script definitions (.s files)",
     icon: convertIcon(FileCode),
-    languagePlugin: {
-        id: "script",
-        name: "Script",
-        extension: ".fn",
-        icon: convertIcon(FileCode),
-        serverPlugin: {
-            import: "static/language.js"
-        },
-        graphicalEditorPlugin: undefined,
-        textualEditorPlugin: {
-            languageConfiguration: defaultLanguageConfiguration,
-            monarchTokensProvider: serializeMonarchTokensProvider({
-                ...defaultMonarchTokenProvider,
-                keywords: [
-                    "import",
-                    "from",
-                    "as",
-                    "fun",
-                    "return",
-                    "if",
-                    "else",
-                    "while",
-                    "for",
-                    "break",
-                    "continue",
-                    "var",
-                    "true",
-                    "false",
-                    "null",
-                    "in",
-                    "is"
-                ]
-            })
-        }
-    },
+    languagePlugins: [scriptLanguagePlugin],
     contributionPlugins: []
 };
 
@@ -82,9 +90,11 @@ const scriptExecutionServiceUrl = process.env.SCRIPT_EXECUTION_SERVICE_URL ?? "h
  */
 const scriptExecutionHandler = new ScriptExecutionHandler(scriptExecutionServiceUrl);
 
-const config: ServiceConfig<ScriptServices> = {
-    ...envConfig,
-    plugin: scriptServicePlugin,
+/**
+ * Language configuration for the script language.
+ */
+const scriptLanguageConfig: LanguageServiceConfig<ScriptServices> = {
+    languagePlugin: scriptLanguagePlugin,
     languagePluginProvider: scriptPluginProvider,
     handlers: {
         [AST_HANDLER_KEY]: astHandler,
@@ -93,9 +103,10 @@ const config: ServiceConfig<ScriptServices> = {
     executionHandlers: [scriptExecutionHandler]
 };
 
-await startLanguageService(config);
+const config: ServiceConfig<ScriptServices> = {
+    ...envConfig,
+    plugin: scriptServicePlugin,
+    languages: [scriptLanguageConfig]
+};
 
-/**
- * Export the execution handler for external access
- */
-export { scriptExecutionHandler };
+await startLanguageService(config);

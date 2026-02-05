@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest, type FastifyReply }
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { resolve } from "path";
-import type { ServiceConfig, FileDataComputeRequest, FileDataComputeResponse } from "./types.js";
+import type { ServiceConfig, FileDataComputeRequest, FileDataComputeResponse, LanguageServiceConfig } from "./types.js";
 import { LangiumInstancePool } from "../langium/langiumPool.js";
 import type { ServerContributionPlugin } from "@mdeo/plugin";
 import { URI } from "vscode-uri";
@@ -10,6 +10,14 @@ import { buildManifest } from "./util.js";
 import type { FileInfo } from "../handler/types.js";
 import type { ExecutionContext } from "../execution/types.js";
 import { JwtAuthMiddleware } from "../auth/jwtAuth.js";
+
+/**
+ * Internal structure for managing a language's pool and configuration.
+ */
+interface LanguageHandler<T> {
+    config: LanguageServiceConfig<T>;
+    pool: LangiumInstancePool<T>;
+}
 
 /**
  * Extracts JWT token from the Authorization header of a request.
@@ -28,9 +36,9 @@ function extractJwtFromRequest(request: FastifyRequest): string {
 }
 
 /**
- * Creates and configures a Fastify-based language service.
+ * Creates and configures a Fastify-based language service supporting multiple languages.
  *
- * @param config The service configuration including plugin definition and handlers
+ * @param config The service configuration including plugin definition and language handlers
  * @returns Promise resolving to a configured Fastify instance ready to be started
  */
 export async function createLanguageService<T>(config: ServiceConfig<T>): Promise<FastifyInstance> {
@@ -56,13 +64,19 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         });
     }
 
-    const instancePool = new LangiumInstancePool<T>({
-        maxInstances: config.maxLangiumInstances ?? 5,
-        languagePluginProvider: config.languagePluginProvider,
-        languageId: config.plugin.languagePlugin.id,
-        extension: config.plugin.languagePlugin.extension,
-        backendUrl: config.backendApiUrl
-    });
+    // Create language handlers map with instance pools
+    const languageHandlers = new Map<string, LanguageHandler<T>>();
+    for (const langConfig of config.languages) {
+        const languageId = langConfig.languagePlugin.id;
+        const pool = new LangiumInstancePool<T>({
+            maxInstances: config.maxLangiumInstances ?? 5,
+            languagePluginProvider: langConfig.languagePluginProvider,
+            languageId,
+            extension: langConfig.languagePlugin.extension,
+            backendUrl: config.backendApiUrl
+        });
+        languageHandlers.set(languageId, { config: langConfig, pool });
+    }
 
     const jwtAuth = new JwtAuthMiddleware(config.backendApiUrl, config.jwtIssuer);
 
@@ -72,31 +86,40 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         return reply.send(manifest);
     });
 
+    /**
+     * File data endpoint with languageId in the path.
+     * POST /data/:languageId/:key
+     */
     fastify.post<{
-        Params: { key: string };
+        Params: { languageId: string; key: string };
         Body: FileDataComputeRequest;
     }>(
-        "/data/:key",
+        "/data/:languageId/:key",
         {
             preHandler: jwtAuth.authenticate.bind(jwtAuth)
         },
         async (request, reply) => {
-            const { key } = request.params;
+            const { languageId, key } = request.params;
             const { project, source, contributionPlugins } = request.body;
 
             if (!JwtAuthMiddleware.hasScope(request, "file-data:read")) {
                 return reply.status(403).send({ error: "Insufficient permissions: file-data:read scope required" });
             }
 
+            const languageHandler = languageHandlers.get(languageId);
+            if (!languageHandler) {
+                return reply.status(404).send({ error: `Unknown language: ${languageId}` });
+            }
+
             const jwt = extractJwtFromRequest(request);
 
-            const handler = config.handlers[key];
+            const handler = languageHandler.config.handlers[key];
             if (handler == undefined) {
                 return reply.status(404).send({ error: `No handler registered for key: ${key}` });
             }
 
             const serverContributionPlugins = (contributionPlugins ?? []) as unknown as ServerContributionPlugin[];
-            const instance = await instancePool.acquire(serverContributionPlugins, jwt, project);
+            const instance = await languageHandler.pool.acquire(serverContributionPlugins, jwt, project);
 
             let fileInfo: FileInfo | undefined = undefined;
             if (source != undefined) {
@@ -123,25 +146,32 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
 
                 return reply.send(response);
             } finally {
-                instancePool.release(instance);
+                languageHandler.pool.release(instance);
             }
         }
     );
 
-    if (config.executionHandlers && config.executionHandlers.length > 0) {
+    // Check if any language has execution handlers
+    const hasExecutionHandlers = config.languages.some(
+        (lang) => lang.executionHandlers && lang.executionHandlers.length > 0
+    );
+
+    if (hasExecutionHandlers) {
         /**
-         * Creates a new execution
-         * POST /executions
+         * Creates a new execution for a specific language.
+         * POST /:languageId/executions
          * Body: { executionId, project, filePath, data }
          */
         fastify.post<{
+            Params: { languageId: string };
             Body: { executionId: string; project: string; filePath: string; data: object };
         }>(
-            "/executions",
+            "/:languageId/executions",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
+                const { languageId } = request.params;
                 const { executionId, project, filePath, data } = request.body;
 
                 if (!JwtAuthMiddleware.hasScope(request, "execution:write")) {
@@ -150,10 +180,18 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         .send({ error: "Insufficient permissions: execution:write scope required" });
                 }
 
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
+                }
+
                 const jwt = extractJwtFromRequest(request);
 
-                if (!config.executionHandlers || config.executionHandlers.length === 0) {
-                    return reply.status(503).send({ error: "Execution service not available" });
+                if (
+                    !languageHandler.config.executionHandlers ||
+                    languageHandler.config.executionHandlers.length === 0
+                ) {
+                    return reply.status(503).send({ error: "Execution service not available for this language" });
                 }
 
                 const executionContext: ExecutionContext = {
@@ -165,7 +203,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 };
 
                 let selectedHandler = null;
-                for (const handler of config.executionHandlers) {
+                for (const handler of languageHandler.config.executionHandlers) {
                     const canHandleResult = await handler.canHandle(executionContext);
                     if (canHandleResult.canHandle) {
                         selectedHandler = handler;
@@ -192,18 +230,18 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         );
 
         /**
-         * Gets the summary for an execution
-         * GET /executions/:executionId/summary
+         * Gets the summary for an execution.
+         * GET /:languageId/executions/:executionId/summary
          */
         fastify.get<{
-            Params: { executionId: string };
+            Params: { languageId: string; executionId: string };
         }>(
-            "/executions/:executionId/summary",
+            "/:languageId/executions/:executionId/summary",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
-                const { executionId } = request.params;
+                const { languageId, executionId } = request.params;
 
                 if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:read")) {
                     return reply
@@ -211,13 +249,21 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         .send({ error: "Insufficient permissions: plugin:execution:read scope required" });
                 }
 
-                const jwt = extractJwtFromRequest(request);
-
-                if (!config.executionHandlers || config.executionHandlers.length === 0) {
-                    return reply.status(503).send({ error: "Execution service not available" });
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
                 }
 
-                const handler = config.executionHandlers[0];
+                const jwt = extractJwtFromRequest(request);
+
+                if (
+                    !languageHandler.config.executionHandlers ||
+                    languageHandler.config.executionHandlers.length === 0
+                ) {
+                    return reply.status(503).send({ error: "Execution service not available for this language" });
+                }
+
+                const handler = languageHandler.config.executionHandlers[0];
 
                 try {
                     const summary = await handler.getSummary(executionId, jwt);
@@ -232,31 +278,40 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         );
 
         /**
-         * Gets the file tree for an execution
-         * GET /executions/:executionId/files
+         * Gets the file tree for an execution.
+         * GET /:languageId/executions/:executionId/files
          */
         fastify.get<{
-            Params: { executionId: string };
+            Params: { languageId: string; executionId: string };
         }>(
-            "/executions/:executionId/files",
+            "/:languageId/executions/:executionId/files",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
-                const { executionId } = request.params;
+                const { languageId, executionId } = request.params;
 
                 if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:read")) {
                     return reply
                         .status(403)
                         .send({ error: "Insufficient permissions: plugin:execution:read scope required" });
                 }
-                const jwt = extractJwtFromRequest(request);
 
-                if (!config.executionHandlers || config.executionHandlers.length === 0) {
-                    return reply.status(503).send({ error: "Execution service not available" });
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
                 }
 
-                const handler = config.executionHandlers[0];
+                const jwt = extractJwtFromRequest(request);
+
+                if (
+                    !languageHandler.config.executionHandlers ||
+                    languageHandler.config.executionHandlers.length === 0
+                ) {
+                    return reply.status(503).send({ error: "Execution service not available for this language" });
+                }
+
+                const handler = languageHandler.config.executionHandlers[0];
 
                 try {
                     const files = await handler.getFileTree(executionId, jwt);
@@ -271,18 +326,18 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         );
 
         /**
-         * Gets a specific file from an execution
-         * GET /executions/:executionId/files/:path
+         * Gets a specific file from an execution.
+         * GET /:languageId/executions/:executionId/files/:path
          */
         fastify.get<{
-            Params: { executionId: string; "*": string };
+            Params: { languageId: string; executionId: string; "*": string };
         }>(
-            "/executions/:executionId/files/*",
+            "/:languageId/executions/:executionId/files/*",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
-                const { executionId } = request.params;
+                const { languageId, executionId } = request.params;
                 const path = request.params["*"];
 
                 if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:read")) {
@@ -291,13 +346,21 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         .send({ error: "Insufficient permissions: plugin:execution:read scope required" });
                 }
 
-                const jwt = extractJwtFromRequest(request);
-
-                if (!config.executionHandlers || config.executionHandlers.length === 0) {
-                    return reply.status(503).send({ error: "Execution service not available" });
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
                 }
 
-                const handler = config.executionHandlers[0];
+                const jwt = extractJwtFromRequest(request);
+
+                if (
+                    !languageHandler.config.executionHandlers ||
+                    languageHandler.config.executionHandlers.length === 0
+                ) {
+                    return reply.status(503).send({ error: "Execution service not available for this language" });
+                }
+
+                const handler = languageHandler.config.executionHandlers[0];
 
                 try {
                     const fileContent = await handler.getFile(executionId, path, jwt);
@@ -312,18 +375,18 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         );
 
         /**
-         * Cancels an execution
-         * POST /executions/:executionId/cancel
+         * Cancels an execution.
+         * POST /:languageId/executions/:executionId/cancel
          */
         fastify.post<{
-            Params: { executionId: string };
+            Params: { languageId: string; executionId: string };
         }>(
-            "/executions/:executionId/cancel",
+            "/:languageId/executions/:executionId/cancel",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
-                const { executionId } = request.params;
+                const { languageId, executionId } = request.params;
 
                 if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:cancel")) {
                     return reply
@@ -331,13 +394,21 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         .send({ error: "Insufficient permissions: plugin:execution:cancel scope required" });
                 }
 
-                const jwt = extractJwtFromRequest(request);
-
-                if (!config.executionHandlers || config.executionHandlers.length === 0) {
-                    return reply.status(503).send({ error: "Execution service not available" });
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
                 }
 
-                const handler = config.executionHandlers[0];
+                const jwt = extractJwtFromRequest(request);
+
+                if (
+                    !languageHandler.config.executionHandlers ||
+                    languageHandler.config.executionHandlers.length === 0
+                ) {
+                    return reply.status(503).send({ error: "Execution service not available for this language" });
+                }
+
+                const handler = languageHandler.config.executionHandlers[0];
 
                 try {
                     await handler.cancel(executionId, jwt);
@@ -352,18 +423,18 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         );
 
         /**
-         * Deletes an execution
-         * DELETE /executions/:executionId
+         * Deletes an execution.
+         * DELETE /:languageId/executions/:executionId
          */
         fastify.delete<{
-            Params: { executionId: string };
+            Params: { languageId: string; executionId: string };
         }>(
-            "/executions/:executionId",
+            "/:languageId/executions/:executionId",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
-                const { executionId } = request.params;
+                const { languageId, executionId } = request.params;
 
                 if (!JwtAuthMiddleware.hasScope(request, "plugin:execution:delete")) {
                     return reply
@@ -371,13 +442,21 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         .send({ error: "Insufficient permissions: plugin:execution:write scope required" });
                 }
 
-                const jwt = extractJwtFromRequest(request);
-
-                if (!config.executionHandlers || config.executionHandlers.length === 0) {
-                    return reply.status(503).send({ error: "Execution service not available" });
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
                 }
 
-                const handler = config.executionHandlers[0];
+                const jwt = extractJwtFromRequest(request);
+
+                if (
+                    !languageHandler.config.executionHandlers ||
+                    languageHandler.config.executionHandlers.length === 0
+                ) {
+                    return reply.status(503).send({ error: "Execution service not available for this language" });
+                }
+
+                const handler = languageHandler.config.executionHandlers[0];
 
                 try {
                     await handler.delete(executionId, jwt);

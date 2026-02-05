@@ -57,6 +57,10 @@ export interface LanguagePlugin {
      * Icon representing the language
      */
     icon: IconNode;
+    /**
+     * Indicates whether this language plugin was generated automatically
+     */
+    isGenerated: boolean;
 }
 
 /**
@@ -74,6 +78,11 @@ export interface LanguageGraphicalEditorPlugin {
      * This should be a URL that can be loaded by the browser.
      */
     stylesUrl: string;
+
+    /**
+     * CSS class name to apply to the editor container for styling purposes.
+     */
+    stylesCls: string;
 }
 
 /**

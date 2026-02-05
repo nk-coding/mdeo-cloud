@@ -51,7 +51,8 @@ object DatabaseFactory {
                 FileDataTable,
                 FileDependenciesTable,
                 DataDependenciesTable,
-                ExecutionsTable
+                ExecutionsTable,
+                ExecutionFileMetadataTable
             )
         }
         

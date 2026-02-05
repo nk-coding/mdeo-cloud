@@ -9,7 +9,6 @@ export enum ToolType {
     HAND = "hand",
     DELETE = "delete",
     MARQUEE = "marquee",
-    CREATE_NODE = "create-node",
     CREATE_EDGE = "create-edge",
     LAYOUT = "layout",
     BOTTOM_PANEL_TOGGLE = "bottom-panel-toggle"
@@ -23,7 +22,7 @@ export enum ToolType {
  * @returns True if the tool is a regular interaction tool
  */
 export function isRegularInteractionTool(toolType: ToolType): boolean {
-    return toolType === ToolType.POINTER || toolType === ToolType.CREATE_NODE;
+    return toolType === ToolType.POINTER;
 }
 
 /**

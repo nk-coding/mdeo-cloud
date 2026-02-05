@@ -174,7 +174,7 @@ private fun Route.getFileTreeRoute(
     executionService: ExecutionServiceWithFileTree
 ) {
     get("{id}/file-tree") {
-        val authResult = call.requireScope(ExecutionScopes.EXECUTION_FILE_TREE)
+        val authResult = call.requireScope(ExecutionScopes.EXECUTION_READ)
         if (authResult is AuthorizationResult.Denied) {
             call.respondAuthError(authResult)
             return@get
@@ -214,7 +214,7 @@ private fun Route.getFileContentsRoute(
     executionService: ExecutionServiceWithFileTree
 ) {
     get("{id}/files/{path...}") {
-        val authResult = call.requireScope(ExecutionScopes.EXECUTION_FILE_CONTENTS)
+        val authResult = call.requireScope(ExecutionScopes.EXECUTION_READ)
         if (authResult is AuthorizationResult.Denied) {
             call.respondAuthError(authResult)
             return@get

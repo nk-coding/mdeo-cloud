@@ -55,7 +55,7 @@
             </template>
             <template v-if="entry.type === FileType.Directory">
                 <ContextMenuItem
-                    v-for="fileType in languagePlugins"
+                    v-for="fileType in languagePlugins.filter(plugin => !plugin.isGenerated)"
                     :key="fileType.id"
                     @click="() => handleCreateFileOfType(fileType)"
                 >
@@ -136,6 +136,7 @@ import {
 } from "@mdeo/language-common";
 import * as vscodeJsonrpc from "vscode-jsonrpc";
 import { getFileExtension } from "@/data/filesystem/util";
+import plugin from "vue-sonner";
 
 const ActionProtocol = createActionProtocol(vscodeJsonrpc);
 

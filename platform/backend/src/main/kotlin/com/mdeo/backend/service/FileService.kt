@@ -405,23 +405,23 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
     }
     
     /**
-     * Deletes all files and directories for a project.
+     * Gets the parent path of a given path.
      *
-     * @param projectId The UUID of the project
+     * @param path The input path
+     * @return The parent path, or null if the input is empty
      */
-    fun deleteAllForProject(projectId: UUID) {
-        transaction {
-            FileChildrenTable.deleteWhere { FileChildrenTable.projectId eq projectId.toKotlinUuid() }
-            FilesTable.deleteWhere { FilesTable.projectId eq projectId.toKotlinUuid() }
-        }
-    }
-    
     private fun getParentPath(path: String): String? {
         if (path.isEmpty()) return null
         val lastSlash = path.lastIndexOf('/')
         return if (lastSlash == -1) "" else path.substring(0, lastSlash)
     }
     
+    /**
+     * Gets the basename (last segment) of a path.
+     *
+     * @param path The input path
+     * @return The basename of the path
+     */
     private fun getBasename(path: String): String {
         val lastSlash = path.lastIndexOf('/')
         return if (lastSlash == -1) path else path.substring(lastSlash + 1)

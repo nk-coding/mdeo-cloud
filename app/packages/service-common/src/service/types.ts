@@ -18,11 +18,38 @@ export interface ServicePluginDefinition extends Omit<ServicePlugin, "languagePl
     /**
      * Language plugins provided by the service plugin
      */
-    languagePlugin: LanguagePlugin;
+    languagePlugins: LanguagePlugin[];
 }
 
 /**
- * Configuration for the language service
+ * Configuration for a single language within a service.
+ *
+ * @template T Type of additional services for this language
+ */
+export interface LanguageServiceConfig<T = object> {
+    /**
+     * The language plugin definition for this language
+     */
+    languagePlugin: LanguagePlugin;
+
+    /**
+     * Langium language plugin provider for this language
+     */
+    languagePluginProvider: LangiumLanguagePluginProvider<T>;
+
+    /**
+     * File data handlers keyed by data key (e.g., "ast", "diagram")
+     */
+    handlers: Record<string, FileDataHandler<unknown, T>>;
+
+    /**
+     * Execution handlers for processing execution requests (optional)
+     */
+    executionHandlers?: ExecutionHandler<unknown>[];
+}
+
+/**
+ * Configuration for the language service supporting multiple languages.
  *
  * @template T Type of additional services
  */
@@ -38,7 +65,7 @@ export interface ServiceConfig<T = object> {
     host?: string;
 
     /**
-     * Maximum number of Langium instances to keep in the pool
+     * Maximum number of Langium instances to keep in the pool per language
      */
     maxLangiumInstances?: number;
 
@@ -58,19 +85,10 @@ export interface ServiceConfig<T = object> {
     plugin: ServicePluginDefinition;
 
     /**
-     * Langium language plugin provider
+     * Language configurations for all supported languages.
+     * Each configuration defines handlers and providers for a specific language.
      */
-    languagePluginProvider: LangiumLanguagePluginProvider<T>;
-
-    /**
-     * File data handlers keyed by data key (e.g., "ast", "diagram")
-     */
-    handlers: Record<string, FileDataHandler<unknown, T>>;
-
-    /**
-     * Execution handlers for processing execution requests (optional)
-     */
-    executionHandlers?: ExecutionHandler<unknown>[];
+    languages: LanguageServiceConfig<T>[];
 
     /**
      * Whether to serve static files (default: true)

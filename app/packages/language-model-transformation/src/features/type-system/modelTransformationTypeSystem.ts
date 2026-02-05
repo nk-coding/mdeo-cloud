@@ -7,22 +7,14 @@ import {
     TypePartialTypeSystem,
     type ClassType,
     type ExpressionTypirServices,
-    type MetamodelClassInfo,
     type PrimitiveTypes,
     typeRef,
     MetamodelPartialTypeSystem
 } from "@mdeo/language-expression";
-import type { AstReflection } from "@mdeo/language-common";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { LangiumDocument, LangiumDocuments, URI } from "langium";
 import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
-import {
-    Class,
-    getExportedEntitiesFromMetamodelFile,
-    MetaModel,
-    type ClassType as MetamodelClassType,
-    type MetaModelType
-} from "@mdeo/language-metamodel";
+import { getExportedEntitiesFromMetamodelFile } from "@mdeo/language-metamodel";
 import {
     expressionTypes,
     ModelTransformation,

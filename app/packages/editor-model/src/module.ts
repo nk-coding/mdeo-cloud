@@ -31,23 +31,18 @@ export const modelDiagramModule = new FeatureModule(
 
         configureDefaultModelElements(context);
 
-        // Configure object node
         configureModelElement(context, ModelElementType.NODE_OBJECT, GObjectNode, GObjectNodeView);
 
-        // Configure object label (combined name and type)
         configureModelElement(context, ModelElementType.LABEL_OBJECT_NAME, GObjectLabel, GObjectLabelView, {
             enable: [editLabelFeature]
         });
         configureModelElement(context, ModelElementType.LABEL_PROPERTY, GPropertyLabel, GLabelView);
 
-        // Configure link edge
         configureModelElement(context, ModelElementType.EDGE_LINK, GLinkEdge, GLinkEdgeView);
 
-        // Configure link endpoint labels
         configureModelElement(context, ModelElementType.LABEL_LINK_SOURCE, GLinkSourceLabel, GLabelView);
         configureModelElement(context, ModelElementType.LABEL_LINK_TARGET, GLinkTargetLabel, GLabelView);
 
-        // Configure compartments and dividers
         configureModelElement(context, ModelElementType.COMPARTMENT, GCompartment, GCompartmentView);
         configureModelElement(context, ModelElementType.DIVIDER, GHorizontalDivider, GHorizontalDividerView);
     },

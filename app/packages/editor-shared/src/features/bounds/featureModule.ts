@@ -14,11 +14,14 @@ const { GLSPHiddenBoundsUpdater } = sharedImport("@eclipse-glsp/client");
  * - HiddenBoundsUpdater: Handles bounds computation for foreign objects
  * - ResetCanvasBoundsCommand: Handles canvas bounds reset on resize
  */
-export const boundsModule: ContainerModule = new FeatureModule((bind, unbind, isBound, rebind) => {
-    bind(HiddenBoundsUpdater).toSelf().inSingletonScope();
-    rebind(GLSPHiddenBoundsUpdater).toService(HiddenBoundsUpdater);
+export const boundsModule: ContainerModule = new FeatureModule(
+    (bind, unbind, isBound, rebind) => {
+        bind(HiddenBoundsUpdater).toSelf().inSingletonScope();
+        rebind(GLSPHiddenBoundsUpdater).toService(HiddenBoundsUpdater);
 
-    configureCommand({ bind, isBound }, ResetCanvasBoundsCommand);
-    configureActionHandler({ bind, isBound }, UpdateModelAction.KIND, UpdateModelBoundsActionHandler);
-    configureActionHandler({ bind, isBound }, SetModelAction.KIND, UpdateModelBoundsActionHandler);
-});
+        configureCommand({ bind, isBound }, ResetCanvasBoundsCommand);
+        configureActionHandler({ bind, isBound }, UpdateModelAction.KIND, UpdateModelBoundsActionHandler);
+        configureActionHandler({ bind, isBound }, SetModelAction.KIND, UpdateModelBoundsActionHandler);
+    },
+    { featureId: Symbol("bounds") }
+);

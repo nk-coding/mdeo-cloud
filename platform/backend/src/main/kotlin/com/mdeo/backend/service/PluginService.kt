@@ -46,7 +46,8 @@ data class ManifestLanguagePlugin(
     val serverPlugin: ManifestServerPlugin,
     val graphicalEditorPlugin: ManifestGraphicalEditorPlugin? = null,
     val textualEditorPlugin: ManifestTextualEditorPlugin? = null,
-    val icon: JsonArray
+    val icon: JsonArray,
+    val isGenerated: Boolean = false
 )
 
 @kotlinx.serialization.Serializable
@@ -57,7 +58,8 @@ data class ManifestServerPlugin(
 @kotlinx.serialization.Serializable
 data class ManifestGraphicalEditorPlugin(
     val import: String,
-    val stylesUrl: String
+    val stylesUrl: String,
+    val stylesCls: String
 )
 
 @kotlinx.serialization.Serializable
@@ -305,9 +307,11 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 it[serverPluginImport] = plugin.serverPlugin.import
                 it[graphicalEditorPluginImport] = plugin.graphicalEditorPlugin?.import
                 it[graphicalEditorStylesUrl] = plugin.graphicalEditorPlugin?.stylesUrl
+                it[graphicalEditorStylesCls] = plugin.graphicalEditorPlugin?.stylesCls
                 it[textualEditorLanguageConfiguration] = plugin.textualEditorPlugin?.languageConfiguration?.toString()
                 it[textualEditorMonarchTokensProvider] = plugin.textualEditorPlugin?.monarchTokensProvider?.toString()
                 it[icon] = plugin.icon.toString()
+                it[isGenerated] = plugin.isGenerated
                 it[createdAt] = now
                 it[updatedAt] = now
             }
@@ -534,18 +538,6 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     }
 
     /**
-     * Removes all plugin associations for a project.
-     * Cascading deletes handle the associations automatically.
-     *
-     * @param projectId The UUID of the project
-     */
-    fun deleteAllForProject(projectId: UUID) {
-        transaction {
-            ProjectPluginsTable.deleteWhere { ProjectPluginsTable.projectId eq projectId.toKotlinUuid() }
-        }
-    }
-
-    /**
      * Finds the plugin responsible for a file based on its extension.
      * Only considers plugins that are associated with the project.
      *
@@ -745,7 +737,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             graphicalEditorPlugin = row[LanguagePluginsTable.graphicalEditorPluginImport]?.let { importPath ->
                 LanguageGraphicalEditorPlugin(
                     import = resolveUrl(importPath, pluginUrl),
-                    stylesUrl = resolveUrl(row[LanguagePluginsTable.graphicalEditorStylesUrl] ?: "", pluginUrl)
+                    stylesUrl = resolveUrl(row[LanguagePluginsTable.graphicalEditorStylesUrl] ?: "", pluginUrl),
+                    stylesCls = row[LanguagePluginsTable.graphicalEditorStylesCls] ?: ""
                 )
             },
             textualEditorPlugin = row[LanguagePluginsTable.textualEditorLanguageConfiguration]?.let { langConfig ->
@@ -754,7 +747,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                     monarchTokensProvider = json.parseToJsonElement(row[LanguagePluginsTable.textualEditorMonarchTokensProvider] ?: "{}").jsonObject
                 )
             },
-            icon = json.parseToJsonElement(row[LanguagePluginsTable.icon]).jsonArray
+            icon = json.parseToJsonElement(row[LanguagePluginsTable.icon]).jsonArray,
+            isGenerated = row[LanguagePluginsTable.isGenerated]
         )
     }
 

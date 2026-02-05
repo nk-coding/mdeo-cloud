@@ -1,6 +1,7 @@
 package com.mdeo.backend.service
 
 import com.mdeo.backend.database.FileMetadataTable
+import com.mdeo.backend.database.ExecutionFileMetadataTable
 import com.mdeo.common.model.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -89,13 +90,70 @@ class MetadataService(services: InjectedServices) : BaseService(), InjectedServi
     }
     
     /**
-     * Deletes all metadata for a project.
+     * Reads metadata for an execution result file.
      *
-     * @param projectId The UUID of the project
+     * @param executionId The UUID of the execution
+     * @param path The path to the result file
+     * @return ApiResult containing the metadata as a JsonObject, or an empty object if no metadata exists
      */
-    fun deleteAllForProject(projectId: UUID) {
-        transaction {
-            FileMetadataTable.deleteWhere { FileMetadataTable.projectId eq projectId.toKotlinUuid() }
+    fun readExecutionFileMetadata(executionId: UUID, path: String): ApiResult<JsonObject> {
+        val normalizedPath = normalizePath(path)
+        
+        return transaction {
+            val row = ExecutionFileMetadataTable.selectAll()
+                .where {
+                    (ExecutionFileMetadataTable.executionId eq executionId.toKotlinUuid()) and
+                    (ExecutionFileMetadataTable.path eq normalizedPath)
+                }
+                .firstOrNull()
+
+            if (row == null) {
+                return@transaction success(JsonObject(emptyMap()))
+            }
+
+            val metadata: JsonObject = row[ExecutionFileMetadataTable.metadata]
+            success(metadata)
+        }
+    }
+    
+    /**
+     * Writes metadata for an execution result file.
+     *
+     * @param executionId The UUID of the execution
+     * @param path The path to the result file
+     * @param metadata The metadata to write as a JsonObject
+     * @return ApiResult indicating success or containing an error
+     */
+    fun writeExecutionFileMetadata(executionId: UUID, path: String, metadata: JsonObject): ApiResult<Unit> {
+        val normalizedPath = normalizePath(path)
+        val now = Instant.now()
+        return transaction {
+            val existing = ExecutionFileMetadataTable.selectAll()
+                .where { 
+                    (ExecutionFileMetadataTable.executionId eq executionId.toKotlinUuid()) and 
+                    (ExecutionFileMetadataTable.path eq normalizedPath) 
+                }
+                .firstOrNull()
+            
+            if (existing != null) {
+                ExecutionFileMetadataTable.update({
+                    (ExecutionFileMetadataTable.executionId eq executionId.toKotlinUuid()) and
+                    (ExecutionFileMetadataTable.path eq normalizedPath)
+                }) {
+                    it[ExecutionFileMetadataTable.metadata] = metadata
+                    it[updatedAt] = now
+                }
+            } else {
+                ExecutionFileMetadataTable.insert {
+                    it[ExecutionFileMetadataTable.executionId] = executionId.toKotlinUuid()
+                    it[ExecutionFileMetadataTable.path] = normalizedPath
+                    it[ExecutionFileMetadataTable.metadata] = metadata
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                }
+            }
+            
+            success(Unit)
         }
     }
     

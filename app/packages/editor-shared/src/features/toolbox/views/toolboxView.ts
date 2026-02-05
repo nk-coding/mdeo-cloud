@@ -41,6 +41,8 @@ export function generateToolboxView(context: Toolbox): VNode {
  * @returns The internal toolbox VNode
  */
 function generateToolboxInternal(context: Toolbox): VNode {
+    const hasItems = context.hasToolboxItems();
+
     return html(
         "div",
         {
@@ -68,6 +70,6 @@ function generateToolboxInternal(context: Toolbox): VNode {
             }
         },
         generateToolbarView(context),
-        generateDetailsPanelView(context)
+        hasItems ? generateDetailsPanelView(context) : undefined
     );
 }

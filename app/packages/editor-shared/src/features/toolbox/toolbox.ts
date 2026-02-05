@@ -51,6 +51,10 @@ export class Toolbox extends ToolPalette {
     public selectedItemIndex: number = 0;
     public searchDebounceTimeout?: number;
 
+    get isLayoutable(): boolean {
+        return this.editorContext.editMode === "layoutable";
+    }
+
     override id(): string {
         return Toolbox.ID;
     }
@@ -90,6 +94,15 @@ export class Toolbox extends ToolPalette {
      */
     protected override addMinimizePaletteButton(): void {
         // Rendering is handled by Snabbdom
+    }
+
+    override editModeChanged(_newValue: string, _oldValue: string): void {
+        // no action needed, toolbox available even in readonly mode
+    }
+
+    override async postRequestModel(): Promise<void> {
+        await this.setPaletteItems();
+        this.show(this.editorContext.modelRoot);
     }
 
     /**
@@ -138,7 +151,7 @@ export class Toolbox extends ToolPalette {
      * Reloads the palette body, refreshing items if dynamic and not readonly.
      */
     protected override async reloadPaletteBody(): Promise<void> {
-        if (!this.editorContext.isReadonly && this.dynamic) {
+        if (!this.isLayoutable && this.dynamic) {
             await this.setPaletteItems();
             this.buildToolboxEntries();
             this.update();
@@ -225,6 +238,15 @@ export class Toolbox extends ToolPalette {
         return results
             .map((result: { id: string }) => entryMap.get(result.id))
             .filter((entry): entry is ToolboxEditEntry => entry !== undefined);
+    }
+
+    /**
+     * Checks if there are any toolbox items at all (regardless of filtering).
+     *
+     * @returns True if there are any toolbox items
+     */
+    hasToolboxItems(): boolean {
+        return this.toolboxEntries.length > 0;
     }
 
     /**

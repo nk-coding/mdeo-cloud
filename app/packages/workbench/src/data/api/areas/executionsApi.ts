@@ -145,4 +145,50 @@ export class ExecutionsApi {
             body: JSON.stringify(request)
         });
     }
+
+    /**
+     * Reads metadata for an execution file
+     *
+     * @param projectId The ID of the project
+     * @param executionId The ID of the execution
+     * @param path The path to the file within the execution results
+     * @returns A promise resolving to the metadata object
+     */
+    async readExecutionFileMetadata(
+        projectId: string,
+        executionId: string,
+        path: string
+    ): Promise<ApiResult<object, ExecutionError>> {
+        const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+        return this.core.fetchApiResult(
+            `${this.core.baseUrl}/projects/${projectId}/executions/${executionId}/metadata/${encodedPath}`,
+            { method: "GET" }
+        );
+    }
+
+    /**
+     * Writes metadata for an execution file
+     *
+     * @param projectId The ID of the project
+     * @param executionId The ID of the execution
+     * @param path The path to the file within the execution results
+     * @param metadata The metadata object to write
+     * @returns A promise resolving to success or an error
+     */
+    async writeExecutionFileMetadata(
+        projectId: string,
+        executionId: string,
+        path: string,
+        metadata: object
+    ): Promise<ApiResult<void, ExecutionError>> {
+        const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+        return this.core.fetchApiResult(
+            `${this.core.baseUrl}/projects/${projectId}/executions/${executionId}/metadata/${encodedPath}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(metadata)
+            }
+        );
+    }
 }

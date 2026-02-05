@@ -7,6 +7,14 @@ import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
 import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.expressions.ListLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.IntLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.LongLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.DoubleLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.FloatLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.StringLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.BooleanLiteralCompiler
+import com.mdeo.modeltransformation.compiler.expressions.NullLiteralCompiler
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
