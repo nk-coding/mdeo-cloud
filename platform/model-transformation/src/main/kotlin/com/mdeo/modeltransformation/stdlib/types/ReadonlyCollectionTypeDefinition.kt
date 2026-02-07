@@ -19,8 +19,8 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 fun createReadonlyCollectionType(): GremlinTypeDefinition {
     return gremlinType("collection.readonly")
         .extends("builtin.any")
-        // Size property
-        .property("size") { receiver ->
+        // size()
+        .method("size", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().count()
             TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }

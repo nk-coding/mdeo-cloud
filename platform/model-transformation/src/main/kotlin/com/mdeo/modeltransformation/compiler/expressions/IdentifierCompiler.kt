@@ -16,22 +16,25 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  * Compiles identifier expressions into [TraversalCompilationResult] containing GraphTraversals
  * that reference variables bound in the match context or from variable scopes.
  *
- * ## Match Context Resolution
- * In match context, identifiers typically reference variables that were bound earlier
- * in the match pattern. These are resolved using `__.select("varName")` to retrieve
- * the value bound to that variable during pattern matching.
+ * ## Scope Resolution
+ * Identifiers are resolved from the variable scope map based on the scope index
+ * assigned by the TypeScript type checker. The scope index represents nesting depth:
+ * - Scope 0: Global scope (built-ins)
+ * - Scope 1: Top-level model transformation scope
+ * - Scope 2+: Nested scopes (if-match, while-match, for-match conditions, etc.)
  *
- * ## Model Transformation Scope (Scope Level 1)
- * When scope is 1 and a transformation context is available, identifiers are resolved:
- * - Match-defined variables: Use `__.select()` for dynamic binding
- * - Named instances: Resolved via vertex ID as constant
- * - Variables: Resolved via value as constant
- *
- * ## Standard Scope Resolution
- * For other scopes, variables are resolved from the variable scope map:
+ * Variable bindings can be:
  * - [VariableBinding.ValueBinding]: Produces a constant traversal
  * - [VariableBinding.TraversalBinding]: Uses `__.select()` to reference the step label
- * - [VariableBinding.InstanceBinding]: Produces a constant with the vertex ID
+ * - [VariableBinding.InstanceBinding]: Uses `__.V(id)` to reference a specific vertex
+ *
+ * ## Important Note on Scope Indices
+ * The scope index is determined by the TypeScript type checker based on AST nesting.
+ * Match statements can appear at any nesting level (inside if/while/for blocks),
+ * so we cannot assume any particular scope index for match variables.
+ * The caller (e.g., MatchExecutor.buildCompilationContextWithTransformation) is
+ * responsible for setting up the variableScopes map with bindings at all relevant
+ * scope levels.
  *
  * ## Initial Traversal Handling
  * When an [initialTraversal] is provided, `select()` is appended to it.
@@ -40,14 +43,6 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  * @see TypedIdentifierExpression
  */
 class IdentifierCompiler : ExpressionCompiler {
-
-    companion object {
-        /**
-         * The scope index for model transformation scope.
-         * Identifiers at this scope are resolved from the transformation context.
-         */
-        const val MT_SCOPE_INDEX = 1
-    }
 
     override fun canCompile(expression: TypedExpression): Boolean {
         return expression is TypedIdentifierExpression
@@ -60,55 +55,17 @@ class IdentifierCompiler : ExpressionCompiler {
     ): TraversalCompilationResult<*, *> {
         val identifierExpression = expression as TypedIdentifierExpression
         val binding = resolveVariable(identifierExpression, context)
-        return compileBinding(binding, initialTraversal)
-    }
-
-    private fun resolveVariable(
-        expression: TypedIdentifierExpression,
-        context: TraversalCompilationContext
-    ): VariableBinding {
-        if (expression.scope == MT_SCOPE_INDEX && context.hasMTScope()) {
-            return resolveMTScopeIdentifier(expression, context)
-        }
-        return resolveStandardScope(expression, context)
+        return compileBinding(binding, context, initialTraversal)
     }
 
     /**
-     * Resolves an identifier from the model transformation scope.
+     * Resolves an identifier to its variable binding from the scope.
      *
-     * Handles three cases:
-     * 1. Match-defined variables: Use dynamic binding via TraversalBinding
-     * 2. Named instances: Resolve to InstanceBinding with vertex ID
-     * 3. Variables: Resolve to ValueBinding with the stored value
+     * All identifiers are resolved uniformly from the variableScopes map.
+     * The caller is responsible for setting up the correct bindings at all
+     * scope levels where variables should be accessible.
      */
-    private fun resolveMTScopeIdentifier(
-        expression: TypedIdentifierExpression,
-        context: TraversalCompilationContext
-    ): VariableBinding {
-        val name = expression.name
-        val txContext = context.transformationContext!!
-
-        if (context.isMatchDefinedVariable(name)) {
-            return VariableBinding.TraversalBinding(name)
-        }
-
-        val instanceId = txContext.lookupInstance(name)
-        if (instanceId != null) {
-            return VariableBinding.InstanceBinding(instanceId, name)
-        }
-
-        if (txContext.hasVariable(name)) {
-            val value = txContext.lookupVariable(name)
-            return VariableBinding.ValueBinding(value)
-        }
-
-        throw CompilationException.unresolvedVariable(name, expression.scope, expression)
-    }
-
-    /**
-     * Resolves an identifier from a standard (non-MT) scope.
-     */
-    private fun resolveStandardScope(
+    private fun resolveVariable(
         expression: TypedIdentifierExpression,
         context: TraversalCompilationContext
     ): VariableBinding {
@@ -129,6 +86,7 @@ class IdentifierCompiler : ExpressionCompiler {
     @Suppress("UNCHECKED_CAST")
     private fun compileBinding(
         binding: VariableBinding,
+        context: TraversalCompilationContext,
         initialTraversal: GraphTraversal<*, *>?
     ): TraversalCompilationResult<*, *> {
         return when (binding) {
@@ -139,9 +97,38 @@ class IdentifierCompiler : ExpressionCompiler {
                 compileTraversalBinding(binding.stepLabel, initialTraversal)
             }
             is VariableBinding.InstanceBinding -> {
-                TraversalCompilationResult.constant(binding.vertexId, initialTraversal)
+                compileInstanceBinding(binding, context, initialTraversal)
             }
         }
+    }
+    
+    /**
+     * Compiles an instance binding to a traversal that references the vertex.
+     * 
+     * Uses __.V(vertexId) to create an ANONYMOUS traversal that starts from the specific vertex.
+     * This allows subsequent property access like .values("address") to work correctly.
+     * 
+     * IMPORTANT: We always use anonymous traversals (__.V) instead of graph-bound (g.V) because:
+     * 1. Anonymous traversals can be used in flatMap(), coalesce(), and other steps that expect spawned traversals
+     * 2. The calling code (compilePropertyValueWithContext) uses g.inject().flatMap() to execute the result
+     * 3. Using g.V() would cause "child traversal was not spawned anonymously" errors
+     * 
+     * If no traversal source is available, falls back to returning the vertex ID as a constant.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun compileInstanceBinding(
+        binding: VariableBinding.InstanceBinding,
+        context: TraversalCompilationContext,
+        initialTraversal: GraphTraversal<*, *>?
+    ): TraversalCompilationResult<Any, Any> {
+        val traversal = if (initialTraversal != null) {
+            initialTraversal.flatMap(
+                AnonymousTraversal.V<Any>(binding.vertexId)
+            ) as GraphTraversal<Any, Any>
+        } else {
+            AnonymousTraversal.V<Any>(binding.vertexId) as GraphTraversal<Any, Any>
+        }
+        return TraversalCompilationResult.of(traversal)
     }
 
     @Suppress("UNCHECKED_CAST")

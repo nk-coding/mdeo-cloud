@@ -33,14 +33,16 @@ class StatementExecutorIntegrationTest {
 
     private lateinit var graph: TinkerGraph
     private lateinit var engine: TransformationEngine
+    private lateinit var registry: StatementExecutorRegistry
 
     @BeforeEach
     fun setUp() {
         graph = TinkerGraph.open()
-        val registry = StatementExecutorRegistry.createDefaultRegistry()
+        registry = StatementExecutorRegistry.createDefaultRegistry()
         
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
+            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
         )
@@ -80,7 +82,14 @@ class StatementExecutorIntegrationTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertTrue(result.isStopped())
             assertIs<TransformationExecutionResult.Stopped>(result)
@@ -113,7 +122,14 @@ class StatementExecutorIntegrationTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertTrue(result.isFailure())
         }
@@ -179,7 +195,14 @@ class StatementExecutorIntegrationTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertTrue(result.isSuccess())
             assertIs<TransformationExecutionResult.Success>(result)
@@ -251,7 +274,14 @@ class StatementExecutorIntegrationTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertTrue(result.isStopped())
             assertIs<TransformationExecutionResult.Stopped>(result)
@@ -270,7 +300,14 @@ class StatementExecutorIntegrationTest {
                 statements = emptyList()
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertTrue(result.isSuccess())
         }

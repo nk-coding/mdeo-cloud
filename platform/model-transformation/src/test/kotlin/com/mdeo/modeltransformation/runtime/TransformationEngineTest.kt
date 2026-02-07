@@ -29,6 +29,7 @@ class TransformationEngineTest {
         registry = StatementExecutorRegistry()
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
+            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
         )
@@ -50,7 +51,14 @@ class TransformationEngineTest {
                 statements = emptyList()
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertIs<TransformationExecutionResult.Success>(result)
         }
@@ -65,7 +73,14 @@ class TransformationEngineTest {
                 statements = emptyList()
             )
             
-            engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            engine.execute()
             
             assertEquals(intType, engine.getType(0))
             assertEquals(stringType, engine.getType(1))
@@ -81,7 +96,14 @@ class TransformationEngineTest {
                 statements = listOf(TypedStopStatement(keyword = "stop"))
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertIs<TransformationExecutionResult.Success>(result)
         }
@@ -99,7 +121,14 @@ class TransformationEngineTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertIs<TransformationExecutionResult.Success>(result)
             assertEquals(2, result.matchedNodes.size)
@@ -121,7 +150,14 @@ class TransformationEngineTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertIs<TransformationExecutionResult.Failure>(result)
             assertEquals(2, countingExecutor.callCount)
@@ -140,7 +176,14 @@ class TransformationEngineTest {
                 )
             )
             
-            val result = engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            
+            val result = engine.execute()
             
             assertIs<TransformationExecutionResult.Stopped>(result)
         }
@@ -264,7 +307,13 @@ class TransformationEngineTest {
                 metamodelUri = "test://model",
                 statements = emptyList()
             )
-            engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            engine.execute()
             
             assertEquals(intType, engine.getType(0))
             assertEquals(booleanType, engine.getType(1))
@@ -279,7 +328,13 @@ class TransformationEngineTest {
                 metamodelUri = "test://model",
                 statements = emptyList()
             )
-            engine.execute(ast)
+            engine = TransformationEngine(
+                traversalSource = graph.traversal(),
+                ast = ast,
+                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
+                statementExecutorRegistry = registry
+            )
+            engine.execute()
             
             assertNull(engine.getTypeOrNull(99))
         }
@@ -290,7 +345,8 @@ class TransformationEngineTest {
 
         @Test
         fun `create returns configured engine`() {
-            val newEngine = TransformationEngine.create(graph.traversal())
+            val ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList())
+            val newEngine = TransformationEngine.create(graph.traversal(), ast)
             
             // Should have all default executors registered
             assertTrue(newEngine.statementExecutorRegistry.executorCount() > 0)

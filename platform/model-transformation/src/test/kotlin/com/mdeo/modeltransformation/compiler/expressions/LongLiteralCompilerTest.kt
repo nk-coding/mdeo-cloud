@@ -3,6 +3,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
 import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -24,7 +25,8 @@ class LongLiteralCompilerTest {
         graph = TinkerGraph.open()
         context = TraversalCompilationContext(
             types = emptyList(),
-            traversalSource = graph.traversal()
+            traversalSource = graph.traversal(),
+            typeRegistry = GremlinTypeRegistry.GLOBAL
         )
     }
 

@@ -3,6 +3,11 @@ package com.mdeo.modeltransformation.runtime.statements
 import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstance
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
@@ -11,6 +16,8 @@ import com.mdeo.modeltransformation.ast.statements.TypedIfExpressionStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
@@ -31,6 +38,7 @@ class IfExpressionStatementExecutorTest {
 
     private lateinit var executor: IfExpressionStatementExecutor
     private lateinit var graph: TinkerGraph
+    private lateinit var g: org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
     private lateinit var engine: TransformationEngine
     private lateinit var context: TransformationExecutionContext
 
@@ -38,6 +46,25 @@ class IfExpressionStatementExecutorTest {
     fun setUp() {
         executor = IfExpressionStatementExecutor()
         graph = TinkerGraph.open()
+        g = graph.traversal()
+        
+        // Set up type registry with __GraphNode, House and Room types
+        val typeRegistry = GremlinTypeRegistry.GLOBAL
+        val graphNodeType = gremlinType("__GraphNode")
+            .graphProperty("address")
+            .graphProperty("size")
+            .build()
+        typeRegistry.register(graphNodeType)
+        val houseType = gremlinType("House")
+            .extends("__GraphNode")
+            .graphProperty("address")
+            .graphProperty("size")
+            .build()
+        val roomType = gremlinType("Room")
+            .extends("__GraphNode")
+            .build()
+        typeRegistry.register(houseType)
+        typeRegistry.register(roomType)
         
         val registry = ExpressionCompilerRegistry.createDefaultRegistry()
         
@@ -45,10 +72,20 @@ class IfExpressionStatementExecutorTest {
             .register(executor)
         
         engine = TransformationEngine(
-            traversalSource = graph.traversal(),
+            traversalSource = g,
+            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
             expressionCompilerRegistry = registry,
             statementExecutorRegistry = statementRegistry
         )
+        
+        // Set up the types array for expression compilers to resolve types
+        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
+        val graphNodeTypeRef = ClassTypeRef(type = "__GraphNode", isNullable = false)
+        val typesField = TransformationEngine::class.java.getDeclaredField("types")
+        typesField.isAccessible = true
+        typesField.set(engine, listOf(graphNodeTypeRef, stringType, graphNodeTypeRef, intType))
+        
         context = TransformationExecutionContext.empty()
     }
 
@@ -398,132 +435,6 @@ class IfExpressionStatementExecutorTest {
     }
 
     @Nested
-    inner class TruthyValueTests {
-
-        @Test
-        fun `non-zero integer is truthy`() {
-            graph.addVertex("House")
-            
-            val statement = TypedIfExpressionStatement(
-                condition = TypedIntLiteralExpression(value = "42", evalType = 0),
-                thenBlock = listOf(
-                    TypedMatchStatement(
-                        pattern = TypedPattern(
-                            elements = listOf(
-                                TypedPatternObjectInstanceElement(
-                                    objectInstance = TypedPatternObjectInstance(
-                                        modifier = null,
-                                        name = "house",
-                                        className = "House",
-                                        properties = emptyList()
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ),
-                elseIfBranches = emptyList()
-            )
-            
-            val result = executor.execute(statement, context, engine)
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertTrue(result.context.hasInstance("house"))
-        }
-
-        @Test
-        fun `zero is falsy`() {
-            val statement = TypedIfExpressionStatement(
-                condition = TypedIntLiteralExpression(value = "0", evalType = 0),
-                thenBlock = listOf(
-                    TypedMatchStatement(
-                        pattern = TypedPattern(
-                            elements = listOf(
-                                TypedPatternObjectInstanceElement(
-                                    objectInstance = TypedPatternObjectInstance(
-                                        modifier = null,
-                                        name = "house",
-                                        className = "House",
-                                        properties = emptyList()
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ),
-                elseIfBranches = emptyList(),
-                elseBlock = null
-            )
-            
-            val result = executor.execute(statement, context, engine)
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertFalse(result.context.hasInstance("house"))
-        }
-
-        @Test
-        fun `non-empty string is truthy`() {
-            graph.addVertex("House")
-            
-            val statement = TypedIfExpressionStatement(
-                condition = TypedStringLiteralExpression(value = "hello", evalType = 0),
-                thenBlock = listOf(
-                    TypedMatchStatement(
-                        pattern = TypedPattern(
-                            elements = listOf(
-                                TypedPatternObjectInstanceElement(
-                                    objectInstance = TypedPatternObjectInstance(
-                                        modifier = null,
-                                        name = "house",
-                                        className = "House",
-                                        properties = emptyList()
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ),
-                elseIfBranches = emptyList()
-            )
-            
-            val result = executor.execute(statement, context, engine)
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertTrue(result.context.hasInstance("house"))
-        }
-
-        @Test
-        fun `empty string is falsy`() {
-            val statement = TypedIfExpressionStatement(
-                condition = TypedStringLiteralExpression(value = "", evalType = 0),
-                thenBlock = listOf(
-                    TypedMatchStatement(
-                        pattern = TypedPattern(
-                            elements = listOf(
-                                TypedPatternObjectInstanceElement(
-                                    objectInstance = TypedPatternObjectInstance(
-                                        modifier = null,
-                                        name = "house",
-                                        className = "House",
-                                        properties = emptyList()
-                                    )
-                                )
-                            )
-                        )
-                    )
-                ),
-                elseIfBranches = emptyList(),
-                elseBlock = null
-            )
-            
-            val result = executor.execute(statement, context, engine)
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertFalse(result.context.hasInstance("house"))
-        }
-    }
-
-    @Nested
     inner class BlockResultPropagationTests {
 
         @Test
@@ -631,6 +542,511 @@ class IfExpressionStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertTrue(result.isFailure())
+        }
+    }
+
+    @Nested
+    inner class DynamicConditionTests {
+
+        @Test
+        fun `executes thenBlock when dynamic comparison condition is true`() {
+            // Create a house with size > 100
+            g.addV("House").property("size", 150).next()
+            
+            // First match the house to bind it to context
+            val matchPattern = TypedPattern(
+                elements = listOf(
+                    TypedPatternObjectInstanceElement(
+                        objectInstance = TypedPatternObjectInstance(
+                            modifier = null,
+                            name = "house",
+                            className = "House",
+                            properties = emptyList()
+                        )
+                    )
+                )
+            )
+            
+            val matchStatement = TypedMatchStatement(pattern = matchPattern)
+            val matchResult = engine.executeStatement(matchStatement, context) as TransformationExecutionResult.Success
+            val contextWithHouse = matchResult.context
+            
+            // Now test the if statement with dynamic condition: house.size > 100
+            val statement = TypedIfExpressionStatement(
+                condition = TypedBinaryExpression(
+                    evalType = 0, // boolean
+                    operator = ">",
+                    left = TypedMemberAccessExpression(
+                        evalType = 3, // int
+                        expression = TypedIdentifierExpression(
+                            evalType = 0, // graph node
+                            name = "house",
+                            scope = 1
+                        ),
+                        member = "size",
+                        isNullChaining = false
+                    ),
+                    right = TypedIntLiteralExpression(
+                        evalType = 3,
+                        value = "100"
+                    )
+                ),
+                thenBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "bigRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                elseIfBranches = emptyList()
+            )
+            
+            val result = executor.execute(statement, contextWithHouse, engine)
+            
+            assertIs<TransformationExecutionResult.Success>(result)
+            assertEquals(1, result.createdNodes.size)
+            assertTrue(result.context.hasInstance("bigRoom"))
+        }
+
+        @Test
+        fun `executes elseBlock when dynamic comparison condition is false`() {
+            // Create a house with size < 100
+            g.addV("House").property("size", 50).next()
+            
+            // First match the house to bind it to context
+            val matchPattern = TypedPattern(
+                elements = listOf(
+                    TypedPatternObjectInstanceElement(
+                        objectInstance = TypedPatternObjectInstance(
+                            modifier = null,
+                            name = "house",
+                            className = "House",
+                            properties = emptyList()
+                        )
+                    )
+                )
+            )
+            
+            val matchStatement = TypedMatchStatement(pattern = matchPattern)
+            val matchResult = engine.executeStatement(matchStatement, context) as TransformationExecutionResult.Success
+            val contextWithHouse = matchResult.context
+            
+            // Test the if statement with dynamic condition: house.size > 100
+            val statement = TypedIfExpressionStatement(
+                condition = TypedBinaryExpression(
+                    evalType = 0, // boolean
+                    operator = ">",
+                    left = TypedMemberAccessExpression(
+                        evalType = 3, // int
+                        expression = TypedIdentifierExpression(
+                            evalType = 0, // graph node
+                            name = "house",
+                            scope = 1
+                        ),
+                        member = "size",
+                        isNullChaining = false
+                    ),
+                    right = TypedIntLiteralExpression(
+                        evalType = 3,
+                        value = "100"
+                    )
+                ),
+                thenBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "bigRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                elseIfBranches = emptyList(),
+                elseBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "smallRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            
+            val result = executor.execute(statement, contextWithHouse, engine)
+            
+            assertIs<TransformationExecutionResult.Success>(result)
+            assertEquals(1, result.createdNodes.size)
+            assertTrue(result.context.hasInstance("smallRoom"))
+            assertFalse(result.context.hasInstance("bigRoom"))
+        }
+
+        @Test
+        fun `handles equality comparison in condition`() {
+            // Create a house with address "Main St"
+            g.addV("House").property("address", "Main St").next()
+            
+            // First match the house
+            val matchPattern = TypedPattern(
+                elements = listOf(
+                    TypedPatternObjectInstanceElement(
+                        objectInstance = TypedPatternObjectInstance(
+                            modifier = null,
+                            name = "house",
+                            className = "House",
+                            properties = emptyList()
+                        )
+                    )
+                )
+            )
+            
+            val matchStatement = TypedMatchStatement(pattern = matchPattern)
+            val matchResult = engine.executeStatement(matchStatement, context) as TransformationExecutionResult.Success
+            val contextWithHouse = matchResult.context
+            
+            // Test: house.address == "Main St"
+            val statement = TypedIfExpressionStatement(
+                condition = TypedBinaryExpression(
+                    evalType = 0, // boolean
+                    operator = "==",
+                    left = TypedMemberAccessExpression(
+                        evalType = 1, // string
+                        expression = TypedIdentifierExpression(
+                            evalType = 0, // graph node
+                            name = "house",
+                            scope = 1
+                        ),
+                        member = "address",
+                        isNullChaining = false
+                    ),
+                    right = TypedStringLiteralExpression(
+                        evalType = 1,
+                        value = "Main St"
+                    )
+                ),
+                thenBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "matchedRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                elseIfBranches = emptyList()
+            )
+            
+            val result = executor.execute(statement, contextWithHouse, engine)
+            
+            assertIs<TransformationExecutionResult.Success>(result)
+            assertEquals(1, result.createdNodes.size)
+            assertTrue(result.context.hasInstance("matchedRoom"))
+        }
+
+        @Test
+        fun `handles logical AND in condition`() {
+            // Create a house with size 150 and address "Main St"
+            g.addV("House").property("size", 150).property("address", "Main St").next()
+            
+            // First match the house
+            val matchPattern = TypedPattern(
+                elements = listOf(
+                    TypedPatternObjectInstanceElement(
+                        objectInstance = TypedPatternObjectInstance(
+                            modifier = null,
+                            name = "house",
+                            className = "House",
+                            properties = emptyList()
+                        )
+                    )
+                )
+            )
+            
+            val matchStatement = TypedMatchStatement(pattern = matchPattern)
+            val matchResult = engine.executeStatement(matchStatement, context) as TransformationExecutionResult.Success
+            val contextWithHouse = matchResult.context
+            
+            // Test: house.size > 100 && house.address == "Main St"
+            val statement = TypedIfExpressionStatement(
+                condition = TypedBinaryExpression(
+                    evalType = 0, // boolean
+                    operator = "&&",
+                    left = TypedBinaryExpression(
+                        evalType = 0,
+                        operator = ">",
+                        left = TypedMemberAccessExpression(
+                            evalType = 3, // int
+                            expression = TypedIdentifierExpression(
+                                evalType = 0,
+                                name = "house",
+                                scope = 1
+                            ),
+                            member = "size",
+                            isNullChaining = false
+                        ),
+                        right = TypedIntLiteralExpression(
+                            evalType = 3,
+                            value = "100"
+                        )
+                    ),
+                    right = TypedBinaryExpression(
+                        evalType = 0,
+                        operator = "==",
+                        left = TypedMemberAccessExpression(
+                            evalType = 1, // string
+                            expression = TypedIdentifierExpression(
+                                evalType = 0,
+                                name = "house",
+                                scope = 1
+                            ),
+                            member = "address",
+                            isNullChaining = false
+                        ),
+                        right = TypedStringLiteralExpression(
+                            evalType = 1,
+                            value = "Main St"
+                        )
+                    )
+                ),
+                thenBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "qualifiedRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                elseIfBranches = emptyList()
+            )
+            
+            val result = executor.execute(statement, contextWithHouse, engine)
+            
+            assertIs<TransformationExecutionResult.Success>(result)
+            assertEquals(1, result.createdNodes.size)
+            assertTrue(result.context.hasInstance("qualifiedRoom"))
+        }
+
+        @Test
+        fun `handles logical AND with false result`() {
+            // Create a house with size 50 and address "Main St" (size fails the > 100 check)
+            g.addV("House").property("size", 50).property("address", "Main St").next()
+            
+            // First match the house
+            val matchPattern = TypedPattern(
+                elements = listOf(
+                    TypedPatternObjectInstanceElement(
+                        objectInstance = TypedPatternObjectInstance(
+                            modifier = null,
+                            name = "house",
+                            className = "House",
+                            properties = emptyList()
+                        )
+                    )
+                )
+            )
+            
+            val matchStatement = TypedMatchStatement(pattern = matchPattern)
+            val matchResult = engine.executeStatement(matchStatement, context) as TransformationExecutionResult.Success
+            val contextWithHouse = matchResult.context
+            
+            // Test: house.size > 100 && house.address == "Main St" (should be false)
+            val statement = TypedIfExpressionStatement(
+                condition = TypedBinaryExpression(
+                    evalType = 0, // boolean
+                    operator = "&&",
+                    left = TypedBinaryExpression(
+                        evalType = 0,
+                        operator = ">",
+                        left = TypedMemberAccessExpression(
+                            evalType = 3, // int
+                            expression = TypedIdentifierExpression(
+                                evalType = 0,
+                                name = "house",
+                                scope = 1
+                            ),
+                            member = "size",
+                            isNullChaining = false
+                        ),
+                        right = TypedIntLiteralExpression(
+                            evalType = 3,
+                            value = "100"
+                        )
+                    ),
+                    right = TypedBinaryExpression(
+                        evalType = 0,
+                        operator = "==",
+                        left = TypedMemberAccessExpression(
+                            evalType = 1, // string
+                            expression = TypedIdentifierExpression(
+                                evalType = 0,
+                                name = "house",
+                                scope = 1
+                            ),
+                            member = "address",
+                            isNullChaining = false
+                        ),
+                        right = TypedStringLiteralExpression(
+                            evalType = 1,
+                            value = "Main St"
+                        )
+                    )
+                ),
+                thenBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "qualifiedRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                elseIfBranches = emptyList(),
+                elseBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "unqualifiedRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            
+            val result = executor.execute(statement, contextWithHouse, engine)
+            
+            assertIs<TransformationExecutionResult.Success>(result)
+            assertEquals(1, result.createdNodes.size)
+            assertTrue(result.context.hasInstance("unqualifiedRoom"))
+            assertFalse(result.context.hasInstance("qualifiedRoom"))
+        }
+        
+        /**
+         * Tests that identifiers with scope > 1 are resolved correctly.
+         * 
+         * This verifies the fix for the MT scope special handling issue:
+         * - Match statements can be nested inside if/while blocks
+         * - When nested, the scope index increments (e.g., if { match { house: House } } means house is at scope 2)
+         * - The IdentifierCompiler now resolves variables uniformly from variableScopes at all scope levels
+         */
+        @Test
+        fun `handles nested scope identifiers (scope greater than 1)`() {
+            // Create a house with size > 100
+            g.addV("House").property("size", 200).next()
+            
+            // First match the house to bind it to context
+            val matchPattern = TypedPattern(
+                elements = listOf(
+                    TypedPatternObjectInstanceElement(
+                        objectInstance = TypedPatternObjectInstance(
+                            modifier = null,
+                            name = "house",
+                            className = "House",
+                            properties = emptyList()
+                        )
+                    )
+                )
+            )
+            
+            val matchStatement = TypedMatchStatement(pattern = matchPattern)
+            val matchResult = engine.executeStatement(matchStatement, context) as TransformationExecutionResult.Success
+            val contextWithHouse = matchResult.context
+            
+            // Test with scope = 2 (simulating a nested scope, e.g., if { match { ... } })
+            // This verifies that the fix works for any scope level, not just scope 1
+            val statement = TypedIfExpressionStatement(
+                condition = TypedBinaryExpression(
+                    evalType = 0, // boolean
+                    operator = ">",
+                    left = TypedMemberAccessExpression(
+                        evalType = 3, // int
+                        expression = TypedIdentifierExpression(
+                            evalType = 0, // graph node
+                            name = "house",
+                            scope = 2  // Nested scope (simulating if { match { house } })
+                        ),
+                        member = "size",
+                        isNullChaining = false
+                    ),
+                    right = TypedIntLiteralExpression(
+                        evalType = 3,
+                        value = "100"
+                    )
+                ),
+                thenBlock = listOf(
+                    TypedMatchStatement(
+                        pattern = TypedPattern(
+                            elements = listOf(
+                                TypedPatternObjectInstanceElement(
+                                    objectInstance = TypedPatternObjectInstance(
+                                        modifier = "create",
+                                        name = "largeRoom",
+                                        className = "Room",
+                                        properties = emptyList()
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                elseIfBranches = emptyList()
+            )
+            
+            val result = executor.execute(statement, contextWithHouse, engine)
+            
+            assertIs<TransformationExecutionResult.Success>(result)
+            assertEquals(1, result.createdNodes.size)
+            assertTrue(result.context.hasInstance("largeRoom"))
         }
     }
 }

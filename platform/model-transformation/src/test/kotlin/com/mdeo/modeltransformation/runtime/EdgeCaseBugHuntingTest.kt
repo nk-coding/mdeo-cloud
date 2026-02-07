@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
@@ -43,6 +44,7 @@ class EdgeCaseBugHuntingTest {
         
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
+            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()), // Dummy AST
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -721,7 +723,7 @@ class EdgeCaseBugHuntingTest {
         @Test
         fun `pattern with only variable elements succeeds`() {
             // Fixed: Variables in patterns with no object instances are now evaluated
-            // by the UnifiedMatchExecutor's handleEmptyPattern function.
+            // by the MatchExecutor's handleEmptyPattern function.
             //
             // Expected: Variable "x" should be bound to value 42
             

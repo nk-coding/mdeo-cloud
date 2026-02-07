@@ -163,9 +163,9 @@ class StdlibRegistrarTest {
     inner class CollectionTypeTests {
 
         @Test
-        fun `ReadonlyCollection has size property`() {
-            val property = registry.lookupProperty("collection.readonly", "size")
-            assertNotNull(property)
+        fun `ReadonlyCollection has size method`() {
+            val method = registry.lookupMethod("collection.readonly", "size", "")
+            assertNotNull(method)
         }
 
         @Test

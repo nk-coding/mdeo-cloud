@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.compiler
 
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
@@ -23,7 +24,9 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * values in where clauses. This ensures no naming conflicts when multiple
  * expressions use temporary bindings.
  *
- * @param types The list of types referenced by expressions via evalType index
+ * @param types The list of types referenced by expressions via evalType index.
+ *              Indices must be preserved from the TypedAst. Entries may be VoidType or
+ *              ValueType subclasses. Only ValueType entries can be used for property lookups.
  * @param variableScopes A map of scope index to variable bindings within that scope
  * @param traversalSource The GraphTraversalSource for building traversals
  * @param transformationContext Optional transformation context for MT scope resolution
@@ -34,12 +37,12 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * @param variableCounter Counter for generating unique intermediate variable names
  */
 data class TraversalCompilationContext(
-    val types: List<ValueType>,
+    val types: List<ReturnType>,
     val variableScopes: Map<Int, VariableScope> = emptyMap(),
     val traversalSource: GraphTraversalSource? = null,
     val transformationContext: TransformationExecutionContext? = null,
     val matchDefinedVariables: Set<String> = emptySet(),
-    val typeRegistry: GremlinTypeRegistry = CompilationContext.GLOBAL_TYPE_REGISTRY,
+    val typeRegistry: GremlinTypeRegistry,
     val inMatchContext: Boolean = false,
     val currentMatchLabel: String? = null,
     val variableCounter: Int = 0
@@ -50,19 +53,27 @@ data class TraversalCompilationContext(
      * @param evalType The index into the types array
      * @return The [ValueType] at the specified index
      * @throws IndexOutOfBoundsException If the index is out of bounds
+     * @throws IllegalStateException If the type at the index is not a ValueType
      */
     fun resolveType(evalType: Int): ValueType {
-        return types[evalType]
+        val type = types[evalType]
+        return type as? ValueType
+            ?: throw IllegalStateException(
+                "Type at index $evalType is not a ValueType (found ${type::class.simpleName}). " +
+                "Only ValueType entries can be resolved for property access."
+            )
     }
 
     /**
-     * Resolves a type from the types array, returning null if the index is out of bounds.
+     * Resolves a type from the types array, returning null if the index is out of bounds
+     * or if the type is not a ValueType.
      *
      * @param evalType The index into the types array
      * @return The [ValueType] at the specified index, or null if the index is invalid
+     *         or the type is not a ValueType
      */
     fun resolveTypeOrNull(evalType: Int): ValueType? {
-        return types.getOrNull(evalType)
+        return types.getOrNull(evalType) as? ValueType
     }
 
     /**
@@ -205,16 +216,6 @@ data class TraversalCompilationContext(
                 matchDefinedVariables = oldContext.matchDefinedVariables,
                 typeRegistry = oldContext.typeRegistry
             )
-        }
-
-        /**
-         * Creates a minimal context with just the required types.
-         *
-         * @param types The list of types for expression compilation
-         * @return A new [TraversalCompilationContext] with minimal configuration
-         */
-        fun withTypes(types: List<ValueType>): TraversalCompilationContext {
-            return TraversalCompilationContext(types = types)
         }
     }
 }

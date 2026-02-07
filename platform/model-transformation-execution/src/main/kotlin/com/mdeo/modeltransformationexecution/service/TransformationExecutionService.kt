@@ -256,14 +256,15 @@ class TransformationExecutionService(
         
         return try {
             val g = graph.traversal()
-            graphLoader.load(g, modelData)
+            val engine = TransformationEngine.create(g, typedAst)
             
-            val engine = TransformationEngine.create(g)
-            val result = engine.execute(typedAst)
+            graphLoader.load(g, modelData, engine.instanceNameRegistry)
+            
+            val result = engine.execute()
             
             when (result) {
                 is TransformationExecutionResult.Success -> {
-                    graphConverter.convert(g, modelData.metamodelUri)
+                    graphConverter.convert(g, modelData.metamodelUri, engine.instanceNameRegistry)
                 }
                 is TransformationExecutionResult.Failure -> {
                     handleTransformationFailure(executionId, result, jwtToken)

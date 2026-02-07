@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.runtime.statements
 
+import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstance
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
@@ -40,6 +41,7 @@ class ForMatchStatementExecutorTest {
         
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
+            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = statementRegistry
         )

@@ -8,7 +8,6 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
 import com.mdeo.modeltransformation.runtime.match.MatchResult
-import com.mdeo.modeltransformation.runtime.match.UnifiedMatchExecutor
 
 /**
  * Executor for TypedUntilMatchStatement.
@@ -35,7 +34,7 @@ import com.mdeo.modeltransformation.runtime.match.UnifiedMatchExecutor
  * @param matchExecutor The executor used for unified pattern matching and modifications.
  */
 class UntilMatchStatementExecutor(
-    private val matchExecutor: MatchExecutor = UnifiedMatchExecutor()
+    private val matchExecutor: MatchExecutor = MatchExecutor()
 ) : StatementExecutor {
     
     /**

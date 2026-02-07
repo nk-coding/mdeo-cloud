@@ -111,9 +111,3 @@ export interface LanguageServerPlugin {
      */
     import: string;
 }
-
-/**
- * Type alias for the legacy editorPlugin field.
- * @deprecated Use LanguageGraphicalEditorPlugin instead
- */
-export type LanguageEditorPlugin = LanguageGraphicalEditorPlugin;

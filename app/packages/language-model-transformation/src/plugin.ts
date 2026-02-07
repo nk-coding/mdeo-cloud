@@ -12,6 +12,7 @@ import {
     registerDefaultTokenSerializers,
     sharedImport,
     ActionHandlerRegistry,
+    generateExtendedParser,
     type ActionHandlerRegistryAdditionalServices
 } from "@mdeo/language-shared";
 import {
@@ -19,12 +20,13 @@ import {
     type AdditionalTypirServices,
     type ExpressionTypirServices,
     registerExpressionSerializers,
-    registerTypeSerializers
+    registerTypeSerializers,
+    generateExpressionRuleOverride
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { AbstractAstReflection } from "langium";
 import { generateModelTransformationRules, ModelTransformationTerminals } from "./grammar/modelTransformationRules.js";
-import { expressionTypes, typeTypes } from "./grammar/modelTransformationTypes.js";
+import { expressionConfig, expressionTypes, typeTypes } from "./grammar/modelTransformationTypes.js";
 import { ModelTransformationLangiumScopeProvider } from "./features/modelTransformationScopeProvider.js";
 import { ModelTransformationScopeComputation } from "./features/modelTransformationScopeComputation.js";
 import { ModelTransformationTypeSystem } from "./features/type-system/modelTransformationTypeSystem.js";
@@ -78,7 +80,8 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
         module: {
             parser: {
                 TokenBuilder: () => new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
-                ValueConverter: () => new IdValueConverter()
+                ValueConverter: () => new IdValueConverter(),
+                ...generateExtendedParser(generateExpressionRuleOverride(expressionConfig))
             },
             references: {
                 ScopeProvider: (services) => new ModelTransformationLangiumScopeProvider(services),

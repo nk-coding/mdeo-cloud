@@ -8,7 +8,6 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
 import com.mdeo.modeltransformation.runtime.match.MatchResult
-import com.mdeo.modeltransformation.runtime.match.UnifiedMatchExecutor
 
 /**
  * Executor for TypedForMatchStatement.
@@ -31,7 +30,7 @@ import com.mdeo.modeltransformation.runtime.match.UnifiedMatchExecutor
  * @param matchExecutor The executor used for unified pattern matching and modifications.
  */
 class ForMatchStatementExecutor(
-    private val matchExecutor: MatchExecutor = UnifiedMatchExecutor()
+    private val matchExecutor: MatchExecutor = MatchExecutor()
 ) : StatementExecutor {
     
     /**
@@ -88,15 +87,13 @@ class ForMatchStatementExecutor(
         context: TransformationExecutionContext,
         engine: TransformationEngine
     ): TransformationExecutionResult {
-        var currentContext = context
-        var accumulatedResult = TransformationExecutionResult.Success(currentContext)
+        var accumulatedResult = TransformationExecutionResult.Success(context)
         
         for (matched in matches) {
-            val iterationResult = executeIteration(statement, matched, currentContext, engine)
+            val iterationResult = executeIteration(statement, matched, context, engine)
             
             when (iterationResult) {
                 is TransformationExecutionResult.Success -> {
-                    currentContext = iterationResult.context
                     accumulatedResult = accumulatedResult.merge(iterationResult)
                 }
                 is TransformationExecutionResult.Failure -> return iterationResult

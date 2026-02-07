@@ -15,6 +15,7 @@ import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedTernaryExpression
 import com.mdeo.expression.ast.expressions.TypedUnaryExpression
 import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
@@ -69,7 +70,8 @@ class TraversalCompilerTest {
         registry = ExpressionCompilerRegistry.createDefaultRegistry()
         context = TraversalCompilationContext(
             types = emptyList(),
-            traversalSource = g
+            traversalSource = g,
+            typeRegistry = GremlinTypeRegistry.GLOBAL
         )
     }
 
@@ -396,9 +398,8 @@ class TraversalCompilerTest {
                 val expr = binary("+", intLiteral(5), intLiteral(3))
                 val result = registry.compile(expr, context)
 
-                // Constant folding occurs - result is Double due to math step
-                assertTrue(result.isConstant)
-                assertEquals(8.0, result.constantValue)
+                // Execute traversal and verify result - arithmetic returns Double
+                assertEquals(8.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -406,8 +407,7 @@ class TraversalCompilerTest {
                 val expr = binary("-", intLiteral(10), intLiteral(4))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(6.0, result.constantValue)
+                assertEquals(6.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -415,8 +415,7 @@ class TraversalCompilerTest {
                 val expr = binary("*", intLiteral(7), intLiteral(6))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(42.0, result.constantValue)
+                assertEquals(42.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -424,8 +423,7 @@ class TraversalCompilerTest {
                 val expr = binary("/", intLiteral(20), intLiteral(4))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(5.0, result.constantValue)
+                assertEquals(5.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -433,8 +431,7 @@ class TraversalCompilerTest {
                 val expr = binary("%", intLiteral(17), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(2.0, result.constantValue)
+                assertEquals(2.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -442,8 +439,7 @@ class TraversalCompilerTest {
                 val expr = binary("+", doubleLiteral(1.5), doubleLiteral(2.5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(4.0, result.constantValue)
+                assertEquals(4.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -454,8 +450,7 @@ class TraversalCompilerTest {
                 val expr = binary("*", add, sub)
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(30.0, result.constantValue) // 5.0 * 6.0 = 30.0
+                assertEquals(30.0, executeWithVertex<Double>(result)) // 5.0 * 6.0 = 30.0
             }
         }
 
@@ -468,8 +463,7 @@ class TraversalCompilerTest {
                 val expr = binary("<", intLiteral(3), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -477,8 +471,7 @@ class TraversalCompilerTest {
                 val expr = binary("<", intLiteral(5), intLiteral(3))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -486,8 +479,7 @@ class TraversalCompilerTest {
                 val expr = binary(">", intLiteral(10), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -495,8 +487,7 @@ class TraversalCompilerTest {
                 val expr = binary(">", intLiteral(3), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -504,8 +495,7 @@ class TraversalCompilerTest {
                 val expr = binary("<=", intLiteral(5), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -513,8 +503,7 @@ class TraversalCompilerTest {
                 val expr = binary("<=", intLiteral(3), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -522,8 +511,7 @@ class TraversalCompilerTest {
                 val expr = binary(">=", intLiteral(5), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -531,8 +519,7 @@ class TraversalCompilerTest {
                 val expr = binary(">=", intLiteral(7), intLiteral(5))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
         }
 
@@ -545,8 +532,7 @@ class TraversalCompilerTest {
                 val expr = binary("==", intLiteral(42), intLiteral(42))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -554,8 +540,7 @@ class TraversalCompilerTest {
                 val expr = binary("==", intLiteral(42), intLiteral(43))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -563,8 +548,7 @@ class TraversalCompilerTest {
                 val expr = binary("!=", intLiteral(42), intLiteral(43))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -572,8 +556,7 @@ class TraversalCompilerTest {
                 val expr = binary("!=", intLiteral(42), intLiteral(42))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -581,8 +564,7 @@ class TraversalCompilerTest {
                 val expr = binary("==", stringLiteral("hello"), stringLiteral("hello"))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -590,8 +572,7 @@ class TraversalCompilerTest {
                 val expr = binary("!=", stringLiteral("hello"), stringLiteral("world"))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
         }
 
@@ -604,8 +585,7 @@ class TraversalCompilerTest {
                 val expr = binary("&&", boolLiteral(true), boolLiteral(true))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -613,8 +593,7 @@ class TraversalCompilerTest {
                 val expr = binary("&&", boolLiteral(true), boolLiteral(false))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -622,8 +601,7 @@ class TraversalCompilerTest {
                 val expr = binary("&&", boolLiteral(false), boolLiteral(true))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -631,8 +609,7 @@ class TraversalCompilerTest {
                 val expr = binary("&&", boolLiteral(false), boolLiteral(false))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -640,8 +617,7 @@ class TraversalCompilerTest {
                 val expr = binary("||", boolLiteral(true), boolLiteral(true))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -649,8 +625,7 @@ class TraversalCompilerTest {
                 val expr = binary("||", boolLiteral(true), boolLiteral(false))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -658,8 +633,7 @@ class TraversalCompilerTest {
                 val expr = binary("||", boolLiteral(false), boolLiteral(true))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -667,8 +641,7 @@ class TraversalCompilerTest {
                 val expr = binary("||", boolLiteral(false), boolLiteral(false))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -678,8 +651,7 @@ class TraversalCompilerTest {
                 val expr = binary("||", and, boolLiteral(true))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
         }
     }
@@ -701,8 +673,7 @@ class TraversalCompilerTest {
                 val expr = unary("-", intLiteral(42))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(-42, result.constantValue)
+                assertEquals(-42.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -710,8 +681,7 @@ class TraversalCompilerTest {
                 val expr = unary("-", intLiteral(-10))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(10, result.constantValue)
+                assertEquals(10.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -719,8 +689,7 @@ class TraversalCompilerTest {
                 val expr = unary("-", intLiteral(0))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(0, result.constantValue)
+                assertEquals(0.0, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -728,8 +697,7 @@ class TraversalCompilerTest {
                 val expr = unary("-", doubleLiteral(3.14))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(-3.14, result.constantValue)
+                assertEquals(-3.14, executeWithVertex<Double>(result))
             }
 
             @Test
@@ -738,8 +706,7 @@ class TraversalCompilerTest {
                 val expr = unary("-", inner)
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(5, result.constantValue)
+                assertEquals(5.0, executeWithVertex<Double>(result))
             }
         }
 
@@ -752,8 +719,7 @@ class TraversalCompilerTest {
                 val expr = unary("+", intLiteral(42))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(42, result.constantValue)
+                assertEquals(42, executeWithVertex<Int>(result))
             }
 
             @Test
@@ -761,8 +727,7 @@ class TraversalCompilerTest {
                 val expr = unary("+", intLiteral(-10))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(-10, result.constantValue)
+                assertEquals(-10, executeWithVertex<Int>(result))
             }
         }
 
@@ -775,8 +740,7 @@ class TraversalCompilerTest {
                 val expr = unary("!", boolLiteral(true))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(false, result.constantValue)
+                assertEquals(false, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -784,8 +748,7 @@ class TraversalCompilerTest {
                 val expr = unary("!", boolLiteral(false))
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
 
             @Test
@@ -794,8 +757,7 @@ class TraversalCompilerTest {
                 val expr = unary("!", inner)
                 val result = registry.compile(expr, context)
 
-                assertTrue(result.isConstant)
-                assertEquals(true, result.constantValue)
+                assertEquals(true, executeWithVertex<Boolean>(result))
             }
         }
     }
@@ -926,8 +888,8 @@ class TraversalCompilerTest {
             val expr = ternary(condition, intLiteral(10), intLiteral(20))
             val result = registry.compile(expr, context)
 
-            assertTrue(result.isConstant)
-            assertEquals(10, result.constantValue)
+            // Since comparison is no longer constant folded, execute the traversal
+            assertEquals(10, executeWithVertex<Int>(result))
         }
     }
 
@@ -960,8 +922,8 @@ class TraversalCompilerTest {
             val expr = binary("+", intLiteral(10), intLiteral(5))
             val result = registry.compile(expr, context, initialTraversal)
 
-            assertTrue(result.isConstant)
-            assertEquals(15.0, result.constantValue) // Arithmetic returns Double
+            // Execute and verify result - arithmetic returns Double
+            assertEquals(15.0, executeConstantTraversal<Double>(result))
         }
 
         @Test
@@ -972,8 +934,8 @@ class TraversalCompilerTest {
             val expr = unary("-", intLiteral(7))
             val result = registry.compile(expr, context, initialTraversal)
 
-            assertTrue(result.isConstant)
-            assertEquals(-7, result.constantValue)
+            // Execute and verify result - negation returns Double
+            assertEquals(-7.0, executeConstantTraversal<Double>(result))
         }
     }
 

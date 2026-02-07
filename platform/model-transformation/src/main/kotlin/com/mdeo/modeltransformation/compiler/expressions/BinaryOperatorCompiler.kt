@@ -20,7 +20,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  * ## Supported Operators
  *
  * ### Arithmetic Operators
- * - `+` - Addition (uses math step)
+ * - `+` - Addition (uses math step) OR String concatenation (for string operands)
  * - `-` - Subtraction (uses math step)
  * - `*` - Multiplication (uses math step)
  * - `/` - Division (uses math step)
@@ -39,6 +39,11 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  * ### Logical Operators
  * - `&&` - Logical AND (uses and step with choose)
  * - `||` - Logical OR (uses or step with choose)
+ *
+ * ## String Concatenation
+ * The `+` operator has special handling for string operands. When both operands
+ * are constant strings, compile-time string concatenation is performed. String
+ * concatenation currently requires constant operands for both sides.
  *
  * ## Initial Traversal Propagation
  * The [initialTraversal] is passed ONLY to the leftmost sub-expression. The right
@@ -209,6 +214,9 @@ class BinaryOperatorCompiler(
      *
      * The math step expects labeled values, so we use `as("_left")` and `as("_right")`
      * to capture both operands, then apply the math operation.
+     * 
+     * Special case: For the + operator, checks if operands are strings and performs
+     * string concatenation instead of numeric addition.
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileArithmetic(
@@ -219,8 +227,9 @@ class BinaryOperatorCompiler(
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
-        if (leftResult.isConstant && rightResult.isConstant) {
-            return compileConstantArithmetic(expr.operator, leftResult, rightResult, initialTraversal)
+        // Special case: Handle string concatenation with + operator
+        if (expr.operator == OPERATOR_ADD && isStringConcatenation(expr, context, leftResult, rightResult)) {
+            return compileRuntimeStringConcatenation(leftResult, rightResult)
         }
 
         val mathSymbol = MATH_OPERATOR_SYMBOLS[expr.operator]
@@ -236,35 +245,96 @@ class BinaryOperatorCompiler(
     }
 
     /**
-     * Compiles constant arithmetic at compile time.
+     * Checks if this binary expression represents string concatenation.
+     * Returns true if the + operator is being used and either:
+     * 1. The result type is a string (if type info is available)
+     * 2. Either operand is a constant string (fallback when type info is unavailable)
+     * 3. The left or right operand has a string result type
      */
-    private fun compileConstantArithmetic(
-        operator: String,
+    private fun isStringConcatenation(
+        expr: TypedBinaryExpression,
+        context: TraversalCompilationContext,
         leftResult: TraversalCompilationResult<*, *>,
-        rightResult: TraversalCompilationResult<*, *>,
-        initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val left = (leftResult.constantValue as Number).toDouble()
-        val right = (rightResult.constantValue as Number).toDouble()
-
-        val result: Double = when (operator) {
-            OPERATOR_ADD -> left + right
-            OPERATOR_SUBTRACT -> left - right
-            OPERATOR_MULTIPLY -> left * right
-            OPERATOR_DIVIDE -> left / right
-            OPERATOR_MODULO -> left % right
-            else -> throw IllegalStateException("Unexpected arithmetic operator: $operator")
+        rightResult: TraversalCompilationResult<*, *>
+    ): Boolean {
+        if (expr.operator != OPERATOR_ADD) {
+            return false
         }
+        
+        // Check if either operand is a constant string
+        if (leftResult.constantValue is String || rightResult.constantValue is String) {
+            return true
+        }
+        
+        // Check if the result type is a string
+        val resultType = context.resolveTypeOrNull(expr.evalType)
+        if (resultType is com.mdeo.expression.ast.types.ClassTypeRef && 
+            (resultType.type == "builtin.string" || resultType.type == "string")) {
+            return true
+        }
+        
+        // Check if left operand type is a string
+        val leftType = context.resolveTypeOrNull(expr.left.evalType)
+        if (leftType is com.mdeo.expression.ast.types.ClassTypeRef &&
+            (leftType.type == "builtin.string" || leftType.type == "string")) {
+            return true
+        }
+        
+        // Check if right operand type is a string
+        val rightType = context.resolveTypeOrNull(expr.right.evalType)
+        if (rightType is com.mdeo.expression.ast.types.ClassTypeRef &&
+            (rightType.type == "builtin.string" || rightType.type == "string")) {
+            return true
+        }
+        
+        return false
+    }
 
-        return TraversalCompilationResult.constant(result, initialTraversal)
+    /**
+     * Compiles runtime string concatenation using a Gremlin lambda.
+     * 
+     * This is necessary because Gremlin doesn't have a built-in string concatenation step
+     * that works without lambdas. While we try to avoid lambdas for portability, string
+     * concatenation is common enough to warrant lambda support.
+     * 
+     * The pattern used:
+     * 1. Store left value with as("_left")
+     * 2. Store right value with as("_right") 
+     * 3. Use path objects to get values and concatenate them
+     * 
+     * Note: We access path objects by index to avoid label conflicts in nested concatenations.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun compileRuntimeStringConcatenation(
+        leftResult: TraversalCompilationResult<*, *>,
+        rightResult: TraversalCompilationResult<*, *>
+    ): TraversalCompilationResult<*, *> {
+        // Use the general pattern: store both values and concatenate
+        val traversal = (leftResult.traversal as GraphTraversal<Any, Any>)
+            .`as`("_left")
+            .flatMap<Any>(rightResult.traversal as GraphTraversal<Any, Any>)
+            .`as`("_right")
+            .map<String> { traverser ->
+                // Get the penultimate and last objects from the path
+                // The penultimate is the left value, the last is the right value (current)
+                val pathObjects = traverser.path().objects()
+                val leftVal = if (pathObjects.size >= 2) {
+                    pathObjects[pathObjects.size - 2].toString()
+                } else {
+                    pathObjects.firstOrNull()?.toString() ?: ""
+                }
+                val rightVal = traverser.get().toString()
+                leftVal + rightVal
+            }
+        
+        return TraversalCompilationResult.of(traversal)
     }
 
     /**
      * Compiles a comparison operator using Gremlin predicates and choose.
      *
      * Comparisons produce boolean results by using choose() with P predicates.
-     * For constant right operands, uses simple P.lt/gt/etc predicates.
-     * For dynamic right operands, uses labeled variables with where pattern.
+     * Uses labeled variables with where pattern for dynamic comparisons.
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileComparison(
@@ -275,18 +345,7 @@ class BinaryOperatorCompiler(
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
-        if (leftResult.isConstant && rightResult.isConstant) {
-            return compileConstantComparison(expr.operator, leftResult, rightResult, initialTraversal)
-        }
-
-        // If right operand is constant, use simple predicate approach
-        if (rightResult.isConstant) {
-            val predicate = createComparisonPredicateFromConstant(expr.operator, rightResult.constantValue)
-            val traversal = buildPredicateChoose(leftResult.traversal, predicate)
-            return TraversalCompilationResult.of(traversal)
-        }
-
-        // For dynamic right operand, use labeled variable pattern with where
+        // Use dynamic comparison pattern with math step
         val traversal = buildDynamicComparisonTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
@@ -297,34 +356,10 @@ class BinaryOperatorCompiler(
     }
 
     /**
-     * Compiles constant comparison at compile time.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun compileConstantComparison(
-        operator: String,
-        leftResult: TraversalCompilationResult<*, *>,
-        rightResult: TraversalCompilationResult<*, *>,
-        initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val left = leftResult.constantValue as Comparable<Any>
-        val right = rightResult.constantValue as Comparable<Any>
-
-        val result: Boolean = when (operator) {
-            OPERATOR_LESS_THAN -> left < right
-            OPERATOR_GREATER_THAN -> left > right
-            OPERATOR_LESS_THAN_OR_EQUAL -> left <= right
-            OPERATOR_GREATER_THAN_OR_EQUAL -> left >= right
-            else -> throw IllegalStateException("Unexpected comparison operator: $operator")
-        }
-
-        return TraversalCompilationResult.constant(result, initialTraversal)
-    }
-
-    /**
      * Compiles an equality operator using Gremlin predicates and choose.
      *
-     * For constant right operands, uses simple P.eq/neq predicates.
-     * For dynamic right operands, uses labeled variables with where pattern.
+     * Uses labeled variables with where pattern for dynamic comparisons.
+     * For equality, we use where(eq()) instead of math subtraction to support all types.
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileEquality(
@@ -335,46 +370,14 @@ class BinaryOperatorCompiler(
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
-        if (leftResult.isConstant && rightResult.isConstant) {
-            return compileConstantEquality(expr.operator, leftResult, rightResult, initialTraversal)
-        }
-
-        // If right operand is constant, use simple predicate approach
-        if (rightResult.isConstant) {
-            val predicate = createEqualityPredicateFromConstant(expr.operator, rightResult.constantValue)
-            val traversal = buildPredicateChoose(leftResult.traversal, predicate)
-            return TraversalCompilationResult.of(traversal)
-        }
-
-        // For dynamic right operand, use labeled variable pattern with where
-        val traversal = buildDynamicComparisonTraversal(
+        // Use where() with predicates for equality to support all types (including strings)
+        val traversal = buildEqualityTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
             rightResult.traversal as GraphTraversal<Any, Any>
         )
 
         return TraversalCompilationResult.of(traversal)
-    }
-
-    /**
-     * Compiles constant equality at compile time.
-     */
-    private fun compileConstantEquality(
-        operator: String,
-        leftResult: TraversalCompilationResult<*, *>,
-        rightResult: TraversalCompilationResult<*, *>,
-        initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val left = leftResult.constantValue
-        val right = rightResult.constantValue
-
-        val result: Boolean = when (operator) {
-            OPERATOR_EQUALS -> left == right
-            OPERATOR_NOT_EQUALS -> left != right
-            else -> throw IllegalStateException("Unexpected equality operator: $operator")
-        }
-
-        return TraversalCompilationResult.constant(result, initialTraversal)
     }
 
     /**
@@ -389,10 +392,6 @@ class BinaryOperatorCompiler(
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
-        if (leftResult.isConstant && rightResult.isConstant) {
-            return compileConstantLogical(expr.operator, leftResult, rightResult, initialTraversal)
-        }
-
         val traversal = buildLogicalTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
@@ -400,57 +399,6 @@ class BinaryOperatorCompiler(
         )
 
         return TraversalCompilationResult.of(traversal)
-    }
-
-    /**
-     * Compiles constant logical at compile time with short-circuit semantics.
-     */
-    private fun compileConstantLogical(
-        operator: String,
-        leftResult: TraversalCompilationResult<*, *>,
-        rightResult: TraversalCompilationResult<*, *>,
-        initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val left = leftResult.constantValue as Boolean
-        val right = rightResult.constantValue as Boolean
-
-        val result: Boolean = when (operator) {
-            OPERATOR_LOGICAL_AND -> left && right
-            OPERATOR_LOGICAL_OR -> left || right
-            else -> throw IllegalStateException("Unexpected logical operator: $operator")
-        }
-
-        return TraversalCompilationResult.constant(result, initialTraversal)
-    }
-
-    /**
-     * Creates a Gremlin predicate for comparison operators from a constant value.
-     */
-    private fun createComparisonPredicateFromConstant(
-        operator: String,
-        rightValue: Any?
-    ): P<*> {
-        return when (operator) {
-            OPERATOR_LESS_THAN -> P.lt(rightValue)
-            OPERATOR_GREATER_THAN -> P.gt(rightValue)
-            OPERATOR_LESS_THAN_OR_EQUAL -> P.lte(rightValue)
-            OPERATOR_GREATER_THAN_OR_EQUAL -> P.gte(rightValue)
-            else -> throw IllegalStateException("Unexpected comparison operator: $operator")
-        }
-    }
-
-    /**
-     * Creates a Gremlin predicate for equality operators from a constant value.
-     */
-    private fun createEqualityPredicateFromConstant(
-        operator: String,
-        rightValue: Any?
-    ): P<*> {
-        return when (operator) {
-            OPERATOR_EQUALS -> P.eq(rightValue)
-            OPERATOR_NOT_EQUALS -> P.neq(rightValue)
-            else -> throw IllegalStateException("Unexpected equality operator: $operator")
-        }
     }
 
     /**
@@ -518,19 +466,46 @@ class BinaryOperatorCompiler(
     }
 
     /**
-     * Builds a choose traversal that evaluates a predicate and returns true/false.
+     * Builds a traversal for equality comparison (== and !=) that works with all types.
+     *
+     * Unlike numeric comparisons, equality doesn't use math subtraction. Instead, we:
+     * 1. Store the left value with as("_left")
+     * 2. Compute the right value and store with as("_right")
+     * 3. Use where() to compare them
+     * 4. Use choose() to produce a boolean result
+     *
+     * Pattern:
+     * ```
+     * leftTraversal.as("_left")
+     *     .map(rightTraversal).as("_right")
+     *     .choose(
+     *       __.where("_left", P.eq("_right")),
+     *       __.constant(true),
+     *       __.constant(false)
+     *     )
+     * ```
      */
     @Suppress("UNCHECKED_CAST")
-    private fun buildPredicateChoose(
-        leftTraversal: GraphTraversal<*, *>,
-        predicate: P<*>
+    private fun buildEqualityTraversal(
+        operator: String,
+        leftTraversal: GraphTraversal<Any, Any>,
+        rightTraversal: GraphTraversal<Any, Any>
     ): GraphTraversal<Any, Boolean> {
-        return (leftTraversal as GraphTraversal<Any, Any>)
+        val predicate: P<String> = if (operator == OPERATOR_EQUALS) {
+            P.eq("_right")
+        } else {
+            P.neq("_right")
+        }
+
+        return leftTraversal
+            .`as`("_left")
+            .map(rightTraversal)
+            .`as`("_right")
             .choose(
-                AnonymousTraversal.`is`(predicate as P<Any>),
+                AnonymousTraversal.where<Any>("_left", predicate),
                 AnonymousTraversal.constant(true),
                 AnonymousTraversal.constant(false)
-            )
+            ) as GraphTraversal<Any, Boolean>
     }
 
     /**

@@ -1,9 +1,14 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.TypedClass
+import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
 /**
@@ -23,12 +28,34 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  */
 class TransformationEngine(
     val traversalSource: GraphTraversalSource,
+    val ast: TypedAst,
     val expressionCompilerRegistry: ExpressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
     val statementExecutorRegistry: StatementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
 ) {
-    
-    private var types: List<ReturnType> = emptyList()
-    
+
+    val instanceNameRegistry: InstanceNameRegistry = InstanceNameRegistry()
+
+    /**
+     * The types list from the currently executing TypedAst.
+     * This is populated from the AST provided in the constructor.
+     */
+    val types: List<ReturnType> = ast.types
+
+    /**
+     * Dynamic type registry that includes both standard library types and metamodel types.
+     *
+     * This registry is built during initialization using the TypedAst. It uses the GLOBAL
+     * registry as a parent, so all stdlib types remain available.
+     *
+     * Metamodel types (e.g., "metamodel./metamodel.mm.House") are registered with their
+     * fully qualified names and include graph properties and edge associations.
+     */
+    val typeRegistry: GremlinTypeRegistry
+
+    init {
+        typeRegistry = createTypeRegistry(ast.classes)
+    }
+
     /**
      * Executes a complete model transformation.
      *
@@ -36,17 +63,15 @@ class TransformationEngine(
      * all statements in the TypedAst sequentially, maintaining state throughout
      * the execution.
      *
-     * @param ast The typed AST representing the transformation to execute.
      * @return The result of the transformation execution.
      */
-    fun execute(ast: TypedAst): TransformationExecutionResult {
-        types = ast.types
+    fun execute(): TransformationExecutionResult {
         var context = TransformationExecutionContext.empty()
         var accumulatedResult = TransformationExecutionResult.Success(context)
-        
+
         for (statement in ast.statements) {
             val result = executeStatement(statement, context)
-            
+
             when (result) {
                 is TransformationExecutionResult.Success -> {
                     context = result.context
@@ -56,10 +81,10 @@ class TransformationEngine(
                 is TransformationExecutionResult.Stopped -> return result
             }
         }
-        
+
         return accumulatedResult
     }
-    
+
     /**
      * Executes a single transformation statement.
      *
@@ -77,7 +102,7 @@ class TransformationEngine(
     ): TransformationExecutionResult {
         return statementExecutorRegistry.execute(statement, context, this)
     }
-    
+
     /**
      * Executes a block of statements sequentially.
      *
@@ -95,10 +120,10 @@ class TransformationEngine(
     ): TransformationExecutionResult {
         var currentContext = context
         var accumulatedResult = TransformationExecutionResult.Success(currentContext)
-        
+
         for (statement in statements) {
             val result = executeStatement(statement, currentContext)
-            
+
             when (result) {
                 is TransformationExecutionResult.Success -> {
                     currentContext = result.context
@@ -108,10 +133,10 @@ class TransformationEngine(
                 is TransformationExecutionResult.Stopped -> return result
             }
         }
-        
+
         return accumulatedResult
     }
-    
+
     /**
      * Returns the type at the given index in the types array.
      *
@@ -122,7 +147,7 @@ class TransformationEngine(
     fun getType(typeIndex: Int): ReturnType {
         return types[typeIndex]
     }
-    
+
     /**
      * Returns the type at the given index, or null if out of bounds.
      *
@@ -132,17 +157,59 @@ class TransformationEngine(
     fun getTypeOrNull(typeIndex: Int): ReturnType? {
         return types.getOrNull(typeIndex)
     }
-    
+
+    /**
+     * Creates a dynamic type registry including metamodel classes.
+     *
+     * @param classes The metamodel class definitions from the TypedAst.
+     */
+    private fun createTypeRegistry(classes: List<TypedClass>): GremlinTypeRegistry {
+        val dynamicRegistry = GremlinTypeRegistry(parent = CompilationContext.GLOBAL_TYPE_REGISTRY)
+
+        for (typedClass in classes) {
+            val fqn = typedClass.`package` + "." + typedClass.name
+
+            val builder = gremlinType(fqn)
+
+            for (superClass in typedClass.superClasses) {
+                builder.extends(superClass)
+            }
+
+            for (property in typedClass.properties) {
+                builder.graphProperty(property.name)
+            }
+
+            for (relation in typedClass.relations) {
+                val edgeLabel = EdgeLabelUtils.computeEdgeLabel(
+                    relation.property,
+                    relation.oppositeProperty,
+                    relation.isOutgoing
+                )
+                builder.association(
+                    propertyName = relation.property,
+                    edgeLabel = edgeLabel,
+                    isOutgoing = relation.isOutgoing
+                )
+            }
+
+            dynamicRegistry.register(builder.build())
+        }
+
+        return dynamicRegistry
+    }
+
     companion object {
         /**
          * Creates a TransformationEngine with default registries.
          *
          * @param traversalSource The Gremlin GraphTraversalSource.
+         * @param ast The TypedAst to execute.
          * @return A new TransformationEngine with default configuration.
          */
-        fun create(traversalSource: GraphTraversalSource): TransformationEngine {
+        fun create(traversalSource: GraphTraversalSource, ast: TypedAst): TransformationEngine {
             return TransformationEngine(
                 traversalSource = traversalSource,
+                ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
             )

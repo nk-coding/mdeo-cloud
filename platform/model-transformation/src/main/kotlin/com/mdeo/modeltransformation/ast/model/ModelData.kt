@@ -218,7 +218,6 @@ object ModelDataPropertyValueSerializer : KSerializer<ModelDataPropertyValue> {
                     throw IllegalArgumentException("Unexpected JSON object structure: $element")
                 }
             }
-            else -> throw IllegalArgumentException("Unexpected JSON element type: ${element::class}")
         }
     }
 
@@ -319,7 +318,6 @@ object PropertiesMapSerializer : KSerializer<Map<String, ModelDataPropertyValue>
                     element.map { deserializePropertyValue(it) }
                 )
             }
-            else -> throw IllegalArgumentException("Unexpected JSON element type: ${element::class}")
         }
     }
     

@@ -102,41 +102,10 @@ class UnaryOperatorCompiler(
     ): TraversalCompilationResult<*, *> {
         val innerResult = registry.compile(expr.expression, context, initialTraversal)
 
-        if (innerResult.isConstant) {
-            return compileConstantNegation(innerResult, initialTraversal)
-        }
-
         val traversal = (innerResult.traversal as GraphTraversal<Any, Any>)
             .math("0 - _")
 
         return TraversalCompilationResult.of(traversal)
-    }
-
-    /**
-     * Compiles constant negation at compile time.
-     */
-    private fun compileConstantNegation(
-        innerResult: TraversalCompilationResult<*, *>,
-        initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val value = innerResult.constantValue as Number
-        val negated = negateNumber(value)
-        return TraversalCompilationResult.constant(negated, initialTraversal)
-    }
-
-    /**
-     * Negates a number preserving its type.
-     */
-    private fun negateNumber(value: Number): Number {
-        return when (value) {
-            is Int -> -value
-            is Long -> -value
-            is Float -> -value
-            is Double -> -value
-            is Short -> (-value).toShort()
-            is Byte -> (-value).toByte()
-            else -> -value.toDouble()
-        }
     }
 
     /**
@@ -150,13 +119,7 @@ class UnaryOperatorCompiler(
         context: TraversalCompilationContext,
         initialTraversal: GraphTraversal<*, *>?
     ): TraversalCompilationResult<*, *> {
-        val innerResult = registry.compile(expr.expression, context, initialTraversal)
-
-        if (innerResult.isConstant) {
-            return TraversalCompilationResult.constant(innerResult.constantValue, initialTraversal)
-        }
-
-        return innerResult
+        return registry.compile(expr.expression, context, initialTraversal)
     }
 
     /**
@@ -174,23 +137,8 @@ class UnaryOperatorCompiler(
     ): TraversalCompilationResult<*, *> {
         val innerResult = registry.compile(expr.expression, context, initialTraversal)
 
-        if (innerResult.isConstant) {
-            return compileConstantLogicalNot(innerResult, initialTraversal)
-        }
-
         val traversal = buildNotTraversal(innerResult.traversal as GraphTraversal<Any, Any>)
         return TraversalCompilationResult.of(traversal)
-    }
-
-    /**
-     * Compiles constant logical not at compile time.
-     */
-    private fun compileConstantLogicalNot(
-        innerResult: TraversalCompilationResult<*, *>,
-        initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val value = innerResult.constantValue as Boolean
-        return TraversalCompilationResult.constant(!value, initialTraversal)
     }
 
     /**

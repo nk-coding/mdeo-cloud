@@ -4,6 +4,7 @@ import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
 import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
+import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import org.slf4j.LoggerFactory
@@ -13,12 +14,14 @@ import org.slf4j.LoggerFactory
  * 
  * Creates vertices for instances and edges for links, preserving
  * all property values and using the edge label format from EdgeLabelUtils.
+ * 
+ * Instance names are registered in the InstanceNameRegistry instead of being
+ * stored as properties in the graph, avoiding conflicts with metamodel properties.
  */
 class ModelDataGraphLoader {
     private val logger = LoggerFactory.getLogger(ModelDataGraphLoader::class.java)
     
     companion object {
-        private const val PROPERTY_NAME = "name"
         private const val PROPERTY_CLASS_NAME = "className"
     }
     
@@ -27,10 +30,15 @@ class ModelDataGraphLoader {
      *
      * @param g The graph traversal source
      * @param modelData The model data to load
+     * @param nameRegistry Registry for tracking vertex ID to name mappings
      * @return Map of instance names to their vertices
      */
-    fun load(g: GraphTraversalSource, modelData: ModelData): Map<String, Vertex> {
-        val vertexMap = createVertices(g, modelData.instances)
+    fun load(
+        g: GraphTraversalSource,
+        modelData: ModelData,
+        nameRegistry: InstanceNameRegistry
+    ): Map<String, Vertex> {
+        val vertexMap = createVertices(g, modelData.instances, nameRegistry)
         createEdges(g, modelData, vertexMap)
         return vertexMap
     }
@@ -40,19 +48,24 @@ class ModelDataGraphLoader {
      */
     private fun createVertices(
         g: GraphTraversalSource,
-        instances: List<ModelDataInstance>
+        instances: List<ModelDataInstance>,
+        nameRegistry: InstanceNameRegistry
     ): Map<String, Vertex> {
         return instances.associate { instance ->
-            instance.name to createVertex(g, instance)
+            instance.name to createVertex(g, instance, nameRegistry)
         }
     }
     
     /**
      * Creates a vertex for a single instance.
+     * Registers the vertex ID with its name in the registry instead of storing it as a property.
      */
-    private fun createVertex(g: GraphTraversalSource, instance: ModelDataInstance): Vertex {
+    private fun createVertex(
+        g: GraphTraversalSource,
+        instance: ModelDataInstance,
+        nameRegistry: InstanceNameRegistry
+    ): Vertex {
         var traversal = g.addV(instance.className)
-            .property(PROPERTY_NAME, instance.name)
             .property(PROPERTY_CLASS_NAME, instance.className)
         
         for ((propertyName, propertyValue) in instance.properties) {
@@ -62,7 +75,12 @@ class ModelDataGraphLoader {
             }
         }
         
-        return traversal.next()
+        val vertex = traversal.next()
+        
+        // Register the vertex with its instance name in the registry
+        nameRegistry.register(vertex.id(), instance.name)
+        
+        return vertex
     }
     
     /**

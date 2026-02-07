@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.runtime
 
+import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
@@ -28,6 +29,7 @@ class StatementExecutorRegistryTest {
         graph = TinkerGraph.open()
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
+            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
         )
