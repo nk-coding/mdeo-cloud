@@ -42,13 +42,19 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
 class UnifiedMatchExecutor : MatchExecutor {
     
     companion object {
-        /** Default limit for single match operations. */
+        /**
+         * Default limit for single match operations. 
+         */
         const val DEFAULT_LIMIT = 1L
         
-        /** Value indicating no limit (for foreach operations). */
+        /**
+         * Value indicating no limit (for foreach operations). 
+         */
         const val UNLIMITED = -1L
         
-        /** Prefix for generated where clause variable names. */
+        /**
+         * Prefix for generated where clause variable names. 
+         */
         private const val WHERE_VAR_PREFIX = "_where"
     }
     
@@ -1089,7 +1095,9 @@ private data class PatternCategories(
     val variables: List<TypedPatternVariableElement>,
     val whereClauses: List<TypedPatternWhereClauseElement>
 ) {
-    /** All instance names for final select() step - includes matched, created, and deleted. */
+    /**
+     * All instance names for final select() step - includes matched, created, and deleted. 
+     */
     val allInstanceNames: List<String>
         get() = matchableInstances.map { it.objectInstance.name } +
                 createInstances.map { it.objectInstance.name } +

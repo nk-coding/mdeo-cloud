@@ -52,17 +52,29 @@ type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
  * Extracted elements from a metamodel including local and imported entities.
  */
 interface ExtractedElements {
-    /** Classes defined locally in this file */
+    /**
+     * Classes defined locally in this file
+     */
     localClasses: PartialClass[];
-    /** Enums defined locally in this file */
+    /**
+     * Enums defined locally in this file
+     */
     localEnums: PartialEnum[];
-    /** Associations defined locally in this file */
+    /**
+     * Associations defined locally in this file
+     */
     localAssociations: PartialAssociation[];
-    /** Classes imported from other files */
+    /**
+     * Classes imported from other files
+     */
     importedClasses: PartialClass[];
-    /** Enums imported from other files */
+    /**
+     * Enums imported from other files
+     */
     importedEnums: PartialEnum[];
-    /** Associations imported from other files */
+    /**
+     * Associations imported from other files
+     */
     importedAssociations: PartialAssociation[];
 }
 

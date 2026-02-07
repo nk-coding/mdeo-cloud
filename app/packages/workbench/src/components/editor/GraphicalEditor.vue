@@ -13,7 +13,6 @@ import { createContainer } from "@mdeo/editor-common";
 import { computed, inject, onMounted, ref, shallowRef, useId } from "vue";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { workbenchStateKey } from "../workbench/util";
-import { MonacoGLSPClient } from "./glspClient";
 import { DiagramLoader } from "@eclipse-glsp/client";
 import { editorContextKey } from "@/lib/editorPlugin";
 import { useResizeObserver } from "@vueuse/core";
@@ -25,9 +24,10 @@ import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 const props = defineProps<{
     tab: EditorTab;
     languagePlugin: ResolvedWorkbenchLanguagePlugin;
+    editable: boolean;
 }>();
 
-const { languageClient } = inject(workbenchStateKey)!;
+const { glspClient } = inject(workbenchStateKey)!;
 const editorContext = inject(editorContextKey)!;
 
 const id = useId();
@@ -47,11 +47,6 @@ onMounted(async () => {
         return;
     }
 
-    const client = new MonacoGLSPClient({
-        client: languageClient.value!,
-        id: id
-    });
-
     const plugin = graphicalEditorPlugin.value;
     if (plugin == undefined) {
         return undefined;
@@ -59,9 +54,9 @@ onMounted(async () => {
     const container = createContainer(editorContext, plugin.containerConfiguration, {
         clientId: id,
         diagramType: props.languagePlugin.id,
-        glspClientProvider: async () => client,
+        glspClientProvider: async () => glspClient.value!,
         sourceUri: props.tab.fileUri.toString(),
-        editMode: props.languagePlugin.isGenerated ? "layoutable" : EditMode.EDITABLE
+        editMode: props.editable ? EditMode.EDITABLE : "layoutable"
     });
 
     const currentActionDispatcher = container.get<IActionDispatcher>(TYPES.IActionDispatcher);

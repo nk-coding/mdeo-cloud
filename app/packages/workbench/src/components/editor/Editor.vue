@@ -12,6 +12,7 @@
                     v-show="state.tab === activeTab"
                     :tab="state.tab"
                     :language-plugin="state.languagePlugin.value!"
+                    :editable="!state.languagePlugin.value!.isGenerated"
                 />
             </ResizablePanel>
         </ResizablePanelGroup>

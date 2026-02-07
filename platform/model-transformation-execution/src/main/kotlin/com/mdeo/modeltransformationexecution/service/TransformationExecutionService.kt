@@ -387,20 +387,33 @@ class TransformationExecutionService(
         val state = execution[TransformationExecutionsTable.state]
         val error = execution[TransformationExecutionsTable.error]
         val logs = execution[TransformationExecutionsTable.logMessages]
+        val modelPath = execution[TransformationExecutionsTable.modelPath]
         
         return when (state) {
-            ExecutionState.COMPLETED -> buildCompletedSummary(logs)
+            ExecutionState.COMPLETED -> buildCompletedSummary(modelPath, logs)
             ExecutionState.FAILED -> buildFailedSummary(error, logs)
             else -> "Execution is in state: $state"
         }
     }
     
-    private fun buildCompletedSummary(logs: String?): String {
+    /**
+     * Builds a summary for a completed transformation execution.
+     * Includes embedded graphical editor views for the source model (absolute path)
+     * and the result model (relative path to execution result file).
+     *
+     * @param modelPath The path to the original model file
+     * @param logs Optional log messages from the execution
+     * @return Markdown summary string
+     */
+    private fun buildCompletedSummary(modelPath: String, logs: String?): String {
         return buildString {
             append("## Transformation Completed\n\n")
             append("The model transformation executed successfully.\n\n")
-            append("### Result File\n\n")
-            append("- `$RESULT_FILE_NAME`\n")
+            append("### Result Model\n\n")
+            append("![Result Model](${RESULT_FILE_NAME})\n")
+            append("### Source Model\n\n")
+            append("Caution: The source model may have been modifed since the transformation was run.\n\n")
+            append("![Source Model](${modelPath})\n\n")
             
             if (!logs.isNullOrBlank()) {
                 append("\n### Log Messages\n\n```\n")

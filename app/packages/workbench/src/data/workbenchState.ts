@@ -11,6 +11,7 @@ import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserve
 import { MonacoLanguageClient } from "monaco-languageclient";
 import { CloseAction, ErrorAction, State, type ResponseMessage } from "vscode-languageclient";
 import { Uri } from "vscode";
+import { MonacoGLSPClient } from "@/data/glspClient";
 import { reinitializeWorkspace } from "@codingame/monaco-vscode-configuration-service-override";
 import {
     GetPluginsRequest,
@@ -106,6 +107,12 @@ export class WorkbenchState {
      * should be disposed before a new one is created
      */
     readonly languageClient = shallowRef<MonacoLanguageClient>();
+
+    /**
+     * The central GLSP client shared across all graphical editors.
+     * Created when the language client is created.
+     */
+    readonly glspClient = shallowRef<MonacoGLSPClient>();
 
     /**
      * Counter for language client restarts
@@ -485,7 +492,16 @@ export class WorkbenchState {
     private async recreateLanguageServer(newProject: Project | undefined, serverPlugins: ServerPlugin[]) {
         const languageClient = this.languageClient.value;
         this.languageClient.value = undefined;
+        const glspClient = this.glspClient.value;
+        this.glspClient.value = undefined;
         await nextTick();
+        if (glspClient != undefined) {
+            try {
+                await glspClient.stop();
+            } catch {
+                // ignore errors during disposal
+            }
+        }
         if (languageClient != undefined) {
             try {
                 await languageClient.stop();
@@ -584,6 +600,12 @@ export class WorkbenchState {
             messageTransports: { reader, writer }
         });
         this.languageClient.value = languageClient;
+
+        // Create the central GLSP client
+        this.glspClient.value = new MonacoGLSPClient({
+            client: languageClient,
+            id: "workbench-glsp-client"
+        });
 
         this.registerFileSystemHandlers(languageClient);
 

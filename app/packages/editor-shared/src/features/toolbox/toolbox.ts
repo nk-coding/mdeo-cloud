@@ -51,6 +51,9 @@ export class Toolbox extends ToolPalette {
     public selectedItemIndex: number = 0;
     public searchDebounceTimeout?: number;
 
+    /**
+     * Indicates whether the toolbox is in layout-only mode, which affects available tools and palette items.
+     */
     get isLayoutable(): boolean {
         return this.editorContext.editMode === "layoutable";
     }
@@ -246,7 +249,7 @@ export class Toolbox extends ToolPalette {
      * @returns True if there are any toolbox items
      */
     hasToolboxItems(): boolean {
-        return this.toolboxEntries.length > 0;
+        return this.toolboxEntries.length > 0 && !this.isLayoutable;
     }
 
     /**

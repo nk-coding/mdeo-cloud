@@ -29,10 +29,14 @@ import com.mdeo.modeltransformation.runtime.TransformationEngine
 interface MatchExecutor {
     
     companion object {
-        /** Default limit for single match operations. */
+        /**
+         * Default limit for single match operations. 
+         */
         const val DEFAULT_LIMIT = 1L
         
-        /** Value indicating no limit (for foreach operations). */
+        /**
+         * Value indicating no limit (for foreach operations). 
+         */
         const val UNLIMITED = -1L
     }
     

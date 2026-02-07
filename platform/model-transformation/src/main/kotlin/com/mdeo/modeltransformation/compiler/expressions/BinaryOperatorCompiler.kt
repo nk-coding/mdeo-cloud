@@ -56,46 +56,74 @@ class BinaryOperatorCompiler(
 ) : ExpressionCompiler {
 
     companion object {
-        /** Addition operator */
+        /**
+         * Addition operator 
+         */
         const val OPERATOR_ADD = "+"
 
-        /** Subtraction operator */
+        /**
+         * Subtraction operator 
+         */
         const val OPERATOR_SUBTRACT = "-"
 
-        /** Multiplication operator */
+        /**
+         * Multiplication operator 
+         */
         const val OPERATOR_MULTIPLY = "*"
 
-        /** Division operator */
+        /**
+         * Division operator 
+         */
         const val OPERATOR_DIVIDE = "/"
 
-        /** Modulo operator */
+        /**
+         * Modulo operator 
+         */
         const val OPERATOR_MODULO = "%"
 
-        /** Less than operator */
+        /**
+         * Less than operator 
+         */
         const val OPERATOR_LESS_THAN = "<"
 
-        /** Greater than operator */
+        /**
+         * Greater than operator 
+         */
         const val OPERATOR_GREATER_THAN = ">"
 
-        /** Less than or equal operator */
+        /**
+         * Less than or equal operator 
+         */
         const val OPERATOR_LESS_THAN_OR_EQUAL = "<="
 
-        /** Greater than or equal operator */
+        /**
+         * Greater than or equal operator 
+         */
         const val OPERATOR_GREATER_THAN_OR_EQUAL = ">="
 
-        /** Structural equality operator */
+        /**
+         * Structural equality operator 
+         */
         const val OPERATOR_EQUALS = "=="
 
-        /** Structural inequality operator */
+        /**
+         * Structural inequality operator 
+         */
         const val OPERATOR_NOT_EQUALS = "!="
 
-        /** Logical AND operator */
+        /**
+         * Logical AND operator 
+         */
         const val OPERATOR_LOGICAL_AND = "&&"
 
-        /** Logical OR operator */
+        /**
+         * Logical OR operator 
+         */
         const val OPERATOR_LOGICAL_OR = "||"
 
-        /** Arithmetic operators that use the math step */
+        /**
+         * Arithmetic operators that use the math step 
+         */
         private val ARITHMETIC_OPERATORS = setOf(
             OPERATOR_ADD,
             OPERATOR_SUBTRACT,
@@ -104,7 +132,9 @@ class BinaryOperatorCompiler(
             OPERATOR_MODULO
         )
 
-        /** Comparison operators that produce boolean results */
+        /**
+         * Comparison operators that produce boolean results 
+         */
         private val COMPARISON_OPERATORS = setOf(
             OPERATOR_LESS_THAN,
             OPERATOR_GREATER_THAN,
@@ -112,25 +142,33 @@ class BinaryOperatorCompiler(
             OPERATOR_GREATER_THAN_OR_EQUAL
         )
 
-        /** Equality operators */
+        /**
+         * Equality operators 
+         */
         private val EQUALITY_OPERATORS = setOf(
             OPERATOR_EQUALS,
             OPERATOR_NOT_EQUALS
         )
 
-        /** Logical operators */
+        /**
+         * Logical operators 
+         */
         private val LOGICAL_OPERATORS = setOf(
             OPERATOR_LOGICAL_AND,
             OPERATOR_LOGICAL_OR
         )
 
-        /** All supported operators */
+        /**
+         * All supported operators 
+         */
         private val ALL_OPERATORS = ARITHMETIC_OPERATORS +
             COMPARISON_OPERATORS +
             EQUALITY_OPERATORS +
             LOGICAL_OPERATORS
 
-        /** Math step operator symbols */
+        /**
+         * Math step operator symbols 
+         */
         private val MATH_OPERATOR_SYMBOLS = mapOf(
             OPERATOR_ADD to "+",
             OPERATOR_SUBTRACT to "-",

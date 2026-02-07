@@ -43,16 +43,24 @@ class UnaryOperatorCompiler(
 ) : ExpressionCompiler {
 
     companion object {
-        /** Logical NOT operator */
+        /**
+         * Logical NOT operator 
+         */
         const val OPERATOR_NOT = "!"
 
-        /** Negation operator */
+        /**
+         * Negation operator 
+         */
         const val OPERATOR_MINUS = "-"
 
-        /** Unary plus operator */
+        /**
+         * Unary plus operator 
+         */
         const val OPERATOR_PLUS = "+"
 
-        /** All supported operators */
+        /**
+         * All supported operators 
+         */
         private val SUPPORTED_OPERATORS = setOf(OPERATOR_NOT, OPERATOR_MINUS, OPERATOR_PLUS)
     }
 
