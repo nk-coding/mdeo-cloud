@@ -85,16 +85,11 @@ class MatchStatementExecutor(
         matched: MatchResult.Matched,
         context: TransformationExecutionContext
     ): TransformationExecutionResult.Success {
-        val updatedContext = matched.applyTo(context)
+        matched.applyTo(context)
         
         return TransformationExecutionResult.Success(
-            context = updatedContext,
-            matchedNodes = matched.matchedNodeIds,
-            matchedEdges = matched.matchedEdgeIds,
             createdNodes = matched.createdNodeIds,
-            createdEdges = matched.createdEdgeIds,
-            deletedNodes = matched.deletedNodeIds,
-            deletedEdges = matched.deletedEdgeIds
+            deletedNodes = matched.deletedNodeIds
         )
     }
     

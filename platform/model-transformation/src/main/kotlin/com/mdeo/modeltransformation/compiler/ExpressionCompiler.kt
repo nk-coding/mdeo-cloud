@@ -7,7 +7,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Interface for expression compilers that produce traversal-based results.
  *
  * This is the new expression compiler interface that always produces a
- * [TraversalCompilationResult]. All expressions are compiled to GraphTraversals,
+ * [GremlinCompilationResult]. All expressions are compiled to GraphTraversals,
  * ensuring uniformity and composability across the compiler infrastructure.
  *
  * ## Initial Traversal Handling
@@ -30,11 +30,11 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  *
  *     override fun compile(
  *         expression: TypedExpression,
- *         context: TraversalCompilationContext,
+ *         context: CompilationContext,
  *         initialTraversal: GraphTraversal<*, *>?
- *     ): TraversalCompilationResult<*, *> {
+ *     ): GremlinCompilationResult {
  *         val intExpr = expression as TypedIntLiteralExpression
- *         return TraversalCompilationResult.constant(
+ *         return GremlinCompilationResult.constant(
  *             intExpr.value.toInt(),
  *             initialTraversal
  *         )
@@ -42,8 +42,8 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * }
  * ```
  *
- * @see TraversalCompilationResult
- * @see TraversalCompilationContext
+ * @see GremlinCompilationResult
+ * @see CompilationContext
  * @see ExpressionCompilerRegistry
  */
 interface ExpressionCompiler {
@@ -64,7 +64,7 @@ interface ExpressionCompiler {
      * Compiles the given expression into a traversal compilation result.
      *
      * This method transforms a typed expression into a GraphTraversal.
-     * The result is always a [TraversalCompilationResult] containing the
+     * The result is always a [GremlinCompilationResult] containing the
      * traversal that represents the expression.
      *
      * ## Initial Traversal Usage
@@ -85,7 +85,7 @@ interface ExpressionCompiler {
      */
     fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>? = null
-    ): TraversalCompilationResult<*, *>
+    ): GremlinCompilationResult
 }

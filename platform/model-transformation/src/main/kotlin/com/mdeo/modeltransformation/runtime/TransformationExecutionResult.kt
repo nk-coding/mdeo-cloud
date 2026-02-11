@@ -1,5 +1,7 @@
 package com.mdeo.modeltransformation.runtime
 
+import com.mdeo.modeltransformation.runtime.match.MatchResult
+
 /**
  * Represents the result of executing a model transformation.
  *
@@ -12,33 +14,13 @@ sealed interface TransformationExecutionResult {
     /**
      * Indicates that the transformation completed successfully.
      *
-     * @param context The final execution context after transformation.
-     * @param matchedNodes Set of vertex IDs that were matched during execution.
      * @param createdNodes Set of vertex IDs that were created during execution.
      * @param deletedNodes Set of vertex IDs that were deleted during execution.
-     * @param matchedEdges Set of edge IDs that were matched during execution.
-     * @param createdEdges Set of edge IDs that were created during execution.
-     * @param deletedEdges Set of edge IDs that were deleted during execution.
      */
     data class Success(
-        val context: TransformationExecutionContext,
-        val matchedNodes: Set<Any> = emptySet(),
         val createdNodes: Set<Any> = emptySet(),
-        val deletedNodes: Set<Any> = emptySet(),
-        val matchedEdges: Set<Any> = emptySet(),
-        val createdEdges: Set<Any> = emptySet(),
-        val deletedEdges: Set<Any> = emptySet()
+        val deletedNodes: Set<Any> = emptySet()
     ) : TransformationExecutionResult {
-        
-        /**
-         * Creates a new Success result with additional matched nodes.
-         *
-         * @param nodeIds The node IDs that were matched.
-         * @return A new Success with the additional matched nodes.
-         */
-        fun withMatchedNodes(vararg nodeIds: Any): Success {
-            return copy(matchedNodes = matchedNodes + nodeIds.toSet())
-        }
         
         /**
          * Creates a new Success result with additional created nodes.
@@ -61,77 +43,45 @@ sealed interface TransformationExecutionResult {
         }
         
         /**
-         * Creates a new Success result with additional matched edges.
-         *
-         * @param edgeIds The edge IDs that were matched.
-         * @return A new Success with the additional matched edges.
-         */
-        fun withMatchedEdges(vararg edgeIds: Any): Success {
-            return copy(matchedEdges = matchedEdges + edgeIds.toSet())
-        }
-        
-        /**
-         * Creates a new Success result with additional created edges.
-         *
-         * @param edgeIds The edge IDs that were created.
-         * @return A new Success with the additional created edges.
-         */
-        fun withCreatedEdges(vararg edgeIds: Any): Success {
-            return copy(createdEdges = createdEdges + edgeIds.toSet())
-        }
-        
-        /**
-         * Creates a new Success result with additional deleted edges.
-         *
-         * @param edgeIds The edge IDs that were deleted.
-         * @return A new Success with the additional deleted edges.
-         */
-        fun withDeletedEdges(vararg edgeIds: Any): Success {
-            return copy(deletedEdges = deletedEdges + edgeIds.toSet())
-        }
-        
-        /**
-         * Creates a new Success result with an updated context.
-         *
-         * @param newContext The new execution context.
-         * @return A new Success with the updated context.
-         */
-        fun withContext(newContext: TransformationExecutionContext): Success {
-            return copy(context = newContext)
-        }
-        
-        /**
          * Merges another Success result into this one.
          *
-         * The contexts are not merged; the other result's context takes precedence.
-         * All node and edge sets are combined.
+         * All node sets are combined.
          *
          * @param other The other Success result to merge.
          * @return A new Success with merged results.
          */
         fun merge(other: Success): Success {
             return Success(
-                context = other.context,
-                matchedNodes = matchedNodes + other.matchedNodes,
                 createdNodes = createdNodes + other.createdNodes,
-                deletedNodes = deletedNodes + other.deletedNodes,
-                matchedEdges = matchedEdges + other.matchedEdges,
-                createdEdges = createdEdges + other.createdEdges,
-                deletedEdges = deletedEdges + other.deletedEdges
+                deletedNodes = deletedNodes + other.deletedNodes
             )
         }
+
+        /**
+         * Merges a MatchResult.Matched into this Success result.
+         *
+         * All node sets are combined.
+         *
+         * @param other The MatchResult.Matched to merge.
+         * @return A new Success with merged results.
+         */
+        fun merge(other: MatchResult.Matched): Success {
+            return Success(
+                createdNodes = createdNodes + other.createdNodeIds,
+                deletedNodes = deletedNodes + other.deletedNodeIds
+            )
+        }
+        
     }
     
     /**
      * Indicates that the transformation failed.
      *
      * @param reason A human-readable description of why the transformation failed.
-     * @param context The execution context at the time of failure.
      * @param failedAt Optional identifier of the statement or pattern that caused the failure.
      */
     data class Failure(
         val reason: String,
-        val context: TransformationExecutionContext? = null,
         val failedAt: String? = null
     ) : TransformationExecutionResult {
         
@@ -144,16 +94,6 @@ sealed interface TransformationExecutionResult {
         fun at(location: String): Failure {
             return copy(failedAt = location)
         }
-        
-        /**
-         * Creates a new Failure with the execution context.
-         *
-         * @param ctx The execution context at the time of failure.
-         * @return A new Failure with the context attached.
-         */
-        fun withContext(ctx: TransformationExecutionContext): Failure {
-            return copy(context = ctx)
-        }
     }
     
     /**
@@ -164,11 +104,9 @@ sealed interface TransformationExecutionResult {
      *
      * @param keyword The keyword used to stop: "stop" for normal termination,
      *                "kill" for immediate termination.
-     * @param context The execution context at the time of stopping.
      */
     data class Stopped(
-        val keyword: String,
-        val context: TransformationExecutionContext
+        val keyword: String
     ) : TransformationExecutionResult {
         
         /**

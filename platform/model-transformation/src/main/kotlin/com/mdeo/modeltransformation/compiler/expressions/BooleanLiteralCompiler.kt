@@ -2,15 +2,15 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedBooleanLiteralExpression] nodes.
  *
- * Compiles boolean literal expressions into a [TraversalCompilationResult] containing
+ * Compiles boolean literal expressions into a [GremlinCompilationResult] containing
  * a GraphTraversal that produces the constant boolean value using `__.constant()`.
  *
  * ## Example
@@ -40,15 +40,15 @@ class BooleanLiteralCompiler : ExpressionCompiler {
      * @param expression The boolean literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [TraversalCompilationResult] producing the boolean value
+     * @return A [GremlinCompilationResult] producing the boolean value
      */
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val booleanExpression = expression as TypedBooleanLiteralExpression
         val booleanValue = booleanExpression.value
-        return TraversalCompilationResult.constant(booleanValue, initialTraversal)
+        return GremlinCompilationResult.constant(booleanValue, initialTraversal)
     }
 }

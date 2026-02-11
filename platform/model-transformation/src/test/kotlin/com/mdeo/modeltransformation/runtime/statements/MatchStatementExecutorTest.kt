@@ -10,12 +10,14 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.isFailure
 import com.mdeo.modeltransformation.runtime.isSuccess
+import com.mdeo.modeltransformation.runtime.testHasInstance
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -108,7 +110,6 @@ class MatchStatementExecutorTest {
             
             assertTrue(result.isSuccess())
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(1, result.matchedNodes.size)
         }
 
         @Test
@@ -156,7 +157,7 @@ class MatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(vertex.id(), result.context.lookupInstance("house"))
+            assertEquals(vertex.id(), (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
@@ -210,7 +211,6 @@ class MatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(1, result.matchedNodes.size)
         }
     }
 
@@ -286,7 +286,7 @@ class MatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertTrue(result.context.hasInstance("newHouse"))
+            assertTrue(context.testHasInstance("newHouse"))
         }
     }
 
@@ -315,7 +315,6 @@ class MatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(1, result.matchedNodes.size)
             assertEquals(1, result.deletedNodes.size)
             
             // Verify vertex is deleted
@@ -357,7 +356,6 @@ class MatchStatementExecutorTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = null,
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(objectName = "person", propertyName = "knows"),
                                 target = TypedPatternLinkEnd(objectName = "house", propertyName = null)
                             )
@@ -366,7 +364,6 @@ class MatchStatementExecutorTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = "create",
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(objectName = "person", propertyName = "livesIn"),
                                 target = TypedPatternLinkEnd(objectName = "house", propertyName = null)
                             )
@@ -378,8 +375,6 @@ class MatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(2, result.matchedNodes.size)
-            assertEquals(1, result.createdEdges.size)
             
             // Verify new edge exists
             val g = engine.traversalSource
@@ -418,7 +413,6 @@ class MatchStatementExecutorTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = "delete",
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(objectName = "person", propertyName = "livesIn"),
                                 target = TypedPatternLinkEnd(objectName = "house", propertyName = null)
                             )
@@ -430,7 +424,6 @@ class MatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(1, result.deletedEdges.size)
             
             // Verify edge is deleted but vertices still exist
             val g = engine.traversalSource

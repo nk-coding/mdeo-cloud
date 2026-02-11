@@ -14,6 +14,7 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.isFailure
 import com.mdeo.modeltransformation.runtime.isSuccess
+import com.mdeo.modeltransformation.runtime.testHasInstance
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -78,49 +79,6 @@ class UntilMatchStatementExecutorTest {
     inner class DoUntilBehaviorTests {
 
         @Test
-        fun `executes body at least once even if pattern matches immediately`() {
-            graph.addVertex("House")
-            
-            val statement = TypedUntilMatchStatement(
-                pattern = TypedPattern(
-                    elements = listOf(
-                        TypedPatternObjectInstanceElement(
-                            objectInstance = TypedPatternObjectInstance(
-                                modifier = null,
-                                name = "house",
-                                className = "House",
-                                properties = emptyList()
-                            )
-                        )
-                    )
-                ),
-                doBlock = listOf(
-                    TypedMatchStatement(
-                        pattern = TypedPattern(
-                            elements = listOf(
-                                TypedPatternObjectInstanceElement(
-                                    objectInstance = TypedPatternObjectInstance(
-                                        modifier = "create",
-                                        name = "room",
-                                        className = "Room",
-                                        properties = emptyList()
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-            
-            val result = executor.execute(statement, context, engine)
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            // Body executed once, creating a Room
-            assertEquals(1, result.createdNodes.size)
-            assertTrue(result.context.hasInstance("room"))
-        }
-
-        @Test
         fun `terminates when pattern matches after body execution`() {
             // Initially no House, so pattern won't match
             // Body creates a House, then pattern matches and loop terminates
@@ -160,7 +118,7 @@ class UntilMatchStatementExecutorTest {
             assertIs<TransformationExecutionResult.Success>(result)
             assertEquals(1, result.createdNodes.size)
             // Pattern matched and bound the house
-            assertTrue(result.context.hasInstance("house"))
+            assertTrue(context.testHasInstance("house"))
         }
     }
 
@@ -238,7 +196,7 @@ class UntilMatchStatementExecutorTest {
             assertEquals(1, result.deletedNodes.size)
             assertEquals(1, result.createdNodes.size)
             // Pattern matched a house
-            assertTrue(result.context.hasInstance("house"))
+            assertTrue(context.testHasInstance("house"))
         }
 
         @Test
@@ -472,7 +430,7 @@ class UntilMatchStatementExecutorTest {
             assertIs<TransformationExecutionResult.Success>(result)
             // The terminating match created a Room
             assertEquals(1, result.createdNodes.size)
-            assertTrue(result.context.hasInstance("termRoom"))
+            assertTrue(context.testHasInstance("termRoom"))
             assertEquals(1, engine.traversalSource.V().hasLabel("Room").count().next())
         }
     }
@@ -505,7 +463,7 @@ class UntilMatchStatementExecutorTest {
             // Pattern matching is the termination condition, not a failure
             assertTrue(result.isSuccess())
             assertIs<TransformationExecutionResult.Success>(result)
-            assertTrue(result.context.hasInstance("house"))
+            assertTrue(context.testHasInstance("house"))
         }
     }
 }

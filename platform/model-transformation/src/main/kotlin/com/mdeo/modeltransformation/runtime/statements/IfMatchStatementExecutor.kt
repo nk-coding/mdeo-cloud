@@ -43,9 +43,11 @@ class IfMatchStatementExecutor(
     /**
      * Executes an if-match statement.
      *
-     * Attempts to match the pattern against the graph. If successful, executes
-     * the thenBlock with the matched bindings (modifications already applied).
-     * If no match is found, executes the elseBlock (if present).
+     * Scope handling per spec:
+     * - Enter a new scope (level+1) for the IfMatchConditionAndBlock
+     * - The match runs in that scope
+     * - The thenBlock enters ANOTHER scope (level+2 total from base)
+     * - The elseBlock enters a scope (level+1 from base, since it's just StatementsScope)
      *
      * Unlike standalone match statements, a failed match here is NOT a failure -
      * it simply means we take the else path.
@@ -62,14 +64,16 @@ class IfMatchStatementExecutor(
     ): TransformationExecutionResult {
         val ifMatchStatement = statement as TypedIfMatchStatement
         
+        val conditionContext = context.enterScope()
+        
         val matchResult = matchExecutor.executeMatch(
             pattern = ifMatchStatement.pattern,
-            context = context,
+            context = conditionContext,
             engine = engine
         )
         
         return when (matchResult) {
-            is MatchResult.Matched -> executeThenBranch(ifMatchStatement, matchResult, context, engine)
+            is MatchResult.Matched -> executeThenBranch(ifMatchStatement, matchResult, conditionContext, context, engine)
             is MatchResult.NoMatch -> executeElseBranch(ifMatchStatement, context, engine)
         }
     }
@@ -77,34 +81,32 @@ class IfMatchStatementExecutor(
     /**
      * Executes the then branch after a successful match.
      *
-     * Executes the thenBlock statements with the updated context containing match bindings.
+     * The thenBlock enters another scope (level+2 total from base) as it's a StatementsScope.
      * Modifications have already been applied by the unified executor.
      *
      * @param statement The if-match statement.
      * @param matched The match result containing bindings.
-     * @param context The original execution context.
+     * @param conditionContext The context at condition scope level (where match bindings live).
+     * @param baseContext The original execution context (for returning).
      * @param engine The transformation engine.
      * @return The result of executing the thenBlock.
      */
     private fun executeThenBranch(
         statement: TypedIfMatchStatement,
         matched: MatchResult.Matched,
-        context: TransformationExecutionContext,
+        conditionContext: TransformationExecutionContext,
+        baseContext: TransformationExecutionContext,
         engine: TransformationEngine
     ): TransformationExecutionResult {
-        val updatedContext = matched.applyTo(context)
-        val blockResult = engine.executeBlock(statement.thenBlock, updatedContext)
+        val matchedContext = matched.applyTo(conditionContext)
+
+        val blockResult = engine.executeBlock(statement.thenBlock, matchedContext)
         
         return when (blockResult) {
             is TransformationExecutionResult.Success -> {
                 TransformationExecutionResult.Success(
-                    context = blockResult.context,
-                    matchedNodes = matched.matchedNodeIds + blockResult.matchedNodes,
-                    matchedEdges = matched.matchedEdgeIds + blockResult.matchedEdges,
                     createdNodes = matched.createdNodeIds + blockResult.createdNodes,
-                    deletedNodes = matched.deletedNodeIds + blockResult.deletedNodes,
-                    createdEdges = matched.createdEdgeIds + blockResult.createdEdges,
-                    deletedEdges = matched.deletedEdgeIds + blockResult.deletedEdges
+                    deletedNodes = matched.deletedNodeIds + blockResult.deletedNodes
                 )
             }
             is TransformationExecutionResult.Failure -> blockResult
@@ -115,6 +117,7 @@ class IfMatchStatementExecutor(
     /**
      * Executes the else branch when no match is found.
      *
+     * The elseBlock enters a scope (level+1 from base) as it's a StatementsScope.
      * If an elseBlock exists, executes it. Otherwise, returns Success with
      * the unchanged context. This is the key difference from standalone match:
      * no match is NOT a failure.
@@ -130,9 +133,9 @@ class IfMatchStatementExecutor(
         engine: TransformationEngine
     ): TransformationExecutionResult {
         return if (statement.elseBlock != null) {
-            engine.executeBlock(statement.elseBlock, context)
+            return engine.executeBlock(statement.elseBlock, context)
         } else {
-            TransformationExecutionResult.Success(context)
+            TransformationExecutionResult.Success()
         }
     }
 }

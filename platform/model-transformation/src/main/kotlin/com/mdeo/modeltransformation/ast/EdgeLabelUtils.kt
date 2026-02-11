@@ -15,21 +15,15 @@ object EdgeLabelUtils {
      * The format is `` `startProperty`_`endProperty` `` where:
      * - Backticks are required around each property name
      * - If a property is null, an empty string is used inside the backticks
-     * - The order respects the isOutgoing flag: if not outgoing, the order is swapped
      *
      * @param startProperty The property name at the start of the edge, or null if not specified
      * @param endProperty The property name at the end of the edge, or null if not specified
-     * @param isOutgoing True if this is an outgoing edge (start to end), false for incoming
      * @return The computed edge label string
      */
-    fun computeEdgeLabel(startProperty: String?, endProperty: String?, isOutgoing: Boolean): String {
+    fun computeEdgeLabel(startProperty: String?, endProperty: String?): String {
         val start = startProperty ?: ""
         val end = endProperty ?: ""
-        return if (isOutgoing) {
-            "`$start`_`$end`"
-        } else {
-            "`$end`_`$start`"
-        }
+        return "`$start`_`$end`"
     }
 
     /**
@@ -39,20 +33,15 @@ object EdgeLabelUtils {
      * property names from a formatted edge label string.
      *
      * @param edgeLabel The edge label to parse
-     * @param isOutgoing True if this is an outgoing edge, false for incoming
      * @return A pair of (startProperty, endProperty), where empty strings are converted to null
      */
-    fun parseEdgeLabel(edgeLabel: String, isOutgoing: Boolean): Pair<String?, String?> {
+    fun parseEdgeLabel(edgeLabel: String): Pair<String?, String?> {
         val parts = edgeLabel.split("`_`")
         if (parts.size != 2) {
             return Pair(null, null)
         }
         val first = parts[0].removePrefix("`").ifEmpty { null }
         val second = parts[1].removeSuffix("`").ifEmpty { null }
-        return if (isOutgoing) {
-            Pair(first, second)
-        } else {
-            Pair(second, first)
-        }
+        return Pair(first, second)
     }
 }

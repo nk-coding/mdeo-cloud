@@ -1,7 +1,8 @@
 package com.mdeo.modeltransformation.compiler.registry
 
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
+import org.apache.tinkerpop.gremlin.structure.VertexProperty
 
 /**
  * Represents a type definition for Gremlin compilation.
@@ -31,6 +32,18 @@ interface GremlinTypeDefinition {
      * For example, all types typically extend "builtin.any".
      */
     val extends: List<String>
+    
+    /**
+     * The cardinality of this type for graph property storage.
+     * 
+     * Determines how values of this type are stored in vertex properties:
+     * - single: Single value (default for primitives, strings, etc.)
+     * - list: Ordered collection allowing duplicates
+     * - set: Unordered collection without duplicates
+     * 
+     * Null indicates default single cardinality.
+     */
+    val cardinality: VertexProperty.Cardinality?
 
     /**
      * Gets a property definition by name.
@@ -110,7 +123,7 @@ interface GremlinPropertyDefinition {
      * @param receiver The receiver traversal (the object the property is accessed on).
      * @return The compilation result containing the property value as a traversal.
      */
-    fun compile(receiver: GraphTraversal<*, *>): TraversalCompilationResult<*, *>
+    fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult
 }
 
 /**
@@ -157,6 +170,6 @@ interface GremlinMethodDefinition {
      */
     fun compile(
         receiver: GraphTraversal<*, *>,
-        arguments: List<TraversalCompilationResult<*, *>>
-    ): TraversalCompilationResult<*, *>
+        arguments: List<GremlinCompilationResult>
+    ): GremlinCompilationResult
 }

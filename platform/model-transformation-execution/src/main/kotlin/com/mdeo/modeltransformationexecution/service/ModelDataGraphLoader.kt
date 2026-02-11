@@ -7,6 +7,7 @@ import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Vertex
+import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import org.slf4j.LoggerFactory
 
 /**
@@ -17,13 +18,13 @@ import org.slf4j.LoggerFactory
  * 
  * Instance names are registered in the InstanceNameRegistry instead of being
  * stored as properties in the graph, avoiding conflicts with metamodel properties.
+ * 
+ * List properties are stored using VertexProperty.Cardinality.list, with each
+ * element added as a separate property value. This ensures portability to
+ * remote graph databases.
  */
 class ModelDataGraphLoader {
     private val logger = LoggerFactory.getLogger(ModelDataGraphLoader::class.java)
-    
-    companion object {
-        private const val PROPERTY_CLASS_NAME = "className"
-    }
     
     /**
      * Loads ModelData into the graph.
@@ -59,6 +60,9 @@ class ModelDataGraphLoader {
     /**
      * Creates a vertex for a single instance.
      * Registers the vertex ID with its name in the registry instead of storing it as a property.
+     * 
+     * List properties are stored using Cardinality.list, with each element added separately.
+     * The className is used only as the vertex label, not as a property.
      */
     private fun createVertex(
         g: GraphTraversalSource,
@@ -66,34 +70,62 @@ class ModelDataGraphLoader {
         nameRegistry: InstanceNameRegistry
     ): Vertex {
         var traversal = g.addV(instance.className)
-            .property(PROPERTY_CLASS_NAME, instance.className)
         
         for ((propertyName, propertyValue) in instance.properties) {
-            val value = convertPropertyValue(propertyValue)
-            if (value != null) {
-                traversal = traversal.property(propertyName, value)
-            }
+            traversal = addPropertyValue(traversal, propertyName, propertyValue)
         }
         
         val vertex = traversal.next()
         
-        // Register the vertex with its instance name in the registry
         nameRegistry.register(vertex.id(), instance.name)
         
         return vertex
     }
     
     /**
-     * Converts ModelDataPropertyValue to a Gremlin-compatible value.
+     * Adds property value(s) to a vertex traversal.
+     * For list properties, adds each element separately with Cardinality.list.
+     * For scalar properties, adds a single value.
      */
-    private fun convertPropertyValue(value: ModelDataPropertyValue): Any? {
+    private fun addPropertyValue(
+        traversal: org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal<Vertex, Vertex>,
+        propertyName: String,
+        propertyValue: ModelDataPropertyValue
+    ): org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal<Vertex, Vertex> {
+        return when (propertyValue) {
+            is ModelDataPropertyValue.ListValue -> {
+                var result = traversal
+                for (element in propertyValue.values) {
+                    val value = convertScalarPropertyValue(element)
+                    if (value != null) {
+                        result = result.property(VertexProperty.Cardinality.list, propertyName, value)
+                    }
+                }
+                result
+            }
+            else -> {
+                val value = convertScalarPropertyValue(propertyValue)
+                if (value != null) {
+                    traversal.property(propertyName, value)
+                } else {
+                    traversal
+                }
+            }
+        }
+    }
+    
+    /**
+     * Converts ModelDataPropertyValue to a Gremlin-compatible scalar value.
+     * Does not handle ListValue - that is handled separately in addPropertyValue.
+     */
+    private fun convertScalarPropertyValue(value: ModelDataPropertyValue): Any? {
         return when (value) {
             is ModelDataPropertyValue.NullValue -> null
             is ModelDataPropertyValue.StringValue -> value.value
             is ModelDataPropertyValue.NumberValue -> value.value
             is ModelDataPropertyValue.BooleanValue -> value.value
             is ModelDataPropertyValue.EnumValue -> value.enumEntry
-            is ModelDataPropertyValue.ListValue -> value.values.mapNotNull { convertPropertyValue(it) }
+            is ModelDataPropertyValue.ListValue -> throw IllegalArgumentException("Lists should be handled by addPropertyValue, not convertScalarPropertyValue")
         }
     }
     
@@ -132,8 +164,7 @@ class ModelDataGraphLoader {
         
         val edgeLabel = EdgeLabelUtils.computeEdgeLabel(
             link.sourceProperty,
-            link.targetProperty,
-            isOutgoing = true
+            link.targetProperty
         )
         
         g.V(sourceVertex).addE(edgeLabel).to(targetVertex).next()

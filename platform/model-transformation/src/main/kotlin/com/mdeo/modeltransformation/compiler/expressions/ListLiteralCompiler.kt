@@ -3,8 +3,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedListLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -13,7 +13,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedListLiteralExpression] nodes.
  *
- * Compiles list literal expressions into a [TraversalCompilationResult] containing
+ * Compiles list literal expressions into a [GremlinCompilationResult] containing
  * a GraphTraversal that produces a list of constant values.
  *
  * ## Compilation Strategy
@@ -49,26 +49,59 @@ class ListLiteralCompiler(
     }
 
     /**
-     * Compiles a list literal expression into a traversal result.
+     * Compiles a list literal expression into a traversal result that emits multiple values.
+     *
+     * This compiler creates a traversal that emits each list element as a separate value,
+     * rather than creating a single List object. This approach supports:
+     * 1. Constant elements: `[10, 20]` → emits 10, then 20
+     * 2. Computed elements: `[10 * 20, 100 - 20]` → evaluates expressions and emits results
+     *
+     * The traversal uses `union()` to combine all element traversals, ensuring
+     * compatibility with remote graph databases (no lambdas required).
+     *
+     * For storage with Cardinality.list, each emitted value will be added as a
+     * separate property value, not as a single List object.
      *
      * @param expression The list literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [TraversalCompilationResult] producing the list value
-     * @throws CompilationException If any element is non-constant
+     * @return A [GremlinCompilationResult] that emits each list element sequentially
      */
+    @Suppress("UNCHECKED_CAST")
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val listExpression = expression as TypedListLiteralExpression
         val elementResults = compileElements(listExpression.elements, context)
 
-        validateAllConstant(elementResults, expression)
+        val traversal: GraphTraversal<Any, Any> = if (elementResults.isEmpty()) {
+            if (initialTraversal != null) {
+                (initialTraversal as GraphTraversal<Any, Any>).not(AnonymousTraversal.identity<Any>()) as GraphTraversal<Any, Any>
+            } else {
+                (AnonymousTraversal.not<Any>(AnonymousTraversal.identity<Any>()) as GraphTraversal<Any, Any>)
+            }
+        } else if (elementResults.size == 1) {
+            val elementTraversal = elementResults[0].traversal as GraphTraversal<Any, Any>
+            if (initialTraversal != null) {
+                (initialTraversal as GraphTraversal<Any, Any>).flatMap(elementTraversal) as GraphTraversal<Any, Any>
+            } else {
+                elementTraversal
+            }
+        } else {
+            val elementTraversals = elementResults.map { 
+                it.traversal as GraphTraversal<Any, Any>
+            }.toTypedArray()
+            
+            if (initialTraversal != null) {
+                (initialTraversal as GraphTraversal<Any, Any>).union(*elementTraversals) as GraphTraversal<Any, Any>
+            } else {
+                AnonymousTraversal.union<Any, Any>(*elementTraversals) as GraphTraversal<Any, Any>
+            }
+        }
 
-        val values = elementResults.map { it.constantValue }
-        return TraversalCompilationResult.constant(values, initialTraversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**
@@ -76,27 +109,11 @@ class ListLiteralCompiler(
      */
     private fun compileElements(
         elements: List<TypedExpression>,
-        context: TraversalCompilationContext
-    ): List<TraversalCompilationResult<*, *>> {
+        context: CompilationContext
+    ): List<GremlinCompilationResult> {
         return elements.map { element ->
             registry.compile(element, context, null)
         }
     }
 
-    /**
-     * Validates that all element results are constants.
-     */
-    private fun validateAllConstant(
-        results: List<TraversalCompilationResult<*, *>>,
-        expression: TypedExpression
-    ) {
-        val nonConstantIndex = results.indexOfFirst { !it.isConstant }
-        if (nonConstantIndex >= 0) {
-            throw CompilationException(
-                "List literal element at index $nonConstantIndex is not a constant. " +
-                    "Dynamic list construction is not yet supported.",
-                expression
-            )
-        }
-    }
 }

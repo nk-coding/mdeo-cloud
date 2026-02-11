@@ -3,8 +3,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -12,7 +12,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 /**
  * Traversal-based compiler for [TypedMemberAccessExpression] nodes.
  *
- * Compiles member access expressions (e.g., `object.property`) into [TraversalCompilationResult]
+ * Compiles member access expressions (e.g., `object.property`) into [GremlinCompilationResult]
  * containing GraphTraversals that navigate to and retrieve property values or traverse edges.
  *
  * ## Property and Association Access
@@ -62,9 +62,9 @@ class MemberAccessCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val memberAccess = expression as TypedMemberAccessExpression
         val objectResult = compileObjectExpression(memberAccess, context, initialTraversal)
         
@@ -86,16 +86,16 @@ class MemberAccessCompiler(
      */
     private fun compileObjectExpression(
         memberAccess: TypedMemberAccessExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         return registry.compile(memberAccess.expression, context, initialTraversal)
     }
 
     /**
      * Gets the type name for an expression from the compilation context.
      */
-    private fun getTypeName(expression: TypedExpression, context: TraversalCompilationContext): String? {
+    private fun getTypeName(expression: TypedExpression, context: CompilationContext): String? {
         val evalType = expression.evalType
         val valueType = context.resolveTypeOrNull(evalType)
         return when (valueType) {
@@ -112,18 +112,17 @@ class MemberAccessCompiler(
      */
     @Suppress("UNCHECKED_CAST")
     private fun compilePropertyWithRegistry(
-        objectResult: TraversalCompilationResult<*, *>,
+        objectResult: GremlinCompilationResult,
         typeName: String,
         propertyName: String,
-        context: TraversalCompilationContext
-    ): TraversalCompilationResult<*, *> {
+        context: CompilationContext
+    ): GremlinCompilationResult {
         val propertyDef = context.typeRegistry.lookupProperty(typeName, propertyName)
             ?: throw IllegalStateException(
                 "Property '$propertyName' not found on type '$typeName'. " +
                 "Ensure the type registry is configured with all metamodel types."
             )
         
-        // Use the property definition to compile the access
         return propertyDef.compile(objectResult.traversal)
     }
 }

@@ -96,23 +96,5 @@ class CompilationException(
             )
         }
         
-        /**
-         * Creates a CompilationException for an invalid compilation mode.
-         *
-         * @param expectedMode The expected compilation mode.
-         * @param actualMode The actual compilation mode.
-         * @param expression The expression being compiled.
-         * @return A CompilationException describing the mode mismatch.
-         */
-        fun invalidMode(
-            expectedMode: CompilationMode,
-            actualMode: CompilationMode,
-            expression: TypedExpression
-        ): CompilationException {
-            return CompilationException(
-                "Invalid compilation mode: expected $expectedMode, got $actualMode",
-                expression
-            )
-        }
     }
 }

@@ -20,7 +20,8 @@ fun voidType(): VoidType = VoidType()
  * @param typeName The type name (e.g., "builtin.int", "builtin.string").
  * @return A ClassTypeRef with isNullable = false.
  */
-fun classType(typeName: String): ClassTypeRef = ClassTypeRef(typeName, false)
+fun classType(typeName: String): ClassTypeRef = 
+    ClassTypeRef(typeName, false, null)
 
 /**
  * Creates a nullable class type reference.
@@ -28,7 +29,8 @@ fun classType(typeName: String): ClassTypeRef = ClassTypeRef(typeName, false)
  * @param typeName The type name (e.g., "builtin.int", "builtin.string").
  * @return A ClassTypeRef with isNullable = true.
  */
-fun nullableClassType(typeName: String): ClassTypeRef = ClassTypeRef(typeName, true)
+fun nullableClassType(typeName: String): ClassTypeRef = 
+    ClassTypeRef(typeName, true, null)
 
 /**
  * Creates a class type reference with generic type arguments.

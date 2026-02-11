@@ -102,8 +102,7 @@ class StatementExecutorRegistry {
     ): TransformationExecutionResult {
         val executor = findExecutor(statement)
             ?: return TransformationExecutionResult.Failure(
-                reason = "No executor found for statement type: ${statement.kind}",
-                context = context
+                reason = "No executor found for statement type: ${statement.kind}"
             )
         return executor.execute(statement, context, engine)
     }

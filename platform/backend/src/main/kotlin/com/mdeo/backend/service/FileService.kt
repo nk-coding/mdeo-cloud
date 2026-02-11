@@ -3,7 +3,6 @@ package com.mdeo.backend.service
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.backend.database.ExecutionsTable
 import com.mdeo.backend.database.FilesTable
-import com.mdeo.backend.database.FileChildrenTable
 import com.mdeo.common.model.*
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.jdbc.*
@@ -136,15 +135,12 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 ensureParentDirectories(projectId, normalizedPath, now)
                 
                 val parentPath = getParentPath(normalizedPath)
-                val basename = getBasename(normalizedPath)
-                if (parentPath != null) {
-                    addChildToDirectory(projectId, parentPath, basename, FileType.FILE, now)
-                }
                 
                 val contentText = Base64.getEncoder().encodeToString(content)
                 FilesTable.insert {
                     it[FilesTable.projectId] = projectId.toKotlinUuid()
                     it[FilesTable.path] = normalizedPath
+                    it[FilesTable.parentPath] = parentPath
                     it[fileType] = FileType.FILE
                     it[FilesTable.content] = contentText
                     it[version] = 1
@@ -186,14 +182,11 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             ensureParentDirectories(projectId, normalizedPath, now)
             
             val parentPath = getParentPath(normalizedPath)
-            val basename = getBasename(normalizedPath)
-            if (parentPath != null) {
-                addChildToDirectory(projectId, parentPath, basename, FileType.DIRECTORY, now)
-            }
             
             FilesTable.insert {
                 it[FilesTable.projectId] = projectId.toKotlinUuid()
                 it[FilesTable.path] = normalizedPath
+                it[FilesTable.parentPath] = parentPath
                 it[fileType] = FileType.DIRECTORY
                 it[content] = null
                 it[createdAt] = now
@@ -227,10 +220,10 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 return@transaction fileSystemFailure(ErrorCodes.FILE_NOT_A_DIRECTORY, "Not a directory: $path")
             }
             
-            val result = FileChildrenTable.selectAll()
-                .where { (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq normalizedPath) }
+            val result = FilesTable.selectAll()
+                .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.parentPath eq normalizedPath) }
                 .map { childRow ->
-                    FileEntry(childRow[FileChildrenTable.childName], childRow[FileChildrenTable.childType])
+                    FileEntry(getBasename(childRow[FilesTable.path]), childRow[FilesTable.fileType])
                 }
             
             success(result)
@@ -311,22 +304,14 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             }
             
             if (row[FilesTable.fileType] == FileType.DIRECTORY) {
-                val childrenCount = FileChildrenTable.selectAll()
-                    .where { (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq normalizedPath) }
+                val childrenCount = FilesTable.selectAll()
+                    .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.parentPath eq normalizedPath) }
                     .count()
                 
                 if (childrenCount > 0 && !recursive) {
                     return@transaction fileSystemFailure(ErrorCodes.DIRECTORY_NOT_EMPTY, "Directory not empty: $path")
                 }
                 
-                if (recursive) {
-                    deleteRecursive(projectId, normalizedPath)
-                }
-            }
-            
-            val parentPath = getParentPath(normalizedPath)
-            if (parentPath != null) {
-                removeChildFromDirectory(projectId, parentPath, getBasename(normalizedPath))
             }
             
             FilesTable.deleteWhere { 
@@ -382,13 +367,6 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             val oldParent = getParentPath(normalizedFrom)
             val newParent = getParentPath(normalizedTo)
             
-            if (oldParent != null) {
-                removeChildFromDirectory(projectId, oldParent, getBasename(normalizedFrom))
-            }
-            if (newParent != null) {
-                addChildToDirectory(projectId, newParent, getBasename(normalizedTo), sourceRow[FilesTable.fileType], now)
-            }
-            
             if (sourceRow[FilesTable.fileType] == FileType.DIRECTORY) {
                 renameDirectoryChildren(projectId, normalizedFrom, normalizedTo)
             }
@@ -397,7 +375,9 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq normalizedFrom) 
             }) {
                 it[path] = normalizedTo
+                it[parentPath] = newParent
                 it[updatedAt] = now
+                it[version] = version + 1
             }
             
             success(Unit)
@@ -445,90 +425,15 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             ensureParentDirectories(projectId, parentPath, now)
             
             val grandparentPath = getParentPath(parentPath)
-            if (grandparentPath != null) {
-                addChildToDirectory(projectId, grandparentPath, getBasename(parentPath), FileType.DIRECTORY, now)
-            }
             
             FilesTable.insert {
                 it[FilesTable.projectId] = projectId.toKotlinUuid()
                 it[FilesTable.path] = parentPath
+                it[FilesTable.parentPath] = grandparentPath
                 it[fileType] = FileType.DIRECTORY
                 it[content] = null
                 it[createdAt] = now
                 it[updatedAt] = now
-            }
-        }
-    }
-    
-    /**
-     * Adds a child entry to a directory's children list.
-     *
-     * @param projectId The UUID of the project
-     * @param dirPath The path to the directory
-     * @param childName The name of the child to add
-     * @param childType The type of the child (file or directory)
-     * @param now The timestamp to use for the update
-     */
-    private fun addChildToDirectory(projectId: UUID, dirPath: String, childName: String, childType: Int, now: Instant) {
-        val existingChild = FileChildrenTable.selectAll()
-            .where { 
-                (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and 
-                (FileChildrenTable.parentPath eq dirPath) and 
-                (FileChildrenTable.childName eq childName)
-            }
-            .firstOrNull()
-        
-        if (existingChild == null) {
-            FileChildrenTable.insert {
-                it[FileChildrenTable.projectId] = projectId.toKotlinUuid()
-                it[FileChildrenTable.parentPath] = dirPath
-                it[FileChildrenTable.childName] = childName
-                it[FileChildrenTable.childType] = childType
-            }
-        }
-    }
-    
-    /**
-     * Removes a child entry from a directory's children list.
-     *
-     * @param projectId The UUID of the project
-     * @param dirPath The path to the directory
-     * @param childName The name of the child to remove
-     */
-    private fun removeChildFromDirectory(projectId: UUID, dirPath: String, childName: String) {
-        FileChildrenTable.deleteWhere {
-            (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and
-            (FileChildrenTable.parentPath eq dirPath) and
-            (FileChildrenTable.childName eq childName)
-        }
-    }
-    
-    /**
-     * Recursively deletes a directory and all its children.
-     *
-     * @param projectId The UUID of the project
-     * @param path The path to the directory to delete
-     */
-    private fun deleteRecursive(projectId: UUID, path: String) {
-        val row = FilesTable.selectAll()
-            .where { (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq path) }
-            .firstOrNull() ?: return
-        
-        if (row[FilesTable.fileType] == FileType.DIRECTORY) {
-            val children = FileChildrenTable.selectAll()
-                .where { (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq path) }
-                .map { it[FileChildrenTable.childName] }
-            
-            for (childName in children) {
-                val childPath = if (path.isEmpty()) childName else "$path/$childName"
-                deleteRecursive(projectId, childPath)
-                FilesTable.deleteWhere { 
-                    (FilesTable.projectId eq projectId.toKotlinUuid()) and (FilesTable.path eq childPath) 
-                }
-            }
-            
-            FileChildrenTable.deleteWhere {
-                (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and (FileChildrenTable.parentPath eq path)
             }
         }
     }
@@ -558,24 +463,7 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
                 }) {
                     it[path] = newChildPath
                     it[updatedAt] = Instant.now()
-                }
-            }
-        
-        FileChildrenTable.selectAll()
-            .where {
-                (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and
-                (FileChildrenTable.parentPath like "$prefix%")
-            }
-            .forEach { row ->
-                val oldParentPath = row[FileChildrenTable.parentPath]
-                val newParentPath = newPrefix + oldParentPath.substring(prefix.length)
-                
-                FileChildrenTable.update({
-                    (FileChildrenTable.projectId eq projectId.toKotlinUuid()) and
-                    (FileChildrenTable.parentPath eq oldParentPath) and
-                    (FileChildrenTable.childName eq row[FileChildrenTable.childName])
-                }) {
-                    it[parentPath] = newParentPath
+                    it[version] = version + 1
                 }
             }
     }

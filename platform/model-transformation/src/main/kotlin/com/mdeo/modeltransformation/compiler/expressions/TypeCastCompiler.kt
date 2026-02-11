@@ -2,8 +2,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedTypeCastExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -12,7 +12,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Traversal-based compiler for [TypedTypeCastExpression] nodes.
  *
  * Compiles type cast expressions (expr as Type, expr as? Type) into
- * [TraversalCompilationResult] containing GraphTraversals.
+ * [GremlinCompilationResult] containing GraphTraversals.
  *
  * ## Gremlin Implementation
  * Since Gremlin is dynamically typed, type casts are essentially no-ops at runtime.
@@ -41,9 +41,9 @@ class TypeCastCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val castExpr = expression as TypedTypeCastExpression
         return compileTypeCast(castExpr, context, initialTraversal)
     }
@@ -57,9 +57,9 @@ class TypeCastCompiler(
      */
     private fun compileTypeCast(
         expr: TypedTypeCastExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         return registry.compile(expr.expression, context, initialTraversal)
     }
 }

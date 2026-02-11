@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
@@ -24,6 +25,14 @@ class StringConcatenationRuntimeTest {
     private lateinit var g: GraphTraversalSource
     private lateinit var engine: TransformationEngine
     private val executor = MatchExecutor()
+
+    // Type constants for use in expressions
+    private val STRING_TYPE_INDEX = 0
+    
+    // Type list with string type at index 0
+    private val types = listOf(
+        ClassTypeRef(type = "builtin.string", isNullable = false)
+    )
     
     @BeforeEach
     fun setup() {
@@ -35,7 +44,7 @@ class StringConcatenationRuntimeTest {
         
         engine = TransformationEngine(
             traversalSource = g,
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()), // Dummy AST
+            ast = TypedAst(types = types, metamodelUri = "test://model", statements = emptyList()),
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -56,14 +65,14 @@ class StringConcatenationRuntimeTest {
                                 propertyName = "category",
                                 operator = "=",
                                 value = TypedBinaryExpression(
-                                    evalType = 0,
+                                    evalType = STRING_TYPE_INDEX,
                                     operator = "+",
                                     left = TypedStringLiteralExpression(
-                                        evalType = 0,
+                                        evalType = STRING_TYPE_INDEX,
                                         value = "Kitchen"
                                     ),
                                     right = TypedStringLiteralExpression(
-                                        evalType = 0,
+                                        evalType = STRING_TYPE_INDEX,
                                         value = "wtf"
                                     )
                                 )
@@ -106,14 +115,14 @@ class StringConcatenationRuntimeTest {
                                 propertyName = "category",
                                 operator = "=",
                                 value = TypedBinaryExpression(
-                                    evalType = 0,
+                                    evalType = STRING_TYPE_INDEX,
                                     operator = "+",
                                     left = TypedStringLiteralExpression(
-                                        evalType = 0,
+                                        evalType = STRING_TYPE_INDEX,
                                         value = ""
                                     ),
                                     right = TypedStringLiteralExpression(
-                                        evalType = 0,
+                                        evalType = STRING_TYPE_INDEX,
                                         value = "test"
                                     )
                                 )
@@ -143,10 +152,10 @@ class StringConcatenationRuntimeTest {
     fun `multiple string concatenations should work`() {
         // ("Hello" + " ") + "World"
         val firstConcat = TypedBinaryExpression(
-            evalType = 0,
+            evalType = STRING_TYPE_INDEX,
             operator = "+",
-            left = TypedStringLiteralExpression(evalType = 0, value = "Hello"),
-            right = TypedStringLiteralExpression(evalType = 0, value = " ")
+            left = TypedStringLiteralExpression(evalType = STRING_TYPE_INDEX, value = "Hello"),
+            right = TypedStringLiteralExpression(evalType = STRING_TYPE_INDEX, value = " ")
         )
         
         val pattern = TypedPattern(
@@ -161,10 +170,10 @@ class StringConcatenationRuntimeTest {
                                 propertyName = "category",
                                 operator = "=",
                                 value = TypedBinaryExpression(
-                                    evalType = 0,
+                                    evalType = STRING_TYPE_INDEX,
                                     operator = "+",
                                     left = firstConcat,
-                                    right = TypedStringLiteralExpression(evalType = 0, value = "World")
+                                    right = TypedStringLiteralExpression(evalType = STRING_TYPE_INDEX, value = "World")
                                 )
                             )
                         )

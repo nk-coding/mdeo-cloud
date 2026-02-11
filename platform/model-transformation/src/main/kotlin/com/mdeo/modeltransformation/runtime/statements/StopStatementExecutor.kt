@@ -52,8 +52,7 @@ class StopStatementExecutor : StatementExecutor {
         val stopStatement = statement as TypedStopStatement
         
         return TransformationExecutionResult.Stopped(
-            keyword = stopStatement.keyword,
-            context = context
+            keyword = stopStatement.keyword
         )
     }
 }

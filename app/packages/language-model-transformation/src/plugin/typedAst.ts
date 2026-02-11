@@ -133,11 +133,6 @@ export interface TypedPatternLink {
     modifier?: string;
 
     /**
-     * True if this is an outgoing edge from source to target, false for incoming.
-     */
-    isOutgoing: boolean;
-
-    /**
      * Source end of the link.
      */
     source: TypedPatternLinkEnd;

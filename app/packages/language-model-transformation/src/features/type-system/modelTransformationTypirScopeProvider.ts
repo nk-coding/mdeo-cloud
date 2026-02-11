@@ -29,7 +29,7 @@
  *    - Pattern variables are visible only within the then block
  *    - Creates isolated scope that prevents pattern variables from leaking to else block
  *
- * 4. **WhileMatchStatement / UntilMatchStatement / ForMatchStatement**
+ * 4. **WhileMatchStatement / ForMatchStatement**
  *    - Pattern variables are visible only within the associated do block
  *    - Creates isolated scope for pattern bindings
  *
@@ -42,7 +42,7 @@
  * - **Match statements do NOT create their own scope** - Consecutive matches in the same
  *   block share variables, allowing later matches to reference earlier bindings.
  *
- * - **Control flow match statements CREATE their own scope** - If/while/until/for match
+ * - **Control flow match statements CREATE their own scope** - If/while/for match
  *   statements isolate their pattern bindings to prevent leakage.
  *
  * - **IfMatchCondition isolates pattern scope** - The new inner node ensures the then block
@@ -81,7 +81,6 @@ import {
     StatementsScope,
     IfMatchConditionAndBlock,
     WhileMatchStatement,
-    UntilMatchStatement,
     ForMatchStatement,
     LambdaExpression,
     expressionTypes,
@@ -90,7 +89,6 @@ import {
     type StatementsScopeType,
     type IfMatchConditionAndBlockType,
     type WhileMatchStatementType,
-    type UntilMatchStatementType,
     type ForMatchStatementType,
     type LambdaExpressionType,
     type PatternType,
@@ -158,7 +156,6 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             [StatementsScope.name, (node, parent) => this.createStatementsScopeScope(node, parent)],
             [IfMatchConditionAndBlock.name, (node, parent) => this.createIfMatchConditionScope(node, parent)],
             [WhileMatchStatement.name, (node, parent) => this.createWhileMatchScope(node, parent)],
-            [UntilMatchStatement.name, (node, parent) => this.createUntilMatchScope(node, parent)],
             [ForMatchStatement.name, (node, parent) => this.createForMatchScope(node, parent)],
             [LambdaExpression.name, (node, parent) => this.createLambdaScope(node, parent)]
         ]);
@@ -176,7 +173,6 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             this.reflection.isInstance(node, StatementsScope) ||
             this.reflection.isInstance(node, IfMatchConditionAndBlock) ||
             this.reflection.isInstance(node, WhileMatchStatement) ||
-            this.reflection.isInstance(node, UntilMatchStatement) ||
             this.reflection.isInstance(node, ForMatchStatement) ||
             this.reflection.isInstance(node, LambdaExpression)
         );
@@ -217,30 +213,33 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
     ): Scope<TypirLangiumSpecifics> {
         return new DefaultScope<TypirLangiumSpecifics>(
             parentScope,
-            (scope) => this.getTransformationScopeEntries(node, scope),
+            (scope) => this.getStatementsScopeEntries(node, scope),
             () => [],
-            this.getTransformationLocalInitializations(node),
+            this.getStatementsScopeInitializations(node),
             node
         );
     }
 
     /**
-     * Gets scope entries for the root transformation.
+     * Gets scope entries for the root transformation / statements scope.
      * Collects object instances and pattern variables from top-level match statements.
      *
      * @param node The transformation node.
      * @param scope The current scope.
      * @returns Array of scope entries.
      */
-    private getTransformationScopeEntries(
-        node: ModelTransformationType,
+    private getStatementsScopeEntries(
+        node: ModelTransformationType | StatementsScopeType,
         scope: Scope<TypirLangiumSpecifics>
     ): ScopeEntry<TypirLangiumSpecifics>[] {
         const entries: ScopeEntry<TypirLangiumSpecifics>[] = [];
 
         for (let i = 0; i < node.statements.length; i++) {
             const statement = node.statements[i];
-            if (this.reflection.isInstance(statement, statementTypes.matchStatementType)) {
+            if (
+                this.reflection.isInstance(statement, statementTypes.matchStatementType) ||
+                this.reflection.isInstance(statement, statementTypes.untilMatchStatementType)
+            ) {
                 this.collectPatternEntries(statement.pattern, i, scope, entries);
             }
         }
@@ -248,17 +247,22 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
     }
 
     /**
-     * Gets local initializations for the root transformation.
+     * Gets local initializations for the root transformation / statements scope.
      *
      * @param node The transformation node.
      * @returns Array of local initialization records.
      */
-    private getTransformationLocalInitializations(node: ModelTransformationType): ScopeLocalInitialization[] {
+    private getStatementsScopeInitializations(
+        node: ModelTransformationType | StatementsScopeType
+    ): ScopeLocalInitialization[] {
         const initializations: ScopeLocalInitialization[] = [];
 
         for (let i = 0; i < node.statements.length; i++) {
             const statement = node.statements[i];
-            if (this.reflection.isInstance(statement, statementTypes.matchStatementType)) {
+            if (
+                this.reflection.isInstance(statement, statementTypes.matchStatementType) ||
+                this.reflection.isInstance(statement, statementTypes.untilMatchStatementType)
+            ) {
                 this.collectPatternInitializations(statement.pattern, i, initializations);
             }
         }
@@ -285,49 +289,6 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             this.getStatementsScopeInitializations(node),
             node
         );
-    }
-
-    /**
-     * Gets scope entries from a statements block.
-     * Includes object instances and pattern variables from match statements.
-     *
-     * @param node The statements scope node.
-     * @param scope The current scope.
-     * @returns Array of scope entries.
-     */
-    private getStatementsScopeEntries(
-        node: StatementsScopeType,
-        scope: Scope<TypirLangiumSpecifics>
-    ): ScopeEntry<TypirLangiumSpecifics>[] {
-        const entries: ScopeEntry<TypirLangiumSpecifics>[] = [];
-
-        for (let i = 0; i < (node.statements?.length ?? 0); i++) {
-            const statement = node.statements[i];
-            if (this.reflection.isInstance(statement, statementTypes.matchStatementType)) {
-                this.collectPatternEntries(statement.pattern, i, scope, entries);
-            }
-        }
-
-        return entries;
-    }
-
-    /**
-     * Gets local initializations from a statements block.
-     *
-     * @param node The statements scope node.
-     * @returns Array of local initialization records.
-     */
-    private getStatementsScopeInitializations(node: StatementsScopeType): ScopeLocalInitialization[] {
-        const initializations: ScopeLocalInitialization[] = [];
-
-        for (let i = 0; i < (node.statements?.length ?? 0); i++) {
-            const statement = node.statements[i];
-            if (this.reflection.isInstance(statement, statementTypes.matchStatementType)) {
-                this.collectPatternInitializations(statement.pattern, i, initializations);
-            }
-        }
-
-        return initializations;
     }
 
     /**
@@ -361,27 +322,6 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
      */
     private createWhileMatchScope(
         node: WhileMatchStatementType,
-        parentScope: BoundScope<TypirLangiumSpecifics> | undefined
-    ): Scope<TypirLangiumSpecifics> {
-        return new DefaultScope<TypirLangiumSpecifics>(
-            parentScope,
-            (scope) => this.collectPatternEntriesFromPattern(node.pattern, scope),
-            () => [],
-            this.collectPatternInitializationsFromPattern(node.pattern),
-            node
-        );
-    }
-
-    /**
-     * Creates a scope for an until-match statement.
-     * Pattern variables are visible in the do block.
-     *
-     * @param node The until-match statement node.
-     * @param parentScope The parent scope.
-     * @returns A new scope for the until-match statement.
-     */
-    private createUntilMatchScope(
-        node: UntilMatchStatementType,
         parentScope: BoundScope<TypirLangiumSpecifics> | undefined
     ): Scope<TypirLangiumSpecifics> {
         return new DefaultScope<TypirLangiumSpecifics>(
@@ -430,7 +370,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             node,
             this.typir,
             expressionTypes,
-            statementTypes as any
+            undefined
         );
 
         return new ModelTransformationLambdaScope(

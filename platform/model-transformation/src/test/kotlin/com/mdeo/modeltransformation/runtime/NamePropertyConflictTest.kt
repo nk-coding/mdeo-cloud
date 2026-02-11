@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
@@ -40,6 +41,17 @@ class NamePropertyConflictTest {
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
+        
+        // Set up the types array that would normally come from a TypedAst
+        // Type 0: builtin.string (used in expressions)
+        // Type 1: builtin.int (used in expressions)
+        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
+        
+        // Use reflection to set the types field since it has a private setter
+        val typesField = TransformationEngine::class.java.getDeclaredField("types")
+        typesField.isAccessible = true
+        typesField.set(engine, listOf(stringType, intType))
     }
     
     @Test

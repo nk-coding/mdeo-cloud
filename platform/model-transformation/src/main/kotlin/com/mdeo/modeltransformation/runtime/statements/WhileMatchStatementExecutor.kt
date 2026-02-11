@@ -47,13 +47,17 @@ class WhileMatchStatementExecutor(
     /**
      * Executes a while-match statement.
      *
+     * Scope handling per spec:
+     * - Enter a new scope (level+1) for WhileMatchStatement
+     * - The match runs in that scope
+     * - The doBlock enters another scope (level+2 from base)
+     *
      * Repeatedly matches the pattern and executes the doBlock while the pattern
      * matches. Accumulates results from all iterations. When the pattern no longer
      * matches, the loop terminates normally (not a failure).
      *
-     * IMPORTANT: Pattern matching uses the base context (without previous iteration's
-     * instance bindings) so that each iteration finds a fresh match. Variables from
-     * the doBlock are preserved across iterations.
+     * Each iteration uses a fresh scope so that match bindings from one iteration
+     * don't affect the next.
      *
      * @param statement The while-match statement to execute.
      * @param context The current execution context.
@@ -67,28 +71,26 @@ class WhileMatchStatementExecutor(
     ): TransformationExecutionResult {
         val whileMatchStatement = statement as TypedWhileMatchStatement
         
-        var baseContext = context
-        var accumulatedResult = TransformationExecutionResult.Success(baseContext)
+        var accumulatedResult = TransformationExecutionResult.Success()
         
         while (true) {
+            val whileContext = context.enterScope()
+            
             val matchResult = matchExecutor.executeMatch(
                 pattern = whileMatchStatement.pattern,
-                context = baseContext,
+                context = whileContext,
                 engine = engine
             )
             
             when (matchResult) {
                 is MatchResult.NoMatch -> break
                 is MatchResult.Matched -> {
-                    val iterationResult = executeIteration(
-                        whileMatchStatement, matchResult, baseContext, engine
-                    )
+                    accumulatedResult = accumulatedResult.merge(matchResult)
+                    val matchedContext = matchResult.applyTo(whileContext)
+                    val iterationResult = engine.executeBlock(whileMatchStatement.doBlock, matchedContext)
                     
                     when (iterationResult) {
                         is TransformationExecutionResult.Success -> {
-                            baseContext = baseContext.bindVariables(
-                                iterationResult.context.getAllVariables()
-                            )
                             accumulatedResult = accumulatedResult.merge(iterationResult)
                         }
                         is TransformationExecutionResult.Failure -> return iterationResult
@@ -101,41 +103,4 @@ class WhileMatchStatementExecutor(
         return accumulatedResult
     }
     
-    /**
-     * Executes a single iteration of the while-match loop.
-     *
-     * Executes the doBlock with the updated context. Modifications have already
-     * been applied by the unified executor.
-     *
-     * @param statement The while-match statement.
-     * @param matched The match result for this iteration.
-     * @param context The current execution context.
-     * @param engine The transformation engine.
-     * @return The result of this iteration.
-     */
-    private fun executeIteration(
-        statement: TypedWhileMatchStatement,
-        matched: MatchResult.Matched,
-        context: TransformationExecutionContext,
-        engine: TransformationEngine
-    ): TransformationExecutionResult {
-        val updatedContext = matched.applyTo(context)
-        val blockResult = engine.executeBlock(statement.doBlock, updatedContext)
-        
-        return when (blockResult) {
-            is TransformationExecutionResult.Success -> {
-                TransformationExecutionResult.Success(
-                    context = blockResult.context,
-                    matchedNodes = matched.matchedNodeIds + blockResult.matchedNodes,
-                    matchedEdges = matched.matchedEdgeIds + blockResult.matchedEdges,
-                    createdNodes = matched.createdNodeIds + blockResult.createdNodes,
-                    deletedNodes = matched.deletedNodeIds + blockResult.deletedNodes,
-                    createdEdges = matched.createdEdgeIds + blockResult.createdEdges,
-                    deletedEdges = matched.deletedEdgeIds + blockResult.deletedEdges
-                )
-            }
-            is TransformationExecutionResult.Failure -> blockResult
-            is TransformationExecutionResult.Stopped -> blockResult
-        }
-    }
 }

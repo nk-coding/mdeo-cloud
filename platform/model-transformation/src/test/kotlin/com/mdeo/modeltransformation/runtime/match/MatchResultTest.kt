@@ -1,6 +1,10 @@
 package com.mdeo.modeltransformation.runtime.match
 
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
+import com.mdeo.modeltransformation.runtime.testBindVariable
+import com.mdeo.modeltransformation.runtime.testBindInstance
+import com.mdeo.modeltransformation.runtime.testGetAllVariables
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -56,16 +60,6 @@ class MatchResultTest {
         }
 
         @Test
-        fun `Matched with matched edge IDs`() {
-            val result = MatchResult.Matched(
-                matchedEdgeIds = setOf("e1", "e2")
-            )
-            
-            assertEquals(2, result.matchedEdgeIds.size)
-            assertTrue(result.matchedEdgeIds.contains("e1"))
-        }
-
-        @Test
         fun `matchedOrNull returns Matched`() {
             val result: MatchResult = MatchResult.Matched()
             
@@ -84,7 +78,7 @@ class MatchResultTest {
             
             val result = matched.applyTo(context)
             
-            assertTrue(result.getAllVariables().isEmpty())
+            assertTrue(result.testGetAllVariables().isEmpty())
             assertTrue(result.getAllInstances().isEmpty())
         }
 
@@ -97,8 +91,8 @@ class MatchResultTest {
             
             val result = matched.applyTo(context)
             
-            assertEquals(1, result.lookupVariable("x"))
-            assertEquals(2, result.lookupVariable("y"))
+            assertEquals(1, (result.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(2, (result.variableScope.getVariable("y") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
@@ -110,14 +104,14 @@ class MatchResultTest {
             
             val result = matched.applyTo(context)
             
-            assertEquals("v-123", result.lookupInstance("house"))
+            assertEquals("v-123", (result.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
         fun `applyTo preserves existing context bindings`() {
             val context = TransformationExecutionContext.empty()
-                .bindVariable("existing", 100)
-                .bindInstance("existingNode", "v-000")
+                .testBindVariable("existing", 100)
+                .testBindInstance("existingNode", "v-000")
             
             val matched = MatchResult.Matched(
                 bindings = mapOf("new" to 200),
@@ -126,16 +120,16 @@ class MatchResultTest {
             
             val result = matched.applyTo(context)
             
-            assertEquals(100, result.lookupVariable("existing"))
-            assertEquals(200, result.lookupVariable("new"))
-            assertEquals("v-000", result.lookupInstance("existingNode"))
-            assertEquals("v-111", result.lookupInstance("newNode"))
+            assertEquals(100, (result.variableScope.getVariable("existing") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(200, (result.variableScope.getVariable("new") as? VariableBinding.ValueBinding)?.value)
+            assertEquals("v-000", (result.variableScope.getVariable("existingNode") as? VariableBinding.InstanceBinding)?.vertexId)
+            assertEquals("v-111", (result.variableScope.getVariable("newNode") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
         fun `applyTo can override existing bindings`() {
             val context = TransformationExecutionContext.empty()
-                .bindVariable("x", 100)
+                .testBindVariable("x", 100)
             
             val matched = MatchResult.Matched(
                 bindings = mapOf("x" to 200)
@@ -143,7 +137,7 @@ class MatchResultTest {
             
             val result = matched.applyTo(context)
             
-            assertEquals(200, result.lookupVariable("x"))
+            assertEquals(200, (result.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
     }
 
@@ -237,8 +231,8 @@ class MatchResultTest {
             
             val result = matched.applyTo(context)
             
-            assertTrue(result.hasVariable("nullable"))
-            assertNull(result.lookupVariable("nullable"))
+            assertTrue(result.testGetAllVariables().containsKey("nullable"))
+            assertNull((result.variableScope.getVariable("nullable") as? VariableBinding.ValueBinding)?.value)
         }
     }
 }

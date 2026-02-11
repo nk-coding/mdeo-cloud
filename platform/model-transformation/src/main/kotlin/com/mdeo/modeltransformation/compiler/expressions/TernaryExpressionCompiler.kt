@@ -2,8 +2,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedTernaryExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.P
@@ -13,7 +13,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedTernaryExpression] nodes.
  *
- * Compiles ternary expressions (condition ? then : else) into [TraversalCompilationResult]
+ * Compiles ternary expressions (condition ? then : else) into [GremlinCompilationResult]
  * containing GraphTraversals that use Gremlin's `choose()` step for conditional branching.
  *
  * ## Gremlin Implementation
@@ -50,9 +50,9 @@ class TernaryExpressionCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val ternaryExpr = expression as TypedTernaryExpression
         return compileTernary(ternaryExpr, context, initialTraversal)
     }
@@ -66,14 +66,10 @@ class TernaryExpressionCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileTernary(
         expr: TypedTernaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val conditionResult = registry.compile(expr.condition, context, initialTraversal)
-
-        if (conditionResult.isConstant) {
-            return compileConstantCondition(expr, context, conditionResult)
-        }
 
         val trueResult = registry.compile(expr.trueExpression, context, null)
         val falseResult = registry.compile(expr.falseExpression, context, null)
@@ -84,26 +80,7 @@ class TernaryExpressionCompiler(
             falseResult.traversal as GraphTraversal<Any, Any>
         )
 
-        return TraversalCompilationResult.of(traversal)
-    }
-
-    /**
-     * Optimizes constant conditions by returning only the appropriate branch.
-     *
-     * When the condition is known at compile time, we can skip the choose step
-     * entirely and just compile and return the appropriate branch.
-     */
-    private fun compileConstantCondition(
-        expr: TypedTernaryExpression,
-        context: TraversalCompilationContext,
-        conditionResult: TraversalCompilationResult<*, *>
-    ): TraversalCompilationResult<*, *> {
-        val conditionValue = conditionResult.constantValue as Boolean
-        return if (conditionValue) {
-            registry.compile(expr.trueExpression, context, null)
-        } else {
-            registry.compile(expr.falseExpression, context, null)
-        }
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**

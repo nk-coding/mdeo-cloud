@@ -7,6 +7,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -108,31 +109,7 @@ class TransformationEngineTest {
             assertIs<TransformationExecutionResult.Success>(result)
         }
 
-        @Test
-        fun `execute with multiple successful statements accumulates results`() {
-            registry.register(MatchedNodesExecutor())
-            
-            val ast = TypedAst(
-                types = emptyList(),
-                metamodelUri = "test://model",
-                statements = listOf(
-                    TypedStopStatement(keyword = "stop"),
-                    TypedStopStatement(keyword = "stop")
-                )
-            )
-            
-            engine = TransformationEngine(
-                traversalSource = graph.traversal(),
-                ast = ast,
-                expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
-                statementExecutorRegistry = registry
-            )
-            
-            val result = engine.execute()
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(2, result.matchedNodes.size)
-        }
+
 
         @Test
         fun `execute stops on first failure`() {
@@ -246,21 +223,6 @@ class TransformationEngineTest {
         }
 
         @Test
-        fun `executeBlock propagates context changes`() {
-            registry.register(ContextModifyingExecutor())
-            
-            val statements = listOf(
-                TypedStopStatement(keyword = "stop"),
-                TypedStopStatement(keyword = "stop")
-            )
-            
-            val result = engine.executeBlock(statements, TransformationExecutionContext.empty())
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(2, result.context.lookupVariable("counter"))
-        }
-
-        @Test
         fun `executeBlock stops on failure`() {
             val countingExecutor = CountingExecutor()
             countingExecutor.failOnCall = 2
@@ -278,20 +240,7 @@ class TransformationEngineTest {
             assertEquals(2, countingExecutor.callCount)
         }
 
-        @Test
-        fun `executeBlock accumulates matched nodes`() {
-            registry.register(MatchedNodesExecutor())
-            
-            val statements = listOf(
-                TypedStopStatement(keyword = "stop"),
-                TypedStopStatement(keyword = "stop")
-            )
-            
-            val result = engine.executeBlock(statements, TransformationExecutionContext.empty())
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(2, result.matchedNodes.size)
-        }
+
     }
 
     @Nested
@@ -370,27 +319,11 @@ class TransformationEngineTest {
             engine: TransformationEngine
         ): TransformationExecutionResult {
             called = true
-            return TransformationExecutionResult.Success(context)
+            return TransformationExecutionResult.Success()
         }
     }
     
-    private class MatchedNodesExecutor : StatementExecutor {
-        private var nodeCounter = 0
-        
-        override fun canExecute(statement: TypedTransformationStatement) = true
-        
-        override fun execute(
-            statement: TypedTransformationStatement,
-            context: TransformationExecutionContext,
-            engine: TransformationEngine
-        ): TransformationExecutionResult {
-            nodeCounter++
-            return TransformationExecutionResult.Success(
-                context = context,
-                matchedNodes = setOf("node-$nodeCounter")
-            )
-        }
-    }
+
     
     private class CountingExecutor : StatementExecutor {
         var callCount = 0
@@ -407,7 +340,7 @@ class TransformationEngineTest {
             return if (callCount == failOnCall) {
                 TransformationExecutionResult.Failure("Failed on call $callCount")
             } else {
-                TransformationExecutionResult.Success(context)
+                TransformationExecutionResult.Success()
             }
         }
     }
@@ -420,9 +353,9 @@ class TransformationEngineTest {
             context: TransformationExecutionContext,
             engine: TransformationEngine
         ): TransformationExecutionResult {
-            val counter = (context.lookupVariable("counter") as? Int) ?: 0
-            val newContext = context.bindVariable("counter", counter + 1)
-            return TransformationExecutionResult.Success(newContext)
+            val counter = ((context.variableScope.getVariable("counter") as? VariableBinding.ValueBinding)?.value as? Int) ?: 0
+            context.testBindVariable("counter", counter + 1)
+            return TransformationExecutionResult.Success()
         }
     }
     
@@ -434,7 +367,7 @@ class TransformationEngineTest {
             context: TransformationExecutionContext,
             engine: TransformationEngine
         ): TransformationExecutionResult {
-            return TransformationExecutionResult.Stopped("stop", context)
+            return TransformationExecutionResult.Stopped("stop")
         }
     }
 }

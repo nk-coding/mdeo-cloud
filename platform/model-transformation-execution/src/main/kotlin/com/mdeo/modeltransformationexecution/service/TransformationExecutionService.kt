@@ -45,7 +45,6 @@ class TransformationExecutionService(
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(TransformationExecutionService::class.java)
     private val graphLoader = ModelDataGraphLoader()
-    private val graphConverter = GraphToModelDataConverter()
     private val json = Json { prettyPrint = true }
     
     companion object {
@@ -262,6 +261,12 @@ class TransformationExecutionService(
             
             val result = engine.execute()
             
+            val graphConverter = GraphToModelDataConverter(
+                metamodelClasses = engine.ast.classes,
+                types = engine.types,
+                typeRegistry = engine.typeRegistry
+            )
+            
             when (result) {
                 is TransformationExecutionResult.Success -> {
                     graphConverter.convert(g, modelData.metamodelUri, engine.instanceNameRegistry)
@@ -271,8 +276,12 @@ class TransformationExecutionService(
                     null
                 }
                 is TransformationExecutionResult.Stopped -> {
-                    handleTransformationStopped(executionId, jwtToken)
-                    null
+                    if (result.isNormalStop) {
+                        graphConverter.convert(g, modelData.metamodelUri, engine.instanceNameRegistry)
+                    } else {
+                        handleTransformationKilled(executionId, jwtToken)
+                        null
+                    }
                 }
             }
         } finally {
@@ -300,9 +309,19 @@ class TransformationExecutionService(
         }
     }
     
-    private fun handleTransformationStopped(executionId: UUID, jwtToken: String) {
+    private fun handleTransformationKilled(executionId: UUID, jwtToken: String) {
+        val errorMessage = "Transformation killed explicitly."
+        
+        transaction {
+            TransformationExecutionsTable.update({
+                TransformationExecutionsTable.id eq executionId.toKotlinUuid()
+            }) {
+                it[error] = errorMessage
+            }
+        }
+        
         kotlinx.coroutines.runBlocking {
-            updateState(executionId, ExecutionState.CANCELLED, "Transformation stopped", jwtToken)
+            updateState(executionId, ExecutionState.FAILED, errorMessage, jwtToken)
         }
     }
     

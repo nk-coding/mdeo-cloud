@@ -234,7 +234,6 @@ class MetamodelPropertyAssignmentTest {
                 TypedPatternLinkElement(
                     link = TypedPatternLink(
                         modifier = "create",
-                        isOutgoing = true,
                         source = TypedPatternLinkEnd(objectName = "house", propertyName = "rooms"),
                         target = TypedPatternLinkEnd(objectName = "newRoom", propertyName = "house")
                     )
@@ -335,7 +334,6 @@ class MetamodelPropertyAssignmentTest {
                             TypedPatternLinkElement(
                                 link = TypedPatternLink(
                                     modifier = "create",
-                                    isOutgoing = true,
                                     source = TypedPatternLinkEnd(objectName = "house", propertyName = "rooms"),
                                     target = TypedPatternLinkEnd(objectName = "newRoom", propertyName = "house")
                                 )

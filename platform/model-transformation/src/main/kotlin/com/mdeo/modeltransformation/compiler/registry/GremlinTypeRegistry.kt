@@ -159,6 +159,29 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
     fun hasType(typeName: String): Boolean {
         return types.containsKey(typeName)
     }
+    
+    /**
+     * Checks if a type is a subtype of another type (including direct match).
+     * 
+     * The check includes both direct equality and inheritance through the extends chain.
+     * 
+     * @param typeName The type to check
+     * @param parentTypeName The potential parent type
+     * @return True if typeName is the same as or inherits from parentTypeName
+     */
+    fun isSubtypeOf(typeName: String, parentTypeName: String): Boolean {
+        if (typeName == parentTypeName) return true
+        
+        val type = getType(typeName) ?: return false
+        
+        for (extendedType in type.extends) {
+            if (isSubtypeOf(extendedType, parentTypeName)) {
+                return true
+            }
+        }
+        
+        return false
+    }
 
     private fun lookupPropertyInHierarchy(
         typeName: String,

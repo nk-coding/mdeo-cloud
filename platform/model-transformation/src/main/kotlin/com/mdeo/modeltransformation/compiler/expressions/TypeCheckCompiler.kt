@@ -4,8 +4,8 @@ import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedTypeCheckExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ValueType
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -15,7 +15,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  * Traversal-based compiler for [TypedTypeCheckExpression] nodes.
  *
  * Compiles type check expressions (expr is Type, expr !is Type) into
- * [TraversalCompilationResult] containing GraphTraversals that check the type
+ * [GremlinCompilationResult] containing GraphTraversals that check the type
  * of graph elements using pure Gremlin.
  *
  * ## Gremlin Implementation
@@ -57,9 +57,9 @@ class TypeCheckCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val checkExpr = expression as TypedTypeCheckExpression
         return compileTypeCheck(checkExpr, context, initialTraversal)
     }
@@ -72,9 +72,9 @@ class TypeCheckCompiler(
      */
     private fun compileTypeCheck(
         expr: TypedTypeCheckExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val checkType = context.resolveType(expr.checkType)
         val innerResult = registry.compile(expr.expression, context, initialTraversal)
 
@@ -91,10 +91,10 @@ class TypeCheckCompiler(
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileVertexTypeCheck(
-        innerResult: TraversalCompilationResult<*, *>,
+        innerResult: GremlinCompilationResult,
         checkType: ClassTypeRef,
         isNegated: Boolean
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val typeName = extractTypeName(checkType.type)
         val (trueValue, falseValue) = if (isNegated) Pair(false, true) else Pair(true, false)
 
@@ -104,7 +104,7 @@ class TypeCheckCompiler(
             AnonymousTraversal.constant(falseValue)
         )
 
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**
@@ -115,13 +115,13 @@ class TypeCheckCompiler(
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileGenericTypeCheck(
-        innerResult: TraversalCompilationResult<*, *>,
+        innerResult: GremlinCompilationResult,
         checkType: ValueType,
         isNegated: Boolean
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val result = if (isNegated) false else true
         val baseTraversal = innerResult.traversal as GraphTraversal<Any, Any>?
-        return TraversalCompilationResult.constant<Any, Boolean>(result, baseTraversal)
+        return GremlinCompilationResult.constant<Any, Boolean>(result, baseTraversal)
     }
 
     /**

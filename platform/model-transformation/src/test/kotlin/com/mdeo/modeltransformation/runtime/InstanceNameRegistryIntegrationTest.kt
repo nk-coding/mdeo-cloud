@@ -1,10 +1,12 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,6 +41,17 @@ class InstanceNameRegistryIntegrationTest {
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
+        
+        // Set up the types array that would normally come from a TypedAst
+        // Type 0: builtin.string (used in expressions)
+        // Type 1: builtin.int (used in expressions)
+        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
+        
+        // Use reflection to set the types field since it has a private setter
+        val typesField = TransformationEngine::class.java.getDeclaredField("types")
+        typesField.isAccessible = true
+        typesField.set(engine, listOf(stringType, intType))
     }
     
     @Test
@@ -139,8 +152,8 @@ class InstanceNameRegistryIntegrationTest {
         result as TransformationExecutionResult.Success
         
         // Verify both nodes are in the name registry
-        val p1Id = result.context.lookupInstance("p1")
-        val p2Id = result.context.lookupInstance("p2")
+        val p1Id = (context.variableScope.getVariable("p1") as? VariableBinding.InstanceBinding)?.vertexId
+        val p2Id = (context.variableScope.getVariable("p2") as? VariableBinding.InstanceBinding)?.vertexId
         
         assertNotNull(p1Id)
         assertNotNull(p2Id)
@@ -212,7 +225,7 @@ class InstanceNameRegistryIntegrationTest {
         // Verify both nodes are in the registry
         assertEquals("existingPerson", engine.instanceNameRegistry.getName(inputVertex.id()))
         
-        val newPersonId = result.context.lookupInstance("newPerson")
+        val newPersonId = (context.variableScope.getVariable("newPerson") as? VariableBinding.InstanceBinding)?.vertexId
         assertNotNull(newPersonId)
         assertEquals("newPerson", engine.instanceNameRegistry.getName(newPersonId))
         

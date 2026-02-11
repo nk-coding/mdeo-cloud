@@ -30,7 +30,6 @@ data class TypedProperty(
  * @param property The property name that defines this relation on the class.
  * @param oppositeProperty The property name at the opposite end of the relation, or null if unnamed.
  * @param oppositeClassName The fully qualified name of the class at the opposite end of the relation.
- * @param isOutgoing True if this is an outgoing relation, false if incoming.
  * @param typeIndex Index into the types array of the TypedAst to resolve the relation's type.
  */
 @Serializable

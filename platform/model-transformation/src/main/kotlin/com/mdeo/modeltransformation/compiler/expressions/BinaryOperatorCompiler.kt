@@ -3,8 +3,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.P
@@ -14,7 +14,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedBinaryExpression] nodes.
  *
- * Compiles binary expressions into [TraversalCompilationResult] containing GraphTraversals
+ * Compiles binary expressions into [GremlinCompilationResult] containing GraphTraversals
  * that implement arithmetic, comparison, equality, and logical operators using pure Gremlin.
  *
  * ## Supported Operators
@@ -190,9 +190,9 @@ class BinaryOperatorCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val binaryExpr = expression as TypedBinaryExpression
         val operator = binaryExpr.operator
 
@@ -221,16 +221,19 @@ class BinaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileArithmetic(
         expr: TypedBinaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
-        val leftResult = registry.compile(expr.left, context, initialTraversal)
-        val rightResult = registry.compile(expr.right, context, null)
-
+    ): GremlinCompilationResult {
         // Special case: Handle string concatenation with + operator
-        if (expr.operator == OPERATOR_ADD && isStringConcatenation(expr, context, leftResult, rightResult)) {
+        // Must check BEFORE compiling operands to avoid treating strings as numbers
+        if (expr.operator == OPERATOR_ADD && isStringConcatenation(expr, context)) {
+            val leftResult = registry.compile(expr.left, context, initialTraversal)
+            val rightResult = registry.compile(expr.right, context, null)
             return compileRuntimeStringConcatenation(leftResult, rightResult)
         }
+
+        val leftResult = registry.compile(expr.left, context, initialTraversal)
+        val rightResult = registry.compile(expr.right, context, null)
 
         val mathSymbol = MATH_OPERATOR_SYMBOLS[expr.operator]
             ?: throw CompilationException.unsupportedOperator(expr.operator, expr)
@@ -241,53 +244,50 @@ class BinaryOperatorCompiler(
             .`as`("_right")
             .math("_left $mathSymbol _right")
 
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
+    }
+
+    /**
+     * Checks if an expression has a string type using static type information.
+     * 
+     * @param expression The expression to check
+     * @param context The compilation context containing type information
+     * @return true if the expression's static type is a string type
+     * @throws CompilationException if the type cannot be resolved (indicates a type checker bug)
+     */
+    private fun isStringType(expression: TypedExpression, context: CompilationContext): Boolean {
+        val type = context.resolveTypeOrNull(expression.evalType)
+            ?: throw CompilationException(
+                "Cannot resolve type for expression at index ${expression.evalType}. " +
+                "This indicates a bug in the type checker - all expressions must have valid evalType indices.",
+                expression
+            )
+        return type is com.mdeo.expression.ast.types.ClassTypeRef && 
+            (type.type == "builtin.string" || type.type == "string")
     }
 
     /**
      * Checks if this binary expression represents string concatenation.
-     * Returns true if the + operator is being used and either:
-     * 1. The result type is a string (if type info is available)
-     * 2. Either operand is a constant string (fallback when type info is unavailable)
-     * 3. The left or right operand has a string result type
+     * 
+     * Uses static type information only - relies on the type checker having correctly
+     * determined the types of all operands. Returns true if the + operator is being
+     * used and either operand has a string type.
+     * 
+     * @param expr The binary expression to check
+     * @param context The compilation context containing type information
+     * @return true if this is a string concatenation operation
      */
     private fun isStringConcatenation(
         expr: TypedBinaryExpression,
-        context: TraversalCompilationContext,
-        leftResult: TraversalCompilationResult<*, *>,
-        rightResult: TraversalCompilationResult<*, *>
+        context: CompilationContext
     ): Boolean {
         if (expr.operator != OPERATOR_ADD) {
             return false
         }
         
-        // Check if either operand is a constant string
-        if (leftResult.constantValue is String || rightResult.constantValue is String) {
-            return true
-        }
-        
-        // Check if the result type is a string
-        val resultType = context.resolveTypeOrNull(expr.evalType)
-        if (resultType is com.mdeo.expression.ast.types.ClassTypeRef && 
-            (resultType.type == "builtin.string" || resultType.type == "string")) {
-            return true
-        }
-        
-        // Check if left operand type is a string
-        val leftType = context.resolveTypeOrNull(expr.left.evalType)
-        if (leftType is com.mdeo.expression.ast.types.ClassTypeRef &&
-            (leftType.type == "builtin.string" || leftType.type == "string")) {
-            return true
-        }
-        
-        // Check if right operand type is a string
-        val rightType = context.resolveTypeOrNull(expr.right.evalType)
-        if (rightType is com.mdeo.expression.ast.types.ClassTypeRef &&
-            (rightType.type == "builtin.string" || rightType.type == "string")) {
-            return true
-        }
-        
-        return false
+        // Check operand types using static type information
+        // If either operand is a string, this is string concatenation
+        return isStringType(expr.left, context) || isStringType(expr.right, context)
     }
 
     /**
@@ -306,9 +306,9 @@ class BinaryOperatorCompiler(
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileRuntimeStringConcatenation(
-        leftResult: TraversalCompilationResult<*, *>,
-        rightResult: TraversalCompilationResult<*, *>
-    ): TraversalCompilationResult<*, *> {
+        leftResult: GremlinCompilationResult,
+        rightResult: GremlinCompilationResult
+    ): GremlinCompilationResult {
         // Use the general pattern: store both values and concatenate
         val traversal = (leftResult.traversal as GraphTraversal<Any, Any>)
             .`as`("_left")
@@ -327,7 +327,7 @@ class BinaryOperatorCompiler(
                 leftVal + rightVal
             }
         
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**
@@ -339,9 +339,9 @@ class BinaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileComparison(
         expr: TypedBinaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
@@ -352,7 +352,7 @@ class BinaryOperatorCompiler(
             rightResult.traversal as GraphTraversal<Any, Any>
         )
 
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**
@@ -364,9 +364,9 @@ class BinaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileEquality(
         expr: TypedBinaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
@@ -377,7 +377,7 @@ class BinaryOperatorCompiler(
             rightResult.traversal as GraphTraversal<Any, Any>
         )
 
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**
@@ -386,9 +386,9 @@ class BinaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileLogical(
         expr: TypedBinaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
@@ -398,7 +398,7 @@ class BinaryOperatorCompiler(
             rightResult.traversal as GraphTraversal<Any, Any>
         )
 
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**

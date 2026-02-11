@@ -51,6 +51,7 @@ object ProjectOwnersTable : Table("project_owners") {
 object FilesTable : Table("files") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val path = varchar("path", 1024)
+    val parentPath = varchar("parent_path", 1024).nullable()
     val fileType = integer("file_type")
     val content = text("content").nullable()
     val version = integer("version").default(1)
@@ -58,23 +59,20 @@ object FilesTable : Table("files") {
     val updatedAt = timestamp("updated_at")
 
     override val primaryKey = PrimaryKey(projectId, path)
-}
-
-/**
- * File children table schema for storing directory child relationships.
- */
-object FileChildrenTable : Table("file_children") {
-    val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
-    val parentPath = varchar("parent_path", 1024)
-    val childName = varchar("child_name", 255)
-    val childType = integer("child_type")
-
-    override val primaryKey = PrimaryKey(projectId, parentPath, childName)
 
     init {
+        foreignKey(
+            projectId,
+            parentPath,
+            target = primaryKey,
+            onDelete = ReferenceOption.CASCADE,
+            onUpdate = ReferenceOption.CASCADE
+        )
         index(false, projectId, parentPath)
     }
 }
+
+
 
 /**
  * File metadata table schema for storing additional metadata associated with files.
@@ -91,7 +89,8 @@ object FileMetadataTable : Table("file_metadata") {
             projectId,
             path,
             target = FilesTable.primaryKey,
-            onDelete = ReferenceOption.CASCADE
+            onDelete = ReferenceOption.CASCADE,
+            onUpdate = ReferenceOption.CASCADE
         )
     }
 
@@ -181,7 +180,8 @@ object FileDataTable : Table("file_data") {
             projectId,
             path,
             target = FilesTable.primaryKey,
-            onDelete = ReferenceOption.CASCADE
+            onDelete = ReferenceOption.CASCADE,
+            onUpdate = ReferenceOption.CASCADE
         )
     }
 
@@ -205,7 +205,8 @@ object FileDependenciesTable : Table("file_dependencies") {
             path,
             dataKey,
             target = FileDataTable.primaryKey,
-            onDelete = ReferenceOption.CASCADE
+            onDelete = ReferenceOption.CASCADE,
+            onUpdate = ReferenceOption.CASCADE
         )
 
         index(
@@ -237,7 +238,8 @@ object DataDependenciesTable : Table("data_dependencies") {
             path,
             dataKey,
             target = FileDataTable.primaryKey,
-            onDelete = ReferenceOption.CASCADE
+            onDelete = ReferenceOption.CASCADE,
+            onUpdate = ReferenceOption.CASCADE
         )
 
         index(

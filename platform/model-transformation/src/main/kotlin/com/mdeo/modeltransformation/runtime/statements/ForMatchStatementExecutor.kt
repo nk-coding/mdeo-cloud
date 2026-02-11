@@ -46,6 +46,11 @@ class ForMatchStatementExecutor(
     /**
      * Executes a for-match statement.
      *
+     * Scope handling per spec:
+     * - Enter a new scope (level+1) for ForMatchStatement
+     * - The match runs in that scope
+     * - The doBlock enters another scope (level+2 from base)
+     *
      * Finds all matches of the pattern upfront using executeMatchAll (unlimited),
      * then executes the doBlock for each match. Results are accumulated from all
      * iterations.
@@ -65,17 +70,19 @@ class ForMatchStatementExecutor(
     ): TransformationExecutionResult {
         val forMatchStatement = statement as TypedForMatchStatement
         
+        val forContext = context.enterScope()
+        
         val allMatches = matchExecutor.executeMatchAll(
             pattern = forMatchStatement.pattern,
-            context = context,
+            context = forContext,
             engine = engine
         )
         
         if (allMatches.isEmpty()) {
-            return TransformationExecutionResult.Success(context)
+            return TransformationExecutionResult.Success()
         }
         
-        return executeIterations(forMatchStatement, allMatches, context, engine)
+        return executeIterations(forMatchStatement, allMatches, forContext, context, engine)
     }
     
     /**
@@ -84,13 +91,16 @@ class ForMatchStatementExecutor(
     private fun executeIterations(
         statement: TypedForMatchStatement,
         matches: List<MatchResult.Matched>,
-        context: TransformationExecutionContext,
+        forContext: TransformationExecutionContext,
+        baseContext: TransformationExecutionContext,
         engine: TransformationEngine
     ): TransformationExecutionResult {
-        var accumulatedResult = TransformationExecutionResult.Success(context)
+        var accumulatedResult = TransformationExecutionResult.Success()
         
         for (matched in matches) {
-            val iterationResult = executeIteration(statement, matched, context, engine)
+            accumulatedResult = accumulatedResult.merge(matched)
+            val matchedContext = matched.applyToCopy(forContext)
+            val iterationResult = engine.executeBlock(statement.doBlock, matchedContext)
             
             when (iterationResult) {
                 is TransformationExecutionResult.Success -> {
@@ -104,41 +114,5 @@ class ForMatchStatementExecutor(
         return accumulatedResult
     }
     
-    /**
-     * Executes a single iteration of the for-match loop.
-     *
-     * The match result already contains modifications applied by the unified executor.
-     * This method just executes the doBlock with the updated context.
-     *
-     * @param statement The for-match statement.
-     * @param matched The match result for this iteration (with modifications applied).
-     * @param context The current execution context.
-     * @param engine The transformation engine.
-     * @return The result of this iteration.
-     */
-    private fun executeIteration(
-        statement: TypedForMatchStatement,
-        matched: MatchResult.Matched,
-        context: TransformationExecutionContext,
-        engine: TransformationEngine
-    ): TransformationExecutionResult {
-        val updatedContext = matched.applyTo(context)
-        val blockResult = engine.executeBlock(statement.doBlock, updatedContext)
-        
-        return when (blockResult) {
-            is TransformationExecutionResult.Success -> {
-                TransformationExecutionResult.Success(
-                    context = blockResult.context,
-                    matchedNodes = matched.matchedNodeIds + blockResult.matchedNodes,
-                    matchedEdges = matched.matchedEdgeIds + blockResult.matchedEdges,
-                    createdNodes = matched.createdNodeIds + blockResult.createdNodes,
-                    deletedNodes = matched.deletedNodeIds + blockResult.deletedNodes,
-                    createdEdges = matched.createdEdgeIds + blockResult.createdEdges,
-                    deletedEdges = matched.deletedEdgeIds + blockResult.deletedEdges
-                )
-            }
-            is TransformationExecutionResult.Failure -> blockResult
-            is TransformationExecutionResult.Stopped -> blockResult
-        }
-    }
 }
+

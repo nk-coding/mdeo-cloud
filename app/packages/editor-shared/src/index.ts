@@ -63,6 +63,7 @@ export * from "./features/viewport/zoom.js";
 export * from "./features/defaultModules.js";
 export * from "./model/compartment.js";
 export * from "./model/edge.js";
+export * from "./model/graph.js";
 export * from "./model/horizontalDivider.js";
 export * from "./model/label.js";
 export * from "./model/node.js";

@@ -5,7 +5,6 @@ import com.mdeo.expression.ast.types.TypedClass
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
-import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
@@ -67,14 +66,13 @@ class TransformationEngine(
      */
     fun execute(): TransformationExecutionResult {
         var context = TransformationExecutionContext.empty()
-        var accumulatedResult = TransformationExecutionResult.Success(context)
+        var accumulatedResult = TransformationExecutionResult.Success()
 
         for (statement in ast.statements) {
             val result = executeStatement(statement, context)
 
             when (result) {
                 is TransformationExecutionResult.Success -> {
-                    context = result.context
                     accumulatedResult = accumulatedResult.merge(result)
                 }
                 is TransformationExecutionResult.Failure -> return result
@@ -118,15 +116,14 @@ class TransformationEngine(
         statements: List<TypedTransformationStatement>,
         context: TransformationExecutionContext
     ): TransformationExecutionResult {
-        var currentContext = context
-        var accumulatedResult = TransformationExecutionResult.Success(currentContext)
+        val currentContext = context.enterScope()
+        var accumulatedResult = TransformationExecutionResult.Success()
 
         for (statement in statements) {
             val result = executeStatement(statement, currentContext)
 
             when (result) {
                 is TransformationExecutionResult.Success -> {
-                    currentContext = result.context
                     accumulatedResult = accumulatedResult.merge(result)
                 }
                 is TransformationExecutionResult.Failure -> return result
@@ -164,7 +161,7 @@ class TransformationEngine(
      * @param classes The metamodel class definitions from the TypedAst.
      */
     private fun createTypeRegistry(classes: List<TypedClass>): GremlinTypeRegistry {
-        val dynamicRegistry = GremlinTypeRegistry(parent = CompilationContext.GLOBAL_TYPE_REGISTRY)
+        val dynamicRegistry = GremlinTypeRegistry(parent = GremlinTypeRegistry.GLOBAL)
 
         for (typedClass in classes) {
             val fqn = typedClass.`package` + "." + typedClass.name
@@ -180,11 +177,11 @@ class TransformationEngine(
             }
 
             for (relation in typedClass.relations) {
-                val edgeLabel = EdgeLabelUtils.computeEdgeLabel(
-                    relation.property,
-                    relation.oppositeProperty,
-                    relation.isOutgoing
-                )
+                val edgeLabel = if (relation.isOutgoing) {
+                    EdgeLabelUtils.computeEdgeLabel(relation.property, relation.oppositeProperty)
+                } else {
+                    EdgeLabelUtils.computeEdgeLabel(relation.oppositeProperty, relation.property)
+                }
                 builder.association(
                     propertyName = relation.property,
                     edgeLabel = edgeLabel,

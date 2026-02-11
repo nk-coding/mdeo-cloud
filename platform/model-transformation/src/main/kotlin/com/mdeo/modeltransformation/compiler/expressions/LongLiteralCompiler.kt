@@ -2,15 +2,15 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedLongLiteralExpression] nodes.
  *
- * Compiles long literal expressions into a [TraversalCompilationResult] containing
+ * Compiles long literal expressions into a [GremlinCompilationResult] containing
  * a GraphTraversal that produces the constant long value using `__.constant()`.
  *
  * ## Example
@@ -41,15 +41,15 @@ class LongLiteralCompiler : ExpressionCompiler {
      * @param expression The long literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [TraversalCompilationResult] producing the long value
+     * @return A [GremlinCompilationResult] producing the long value
      */
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val longExpression = expression as TypedLongLiteralExpression
         val longValue = longExpression.value.toLong()
-        return TraversalCompilationResult.constant(longValue, initialTraversal)
+        return GremlinCompilationResult.constant(longValue, initialTraversal)
     }
 }

@@ -2,7 +2,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedFloatLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
@@ -17,13 +17,13 @@ class FloatLiteralCompilerTest {
 
     private lateinit var compiler: FloatLiteralCompiler
     private lateinit var graph: TinkerGraph
-    private lateinit var context: TraversalCompilationContext
+    private lateinit var context: CompilationContext
 
     @BeforeEach
     fun setUp() {
         compiler = FloatLiteralCompiler()
         graph = TinkerGraph.open()
-        context = TraversalCompilationContext(
+        context = CompilationContext(
             types = emptyList(),
             traversalSource = graph.traversal(),
             typeRegistry = GremlinTypeRegistry.GLOBAL
@@ -60,8 +60,8 @@ class FloatLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(3.14f, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(3.14f, actualValue)
         }
 
         @Test
@@ -70,8 +70,8 @@ class FloatLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(-2.5f, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(-2.5f, actualValue)
         }
 
         @Test
@@ -80,8 +80,8 @@ class FloatLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(0.0f, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(0.0f, actualValue)
         }
 
         @Test
@@ -102,7 +102,6 @@ class FloatLiteralCompilerTest {
             val result = compiler.compile(expression, context, initialTraversal)
             val value = result.traversal.next()
 
-            assertTrue(result.isConstant)
             assertEquals(1.5f, value)
         }
 
@@ -115,8 +114,8 @@ class FloatLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(Float.MAX_VALUE, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(Float.MAX_VALUE, actualValue)
         }
     }
 }

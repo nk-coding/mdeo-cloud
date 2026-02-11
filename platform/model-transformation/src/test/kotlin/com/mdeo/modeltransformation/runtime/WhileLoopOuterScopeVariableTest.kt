@@ -194,7 +194,6 @@ class WhileLoopOuterScopeVariableTest {
         // Execute the first match to bind the house variable
         val matchResult = engine.executeStatement(matchStatement, context)
         assertIs<TransformationExecutionResult.Success>(matchResult)
-        context = matchResult.context
 
         // Create the while loop condition: house.rooms.size() < 5
         // This mirrors the JSON structure from Prompt.md
@@ -233,7 +232,6 @@ class WhileLoopOuterScopeVariableTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = "create",
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(
                                     objectName = "house",
                                     propertyName = "rooms"

@@ -10,6 +10,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceEleme
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
@@ -17,6 +18,7 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.isFailure
 import com.mdeo.modeltransformation.runtime.isSuccess
 import com.mdeo.modeltransformation.runtime.isStopped
+import com.mdeo.modeltransformation.runtime.testBindInstance
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -184,7 +186,6 @@ class StatementExecutorIntegrationTest {
                                 TypedPatternLinkElement(
                                     link = TypedPatternLink(
                                         modifier = null,
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(objectName = "house", propertyName = "rooms"),
                                         target = TypedPatternLinkEnd(objectName = "room")
                                     )
@@ -206,7 +207,6 @@ class StatementExecutorIntegrationTest {
             
             assertTrue(result.isSuccess())
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(2, result.matchedNodes.size)
         }
 
         @Test
@@ -219,7 +219,7 @@ class StatementExecutorIntegrationTest {
             house2.addEdge("`rooms`_``", room2)
             
             val context = TransformationExecutionContext.empty()
-                .bindInstance("house", house2.id())
+                .testBindInstance("house", house2.id())
             
             val matchStatement = TypedMatchStatement(
                 pattern = TypedPattern(
@@ -243,7 +243,6 @@ class StatementExecutorIntegrationTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = null,
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(objectName = "house", propertyName = "rooms"),
                                 target = TypedPatternLinkEnd(objectName = "room")
                             )
@@ -257,7 +256,7 @@ class StatementExecutorIntegrationTest {
             assertTrue(result.isSuccess())
             assertIs<TransformationExecutionResult.Success>(result)
             // Should match house2 -> room2 due to pre-bound house
-            assertEquals(room2.id(), result.context.lookupInstance("room"))
+            assertEquals(room2.id(), (context.variableScope.getVariable("room") as? VariableBinding.InstanceBinding)?.vertexId)
         }
     }
 

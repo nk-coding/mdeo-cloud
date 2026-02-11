@@ -6,6 +6,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
@@ -14,6 +15,7 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.isFailure
 import com.mdeo.modeltransformation.runtime.isSuccess
+import com.mdeo.modeltransformation.runtime.testHasInstance
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -171,11 +173,10 @@ class CrossMatchVariableTest {
             // Execute first match
             val firstResult = engine.executeStatement(firstMatch, context)
             assertIs<TransformationExecutionResult.Success>(firstResult)
-            context = firstResult.context
             
             // Verify first match created the room
-            assertTrue(context.hasInstance("house"), "house should be bound")
-            assertTrue(context.hasInstance("newRoom"), "newRoom should be bound")
+            assertTrue(context.testHasInstance("house"), "house should be bound")
+            assertTrue(context.testHasInstance("newRoom"), "newRoom should be bound")
             assertEquals(1L, graph.traversal().V().hasLabel("Room").count().next())
             
             // Second match statement: create link between house and newRoom
@@ -187,7 +188,6 @@ class CrossMatchVariableTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = "create",
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(
                                     objectName = "house",
                                     propertyName = "rooms"
@@ -211,8 +211,8 @@ class CrossMatchVariableTest {
                 "Second match should succeed - context should contain house and newRoom")
             
             // Verify the edge was created
-            val houseId = context.lookupInstance("house")
-            val roomId = context.lookupInstance("newRoom")
+            val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
+            val roomId = (context.variableScope.getVariable("newRoom") as? VariableBinding.InstanceBinding)?.vertexId
             
             // Check edge exists between house and room
             val edgeCount = graph.traversal().V(houseId)
@@ -320,13 +320,12 @@ class CrossMatchVariableTest {
             // Execute first match
             val firstResult = engine.executeStatement(firstMatch, context)
             assertIs<TransformationExecutionResult.Success>(firstResult)
-            context = firstResult.context
             
             // Verify first match results
-            assertTrue(context.hasInstance("house"))
-            assertTrue(context.hasInstance("newRoom"))
+            assertTrue(context.testHasInstance("house"))
+            assertTrue(context.testHasInstance("newRoom"))
             
-            val roomId = context.lookupInstance("newRoom")
+            val roomId = (context.variableScope.getVariable("newRoom") as? VariableBinding.InstanceBinding)?.vertexId
             val category = graph.traversal().V(roomId).values<String>("category").next()
             assertEquals("123 Main Sttest", category, "Category should be house.address + 'test'")
             
@@ -342,7 +341,6 @@ class CrossMatchVariableTest {
                         TypedPatternLinkElement(
                             link = TypedPatternLink(
                                 modifier = "create",
-                                isOutgoing = true,
                                 source = TypedPatternLinkEnd(
                                     objectName = "house",
                                     propertyName = "rooms"
@@ -400,8 +398,8 @@ class CrossMatchVariableTest {
                 "Second match should succeed - should resolve 'house' from context")
             
             // Verify edge was created
-            val houseId = context.lookupInstance("house")
-            val newRoomId = context.lookupInstance("newRoom")
+            val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
+            val newRoomId = (context.variableScope.getVariable("newRoom") as? VariableBinding.InstanceBinding)?.vertexId
             val edgeCount = graph.traversal().V(houseId)
                 .outE("`rooms`_`house`")
                 .filter { it.get().inVertex().id() == newRoomId }
@@ -409,7 +407,7 @@ class CrossMatchVariableTest {
             assertEquals(1L, edgeCount, "Edge should exist between house and newRoom")
             
             // Verify example house was created with correct address
-            val exampleId = secondResult.context.lookupInstance("example")
+            val exampleId = (context.variableScope.getVariable("example") as? VariableBinding.InstanceBinding)?.vertexId
             assertNotNull(exampleId, "example should be bound in context")
             
             val exampleAddress = graph.traversal().V(exampleId).values<String>("address").next()
@@ -444,10 +442,9 @@ class CrossMatchVariableTest {
             
             val firstResult = engine.executeStatement(firstMatch, context)
             assertIs<TransformationExecutionResult.Success>(firstResult)
-            context = firstResult.context
             
-            assertTrue(context.hasInstance("myHouse"), "myHouse should be in context")
-            assertEquals(houseVertex.id(), context.lookupInstance("myHouse"))
+            assertTrue(context.testHasInstance("myHouse"), "myHouse should be in context")
+            assertEquals(houseVertex.id(), (context.variableScope.getVariable("myHouse") as? VariableBinding.InstanceBinding)?.vertexId)
             
             // Second match - create only pattern that uses myHouse
             val secondMatch = TypedMatchStatement(
@@ -486,7 +483,7 @@ class CrossMatchVariableTest {
             assertIs<TransformationExecutionResult.Success>(secondResult,
                 "Second match should succeed - myHouse should be accessible")
             
-            val roomId = secondResult.context.lookupInstance("aRoom")
+            val roomId = (context.variableScope.getVariable("aRoom") as? VariableBinding.InstanceBinding)?.vertexId
             assertNotNull(roomId, "aRoom should be bound in context")
             
             // Debug: check what properties exist on the room vertex

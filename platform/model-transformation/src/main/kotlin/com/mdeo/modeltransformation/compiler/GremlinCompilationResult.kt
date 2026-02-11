@@ -7,60 +7,118 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  *
  * The compiler can produce different types of results depending on how the
  * expression will be used:
- * - [FilterResult]: Used when the expression should filter/match existing graph elements
- * - [ValueResult]: Used when the expression should produce a value (for creating nodes or comparisons)
- * - [TraversalResult]: Used when the expression produces a complete traversal step
+ * - [TraversalResult]: Used when the expression produces a complete traversal
+ * - [ValueResult]: Used when the expression produces a known constant primitive value
  *
  * This sealed interface enables type-safe handling of compilation results and
- * supports the dual-mode compilation required for graph transformations.
+ * supports optimizations for constant values.
+ *
+ * All result types provide a [traversal] property containing the compiled GraphTraversal.
  */
 sealed interface GremlinCompilationResult {
     
     /**
-     * Result type for expressions compiled in filter mode.
-     *
-     * Filter mode generates Gremlin steps that filter or match existing graph elements.
-     * This is used when expressions appear in pattern matching contexts, such as
-     * conditions that must be satisfied by existing nodes.
-     *
-     * @param T The type of graph element being filtered (Vertex, Edge, etc.)
-     * @param S The type of value being compared
-     * @param filter A function that takes a traversal and applies filter steps to it.
-     *               The function receives the current traversal and returns a modified
-     *               traversal with the filter conditions applied.
+     * The compiled GraphTraversal representing this expression.
      */
-    data class FilterResult<T, S>(
-        val filter: (GraphTraversal<T, S>) -> GraphTraversal<T, S>
-    ) : GremlinCompilationResult
-    
-    /**
-     * Result type for expressions compiled in value mode.
-     *
-     * Value mode produces a constant value that can be used directly in Gremlin
-     * operations. This is used when expressions appear in contexts where a value
-     * is needed, such as property assignments or literal comparisons.
-     *
-     * @param value The compiled value. Can be any type that Gremlin supports
-     *              (primitives, strings, lists, etc.)
-     */
-    data class ValueResult(
-        val value: Any?
-    ) : GremlinCompilationResult
+    val traversal: GraphTraversal<*, *>
     
     /**
      * Result type for expressions that compile to traversal steps.
      *
-     * Traversal mode generates Gremlin steps that transform or navigate the graph.
-     * This is used for more complex expressions that require graph operations
-     * beyond simple filtering or value production.
+     * This is used for expressions that require graph operations or produce
+     * dynamic values that cannot be determined at compile time.
      *
-     * @param T The input type of the traversal
-     * @param S The output type of the traversal
-     * @param step A function that takes a traversal and applies transformation steps to it.
-     *             The function receives the current traversal and returns a modified
-     *             traversal with the transformation applied.
+     * @param traversal The compiled GraphTraversal
      */
-    data class TraversalResult<T, S>(
-        val step: (GraphTraversal<T, *>) -> GraphTraversal<T, S>
+    data class TraversalResult(
+        override val traversal: GraphTraversal<*, *>
     ) : GremlinCompilationResult
+    
+    /**
+     * Result type for expressions that produce a known constant primitive value.
+     *
+     * ValueResult is used when the compiler knows the expression evaluates to a
+     * constant primitive value (string, number, boolean, null). This allows
+     * for optimizations like inlining constants in property assignments or
+     * Gremlin math expressions.
+     *
+     * IMPORTANT: Only primitive-like values may be stored in [value]:
+     * - null
+     * - String
+     * - Number (Int, Long, Float, Double, etc.)
+     * - Boolean
+     * - Char
+     *
+     * Collections (List, Set, Map, etc.) are NOT allowed and will cause an exception.
+     *
+     * @param traversal The compiled GraphTraversal that produces the constant
+     * @param value The known constant value (must be a primitive type or null)
+     * @throws IllegalArgumentException if value is a collection type
+     */
+    data class ValueResult(
+        override val traversal: GraphTraversal<*, *>,
+        val value: Any?
+    ) : GremlinCompilationResult {
+        init {
+            if (value != null) {
+                val isAllowedType = value is String ||
+                    value is Number ||
+                    value is Boolean ||
+                    value is Char
+                
+                if (!isAllowedType) {
+                    throw IllegalArgumentException(
+                        "ValueResult can only hold primitive values (String, Number, Boolean, Char, null). " +
+                        "Got ${value::class.simpleName}: $value. " +
+                        "Use TraversalResult for complex values or collections."
+                    )
+                }
+            }
+        }
+    }
+    
+    companion object {
+        /**
+         * Creates a result for a constant value.
+         *
+         * @param value The constant value
+         * @param initialTraversal Optional initial traversal to prepend
+         * @return A [GremlinCompilationResult.ValueResult] that produces the constant value
+         */
+        @Suppress("UNCHECKED_CAST")
+        fun <S, E> constant(value: E, initialTraversal: GraphTraversal<S, *>? = null): GremlinCompilationResult {
+            val traversal = (initialTraversal ?: 
+                org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__`.identity<Any>())
+                .constant(value) as GraphTraversal<Any, Any>
+            
+            return ValueResult(
+                traversal = traversal,
+                value = value
+            )
+        }
+
+        /**
+         * Creates a result from an existing traversal.
+         *
+         * @param traversal The traversal to wrap
+         * @return A [GremlinCompilationResult.TraversalResult] wrapping the traversal
+         */
+        fun <S, E> of(traversal: GraphTraversal<S, E>): GremlinCompilationResult {
+            return TraversalResult(traversal = traversal)
+        }
+
+        /**
+         * Creates an identity result that passes through the input unchanged.
+         *
+         * @param initialTraversal Optional initial traversal to use instead
+         * @return A [GremlinCompilationResult] that passes through input
+         */
+        @Suppress("UNCHECKED_CAST")
+        fun <S> identity(initialTraversal: GraphTraversal<S, *>? = null): GremlinCompilationResult {
+            val traversal = initialTraversal ?: 
+                org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__`.identity<Any>()
+            
+            return TraversalResult(traversal = traversal as GraphTraversal<Any, Any>)
+        }
+    }
 }

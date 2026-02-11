@@ -22,10 +22,14 @@ export function calculateRelativePath(fromPath: string, toPath: string): string 
     }
 
     const upLevels = fromParts.length - commonLength;
-    const relativeParts: string[] = ["."];
+    const relativeParts: string[] = [];
 
-    for (let i = 0; i < upLevels; i++) {
-        relativeParts.push("..");
+    if (upLevels > 0) {
+        for (let i = 0; i < upLevels; i++) {
+            relativeParts.push("..");
+        }
+    } else {
+        relativeParts.push(".");
     }
 
     relativeParts.push(...toParts.slice(commonLength));

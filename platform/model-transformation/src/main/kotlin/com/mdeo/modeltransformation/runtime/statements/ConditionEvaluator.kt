@@ -1,11 +1,12 @@
 package com.mdeo.modeltransformation.runtime.statements
 
-import com.mdeo.expression.ast.expressions.TypedExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.expression.ast.expressions.*
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
+import com.mdeo.modeltransformation.runtime.match.MatchAnalyzer
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
@@ -13,38 +14,33 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  *
  * This class provides common functionality for evaluating conditions in control flow
  * statements like `if` and `while`. It handles:
+ * - Analyzing expressions to extract referenced identifiers using MatchAnalyzer
+ * - Setting up a traversal context where instances are available via step labels
  * - Compiling expressions using the expression compiler registry
  * - Executing constant expressions directly
  * - Executing dynamic expressions that reference graph instances
  *
- * The implementation uses portable Gremlin patterns (no lambdas) and the g.V(id)
- * pattern for vertex access to ensure compatibility across different Gremlin providers.
- *
- * Usage:
- * ```kotlin
- * val evaluator = ConditionEvaluator(engine)
- * val result = evaluator.evaluate(condition, context)
- * ```
+ * The implementation uses portable Gremlin patterns (no lambdas) and follows the
+ * same binding approach as MatchExecutor for consistency.
  */
 class ConditionEvaluator(private val engine: TransformationEngine) {
-
-    companion object {
-        /**
-         * Maximum scope depth to register variable bindings at.
-         * This should match the value used in MatchExecutor.
-         */
-        private const val MAX_SCOPE_DEPTH = 5
-    }
 
     /**
      * Evaluates a boolean expression to determine if it's true or false.
      *
-     * Compiles the expression using the traversal compiler registry and executes
-     * it against the graph database. Handles both constant and dynamic expressions.
+     * Analyzes the expression to find referenced identifiers using MatchAnalyzer,
+     * sets up InstanceBindings for them (if they reference instances), then compiles
+     * and executes the expression in a traversal context where instances are available
+     * via step labels.
      *
      * For constant expressions, the value is returned directly without graph traversal.
-     * For dynamic expressions referencing graph instances, the IdentifierCompiler uses
-     * __.V(vertexId) to access them directly, avoiding the need for labeling.
+     * For dynamic expressions, a traversal is built that:
+     * 1. Starts with inject(1)
+     * 2. For each referenced instance, adds .V(vertexId).as(stepLabel)
+     * 3. Executes the condition expression using flatMap()
+     *
+     * This ensures that when IdentifierCompiler uses select(stepLabel), the instances
+     * are available in the traversal context.
      *
      * @param expression The boolean expression to evaluate.
      * @param context The execution context for variable resolution and instance lookup.
@@ -64,29 +60,28 @@ class ConditionEvaluator(private val engine: TransformationEngine) {
         }
 
         return try {
+            val analyzer = MatchAnalyzer(context.variableScope)
+            analyzer.analyzeExpression(expression)
+            val referencedIdentifiers = analyzer.getReferencedInstances()
+            
             val instances = context.getAllInstances()
+            val scope = context.variableScope
             
-            val bindings = instances.mapValues { (name, vertexId) ->
-                VariableBinding.InstanceBinding(vertexId, name)
+            for (name in referencedIdentifiers) {
+                if (instances.containsKey(name) && scope.getVariable(name) == null) {
+                    scope.setBinding(name, VariableBinding.InstanceBinding(vertexId = null))
+                }
             }
-            val variableScope = VariableScope(bindings)
-            
-            val variableScopes = (0..MAX_SCOPE_DEPTH).associateWith { variableScope }
 
-            val compilationContext = TraversalCompilationContext(
+            val compilationContext = CompilationContext(
                 types = engine.types,
                 traversalSource = engine.traversalSource,
                 typeRegistry = engine.typeRegistry,
-                variableScopes = variableScopes,
-                matchDefinedVariables = instances.keys
+                currentScope = context.variableScope,
             )
             val result = engine.expressionCompilerRegistry.compile(expression, compilationContext)
 
-            if (result.isConstant) {
-                return result.constantValue as? Boolean ?: false
-            }
-
-            executeConditionTraversal(result.traversal)
+            executeConditionTraversal(result.traversal, referencedIdentifiers, instances)
         } catch (e: Exception) {
             throw IllegalStateException(
                 "Failed to evaluate condition expression '${expression::class.simpleName}': ${e.message}",
@@ -98,25 +93,50 @@ class ConditionEvaluator(private val engine: TransformationEngine) {
     /**
      * Executes a condition traversal against the graph database.
      *
-     * Since we use InstanceBinding with __.V(vertexId), the IdentifierCompiler
-     * generates anonymous traversals that directly access vertices by ID.
-     * We simply need to inject a starting element and execute the traversal.
+     * Builds a traversal that sets up step labels for all referenced instances,
+     * then executes the condition expression using flatMap().
+     *
+     * The traversal structure is:
+     * ```
+     * g.inject(1)
+     *   .V(vertexId1).as("name1")
+     *   .V(vertexId2).as("name2")
+     *   ...
+     *   .flatMap(conditionTraversal)
+     * ```
+     *
+     * This makes instances available via select("name") in the condition traversal.
      *
      * @param traversal The compiled condition traversal.
+     * @param referencedIdentifiers Names of identifiers referenced in the expression.
+     * @param instances Map of instance names to vertex IDs from the execution context.
      * @return The boolean result of the condition.
      */
     @Suppress("UNCHECKED_CAST")
     private fun executeConditionTraversal(
-        traversal: GraphTraversal<*, *>
+        traversal: GraphTraversal<*, *>,
+        referencedIdentifiers: Set<String>,
+        instances: Map<String, Any>
     ): Boolean {
-        val result = engine.traversalSource
-            .inject(1 as Any)
-            .flatMap(traversal as GraphTraversal<*, Boolean>)
+        // Start with inject(1)
+        var setupTraversal: GraphTraversal<Any, Any> = engine.traversalSource.inject(1 as Any) as GraphTraversal<Any, Any>
         
-        if (result.hasNext()) {
-            return result.next()
+        // For each referenced instance that exists in the context, add it to the traversal with a step label
+        for (name in referencedIdentifiers) {
+            val vertexId = instances[name]
+            if (vertexId != null) {
+                val stepLabel = VariableBinding.stepLabel(name)
+                setupTraversal = setupTraversal.V(vertexId).`as`(stepLabel) as GraphTraversal<Any, Any>
+            }
+        }
+        
+        // Execute the condition traversal in the context where instances are labeled
+        val result = setupTraversal.flatMap(traversal as GraphTraversal<*, Boolean>)
+        
+        return if (result.hasNext()) {
+            result.next()
         } else {
-            return false
+            false
         }
     }
 }

@@ -1,7 +1,8 @@
 package com.mdeo.modeltransformation.compiler.registry
 
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
+import org.apache.tinkerpop.gremlin.structure.VertexProperty
 
 /**
  * Default implementation of [GremlinTypeDefinition].
@@ -11,12 +12,14 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  *
  * @param typeName The unique name of this type.
  * @param extends The names of types this type extends.
+ * @param cardinality The cardinality for graph property storage (null for single).
  * @param properties A map of property name to property definition.
  * @param methods A map of method name to list of method definitions (overloads).
  */
 class SimpleGremlinTypeDefinition(
     override val typeName: String,
     override val extends: List<String> = emptyList(),
+    override val cardinality: VertexProperty.Cardinality? = null,
     private val properties: Map<String, GremlinPropertyDefinition> = emptyMap(),
     private val methods: Map<String, List<GremlinMethodDefinition>> = emptyMap()
 ) : GremlinTypeDefinition {
@@ -61,6 +64,7 @@ class GremlinTypeDefinitionBuilder(
     private val typeName: String
 ) {
     private val extendsList = mutableListOf<String>()
+    private var cardinality: VertexProperty.Cardinality? = null
     private val properties = mutableMapOf<String, GremlinPropertyDefinition>()
     private val methods = mutableMapOf<String, MutableList<GremlinMethodDefinition>>()
 
@@ -74,6 +78,17 @@ class GremlinTypeDefinitionBuilder(
         extendsList.add(parentType)
         return this
     }
+    
+    /**
+     * Sets the cardinality for this type.
+     *
+     * @param cardinality The cardinality (single, list, or set).
+     * @return This builder, for method chaining.
+     */
+    fun cardinality(cardinality: VertexProperty.Cardinality): GremlinTypeDefinitionBuilder {
+        this.cardinality = cardinality
+        return this
+    }
 
     /**
      * Adds a property to this type using a traversal compiler.
@@ -84,7 +99,7 @@ class GremlinTypeDefinitionBuilder(
      */
     fun property(
         name: String,
-        compiler: (GraphTraversal<*, *>) -> TraversalCompilationResult<*, *>
+        compiler: (GraphTraversal<*, *>) -> GremlinCompilationResult
     ): GremlinTypeDefinitionBuilder {
         properties[name] = SimpleGremlinPropertyDefinition(name, compiler)
         return this
@@ -116,7 +131,7 @@ class GremlinTypeDefinitionBuilder(
     fun graphProperty(name: String): GremlinTypeDefinitionBuilder {
         properties[name] = SimpleGremlinPropertyDefinition(name) { receiver ->
             val traversal = (receiver as GraphTraversal<Any, Any>).values<Any>(name)
-            TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         return this
     }
@@ -164,7 +179,7 @@ class GremlinTypeDefinitionBuilder(
         name: String,
         overloadKey: String = "",
         parameterCount: Int = 0,
-        compiler: (GraphTraversal<*, *>, List<TraversalCompilationResult<*, *>>) -> TraversalCompilationResult<*, *>
+        compiler: (GraphTraversal<*, *>, List<GremlinCompilationResult>) -> GremlinCompilationResult
     ): GremlinTypeDefinitionBuilder {
         val methodDef = SimpleGremlinMethodDefinition(name, overloadKey, parameterCount, compiler)
         methods.getOrPut(name) { mutableListOf() }.add(methodDef)
@@ -193,6 +208,7 @@ class GremlinTypeDefinitionBuilder(
         return SimpleGremlinTypeDefinition(
             typeName = typeName,
             extends = extendsList.toList(),
+            cardinality = cardinality,
             properties = properties.toMap(),
             methods = methods.mapValues { it.value.toList() }
         )
@@ -207,10 +223,10 @@ class GremlinTypeDefinitionBuilder(
  */
 class SimpleGremlinPropertyDefinition(
     override val name: String,
-    private val compiler: (GraphTraversal<*, *>) -> TraversalCompilationResult<*, *>
+    private val compiler: (GraphTraversal<*, *>) -> GremlinCompilationResult
 ) : GremlinPropertyDefinition {
 
-    override fun compile(receiver: GraphTraversal<*, *>): TraversalCompilationResult<*, *> {
+    override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
         return compiler(receiver)
     }
 }
@@ -236,7 +252,7 @@ class AssociationGremlinPropertyDefinition(
 ) : GremlinPropertyDefinition {
 
     @Suppress("UNCHECKED_CAST")
-    override fun compile(receiver: GraphTraversal<*, *>): TraversalCompilationResult<*, *> {
+    override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
         val typed = receiver as GraphTraversal<Any, Any>
         
         val traversal: GraphTraversal<Any, out Any> = if (isOutgoing) {
@@ -245,9 +261,7 @@ class AssociationGremlinPropertyDefinition(
             typed.`in`(edgeLabel)
         }
         
-        // For nullable associations, we don't wrap in coalesce here
-        // as that's better handled by null-safe chaining operators
-        return TraversalCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        return GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
     }
 }
 
@@ -263,13 +277,13 @@ class SimpleGremlinMethodDefinition(
     override val name: String,
     override val overloadKey: String,
     override val parameterCount: Int,
-    private val compiler: (GraphTraversal<*, *>, List<TraversalCompilationResult<*, *>>) -> TraversalCompilationResult<*, *>
+    private val compiler: (GraphTraversal<*, *>, List<GremlinCompilationResult>) -> GremlinCompilationResult
 ) : GremlinMethodDefinition {
 
     override fun compile(
         receiver: GraphTraversal<*, *>,
-        arguments: List<TraversalCompilationResult<*, *>>
-    ): TraversalCompilationResult<*, *> {
+        arguments: List<GremlinCompilationResult>
+    ): GremlinCompilationResult {
         return compiler(receiver, arguments)
     }
 }

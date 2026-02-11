@@ -74,7 +74,7 @@ export function inferLambdaTypeFromContext<Specifics extends TypirLangiumSpecifi
     lambdaNode: Specifics["LanguageType"],
     services: ExpressionTypirServices<Specifics>,
     expressionTypes: ExpressionTypes,
-    statementTypes: StatementTypes
+    statementTypes: StatementTypes | undefined
 ): LambdaTypeInferenceResult<Specifics> {
     const astReflection = services.langium.LangiumServices.AstReflection;
     const container = lambdaNode.$container as Specifics["LanguageType"] | undefined;
@@ -83,12 +83,14 @@ export function inferLambdaTypeFromContext<Specifics extends TypirLangiumSpecifi
         return createInferenceProblem(services, lambdaNode, "Lambda expression has no container.");
     }
 
-    if (astReflection.isInstance(container, statementTypes.assignmentStatementType)) {
-        return inferFromAssignment(lambdaNode, container, services);
-    }
+    if (statementTypes != undefined) {
+        if (astReflection.isInstance(container, statementTypes.assignmentStatementType)) {
+            return inferFromAssignment(lambdaNode, container, services);
+        }
 
-    if (astReflection.isInstance(container, statementTypes.variableDeclarationStatementType)) {
-        return inferFromVariableDeclaration(lambdaNode, container, services);
+        if (astReflection.isInstance(container, statementTypes.variableDeclarationStatementType)) {
+            return inferFromVariableDeclaration(lambdaNode, container, services);
+        }
     }
 
     if (astReflection.isInstance(container, expressionTypes.callExpressionType)) {

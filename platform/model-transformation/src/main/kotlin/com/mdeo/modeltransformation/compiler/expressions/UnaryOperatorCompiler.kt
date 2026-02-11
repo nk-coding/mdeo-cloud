@@ -3,8 +3,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedUnaryExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.P
@@ -14,7 +14,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedUnaryExpression] nodes.
  *
- * Compiles unary expressions into [TraversalCompilationResult] containing GraphTraversals
+ * Compiles unary expressions into [GremlinCompilationResult] containing GraphTraversals
  * that implement negation and logical not operators using pure Gremlin.
  *
  * ## Supported Operators
@@ -71,9 +71,9 @@ class UnaryOperatorCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val unaryExpr = expression as TypedUnaryExpression
         val operator = unaryExpr.operator
 
@@ -97,15 +97,15 @@ class UnaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileNegation(
         expr: TypedUnaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val innerResult = registry.compile(expr.expression, context, initialTraversal)
 
         val traversal = (innerResult.traversal as GraphTraversal<Any, Any>)
             .math("0 - _")
 
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**
@@ -116,9 +116,9 @@ class UnaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileUnaryPlus(
         expr: TypedUnaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         return registry.compile(expr.expression, context, initialTraversal)
     }
 
@@ -132,13 +132,13 @@ class UnaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileLogicalNot(
         expr: TypedUnaryExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val innerResult = registry.compile(expr.expression, context, initialTraversal)
 
         val traversal = buildNotTraversal(innerResult.traversal as GraphTraversal<Any, Any>)
-        return TraversalCompilationResult.of(traversal)
+        return GremlinCompilationResult.of(traversal)
     }
 
     /**

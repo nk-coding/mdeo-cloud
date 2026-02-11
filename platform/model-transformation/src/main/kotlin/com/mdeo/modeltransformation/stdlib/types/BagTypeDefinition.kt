@@ -1,6 +1,8 @@
 package com.mdeo.modeltransformation.stdlib.types
 
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinitionBuilder
+import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 
 /**
@@ -9,7 +11,8 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * Extends ReadonlyCollection. A bag allows duplicate elements.
  */
 fun createBagType(): GremlinTypeDefinition {
-    return gremlinType("collection.bag")
-        .extends("collection.readonly")
+    return gremlinType("builtin.Bag")
+        .extends("builtin.ReadonlyCollection")
+        .cardinality(VertexProperty.Cardinality.list)
         .build()
 }

@@ -3,7 +3,7 @@ package com.mdeo.modeltransformation.compiler.expressions.traversal
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
@@ -34,7 +34,7 @@ class MemberAccessTraversalCompilerIntegrationTest {
 
     private lateinit var graph: TinkerGraph
     private lateinit var registry: ExpressionCompilerRegistry
-    private lateinit var context: TraversalCompilationContext
+    private lateinit var context: CompilationContext
 
     @BeforeEach
     fun setUp() {
@@ -44,7 +44,7 @@ class MemberAccessTraversalCompilerIntegrationTest {
         // Create type registry with metamodel types
         val typeRegistry = createTestTypeRegistry()
         
-        context = TraversalCompilationContext(
+        context = CompilationContext(
             types = listOf(
                 ClassTypeRef("Person", isNullable = false),
                 ClassTypeRef("builtin.string", isNullable = false),
@@ -109,11 +109,12 @@ class MemberAccessTraversalCompilerIntegrationTest {
             val person = graph.addVertex(T.label, "Person", "name", "Alice", "age", 30)
             
             // Create context with person variable in scope
-            val scope = VariableScope(mapOf(
-                "p" to VariableBinding.TraversalBinding("p")
+            val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
+                "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.withScope(0, scope)
-                .withMatchDefinedVariables(setOf("p"))
+            val contextWithScope = context.copy(
+                currentScope = scope,
+            )
             
             // Compile p.name using an initial traversal from the person vertex
             val personExpr = identifier("p", evalType = 0, scope = 0)
@@ -137,11 +138,12 @@ class MemberAccessTraversalCompilerIntegrationTest {
             val person = graph.addVertex(T.label, "Person", "name", "Bob", "age", 25)
             
             // Create context with person variable in scope
-            val scope = VariableScope(mapOf(
-                "p" to VariableBinding.TraversalBinding("p")
+            val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
+                "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.withScope(0, scope)
-                .withMatchDefinedVariables(setOf("p"))
+            val contextWithScope = context.copy(
+                currentScope = scope,
+            )
             
             // Compile p.age
             val personExpr = identifier("p", evalType = 0, scope = 0)
@@ -170,11 +172,12 @@ class MemberAccessTraversalCompilerIntegrationTest {
             person.addEdge("lives_at", address)
             
             // Create context with person variable in scope
-            val scope = VariableScope(mapOf(
-                "p" to VariableBinding.TraversalBinding("p")
+            val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
+                "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.withScope(0, scope)
-                .withMatchDefinedVariables(setOf("p"))
+            val contextWithScope = context.copy(
+                currentScope = scope,
+            )
             
             // Compile p.address (should traverse via outgoing edge)
             val personExpr = identifier("p", evalType = 0, scope = 0)
@@ -202,11 +205,12 @@ class MemberAccessTraversalCompilerIntegrationTest {
             // Create context with address variable in scope
             val addressType = ClassTypeRef("Address", isNullable = false)
             val contextWithAddressType = context.copy(types = listOf(addressType))
-            val scope = VariableScope(mapOf(
-                "a" to VariableBinding.TraversalBinding("a")
+            val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
+                "a" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = contextWithAddressType.withScope(0, scope)
-                .withMatchDefinedVariables(setOf("a"))
+            val contextWithScope = contextWithAddressType.copy(
+                currentScope = scope,
+            )
             
             // Compile a.residents (should traverse via incoming edge)
             val addressExpr = identifier("a", evalType = 0, scope = 0)
@@ -237,11 +241,12 @@ class MemberAccessTraversalCompilerIntegrationTest {
             person.addEdge("lives_at", address)
             
             // Create context with person variable in scope
-            val scope = VariableScope(mapOf(
-                "p" to VariableBinding.TraversalBinding("p")
+            val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
+                "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.withScope(0, scope)
-                .withMatchDefinedVariables(setOf("p"))
+            val contextWithScope = context.copy(
+                currentScope = scope,
+            )
             
             // Build p.address.city
             // First, compile p.address

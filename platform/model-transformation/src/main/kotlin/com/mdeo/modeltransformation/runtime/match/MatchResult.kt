@@ -22,33 +22,79 @@ sealed interface MatchResult {
      * @param bindings Variable bindings established by the match.
      * @param instanceMappings Maps instance names to their matched/created vertex IDs.
      * @param matchedNodeIds Set of vertex IDs that were matched (not created).
-     * @param matchedEdgeIds Set of edge IDs that were matched (not created).
      * @param createdNodeIds Set of vertex IDs that were created by the pattern.
-     * @param createdEdgeIds Set of edge IDs that were created by the pattern.
      * @param deletedNodeIds Set of vertex IDs that were deleted by the pattern.
-     * @param deletedEdgeIds Set of edge IDs that were deleted by the pattern.
      */
     data class Matched(
         val bindings: Map<String, Any?> = emptyMap(),
         val instanceMappings: Map<String, Any> = emptyMap(),
         val matchedNodeIds: Set<Any> = emptySet(),
-        val matchedEdgeIds: Set<Any> = emptySet(),
         val createdNodeIds: Set<Any> = emptySet(),
-        val createdEdgeIds: Set<Any> = emptySet(),
         val deletedNodeIds: Set<Any> = emptySet(),
-        val deletedEdgeIds: Set<Any> = emptySet()
     ) : MatchResult {
         
         /**
          * Applies this match result to an execution context.
+         * 
+         * Updates the CURRENT scope's bindings in place:
+         * - For each matched instance, updates the binding's vertexId
+         * - For each variable binding, sets a ValueBinding
+         *
+         * This is the new behavior per the scope handling specification:
+         * match does NOT create new scopes, it updates bindings in the current scope.
          *
          * @param context The context to update with the match bindings.
-         * @return A new context with the bindings applied.
+         * @return The same context with bindings updated in place.
          */
         fun applyTo(context: TransformationExecutionContext): TransformationExecutionContext {
+            val scope = context.variableScope
+            
+            for ((name, vertexId) in instanceMappings) {
+                val binding = scope.getVariable(name) as? com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding
+                if (binding != null) {
+                    binding.vertexId = vertexId
+                } else {
+                    scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding(vertexId))
+                }
+            }
+            
+            for ((name, value) in bindings) {
+                scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.ValueBinding(value))
+            }
+            
             return context
-                .bindVariables(bindings)
-                .bindInstances(instanceMappings)
+        }
+
+        /**
+        * Applies this match result to a copy of the given context.
+        *
+        * Creates a new scope with the match bindings applied, leaving the original context unchanged.
+        * This is useful for scenarios where we want to preserve the original context and work with a modified copy.
+        *
+        * Note: This method creates a new scope, which is different from the applyTo() method that updates in place.
+        * The choice between these methods depends on whether you want to modify the existing context or work with a new one.
+        * This does NOT create a child scope!
+        *
+        * @param context The context to copy and update with the match bindings.
+        * @return A new context with the match bindings applied in a new scope.
+        */
+        fun applyToCopy(context: TransformationExecutionContext): TransformationExecutionContext {
+            val scope = context.variableScope.copy()
+            
+            for ((name, vertexId) in instanceMappings) {
+                val binding = scope.getVariable(name) as? com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding
+                if (binding != null) {
+                    binding.vertexId = vertexId
+                } else {
+                    scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding(vertexId))
+                }
+            }
+            
+            for ((name, value) in bindings) {
+                scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.ValueBinding(value))
+            }
+            
+            return context.withScope(scope)
         }
     }
     

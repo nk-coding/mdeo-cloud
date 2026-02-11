@@ -1,6 +1,6 @@
 package com.mdeo.modeltransformation.stdlib.types
 
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -16,8 +16,8 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  */
 @Suppress("UNCHECKED_CAST")
 fun createReadonlyOrderedCollectionType(): GremlinTypeDefinition {
-    return gremlinType("collection.readonly-ordered")
-        .extends("collection.readonly")
+    return gremlinType("builtin.ReadonlyOrderedCollection")
+        .extends("builtin.ReadonlyCollection")
         // first() and last() already inherited from ReadonlyCollection
         .build()
 }

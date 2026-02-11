@@ -2,7 +2,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
@@ -17,13 +17,13 @@ class BooleanLiteralCompilerTest {
 
     private lateinit var compiler: BooleanLiteralCompiler
     private lateinit var graph: TinkerGraph
-    private lateinit var context: TraversalCompilationContext
+    private lateinit var context: CompilationContext
 
     @BeforeEach
     fun setUp() {
         compiler = BooleanLiteralCompiler()
         graph = TinkerGraph.open()
-        context = TraversalCompilationContext(
+        context = CompilationContext(
             types = emptyList(),
             traversalSource = graph.traversal(),
             typeRegistry = GremlinTypeRegistry.GLOBAL
@@ -60,8 +60,8 @@ class BooleanLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(true, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(true, actualValue)
         }
 
         @Test
@@ -70,8 +70,8 @@ class BooleanLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(false, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(false, actualValue)
         }
 
         @Test
@@ -102,7 +102,6 @@ class BooleanLiteralCompilerTest {
             val result = compiler.compile(expression, context, initialTraversal)
             val value = result.traversal.next()
 
-            assertTrue(result.isConstant)
             assertEquals(true, value)
         }
 
@@ -114,7 +113,6 @@ class BooleanLiteralCompilerTest {
             val result = compiler.compile(expression, context, initialTraversal)
             val value = result.traversal.next()
 
-            assertTrue(result.isConstant)
             assertEquals(false, value)
         }
     }

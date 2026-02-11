@@ -2,7 +2,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
@@ -17,13 +17,13 @@ class LongLiteralCompilerTest {
 
     private lateinit var compiler: LongLiteralCompiler
     private lateinit var graph: TinkerGraph
-    private lateinit var context: TraversalCompilationContext
+    private lateinit var context: CompilationContext
 
     @BeforeEach
     fun setUp() {
         compiler = LongLiteralCompiler()
         graph = TinkerGraph.open()
-        context = TraversalCompilationContext(
+        context = CompilationContext(
             types = emptyList(),
             traversalSource = graph.traversal(),
             typeRegistry = GremlinTypeRegistry.GLOBAL
@@ -60,8 +60,8 @@ class LongLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(42L, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(42L, actualValue)
         }
 
         @Test
@@ -70,8 +70,8 @@ class LongLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(-123L, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(-123L, actualValue)
         }
 
         @Test
@@ -80,8 +80,8 @@ class LongLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(0L, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(0L, actualValue)
         }
 
         @Test
@@ -102,7 +102,6 @@ class LongLiteralCompilerTest {
             val result = compiler.compile(expression, context, initialTraversal)
             val value = result.traversal.next()
 
-            assertTrue(result.isConstant)
             assertEquals(77L, value)
         }
 
@@ -115,8 +114,8 @@ class LongLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(Long.MAX_VALUE, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(Long.MAX_VALUE, actualValue)
         }
 
         @Test
@@ -128,8 +127,8 @@ class LongLiteralCompilerTest {
 
             val result = compiler.compile(expression, context, null)
 
-            assertTrue(result.isConstant)
-            assertEquals(Long.MIN_VALUE, result.constantValue)
+            val actualValue = graph.traversal().inject(null as Any?).flatMap(result.traversal).next()
+            assertEquals(Long.MIN_VALUE, actualValue)
         }
     }
 }

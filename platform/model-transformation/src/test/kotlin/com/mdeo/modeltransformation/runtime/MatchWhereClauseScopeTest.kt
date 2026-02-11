@@ -10,6 +10,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -183,7 +184,7 @@ class MatchWhereClauseScopeTest {
         assertIs<TransformationExecutionResult.Success>(matchResult)
         
         // Verify that the matched house has the correct address
-        val houseId = matchResult.context.lookupInstance("house")
+        val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
         val houseVertex = g.V(houseId).next()
         val address = houseVertex.property<String>("address").value()
         assertEquals("example2", address, "Expected to match the house with address 'example2'")
@@ -242,7 +243,7 @@ class MatchWhereClauseScopeTest {
         assertIs<TransformationExecutionResult.Success>(matchResult)
         
         // Verify that the matched house does not have address "example1"
-        val houseId = matchResult.context.lookupInstance("house")
+        val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
         val houseVertex = g.V(houseId).next()
         val address = houseVertex.property<String>("address").value()
         assertEquals("example2", address)
@@ -328,7 +329,7 @@ class MatchWhereClauseScopeTest {
 
         assertIs<TransformationExecutionResult.Success>(matchResult)
         
-        val houseId = matchResult.context.lookupInstance("house")
+        val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
         val houseVertex = g.V(houseId).next()
         val address = houseVertex.property<String>("address").value()
         assertEquals("example2", address)

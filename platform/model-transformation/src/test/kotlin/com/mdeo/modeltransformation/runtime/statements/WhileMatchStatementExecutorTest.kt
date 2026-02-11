@@ -123,7 +123,6 @@ class WhileMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(0, result.matchedNodes.size)
         }
     }
 
@@ -156,7 +155,7 @@ class WhileMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(3, result.matchedNodes.size)
+            // Matched nodes are not visible outside the loop
             assertEquals(3, result.deletedNodes.size)
             assertEquals(0, engine.traversalSource.V().count().next())
         }
@@ -206,33 +205,6 @@ class WhileMatchStatementExecutorTest {
             assertEquals(2, engine.traversalSource.V().hasLabel("Room").count().next())
         }
 
-        @Test
-        fun `context is updated across iterations`() {
-            graph.addVertex("House")
-            graph.addVertex("House")
-            
-            val statement = TypedWhileMatchStatement(
-                pattern = TypedPattern(
-                    elements = listOf(
-                        TypedPatternObjectInstanceElement(
-                            objectInstance = TypedPatternObjectInstance(
-                                modifier = "delete",
-                                name = "house",
-                                className = "House",
-                                properties = emptyList()
-                            )
-                        )
-                    )
-                ),
-                doBlock = emptyList()
-            )
-            
-            val result = executor.execute(statement, context, engine)
-            
-            assertIs<TransformationExecutionResult.Success>(result)
-            // The last matched house should be bound
-            assertTrue(result.context.hasInstance("house"))
-        }
     }
 
     @Nested
@@ -371,7 +343,6 @@ class WhileMatchStatementExecutorTest {
             
             assertIs<TransformationExecutionResult.Success>(result)
             assertEquals(1, result.createdNodes.size)
-            assertTrue(result.context.hasInstance("room"))
         }
     }
 }

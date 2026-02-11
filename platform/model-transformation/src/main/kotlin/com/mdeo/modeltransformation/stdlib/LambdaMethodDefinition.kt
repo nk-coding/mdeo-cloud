@@ -1,17 +1,14 @@
 package com.mdeo.modeltransformation.stdlib
 
 import com.mdeo.modeltransformation.ast.expressions.TypedLambdaExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.compiler.registry.GremlinMethodDefinition
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinitionBuilder
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
-
-/** Scope index for lambda parameters */
-const val LAMBDA_SCOPE_INDEX = 100
 
 /**
  * Interface for lambda methods that support compilation with TypedLambdaExpression.
@@ -23,9 +20,9 @@ interface LambdaMethodDefinition : GremlinMethodDefinition {
     fun compileWithLambda(
         receiver: GraphTraversal<*, *>,
         lambda: TypedLambdaExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         compilerRegistry: ExpressionCompilerRegistry
-    ): TraversalCompilationResult<*, *>
+    ): GremlinCompilationResult
 }
 
 /**
@@ -36,26 +33,26 @@ fun GremlinTypeDefinitionBuilder.lambdaMethod(
     compiler: (
         receiver: GraphTraversal<*, *>,
         lambda: TypedLambdaExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         compilerRegistry: ExpressionCompilerRegistry
-    ) -> TraversalCompilationResult<*, *>
+    ) -> GremlinCompilationResult
 ): GremlinTypeDefinitionBuilder {
     return method(object : LambdaMethodDefinition {
         override val name = name
-        override val overloadKey = "lambda"
+        override val overloadKey = ""
         override val parameterCount = 1
 
         override fun compileWithLambda(
             receiver: GraphTraversal<*, *>,
             lambda: TypedLambdaExpression,
-            context: TraversalCompilationContext,
+            context: CompilationContext,
             compilerRegistry: ExpressionCompilerRegistry
-        ): TraversalCompilationResult<*, *> = compiler(receiver, lambda, context, compilerRegistry)
+        ): GremlinCompilationResult = compiler(receiver, lambda, context, compilerRegistry)
 
         override fun compile(
             receiver: GraphTraversal<*, *>,
-            arguments: List<TraversalCompilationResult<*, *>>
-        ): TraversalCompilationResult<*, *> {
+            arguments: List<GremlinCompilationResult>
+        ): GremlinCompilationResult {
             throw UnsupportedOperationException("Lambda method '$name' must be compiled via compileWithLambda()")
         }
     })
@@ -63,8 +60,9 @@ fun GremlinTypeDefinitionBuilder.lambdaMethod(
 
 /**
  * Helper to create a lambda context with the parameter bound.
+ * Creates a child scope at the next scope level (parent scope index + 1).
  */
-fun TraversalCompilationContext.withLambdaParam(paramName: String): TraversalCompilationContext {
-    val lambdaScope = VariableScope.of(paramName to VariableBinding.TraversalBinding(paramName))
-    return this.withScope(LAMBDA_SCOPE_INDEX, lambdaScope)
+fun CompilationContext.withLambdaParam(paramName: String): CompilationContext {
+    val childScopeIndex = this.currentScope.scopeIndex + 1
+    return this.withChildScope(childScopeIndex, mapOf(paramName to VariableBinding.InstanceBinding(vertexId = null)))
 }

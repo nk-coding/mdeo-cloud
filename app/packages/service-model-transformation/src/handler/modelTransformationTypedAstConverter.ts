@@ -453,17 +453,19 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
     private convertPatternLink(link: PatternLinkType): TypedPatternLink {
         const { sourcePropertyName, targetPropertyName, isOutgoing } = this.resolvePatternLinkProperties(link);
 
+        const start = {
+            objectName: link.source.object?.$refText ?? "",
+            propertyName: sourcePropertyName
+        };
+        const end = {
+            objectName: link.target.object?.$refText ?? "",
+            propertyName: targetPropertyName
+        };
+
         return {
             modifier: link.modifier?.modifier,
-            isOutgoing,
-            source: {
-                objectName: link.source.object?.$refText ?? "",
-                propertyName: sourcePropertyName
-            },
-            target: {
-                objectName: link.target.object?.$refText ?? "",
-                propertyName: targetPropertyName
-            }
+            source: isOutgoing ? start : end,
+            target: isOutgoing ? end : start
         };
     }
 
@@ -483,7 +485,9 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
         const targetClass = this.getPatternLinkEndClass(link.target);
 
         if (!sourceClass || !targetClass) {
-            return this.buildFallbackLinkProperties(link);
+            throw new Error(
+                `Unable to resolve classes for pattern link between '${link.source.object?.$refText}' and '${link.target.object?.$refText}'`
+            );
         }
 
         const sourceProperty = link.source.property?.ref as PropertyType | undefined;
@@ -497,7 +501,9 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
         );
 
         if (!resolved) {
-            return this.buildFallbackLinkProperties(link);
+            throw new Error(
+                `Unable to resolve association for pattern link between '${sourceClass.name}' and '${targetClass.name}' with properties '${sourceProperty?.name}' and '${targetProperty?.name}'.`
+            );
         }
 
         return {
@@ -524,25 +530,6 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
             return classRef;
         }
         return undefined;
-    }
-
-    /**
-     * Builds fallback link properties when association cannot be resolved.
-     * Uses the property names as specified in the source code.
-     *
-     * @param link The PatternLink AST node
-     * @returns Fallback properties with isOutgoing defaulting to true
-     */
-    private buildFallbackLinkProperties(link: PatternLinkType): {
-        sourcePropertyName?: string;
-        targetPropertyName?: string;
-        isOutgoing: boolean;
-    } {
-        return {
-            sourcePropertyName: link.source.property?.$refText,
-            targetPropertyName: link.target.property?.$refText,
-            isOutgoing: true
-        };
     }
 
     /**

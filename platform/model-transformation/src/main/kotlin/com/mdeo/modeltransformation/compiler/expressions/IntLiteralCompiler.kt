@@ -2,15 +2,15 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedIntLiteralExpression] nodes.
  *
- * Compiles integer literal expressions into a [TraversalCompilationResult] containing
+ * Compiles integer literal expressions into a [GremlinCompilationResult] containing
  * a GraphTraversal that produces the constant integer value using `__.constant()`.
  *
  * ## Example
@@ -40,15 +40,15 @@ class IntLiteralCompiler : ExpressionCompiler {
      * @param expression The integer literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [TraversalCompilationResult] producing the integer value
+     * @return A [GremlinCompilationResult] producing the integer value
      */
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val intExpression = expression as TypedIntLiteralExpression
         val intValue = intExpression.value.toInt()
-        return TraversalCompilationResult.constant(intValue, initialTraversal)
+        return GremlinCompilationResult.constant(intValue, initialTraversal)
     }
 }

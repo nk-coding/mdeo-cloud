@@ -2,8 +2,8 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedAssertNonNullExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -11,7 +11,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 /**
  * Traversal-based compiler for [TypedAssertNonNullExpression] nodes.
  *
- * Compiles assert non-null expressions (expr!!) into [TraversalCompilationResult]
+ * Compiles assert non-null expressions (expr!!) into [GremlinCompilationResult]
  * containing GraphTraversals.
  *
  * ## Gremlin Implementation
@@ -42,9 +42,9 @@ class AssertNonNullCompiler(
 
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val assertExpr = expression as TypedAssertNonNullExpression
         return compileAssertNonNull(assertExpr, context, initialTraversal)
     }
@@ -58,9 +58,9 @@ class AssertNonNullCompiler(
      */
     private fun compileAssertNonNull(
         expr: TypedAssertNonNullExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         return registry.compile(expr.expression, context, initialTraversal)
     }
 }

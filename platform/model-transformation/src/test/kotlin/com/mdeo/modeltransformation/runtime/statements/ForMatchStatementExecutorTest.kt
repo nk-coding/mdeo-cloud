@@ -14,6 +14,7 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.isFailure
 import com.mdeo.modeltransformation.runtime.isSuccess
+import com.mdeo.modeltransformation.runtime.testHasInstance
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -188,7 +189,7 @@ class ForMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(3, result.matchedNodes.size)  // 3 houses matched
+            // Matched nodes are not visible outside the loop (sideeffectsOnly)
             assertEquals(3, result.createdNodes.size)  // 3 rooms created
             assertEquals(3, engine.traversalSource.V().hasLabel("Room").count().next())
         }
@@ -217,7 +218,7 @@ class ForMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(2, result.matchedNodes.size)
+            // Matched nodes are not visible outside the loop
         }
 
         @Test
@@ -244,8 +245,7 @@ class ForMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            // Final context should have the last matched house
-            assertTrue(result.context.hasInstance("house"))
+            // Note: Bindings from for-match iterations are in child scopes and not visible in parent context
         }
     }
 
@@ -295,8 +295,7 @@ class ForMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            // Only 2 original matches
-            assertEquals(2, result.matchedNodes.size)
+            // Only 2 original matches (but not visible outside loop)
             // But 2 new houses created
             assertEquals(2, result.createdNodes.size)
             // Total 4 houses in graph
@@ -519,7 +518,7 @@ class ForMatchStatementExecutorTest {
             val result = executor.execute(statement, context, engine)
             
             assertIs<TransformationExecutionResult.Success>(result)
-            assertEquals(1, result.matchedNodes.size)
+            // Matched nodes are not visible outside the loop
             assertEquals(1, result.createdNodes.size)
         }
     }

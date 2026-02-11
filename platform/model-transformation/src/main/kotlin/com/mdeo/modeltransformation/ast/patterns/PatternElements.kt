@@ -88,14 +88,12 @@ data class TypedPatternLinkEnd(
  * @param modifier Optional modifier for the link: "create" to create a new link,
  *                 "delete" to delete a matched link, "forbid" to specify links that must not exist,
  *                 or null for simple matching.
- * @param isOutgoing True if this is an outgoing edge from source to target, false for incoming.
  * @param source Source end of the link.
  * @param target Target end of the link.
  */
 @Serializable
 data class TypedPatternLink(
     val modifier: String? = null,
-    val isOutgoing: Boolean,
     val source: TypedPatternLinkEnd,
     val target: TypedPatternLinkEnd
 )

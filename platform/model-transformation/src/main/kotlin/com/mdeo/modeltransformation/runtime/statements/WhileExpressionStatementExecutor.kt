@@ -32,6 +32,10 @@ class WhileExpressionStatementExecutor : StatementExecutor {
     /**
      * Executes a while-expression statement.
      *
+     * Scope handling per spec:
+     * - The while loop enters a new scope (level+1)
+     * - The doBlock enters another scope (level+2)
+     *
      * Repeatedly evaluates the condition and executes the block as long as
      * the condition is truthy. Accumulates results from all iterations.
      * Terminates immediately if any iteration returns Failure or Stopped.
@@ -47,17 +51,18 @@ class WhileExpressionStatementExecutor : StatementExecutor {
         engine: TransformationEngine
     ): TransformationExecutionResult {
         val whileStatement = statement as TypedWhileExpressionStatement
-        var accumulatedResult = TransformationExecutionResult.Success(context)
+        var accumulatedResult = TransformationExecutionResult.Success()
         val conditionEvaluator = ConditionEvaluator(engine)
 
         while (true) {
-            val conditionValue = conditionEvaluator.evaluate(whileStatement.condition, context)
+            val whileContext = context.enterScope()
+            val conditionValue = conditionEvaluator.evaluate(whileStatement.condition, whileContext)
             
             if (!conditionValue) {
                 break
             }
             
-            val iterationResult = engine.executeBlock(whileStatement.block, context)
+            val iterationResult = engine.executeBlock(whileStatement.block, whileContext)
             
             when (iterationResult) {
                 is TransformationExecutionResult.Success -> {
@@ -67,7 +72,8 @@ class WhileExpressionStatementExecutor : StatementExecutor {
                 is TransformationExecutionResult.Stopped -> return iterationResult
             }
         }
-        
+
         return accumulatedResult
     }
+
 }

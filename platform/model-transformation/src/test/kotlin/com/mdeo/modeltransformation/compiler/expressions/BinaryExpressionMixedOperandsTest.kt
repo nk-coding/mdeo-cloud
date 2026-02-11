@@ -2,9 +2,9 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.*
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
+import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.T
@@ -22,7 +22,7 @@ class BinaryExpressionMixedOperandsTest {
     private lateinit var graph: TinkerGraph
     private lateinit var g: org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
     private lateinit var registry: ExpressionCompilerRegistry
-    private lateinit var context: TraversalCompilationContext
+    private lateinit var context: CompilationContext
 
     @BeforeEach
     fun setUp() {
@@ -38,7 +38,7 @@ class BinaryExpressionMixedOperandsTest {
         val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
         val types = listOf(stringType, stringType)
         
-        context = TraversalCompilationContext(
+        context = CompilationContext(
             types = types,
             traversalSource = g,
             typeRegistry = GremlinTypeRegistry.GLOBAL
@@ -51,28 +51,13 @@ class BinaryExpressionMixedOperandsTest {
     }
 
     /**
-     * Helper to execute a traversal.
-     * For anonymous traversals, we inject a starting value.
+     * Helper to execute a traversal by injecting a null start value.
+     * This is needed for anonymous traversals.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun <T> executeTraversal(result: TraversalCompilationResult<*, *>): T? {
-        // Try to execute the traversal directly first
+    private fun <T> executeTraversal(result: GremlinCompilationResult): T? {
         val traversal = result.traversal as GraphTraversal<Any, T>
-        
-        // If the traversal needs a starting point, inject one
-        return try {
-            if (traversal.hasNext()) {
-                traversal.next()
-            } else {
-                // If no results, try injecting a null value as starting point
-                val injectedTraversal = g.inject(null as Any?).flatMap(result.traversal as GraphTraversal<Any, T>)
-                if (injectedTraversal.hasNext()) injectedTraversal.next() else null
-            }
-        } catch (e: Exception) {
-            // If direct execution fails, try with injected start
-            val injectedTraversal = g.inject(null as Any?).flatMap(result.traversal as GraphTraversal<Any, T>)
-            if (injectedTraversal.hasNext()) injectedTraversal.next() else null
-        }
+        return g.inject(null as Any?).flatMap(traversal).next()
     }
 
     @Test

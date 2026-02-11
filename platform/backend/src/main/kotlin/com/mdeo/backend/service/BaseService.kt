@@ -12,8 +12,12 @@ abstract class BaseService {
      */
     protected fun normalizePath(path: String): String {
         var p = path
-        if (p.startsWith("/")) p = p.substring(1)
-        if (p.endsWith("/") && p.length > 1) p = p.substring(0, p.length - 1)
+        if (p.startsWith("/")) {
+            p = p.substring(1)
+        }
+        if (p.endsWith("/") && p.length > 1) {
+            p = p.substring(0, p.length - 1)
+        }
         return p
     }
 }

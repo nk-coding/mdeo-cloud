@@ -5,11 +5,14 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.runtime.isStopped
+import com.mdeo.modeltransformation.runtime.testBindVariable
+import com.mdeo.modeltransformation.runtime.testBindInstance
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -93,16 +96,16 @@ class StopStatementExecutorTest {
         @Test
         fun `stop preserves execution context`() {
             val contextWithBindings = context
-                .bindVariable("x", 42)
-                .bindInstance("node", "test-id")
+                .testBindVariable("x", 42)
+                .testBindInstance("node", "test-id")
             
             val statement = TypedStopStatement(keyword = "stop")
             
             val result = executor.execute(statement, contextWithBindings, engine)
             
             assertIs<TransformationExecutionResult.Stopped>(result)
-            assertEquals(42, result.context.lookupVariable("x"))
-            assertEquals("test-id", result.context.lookupInstance("node"))
+            assertEquals(42, (contextWithBindings.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
+            assertEquals("test-id", (contextWithBindings.variableScope.getVariable("node") as? VariableBinding.InstanceBinding)?.vertexId)
         }
     }
 
@@ -134,16 +137,16 @@ class StopStatementExecutorTest {
         @Test
         fun `kill preserves execution context`() {
             val contextWithBindings = context
-                .bindVariable("y", "value")
-                .bindInstance("other", 123L)
+                .testBindVariable("y", "value")
+                .testBindInstance("other", 123L)
             
             val statement = TypedStopStatement(keyword = "kill")
             
             val result = executor.execute(statement, contextWithBindings, engine)
             
             assertIs<TransformationExecutionResult.Stopped>(result)
-            assertEquals("value", result.context.lookupVariable("y"))
-            assertEquals(123L, result.context.lookupInstance("other"))
+            assertEquals("value", (contextWithBindings.variableScope.getVariable("y") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(123L, (contextWithBindings.variableScope.getVariable("other") as? VariableBinding.InstanceBinding)?.vertexId)
         }
     }
 

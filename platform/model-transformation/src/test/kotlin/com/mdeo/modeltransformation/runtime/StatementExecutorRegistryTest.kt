@@ -6,6 +6,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -181,11 +182,11 @@ class StatementExecutorRegistryTest {
             registry.register(executor)
             
             val statement = TypedStopStatement(keyword = "stop")
-            val context = TransformationExecutionContext.empty().bindVariable("x", 42)
+            val context = TransformationExecutionContext.empty().testBindVariable("x", 42)
             
             registry.execute(statement, context, engine)
             
-            assertEquals(42, executor.lastContext?.lookupVariable("x"))
+            assertEquals(42, (executor.lastContext?.variableScope?.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
@@ -228,7 +229,7 @@ class StatementExecutorRegistryTest {
             lastEngine = engine
             
             return if (successResult) {
-                TransformationExecutionResult.Success(context)
+                TransformationExecutionResult.Success()
             } else {
                 TransformationExecutionResult.Failure("Test failure")
             }

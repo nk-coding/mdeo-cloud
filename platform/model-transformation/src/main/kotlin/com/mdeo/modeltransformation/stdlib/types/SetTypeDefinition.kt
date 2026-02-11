@@ -1,6 +1,8 @@
 package com.mdeo.modeltransformation.stdlib.types
 
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
+import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinitionBuilder
+import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 
 /**
@@ -9,7 +11,8 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * Extends ReadonlyCollection.
  */
 fun createSetType(): GremlinTypeDefinition {
-    return gremlinType("collection.set")
-        .extends("collection.readonly")
+    return gremlinType("builtin.Set")
+        .extends("builtin.ReadonlyCollection")
+        .cardinality(VertexProperty.Cardinality.set)
         .build()
 }

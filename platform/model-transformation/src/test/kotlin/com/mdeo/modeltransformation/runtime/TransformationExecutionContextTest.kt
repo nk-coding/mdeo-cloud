@@ -1,10 +1,12 @@
 package com.mdeo.modeltransformation.runtime
 
+import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -22,24 +24,23 @@ class TransformationExecutionContextTest {
 
         @Test
         fun `empty context has no variables`() {
-            assertFalse(context.hasVariable("x"))
-            assertNull(context.lookupVariable("x"))
+            assertNull((context.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `empty context has no instances`() {
-            assertFalse(context.hasInstance("node1"))
-            assertNull(context.lookupInstance("node1"))
+            assertFalse(context.testHasInstance("node1"))
+            assertNull((context.variableScope.getVariable("node1") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
-        fun `empty context has depth 0`() {
-            assertEquals(0, context.getScopeDepth())
+        fun `empty context starts at scope index 1`() {
+            assertEquals(1, context.scopeIndex)
         }
 
         @Test
         fun `getAllVariables returns empty map`() {
-            assertTrue(context.getAllVariables().isEmpty())
+            assertTrue(context.testGetAllVariables().isEmpty())
         }
 
         @Test
@@ -53,51 +54,53 @@ class TransformationExecutionContextTest {
 
         @Test
         fun `bindVariable creates new context with variable`() {
-            val newContext = context.bindVariable("x", 42)
+            val newContext = context.testBindVariable("x", 42)
             
-            assertTrue(newContext.hasVariable("x"))
-            assertEquals(42, newContext.lookupVariable("x"))
+            assertNotNull((newContext.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(42, (newContext.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `original context is unchanged after binding`() {
-            context.bindVariable("x", 42)
+            context.testBindVariable("x", 42)
             
-            assertFalse(context.hasVariable("x"))
+            assertNull((context.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
-        fun `bindVariable with null value`() {
-            val newContext = context.bindVariable("x", null)
+        fun `bindVariable with null value marks variable as bound`() {
+            val newContext = context.testBindVariable("x", null)
             
-            assertTrue(newContext.hasVariable("x"))
-            assertNull(newContext.lookupVariable("x"))
+            // Variable is bound but has null value
+            assertNull((newContext.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
+            // Check that variable exists in getAllVariables
+            assertTrue(newContext.testGetAllVariables().containsKey("x"))
         }
 
         @Test
         fun `bindVariable overwrites existing value`() {
-            val ctx1 = context.bindVariable("x", 42)
-            val ctx2 = ctx1.bindVariable("x", 100)
+            val ctx1 = context.testBindVariable("x", 42)
+            val ctx2 = ctx1.testBindVariable("x", 100)
             
-            assertEquals(100, ctx2.lookupVariable("x"))
+            assertEquals(100, (ctx2.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `bindVariables binds multiple variables at once`() {
-            val newContext = context.bindVariables(mapOf("x" to 1, "y" to 2, "z" to 3))
+            val newContext = context.testBindVariables(mapOf("x" to 1, "y" to 2, "z" to 3))
             
-            assertEquals(1, newContext.lookupVariable("x"))
-            assertEquals(2, newContext.lookupVariable("y"))
-            assertEquals(3, newContext.lookupVariable("z"))
+            assertEquals(1, (newContext.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(2, (newContext.variableScope.getVariable("y") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(3, (newContext.variableScope.getVariable("z") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `getAllVariables returns all bindings`() {
             val newContext = context
-                .bindVariable("a", 1)
-                .bindVariable("b", "hello")
+                .testBindVariable("a", 1)
+                .testBindVariable("b", "hello")
             
-            val allVars = newContext.getAllVariables()
+            val allVars = newContext.testGetAllVariables()
             assertEquals(2, allVars.size)
             assertEquals(1, allVars["a"])
             assertEquals("hello", allVars["b"])
@@ -109,35 +112,35 @@ class TransformationExecutionContextTest {
 
         @Test
         fun `bindInstance creates new context with instance mapping`() {
-            val newContext = context.bindInstance("house", "vertex-123")
+            val newContext = context.testBindInstance("house", "vertex-123")
             
-            assertTrue(newContext.hasInstance("house"))
-            assertEquals("vertex-123", newContext.lookupInstance("house"))
+            assertTrue(newContext.testHasInstance("house"))
+            assertEquals("vertex-123", (newContext.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
         fun `original context is unchanged after binding instance`() {
-            context.bindInstance("house", "vertex-123")
+            context.testBindInstance("house", "vertex-123")
             
-            assertFalse(context.hasInstance("house"))
+            assertFalse(context.testHasInstance("house"))
         }
 
         @Test
         fun `bindInstances binds multiple instances at once`() {
-            val newContext = context.bindInstances(
+            val newContext = context.testBindInstances(
                 mapOf("house" to "v1", "room" to "v2", "door" to "v3")
             )
             
-            assertEquals("v1", newContext.lookupInstance("house"))
-            assertEquals("v2", newContext.lookupInstance("room"))
-            assertEquals("v3", newContext.lookupInstance("door"))
+            assertEquals("v1", (newContext.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId)
+            assertEquals("v2", (newContext.variableScope.getVariable("room") as? VariableBinding.InstanceBinding)?.vertexId)
+            assertEquals("v3", (newContext.variableScope.getVariable("door") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
         fun `getAllInstances returns all mappings`() {
             val newContext = context
-                .bindInstance("a", "v1")
-                .bindInstance("b", "v2")
+                .testBindInstance("a", "v1")
+                .testBindInstance("b", "v2")
             
             val allInstances = newContext.getAllInstances()
             assertEquals(2, allInstances.size)
@@ -150,76 +153,76 @@ class TransformationExecutionContextTest {
     inner class ScopeTests {
 
         @Test
-        fun `enterScope increases depth by 1`() {
+        fun `enterScope increases scope index by 1`() {
             val childContext = context.enterScope()
             
-            assertEquals(1, childContext.getScopeDepth())
+            assertEquals(context.scopeIndex + 1, childContext.scopeIndex)
         }
 
         @Test
-        fun `nested enterScope increases depth further`() {
+        fun `nested enterScope increases scope index further`() {
             val child = context.enterScope()
             val grandchild = child.enterScope()
             
-            assertEquals(2, grandchild.getScopeDepth())
+            assertEquals(context.scopeIndex + 2, grandchild.scopeIndex)
         }
 
         @Test
         fun `exitScope returns to parent scope`() {
-            val parent = context.bindVariable("x", 1)
+            val parent = context.testBindVariable("x", 1)
             val child = parent.enterScope()
             val restored = child.exitScope()
             
-            assertEquals(0, restored.getScopeDepth())
+            assertEquals(parent.scopeIndex, restored.scopeIndex)
         }
 
         @Test
         fun `exitScope on root context returns same context`() {
             val result = context.exitScope()
             
-            assertEquals(0, result.getScopeDepth())
+            assertEquals(context.scopeIndex, result.scopeIndex)
         }
 
         @Test
         fun `child scope inherits parent variables`() {
-            val parent = context.bindVariable("x", 42)
+            val parent = context.testBindVariable("x", 42)
             val child = parent.enterScope()
             
-            assertEquals(42, child.lookupVariable("x"))
+            assertEquals(42, (child.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `child scope can shadow parent variable`() {
-            val parent = context.bindVariable("x", 42)
-            val child = parent.enterScope().bindVariable("x", 100)
+            val parent = context.testBindVariable("x", 42)
+            val child = parent.enterScope().testBindVariable("x", 100)
             
-            assertEquals(100, child.lookupVariable("x"))
-            assertEquals(42, parent.lookupVariable("x"))
+            assertEquals(100, (child.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(42, (parent.variableScope.getVariable("x") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `child scope variable does not affect parent`() {
-            val parent = context.bindVariable("x", 42)
-            val child = parent.enterScope().bindVariable("y", 100)
+            val parent = context.testBindVariable("x", 42)
+            val child = parent.enterScope().testBindVariable("y", 100)
             
-            assertTrue(child.hasVariable("y"))
-            assertFalse(parent.hasVariable("y"))
+            assertNotNull((child.variableScope.getVariable("y") as? VariableBinding.ValueBinding)?.value)
+            assertNull((parent.variableScope.getVariable("y") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `child scope inherits parent instances`() {
-            val parent = context.bindInstance("house", "v1")
+            val parent = context.testBindInstance("house", "v1")
             val child = parent.enterScope()
             
-            assertEquals("v1", child.lookupInstance("house"))
+            assertEquals("v1", (child.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId)
         }
 
         @Test
         fun `getAllVariables includes parent scope variables`() {
-            val parent = context.bindVariable("x", 1)
-            val child = parent.enterScope().bindVariable("y", 2)
+            val parent = context.testBindVariable("x", 1)
+            val child = parent.enterScope().testBindVariable("y", 2)
             
-            val allVars = child.getAllVariables()
+            val allVars = child.testGetAllVariables()
             assertEquals(2, allVars.size)
             assertEquals(1, allVars["x"])
             assertEquals(2, allVars["y"])
@@ -227,18 +230,18 @@ class TransformationExecutionContextTest {
 
         @Test
         fun `getAllVariables child shadows parent`() {
-            val parent = context.bindVariable("x", 1)
-            val child = parent.enterScope().bindVariable("x", 2)
+            val parent = context.testBindVariable("x", 1)
+            val child = parent.enterScope().testBindVariable("x", 2)
             
-            val allVars = child.getAllVariables()
+            val allVars = child.testGetAllVariables()
             assertEquals(1, allVars.size)
             assertEquals(2, allVars["x"])
         }
 
         @Test
         fun `getAllInstances includes parent scope instances`() {
-            val parent = context.bindInstance("a", "v1")
-            val child = parent.enterScope().bindInstance("b", "v2")
+            val parent = context.testBindInstance("a", "v1")
+            val child = parent.enterScope().testBindInstance("b", "v2")
             
             val allInstances = child.getAllInstances()
             assertEquals(2, allInstances.size)
@@ -251,11 +254,11 @@ class TransformationExecutionContextTest {
     inner class CompanionObjectTests {
 
         @Test
-        fun `empty creates empty context`() {
+        fun `empty creates empty context at scope index 1`() {
             val emptyContext = TransformationExecutionContext.empty()
             
-            assertEquals(0, emptyContext.getScopeDepth())
-            assertTrue(emptyContext.getAllVariables().isEmpty())
+            assertEquals(1, emptyContext.scopeIndex)
+            assertTrue(emptyContext.testGetAllVariables().isEmpty())
             assertTrue(emptyContext.getAllInstances().isEmpty())
         }
     }
@@ -266,31 +269,31 @@ class TransformationExecutionContextTest {
         @Test
         fun `can store various types as variable values`() {
             val ctx = context
-                .bindVariable("int", 42)
-                .bindVariable("double", 3.14)
-                .bindVariable("string", "hello")
-                .bindVariable("boolean", true)
-                .bindVariable("list", listOf(1, 2, 3))
-                .bindVariable("null", null)
+                .testBindVariable("int", 42)
+                .testBindVariable("double", 3.14)
+                .testBindVariable("string", "hello")
+                .testBindVariable("boolean", true)
+                .testBindVariable("list", listOf(1, 2, 3))
+                .testBindVariable("null", null)
             
-            assertEquals(42, ctx.lookupVariable("int"))
-            assertEquals(3.14, ctx.lookupVariable("double"))
-            assertEquals("hello", ctx.lookupVariable("string"))
-            assertEquals(true, ctx.lookupVariable("boolean"))
-            assertEquals(listOf(1, 2, 3), ctx.lookupVariable("list"))
-            assertNull(ctx.lookupVariable("null"))
+            assertEquals(42, (ctx.variableScope.getVariable("int") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(3.14, (ctx.variableScope.getVariable("double") as? VariableBinding.ValueBinding)?.value)
+            assertEquals("hello", (ctx.variableScope.getVariable("string") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(true, (ctx.variableScope.getVariable("boolean") as? VariableBinding.ValueBinding)?.value)
+            assertEquals(listOf(1, 2, 3), (ctx.variableScope.getVariable("list") as? VariableBinding.ValueBinding)?.value)
+            assertNull((ctx.variableScope.getVariable("null") as? VariableBinding.ValueBinding)?.value)
         }
 
         @Test
         fun `can store various types as instance IDs`() {
             val ctx = context
-                .bindInstance("node1", "string-id")
-                .bindInstance("node2", 12345L)
-                .bindInstance("node3", java.util.UUID.randomUUID())
+                .testBindInstance("node1", "string-id")
+                .testBindInstance("node2", 12345L)
+                .testBindInstance("node3", java.util.UUID.randomUUID())
             
-            assertEquals("string-id", ctx.lookupInstance("node1"))
-            assertEquals(12345L, ctx.lookupInstance("node2"))
-            assertTrue(ctx.lookupInstance("node3") is java.util.UUID)
+            assertEquals("string-id", (ctx.variableScope.getVariable("node1") as? VariableBinding.InstanceBinding)?.vertexId)
+            assertEquals(12345L, (ctx.variableScope.getVariable("node2") as? VariableBinding.InstanceBinding)?.vertexId)
+            assertTrue((ctx.variableScope.getVariable("node3") as? VariableBinding.InstanceBinding)?.vertexId is java.util.UUID)
         }
     }
 }

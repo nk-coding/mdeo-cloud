@@ -6,8 +6,8 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.GenericTypeRef
 import com.mdeo.expression.ast.types.LambdaType
 import com.mdeo.modeltransformation.ast.expressions.TypedLambdaExpression
-import com.mdeo.modeltransformation.compiler.TraversalCompilationContext
-import com.mdeo.modeltransformation.compiler.TraversalCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import com.mdeo.modeltransformation.stdlib.LambdaMethodDefinition
@@ -44,9 +44,9 @@ class MemberCallCompiler(
     @Suppress("UNCHECKED_CAST")
     override fun compile(
         expression: TypedExpression,
-        context: TraversalCompilationContext,
+        context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): TraversalCompilationResult<*, *> {
+    ): GremlinCompilationResult {
         val memberCall = expression as TypedMemberCallExpression
         
         // Compile the receiver expression
@@ -94,10 +94,10 @@ class MemberCallCompiler(
      * @param context The compilation context.
      * @return The type name string.
      */
-    private fun getTypeName(expression: TypedExpression, context: TraversalCompilationContext): String {
+    private fun getTypeName(expression: TypedExpression, context: CompilationContext): String {
         val type = context.resolveTypeOrNull(expression.evalType)
         return when (type) {
-            is ClassTypeRef -> mapTypeName(type.type)
+            is ClassTypeRef -> type.type
             is GenericTypeRef -> "builtin.any"
             is LambdaType -> "builtin.any"
             null -> "builtin.any"
@@ -106,28 +106,9 @@ class MemberCallCompiler(
     }
 
     /**
-     * Maps AST type names to registry type names.
-     *
-     * The AST uses type names like "builtin.List" while the registry
-     * uses names like "collection.list".
-     */
-    private fun mapTypeName(typeName: String): String {
-        return when {
-            typeName.startsWith("builtin.List") -> "collection.list"
-            typeName.startsWith("builtin.Set") -> "collection.set"
-            typeName.startsWith("builtin.OrderedSet") -> "collection.ordered-set"
-            typeName.startsWith("builtin.Bag") -> "collection.bag"
-            typeName.startsWith("builtin.Collection") -> "collection.collection"
-            typeName.startsWith("builtin.ReadonlyCollection") -> "collection.readonly"
-            typeName.startsWith("builtin.ReadonlyOrderedCollection") -> "collection.readonly-ordered"
-            else -> typeName
-        }
-    }
-
-    /**
      * Gets the overload key from method arguments.
      *
-     * For lambda methods, the overload key is "lambda".
+     * For lambda methods, the overload key is "" (empty string).
      * For other methods, it's based on argument types.
      *
      * @param arguments The method arguments.
@@ -136,23 +117,23 @@ class MemberCallCompiler(
      */
     private fun getOverloadKey(
         arguments: List<TypedExpression>,
-        context: TraversalCompilationContext
+        context: CompilationContext
     ): String {
         if (arguments.isEmpty()) return ""
         
         val firstArg = arguments.first()
         
-        // Lambda methods have overload key "lambda"
+        // Lambda methods have empty string as overload key
         if (firstArg is TypedLambdaExpression) {
-            return "lambda"
+            return ""
         }
         
         // For other methods, use the first argument's type
         val argType = context.resolveTypeOrNull(firstArg.evalType)
         return when (argType) {
-            is ClassTypeRef -> mapTypeName(argType.type)
+            is ClassTypeRef -> argType.type
             is GenericTypeRef -> ""
-            is LambdaType -> "lambda"
+            is LambdaType -> ""
             null -> ""
             else -> ""
         }
