@@ -416,23 +416,26 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     }
 
     /**
+     * Clear all super types from this class.
+     */
+    clearExtends(): this {
+        this.superTypes = [];
+        return this;
+    }
+
+    /**
      * Create a new builder based on this type, keeping only specified members.
      *
      * @param memberNames Array of member names to keep
      */
     keepMembers<K extends keyof T & string>(...memberNames: readonly K[]): ClassTypeBuilder<Pick<T, K>> {
-        const builder = new ClassTypeBuilder<Pick<T, K>>(this.name, this.package);
-        builder.genericNames = this.genericNames;
-        builder.superTypes = [...this.superTypes];
-
-        for (const memberName of memberNames) {
-            const member = this.members[memberName];
-            if (member) {
-                builder.members[memberName] = member;
+        const keepSet = new Set<string>(memberNames as unknown as string[]);
+        for (const existingName of Object.keys(this.members)) {
+            if (!keepSet.has(existingName)) {
+                delete this.members[existingName];
             }
         }
-
-        return builder;
+        return this as ClassTypeBuilder<Pick<T, K>>;
     }
 
     /**
@@ -441,18 +444,13 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
      * @param memberNames Array of member names to omit
      */
     omitMembers<K extends keyof T & string>(...memberNames: readonly K[]): ClassTypeBuilder<Omit<T, K>> {
-        const builder = new ClassTypeBuilder<Omit<T, K>>(this.name, this.package);
-        builder.genericNames = this.genericNames;
-        builder.superTypes = [...this.superTypes];
-
-        const omitSet = new Set(memberNames);
-        for (const memberName in this.members) {
-            if (!omitSet.has(memberName as K)) {
-                builder.members[memberName] = this.members[memberName];
+        const omitSet = new Set<string>(memberNames as unknown as string[]);
+        for (const existingName of Object.keys(this.members)) {
+            if (omitSet.has(existingName)) {
+                delete this.members[existingName];
             }
         }
-
-        return builder;
+        return this as ClassTypeBuilder<Omit<T, K>>;
     }
 
     /**
@@ -494,16 +492,18 @@ export function classType(name: string, pkg: string = "builtin"): ClassTypeBuild
  * To preserve type safety, use the builder directly or the typed result from .build().
  *
  * @param existingType The existing class type to copy from
+ * @param name Optional new name for the class type (defaults to existing type's name)
+ * @param pkg Optional new package for the class type (defaults to existing type's package)
  */
-export function classTypeFrom(existingType: ClassType): ClassTypeBuilder<any> {
-    const builder = new ClassTypeBuilder<any>(existingType.name, existingType.package);
+export function classTypeFrom(
+    existingType: ClassType,
+    name = existingType.name,
+    pkg = existingType.package
+): ClassTypeBuilder<any> {
+    const builder = new ClassTypeBuilder<any>(name, pkg);
 
     for (const [memberName, member] of Object.entries(existingType.members)) {
-        if (member.isProperty) {
-            builder.members[memberName] = member;
-        } else {
-            (builder as any).members[memberName] = member;
-        }
+        builder.members[memberName] = member;
     }
 
     if (existingType.generics) {

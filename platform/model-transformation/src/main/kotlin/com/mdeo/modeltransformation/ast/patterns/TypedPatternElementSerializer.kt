@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Pattern elements include:
  * - variable: Variable declarations within patterns
- * - objectInstance: Object instance definitions
+ * - objectInstance: Object instance definitions (including delete with modifier)
  * - link: Link definitions between objects
  * - whereClause: Constraint expressions
  */

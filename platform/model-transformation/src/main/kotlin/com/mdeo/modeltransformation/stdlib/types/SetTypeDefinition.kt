@@ -12,7 +12,7 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  */
 fun createSetType(): GremlinTypeDefinition {
     return gremlinType("builtin.Set")
-        .extends("builtin.ReadonlyCollection")
+        .extends("builtin.Collection")
         .cardinality(VertexProperty.Cardinality.set)
         .build()
 }

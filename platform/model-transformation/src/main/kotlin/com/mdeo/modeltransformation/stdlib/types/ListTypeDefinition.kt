@@ -12,7 +12,7 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  */
 fun createListType(): GremlinTypeDefinition {
     return gremlinType("builtin.List")
-        .extends("builtin.ReadonlyOrderedCollection")
+        .extends("builtin.OrderedCollection")
         .cardinality(VertexProperty.Cardinality.list)
         .build()
 }

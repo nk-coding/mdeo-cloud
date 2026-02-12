@@ -234,7 +234,7 @@ class BagImpl<T> : Bag<T> {
         return result
     }
 
-    override fun <U> map(mapper: Func1<T, U>): ReadonlyCollection<U> {
+    override fun <U> map(mapper: Func1<T, U>): Bag<U> {
         val result = HashBag<U>()
         for (element in backing) {
             result.add(mapper.call(element))

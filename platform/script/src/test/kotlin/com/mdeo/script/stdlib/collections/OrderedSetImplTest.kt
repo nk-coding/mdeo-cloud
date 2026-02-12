@@ -347,7 +347,7 @@ class OrderedSetImplTest {
     fun `map returns ordered set`() {
         val set = OrderedSetImpl.of(1, 2, 3)
         val mapped = set.map(Func1 { it * 2 })
-        assertTrue(mapped is ReadonlyOrderedSet)
+        assertTrue(mapped is OrderedSet)
     }
 
     @Test

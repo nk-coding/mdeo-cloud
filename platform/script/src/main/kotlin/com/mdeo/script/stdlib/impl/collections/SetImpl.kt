@@ -66,7 +66,7 @@ class SetImpl<T> : AbstractCollection<T, HashSet<T>>, ScriptSet<T> {
         return SetImpl(result)
     }
 
-    override fun <U> map(mapper: Func1<T, U>): ReadonlySet<U> {
+    override fun <U> map(mapper: Func1<T, U>): ScriptSet<U> {
         val result = HashSet<U>()
         for (element in backing) {
             result.add(mapper.call(element))

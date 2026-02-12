@@ -1,10 +1,10 @@
-import { CollectionType, classTypeFrom } from "@mdeo/language-expression";
+import { ReadonlyCollectionType, classTypeFrom } from "@mdeo/language-expression";
 import type { ClassType } from "@mdeo/language-expression";
 
 /**
  * Immutable Collection type for model transformation.
  */
-export const ModelTransformationCollectionType: ClassType = classTypeFrom(CollectionType)
+export const ModelTransformationCollectionType: ClassType = classTypeFrom(ReadonlyCollectionType, "Collection")
     .keepMembers(
         "size",
         "isEmpty",

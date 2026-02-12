@@ -68,7 +68,6 @@ class MemberAccessCompiler(
         val memberAccess = expression as TypedMemberAccessExpression
         val objectResult = compileObjectExpression(memberAccess, context, initialTraversal)
         
-        // Get the receiver's type name - throw if not found
         val receiverTypeName = getTypeName(memberAccess.expression, context)
             ?: throw IllegalStateException(
                 "Cannot determine type for member access expression: ${memberAccess.member}. " +

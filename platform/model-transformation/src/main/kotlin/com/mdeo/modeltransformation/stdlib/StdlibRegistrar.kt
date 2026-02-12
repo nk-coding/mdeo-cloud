@@ -12,8 +12,7 @@ import com.mdeo.modeltransformation.stdlib.types.createIntType
 import com.mdeo.modeltransformation.stdlib.types.createListType
 import com.mdeo.modeltransformation.stdlib.types.createLongType
 import com.mdeo.modeltransformation.stdlib.types.createOrderedSetType
-import com.mdeo.modeltransformation.stdlib.types.createReadonlyCollectionType
-import com.mdeo.modeltransformation.stdlib.types.createReadonlyOrderedCollectionType
+import com.mdeo.modeltransformation.stdlib.types.createOrderedCollectionType
 import com.mdeo.modeltransformation.stdlib.types.createSetType
 import com.mdeo.modeltransformation.stdlib.types.createStringType
 
@@ -68,9 +67,8 @@ object StdlibRegistrar {
             createDoubleType(),
             createStringType(),
             // Collection types
-            createReadonlyCollectionType(),
             createCollectionType(),
-            createReadonlyOrderedCollectionType(),
+            createOrderedCollectionType(),
             createListType(),
             createSetType(),
             createOrderedSetType(),
@@ -89,9 +87,8 @@ object StdlibRegistrar {
     }
 
     private fun registerCollectionTypes(registry: GremlinTypeRegistry) {
-        registry.register(createReadonlyCollectionType())
         registry.register(createCollectionType())
-        registry.register(createReadonlyOrderedCollectionType())
+        registry.register(createOrderedCollectionType())
         registry.register(createListType())
         registry.register(createSetType())
         registry.register(createOrderedSetType())

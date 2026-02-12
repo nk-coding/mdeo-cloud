@@ -43,9 +43,9 @@ class StdlibRegistrarTest {
 
         @Test
         fun `registers all collection types`() {
-            assertTrue(registry.hasType("builtin.ReadonlyCollection"))
             assertTrue(registry.hasType("builtin.Collection"))
-            assertTrue(registry.hasType("builtin.ReadonlyOrderedCollection"))
+            assertTrue(registry.hasType("builtin.Collection"))
+            assertTrue(registry.hasType("builtin.OrderedCollection"))
             assertTrue(registry.hasType("builtin.List"))
             assertTrue(registry.hasType("builtin.Set"))
             assertTrue(registry.hasType("builtin.OrderedSet"))
@@ -163,86 +163,86 @@ class StdlibRegistrarTest {
     inner class CollectionTypeTests {
 
         @Test
-        fun `ReadonlyCollection has size method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "size", "")
+        fun `Collection has size method`() {
+            val method = registry.lookupMethod("builtin.Collection", "size", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has isEmpty method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "isEmpty", "")
+        fun `Collection has isEmpty method`() {
+            val method = registry.lookupMethod("builtin.Collection", "isEmpty", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has notEmpty method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "notEmpty", "")
+        fun `Collection has notEmpty method`() {
+            val method = registry.lookupMethod("builtin.Collection", "notEmpty", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has sum method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "sum", "")
+        fun `Collection has sum method`() {
+            val method = registry.lookupMethod("builtin.Collection", "sum", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has first method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "first", "")
+        fun `Collection has first method`() {
+            val method = registry.lookupMethod("builtin.Collection", "first", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has last method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "last", "")
+        fun `Collection has last method`() {
+            val method = registry.lookupMethod("builtin.Collection", "last", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has filter lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "filter", "")
+        fun `Collection has filter lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "filter", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has map lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "map", "")
+        fun `Collection has map lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "map", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has exists lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "exists", "")
+        fun `Collection has exists lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "exists", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has all lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "all", "")
+        fun `Collection has all lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "all", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has none lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "none", "")
+        fun `Collection has none lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "none", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has one lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "one", "")
+        fun `Collection has one lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "one", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has find lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "find", "")
+        fun `Collection has find lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "find", "")
             assertNotNull(method)
         }
 
         @Test
-        fun `ReadonlyCollection has reject lambda method`() {
-            val method = registry.lookupMethod("builtin.ReadonlyCollection", "reject", "")
+        fun `Collection has reject lambda method`() {
+            val method = registry.lookupMethod("builtin.Collection", "reject", "")
             assertNotNull(method)
         }
     }
@@ -251,17 +251,17 @@ class StdlibRegistrarTest {
     inner class TypeHierarchyTests {
 
         @Test
-        fun `Collection extends ReadonlyCollection`() {
+        fun `Collection extends any`() {
             val collectionType = registry.getType("builtin.Collection")
             assertNotNull(collectionType)
-            assertTrue(collectionType.extends.contains("builtin.ReadonlyCollection"))
+            assertTrue(collectionType.extends.contains("builtin.any"))
         }
 
         @Test
-        fun `List extends ReadonlyOrderedCollection`() {
+        fun `List extends OrderedCollection`() {
             val listType = registry.getType("builtin.List")
             assertNotNull(listType)
-            assertTrue(listType.extends.contains("builtin.ReadonlyOrderedCollection"))
+            assertTrue(listType.extends.contains("builtin.OrderedCollection"))
         }
 
         @Test
@@ -279,31 +279,31 @@ class StdlibRegistrarTest {
         }
 
         @Test
-        fun `ReadonlyOrderedCollection extends ReadonlyCollection`() {
-            val orderedType = registry.getType("builtin.ReadonlyOrderedCollection")
+        fun `OrderedCollection extends Collection`() {
+            val orderedType = registry.getType("builtin.OrderedCollection")
             assertNotNull(orderedType)
-            assertTrue(orderedType.extends.contains("builtin.ReadonlyCollection"))
+            assertTrue(orderedType.extends.contains("builtin.Collection"))
         }
 
         @Test
-        fun `OrderedSet extends ReadonlyOrderedCollection`() {
+        fun `OrderedSet extends OrderedCollection`() {
             val setType = registry.getType("builtin.OrderedSet")
             assertNotNull(setType)
-            assertTrue(setType.extends.contains("builtin.ReadonlyOrderedCollection"))
+            assertTrue(setType.extends.contains("builtin.OrderedCollection"))
         }
 
         @Test
-        fun `Set extends ReadonlyCollection`() {
+        fun `Set extends Collection`() {
             val setType = registry.getType("builtin.Set")
             assertNotNull(setType)
-            assertTrue(setType.extends.contains("builtin.ReadonlyCollection"))
+            assertTrue(setType.extends.contains("builtin.Collection"))
         }
 
         @Test
-        fun `Bag extends ReadonlyCollection`() {
+        fun `Bag extends Collection`() {
             val bagType = registry.getType("builtin.Bag")
             assertNotNull(bagType)
-            assertTrue(bagType.extends.contains("builtin.ReadonlyCollection"))
+            assertTrue(bagType.extends.contains("builtin.Collection"))
         }
     }
 }

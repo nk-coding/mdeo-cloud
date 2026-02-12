@@ -12,6 +12,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternPropertyAssignment
 import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.VariableBinding
+import com.mdeo.modeltransformation.compiler.expressions.EqualityCompilerUtil
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import org.apache.tinkerpop.gremlin.process.traversal.P
@@ -42,6 +43,11 @@ class MatchExecutor {
     
     private var idCounter = 0
     
+    /**
+     * Generates a unique ID for use in Gremlin traversal labels.
+     * 
+     * @return A unique string identifier in the format "id_N" where N is an incrementing counter
+     */
     private fun getUniqueId(): String {
         return "id_${idCounter++}"
     }
@@ -65,6 +71,11 @@ class MatchExecutor {
     
     /**
      * Executes a pattern match with modifications, returning the first match.
+     * 
+     * @param pattern The pattern to match against the graph
+     * @param context The current transformation execution context
+     * @param engine The transformation engine providing access to the graph and compilers
+     * @return A MatchResult containing the matched bindings, or NoMatch if no match is found
      */
     fun executeMatch(
         pattern: TypedPattern,
@@ -77,6 +88,11 @@ class MatchExecutor {
     
     /**
      * Executes a pattern match with modifications, returning all matches.
+     * 
+     * @param pattern The pattern to match against the graph
+     * @param context The current transformation execution context
+     * @param engine The transformation engine providing access to the graph and compilers
+     * @return A list of all MatchResult.Matched instances found in the graph
      */
     fun executeMatchAll(
         pattern: TypedPattern,
@@ -115,6 +131,15 @@ class MatchExecutor {
     
     /**
      * Executes the unified traversal combining match and modifications.
+     * 
+     * Analyzes the pattern elements, builds match clauses, constructs a unified traversal,
+     * and executes it to return matched results with all modifications applied.
+     * 
+     * @param elements Categorized pattern elements (instances, links, variables, etc.)
+     * @param context The transformation execution context with variable bindings
+     * @param engine The transformation engine providing graph access and compilers
+     * @param limit Maximum number of matches to return (-1 for unlimited)
+     * @return List of matched results with instance mappings and node classifications
      */
     private fun executeUnifiedTraversal(
         elements: PatternCategories,
@@ -122,6 +147,12 @@ class MatchExecutor {
         engine: TransformationEngine,
         limit: Long
     ): List<MatchResult.Matched> {
+        for (variableElement in elements.variables) {
+            val variableName = variableElement.variable.name
+            val variableLabel = VariableBinding.variableLabel(variableName)
+            context.variableScope.setBinding(variableName, VariableBinding.LabelBinding(variableLabel))
+        }
+        
         val analyzer = MatchAnalyzer(context.variableScope)
         for (element in elements.variables) {
             analyzer.analyzeVariable(element)
@@ -141,9 +172,9 @@ class MatchExecutor {
         val allMatchableInstances = elements.matchableInstances + elements.deleteInstances
         val allMatchableLinks = elements.matchableLinks + elements.deleteLinks
         
-        val matchClauses = buildMatchClauses(allMatchableInstances, allMatchableLinks, referencedInstances,  context, engine)
+        val matchBuildResult = buildMatchClauses(allMatchableInstances, allMatchableLinks, elements.variables, referencedInstances, context, engine)
         
-        val traversal = buildUnifiedTraversal(elements, matchClauses, context, engine, limit)
+        val traversal = buildUnifiedTraversal(elements, matchBuildResult.clauses, matchBuildResult.compiledVariables, context, engine, limit)
         val matchedInstanceNames = (elements.matchableInstances + elements.deleteInstances).map { it.objectInstance.name }
         return executeTraversalAndExtract(traversal, elements, context, engine, matchedInstanceNames)
     }
@@ -157,21 +188,33 @@ class MatchExecutor {
      * 
      * The final select step returns Any (either a single element or a map),
      * so this method returns GraphTraversal<Vertex, Any>.
+     * 
+     * @param elements Categorized pattern elements (instances, links, variables, where clauses)
+     * @param matchClauses Array of match clause traversals to combine
+     * @param compiledVariables Compiled variable expressions indexed by variable label
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param limit Maximum number of matches (-1 for unlimited)
+     * @return A unified traversal that executes match, modifications, and returns selected values
      */
     @Suppress("UNCHECKED_CAST")
     private fun buildUnifiedTraversal(
         elements: PatternCategories,
         matchClauses: Array<GraphTraversal<Any, Any>>,
+        compiledVariables: CompiledVariables,
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         limit: Long
     ): GraphTraversal<Vertex, Any> {
         val g = engine.traversalSource
         
+        val allMatchableInstances = elements.matchableInstances + elements.deleteInstances
+        
         var traversal: GraphTraversal<Vertex, Map<String, Any>> = if (matchClauses.isEmpty()) {
             var traversal = g.inject(emptyMap<String, Any>()) as GraphTraversal<Vertex, Map<String, Any>>
             traversal = addForbidConstraints(traversal, elements)
-            traversal = addWhereClauseConstraints(traversal, elements.whereClauses, context, engine)
+            traversal = addPropertyWhereConstraints(traversal, allMatchableInstances, compiledVariables, context, engine)
+            traversal = addWhereClauseConstraints(traversal, elements.whereClauses, compiledVariables, context, engine)
             traversal
         } else {
             var traversal = buildMatchStep(
@@ -179,7 +222,8 @@ class MatchExecutor {
                 matchClauses
             )
             traversal = addForbidConstraints(traversal, elements)
-            traversal = addWhereClauseConstraints(traversal, elements.whereClauses, context, engine)
+            traversal = addPropertyWhereConstraints(traversal, allMatchableInstances, compiledVariables, context, engine)
+            traversal = addWhereClauseConstraints(traversal, elements.whereClauses, compiledVariables, context, engine)
             traversal
         }
         
@@ -188,16 +232,24 @@ class MatchExecutor {
         val matchedInstanceNames = elements.matchableInstances.map { it.objectInstance.name }
         traversal = addCreateVertexSteps(traversal, elements.createInstances, context, engine, matchedInstanceNames)
         
-        traversal = addPropertyUpdateSteps(traversal, elements, context, engine, matchedInstanceNames)
+        traversal = addPropertyUpdateSteps(traversal, elements, compiledVariables, context, engine, matchedInstanceNames)
         val currentPatternInstanceNames = elements.allInstanceNames.toSet()
         traversal = addCreateEdgeSteps(traversal, elements.createLinks, context, engine, currentPatternInstanceNames)
         traversal = addDeleteSteps(traversal, elements)
         
-        return addSelectStep(traversal, elements.allInstanceNames)
+        val variableLabels = elements.variables.map { VariableBinding.variableLabel(it.variable.name) }
+        return addSelectStep(traversal, elements.allInstanceNames + variableLabels)
     }
     
     /**
      * Builds the match() step from the clauses.
+     * 
+     * Handles both single and multiple match clauses using the appropriate overload
+     * of the match() step. Gremlin requires different syntax for one vs many clauses.
+     * 
+     * @param traversal The base traversal to append the match step to
+     * @param matchClauses Array of match clause traversals
+     * @return The traversal with match step applied, returning a map of matched elements
      */
     @Suppress("UNCHECKED_CAST")
     private fun buildMatchStep(
@@ -214,6 +266,10 @@ class MatchExecutor {
     
     /**
      * Applies limit to the traversal (unless unlimited).
+     * 
+     * @param traversal The traversal to apply the limit to
+     * @param limit Maximum number of results to return (values <= 0 mean no limit)
+     * @return The traversal with limit applied if limit > 0, otherwise unchanged
      */
     @Suppress("UNCHECKED_CAST")
     private fun applyLimit(
@@ -236,6 +292,13 @@ class MatchExecutor {
      * 3. Deferred: Non-constant properties set via addDeferredProperties()
      * 
      * Uses step labels for consistency with matched vertices.
+     * 
+     * @param traversal The traversal to extend with vertex creation steps
+     * @param createInstances List of instance elements marked for creation
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param matchedInstanceNames Names of matched instances that can be referenced
+     * @return The extended traversal with all vertex creation steps added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addCreateVertexSteps(
@@ -291,6 +354,7 @@ class MatchExecutor {
         }
 
         for (property in simpleProperties) {
+            println("Compiling property '${property.propertyName}' for instance '$instanceName'")
             val compilationResult = compilePropertyExpression(property.value, context, engine, matchedInstanceNames)!!
             if (compilationResult is GremlinCompilationResult.ValueResult) {
                 val value = compilationResult.value
@@ -305,6 +369,7 @@ class MatchExecutor {
         }
         
         for (property in listProperties) {
+            println("Compiling list property '${property.propertyName}' for instance '$instanceName'")
             val listResult = compilePropertyExpression(property.value, context, engine, matchedInstanceNames)!!
             val listTraversal = listResult.traversal as GraphTraversal<Any, Any>
             val valueLabel = getUniqueId()
@@ -356,13 +421,14 @@ class MatchExecutor {
         type: com.mdeo.expression.ast.types.ValueType?,
         engine: TransformationEngine
     ): Boolean {
+        println("Resolving if type is collection: $type")
         if (type == null) return false
         
         if (type !is com.mdeo.expression.ast.types.ClassTypeRef) {
             return false
         }
                 
-        val typeDefinition = engine.typeRegistry.getType(type.type) ?: return false
+        val typeDefinition = engine.typeRegistry.getType(type.type)!!
         val registryCardinality = typeDefinition.cardinality
         return registryCardinality == VertexProperty.Cardinality.list || registryCardinality == VertexProperty.Cardinality.set
     }
@@ -370,11 +436,20 @@ class MatchExecutor {
     /**
      * Adds property update steps for all instances (matched and created).
      * Uses sideEffect pattern for all updates to existing/matched vertices.
+     * 
+     * @param traversal The traversal to extend with property update steps
+     * @param elements Categorized pattern elements containing instances to update
+     * @param compiledVariables Compiled variable expressions for property value resolution
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param matchedInstanceNames Names of matched instances available for reference
+     * @return The extended traversal with all property update steps added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addPropertyUpdateSteps(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         elements: PatternCategories,
+        compiledVariables: CompiledVariables,
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         matchedInstanceNames: List<String>
@@ -383,7 +458,7 @@ class MatchExecutor {
         
         for (instance in elements.matchableInstances) {
             if (instance.objectInstance.modifier == "delete") continue
-            result = addMatchedInstanceProperties(result, instance, context, engine, matchedInstanceNames)
+            result = addMatchedInstanceProperties(result, instance, compiledVariables, context, engine, matchedInstanceNames)
         }
         
         return result
@@ -406,6 +481,7 @@ class MatchExecutor {
     private fun addMatchedInstanceProperties(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         instance: TypedPatternObjectInstanceElement,
+        compiledVariables: CompiledVariables,
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         matchedInstanceNames: List<String>
@@ -494,6 +570,13 @@ class MatchExecutor {
      * Handles two cases:
      * - Instances in current pattern: use select() to reference step labels
      * - Instances from previous matches: use V(vertexId) from context bindings
+     * 
+     * @param traversal The traversal to extend with edge creation steps
+     * @param createLinks List of link elements marked for creation
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param currentPatternInstanceNames Set of instance names in the current pattern
+     * @return The extended traversal with all edge creation steps added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addCreateEdgeSteps(
@@ -527,6 +610,22 @@ class MatchExecutor {
      * Adds drop() steps for deleting edges and vertices.
      * 
      * Uses step labels for selecting instances.
+     * Deletes links first, then vertices to avoid foreign key constraint issues.
+     * 
+     * @param traversal The traversal to extend with deletion steps
+     * @param elements Categorized pattern elements containing items to delete
+     * @return The extended traversal with all deletion steps added
+     */
+    /**
+     * Adds delete steps for deleteInstances and deleteLinks.
+     * 
+     * Delete instances have a "delete" modifier and may or may not have a className:
+     * - With className: matched first, then deleted
+     * - Without className: directly deletes an already named node from previous match
+     * 
+     * @param traversal The traversal to extend with delete operations
+     * @param elements Categorized pattern elements containing delete instances
+     * @return The traversal with delete steps added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addDeleteSteps(
@@ -553,6 +652,12 @@ class MatchExecutor {
      * Adds a step to delete an edge between two instances.
      * 
      * Uses step labels for selecting instances.
+     * Computes the edge label from property names and filters edges to ensure
+     * only edges between the specific source and target vertices are deleted.
+     * 
+     * @param traversal The traversal to extend with the edge deletion step
+     * @param link The link element representing the edge to delete
+     * @return The extended traversal with the edge deletion step added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addDeleteEdgeStep(
@@ -575,25 +680,43 @@ class MatchExecutor {
     
     /**
      * Builds match clauses for the Gremlin match() step.
+     * 
+     * Order of match clauses:
+     * 1. Vertex/instance clauses (for pattern instances and referenced instances)
+     * 2. Edge/link clauses  
+     * 3. Variable clauses
+     * 
+     * @param instances List of object instance elements to match
+     * @param links List of link elements to match
+     * @param variables List of variable elements to evaluate
+     * @param referencedInstances Set of instance names referenced but not explicitly matched
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @return MatchClauseBuildResult containing the clause array and compiled variables
      */
     private fun buildMatchClauses(
         instances: List<TypedPatternObjectInstanceElement>,
         links: List<TypedPatternLinkElement>,
+        variables: List<TypedPatternVariableElement>,
         referencedInstances: Set<String>,
         context: TransformationExecutionContext,
         engine: TransformationEngine
-    ): Array<GraphTraversal<Any, Any>> {
+    ): MatchClauseBuildResult {
         val clauses = mutableListOf<GraphTraversal<Any, Any>>()
         
         for (instance in instances) {
             val binding = context.variableScope.getVariable(instance.objectInstance.name)
             val vertexId = (binding as? VariableBinding.InstanceBinding)?.vertexId
+            
             if (vertexId != null) {
                 clauses.add(buildIdVertexMatchClause(vertexId, instance.objectInstance.name))
-            } else {
+            } else if (instance.objectInstance.className != null) {
                 clauses.add(buildVertexMatchClauses(instance, context, engine))
+            } else {
+                continue
             }
         }
+        
         val instanceNames = instances.map { it.objectInstance.name }.toSet()
         for (referencedInstance in referencedInstances) {
             if (referencedInstance in instanceNames) {
@@ -610,13 +733,78 @@ class MatchExecutor {
             clauses.add(buildEdgeMatchClause(link))
         }
         
+        val compiledVariablesMap = mutableMapOf<String, GremlinCompilationResult>()
+        for (variableElement in variables) {
+            val variableName = variableElement.variable.name
+            val variableLabel = VariableBinding.variableLabel(variableName)
+            val (variableClause, compilationResult) = buildVariableMatchClause(variableElement, variableLabel, context, engine)
+            clauses.add(variableClause)
+            compiledVariablesMap[variableLabel] = compilationResult
+        }
+        
         @Suppress("UNCHECKED_CAST")
-        return clauses.toTypedArray()
+        return MatchClauseBuildResult(
+            clauses = clauses.toTypedArray(),
+            compiledVariables = CompiledVariables(compiledVariablesMap)
+        )
+    }
+    
+    /**
+     * Builds a match clause for a variable.
+     * 
+     * The variable expression is compiled to a traversal and labeled.
+     * For variables that reference instances, the traversal will use select() to reference them.
+     * The result is: select(instance).expression.as(variableLabel) or constant().as(variableLabel)
+     * 
+     * @param variableElement The variable element to compile
+     * @param variableLabel The label to use for the compiled variable in the traversal
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @return A pair of (match clause traversal, compilation result)
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun buildVariableMatchClause(
+        variableElement: TypedPatternVariableElement,
+        variableLabel: String,
+        context: TransformationExecutionContext,
+        engine: TransformationEngine
+    ): Pair<GraphTraversal<Any, Any>, GremlinCompilationResult> {
+        val anchorTraversal = AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
+        
+        val compilationContext = CompilationContext(
+            types = engine.types,
+            traversalSource = engine.traversalSource,
+            currentScope = context.variableScope,
+            typeRegistry = engine.typeRegistry
+        )
+        
+        val compilationResult = engine.expressionCompilerRegistry.compile(
+            variableElement.variable.value,
+            compilationContext,
+            anchorTraversal
+        )
+        
+        val traversal = compilationResult.traversal.`as`(variableLabel) as GraphTraversal<Any, Any>
+        
+        return Pair(traversal, compilationResult)
     }
     
     /**
      * Builds a vertex match clause for an object instance using the anchor pattern.
      * If the instance is pre-bound (has a vertexId in context), uses V(id) instead of V().hasLabel().
+     * 
+     * Supports two modes:
+     * 1. Full matching: When className is provided, matches vertices by class and properties
+     * 2. Reference mode: When className is null, references a previously matched node by name
+     *    and only applies property comparisons (== operator)
+     * 
+     * Only handles constant property comparisons (ValueResult). Non-constant property 
+     * constraints are handled separately via addPropertyWhereConstraints().
+     * 
+     * @param instance The object instance element to match
+     * @param context The transformation execution context for property compilation
+     * @param engine The transformation engine
+     * @return A match clause traversal for the vertex with property filters
      */
     @Suppress("UNCHECKED_CAST")
     private fun buildVertexMatchClauses(
@@ -626,29 +814,48 @@ class MatchExecutor {
     ): GraphTraversal<Any, Any> {
         val name = instance.objectInstance.name
         val className = instance.objectInstance.className
-                
-        var clause = AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
-            .V()
-            .hasLabel(className)
-            .`as`(VariableBinding.stepLabel(name)) as GraphTraversal<Any, Any>
+        
+        // If className is null, this references a previously matched node
+        // Start from the already matched node using select()
+        var clause: GraphTraversal<Any, Any> = if (className == null) {
+            AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
+                .select<Any>(VariableBinding.stepLabel(name))
+                .`as`(VariableBinding.stepLabel(name)) as GraphTraversal<Any, Any>
+        } else {
+            AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
+                .V()
+                .hasLabel(className)
+                .`as`(VariableBinding.stepLabel(name)) as GraphTraversal<Any, Any>
+        }
         
         for (property in instance.objectInstance.properties) {
             if (property.operator == "==") {
-                val isListLiteral = property.value is com.mdeo.expression.ast.expressions.TypedListLiteralExpression
-                if (isListLiteral) {
+                if (isCollectionType(resolveExpressionType(property.value, engine), engine)) {
                     throw IllegalArgumentException("List properties cannot be used in match clause comparisons (== operator) - not supported in Gremlin match patterns")
                 }
                 
-                val value = getPropertyValue(property.value, context, engine, emptyList())
-                clause = clause.has(property.propertyName, value) as GraphTraversal<Any, Any>
+                val compilationResult = compilePropertyExpression(property.value, context, engine, emptyList())                
+                if (compilationResult == null) {
+                    throw IllegalStateException("Failed to compile property expression for ${property.propertyName}")
+                }
+                
+                if (compilationResult is GremlinCompilationResult.ValueResult) {
+                    clause = clause.has(property.propertyName, compilationResult.value) as GraphTraversal<Any, Any>
+                }
             }
         }
         
         return clause
     }
     
+
+    
     /**
-     * Builds a vertex match clause for an object instance using V(id) if pre-bound, otherwise the anchor pattern.
+     * Builds a vertex match clause for an object instance using V(id) for pre-bound instances.
+     * 
+     * @param vertexId The vertex ID to match directly
+     * @param name The instance name to use as the step label
+     * @return A match clause traversal starting from the specified vertex ID
      */
     @Suppress("UNCHECKED_CAST")
     private fun buildIdVertexMatchClause(
@@ -664,8 +871,10 @@ class MatchExecutor {
      * Builds an edge match clause for a link.
      *
      * Computes the edge label from source and target property names using EdgeLabelUtils.
-     * 
      * Uses step labels for source and target.
+     * 
+     * @param link The link element representing the edge to match
+     * @return A match clause traversal for the edge from source to target
      */
     @Suppress("UNCHECKED_CAST")
     private fun buildEdgeMatchClause(link: TypedPatternLinkElement): GraphTraversal<Any, Any> {
@@ -682,6 +891,13 @@ class MatchExecutor {
     
     /**
      * Adds forbid constraints as where(not(...)) clauses.
+     * 
+     * Forbid constraints ensure that certain patterns do NOT exist in the match.
+     * Handles both connected forbid instances (via links) and disconnected ones.
+     * 
+     * @param traversal The traversal to extend with forbid constraints
+     * @param elements Categorized pattern elements containing forbid instances and links
+     * @return The extended traversal with forbid constraints added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addForbidConstraints(
@@ -690,9 +906,14 @@ class MatchExecutor {
     ): GraphTraversal<Vertex, Map<String, Any>> {
         var result = traversal
         val matchableNames = elements.matchableInstances.map { it.objectInstance.name }.toSet()
-        val forbidMap = elements.forbidInstances.associate { 
-            it.objectInstance.name to it.objectInstance.className
-        }
+        val forbidMap = elements.forbidInstances.mapNotNull { forbidInstance ->
+            val className = forbidInstance.objectInstance.className
+            if (className != null) {
+                forbidInstance.objectInstance.name to className
+            } else {
+                null
+            }
+        }.toMap()
         
         for (forbidLink in elements.forbidLinks) {
             result = addForbidLinkConstraint(result, forbidLink, matchableNames, forbidMap)
@@ -707,6 +928,16 @@ class MatchExecutor {
      * Adds a forbid constraint for a single link.
      * 
      * Uses step labels for referencing matched instances.
+     * Handles three cases:
+     * 1. Matched source, forbid target: forbid outgoing edge to specific class
+     * 2. Matched target, forbid source: forbid incoming edge from specific class
+     * 3. Both matched: forbid edge between specific instances
+     * 
+     * @param traversal The traversal to extend with the forbid link constraint
+     * @param forbidLink The link element to forbid
+     * @param matchableNames Set of instance names that are being matched
+     * @param forbidMap Map of forbid instance names to their class names
+     * @return The extended traversal with the forbid link constraint added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addForbidLinkConstraint(
@@ -748,6 +979,13 @@ class MatchExecutor {
     
     /**
      * Adds constraints for forbid instances not connected via links.
+     * 
+     * For forbid instances that don't appear in any forbid links, adds a constraint
+     * that no vertex of that class exists in the entire graph.
+     * 
+     * @param traversal The traversal to extend with disconnected forbid constraints
+     * @param elements Categorized pattern elements containing forbid instances and links
+     * @return The extended traversal with disconnected forbid constraints added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addDisconnectedForbidConstraints(
@@ -765,9 +1003,11 @@ class MatchExecutor {
             val name = forbidInstance.objectInstance.name
             if (!connectedForbidNames.contains(name)) {
                 val className = forbidInstance.objectInstance.className
-                val notClause = AnonymousTraversal.V<Any>()
-                    .hasLabel(className).count().`is`(P.eq(0L)) as GraphTraversal<Any, Any>
-                result = result.where(notClause) as GraphTraversal<Vertex, Map<String, Any>>
+                if (className != null) {
+                    val notClause = AnonymousTraversal.V<Any>()
+                        .hasLabel(className).count().`is`(P.eq(0L)) as GraphTraversal<Any, Any>
+                    result = result.where(notClause) as GraphTraversal<Vertex, Map<String, Any>>
+                }
             }
         }
         
@@ -780,11 +1020,19 @@ class MatchExecutor {
      * Where clauses are compiled to traversals and applied as where() filters.
      * For boolean expressions, the compiled traversal determines if the where
      * clause passes or fails.
+     * 
+     * @param traversal The traversal to extend with where clause constraints
+     * @param whereClauses List of where clause elements to apply
+     * @param compiledVariables Compiled variable expressions for reference in where clauses
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @return The extended traversal with all where clause constraints added
      */
     @Suppress("UNCHECKED_CAST")
     private fun addWhereClauseConstraints(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         whereClauses: List<TypedPatternWhereClauseElement>,
+        compiledVariables: CompiledVariables,
         context: TransformationExecutionContext,
         engine: TransformationEngine
     ): GraphTraversal<Vertex, Map<String, Any>> {
@@ -798,10 +1046,88 @@ class MatchExecutor {
     }
     
     /**
+     * Adds property comparison constraints as where() filters for non-constant property values.
+     * 
+     * This method handles property constraints (with "==" operator) where the property value
+     * is not a compile-time constant. It compiles equality comparisons between the property
+     * value and the expression using EqualityCompilerUtil.
+     * 
+     * @param traversal The main traversal to extend
+     * @param instances The instances with property constraints to check
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @return The extended traversal with property where constraints
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun addPropertyWhereConstraints(
+        traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        instances: List<TypedPatternObjectInstanceElement>,
+        compiledVariables: CompiledVariables,
+        context: TransformationExecutionContext,
+        engine: TransformationEngine
+    ): GraphTraversal<Vertex, Map<String, Any>> {
+        var result = traversal
+        
+        for (instance in instances) {
+            val instanceName = instance.objectInstance.name
+            val instanceLabel = VariableBinding.stepLabel(instanceName)
+            val className = instance.objectInstance.className
+            
+            for (property in instance.objectInstance.properties) {
+                if (property.operator == "==") {
+                    val compilationResult = compilePropertyExpression(property.value, context, engine, emptyList())
+                    
+                    if (className == null && compilationResult is GremlinCompilationResult.ValueResult) {
+                        result = result.where(
+                            AnonymousTraversal.select<Any, Any>(instanceLabel)
+                                .has(property.propertyName, compilationResult.value)
+                        ) as GraphTraversal<Vertex, Map<String, Any>>
+                    } else if (compilationResult != null && compilationResult !is GremlinCompilationResult.ValueResult) {
+                        val propertyTraversal = AnonymousTraversal.select<Any, Any>(instanceLabel)
+                            .values<Any>(property.propertyName) as GraphTraversal<Any, Any>
+                        
+                        val anchorTraversal = AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
+                        val expressionTraversal = compileExpressionToTraversal(
+                            property.value,
+                            engine,
+                            context,
+                            anchorTraversal
+                        ) as GraphTraversal<Any, Any>
+                        
+                        val propertyType = resolveExpressionType(property.value, engine)
+                            ?: throw IllegalStateException("Cannot resolve type for property expression: ${property.propertyName}")
+                        
+                        val equalityTraversal = EqualityCompilerUtil.buildEqualityTraversal(
+                            "==",
+                            propertyTraversal,
+                            expressionTraversal,
+                            propertyType,
+                            propertyType,
+                            engine.typeRegistry
+                        )
+                        
+                        result = result.where(equalityTraversal.`is`(true)) 
+                            as GraphTraversal<Vertex, Map<String, Any>>
+                    }
+                }
+            }
+        }
+        
+        return result
+    }
+    
+    /**
      * Applies a where clause using traversal-based expression compilation.
      *
      * Compiles the where clause expression to a traversal and applies it as a filter.
      * The traversal produces a boolean value which is compared against true.
+     * 
+     * @param traversal The traversal to extend with the where clause
+     * @param whereClause The where clause element to apply
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param counter The index of this where clause (for debugging/tracking)
+     * @return The extended traversal with the where clause constraint added
      */
     @Suppress("UNCHECKED_CAST")
     private fun applyTraversalWhereClause(
@@ -814,27 +1140,9 @@ class MatchExecutor {
         val compiledTraversal = compileExpressionToTraversal(
             whereClause.whereClause.expression, engine, context
         )
-
-        if (compiledTraversal == null) {
-            throw IllegalStateException("Failed to compile where clause expression: ${whereClause.whereClause.expression}")
-        }
         
-        return applyTraversalAsFilter(traversal, compiledTraversal)
-    }
-    
-    /**
-     * Applies a compiled traversal as a where clause filter.
-     *
-     * The traversal is expected to produce a boolean value. The filter passes
-     * if the result equals true.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun applyTraversalAsFilter(
-        traversal: GraphTraversal<Vertex, Map<String, Any>>,
-        booleanTraversal: GraphTraversal<*, *>
-    ): GraphTraversal<Vertex, Map<String, Any>> {
         return traversal.where(
-            booleanTraversal.`is`(true)
+            compiledTraversal.`is`(true)
         ) as GraphTraversal<Vertex, Map<String, Any>>
     }
     
@@ -846,15 +1154,23 @@ class MatchExecutor {
      * Builds a proper scope chain that includes all levels from 0 up to the match scope level.
      * This ensures expressions with specific scope indices can resolve correctly.
      *
-     * @param context The transformation execution context with properly configured scope.
+     * @param expression The expression to compile
+     * @param engine The transformation engine with compiler registry
+     * @param context The transformation execution context with properly configured scope
+     * @param initialTraversal Optional initial traversal to start from (for match contexts)
+     * @return The compiled traversal
      */
     private fun compileExpressionToTraversal(
         expression: TypedExpression,
         engine: TransformationEngine,
         context: TransformationExecutionContext,
-    ): GraphTraversal<*, *>? {
+        initialTraversal: GraphTraversal<*, *>? = null
+    ): GraphTraversal<*, *> {
         if (!engine.expressionCompilerRegistry.canCompile(expression)) {
-            return null
+            throw IllegalStateException(
+                "Cannot compile expression to traversal. " +
+                "Expression type: ${expression.javaClass.simpleName} is not supported."
+            )
         }
         
         val compilationContext = CompilationContext(
@@ -864,7 +1180,11 @@ class MatchExecutor {
             typeRegistry = engine.typeRegistry
         )
         
-        return engine.expressionCompilerRegistry.compile(expression, compilationContext).traversal
+        return engine.expressionCompilerRegistry.compile(
+            expression, 
+            compilationContext, 
+            initialTraversal
+        ).traversal
     }
     
 
@@ -877,6 +1197,10 @@ class MatchExecutor {
      * 
      * Note: When selecting a single element, returns that element directly.
      * When selecting multiple, returns a map with step labels as keys.
+     * 
+     * @param traversal The traversal to extend with the select step
+     * @param instanceNames List of instance names (converted to step labels) to select
+     * @return The extended traversal with select step for extracting named bindings
      */
     @Suppress("UNCHECKED_CAST")
     private fun addSelectStep(
@@ -904,6 +1228,15 @@ class MatchExecutor {
      * Converts step labels back to original instance names.
      * Handles the fact that select() with one element returns the element directly,
      * while select() with multiple elements returns a map.
+     * 
+     * Variables are not included in the select - they're already evaluated and stored in the scope.
+     * 
+     * @param traversal The unified traversal to execute
+     * @param elements Categorized pattern elements for result extraction
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param matchedInstanceNames Names of matched instances (for classification)
+     * @return List of matched results with classified nodes and bindings
      */
     @Suppress("UNCHECKED_CAST")
     private fun executeTraversalAndExtract(
@@ -914,20 +1247,27 @@ class MatchExecutor {
         matchedInstanceNames: List<String>
     ): List<MatchResult.Matched> {
         val instanceNames = elements.allInstanceNames
+        val variableLabels = elements.variables.map { VariableBinding.variableLabel(it.variable.name) }
+        val allLabels = instanceNames + variableLabels
+        
         return traversal.toList().map { rawResult ->
             val result: Map<String, Any> = when {
-                instanceNames.isEmpty() -> {
+                allLabels.isEmpty() -> {
                     rawResult as Map<String, Any>
                 }
-                instanceNames.size == 1 -> {
-                    val name = instanceNames[0]
-                    mapOf(name to rawResult)
+                allLabels.size == 1 -> {
+                    val label = allLabels[0]
+                    mapOf(label to rawResult)
                 }
                 else -> {
                     val rawMap = rawResult as Map<String, Any>
-                    instanceNames.associateWith { name -> 
+                    val instanceMap = instanceNames.associateWith { name -> 
                         rawMap[VariableBinding.stepLabel(name)]!!
                     }
+                    val variableMap = variableLabels.associateWith { label ->
+                        rawMap[label]!!
+                    }
+                    instanceMap + variableMap
                 }
             }
             extractMatchResult(result, elements, context, engine, matchedInstanceNames)
@@ -940,6 +1280,16 @@ class MatchExecutor {
      * The instance mappings returned will be used by MatchResult.applyTo to update
      * the current scope's bindings (setting vertexId on InstanceBindings).
      * This happens in place - no new scopes are created.
+     * 
+     * Variables are extracted from the scope (where they were stored during evaluation)
+     * and their LabelBinding is replaced with ValueBinding for use in subsequent scopes.
+     * 
+     * @param result The raw result map from traversal execution (step labels to values)
+     * @param elements Categorized pattern elements for extracting variables and instances
+     * @param context The transformation execution context
+     * @param engine The transformation engine
+     * @param matchedInstanceNames Names of matched instances for node classification
+     * @return A MatchResult.Matched with bindings and classified node IDs
      */
     private fun extractMatchResult(
         result: Map<String, Any>,
@@ -947,27 +1297,17 @@ class MatchExecutor {
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         matchedInstanceNames: List<String>
-    ): MatchResult.Matched {
-        val nodeClassification = classifyNodes(result, elements, engine)
-        val bindings = evaluateVariables(elements.variables, context, engine)
+    ): MatchResult.Matched {        
+        val bindings = mutableMapOf<String, Any?>()
+        for (variableElement in elements.variables) {
+            val variableName = variableElement.variable.name
+            val variableLabel = VariableBinding.variableLabel(variableName)
+            val value = result[variableLabel]
+            bindings[variableName] = value
+            
+            context.variableScope.setBinding(variableName, VariableBinding.ValueBinding(value))
+        }
         
-        return MatchResult.Matched(
-            bindings = bindings,
-            instanceMappings = nodeClassification.instanceMappings,
-            matchedNodeIds = nodeClassification.matchedNodeIds,
-            createdNodeIds = nodeClassification.createdNodeIds,
-            deletedNodeIds = nodeClassification.deletedNodeIds
-        )
-    }
-    
-    /**
-     * Classifies nodes from traversal result into matched, created, and deleted categories.
-     */
-    private fun classifyNodes(
-        result: Map<String, Any>,
-        elements: PatternCategories,
-        engine: TransformationEngine
-    ): NodeClassification {
         val instanceMappings = mutableMapOf<String, Any>()
         val matchedNodeIds = mutableSetOf<Any>()
         val createdNodeIds = mutableSetOf<Any>()
@@ -983,11 +1323,25 @@ class MatchExecutor {
             )
         }
         
-        return NodeClassification(instanceMappings, matchedNodeIds, createdNodeIds, deletedNodeIds)
+        return MatchResult.Matched(bindings, instanceMappings, matchedNodeIds, createdNodeIds, deletedNodeIds)
     }
     
     /**
      * Classifies a single node into the appropriate category.
+     * 
+     * Determines whether a node is matched, created, or deleted based on the instance name
+     * and updates the appropriate collections. Registers created nodes with the instance
+     * name registry for lookup by name.
+     * 
+     * @param name The instance name
+     * @param value The vertex or value from the traversal result
+     * @param createInstanceNames Set of instance names marked for creation
+     * @param deleteInstanceNames Set of instance names marked for deletion
+     * @param instanceMappings Mutable map to populate with instance name to vertex ID mappings
+     * @param matchedNodeIds Mutable set to add matched node IDs to
+     * @param createdNodeIds Mutable set to add created node IDs to
+     * @param deletedNodeIds Mutable set to add deleted node IDs to
+     * @param engine The transformation engine for instance name registration
      */
     private fun classifyNodeByName(
         name: String,
@@ -1017,29 +1371,6 @@ class MatchExecutor {
         } else if (value != null) {
             instanceMappings[name] = value
         }
-    }
-    
-    private data class NodeClassification(
-        val instanceMappings: Map<String, Any>,
-        val matchedNodeIds: Set<Any>,
-        val createdNodeIds: Set<Any>,
-        val deletedNodeIds: Set<Any>
-    )
-    
-    /**
-     * Evaluates pattern variables.
-     */
-    private fun evaluateVariables(
-        variables: List<TypedPatternVariableElement>,
-        context: TransformationExecutionContext,
-        engine: TransformationEngine
-    ): Map<String, Any?> {
-        val bindings = mutableMapOf<String, Any?>()
-        for (variableElement in variables) {
-            val variable = variableElement.variable
-            bindings[variable.name] = getPropertyValue(variable.value, context, engine, emptyList())
-        }
-        return bindings
     }
     
     /**
@@ -1138,94 +1469,54 @@ class MatchExecutor {
             transformationContext = txContext
         )
     }
-}
-
-/**
- * Internal data class for holding categorized pattern elements for the unified executor.
- */
-private data class PatternCategories(
-    val matchableInstances: List<TypedPatternObjectInstanceElement>,
-    val matchableLinks: List<TypedPatternLinkElement>,
-    val createInstances: List<TypedPatternObjectInstanceElement>,
-    val deleteInstances: List<TypedPatternObjectInstanceElement>,
-    val createLinks: List<TypedPatternLinkElement>,
-    val deleteLinks: List<TypedPatternLinkElement>,
-    val forbidInstances: List<TypedPatternObjectInstanceElement>,
-    val forbidLinks: List<TypedPatternLinkElement>,
-    val variables: List<TypedPatternVariableElement>,
-    val whereClauses: List<TypedPatternWhereClauseElement>
-) {
-    /**
-     * All instance names for final select() step - includes matched, created, and deleted. 
-     */
-    val allInstanceNames: List<String>
-        get() = matchableInstances.map { it.objectInstance.name } +
-                createInstances.map { it.objectInstance.name } +
-                deleteInstances.map { it.objectInstance.name }
     
-    companion object {
-        /**
-         * Creates PatternCategories from a pattern.
-         */
-        fun from(pattern: TypedPattern): PatternCategories {
-            val matchableInstances = mutableListOf<TypedPatternObjectInstanceElement>()
-            val matchableLinks = mutableListOf<TypedPatternLinkElement>()
-            val createInstances = mutableListOf<TypedPatternObjectInstanceElement>()
-            val deleteInstances = mutableListOf<TypedPatternObjectInstanceElement>()
-            val createLinks = mutableListOf<TypedPatternLinkElement>()
-            val deleteLinks = mutableListOf<TypedPatternLinkElement>()
-            val forbidInstances = mutableListOf<TypedPatternObjectInstanceElement>()
-            val forbidLinks = mutableListOf<TypedPatternLinkElement>()
-            val variables = mutableListOf<TypedPatternVariableElement>()
-            val whereClauses = mutableListOf<TypedPatternWhereClauseElement>()
+    /**
+     * Result of building match clauses.
+     *
+     * Contains both the match clause traversals and the compiled variable expressions.
+     * This avoids recompiling variables when they are referenced later in property constraints.
+     *
+     * @property clauses The array of match clause traversals
+     * @property compiledVariables The compiled variable expressions indexed by variable label
+     */
+    private data class MatchClauseBuildResult(
+        val clauses: Array<GraphTraversal<Any, Any>>,
+        val compiledVariables: CompiledVariables
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
             
-            for (element in pattern.elements) {
-                when (element) {
-                    is TypedPatternObjectInstanceElement -> categorizeInstance(
-                        element, matchableInstances, createInstances, deleteInstances, forbidInstances
-                    )
-                    is TypedPatternLinkElement -> categorizeLink(
-                        element, matchableLinks, createLinks, deleteLinks, forbidLinks
-                    )
-                    is TypedPatternVariableElement -> variables.add(element)
-                    is TypedPatternWhereClauseElement -> whereClauses.add(element)
-                }
-            }
+            other as MatchClauseBuildResult
             
-            return PatternCategories(
-                matchableInstances, matchableLinks, createInstances, deleteInstances,
-                createLinks, deleteLinks, forbidInstances, forbidLinks, variables, whereClauses
-            )
+            if (!clauses.contentEquals(other.clauses)) return false
+            if (compiledVariables != other.compiledVariables) return false
+            
+            return true
         }
         
-        private fun categorizeInstance(
-            element: TypedPatternObjectInstanceElement,
-            matchable: MutableList<TypedPatternObjectInstanceElement>,
-            create: MutableList<TypedPatternObjectInstanceElement>,
-            delete: MutableList<TypedPatternObjectInstanceElement>,
-            forbid: MutableList<TypedPatternObjectInstanceElement>
-        ) {
-            when (element.objectInstance.modifier) {
-                "create" -> create.add(element)
-                "delete" -> delete.add(element)
-                "forbid" -> forbid.add(element)
-                else -> matchable.add(element)
-            }
-        }
-        
-        private fun categorizeLink(
-            element: TypedPatternLinkElement,
-            matchable: MutableList<TypedPatternLinkElement>,
-            create: MutableList<TypedPatternLinkElement>,
-            delete: MutableList<TypedPatternLinkElement>,
-            forbid: MutableList<TypedPatternLinkElement>
-        ) {
-            when (element.link.modifier) {
-                "create" -> create.add(element)
-                "delete" -> delete.add(element)
-                "forbid" -> forbid.add(element)
-                else -> matchable.add(element)
-            }
+        override fun hashCode(): Int {
+            var result = clauses.contentHashCode()
+            result = 31 * result + compiledVariables.hashCode()
+            return result
         }
     }
 }
+
+/**
+    * Classification of nodes from a match result.
+    * 
+    * Categorizes nodes into matched, created, and deleted sets, and provides
+    * mappings from instance names to vertex IDs or values.
+    * 
+    * @property instanceMappings Map from instance name to vertex ID or value
+    * @property matchedNodeIds Set of vertex IDs that were matched (but not created)
+    * @property createdNodeIds Set of vertex IDs that were created in this match
+    * @property deletedNodeIds Set of vertex IDs that will be deleted
+    */
+private data class NodeClassification(
+    val instanceMappings: Map<String, Any>,
+    val matchedNodeIds: Set<Any>,
+    val createdNodeIds: Set<Any>,
+    val deletedNodeIds: Set<Any>
+)

@@ -147,7 +147,7 @@ class OrderedSetImpl<T> : AbstractCollection<T, LinkedHashSet<T>>, OrderedSet<T>
         return OrderedSetImpl(result)
     }
 
-    override fun <U> map(mapper: Func1<T, U>): ReadonlyOrderedSet<U> {
+    override fun <U> map(mapper: Func1<T, U>): OrderedSet<U> {
         val result = LinkedHashSet<U>()
         for (element in backing) {
             result.add(mapper.call(element))

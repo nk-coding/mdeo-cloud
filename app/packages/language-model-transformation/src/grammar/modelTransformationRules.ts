@@ -23,6 +23,7 @@ import {
     Pattern,
     PatternVariable,
     PatternObjectInstance,
+    PatternObjectInstanceDelete,
     PatternPropertyAssignment,
     PatternLink,
     PatternLinkEnd,
@@ -47,7 +48,8 @@ import {
     expressionConfig,
     expressionTypes,
     type ModelTransformationType,
-    BaseTransformationStatement
+    BaseTransformationStatement,
+    PatternObjectInstanceReference
 } from "./modelTransformationTypes.js";
 
 /**
@@ -149,6 +151,28 @@ export function generateModelTransformationRules(): {
         ]);
 
     /**
+     * Gets the scope for property references in pattern object instances.
+     * Traverses the class chain and looks up all properties for each class.
+     */
+    const PatternObjectInstanceReferenceRule = createRule("PatternObjectInstanceReferenceRule")
+        .returns(PatternObjectInstanceReference)
+        .as(({ set, add }) => [
+            set("instance", ref(PatternObjectInstance, ID)),
+            "{",
+            many(or(add("properties", PatternPropertyAssignmentRule), NEWLINE)),
+            "}"
+        ]);
+
+    /**
+     * Pattern object delete rule.
+     * Format: delete name
+     * Deletes an already named node from a previous match.
+     */
+    const PatternObjectDeleteRule = createRule("PatternObjectDeleteRule")
+        .returns(PatternObjectInstanceDelete)
+        .as(({ set }) => ["delete", set("instance", ref(PatternObjectInstance, ID))]);
+
+    /**
      * Pattern link end rule.
      * Format: object[.property]
      */
@@ -190,6 +214,8 @@ export function generateModelTransformationRules(): {
             many(
                 or(
                     add("elements", PatternVariableRule),
+                    add("elements", PatternObjectInstanceReferenceRule),
+                    add("elements", PatternObjectDeleteRule),
                     add("elements", PatternObjectInstanceRule),
                     add("elements", PatternLinkRule),
                     add("elements", WhereClauseRule),

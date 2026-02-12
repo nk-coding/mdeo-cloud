@@ -1,7 +1,7 @@
 import type { SetModelAction as SetModelActionType, UpdateModelAction } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../../sharedImport.js";
 import type { CommandExecutionContext, CommandReturn, IActionDispatcher } from "@eclipse-glsp/sprotty";
-import { createFitToScreenAction } from "./fitToScreenAction.js";
+import { createFitToScreenAction } from "./fitToScreen.js";
 import { GNode } from "../../model/node.js";
 import { LayoutAction } from "../toolbox/layoutAction.js";
 
@@ -34,6 +34,7 @@ export class InitializeViewportLayoutCommand extends Command {
             ) {
                 this.actionDispatcher.dispatch(LayoutAction.create());
             } else {
+                console.log("fit to screen dispatched");
                 this.actionDispatcher.dispatchOnceModelInitialized(
                     createFitToScreenAction(false, this.action.newRoot.children?.map((child) => child.id) ?? [])
                 );

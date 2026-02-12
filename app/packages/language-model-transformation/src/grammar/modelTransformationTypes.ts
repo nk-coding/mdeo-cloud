@@ -97,6 +97,34 @@ export const PatternObjectInstance = createInterface("PatternObjectInstance").at
 export type PatternObjectInstanceType = ASTType<typeof PatternObjectInstance>;
 
 /**
+ * Reference to a pattern object instance, used for referencing previously matched nodes.
+ * Contains the instance reference and optional property assignments for constraints.
+ */
+export const PatternObjectInstanceReference = createInterface("PatternObjectInstanceReference").attrs({
+    instance: Ref(PatternObjectInstance),
+    properties: [PatternPropertyAssignment]
+});
+
+/**
+ * Type representing a PatternObjectInstanceReference AST node.
+ */
+export type PatternObjectInstanceReferenceType = ASTType<typeof PatternObjectInstanceReference>;
+
+/**
+ * Pattern object delete.
+ * Deletes an already named node from a previous match.
+ * Format: delete nameOfTheNode
+ */
+export const PatternObjectInstanceDelete = createInterface("PatternObjectDelete").attrs({
+    instance: Ref(() => PatternObjectInstance)
+});
+
+/**
+ * Type representing a PatternObjectDelete AST node.
+ */
+export type PatternObjectInstanceDeleteType = ASTType<typeof PatternObjectInstanceDelete>;
+
+/**
  * Link end in a pattern.
  * References an object instance with optional property.
  */
@@ -143,6 +171,7 @@ export type WhereClauseType = ASTType<typeof WhereClause>;
 export const PatternElement: BaseType<AstNode> = createType("PatternElement").types(
     PatternVariable,
     PatternObjectInstance,
+    PatternObjectInstanceDelete,
     PatternLink,
     WhereClause
 );
@@ -415,24 +444,3 @@ export const ModelTransformation = createInterface("ModelTransformation").attrs(
  * Model Transformation AST type.
  */
 export type ModelTransformationType = ASTType<typeof ModelTransformation>;
-
-/**
- * All statement types including Model Transformation-specific statements.
- */
-export const statementTypes = {
-    baseTransformationStatementType: BaseTransformationStatement,
-    statementsScopeType: StatementsScope,
-    matchStatementType: MatchStatement,
-    ifMatchConditionType: IfMatchConditionAndBlock,
-    ifMatchStatementType: IfMatchStatement,
-    whileMatchStatementType: WhileMatchStatement,
-    untilMatchStatementType: UntilMatchStatement,
-    forMatchStatementType: ForMatchStatement,
-    ifExpressionStatementType: IfExpressionStatement,
-    whileExpressionStatementType: WhileExpressionStatement,
-    stopStatementType: StopStatement,
-    patternVariableType: PatternVariable,
-    patternObjectInstanceType: PatternObjectInstance,
-    patternLinkType: PatternLink,
-    whereClauseType: WhereClause
-};

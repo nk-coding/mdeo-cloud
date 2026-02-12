@@ -12,8 +12,7 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  */
 fun createOrderedSetType(): GremlinTypeDefinition {
     return gremlinType("builtin.OrderedSet")
-        .extends("builtin.ReadonlyOrderedCollection")
+        .extends("builtin.OrderedCollection")
         .cardinality(VertexProperty.Cardinality.set)
-        // Note: Also conceptually extends Set
         .build()
 }

@@ -370,11 +370,18 @@ class BinaryOperatorCompiler(
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
-        // Use where() with predicates for equality to support all types (including strings)
-        val traversal = buildEqualityTraversal(
+        val leftType = context.resolveTypeOrNull(expr.left.evalType)
+            ?: throw CompilationException("Cannot resolve type for left operand of equality expression")
+        val rightType = context.resolveTypeOrNull(expr.right.evalType)
+            ?: throw CompilationException("Cannot resolve type for right operand of equality expression")
+
+        val traversal = EqualityCompilerUtil.buildEqualityTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
-            rightResult.traversal as GraphTraversal<Any, Any>
+            rightResult.traversal as GraphTraversal<Any, Any>,
+            leftType,
+            rightType,
+            context.typeRegistry
         )
 
         return GremlinCompilationResult.of(traversal)
@@ -463,49 +470,6 @@ class BinaryOperatorCompiler(
         } else {
             baseTraversal as GraphTraversal<Any, Boolean>
         }
-    }
-
-    /**
-     * Builds a traversal for equality comparison (== and !=) that works with all types.
-     *
-     * Unlike numeric comparisons, equality doesn't use math subtraction. Instead, we:
-     * 1. Store the left value with as("_left")
-     * 2. Compute the right value and store with as("_right")
-     * 3. Use where() to compare them
-     * 4. Use choose() to produce a boolean result
-     *
-     * Pattern:
-     * ```
-     * leftTraversal.as("_left")
-     *     .map(rightTraversal).as("_right")
-     *     .choose(
-     *       __.where("_left", P.eq("_right")),
-     *       __.constant(true),
-     *       __.constant(false)
-     *     )
-     * ```
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun buildEqualityTraversal(
-        operator: String,
-        leftTraversal: GraphTraversal<Any, Any>,
-        rightTraversal: GraphTraversal<Any, Any>
-    ): GraphTraversal<Any, Boolean> {
-        val predicate: P<String> = if (operator == OPERATOR_EQUALS) {
-            P.eq("_right")
-        } else {
-            P.neq("_right")
-        }
-
-        return leftTraversal
-            .`as`("_left")
-            .map(rightTraversal)
-            .`as`("_right")
-            .choose(
-                AnonymousTraversal.where<Any>("_left", predicate),
-                AnonymousTraversal.constant(true),
-                AnonymousTraversal.constant(false)
-            ) as GraphTraversal<Any, Boolean>
     }
 
     /**

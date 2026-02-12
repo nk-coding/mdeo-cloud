@@ -236,7 +236,7 @@ class SetImplTest {
     fun `map returns set type`() {
         val set = SetImpl.of(1, 2, 3)
         val mapped = set.map(Func1 { it * 2 })
-        assertTrue(mapped is ReadonlySet)
+        assertTrue(mapped is ScriptSet)
     }
 
     @Test

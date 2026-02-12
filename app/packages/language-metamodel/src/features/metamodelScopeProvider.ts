@@ -70,10 +70,8 @@ export class MetamodelScopeProvider extends DefaultScopeProvider {
      * @returns A scope containing all accessible classes and enums
      */
     private getClassOrEnumScope(referenceInfo: ReferenceInfo, document: LangiumDocument, _model: MetaModelType): Scope {
-        // Get imported elements scope (transitively follows imports)
         const importedScope = this.getImportedEntitiesScope(document);
 
-        // Create local scope with imported scope as outer scope
         return createLocalScope(referenceInfo, document, this.astReflection, importedScope);
     }
 
@@ -90,7 +88,6 @@ export class MetamodelScopeProvider extends DefaultScopeProvider {
             return EMPTY_SCOPE;
         }
 
-        // Collect entities from all imported files using the helper
         return getScopeFromMetamodelFile(document, this.documents, this.descriptionProvider);
     }
 }

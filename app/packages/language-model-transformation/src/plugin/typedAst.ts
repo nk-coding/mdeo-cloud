@@ -96,8 +96,9 @@ export interface TypedPatternObjectInstance {
 
     /**
      * Fully qualified class name.
+     * Optional to support referencing previously matched nodes.
      */
-    className: string;
+    className?: string;
 
     /**
      * Property assignments.

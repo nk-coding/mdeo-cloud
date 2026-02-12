@@ -56,7 +56,7 @@ class LambdaMethodDefinitionsTest {
         val types = listOf(
             ClassTypeRef(type = "builtin.int", isNullable = false),
             ClassTypeRef(type = "builtin.boolean", isNullable = false),
-            ClassTypeRef(type = "builtin.ReadonlyCollection", isNullable = false),
+            ClassTypeRef(type = "builtin.Collection", isNullable = false),
             ClassTypeRef(type = "builtin.List", isNullable = false)
         )
         

@@ -13,6 +13,6 @@
         "src"
     ],
     "devDependencies": {
-        "@eclipse-glsp/protocol": "^2.5.0"
+        "@eclipse-glsp/protocol": "^2.6.0"
     }
 }

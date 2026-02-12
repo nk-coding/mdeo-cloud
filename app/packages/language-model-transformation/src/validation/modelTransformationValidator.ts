@@ -22,7 +22,6 @@ import {
     type ElseIfBranchType,
     type IfMatchStatementType
 } from "../grammar/modelTransformationTypes.js";
-import { DeletedInstanceAnalyzer } from "./deletedInstanceAnalyzer.js";
 import { sharedImport } from "@mdeo/language-shared";
 
 const { MultiMap } = sharedImport("langium");
@@ -37,18 +36,12 @@ interface NamedElement {
 }
 
 /**
- * Identifier expression type for validation.
- */
-type IdentifierExpressionType = AstNode & { name: string };
-
-/**
  * Interface mapping for model transformation AST types used in validation checks.
  */
 interface ModelTransformationAstTypes {
     ModelTransformation: ModelTransformationType;
     PatternObjectInstance: PatternObjectInstanceType;
     PatternLink: PatternLinkType;
-    ModelTransformationIdentifierExpression: IdentifierExpressionType;
 }
 
 /**
@@ -63,8 +56,7 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
     const checks: ValidationChecks<ModelTransformationAstTypes> = {
         ModelTransformation: validator.validateTransformation.bind(validator),
         PatternObjectInstance: validator.validateObjectInstance.bind(validator),
-        PatternLink: validator.validateLink.bind(validator),
-        ModelTransformationIdentifierExpression: validator.validateIdentifierExpression.bind(validator)
+        PatternLink: validator.validateLink.bind(validator)
     };
 
     registry.register(checks, validator);
@@ -72,15 +64,11 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
 
 /**
  * Validator for model transformation language constructs.
- * Provides validation for global uniqueness, required properties, link validation,
- * and control flow validation for deleted object instances.
+ * Provides validation for global uniqueness, required properties, and link validation.
  */
 export class ModelTransformationValidator extends BaseModelValidator {
-    private readonly deletedInstanceAnalyzer: DeletedInstanceAnalyzer;
-
     constructor(private readonly services: ExtendedLangiumServices) {
         super(services.shared.AstReflection);
-        this.deletedInstanceAnalyzer = new DeletedInstanceAnalyzer(this.reflection, services.shared);
     }
 
     /**
@@ -93,17 +81,6 @@ export class ModelTransformationValidator extends BaseModelValidator {
         const allNames = new MultiMap<string, NamedElement>();
         this.collectAllNames(transformation, allNames);
         this.reportDuplicateNames(allNames, accept);
-    }
-
-    /**
-     * Validates an identifier expression for references to deleted object instances.
-     * Uses control flow analysis to detect if the referenced instance might have been deleted.
-     *
-     * @param identifier The identifier expression to validate
-     * @param accept The validation acceptor
-     */
-    validateIdentifierExpression(identifier: IdentifierExpressionType, accept: ValidationAcceptor): void {
-        this.deletedInstanceAnalyzer.validateIdentifierReference(identifier, accept);
     }
 
     /**
@@ -279,8 +256,19 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * @param accept The validation acceptor
      */
     validateObjectInstance(obj: PatternObjectInstanceType, accept: ValidationAcceptor): void {
-        this.validateClassNotAbstract(obj, accept);
-        this.validateRequiredPropertiesForCreate(obj, accept);
+        // Only validate class-specific constraints if class is present
+        if (obj.class != undefined) {
+            this.validateClassNotAbstract(obj, accept);
+            this.validateRequiredPropertiesForCreate(obj, accept);
+        } else {
+            // For references to previously matched nodes, ensure no create modifier
+            if (obj.modifier?.modifier === "create") {
+                accept("error", `Cannot use 'create' modifier without specifying a class type.`, {
+                    node: obj,
+                    property: "modifier"
+                });
+            }
+        }
     }
 
     /**

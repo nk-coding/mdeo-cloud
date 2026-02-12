@@ -343,7 +343,7 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
         accept: ValidationProblemAcceptor<TypirLangiumSpecifics>
     ): void {
         const propertyRef = node.name?.ref;
-        if (propertyRef == undefined) {
+        if (propertyRef == undefined || node.value == undefined) {
             return;
         }
 

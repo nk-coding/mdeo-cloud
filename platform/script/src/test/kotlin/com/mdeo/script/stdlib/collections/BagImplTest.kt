@@ -276,7 +276,7 @@ class BagImplTest {
         val bag = BagImpl.of(1, 2, 3)
         val mapped = bag.map(Func1 { it * 2 })
         @Suppress("USELESS_IS_CHECK")
-        assertTrue(mapped is ReadonlyCollection)
+        assertTrue(mapped is Bag)
     }
 
     // ==================== filter() / reject() tests ====================

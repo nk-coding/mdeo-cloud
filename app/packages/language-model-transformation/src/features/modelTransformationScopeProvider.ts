@@ -11,12 +11,15 @@ import type {
 } from "langium";
 import {
     PatternObjectInstance,
+    PatternObjectInstanceDelete,
     PatternPropertyAssignment,
     PatternLinkEnd,
     type PatternObjectInstanceType,
     type PatternPropertyAssignmentType,
     type PatternLinkEndType,
-    ModelTransformation
+    ModelTransformation,
+    PatternObjectInstanceReference,
+    type PatternObjectInstanceReferenceType
 } from "../grammar/modelTransformationTypes.js";
 import { getScopeFromMetamodelFile, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import { AssociationEndCache } from "@mdeo/language-model";
@@ -83,6 +86,18 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
             return this.getPropertyNameScope(referenceInfo);
         }
         if (
+            referenceInfo.property === "instance" &&
+            this.astReflection.isInstance(referenceInfo.container, PatternObjectInstanceDelete)
+        ) {
+            return this.getObjectInstancesScope(referenceInfo);
+        }
+        if (
+            referenceInfo.property === "instance" &&
+            this.astReflection.isInstance(referenceInfo.container, PatternObjectInstanceReference)
+        ) {
+            return this.getObjectInstancesScope(referenceInfo);
+        }
+        if (
             referenceInfo.property === "property" &&
             this.astReflection.isInstance(referenceInfo.container, PatternLinkEnd)
         ) {
@@ -137,13 +152,29 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
      */
     private getPropertyNameScope(referenceInfo: ReferenceInfo): Scope {
         const propertyAssignment = referenceInfo.container as PatternPropertyAssignmentType;
-        const objectInstance = propertyAssignment.$container as PatternObjectInstanceType | undefined;
+        let objectInstance = propertyAssignment.$container as
+            | PatternObjectInstanceType
+            | PatternObjectInstanceReferenceType
+            | undefined;
+
+        // workaround for langium weirdness in completion mode
+        if (this.astReflection.isInstance(objectInstance, PatternPropertyAssignment)) {
+            objectInstance = objectInstance.$container as
+                | PatternObjectInstanceType
+                | PatternObjectInstanceReferenceType
+                | undefined;
+        }
 
         if (objectInstance == undefined) {
             return EMPTY_SCOPE;
         }
 
-        const classRef = objectInstance.class?.ref as ClassType | undefined;
+        let classRef: ClassType | undefined = undefined;
+        if (this.astReflection.isInstance(objectInstance, PatternObjectInstance)) {
+            classRef = objectInstance.class?.ref as ClassType | undefined;
+        } else {
+            classRef = objectInstance.instance.ref?.class?.ref as ClassType | undefined;
+        }
         if (classRef == undefined) {
             return EMPTY_SCOPE;
         }

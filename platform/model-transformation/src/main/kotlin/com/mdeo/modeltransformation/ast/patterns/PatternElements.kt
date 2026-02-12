@@ -51,14 +51,16 @@ data class TypedPatternPropertyAssignment(
  *                 "delete" to delete a matched object, "forbid" to specify objects that must not exist,
  *                 or null for simple matching.
  * @param name Name of the object instance, used for referencing in links and expressions.
- * @param className Fully qualified class name of the object's type.
+ * @param className Fully qualified class name of the object's type. When null, refers to a previously
+ *                  matched node with the same name, allowing property assignments and comparisons on
+ *                  already matched nodes.
  * @param properties Property assignments for this object instance.
  */
 @Serializable
 data class TypedPatternObjectInstance(
     val modifier: String? = null,
     val name: String,
-    val className: String,
+    val className: String? = null,
     val properties: List<TypedPatternPropertyAssignment>
 )
 

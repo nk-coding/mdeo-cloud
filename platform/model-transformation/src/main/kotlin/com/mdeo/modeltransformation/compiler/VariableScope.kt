@@ -33,12 +33,34 @@ sealed interface VariableBinding {
         var vertexId: Any?
     ) : VariableBinding
     
+    /**
+     * A binding to a label in a Gremlin match() clause.
+     *
+     * This is used for variables declared in match blocks that need to be referenced
+     * within the same match. The variable is evaluated as part of the match (as another
+     * match clause) and bound to a label using .as("label"). 
+     *
+     * After the match executes, LabelBinding should be replaced with ValueBinding 
+     * so the variable can be used in subsequent scopes.
+     *
+     * @param label The Gremlin step label used in the match clause (typically prefixed with $)
+     */
+    data class LabelBinding(
+        val label: String
+    ) : VariableBinding
+    
     companion object {
         /**
-         * Generates a step label for an instance name.
-         * Returns the name as-is to be used as a Gremlin step label.
+         * Generates a step label for an instance or variable name.
+         * Returns the name with a dollar prefix to distinguish variables from instances in the match.
          */
         fun stepLabel(name: String): String = name
+        
+        /**
+         * Generates a step label for a variable name used in match clauses.
+         * Uses dollar prefix to distinguish variables from instances.
+         */
+        fun variableLabel(name: String): String = "\$$name"
     }
 }
 

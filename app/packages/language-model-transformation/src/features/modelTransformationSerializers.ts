@@ -9,6 +9,7 @@ import {
     PatternVariable,
     PatternPropertyAssignment,
     PatternObjectInstance,
+    PatternObjectInstanceDelete,
     PatternLinkEnd,
     PatternLink,
     WhereClause,
@@ -33,6 +34,7 @@ import {
     type PatternVariableType,
     type PatternPropertyAssignmentType,
     type PatternObjectInstanceType,
+    type PatternObjectInstanceDeleteType,
     type PatternLinkEndType,
     type PatternLinkType,
     type WhereClauseType,
@@ -51,7 +53,9 @@ import {
     type LambdaParameterType,
     type LambdaParametersType,
     type LambdaExpressionType,
-    type StatementsScopeType
+    type StatementsScopeType,
+    type PatternObjectInstanceReferenceType,
+    PatternObjectInstanceReference
 } from "../grammar/modelTransformationTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -96,6 +100,10 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(PatternVariable, (ctx) => printPatternVariable(ctx));
     AstSerializer.registerNodeSerializer(PatternPropertyAssignment, (ctx) => printPatternPropertyAssignment(ctx));
     AstSerializer.registerNodeSerializer(PatternObjectInstance, (ctx) => printPatternObjectInstance(ctx));
+    AstSerializer.registerNodeSerializer(PatternObjectInstanceReference, (ctx) =>
+        printPatternObjectInstanceReference(ctx)
+    );
+    AstSerializer.registerNodeSerializer(PatternObjectInstanceDelete, (ctx) => printPatternObjectInstanceDelete(ctx));
     AstSerializer.registerNodeSerializer(PatternLinkEnd, (ctx) => printPatternLinkEnd(ctx));
     AstSerializer.registerNodeSerializer(PatternLink, (ctx) => printPatternLink(ctx));
     AstSerializer.registerNodeSerializer(WhereClause, (ctx) => printWhereClause(ctx));
@@ -183,6 +191,42 @@ function printPatternObjectInstance(context: PrintContext<PatternObjectInstanceT
     docs.push("}");
 
     return group(docs);
+}
+
+/**
+ * Prints a pattern object instance reference node.
+ * This is used for referencing existing object instances in the pattern, allowing property assignments to modify them.
+ *
+ * @param context The print context.
+ * @returns The formatted object instance reference with property assignments.
+ */
+function printPatternObjectInstanceReference(context: PrintContext<PatternObjectInstanceReferenceType>): Doc {
+    const { path, printReference } = context;
+    const docs: Doc[] = [];
+
+    docs.push(path.call((ref) => printReference(ref, ID), "instance"));
+
+    docs.push(" {");
+
+    const content = serializeNewlineSep(context, ["properties"], doc.builders);
+    if (content.length > 0) {
+        docs.push(indent([hardline, content]), hardline);
+    }
+
+    docs.push("}");
+
+    return group(docs);
+}
+
+/**
+ * Prints a pattern object delete node.
+ *
+ * @param context The print context.
+ * @returns The formatted object delete.
+ */
+function printPatternObjectInstanceDelete(context: PrintContext<PatternObjectInstanceDeleteType>): Doc {
+    const { path, printReference } = context;
+    return ["delete ", path.call((ref) => printReference(ref, ID), "instance")];
 }
 
 /**

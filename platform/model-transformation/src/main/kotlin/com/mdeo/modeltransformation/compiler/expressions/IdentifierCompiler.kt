@@ -97,6 +97,9 @@ class IdentifierCompiler : ExpressionCompiler {
             is VariableBinding.InstanceBinding -> {
                 compileInstanceBinding(binding, name, context, initialTraversal)
             }
+            is VariableBinding.LabelBinding -> {
+                compileLabelBinding(binding, context, initialTraversal)
+            }
         }
     }
     
@@ -129,6 +132,31 @@ class IdentifierCompiler : ExpressionCompiler {
             initialTraversal.select<Any>(stepLabel) as GraphTraversal<Any, Any>
         } else {
             AnonymousTraversal.select<Any, Any>(stepLabel)
+        }
+        return GremlinCompilationResult.of(traversal)
+    }
+    
+    /**
+     * Compiles a label binding to a traversal that uses select() to reference the label.
+     * 
+     * LabelBinding is used for variables declared in match blocks that are evaluated
+     * as part of the match using .as(label). The label is retrieved using select().
+     * 
+     * @param binding The LabelBinding containing the step label
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to append to
+     * @return A GremlinCompilationResult containing the select() traversal
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun compileLabelBinding(
+        binding: VariableBinding.LabelBinding,
+        context: CompilationContext,
+        initialTraversal: GraphTraversal<*, *>?
+    ): GremlinCompilationResult {
+        val traversal = if (initialTraversal != null) {
+            initialTraversal.select<Any>(binding.label) as GraphTraversal<Any, Any>
+        } else {
+            AnonymousTraversal.select<Any, Any>(binding.label)
         }
         return GremlinCompilationResult.of(traversal)
     }

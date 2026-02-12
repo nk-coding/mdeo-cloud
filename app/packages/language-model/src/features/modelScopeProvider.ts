@@ -124,6 +124,7 @@ export class ModelScopeProvider extends DefaultScopeProvider {
      */
     private getPropertyNameScope(context: ReferenceInfo): Scope {
         let objectInstance = context.container.$container as ObjectInstanceType;
+        // workaround for langium weirdness in completion mode
         if (this.astReflection.isInstance(objectInstance, PropertyAssignment)) {
             objectInstance = objectInstance.$container as ObjectInstanceType;
         }

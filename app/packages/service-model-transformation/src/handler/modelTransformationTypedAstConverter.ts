@@ -15,7 +15,6 @@ import {
     type ModelTransformationType,
     type TypedAst,
     type TypedTransformationStatement,
-    statementTypes,
     type MatchStatementType,
     type TypedMatchStatement,
     type IfMatchStatementType,
@@ -50,7 +49,23 @@ import {
     type TypedWhereClause,
     LambdaExpression,
     type LambdaExpressionType,
-    type TypedLambdaExpression
+    type TypedLambdaExpression,
+    IfMatchStatement,
+    WhileMatchStatement,
+    UntilMatchStatement,
+    IfExpressionStatement,
+    WhileExpressionStatement,
+    StopStatement,
+    ForMatchStatement,
+    MatchStatement,
+    PatternVariable,
+    PatternObjectInstance,
+    PatternLink,
+    WhereClause,
+    PatternObjectInstanceDelete,
+    type PatternObjectInstanceDeleteType,
+    type PatternObjectInstanceReferenceType,
+    PatternObjectInstanceReference
 } from "@mdeo/language-model-transformation";
 import {
     Class,
@@ -212,28 +227,28 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
      * @throws Error if statement type is unknown or not supported
      */
     private convertTransformationStatement(stmt: AstNode): TypedTransformationStatement {
-        if (this.reflection.isInstance(stmt, statementTypes.matchStatementType)) {
+        if (this.reflection.isInstance(stmt, MatchStatement)) {
             return this.convertMatchStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.ifMatchStatementType)) {
+        if (this.reflection.isInstance(stmt, IfMatchStatement)) {
             return this.convertIfMatchStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.whileMatchStatementType)) {
+        if (this.reflection.isInstance(stmt, WhileMatchStatement)) {
             return this.convertWhileMatchStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.untilMatchStatementType)) {
+        if (this.reflection.isInstance(stmt, UntilMatchStatement)) {
             return this.convertUntilMatchStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.forMatchStatementType)) {
+        if (this.reflection.isInstance(stmt, ForMatchStatement)) {
             return this.convertForMatchStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.ifExpressionStatementType)) {
+        if (this.reflection.isInstance(stmt, IfExpressionStatement)) {
             return this.convertIfExpressionStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.whileExpressionStatementType)) {
+        if (this.reflection.isInstance(stmt, WhileExpressionStatement)) {
             return this.convertWhileExpressionStatement(stmt);
         }
-        if (this.reflection.isInstance(stmt, statementTypes.stopStatementType)) {
+        if (this.reflection.isInstance(stmt, StopStatement)) {
             return this.convertStopStatement(stmt);
         }
         throw new Error(`Unknown transformation statement type: ${stmt.$type}`);
@@ -384,26 +399,38 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
         )[] = [];
 
         for (const element of pattern.elements) {
-            if (this.reflection.isInstance(element, statementTypes.patternVariableType)) {
+            if (this.reflection.isInstance(element, PatternVariable)) {
                 elements.push({
                     kind: "variable",
                     variable: this.convertPatternVariable(element)
                 });
-            } else if (this.reflection.isInstance(element, statementTypes.patternObjectInstanceType)) {
+            } else if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 elements.push({
                     kind: "objectInstance",
                     objectInstance: this.convertPatternObjectInstance(element)
                 });
-            } else if (this.reflection.isInstance(element, statementTypes.patternLinkType)) {
+            } else if (this.reflection.isInstance(element, PatternLink)) {
                 elements.push({
                     kind: "link",
                     link: this.convertPatternLink(element)
                 });
-            } else if (this.reflection.isInstance(element, statementTypes.whereClauseType)) {
+            } else if (this.reflection.isInstance(element, WhereClause)) {
                 elements.push({
                     kind: "whereClause",
                     whereClause: this.convertWhereClause(element)
                 });
+            } else if (this.reflection.isInstance(element, PatternObjectInstanceDelete)) {
+                elements.push({
+                    kind: "objectInstance",
+                    objectInstance: this.convertPatternObjectReferenceDelete(element)
+                });
+            } else if (this.reflection.isInstance(element, PatternObjectInstanceReference)) {
+                elements.push({
+                    kind: "objectInstance",
+                    objectInstance: this.convertPatternObjectInstanceReference(element)
+                });
+            } else {
+                throw new Error(`Unknown pattern element type: ${element.$type}`);
             }
         }
 
@@ -440,6 +467,40 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
                 operator: prop.operator,
                 value: this.convertExpression(prop.value)
             }))
+        };
+    }
+
+    /**
+     * Converts a pattern object instance reference.
+     *
+     * @param objRef The PatternObjectInstanceReference AST node
+     * @returns The TypedPatternObjectInstance representation without className and with empty properties, as it's just a reference
+     */
+    private convertPatternObjectInstanceReference(
+        objRef: PatternObjectInstanceReferenceType
+    ): TypedPatternObjectInstance {
+        return {
+            name: objRef.instance.$refText,
+            properties: objRef.properties.map((prop) => ({
+                propertyName: prop.name?.$refText ?? "",
+                operator: prop.operator,
+                value: this.convertExpression(prop.value)
+            }))
+        };
+    }
+
+    /**
+     * Converts a pattern object delete element.
+     *
+     * @param obj The PatternObjectDelete AST node
+     * @returns The TypedPatternObjectInstance representation with modifier "delete"
+     */
+    private convertPatternObjectReferenceDelete(obj: PatternObjectInstanceDeleteType): TypedPatternObjectInstance {
+        return {
+            modifier: "delete",
+            name: obj.instance.$refText,
+            className: undefined,
+            properties: []
         };
     }
 

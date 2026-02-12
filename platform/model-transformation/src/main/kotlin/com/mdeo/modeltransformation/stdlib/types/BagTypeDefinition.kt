@@ -12,7 +12,7 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  */
 fun createBagType(): GremlinTypeDefinition {
     return gremlinType("builtin.Bag")
-        .extends("builtin.ReadonlyCollection")
+        .extends("builtin.Collection")
         .cardinality(VertexProperty.Cardinality.list)
         .build()
 }

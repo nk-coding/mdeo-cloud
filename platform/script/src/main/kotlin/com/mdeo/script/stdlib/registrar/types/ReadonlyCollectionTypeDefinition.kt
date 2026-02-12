@@ -146,9 +146,9 @@ fun createReadonlyCollectionType(): TypeDefinition {
         }
 
         instanceMethod("map") {
-            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/ReadonlyCollection;",
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
                 READONLY_COLLECTION, isInterface = true,
-                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.READONLY_COLLECTION)
+                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.COLLECTION)
         }
 
         instanceMethod("exists") {

@@ -169,7 +169,7 @@ class ListLiteralPropertyAssignmentTest {
         val intValues = valuesList.map { 
             when (it) {
                 is Number -> it.toInt()
-                else -> fail("List element should be a Number, but was ${it?.javaClass?.name}: $it")
+                else -> fail("List element should be a Number, but was ${it.javaClass.name}: $it")
             }
         }
         
@@ -270,7 +270,7 @@ class ListLiteralPropertyAssignmentTest {
         
         val intValue = when (val elem = valuesList[0]) {
             is Number -> elem.toInt()
-            else -> fail("List element should be a Number, but was ${elem?.javaClass?.name}: $elem")
+            else -> fail("List element should be a Number, but was ${elem.javaClass.name}: $elem")
         }
         
         assertEquals(42, intValue, "values list should contain [42]")
@@ -370,7 +370,7 @@ class ListLiteralPropertyAssignmentTest {
         val intValues = valuesList.map { 
             when (it) {
                 is Number -> it.toInt()
-                else -> fail("List element should be a Number, but was ${it?.javaClass?.name}: $it")
+                else -> fail("List element should be a Number, but was ${it.javaClass.name}: $it")
             }
         }
         

@@ -56,7 +56,7 @@ export * from "./features/toolbox/toolbox.js";
 export * from "./features/toolbox/toolboxTypes.js";
 export * from "./features/toolbox/tools.js";
 export * from "./features/viewport/featureModule.js";
-export * from "./features/viewport/fitToScreenAction.js";
+export * from "./features/viewport/fitToScreen.js";
 export * from "./features/viewport/initializeViewportLayout.js";
 export * from "./features/viewport/viewport.js";
 export * from "./features/viewport/zoom.js";

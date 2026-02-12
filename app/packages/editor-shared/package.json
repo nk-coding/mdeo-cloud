@@ -23,9 +23,9 @@
         "@mdeo/language-shared": "^0.1.0"
     },
     "devDependencies": {
-        "@eclipse-glsp/client": "^2.5.0",
-        "@eclipse-glsp/protocol": "^2.5.0",
-        "@eclipse-glsp/sprotty": "^2.5.0",
+        "@eclipse-glsp/client": "^2.6.0",
+        "@eclipse-glsp/protocol": "^2.6.0",
+        "@eclipse-glsp/sprotty": "^2.6.0",
         "@mdeo/editor-protocol": "^0.1.0",
         "inversify": "^6.2.2",
         "lucide": "0.562.0",

@@ -179,7 +179,7 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      *
      * @param mapper the mapping function
      */
-    fun <U> map(mapper: Func1<@UnsafeVariance T, U>): ReadonlyCollection<U>
+    fun <U> map(mapper: Func1<@UnsafeVariance T, U>): Collection<U>
 
     /**
      * Returns true if at least one element matches the predicate.

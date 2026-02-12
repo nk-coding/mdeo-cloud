@@ -27,12 +27,6 @@ import { ModelTransformationCollectionType } from "../stdlib/collections/Collect
 import { ModelTransformationListType } from "../stdlib/collections/List.js";
 import { ModelTransformationOrderedCollectionType } from "../stdlib/collections/OrderedCollection.js";
 import { ModelTransformationOrderedSetType } from "../stdlib/collections/OrderedSet.js";
-import { ModelTransformationReadonlyBagType } from "../stdlib/collections/ReadonlyBag.js";
-import { ModelTransformationReadonlyCollectionType } from "../stdlib/collections/ReadonlyCollection.js";
-import { ModelTransformationReadonlyListType } from "../stdlib/collections/ReadonlyList.js";
-import { ModelTransformationReadonlyOrderedCollectionType } from "../stdlib/collections/ReadonlyOrderedCollection.js";
-import { ModelTransformationReadonlyOrderedSetType } from "../stdlib/collections/ReadonlyOrderedSet.js";
-import { ModelTransformationReadonlySetType } from "../stdlib/collections/ReadonlySet.js";
 import { ModelTransformationSetType } from "../stdlib/collections/Set.js";
 import { ModelTransformationAnyType } from "../stdlib/primitives/Any.js";
 import { modelTransformationBooleanType } from "../stdlib/primitives/boolean.js";
@@ -65,17 +59,11 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
                 Iterable: IterableType,
                 additionalTypes: [
                     ModelTransformationCollectionType,
-                    ModelTransformationReadonlyCollectionType,
                     ModelTransformationOrderedCollectionType,
-                    ModelTransformationReadonlyOrderedCollectionType,
                     ModelTransformationListType,
-                    ModelTransformationReadonlyListType,
                     ModelTransformationSetType,
-                    ModelTransformationReadonlySetType,
                     ModelTransformationBagType,
-                    ModelTransformationReadonlyBagType,
-                    ModelTransformationOrderedSetType,
-                    ModelTransformationReadonlyOrderedSetType
+                    ModelTransformationOrderedSetType
                 ],
                 lambdaSuperTypes: [{ type: ModelTransformationAnyType.name }],
                 createListType: (elementType) => typeRef("List").withTypeArgs({ T: elementType }).build()

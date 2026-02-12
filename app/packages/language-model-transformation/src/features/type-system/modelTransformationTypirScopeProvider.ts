@@ -1,67 +1,3 @@
-/**
- * @module ModelTransformationTypirScopeProvider
- *
- * This module provides scoping rules for type inference in the Model Transformation language.
- * Scoping determines which variables, pattern object instances, and other declarations are
- * visible at each point in a transformation.
- *
- * ## Scoping Architecture
- *
- * The scope provider uses a hierarchical scope model where each scope-creating node
- * establishes a new scope that can access entries from parent scopes. Scopes are created
- * lazily during type inference and cached for performance.
- *
- * ## Scope-Creating Nodes
- *
- * The following AST nodes create their own scope:
- *
- * 1. **ModelTransformation** (root scope)
- *    - Contains all top-level match statements and their declared variables
- *    - Variables from consecutive match statements are visible to subsequent statements
- *
- * 2. **StatementsScope** (block scope)
- *    - Contains variables from match statements within the block
- *    - Inherits from parent scope
- *    - Operates identically to ModelTransformation but for nested blocks
- *
- * 3. **IfMatchCondition** (condition scope)
- *    - Inner node wrapping pattern and then block for if-match statements
- *    - Pattern variables are visible only within the then block
- *    - Creates isolated scope that prevents pattern variables from leaking to else block
- *
- * 4. **WhileMatchStatement / ForMatchStatement**
- *    - Pattern variables are visible only within the associated do block
- *    - Creates isolated scope for pattern bindings
- *
- * 5. **LambdaExpression**
- *    - Creates a specialized scope for lambda parameters
- *    - Infers parameter types from the calling context
- *
- * ## Key Scoping Rules
- *
- * - **Match statements do NOT create their own scope** - Consecutive matches in the same
- *   block share variables, allowing later matches to reference earlier bindings.
- *
- * - **Control flow match statements CREATE their own scope** - If/while/for match
- *   statements isolate their pattern bindings to prevent leakage.
- *
- * - **IfMatchCondition isolates pattern scope** - The new inner node ensures the then block
- *   has access to pattern variables while the else block does not.
- *
- * - **If/While expression statements do NOT create scope** - These are pure control flow
- *   and don't introduce variable bindings.
- *
- * - **Object instances are scoped by name** - Pattern object instances (e.g., `obj: MyClass`)
- *   are available in scope under their declared name.
- *
- * - **Lambda parameters shadow outer variables** - Lambda parameter names take precedence
- *   over any same-named variables in enclosing scopes.
- *
- * ## Position-Based Visibility
- *
- * Variables become visible only after their declaration point within a scope. This is
- * tracked via the `position` field in scope entries, allowing forward reference detection.
- */
 import {
     BaseScopeProvider,
     DefaultScope,
@@ -84,7 +20,6 @@ import {
     ForMatchStatement,
     LambdaExpression,
     expressionTypes,
-    statementTypes,
     type ModelTransformationType,
     type StatementsScopeType,
     type IfMatchConditionAndBlockType,
@@ -93,7 +28,11 @@ import {
     type LambdaExpressionType,
     type PatternType,
     type PatternObjectInstanceType,
-    type PatternVariableType
+    type PatternVariableType,
+    MatchStatement,
+    UntilMatchStatement,
+    PatternObjectInstance,
+    PatternVariable
 } from "../../grammar/modelTransformationTypes.js";
 import { ModelTransformationLambdaScope } from "./modelTransformationLambdaScope.js";
 
@@ -237,8 +176,8 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         for (let i = 0; i < node.statements.length; i++) {
             const statement = node.statements[i];
             if (
-                this.reflection.isInstance(statement, statementTypes.matchStatementType) ||
-                this.reflection.isInstance(statement, statementTypes.untilMatchStatementType)
+                this.reflection.isInstance(statement, MatchStatement) ||
+                this.reflection.isInstance(statement, UntilMatchStatement)
             ) {
                 this.collectPatternEntries(statement.pattern, i, scope, entries);
             }
@@ -260,8 +199,8 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         for (let i = 0; i < node.statements.length; i++) {
             const statement = node.statements[i];
             if (
-                this.reflection.isInstance(statement, statementTypes.matchStatementType) ||
-                this.reflection.isInstance(statement, statementTypes.untilMatchStatementType)
+                this.reflection.isInstance(statement, MatchStatement) ||
+                this.reflection.isInstance(statement, UntilMatchStatement)
             ) {
                 this.collectPatternInitializations(statement.pattern, i, initializations);
             }
@@ -438,9 +377,9 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         entries: ScopeEntry<TypirLangiumSpecifics>[]
     ): void {
         for (const element of pattern?.elements ?? []) {
-            if (this.reflection.isInstance(element, statementTypes.patternObjectInstanceType)) {
+            if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 entries.push(this.createObjectInstanceEntry(element, position, scope));
-            } else if (this.reflection.isInstance(element, statementTypes.patternVariableType)) {
+            } else if (this.reflection.isInstance(element, PatternVariable)) {
                 entries.push(this.createPatternVariableEntry(element, position, scope));
             }
         }
@@ -475,9 +414,9 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         initializations: ScopeLocalInitialization[]
     ): void {
         for (const element of pattern?.elements ?? []) {
-            if (this.reflection.isInstance(element, statementTypes.patternObjectInstanceType)) {
+            if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 initializations.push({ name: element.name, position });
-            } else if (this.reflection.isInstance(element, statementTypes.patternVariableType)) {
+            } else if (this.reflection.isInstance(element, PatternVariable)) {
                 initializations.push({ name: element.name, position });
             }
         }
