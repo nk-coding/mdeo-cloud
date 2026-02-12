@@ -9,7 +9,23 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Creates the Double type definition.
  *
  * Double methods are implemented using Gremlin's `math()` step for pure
- * traversal-based computation. Same operations as Float.
+ * traversal-based computation. Provides the same operations as Float but
+ * for double-precision floating-point values.
+ *
+ * ## Supported Operations
+ * - `abs()` - Absolute value of the double
+ * - `floor()` - Rounds down to the nearest integer
+ * - `ceiling()` - Rounds up to the nearest integer
+ * - `round()` - Rounds to the nearest integer (uses floor(x + 0.5))
+ * - `log()` - Natural logarithm (base e)
+ * - `log10()` - Base-10 logarithm
+ * - `pow(exp)` - Raises the double to the power of exp
+ * - `max(other)` - Returns the maximum of this double and other
+ * - `min(other)` - Returns the minimum of this double and other
+ *
+ * The max and min operations are overloaded to work with int, long, float, and double types.
+ *
+ * @return The Double type definition for the Gremlin type registry
  */
 @Suppress("UNCHECKED_CAST")
 fun createDoubleType(): GremlinTypeDefinition {

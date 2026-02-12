@@ -67,8 +67,15 @@ class TypeCheckCompiler(
     /**
      * Compiles a type check expression.
      *
-     * Resolves the target type and delegates to the appropriate compilation
-     * strategy based on whether it's a vertex type or other type.
+     * Resolves the target type from the type check expression and delegates to the
+     * appropriate compilation strategy based on whether it's a vertex type (ClassTypeRef)
+     * or other type. Vertex types use hasLabel() checking, while other types use
+     * static type analysis.
+     *
+     * @param expr The type check expression to compile (is or !is)
+     * @param context The compilation context for type resolution
+     * @param initialTraversal Optional initial traversal to build upon (passed to inner expression)
+     * @return The compiled traversal result producing a boolean type check result
      */
     private fun compileTypeCheck(
         expr: TypedTypeCheckExpression,
@@ -87,7 +94,15 @@ class TypeCheckCompiler(
     /**
      * Compiles a type check for vertex types using hasLabel.
      *
-     * Uses choose() with hasLabel() to determine if the element has the expected label.
+     * Uses choose() with hasLabel() to determine if the graph element has the expected
+     * label. The hasLabel() predicate is used in an anonymous traversal within choose()
+     * to produce a boolean result. For negated checks (!is), the true/false values
+     * are swapped.
+     *
+     * @param innerResult The compiled traversal result for the expression being type-checked
+     * @param checkType The class type being checked against
+     * @param isNegated true if this is a negated type check (!is), false for normal check (is)
+     * @return The compiled traversal result producing a boolean type check result
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileVertexTypeCheck(
@@ -110,8 +125,15 @@ class TypeCheckCompiler(
     /**
      * Compiles a type check for non-vertex types.
      *
-     * For primitive and other types, performs compile-time type analysis where
-     * possible. Returns a constant result based on static type compatibility.
+     * For primitive and other types (non-ClassTypeRef), performs compile-time type
+     * analysis where possible. Currently returns a constant result (true for is,
+     * false for !is) since these types don't have runtime type checking in Gremlin.
+     * This could be enhanced for more precise compile-time type analysis.
+     *
+     * @param innerResult The compiled traversal result for the expression being type-checked
+     * @param checkType The value type being checked against (non-ClassTypeRef)
+     * @param isNegated true if this is a negated type check (!is), false for normal check (is)
+     * @return The compiled traversal result producing a constant boolean result
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileGenericTypeCheck(
@@ -128,7 +150,11 @@ class TypeCheckCompiler(
      * Extracts the simple type name from a fully qualified type string.
      *
      * Type strings may be in the form "namespace.TypeName" and this method
-     * returns just the "TypeName" part for use with hasLabel().
+     * returns just the "TypeName" part for use with hasLabel(). For example,
+     * "myapp.Person" becomes "Person".
+     *
+     * @param typeString The fully qualified type name (may contain dots)
+     * @return The simple type name (everything after the last dot, or the whole string if no dots)
      */
     private fun extractTypeName(typeString: String): String {
         return typeString.substringAfterLast(".")

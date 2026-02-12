@@ -111,11 +111,15 @@ sealed interface TransformationExecutionResult {
         
         /**
          * Returns true if this was a normal stop (not a kill).
+         *
+         * @return True if keyword equals "stop"
          */
         val isNormalStop: Boolean get() = keyword == "stop"
         
         /**
          * Returns true if this was a kill (immediate termination).
+         *
+         * @return True if keyword equals "kill"
          */
         val isKill: Boolean get() = keyword == "kill"
     }

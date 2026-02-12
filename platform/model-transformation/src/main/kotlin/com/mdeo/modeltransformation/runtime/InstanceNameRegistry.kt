@@ -114,6 +114,10 @@ class InstanceNameRegistry {
     
     /**
      * Clears all registrations.
+     *
+     * Removes all vertex ID to name mappings, name to vertex ID mappings,
+     * and resets all name counters. After calling this method, the registry
+     * will be in the same state as a newly created instance.
      */
     fun clear() {
         idToName.clear()

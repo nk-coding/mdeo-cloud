@@ -8,7 +8,13 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
 /**
  * Creates the Bag type definition.
  *
- * Extends ReadonlyCollection. A bag allows duplicate elements.
+ * A Bag is an unordered collection that allows duplicate elements (also known as a multiset).
+ * It extends the builtin.Collection type and uses list cardinality for vertex properties
+ * to support duplicates.
+ *
+ * Inherits all methods from Collection including filter, map, exists, all, etc.
+ *
+ * @return The Bag type definition for the Gremlin type registry
  */
 fun createBagType(): GremlinTypeDefinition {
     return gremlinType("builtin.Bag")

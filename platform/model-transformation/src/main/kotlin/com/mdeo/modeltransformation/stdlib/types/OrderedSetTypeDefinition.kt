@@ -8,7 +8,12 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
 /**
  * Creates the OrderedSet type definition.
  *
- * Extends both ReadonlyOrderedCollection and Set.
+ * An OrderedSet is a collection that maintains insertion order and does not allow duplicates.
+ * It extends the builtin.OrderedCollection type and uses set cardinality for vertex properties.
+ *
+ * Inherits all methods from OrderedCollection and Collection including filter, map, exists, all, etc.
+ *
+ * @return The OrderedSet type definition for the Gremlin type registry
  */
 fun createOrderedSetType(): GremlinTypeDefinition {
     return gremlinType("builtin.OrderedSet")

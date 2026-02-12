@@ -78,10 +78,16 @@ class MemberAccessCompiler(
     }
 
     /**
-     * Compiles the target object expression.
+     * Compiles the target object expression for member access.
      *
      * Passes the initialTraversal to the object expression since it's the leftmost
-     * part of the member access chain.
+     * part of the member access chain. This ensures proper traversal construction when
+     * the member access is used in match contexts.
+     *
+     * @param memberAccess The member access expression containing the target object
+     * @param context The compilation context with type information and registry
+     * @param initialTraversal Optional traversal to build upon (passed to the object expression)
+     * @return The compiled traversal result for the object expression
      */
     private fun compileObjectExpression(
         memberAccess: TypedMemberAccessExpression,
@@ -93,6 +99,13 @@ class MemberAccessCompiler(
 
     /**
      * Gets the type name for an expression from the compilation context.
+     *
+     * Resolves the expression's evalType index to a ValueType and extracts the
+     * type name if it's a ClassTypeRef. Returns null for non-class types.
+     *
+     * @param expression The expression to get the type name from
+     * @param context The compilation context containing type resolution information
+     * @return The type name string if the expression is a ClassTypeRef, null otherwise
      */
     private fun getTypeName(expression: TypedExpression, context: CompilationContext): String? {
         val evalType = expression.evalType
@@ -107,7 +120,15 @@ class MemberAccessCompiler(
      * Compiles property access using the GremlinTypeRegistry.
      *
      * Looks up the property in the type registry and uses the property definition's
-     * compile method. Throws an error if the property is not found.
+     * compile method to generate the appropriate Gremlin traversal for accessing
+     * the property or navigating the association.
+     *
+     * @param objectResult The compiled traversal result for the object expression
+     * @param typeName The name of the type containing the property
+     * @param propertyName The name of the property or association to access
+     * @param context The compilation context with type registry
+     * @return The compiled traversal result for the property access
+     * @throws IllegalStateException if the property is not found in the type registry
      */
     @Suppress("UNCHECKED_CAST")
     private fun compilePropertyWithRegistry(

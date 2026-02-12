@@ -87,6 +87,17 @@ class ForMatchStatementExecutor(
     
     /**
      * Executes all iterations of the for-match loop.
+     *
+     * Iterates through each match result and executes the doBlock for each one.
+     * Accumulates results from all successful iterations. If any iteration returns
+     * Failure or Stopped, the loop terminates immediately and that result is returned.
+     *
+     * @param statement The for-match statement being executed.
+     * @param matches List of all matched results to iterate over.
+     * @param forContext The scope context for the for-match statement (level+1).
+     * @param baseContext The original execution context before entering the for-match scope.
+     * @param engine The transformation engine for executing the doBlock.
+     * @return The accumulated result from all iterations, or the first Failure/Stopped result.
      */
     private fun executeIterations(
         statement: TypedForMatchStatement,

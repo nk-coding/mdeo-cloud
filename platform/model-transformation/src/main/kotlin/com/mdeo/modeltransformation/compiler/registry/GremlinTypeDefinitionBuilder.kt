@@ -24,14 +24,33 @@ class SimpleGremlinTypeDefinition(
     private val methods: Map<String, List<GremlinMethodDefinition>> = emptyMap()
 ) : GremlinTypeDefinition {
 
+    /**
+     * Gets a property definition by name from this type.
+     *
+     * @param name The property name
+     * @return The property definition, or null if not found
+     */
     override fun getProperty(name: String): GremlinPropertyDefinition? {
         return properties[name]
     }
 
+    /**
+     * Gets a method definition by name and overload key from this type.
+     *
+     * @param name The method name
+     * @param overloadKey The overload key that identifies a specific overload
+     * @return The method definition, or null if not found
+     */
     override fun getMethod(name: String, overloadKey: String): GremlinMethodDefinition? {
         return methods[name]?.find { it.overloadKey == overloadKey }
     }
 
+    /**
+     * Gets all method definitions for a given method name from this type.
+     *
+     * @param name The method name
+     * @return List of method definitions with this name, empty if not found
+     */
     override fun getMethods(name: String): List<GremlinMethodDefinition> {
         return methods[name] ?: emptyList()
     }
@@ -226,6 +245,14 @@ class SimpleGremlinPropertyDefinition(
     private val compiler: (GraphTraversal<*, *>) -> GremlinCompilationResult
 ) : GremlinPropertyDefinition {
 
+    /**
+     * Compiles an access to this property using traversal mode.
+     *
+     * Delegates to the compiler function provided during construction.
+     *
+     * @param receiver The receiver traversal (the object the property is accessed on)
+     * @return The compilation result containing the property value as a traversal
+     */
     override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
         return compiler(receiver)
     }
@@ -251,6 +278,15 @@ class AssociationGremlinPropertyDefinition(
     val isNullable: Boolean = false
 ) : GremlinPropertyDefinition {
 
+    /**
+     * Compiles an association access to edge traversals.
+     *
+     * Creates either an outgoing (.out()) or incoming (.in()) edge traversal
+     * based on the association direction.
+     *
+     * @param receiver The receiver traversal (the vertex to traverse from)
+     * @return The compilation result containing the edge traversal
+     */
     @Suppress("UNCHECKED_CAST")
     override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
         val typed = receiver as GraphTraversal<Any, Any>
@@ -280,6 +316,15 @@ class SimpleGremlinMethodDefinition(
     private val compiler: (GraphTraversal<*, *>, List<GremlinCompilationResult>) -> GremlinCompilationResult
 ) : GremlinMethodDefinition {
 
+    /**
+     * Compiles a call to this method using traversal mode.
+     *
+     * Delegates to the compiler function provided during construction.
+     *
+     * @param receiver The receiver traversal (the object the method is called on)
+     * @param arguments The compiled argument traversals
+     * @return The compilation result containing the method's return value as a traversal
+     */
     override fun compile(
         receiver: GraphTraversal<*, *>,
         arguments: List<GremlinCompilationResult>

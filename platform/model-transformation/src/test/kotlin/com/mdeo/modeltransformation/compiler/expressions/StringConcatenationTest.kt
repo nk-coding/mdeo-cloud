@@ -4,6 +4,7 @@ import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
@@ -46,6 +47,7 @@ class StringConcatenationTest {
         
         context = CompilationContext(
             types = types,
+            currentScope = VariableScope.empty(),
             traversalSource = g,
             typeRegistry = GremlinTypeRegistry.GLOBAL
         )

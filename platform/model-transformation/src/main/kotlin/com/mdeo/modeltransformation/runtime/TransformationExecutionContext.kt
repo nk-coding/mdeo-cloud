@@ -74,6 +74,15 @@ class TransformationExecutionContext private constructor(
         return result
     }
     
+    /**
+     * Recursively collects instance bindings from the given scope and all parent scopes.
+     *
+     * Traverses the scope chain from parent to child, accumulating instance bindings.
+     * Only includes instances with resolved vertex IDs (non-null).
+     *
+     * @param scope The variable scope to collect instances from
+     * @param result Mutable map to accumulate instance name to vertex ID mappings
+     */
     private fun collectInstances(scope: VariableScope?, result: MutableMap<String, Any>) {
         if (scope == null) return
         collectInstances(scope.parent, result)
@@ -85,15 +94,6 @@ class TransformationExecutionContext private constructor(
                 }
             }
         }
-    }
-    
-    /**
-     * Gets the next scope index for a nested scope.
-     * 
-     * @return The next scope index (current + 1).
-     */
-    fun getNextScopeIndex(): Int {
-        return scopeIndex + 1
     }
 
     /**

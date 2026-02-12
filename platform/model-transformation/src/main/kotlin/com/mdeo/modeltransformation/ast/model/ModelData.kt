@@ -188,6 +188,12 @@ object ModelDataPropertyValueSerializer : KSerializer<ModelDataPropertyValue> {
         return deserializeFromJsonElement(jsonDecoder.decodeJsonElement())
     }
 
+    /**
+     * Converts a ModelDataPropertyValue to its JSON representation.
+     *
+     * @param value The property value to serialize.
+     * @return The corresponding JSON element.
+     */
     private fun serializeToJsonElement(value: ModelDataPropertyValue): JsonElement {
         return when (value) {
             is ModelDataPropertyValue.StringValue -> JsonPrimitive(value.value)
@@ -203,6 +209,15 @@ object ModelDataPropertyValueSerializer : KSerializer<ModelDataPropertyValue> {
         }
     }
 
+    /**
+     * Converts a JSON element to a ModelDataPropertyValue.
+     *
+     * Handles all JSON types including primitives, objects (for enums), arrays, and null.
+     *
+     * @param element The JSON element to deserialize.
+     * @return The corresponding ModelDataPropertyValue.
+     * @throws IllegalArgumentException If the JSON structure is unexpected.
+     */
     private fun deserializeFromJsonElement(element: JsonElement): ModelDataPropertyValue {
         return when (element) {
             is JsonNull -> ModelDataPropertyValue.NullValue
@@ -221,6 +236,16 @@ object ModelDataPropertyValueSerializer : KSerializer<ModelDataPropertyValue> {
         }
     }
 
+    /**
+     * Converts a JSON primitive to a ModelDataPropertyValue.
+     *
+     * Determines the correct type based on the JSON primitive's content,
+     * checking for boolean, integer, long, double, and string values in that order.
+     *
+     * @param primitive The JSON primitive to deserialize.
+     * @return The corresponding ModelDataPropertyValue (StringValue, NumberValue, or BooleanValue).
+     * @throws IllegalArgumentException If the primitive type is unknown.
+     */
     private fun deserializePrimitive(primitive: JsonPrimitive): ModelDataPropertyValue {
         return when {
             primitive.isString -> ModelDataPropertyValue.StringValue(primitive.content)
@@ -284,6 +309,14 @@ object PropertiesMapSerializer : KSerializer<Map<String, ModelDataPropertyValue>
         return result
     }
     
+    /**
+     * Converts a ModelDataPropertyValue to its JSON representation for use in property maps.
+     *
+     * Similar to serializeToJsonElement but used specifically within the PropertiesMapSerializer context.
+     *
+     * @param value The property value to serialize.
+     * @return The corresponding JSON element.
+     */
     private fun serializePropertyValue(value: ModelDataPropertyValue): JsonElement {
         return when (value) {
             is ModelDataPropertyValue.StringValue -> JsonPrimitive(value.value)
@@ -301,6 +334,16 @@ object PropertiesMapSerializer : KSerializer<Map<String, ModelDataPropertyValue>
         }
     }
     
+    /**
+     * Converts a JSON element to a ModelDataPropertyValue for use in property maps.
+     *
+     * Handles all JSON types including primitives, objects (for enums), arrays, and null.
+     * Used specifically within the PropertiesMapSerializer context.
+     *
+     * @param element The JSON element to deserialize.
+     * @return The corresponding ModelDataPropertyValue.
+     * @throws IllegalArgumentException If the JSON structure is unexpected.
+     */
     private fun deserializePropertyValue(element: JsonElement): ModelDataPropertyValue {
         return when (element) {
             is JsonNull -> ModelDataPropertyValue.NullValue
@@ -321,6 +364,17 @@ object PropertiesMapSerializer : KSerializer<Map<String, ModelDataPropertyValue>
         }
     }
     
+    /**
+     * Converts a JSON primitive to a ModelDataPropertyValue for use in property maps.
+     *
+     * Determines the correct type based on the JSON primitive's content,
+     * checking for boolean, integer, long, double, and string values in that order.
+     * Used specifically within the PropertiesMapSerializer context.
+     *
+     * @param primitive The JSON primitive to deserialize.
+     * @return The corresponding ModelDataPropertyValue (StringValue, NumberValue, or BooleanValue).
+     * @throws IllegalArgumentException If the primitive type is unknown.
+     */
     private fun deserializePrimitiveValue(primitive: JsonPrimitive): ModelDataPropertyValue {
         return when {
             primitive.isString -> ModelDataPropertyValue.StringValue(primitive.content)

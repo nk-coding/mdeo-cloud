@@ -75,9 +75,9 @@ class ConditionEvaluator(private val engine: TransformationEngine) {
 
             val compilationContext = CompilationContext(
                 types = engine.types,
-                traversalSource = engine.traversalSource,
-                typeRegistry = engine.typeRegistry,
                 currentScope = context.variableScope,
+                traversalSource = engine.traversalSource,
+                typeRegistry = engine.typeRegistry
             )
             val result = engine.expressionCompilerRegistry.compile(expression, compilationContext)
 

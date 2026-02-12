@@ -212,11 +212,17 @@ class BinaryOperatorCompiler(
     /**
      * Compiles an arithmetic operator using Gremlin's math step.
      *
-     * The math step expects labeled values, so we use `as("_left")` and `as("_right")`
-     * to capture both operands, then apply the math operation.
+     * The math step expects labeled values, so we use unique IDs from context.getUniqueId()
+     * to capture both operands, then apply the math operation. The pattern used is:
+     * leftTraversal.as(leftLabel).map(rightTraversal).as(rightLabel).math("leftLabel op rightLabel")
      * 
      * Special case: For the + operator, checks if operands are strings and performs
      * string concatenation instead of numeric addition.
+     *
+     * @param expr The binary expression to compile
+     * @param context The compilation context for generating unique IDs and type resolution
+     * @param initialTraversal Optional initial traversal to build upon (passed to left operand)
+     * @return The compiled traversal result performing the arithmetic operation
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileArithmetic(
@@ -229,7 +235,7 @@ class BinaryOperatorCompiler(
         if (expr.operator == OPERATOR_ADD && isStringConcatenation(expr, context)) {
             val leftResult = registry.compile(expr.left, context, initialTraversal)
             val rightResult = registry.compile(expr.right, context, null)
-            return compileRuntimeStringConcatenation(leftResult, rightResult)
+            return compileRuntimeStringConcatenation(leftResult, rightResult, context)
         }
 
         val leftResult = registry.compile(expr.left, context, initialTraversal)
@@ -238,21 +244,26 @@ class BinaryOperatorCompiler(
         val mathSymbol = MATH_OPERATOR_SYMBOLS[expr.operator]
             ?: throw CompilationException.unsupportedOperator(expr.operator, expr)
 
+        val leftLabel = context.getUniqueId()
+        val rightLabel = context.getUniqueId()
         val traversal = (leftResult.traversal as GraphTraversal<Any, Any>)
-            .`as`("_left")
+            .`as`(leftLabel)
             .map(rightResult.traversal as GraphTraversal<Any, Any>)
-            .`as`("_right")
-            .math("_left $mathSymbol _right")
+            .`as`(rightLabel)
+            .math("$leftLabel $mathSymbol $rightLabel")
 
         return GremlinCompilationResult.of(traversal)
     }
 
     /**
      * Checks if an expression has a string type using static type information.
+     *
+     * Resolves the expression's evalType to determine if it represents a string type.
+     * Checks for both "builtin.string" and "string" type names.
      * 
-     * @param expression The expression to check
-     * @param context The compilation context containing type information
-     * @return true if the expression's static type is a string type
+     * @param expression The expression to check for string type
+     * @param context The compilation context containing type information and resolution
+     * @return true if the expression's static type is a string type, false otherwise
      * @throws CompilationException if the type cannot be resolved (indicates a type checker bug)
      */
     private fun isStringType(expression: TypedExpression, context: CompilationContext): Boolean {
@@ -268,14 +279,15 @@ class BinaryOperatorCompiler(
 
     /**
      * Checks if this binary expression represents string concatenation.
-     * 
+     *
      * Uses static type information only - relies on the type checker having correctly
      * determined the types of all operands. Returns true if the + operator is being
-     * used and either operand has a string type.
+     * used and either operand has a string type. This allows mixed-type concatenation
+     * where one operand is a string and the other is coerced to string.
      * 
-     * @param expr The binary expression to check
-     * @param context The compilation context containing type information
-     * @return true if this is a string concatenation operation
+     * @param expr The binary expression to check for string concatenation
+     * @param context The compilation context containing type information and resolution
+     * @return true if this is a string concatenation operation (+ with string operand)
      */
     private fun isStringConcatenation(
         expr: TypedBinaryExpression,
@@ -298,8 +310,8 @@ class BinaryOperatorCompiler(
      * concatenation is common enough to warrant lambda support.
      * 
      * The pattern used:
-     * 1. Store left value with as("_left")
-     * 2. Store right value with as("_right") 
+     * 1. Store left value with unique ID label
+     * 2. Store right value with unique ID label
      * 3. Use path objects to get values and concatenate them
      * 
      * Note: We access path objects by index to avoid label conflicts in nested concatenations.
@@ -307,13 +319,16 @@ class BinaryOperatorCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compileRuntimeStringConcatenation(
         leftResult: GremlinCompilationResult,
-        rightResult: GremlinCompilationResult
+        rightResult: GremlinCompilationResult,
+        context: CompilationContext
     ): GremlinCompilationResult {
         // Use the general pattern: store both values and concatenate
+        val leftLabel = context.getUniqueId()
+        val rightLabel = context.getUniqueId()
         val traversal = (leftResult.traversal as GraphTraversal<Any, Any>)
-            .`as`("_left")
+            .`as`(leftLabel)
             .flatMap<Any>(rightResult.traversal as GraphTraversal<Any, Any>)
-            .`as`("_right")
+            .`as`(rightLabel)
             .map<String> { traverser ->
                 // Get the penultimate and last objects from the path
                 // The penultimate is the left value, the last is the right value (current)
@@ -334,7 +349,13 @@ class BinaryOperatorCompiler(
      * Compiles a comparison operator using Gremlin predicates and choose.
      *
      * Comparisons produce boolean results by using choose() with P predicates.
-     * Uses labeled variables with where pattern for dynamic comparisons.
+     * Uses labeled variables with math step to compute the difference and compare
+     * to zero for dynamic comparisons where both operands may be traversals.
+     *
+     * @param expr The binary expression to compile (must be a comparison operator)
+     * @param context The compilation context for generating unique IDs
+     * @param initialTraversal Optional initial traversal to build upon (passed to left operand)
+     * @return The compiled traversal result producing a boolean comparison result
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileComparison(
@@ -349,7 +370,8 @@ class BinaryOperatorCompiler(
         val traversal = buildDynamicComparisonTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
-            rightResult.traversal as GraphTraversal<Any, Any>
+            rightResult.traversal as GraphTraversal<Any, Any>,
+            context
         )
 
         return GremlinCompilationResult.of(traversal)
@@ -359,7 +381,15 @@ class BinaryOperatorCompiler(
      * Compiles an equality operator using Gremlin predicates and choose.
      *
      * Uses labeled variables with where pattern for dynamic comparisons.
-     * For equality, we use where(eq()) instead of math subtraction to support all types.
+     * For equality, we use where(eq()) instead of math subtraction to support all types,
+     * including non-numeric types like strings and vertices. Delegates to EqualityCompilerUtil
+     * to handle collection type folding and proper predicate construction.
+     *
+     * @param expr The binary expression to compile (must be == or !=)
+     * @param context The compilation context for type resolution and unique ID generation
+     * @param initialTraversal Optional initial traversal to build upon (passed to left operand)
+     * @return The compiled traversal result producing a boolean equality result
+     * @throws CompilationException if operand types cannot be resolved
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileEquality(
@@ -375,13 +405,17 @@ class BinaryOperatorCompiler(
         val rightType = context.resolveTypeOrNull(expr.right.evalType)
             ?: throw CompilationException("Cannot resolve type for right operand of equality expression")
 
+        val leftLabel = context.getUniqueId()
+        val rightLabel = context.getUniqueId()
         val traversal = EqualityCompilerUtil.buildEqualityTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
             rightResult.traversal as GraphTraversal<Any, Any>,
             leftType,
             rightType,
-            context.typeRegistry
+            context.typeRegistry,
+            leftLabel,
+            rightLabel
         )
 
         return GremlinCompilationResult.of(traversal)
@@ -389,6 +423,15 @@ class BinaryOperatorCompiler(
 
     /**
      * Compiles a logical operator using Gremlin and/or steps with choose.
+     *
+     * Logical operators are implemented using nested choose() steps that evaluate
+     * operands as boolean values. Short-circuit evaluation is achieved through the
+     * choose() structure where the false/true branches avoid evaluating the second operand.
+     *
+     * @param expr The binary expression to compile (must be && or ||)
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon (passed to left operand)
+     * @return The compiled traversal result producing a boolean logical result
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileLogical(
@@ -411,25 +454,33 @@ class BinaryOperatorCompiler(
     /**
      * Builds a traversal for dynamic comparison where the right operand is not constant.
      *
-     * Uses the same pattern as arithmetic: store left with as("_left"), compute right with
-     * map() and store with as("_right"), then use math step to compute difference
-     * and check the result.
+     * Uses the same pattern as arithmetic: store left with unique ID, compute right with
+     * map() and store with unique ID, then use math step to compute difference
+     * and check the result against zero with the appropriate predicate.
      *
      * Pattern:
      * ```
-     * leftTraversal.as("_left")
-     *     .map(rightTraversal).as("_right")
-     *     .math("_left - _right")
+     * leftTraversal.as(leftLabel)
+     *     .map(rightTraversal).as(rightLabel)
+     *     .math("leftLabel - rightLabel")
      *     .choose(__.is(P.op(0)), __.constant(true), __.constant(false))
      * ```
      *
-     * For inequality (!=), we invert the logic.
+     * For inequality (!=), we invert the logic after comparison.
+     *
+     * @param operator The comparison operator (<, >, <=, >=, ==, or !=)
+     * @param leftTraversal The traversal producing the left operand value
+     * @param rightTraversal The traversal producing the right operand value
+     * @param context The compilation context for generating unique IDs
+     * @return A traversal producing a boolean comparison result
+     * @throws IllegalStateException if an unexpected operator is provided
      */
     @Suppress("UNCHECKED_CAST")
     private fun buildDynamicComparisonTraversal(
         operator: String,
         leftTraversal: GraphTraversal<Any, Any>,
-        rightTraversal: GraphTraversal<Any, Any>
+        rightTraversal: GraphTraversal<Any, Any>,
+        context: CompilationContext
     ): GraphTraversal<Any, Boolean> {
         // For != we use eq internally and invert the result
         val (effectiveOperator, invertResult) = if (operator == OPERATOR_NOT_EQUALS) {
@@ -448,19 +499,19 @@ class BinaryOperatorCompiler(
             else -> throw IllegalStateException("Unexpected comparison operator: $effectiveOperator")
         }
 
-        // Use the same pattern as arithmetic: as("_left").map(right).as("_right").math(...)
+        val leftLabel = context.getUniqueId()
+        val rightLabel = context.getUniqueId()
         val baseTraversal = leftTraversal
-            .`as`("_left")
+            .`as`(leftLabel)
             .map(rightTraversal)
-            .`as`("_right")
-            .math("_left - _right")
+            .`as`(rightLabel)
+            .math("$leftLabel - $rightLabel")
             .choose(
                 AnonymousTraversal.`is`(predicate),
                 AnonymousTraversal.constant<Any>(true),
                 AnonymousTraversal.constant<Any>(false)
             )
 
-        // For != we need to invert the result
         return if (invertResult) {
             baseTraversal.choose(
                 AnonymousTraversal.`is`(P.eq(true)),
@@ -473,7 +524,19 @@ class BinaryOperatorCompiler(
     }
 
     /**
-     * Builds a logical AND/OR traversal using choose.
+     * Builds a logical AND/OR traversal using choose with nested conditionals.
+     *
+     * For AND (&&): Returns false if left is false, otherwise evaluates and returns right
+     * For OR (||): Returns true if left is true, otherwise evaluates and returns right
+     *
+     * The choose() structure implements short-circuit evaluation by not evaluating
+     * the right operand when the result can be determined from the left operand alone.
+     *
+     * @param operator The logical operator ("&&" or "||")
+     * @param leftTraversal The traversal producing the left operand boolean value
+     * @param rightTraversal The traversal producing the right operand boolean value
+     * @return A traversal producing the logical AND/OR boolean result
+     * @throws IllegalStateException if an unexpected operator is provided
      */
     private fun buildLogicalTraversal(
         operator: String,

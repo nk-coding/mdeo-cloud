@@ -6,6 +6,7 @@ import com.mdeo.expression.ast.expressions.TypedListLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
 import com.mdeo.modeltransformation.compiler.CompilationContext
+import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
@@ -42,6 +43,7 @@ class ListLiteralCompilerTest {
         graph = TinkerGraph.open()
         context = CompilationContext(
             types = emptyList(),
+            currentScope = VariableScope.empty(),
             traversalSource = graph.traversal(),
             typeRegistry = GremlinTypeRegistry.GLOBAL
         )

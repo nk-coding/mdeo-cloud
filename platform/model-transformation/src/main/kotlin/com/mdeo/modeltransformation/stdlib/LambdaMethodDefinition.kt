@@ -17,6 +17,18 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * is passed as an argument. These are compiled specially by MemberCallCompiler.
  */
 interface LambdaMethodDefinition : GremlinMethodDefinition {
+    /**
+     * Compiles the method call with a lambda argument.
+     *
+     * This method handles the special compilation logic for lambda-based operations,
+     * allowing the lambda body to be directly integrated into the Gremlin traversal.
+     *
+     * @param receiver The receiver traversal that this method is called on
+     * @param lambda The typed lambda expression to be compiled
+     * @param context The compilation context containing variable bindings and scope information
+     * @param compilerRegistry The registry used to compile the lambda body expression
+     * @return The compiled Gremlin traversal result
+     */
     fun compileWithLambda(
         receiver: GraphTraversal<*, *>,
         lambda: TypedLambdaExpression,
@@ -27,6 +39,14 @@ interface LambdaMethodDefinition : GremlinMethodDefinition {
 
 /**
  * Builder extension for defining lambda methods inline.
+ *
+ * This extension function allows lambda methods to be defined directly in the type definition
+ * builder using a concise syntax. The compiler function receives the receiver traversal,
+ * lambda expression, compilation context, and compiler registry.
+ *
+ * @param name The name of the lambda method
+ * @param compiler The compilation function that implements the method behavior
+ * @return The builder for method chaining
  */
 fun GremlinTypeDefinitionBuilder.lambdaMethod(
     name: String,
@@ -60,9 +80,16 @@ fun GremlinTypeDefinitionBuilder.lambdaMethod(
 
 /**
  * Helper to create a lambda context with the parameter bound.
- * Creates a child scope at the next scope level (parent scope index + 1).
+ * 
+ * Creates a child scope at the next scope level (parent scope index + 1) with the
+ * specified parameter name bound to a step label. This is used when compiling lambda
+ * bodies to make the lambda parameter accessible within the lambda's scope.
+ * 
+ * @param paramName The name of the lambda parameter to bind
+ * @param stepLabel The unique step label to use for the parameter binding in the traversal
+ * @return A new compilation context with the child scope configured
  */
-fun CompilationContext.withLambdaParam(paramName: String): CompilationContext {
+fun CompilationContext.withLambdaParam(paramName: String, stepLabel: String): CompilationContext {
     val childScopeIndex = this.currentScope.scopeIndex + 1
-    return this.withChildScope(childScopeIndex, mapOf(paramName to VariableBinding.InstanceBinding(vertexId = null)))
+    return this.withChildScope(childScopeIndex, mapOf(paramName to VariableBinding.LabelBinding(stepLabel)))
 }

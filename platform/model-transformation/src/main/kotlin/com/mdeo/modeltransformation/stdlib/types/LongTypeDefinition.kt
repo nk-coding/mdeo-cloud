@@ -9,7 +9,22 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Creates the Long type definition.
  *
  * Long methods are implemented using Gremlin's `math()` step for pure
- * traversal-based computation. Same operations as Int.
+ * traversal-based computation. Provides the same operations as Int but
+ * for 64-bit long integer values.
+ *
+ * ## Supported Operations
+ * - `abs()` - Absolute value of the long
+ * - `floor()`, `ceiling()`, `round()` - Identity operations for longs (no change)
+ * - `log()` - Natural logarithm (base e)
+ * - `log10()` - Base-10 logarithm
+ * - `pow(exp)` - Raises the long to the power of exp
+ * - `mod(divisor)` - Modulo operation (remainder after division)
+ * - `max(other)` - Returns the maximum of this long and other
+ * - `min(other)` - Returns the minimum of this long and other
+ *
+ * The max and min operations are overloaded to work with int, long, float, and double types.
+ *
+ * @return The Long type definition for the Gremlin type registry
  */
 @Suppress("UNCHECKED_CAST")
 fun createLongType(): GremlinTypeDefinition {

@@ -9,7 +9,23 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Creates the Float type definition.
  *
  * Float methods are implemented using Gremlin's `math()` step for pure
- * traversal-based computation including floor, ceiling, and round.
+ * traversal-based computation. Includes rounding operations suitable
+ * for floating-point values.
+ *
+ * ## Supported Operations
+ * - `abs()` - Absolute value of the float
+ * - `floor()` - Rounds down to the nearest integer
+ * - `ceiling()` - Rounds up to the nearest integer
+ * - `round()` - Rounds to the nearest integer (uses floor(x + 0.5))
+ * - `log()` - Natural logarithm (base e)
+ * - `log10()` - Base-10 logarithm
+ * - `pow(exp)` - Raises the float to the power of exp
+ * - `max(other)` - Returns the maximum of this float and other
+ * - `min(other)` - Returns the minimum of this float and other
+ *
+ * The max and min operations are overloaded to work with int, long, float, and double types.
+ *
+ * @return The Float type definition for the Gremlin type registry
  */
 @Suppress("UNCHECKED_CAST")
 fun createFloatType(): GremlinTypeDefinition {

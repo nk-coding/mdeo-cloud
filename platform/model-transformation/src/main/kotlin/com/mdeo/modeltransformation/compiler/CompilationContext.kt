@@ -13,12 +13,6 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * into GraphTraversals. It extends the compilation infrastructure with match-specific
  * settings to support the unified traversal compilation model.
  *
- * ## Match Context
- * When [inMatchContext] is true, expressions are being compiled for use within
- * a Gremlin match() clause. This affects how traversals are constructed:
- * - Traversals typically need to start with `__.as()` to bind to variables
- * - The [currentMatchLabel] provides the label for the current match binding
- *
  * ## Variable Counter
  * The [variableCounter] is used to generate unique variable names for intermediate
  * values in where clauses. This ensures no naming conflicts when multiple
@@ -28,27 +22,36 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * The [currentScope] represents the current variable scope with access to parent scopes
  * through the scope chain. Variable resolution walks up the chain to find bindings.
  *
+ * ## Unique ID Generation
+ * The context maintains an internal counter for generating unique labels in Gremlin
+ * traversals via [getUniqueId]. This ensures no naming conflicts across operations.
+ *
  * @param types The list of types referenced by expressions via evalType index.
  *              Indices must be preserved from the TypedAst. Entries may be VoidType or
  *              ValueType subclasses. Only ValueType entries can be used for property lookups.
  * @param currentScope The current variable scope with access to parent scopes
  * @param traversalSource The GraphTraversalSource for building traversals
- * @param transformationContext Optional transformation context for MT scope resolution
  * @param typeRegistry The type registry for property and method lookup
- * @param inMatchContext Whether compilation is occurring within a match() clause
- * @param currentMatchLabel The current match label for `__.as()` prefix, if in match
- * @param variableCounter Counter for generating unique intermediate variable names
  */
-data class CompilationContext(
+class CompilationContext(
     val types: List<ReturnType>,
-    val currentScope: VariableScope = VariableScope.empty(),
-    val traversalSource: GraphTraversalSource? = null,
-    val transformationContext: TransformationExecutionContext? = null,
-    val typeRegistry: GremlinTypeRegistry,
-    val inMatchContext: Boolean = false,
-    val currentMatchLabel: String? = null,
-    val variableCounter: Int = 0
+    val currentScope: VariableScope,
+    val traversalSource: GraphTraversalSource?,
+    val typeRegistry: GremlinTypeRegistry
 ) {
+    /**
+     * Counter for generating unique variable names
+     */
+    private var idCounter = 0
+    
+    /**
+     * Generates a unique ID for use in Gremlin traversal labels.
+     * 
+     * @return A unique string identifier in the format "id_N" where N is an incrementing counter
+     */
+    fun getUniqueId(): String {
+        return "id_${idCounter++}"
+    }
     /**
      * Resolves a type from the types array using the given index.
      *
@@ -97,6 +100,11 @@ data class CompilationContext(
      */
     fun withChildScope(scopeIndex: Int, childBindings: Map<String, VariableBinding> = emptyMap()): CompilationContext {
         val childScope = currentScope.createChild(scopeIndex, childBindings)
-        return copy(currentScope = childScope)
+        return CompilationContext(
+            types = types,
+            currentScope = childScope,
+            traversalSource = traversalSource,
+            typeRegistry = typeRegistry
+        )
     }
 }

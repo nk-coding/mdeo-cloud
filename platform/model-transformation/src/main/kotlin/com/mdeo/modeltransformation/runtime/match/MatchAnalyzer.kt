@@ -17,29 +17,70 @@ class MatchAnalyzer(val scope: VariableScope) {
 
     private val _referencedInstances: MutableSet<String> = mutableSetOf()
 
+    /**
+     * Returns all instance names that have been referenced during analysis.
+     *
+     * @return An immutable set of instance names that were referenced
+     */
     fun getReferencedInstances(): Set<String> = _referencedInstances.toSet()
 
+    /**
+     * Analyzes an object instance element to extract referenced instances from property values.
+     *
+     * Examines all property assignments in the object instance and recursively analyzes
+     * their value expressions to find instance references.
+     *
+     * @param element The object instance element to analyze
+     */
     fun analyzeObjectInstance(element: TypedPatternObjectInstanceElement) {
         for (property in element.objectInstance.properties) {
             analyzeExpression(property.value)
         }
     }
 
+    /**
+     * Analyzes a link element to extract source and target instance references.
+     *
+     * Adds both the source and target object names to the referenced instances set.
+     *
+     * @param element The link element to analyze
+     */
     fun analyzeLink(element: TypedPatternLinkElement) {
         _referencedInstances.add(element.link.source.objectName)
         _referencedInstances.add(element.link.target.objectName)
     }
 
+    /**
+     * Analyzes a where clause element to extract referenced instances from the condition expression.
+     *
+     * @param element The where clause element to analyze
+     */
     fun analyzeWhereClause(element: TypedPatternWhereClauseElement) {
         analyzeExpression(element.whereClause.expression)
     }
 
+    /**
+     * Analyzes a variable element to extract referenced instances from the variable's value expression.
+     *
+     * @param element The variable element to analyze
+     */
     fun analyzeVariable(element: TypedPatternVariableElement) {
         analyzeExpression(element.variable.value)
     }
 
     /**
      * Recursively analyzes an expression to extract all referenced identifiers.
+     *
+     * Traverses the expression tree and identifies identifier expressions that reference
+     * instance bindings within the current scope. For complex expressions (binary, unary,
+     * member access, function calls, etc.), recursively analyzes all sub-expressions.
+     *
+     * Only identifiers that:
+     * 1. Have a scope index <= current scope index
+     * 2. Resolve to InstanceBinding in the variable scope
+     * are added to the referenced instances set.
+     *
+     * @param expression The expression to analyze
      */
     fun analyzeExpression(expression: TypedExpression) {
         when (expression) {

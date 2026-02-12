@@ -183,6 +183,17 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
         return false
     }
 
+    /**
+     * Internal method to look up a property in the type hierarchy.
+     *
+     * Recursively searches the type and its parent types for the property.
+     * Uses a visited set to prevent infinite loops in circular inheritance.
+     *
+     * @param typeName The type name to search
+     * @param propertyName The property name to find
+     * @param visited Set of already visited types to prevent circular lookups
+     * @return The property definition, or null if not found
+     */
     private fun lookupPropertyInHierarchy(
         typeName: String,
         propertyName: String,
@@ -203,6 +214,19 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
         return null
     }
 
+    /**
+     * Internal method to look up a method in the type hierarchy.
+     *
+     * Recursively searches the type and its parent types for the method with
+     * the specified overload key. Uses a visited set to prevent infinite loops
+     * in circular inheritance.
+     *
+     * @param typeName The type name to search
+     * @param methodName The method name to find
+     * @param overloadKey The overload key to match
+     * @param visited Set of already visited types to prevent circular lookups
+     * @return The method definition, or null if not found
+     */
     private fun lookupMethodInHierarchy(
         typeName: String,
         methodName: String,
@@ -224,6 +248,18 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
         return null
     }
 
+    /**
+     * Internal method to look up all method overloads in the type hierarchy.
+     *
+     * Recursively collects all methods with the specified name from the type
+     * and its parent types. Uses a visited set to prevent infinite loops in
+     * circular inheritance.
+     *
+     * @param typeName The type name to search
+     * @param methodName The method name to find
+     * @param visited Set of already visited types to prevent circular lookups
+     * @return List of all method definitions with this name in the hierarchy
+     */
     private fun lookupMethodsInHierarchy(
         typeName: String,
         methodName: String,

@@ -13,17 +13,24 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * traverser value.
  *
  * ## Supported Operations
- * - `abs()` - Absolute value
- * - `floor()`, `ceiling()`, `round()` - Identity for integers
- * - `log()`, `log10()` - Natural and base-10 logarithms
- * - `pow(exp)` - Exponentiation
- * - `mod(divisor)` - Modulo operation
- * - `max(other)`, `min(other)` - Comparison operations
+ * - `abs()` - Absolute value of the integer
+ * - `floor()`, `ceiling()`, `round()` - Identity operations for integers (no change)
+ * - `log()` - Natural logarithm (base e)
+ * - `log10()` - Base-10 logarithm
+ * - `pow(exp)` - Raises the integer to the power of exp
+ * - `mod(divisor)` - Modulo operation (remainder after division)
+ * - `max(other)` - Returns the maximum of this integer and other
+ * - `min(other)` - Returns the minimum of this integer and other
+ *
+ * The max and min operations are overloaded to work with int, long, float, and double types.
+ *
+ * @return The Int type definition for the Gremlin type registry
  */
 @Suppress("UNCHECKED_CAST")
 fun createIntType(): GremlinTypeDefinition {
     return gremlinType("builtin.int")
         .extends("builtin.any")
+        // abs() - Absolute value
         .method("abs", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).math("abs(_)")
             GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)

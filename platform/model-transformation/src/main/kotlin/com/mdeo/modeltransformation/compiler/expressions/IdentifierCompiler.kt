@@ -44,10 +44,29 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  */
 class IdentifierCompiler : ExpressionCompiler {
 
+    /**
+     * Determines whether this compiler can handle the given expression.
+     *
+     * @param expression The expression to check
+     * @return `true` if the expression is a [TypedIdentifierExpression], `false` otherwise
+     */
     override fun canCompile(expression: TypedExpression): Boolean {
         return expression is TypedIdentifierExpression
     }
 
+    /**
+     * Compiles an identifier expression into a Gremlin traversal.
+     *
+     * This method resolves the identifier from the variable scope and compiles it
+     * to the appropriate Gremlin traversal based on the type of binding (value,
+     * instance, or label).
+     *
+     * @param expression The identifier expression to compile
+     * @param context The compilation context containing variable scope information
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] containing the compiled identifier traversal
+     * @throws CompilationException if the variable cannot be resolved in the scope
+     */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
@@ -64,6 +83,11 @@ class IdentifierCompiler : ExpressionCompiler {
      * All identifiers are resolved uniformly from the variableScopes map.
      * The caller is responsible for setting up the correct bindings at all
      * scope levels where variables should be accessible.
+     *
+     * @param expression The identifier expression containing the name and scope index
+     * @param context The compilation context with variable scope mappings
+     * @return The [VariableBinding] for the identifier
+     * @throws CompilationException if the scope is not found or the variable is not in scope
      */
     private fun resolveVariable(
         expression: TypedIdentifierExpression,
@@ -83,6 +107,21 @@ class IdentifierCompiler : ExpressionCompiler {
             )
     }
 
+    /**
+     * Compiles a variable binding into the appropriate Gremlin traversal.
+     *
+     * This method dispatches to the appropriate compilation method based on the
+     * type of binding:
+     * - [VariableBinding.ValueBinding]: Compiles to a constant traversal
+     * - [VariableBinding.InstanceBinding]: Compiles to select() or V() traversal
+     * - [VariableBinding.LabelBinding]: Compiles to select() with label
+     *
+     * @param binding The variable binding to compile
+     * @param name The name of the variable (used for step labels)
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] representing the variable reference
+     */
     @Suppress("UNCHECKED_CAST")
     private fun compileBinding(
         binding: VariableBinding,
@@ -105,20 +144,27 @@ class IdentifierCompiler : ExpressionCompiler {
     
     /**
      * Compiles an instance binding to a traversal that references the vertex.
-     * 
+     *
+     * This method handles two cases:
      * - If vertexId is null: Uses select() with a step label derived from the variable name
      * - If vertexId is set: Uses __.V(vertexId) for resolved instances (after match execution)
-     * 
+     *
      * The step label is generated using VariableBinding.stepLabel() which currently just
      * returns the variable name as-is, but provides a centralized place for step label logic.
-     * 
+     *
      * Uses __.V(vertexId) to create an ANONYMOUS traversal that starts from the specific vertex.
      * This allows subsequent property access like .values("address") to work correctly.
-     * 
+     *
      * IMPORTANT: We always use anonymous traversals (__.V) instead of graph-bound (g.V) because:
      * 1. Anonymous traversals can be used in flatMap(), coalesce(), and other steps that expect spawned traversals
      * 2. The calling code (compilePropertyValueWithContext) uses g.inject().flatMap() to execute the result
      * 3. Using g.V() would cause "child traversal was not spawned anonymously" errors
+     *
+     * @param binding The instance binding containing optional vertex ID
+     * @param name The variable name used to derive the step label
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] with select() traversal for the instance
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileInstanceBinding(
@@ -138,14 +184,14 @@ class IdentifierCompiler : ExpressionCompiler {
     
     /**
      * Compiles a label binding to a traversal that uses select() to reference the label.
-     * 
+     *
      * LabelBinding is used for variables declared in match blocks that are evaluated
      * as part of the match using .as(label). The label is retrieved using select().
-     * 
+     *
      * @param binding The LabelBinding containing the step label
      * @param context The compilation context
      * @param initialTraversal Optional initial traversal to append to
-     * @return A GremlinCompilationResult containing the select() traversal
+     * @return A [GremlinCompilationResult] containing the select() traversal
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileLabelBinding(

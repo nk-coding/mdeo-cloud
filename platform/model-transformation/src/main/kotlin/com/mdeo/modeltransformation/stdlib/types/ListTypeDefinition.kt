@@ -8,7 +8,12 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
 /**
  * Creates the List type definition.
  *
- * Extends ReadonlyOrderedCollection.
+ * A List is an ordered collection that allows duplicate elements and maintains insertion order.
+ * It extends the builtin.OrderedCollection type and uses list cardinality for vertex properties.
+ *
+ * Inherits all methods from OrderedCollection and Collection including filter, map, exists, all, etc.
+ *
+ * @return The List type definition for the Gremlin type registry
  */
 fun createListType(): GremlinTypeDefinition {
     return gremlinType("builtin.List")

@@ -64,11 +64,31 @@ class UnaryOperatorCompiler(
         private val SUPPORTED_OPERATORS = setOf(OPERATOR_NOT, OPERATOR_MINUS, OPERATOR_PLUS)
     }
 
+    /**
+     * Determines whether this compiler can handle the given expression.
+     *
+     * @param expression The expression to check
+     * @return `true` if the expression is a [TypedUnaryExpression] with a supported operator
+     */
     override fun canCompile(expression: TypedExpression): Boolean {
         if (expression !is TypedUnaryExpression) return false
         return expression.operator in SUPPORTED_OPERATORS
     }
 
+    /**
+     * Compiles a unary expression into a Gremlin traversal.
+     *
+     * This method dispatches to the appropriate compilation method based on the operator:
+     * - `-`: Numeric negation using math("0 - _")
+     * - `+`: Unary plus (identity/no-op)
+     * - `!`: Logical not using choose()
+     *
+     * @param expression The unary expression to compile
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] containing the compiled unary operation
+     * @throws CompilationException if the operator is not supported
+     */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
@@ -93,6 +113,12 @@ class UnaryOperatorCompiler(
      * Compiles a numeric negation using Gremlin's math step.
      *
      * Uses the formula "0 - _" to negate the value where "_" refers to the current value.
+     * This provides a pure Gremlin implementation without requiring lambdas.
+     *
+     * @param expr The unary expression containing the value to negate
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] with the negation traversal
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileNegation(
@@ -112,6 +138,12 @@ class UnaryOperatorCompiler(
      * Compiles unary plus (identity) operation.
      *
      * Unary plus is a no-op but validates that the operand is numeric.
+     * The inner expression is simply compiled and returned as-is.
+     *
+     * @param expr The unary expression with unary plus operator
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] with the inner expression unchanged
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileUnaryPlus(
@@ -128,6 +160,11 @@ class UnaryOperatorCompiler(
      * Uses choose with P.eq(true) to invert boolean values:
      * - If input is true, return false
      * - If input is false (or not true), return true
+     *
+     * @param expr The unary expression with logical not operator
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] with the boolean inversion traversal
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileLogicalNot(
@@ -143,6 +180,13 @@ class UnaryOperatorCompiler(
 
     /**
      * Builds a traversal that inverts a boolean value using choose.
+     *
+     * Creates a choose step that checks if the value equals true:
+     * - If true: returns constant(false)
+     * - Otherwise: returns constant(true)
+     *
+     * @param innerTraversal The traversal producing the boolean value to invert
+     * @return A [GraphTraversal] that inverts the boolean value
      */
     private fun buildNotTraversal(
         innerTraversal: GraphTraversal<Any, Any>

@@ -106,6 +106,14 @@ class ListLiteralCompiler(
 
     /**
      * Compiles each element expression to a traversal result.
+     *
+     * This method recursively compiles all element expressions in the list,
+     * with null initialTraversal since each element is compiled as an independent
+     * anonymous traversal that will be combined using union().
+     *
+     * @param elements The list of element expressions to compile
+     * @param context The compilation context
+     * @return A list of [GremlinCompilationResult] for each element
      */
     private fun compileElements(
         elements: List<TypedExpression>,

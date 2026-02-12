@@ -90,9 +90,13 @@ class MemberCallCompiler(
     /**
      * Gets the type name from an expression for method lookup.
      *
-     * @param expression The expression to get the type from.
-     * @param context The compilation context.
-     * @return The type name string.
+     * Resolves the expression's evalType to determine the type name for looking up
+     * methods in the type registry. Returns "builtin.any" for generic types, lambdas,
+     * or unresolved types as a fallback.
+     *
+     * @param expression The expression to get the type from
+     * @param context The compilation context containing type resolution information
+     * @return The type name string for method lookup ("builtin.any" for unknown types)
      */
     private fun getTypeName(expression: TypedExpression, context: CompilationContext): String {
         val type = context.resolveTypeOrNull(expression.evalType)
@@ -106,14 +110,16 @@ class MemberCallCompiler(
     }
 
     /**
-     * Gets the overload key from method arguments.
+     * Gets the overload key from method arguments for method lookup.
      *
-     * For lambda methods, the overload key is "" (empty string).
-     * For other methods, it's based on argument types.
+     * The overload key is used to distinguish between different overloads of the same
+     * method name. For lambda methods (first argument is a lambda), returns an empty
+     * string. For other methods, returns the type name of the first argument if it's
+     * a ClassTypeRef, otherwise returns an empty string.
      *
-     * @param arguments The method arguments.
-     * @param context The compilation context.
-     * @return The overload key string.
+     * @param arguments The list of method argument expressions
+     * @param context The compilation context containing type resolution information
+     * @return The overload key string (empty string for lambdas or untyped arguments)
      */
     private fun getOverloadKey(
         arguments: List<TypedExpression>,

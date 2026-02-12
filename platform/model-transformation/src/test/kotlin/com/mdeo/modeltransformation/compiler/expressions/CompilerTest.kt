@@ -95,6 +95,7 @@ class TraversalCompilerTest {
         registry = ExpressionCompilerRegistry.createDefaultRegistry()
         context = CompilationContext(
             types = types,
+            currentScope = VariableScope.empty(),
             traversalSource = g,
             typeRegistry = GremlinTypeRegistry.GLOBAL
         )
@@ -821,7 +822,12 @@ class TraversalCompilerTest {
         @Test
         fun `resolves value binding from variable scope`() {
             val scope = VariableScope.of("myVar" to VariableBinding.ValueBinding(42), scopeIndex = 0)
-            val contextWithScope = context.copy(currentScope = scope)
+            val contextWithScope = CompilationContext(
+                types = context.types,
+                currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
+            )
 
             val expr = identifier("myVar", scope = 0)
             val result = registry.compile(expr, contextWithScope)
@@ -833,7 +839,12 @@ class TraversalCompilerTest {
         @Test
         fun `resolves string value binding`() {
             val scope = VariableScope.of("name" to VariableBinding.ValueBinding("Alice"), scopeIndex = 0)
-            val contextWithScope = context.copy(currentScope = scope)
+            val contextWithScope = CompilationContext(
+                types = context.types,
+                currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
+            )
 
             val expr = identifier("name", scope = 0)
             val result = registry.compile(expr, contextWithScope)
@@ -848,8 +859,11 @@ class TraversalCompilerTest {
             val vertex = graph.addVertex(T.label, "Person", "name", "Bob")
             
             val scope = VariableScope.of("person" to VariableBinding.InstanceBinding(vertexId = null), scopeIndex = 0)
-            val contextWithScope = context.copy(
+            val contextWithScope = CompilationContext(
+                types = context.types,
                 currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
             )
 
             val expr = identifier("person", scope = 0)
@@ -864,9 +878,11 @@ class TraversalCompilerTest {
             graph.addVertex(T.label, "Person", "name", "Charlie")
             
             val scope = VariableScope.of("p" to VariableBinding.InstanceBinding(vertexId = null), scopeIndex = 0)
-            val contextWithMatch = context.copy(
+            val contextWithMatch = CompilationContext(
+                types = context.types,
                 currentScope = scope,
-                inMatchContext = true
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
             )
 
             val expr = identifier("p", scope = 0)

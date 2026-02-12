@@ -486,10 +486,8 @@ class CrossMatchVariableTest {
             val roomId = (context.variableScope.getVariable("aRoom") as? VariableBinding.InstanceBinding)?.vertexId
             assertNotNull(roomId, "aRoom should be bound in context")
             
-            // Debug: check what properties exist on the room vertex
             val vertex = graph.traversal().V(roomId).next()
             val props = vertex.properties<Any>().asSequence().map { "${it.key()}=${it.value()}" }.toList()
-            println("Room vertex properties: $props")
             
             // Check if category property exists before asserting
             val hasCategory = graph.traversal().V(roomId).has("category").hasNext()

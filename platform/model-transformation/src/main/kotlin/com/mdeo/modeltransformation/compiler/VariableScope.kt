@@ -52,9 +52,10 @@ sealed interface VariableBinding {
     companion object {
         /**
          * Generates a step label for an instance or variable name.
-         * Returns the name with a dollar prefix to distinguish variables from instances in the match.
+         * Returns the name as-is, providing a centralized place for step label generation.
+         * This function can be modified to add prefixes/suffixes without breaking existing code.
          */
-        fun stepLabel(name: String): String = name
+        fun stepLabel(name: String): String = "$name"
         
         /**
          * Generates a step label for a variable name used in match clauses.
@@ -166,6 +167,15 @@ class VariableScope(
         }
     }
 
+    /**
+     * Creates a shallow copy of this scope.
+     *
+     * The copy will have the same scope index, a new mutable map containing the same bindings,
+     * and the same parent reference. This is useful when you need to preserve the current
+     * state while allowing future modifications to diverge.
+     *
+     * @return A new [VariableScope] with the same scope index, bindings, and parent
+     */
     fun copy(): VariableScope {
         return VariableScope(
             scopeIndex = this.scopeIndex,

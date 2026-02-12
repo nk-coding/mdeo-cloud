@@ -44,10 +44,27 @@ class TernaryExpressionCompiler(
     private val registry: ExpressionCompilerRegistry
 ) : ExpressionCompiler {
 
+    /**
+     * Determines whether this compiler can handle the given expression.
+     *
+     * @param expression The expression to check
+     * @return `true` if the expression is a [TypedTernaryExpression], `false` otherwise
+     */
     override fun canCompile(expression: TypedExpression): Boolean {
         return expression is TypedTernaryExpression
     }
 
+    /**
+     * Compiles a ternary expression into a Gremlin traversal.
+     *
+     * This method converts the ternary expression into a Gremlin choose() step
+     * that implements conditional branching based on the condition evaluation.
+     *
+     * @param expression The ternary expression to compile
+     * @param context The compilation context containing variable bindings and scope information
+     * @param initialTraversal Optional initial traversal to build upon; passed only to the condition
+     * @return A [GremlinCompilationResult] containing the compiled choose() traversal
+     */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
@@ -61,7 +78,14 @@ class TernaryExpressionCompiler(
      * Compiles a ternary expression using Gremlin's choose step.
      *
      * Evaluates the condition and branches to either the true or false expression
-     * based on the condition's result.
+     * based on the condition's result. The condition is compiled with the initialTraversal
+     * while the true and false branches start fresh with null initialTraversal since they
+     * execute within anonymous traversals in the choose step.
+     *
+     * @param expr The ternary expression containing condition, true, and false branches
+     * @param context The compilation context for resolving variables and scopes
+     * @param initialTraversal Optional initial traversal passed only to the condition expression
+     * @return A [GremlinCompilationResult] with the complete choose() traversal
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileTernary(
@@ -87,7 +111,13 @@ class TernaryExpressionCompiler(
      * Builds the choose traversal for conditional branching.
      *
      * Uses is(P.eq(true)) as the condition predicate to check if the
-     * condition evaluates to true.
+     * condition evaluates to true. This creates the Gremlin equivalent of
+     * the ternary operator: condition ? trueExpr : falseExpr.
+     *
+     * @param conditionTraversal The traversal that produces the boolean condition value
+     * @param trueTraversal The traversal to execute if the condition is true
+     * @param falseTraversal The traversal to execute if the condition is false
+     * @return A [GraphTraversal] implementing the conditional logic with choose()
      */
     private fun buildChooseTraversal(
         conditionTraversal: GraphTraversal<Any, Any>,

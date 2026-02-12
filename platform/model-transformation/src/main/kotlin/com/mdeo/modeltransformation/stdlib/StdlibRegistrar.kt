@@ -76,6 +76,13 @@ object StdlibRegistrar {
         )
     }
 
+    /**
+     * Registers all primitive types with the given registry.
+     *
+     * Primitive types include: any, boolean, int, long, float, double, and string.
+     *
+     * @param registry The registry to register primitive types with
+     */
     private fun registerPrimitiveTypes(registry: GremlinTypeRegistry) {
         registry.register(createAnyType())
         registry.register(createBooleanType())
@@ -86,6 +93,13 @@ object StdlibRegistrar {
         registry.register(createStringType())
     }
 
+    /**
+     * Registers all collection types with the given registry.
+     *
+     * Collection types include: Collection, OrderedCollection, List, Set, OrderedSet, and Bag.
+     *
+     * @param registry The registry to register collection types with
+     */
     private fun registerCollectionTypes(registry: GremlinTypeRegistry) {
         registry.register(createCollectionType())
         registry.register(createOrderedCollectionType())

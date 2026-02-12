@@ -51,6 +51,7 @@ class MemberAccessCompilerIntegrationTest {
                 ClassTypeRef("Address", isNullable = false),
                 ClassTypeRef("builtin.int", isNullable = false)
             ),
+            currentScope = VariableScope.empty(),
             traversalSource = graph.traversal(),
             typeRegistry = typeRegistry
         )
@@ -112,8 +113,11 @@ class MemberAccessCompilerIntegrationTest {
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
                 "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.copy(
+            val contextWithScope = CompilationContext(
+                types = context.types,
                 currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
             )
             
             // Compile p.name using an initial traversal from the person vertex
@@ -122,7 +126,7 @@ class MemberAccessCompilerIntegrationTest {
             
             // Use select() to start from the named step and access property
             val g = graph.traversal()
-            val traversal = g.V(person).`as`("p")
+            val traversal = g.V(person).`as`(VariableBinding.stepLabel("p"))
             val compiled = registry.compile(nameAccess, contextWithScope, traversal)
             
             // Execute the traversal
@@ -141,8 +145,11 @@ class MemberAccessCompilerIntegrationTest {
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
                 "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.copy(
+            val contextWithScope = CompilationContext(
+                types = context.types,
                 currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
             )
             
             // Compile p.age
@@ -150,7 +157,7 @@ class MemberAccessCompilerIntegrationTest {
             val ageAccess = memberAccess(personExpr, "age", receiverEvalType = 0, resultEvalType = 3)
             
             val g = graph.traversal()
-            val traversal = g.V(person).`as`("p")
+            val traversal = g.V(person).`as`(VariableBinding.stepLabel("p"))
             val compiled = registry.compile(ageAccess, contextWithScope, traversal)
             
             @Suppress("UNCHECKED_CAST")
@@ -175,8 +182,11 @@ class MemberAccessCompilerIntegrationTest {
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
                 "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.copy(
+            val contextWithScope = CompilationContext(
+                types = context.types,
                 currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
             )
             
             // Compile p.address (should traverse via outgoing edge)
@@ -184,7 +194,7 @@ class MemberAccessCompilerIntegrationTest {
             val addressAccess = memberAccess(personExpr, "address", receiverEvalType = 0, resultEvalType = 2)
             
             val g = graph.traversal()
-            val traversal = g.V(person).`as`("p")
+            val traversal = g.V(person).`as`(VariableBinding.stepLabel("p"))
             val compiled = registry.compile(addressAccess, contextWithScope, traversal)
             
             @Suppress("UNCHECKED_CAST")
@@ -204,12 +214,20 @@ class MemberAccessCompilerIntegrationTest {
             
             // Create context with address variable in scope
             val addressType = ClassTypeRef("Address", isNullable = false)
-            val contextWithAddressType = context.copy(types = listOf(addressType))
+            val contextWithAddressType = CompilationContext(
+                types = listOf(addressType),
+                currentScope = context.currentScope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
+            )
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
                 "a" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = contextWithAddressType.copy(
+            val contextWithScope = CompilationContext(
+                types = contextWithAddressType.types,
                 currentScope = scope,
+                traversalSource = contextWithAddressType.traversalSource,
+                typeRegistry = contextWithAddressType.typeRegistry
             )
             
             // Compile a.residents (should traverse via incoming edge)
@@ -217,7 +235,7 @@ class MemberAccessCompilerIntegrationTest {
             val residentsAccess = memberAccess(addressExpr, "residents", receiverEvalType = 0, resultEvalType = 0)
             
             val g = graph.traversal()
-            val traversal = g.V(address).`as`("a")
+            val traversal = g.V(address).`as`(VariableBinding.stepLabel("a"))
             val compiled = registry.compile(residentsAccess, contextWithScope, traversal)
             
             @Suppress("UNCHECKED_CAST")
@@ -244,8 +262,11 @@ class MemberAccessCompilerIntegrationTest {
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
                 "p" to VariableBinding.InstanceBinding(vertexId = null)
             ))
-            val contextWithScope = context.copy(
+            val contextWithScope = CompilationContext(
+                types = context.types,
                 currentScope = scope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
             )
             
             // Build p.address.city
@@ -267,7 +288,7 @@ class MemberAccessCompilerIntegrationTest {
             )
             
             val g = graph.traversal()
-            val traversal = g.V(person).`as`("p")
+            val traversal = g.V(person).`as`(VariableBinding.stepLabel("p"))
             val compiled = registry.compile(cityAccess, contextWithScope, traversal)
             
             @Suppress("UNCHECKED_CAST")

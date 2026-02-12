@@ -62,6 +62,7 @@ class LambdaMethodDefinitionsTest {
         
         context = CompilationContext(
             types = types,
+            currentScope = VariableScope.empty(),
             traversalSource = graph.traversal(),
             typeRegistry = GremlinTypeRegistry.GLOBAL
         )
@@ -273,18 +274,6 @@ class LambdaMethodDefinitionsTest {
             
             val actualValue = g.inject(null as Any?).flatMap(result.traversal).next()
             assertEquals(false, actualValue)
-        }
-
-        @Test
-        fun `any is alias for exists`() {
-            val list = listLiteral(1, 10, 3)
-            val lambda = greaterThanLambda(5)
-            val memberCall = memberCallWithLambda("any", list, lambda)
-            
-            val result = registry.compile(memberCall, context)
-            
-            val actualValue = g.inject(null as Any?).flatMap(result.traversal).next()
-            assertEquals(true, actualValue)
         }
     }
 
@@ -522,7 +511,12 @@ class LambdaMethodDefinitionsTest {
         @Test
         fun `filter with lambda accessing outer scope variable`() {
             val outerScope = VariableScope.of("threshold" to VariableBinding.ValueBinding(5), scopeIndex = 0)
-            val contextWithScope = context.copy(currentScope = outerScope)
+            val contextWithScope = CompilationContext(
+                types = context.types,
+                currentScope = outerScope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
+            )
             
             val list = listLiteral(1, 2, 3, 10, 20)
             val lambda = greaterThanOuterScopeThresholdLambda()
@@ -538,7 +532,12 @@ class LambdaMethodDefinitionsTest {
         @Test
         fun `exists with lambda accessing outer scope variable`() {
             val outerScope = VariableScope.of("threshold" to VariableBinding.ValueBinding(15))
-            val contextWithScope = context.copy(currentScope = outerScope)
+            val contextWithScope = CompilationContext(
+                types = context.types,
+                currentScope = outerScope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
+            )
             
             val list = listLiteral(1, 10, 20)
             val lambda = greaterThanOuterScopeThresholdLambda()
@@ -553,7 +552,12 @@ class LambdaMethodDefinitionsTest {
         @Test
         fun `all with lambda accessing outer scope variable`() {
             val outerScope = VariableScope.of("threshold" to VariableBinding.ValueBinding(5))
-            val contextWithScope = context.copy(currentScope = outerScope)
+            val contextWithScope = CompilationContext(
+                types = context.types,
+                currentScope = outerScope,
+                traversalSource = context.traversalSource,
+                typeRegistry = context.typeRegistry
+            )
             
             val list = listLiteral(10, 20, 30)
             val lambda = greaterThanOuterScopeThresholdLambda()

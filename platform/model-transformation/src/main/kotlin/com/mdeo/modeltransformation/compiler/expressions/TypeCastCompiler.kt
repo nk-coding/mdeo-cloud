@@ -53,7 +53,13 @@ class TypeCastCompiler(
      *
      * In Gremlin's dynamic type system, casts are pass-throughs. The inner
      * expression is compiled and returned directly since there's no runtime
-     * type conversion needed for graph traversals.
+     * type conversion needed for graph traversals. Both safe casts (as?) and
+     * unsafe casts (as) are handled identically.
+     *
+     * @param expr The type cast expression to compile
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon (passed to inner expression)
+     * @return The compiled traversal result from the inner expression
      */
     private fun compileTypeCast(
         expr: TypedTypeCastExpression,

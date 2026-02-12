@@ -36,10 +36,28 @@ class AssertNonNullCompiler(
     private val registry: ExpressionCompilerRegistry
 ) : ExpressionCompiler {
 
+    /**
+     * Determines whether this compiler can handle the given expression.
+     *
+     * @param expression The expression to check
+     * @return `true` if the expression is a [TypedAssertNonNullExpression], `false` otherwise
+     */
     override fun canCompile(expression: TypedExpression): Boolean {
         return expression is TypedAssertNonNullExpression
     }
 
+    /**
+     * Compiles an assert non-null expression into a Gremlin traversal.
+     *
+     * Since Gremlin's traversal semantics naturally handle null values by filtering
+     * them out (null values don't produce traversers), the non-null assertion is
+     * effectively a pass-through operation.
+     *
+     * @param expression The assert non-null expression to compile
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] containing the inner expression's traversal
+     */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
@@ -55,6 +73,11 @@ class AssertNonNullCompiler(
      * In Gremlin, null values naturally don't produce traversers, so the
      * non-null assertion is a semantic pass-through. The inner expression
      * is compiled and returned directly.
+     *
+     * @param expr The assert non-null expression containing the inner expression
+     * @param context The compilation context
+     * @param initialTraversal Optional initial traversal to build upon
+     * @return A [GremlinCompilationResult] with the compiled inner expression
      */
     private fun compileAssertNonNull(
         expr: TypedAssertNonNullExpression,
