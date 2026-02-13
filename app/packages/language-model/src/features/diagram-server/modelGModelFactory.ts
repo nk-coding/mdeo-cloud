@@ -13,9 +13,9 @@ import { GObjectNode } from "./model/objectNode.js";
 import { GObjectNameLabel } from "./model/objectNameLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";
 import { GLinkEdge } from "./model/linkEdge.js";
-import { GLinkSourceLabel } from "./model/linkSourceLabel.js";
-import { GLinkTargetLabel } from "./model/linkTargetLabel.js";
-import { EdgeLayoutMetadataUtil } from "./metadataTypes.js";
+import { GLinkEndNode } from "./model/linkEndNode.js";
+import { GLinkEndLabel } from "./model/linkEndLabel.js";
+import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { ModelElementType } from "./model/elementTypes.js";
 import {
     EnumValue,
@@ -356,30 +356,64 @@ export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
     }
 
     /**
-     * Adds source and target labels to a link edge if properties are specified.
+     * Adds source and target label nodes to a link edge if properties are specified.
+     * Creates nodes that wrap the labels to provide proper bounds handling.
      *
-     * @param edge The link edge to add labels to
+     * @param edge The link edge to add label nodes to
      * @param edgeId The edge ID
      * @param sourceProperty Optional source property name
      * @param targetProperty Optional target property name
      */
-    private addLinkLabels(edge: GLinkEdge, edgeId: string, sourceProperty?: string, targetProperty?: string): void {
-        if (sourceProperty) {
-            const sourceLabel = GLinkSourceLabel.builder()
-                .id(`${edgeId}#source-label`)
-                .text(sourceProperty)
-                .readonly(true)
-                .build();
-            edge.children.push(sourceLabel);
+    private addLinkLabels(
+        edge: GLinkEdge,
+        edgeId: string,
+        sourceProperty: string | undefined,
+        targetProperty: string | undefined
+    ): void {
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+
+        if (sourceProperty != undefined) {
+            const sourceNodes = this.createLinkEndNodes(edgeId, sourceProperty, "target", validatedMetadata);
+            edge.children.push(...sourceNodes);
         }
 
-        if (targetProperty) {
-            const targetLabel = GLinkTargetLabel.builder()
-                .id(`${edgeId}#target-label`)
-                .text(targetProperty)
-                .readonly(true)
-                .build();
-            edge.children.push(targetLabel);
+        if (targetProperty != undefined) {
+            const targetNodes = this.createLinkEndNodes(edgeId, targetProperty, "source", validatedMetadata);
+            edge.children.push(...targetNodes);
         }
+    }
+
+    /**
+     * Creates nodes for a link endpoint with property name.
+     *
+     * @param edgeId The edge ID
+     * @param property The property name
+     * @param end Whether this is at "source" or "target" of the link
+     * @param validatedMetadata The validated metadata containing node placement
+     * @returns An array of created nodes (property node with label)
+     */
+    private createLinkEndNodes(
+        edgeId: string,
+        property: string,
+        end: "source" | "target",
+        validatedMetadata: ReturnType<typeof this.modelState.getValidatedMetadata>
+    ): GModelElement[] {
+        const nodes: GModelElement[] = [];
+
+        const nodeId = `${edgeId}#${end}-node`;
+        const nodeMeta = validatedMetadata.nodes[nodeId];
+        const metadata =
+            nodeMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(nodeMeta.meta)
+                ? nodeMeta.meta
+                : NodeLayoutMetadataUtil.create(0, 0);
+
+        const endNode = GLinkEndNode.builder().id(nodeId).end(end).meta(metadata).build();
+
+        const endLabel = GLinkEndLabel.builder().id(`${edgeId}#${end}-label`).text(property).readonly(true).build();
+
+        endNode.children.push(endLabel);
+        nodes.push(endNode);
+
+        return nodes;
     }
 }

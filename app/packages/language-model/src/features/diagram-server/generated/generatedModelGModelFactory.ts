@@ -8,8 +8,7 @@ import { GObjectNode } from "../model/objectNode.js";
 import { GObjectNameLabel } from "../model/objectNameLabel.js";
 import { GPropertyLabel } from "../model/propertyLabel.js";
 import { GLinkEdge } from "../model/linkEdge.js";
-import { GLinkSourceLabel } from "../model/linkSourceLabel.js";
-import { GLinkTargetLabel } from "../model/linkTargetLabel.js";
+import { GLinkEndLabel } from "../model/linkEndLabel.js";
 import { EdgeLayoutMetadataUtil } from "../metadataTypes.js";
 import { ModelElementType } from "../model/elementTypes.js";
 
@@ -297,7 +296,7 @@ export class GeneratedModelGModelFactory extends BaseGModelFactory<PartialGenera
         targetProperty: string | null
     ): void {
         if (sourceProperty) {
-            const sourceLabel = GLinkSourceLabel.builder()
+            const sourceLabel = GLinkEndLabel.builder()
                 .id(`${edgeId}#source-label`)
                 .text(sourceProperty)
                 .readonly(true)
@@ -306,7 +305,7 @@ export class GeneratedModelGModelFactory extends BaseGModelFactory<PartialGenera
         }
 
         if (targetProperty) {
-            const targetLabel = GLinkTargetLabel.builder()
+            const targetLabel = GLinkEndLabel.builder()
                 .id(`${edgeId}#target-label`)
                 .text(targetProperty)
                 .readonly(true)

@@ -12,11 +12,12 @@ import { GObjectNode } from "./model/objectNode.js";
 import { GObjectLabel } from "./model/objectLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";
 import { GLinkEdge } from "./model/linkEdge.js";
-import { GLinkSourceLabel } from "./model/linkSourceLabel.js";
-import { GLinkTargetLabel } from "./model/linkTargetLabel.js";
+import { GLinkEndNode } from "./model/linkEndNode.js";
+import { GLinkEndLabel } from "./model/linkEndLabel.js";
 import { GObjectNodeView } from "./views/objectNodeView.js";
 import { GObjectLabelView } from "./views/objectLabelView.js";
 import { GLinkEdgeView } from "./views/linkEdgeView.js";
+import { GLinkEndNodeView } from "./views/linkEndNodeView.js";
 import { ModelElementType } from "./model/elementTypes.js";
 
 const { FeatureModule, configureModelElement, editLabelFeature } = sharedImport("@eclipse-glsp/sprotty");
@@ -40,8 +41,8 @@ export const modelDiagramModule = new FeatureModule(
 
         configureModelElement(context, ModelElementType.EDGE_LINK, GLinkEdge, GLinkEdgeView);
 
-        configureModelElement(context, ModelElementType.LABEL_LINK_SOURCE, GLinkSourceLabel, GLabelView);
-        configureModelElement(context, ModelElementType.LABEL_LINK_TARGET, GLinkTargetLabel, GLabelView);
+        configureModelElement(context, ModelElementType.NODE_LINK_END, GLinkEndNode, GLinkEndNodeView);
+        configureModelElement(context, ModelElementType.LABEL_LINK_END, GLinkEndLabel, GLabelView);
 
         configureModelElement(context, ModelElementType.COMPARTMENT, GCompartment, GCompartmentView);
         configureModelElement(context, ModelElementType.DIVIDER, GHorizontalDivider, GHorizontalDividerView);

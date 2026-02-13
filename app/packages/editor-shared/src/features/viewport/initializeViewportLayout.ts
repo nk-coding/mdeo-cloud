@@ -34,7 +34,6 @@ export class InitializeViewportLayoutCommand extends Command {
             ) {
                 this.actionDispatcher.dispatch(LayoutAction.create());
             } else {
-                console.log("fit to screen dispatched");
                 this.actionDispatcher.dispatchOnceModelInitialized(
                     createFitToScreenAction(false, this.action.newRoot.children?.map((child) => child.id) ?? [])
                 );

@@ -36,6 +36,10 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
             return NodeLayoutMetadataUtil.verify(model.meta, 250);
         }
 
+        if (model.type === ModelElementType.NODE_LINK_SOURCE || model.type === ModelElementType.NODE_LINK_TARGET) {
+            return NodeLayoutMetadataUtil.verify(model.meta);
+        }
+
         if (model.type === ModelElementType.EDGE_LINK) {
             const edgeModel = model as EdgeMetadata;
             return EdgeLayoutMetadataUtil.verify(edgeModel.meta);
@@ -174,7 +178,7 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
         const { objects, links } = this.extractObjectsAndLinks(sourceModel);
 
         this.extractObjectMetadata(objects, idRegistry, nodes);
-        this.extractLinkMetadata(links, idRegistry, edges);
+        this.extractLinkMetadata(links, idRegistry, edges, nodes);
 
         return { nodes, edges };
     }
@@ -246,16 +250,18 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
     }
 
     /**
-     * Extracts metadata for all links.
+     * Extracts metadata for all links and their label nodes.
      *
      * @param links List of links in the model
      * @param idRegistry Model ID registry
      * @param edges Record to populate with edge metadata
+     * @param nodes Record to populate with node metadata
      */
     private extractLinkMetadata(
         links: PartialLink[],
         idRegistry: ModelIdRegistry,
-        edges: Record<string, EdgeMetadata>
+        edges: Record<string, EdgeMetadata>,
+        nodes: Record<string, NodeMetadata>
     ): void {
         for (const link of links) {
             const edgeId = idRegistry.getId(link);
@@ -269,7 +275,32 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
                     to: idRegistry.getId(targetObj),
                     attrs: this.createLinkAttributes(link)
                 };
+
+                this.extractLinkLabelMetadata(link, edgeId, nodes);
             }
+        }
+    }
+
+    /**
+     * Extracts metadata for link label nodes.
+     *
+     * @param link The link definition
+     * @param edgeId The edge ID
+     * @param nodes Record to populate with node metadata
+     */
+    private extractLinkLabelMetadata(link: PartialLink, edgeId: string, nodes: Record<string, NodeMetadata>): void {
+        if (link.source?.property != undefined) {
+            nodes[`${edgeId}#source-node`] = {
+                type: ModelElementType.NODE_LINK_END,
+                attrs: {}
+            };
+        }
+
+        if (link.target?.property != undefined) {
+            nodes[`${edgeId}#target-node`] = {
+                type: ModelElementType.NODE_LINK_END,
+                attrs: {}
+            };
         }
     }
 

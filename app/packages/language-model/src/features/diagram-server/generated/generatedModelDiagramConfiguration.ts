@@ -5,8 +5,7 @@ import { GObjectNode } from "../model/objectNode.js";
 import { GObjectNameLabel } from "../model/objectNameLabel.js";
 import { GPropertyLabel } from "../model/propertyLabel.js";
 import { GLinkEdge } from "../model/linkEdge.js";
-import { GLinkSourceLabel } from "../model/linkSourceLabel.js";
-import { GLinkTargetLabel } from "../model/linkTargetLabel.js";
+import { GLinkEndLabel } from "../model/linkEndLabel.js";
 
 const { injectable } = sharedImport("inversify");
 const { ServerLayoutKind, getDefaultMapping } = sharedImport("@eclipse-glsp/server");
@@ -32,8 +31,7 @@ export class GeneratedModelDiagramConfiguration implements DiagramConfiguration 
         mapping.set(ModelElementType.LABEL_OBJECT_NAME, GObjectNameLabel);
         mapping.set(ModelElementType.LABEL_PROPERTY, GPropertyLabel);
         mapping.set(ModelElementType.EDGE_LINK, GLinkEdge);
-        mapping.set(ModelElementType.LABEL_LINK_SOURCE, GLinkSourceLabel);
-        mapping.set(ModelElementType.LABEL_LINK_TARGET, GLinkTargetLabel);
+        mapping.set(ModelElementType.LABEL_LINK_END, GLinkEndLabel);
 
         return mapping;
     }

@@ -32,11 +32,27 @@ export enum ModelElementType {
      */
     DIVIDER = "divider:horizontal",
     /**
-     * Label at the source end of a link
+     * Node wrapping a link end label (source or target)
+     */
+    NODE_LINK_END = "node:link-end",
+    /**
+     * Label at the end of a link (source or target)
+     */
+    LABEL_LINK_END = "label:link-end",
+    /**
+     * @deprecated Use NODE_LINK_END with end property
+     */
+    NODE_LINK_SOURCE = "node:link-source",
+    /**
+     * @deprecated Use NODE_LINK_END with end property
+     */
+    NODE_LINK_TARGET = "node:link-target",
+    /**
+     * @deprecated Use LABEL_LINK_END
      */
     LABEL_LINK_SOURCE = "label:link-source",
     /**
-     * Label at the target end of a link
+     * @deprecated Use LABEL_LINK_END
      */
     LABEL_LINK_TARGET = "label:link-target"
 }

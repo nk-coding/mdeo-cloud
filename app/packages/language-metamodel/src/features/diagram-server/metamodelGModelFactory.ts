@@ -709,12 +709,12 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         this.applyRoutingPoints(edge, metadata);
 
         if (assoc.source != undefined) {
-            const startNodes = this.createAssociationEndNodes(idRegistry, assoc.source, "source", validatedMetadata);
+            const startNodes = this.createAssociationEndNodes(idRegistry, assoc.source, "target", validatedMetadata);
             edge.children.push(...startNodes);
         }
 
         if (assoc.target != undefined) {
-            const targetNodes = this.createAssociationEndNodes(idRegistry, assoc.target, "target", validatedMetadata);
+            const targetNodes = this.createAssociationEndNodes(idRegistry, assoc.target, "source", validatedMetadata);
             edge.children.push(...targetNodes);
         }
 
