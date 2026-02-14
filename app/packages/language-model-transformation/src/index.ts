@@ -1,5 +1,6 @@
 export * from "./action-handlers/newFileActionHandler.js";
 export * from "./action-handlers/runModelTransformationActionHandler.js";
+export * from "./features/diagram-server/index.js";
 export * from "./features/stdlib/collections/Bag.js";
 export * from "./features/stdlib/collections/Collection.js";
 export * from "./features/stdlib/collections/List.js";
