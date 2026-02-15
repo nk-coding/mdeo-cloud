@@ -31,8 +31,7 @@ import {
     type IfExpressionStatementType,
     type WhileExpressionStatementType,
     type StopStatementType,
-    type PatternType,
-    type ModelTransformationType
+    type PatternType
 } from "../../grammar/modelTransformationTypes.js";
 import type { AstReflection } from "@mdeo/language-common";
 

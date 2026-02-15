@@ -1070,10 +1070,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         // Create labels for where clauses and variables
         if (pattern?.elements != undefined) {
-            const constraintsCompartment = this.createConstraintsCompartment(nodeId, pattern.elements, idRegistry);
-            if (constraintsCompartment != undefined) {
-                node.children.push(constraintsCompartment);
-            }
+            const constraintCompartments = this.createConstraintCompartments(nodeId, pattern.elements, idRegistry);
+            node.children.push(...constraintCompartments);
         }
 
         graph.children.push(node);
@@ -1240,20 +1238,23 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     }
 
     /**
-     * Creates a compartment for where clauses and variables.
+     * Creates compartments for where clauses and variables.
+     * Returns separate compartments with dividers for each section that has content.
      *
      * @param nodeId The parent node ID
      * @param elements The pattern elements
      * @param idRegistry The model ID registry
-     * @returns The constraints compartment or undefined if empty
+     * @returns An array of constraint compartments (may be empty)
      */
-    private createConstraintsCompartment(
+    private createConstraintCompartments(
         nodeId: string,
         elements: unknown[],
         idRegistry: ModelIdRegistry
-    ): GCompartment | undefined {
-        const constraintElements: GModelElement[] = [];
+    ): GCompartment[] {
+        const result: GCompartment[] = [];
 
+        // Collect where clause labels
+        const whereClauseLabels: GModelElement[] = [];
         for (const element of elements) {
             if (this.reflection.isInstance(element, WhereClause)) {
                 const where = element as WhereClauseType;
@@ -1264,9 +1265,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                     .text(`where ${exprText}`)
                     .readonly(true)
                     .build();
-                constraintElements.push(label);
+                whereClauseLabels.push(label);
             }
+        }
 
+        // Collect variable labels
+        const variableLabels: GModelElement[] = [];
+        for (const element of elements) {
             if (this.reflection.isInstance(element, PatternVariable)) {
                 const variable = element as PatternVariableType;
                 const varId = idRegistry.getId(variable);
@@ -1284,26 +1289,43 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                     .text(varText)
                     .readonly(true)
                     .build();
-                constraintElements.push(label);
+                variableLabels.push(label);
             }
         }
 
-        if (constraintElements.length === 0) {
-            return undefined;
+        // Create where clauses compartment (if any)
+        if (whereClauseLabels.length > 0) {
+            const divider = GHorizontalDivider.builder()
+                .type(ModelTransformationElementType.DIVIDER)
+                .id(`${nodeId}#where-divider`)
+                .build();
+
+            const compartment = GCompartment.builder()
+                .type(ModelTransformationElementType.COMPARTMENT)
+                .id(`${nodeId}#where-clauses`)
+                .build();
+
+            compartment.children.push(divider, ...whereClauseLabels);
+            result.push(compartment);
         }
 
-        const divider = GHorizontalDivider.builder()
-            .type(ModelTransformationElementType.DIVIDER)
-            .id(`${nodeId}#constraints-divider`)
-            .build();
+        // Create variables compartment (if any)
+        if (variableLabels.length > 0) {
+            const divider = GHorizontalDivider.builder()
+                .type(ModelTransformationElementType.DIVIDER)
+                .id(`${nodeId}#variables-divider`)
+                .build();
 
-        const compartment = GCompartment.builder()
-            .type(ModelTransformationElementType.COMPARTMENT)
-            .id(`${nodeId}#constraints`)
-            .build();
+            const compartment = GCompartment.builder()
+                .type(ModelTransformationElementType.COMPARTMENT)
+                .id(`${nodeId}#variables`)
+                .build();
 
-        compartment.children.push(divider, ...constraintElements);
-        return compartment;
+            compartment.children.push(divider, ...variableLabels);
+            result.push(compartment);
+        }
+
+        return result;
     }
 
     /**

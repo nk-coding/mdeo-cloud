@@ -6,6 +6,9 @@
     },
     "references": [
         {
+            "path": "../editor-model-transformation"
+        },
+        {
             "path": "../language-common"
         },
         {

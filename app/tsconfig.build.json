@@ -45,6 +45,9 @@
             "path": "packages/editor-model"
         },
         {
+            "path": "packages/editor-model-transformation"
+        },
+        {
             "path": "packages/service-common"
         },
         {
