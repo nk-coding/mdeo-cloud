@@ -9,7 +9,8 @@ import {
     HIDDEN_NEWLINE,
     INT,
     FLOAT,
-    type ParserRule
+    type ParserRule,
+    STRING
 } from "@mdeo/language-common";
 import {
     generateExpressionRules,
@@ -104,7 +105,7 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
     const deserializationContext = GrammarDeserializationContext.create(
         [BaseExpression, BaseExtension],
         [...Object.values(expressionRules), LambdaExpressionRule],
-        [ID, NEWLINE, HIDDEN_NEWLINE, INT, FLOAT]
+        [ID, NEWLINE, HIDDEN_NEWLINE, INT, FLOAT, STRING]
     );
 
     const resolvedPlugins = resolvePlugins(plugins, deserializationContext);

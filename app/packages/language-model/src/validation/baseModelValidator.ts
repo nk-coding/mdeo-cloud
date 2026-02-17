@@ -1,10 +1,3 @@
-/**
- * @module baseModelValidator
- *
- * Provides base validation logic shared across model validators.
- * Includes common validation for links, associations, multiplicities,
- * and class/enum resolution.
- */
 import type { ValidationAcceptor, AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
 import {

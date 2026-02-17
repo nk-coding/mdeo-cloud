@@ -27,6 +27,9 @@
             "path": "packages/language-config"
         },
         {
+            "path": "packages/language-config-optimization"
+        },
+        {
             "path": "packages/language-script"
         },
         {
@@ -45,7 +48,16 @@
             "path": "packages/editor-model"
         },
         {
+            "path": "packages/editor-model-transformation"
+        },
+        {
             "path": "packages/service-common"
+        },
+        {
+            "path": "packages/service-config"
+        },
+        {
+            "path": "packages/service-config-optimization"
         },
         {
             "path": "packages/service-metamodel"

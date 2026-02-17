@@ -58,6 +58,15 @@ const scriptLanguagePlugin: LanguagePlugin = {
     isGenerated: false
 };
 
+initializePluginContext();
+
+const { scriptPluginProvider } = await import("@mdeo/language-script");
+const { typedAstHandler, TYPED_AST_HANDLER_KEY } = await import("./handler/typedAstHandler.js");
+const { ScriptExecutionHandler } = await import("./handler/scriptExecutionHandler.js");
+const { createScriptConfigContributionPlugin } = await import("./scriptConfigContributionPlugin.js");
+
+const envConfig = parseServiceConfigFromEnv();
+
 /**
  * Plugin definition for the script service.
  */
@@ -67,16 +76,13 @@ const scriptServicePlugin: ServicePluginDefinition = {
     description: "Language support for script definitions (.s files)",
     icon: convertIcon(FileCode),
     languagePlugins: [scriptLanguagePlugin],
-    contributionPlugins: []
+    contributionPlugins: [{
+        languageId: "config",
+        description: "Provides script function type exports for config language",
+        additionalKeywords: [],
+        serverContributionPlugins: [createScriptConfigContributionPlugin()]
+    }]
 };
-
-initializePluginContext();
-
-const { scriptPluginProvider } = await import("@mdeo/language-script");
-const { typedAstHandler, TYPED_AST_HANDLER_KEY } = await import("./handler/typedAstHandler.js");
-const { ScriptExecutionHandler } = await import("./handler/scriptExecutionHandler.js");
-
-const envConfig = parseServiceConfigFromEnv();
 
 /**
  * URL of the script-execution backend service.

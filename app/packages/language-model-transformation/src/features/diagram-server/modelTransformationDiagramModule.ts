@@ -1,0 +1,38 @@
+import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
+import type { BaseLayoutEngine, MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
+import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
+import { ModelTransformationGModelFactory } from "./modelTransformationGModelFactory.js";
+import { ModelTransformationDiagramConfiguration } from "./modelTransformationDiagramConfiguration.js";
+import { ModelTransformationModelIdProvider } from "./modelTransformationModelIdProvider.js";
+import { ModelTransformationMetadataManager } from "./modelTransformationMetadataManager.js";
+import { ModelTransformationLayoutEngine } from "./modelTransformationLayoutEngine.js";
+
+const { injectable } = sharedImport("inversify");
+
+/**
+ * Diagram module for model transformation visualizations.
+ * Configures the GLSP diagram with model-transformation-specific factory and configuration.
+ */
+@injectable()
+export class ModelTransformationDiagramModule extends BaseDiagramModule {
+    
+    protected override bindDiagramConfiguration(): BindingTarget<DiagramConfiguration> {
+        return ModelTransformationDiagramConfiguration;
+    }
+
+    protected override bindGModelFactory(): BindingTarget<GModelFactory> {
+        return ModelTransformationGModelFactory;
+    }
+
+    protected override bindModelIdProvider(): BindingTarget<ModelIdProvider> {
+        return ModelTransformationModelIdProvider;
+    }
+
+    protected override bindMetadataManager(): BindingTarget<MetadataManager> {
+        return ModelTransformationMetadataManager;
+    }
+
+    protected override bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine> {
+        return ModelTransformationLayoutEngine;
+    }
+}

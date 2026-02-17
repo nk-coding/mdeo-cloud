@@ -1,9 +1,3 @@
-/**
- * @module modelDataHandler
- *
- * Handler for computing the ModelData representation of a model file.
- * Provides a lightweight, serializable format for model data exchange.
- */
 import { type ModelData, type ModelServices, ModelDataConverter, Model } from "@mdeo/language-model";
 import { hasErrors, type FileDataHandler } from "@mdeo/service-common";
 

@@ -6,10 +6,10 @@
     },
     "references": [
         {
-            "path": "../language-common"
+            "path": "../plugin"
         },
         {
-            "path": "../language-expression"
+            "path": "../language-common"
         },
         {
             "path": "../language-shared"

@@ -38,6 +38,7 @@ import { RunModelTransformationActionHandler } from "./action-handlers/runModelT
 import { ModelTransformationActionProvider } from "./features/modelTransformationActionProvider.js";
 import { addExternalReferenceCollectionPhase } from "@mdeo/language-shared";
 import { registerModelTransformationValidationChecks } from "./validation/modelTransformationValidator.js";
+import { ModelTransformationDiagramModule } from "./features/diagram-server/modelTransformationDiagramModule.js";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");
@@ -125,6 +126,7 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
             registerExpressionSerializers(services, expressionTypes);
             registerModelTransformationSerializers(services);
             registerModelTransformationValidationChecks(services);
+            services.shared.glsp.serverModule.configureDiagramModule(new ModelTransformationDiagramModule(services));
             addExternalReferenceCollectionPhase(services);
         }
     };

@@ -2,6 +2,8 @@ import type { AstNode, GrammarAST, Reference } from "langium";
 import type { SerializableGrammarNode } from "./types.js";
 import type { ParserRule } from "../rule/types.js";
 import type { TerminalRule } from "../rule/terminal/types.js";
+import type { Interface } from "../type/interface/types.js";
+import type { Type } from "../type/type/types.js";
 
 /**
  * Utility type that represents either a single value or an array of values.
@@ -126,6 +128,34 @@ export interface SerializedGrammar {
 }
 
 /**
+ * Configuration input for the GrammarSerializer.
+ * Allows specifying rules, terminals, interfaces, and types to be serialized.
+ */
+export interface GrammarSerializerInput {
+    /**
+     * Parser rules serving as entry points for the grammar.
+     */
+    rules: ParserRule<any>[];
+
+    /**
+     * Additional terminal rules to include in the grammar.
+     */
+    additionalTerminals: TerminalRule<any>[];
+
+    /**
+     * Interfaces to directly register in the serialized grammar.
+     * Optional - if not provided, interfaces are discovered through rules.
+     */
+    interfaces?: Interface<any>[];
+
+    /**
+     * Types to directly register in the serialized grammar.
+     * Optional - if not provided, types are discovered through rules.
+     */
+    types?: Type<any>[];
+}
+
+/**
  * Serializes grammar rules and types into a JSON-serializable format that can be
  * processed by Langium's grammar loading mechanisms.
  */
@@ -184,25 +214,45 @@ export class GrammarSerializer {
     }
 
     /**
-     * Creates a new grammar serializer and registers the entry rule and additional terminals.
+     * Creates a new grammar serializer and registers rules, terminals, interfaces, and types.
      *
-     * @param rules The parser rules serving as entry points
-     * @param additionalTerminals Array of terminal rules to include in the grammar
+     * @param config The configuration input containing rules, terminals, interfaces, and types to serialize
      */
-    constructor(rules: ParserRule<any>[], additionalTerminals: TerminalRule<any>[]) {
-        for (const rule of rules) {
+    constructor(config: GrammarSerializerInput) {
+        for (const rule of config.rules) {
             const entryRule = rule.toRule();
             if (this.isExternalReference(entryRule)) {
                 throw new Error("Entry rule cannot be an external reference");
             }
             this.registerRule(entryRule);
         }
-        for (const terminal of additionalTerminals) {
+
+        for (const terminal of config.additionalTerminals) {
             const terminalRule = terminal.toRule();
             if (!this.isExternalReference(terminalRule)) {
                 this.registerRule(terminalRule);
             } else {
                 throw new Error("Additional terminals cannot be external references");
+            }
+        }
+
+        if (config.interfaces) {
+            for (const iface of config.interfaces) {
+                const interfaceNode = iface.toType();
+                if (this.isExternalReference(interfaceNode)) {
+                    throw new Error("Directly registered interfaces cannot be external references");
+                }
+                this.registerInterface(interfaceNode);
+            }
+        }
+
+        if (config.types) {
+            for (const type of config.types) {
+                const typeNode = type.toType();
+                if (this.isExternalReference(typeNode)) {
+                    throw new Error("Directly registered types cannot be external references");
+                }
+                this.registerType(typeNode);
             }
         }
     }
@@ -264,6 +314,7 @@ export class GrammarSerializer {
         const existing = this.ruleLookup.get(rule.name);
         if (existing) {
             if (existing.node !== rule) {
+                console.trace()
                 throw new Error(`Duplicate rule name: ${rule.name}`);
             }
             return existing.ref;

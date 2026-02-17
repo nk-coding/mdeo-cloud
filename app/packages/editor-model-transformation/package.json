@@ -1,0 +1,35 @@
+{
+    "name": "@mdeo/editor-model-transformation",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./styles": {
+            "style": "./dist/styles.css",
+            "import": "./dist/styles.css",
+            "default": "./dist/styles.css"
+        }
+    },
+    "files": [
+        "dist",
+        "src"
+    ],
+    "scripts": {
+        "build:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --minify",
+        "watch:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --watch"
+    },
+    "dependencies": {
+        "@mdeo/editor-shared": "^0.1.0"
+    },
+    "devDependencies": {
+        "@eclipse-glsp/client": "^2.6.0",
+        "@eclipse-glsp/sprotty": "^2.6.0",
+        "@tailwindcss/cli": "^4.1.18",
+        "inversify": "^6.2.2",
+        "snabbdom": "~3.5.1",
+        "tailwindcss": "^4.1.18"
+    }
+}

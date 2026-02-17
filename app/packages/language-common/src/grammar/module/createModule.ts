@@ -19,7 +19,10 @@ export function createModule(
 ): LanguageModule {
     const serializedGrammars = new Map<LangiumLanguagePlugin<any>, string>();
     for (const plugin of plugins) {
-        const serializableGrammar = new GrammarSerializer([plugin.rootRule], plugin.additionalTerminals).grammar;
+        const serializableGrammar = new GrammarSerializer({
+            rules: [plugin.rootRule],
+            additionalTerminals: plugin.additionalTerminals
+        }).grammar;
         (serializableGrammar.rules[0] as SerializedAstNode<GrammarAST.ParserRule>).entry = true;
         const serializedGrammar = JSON.stringify({
             $type: "Grammar",

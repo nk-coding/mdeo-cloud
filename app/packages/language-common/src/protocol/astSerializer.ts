@@ -50,6 +50,20 @@ export interface AstSerializer {
     registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => string): void;
 
     /**
+     * Retrieves the registered node serializers.
+     *
+     * @returns A map of node type names to their corresponding printer functions
+     */
+    getNodeSerializers(): Map<string, (context: PrintContext) => Doc>;
+
+    /**
+     * Retrieves the registered primitive serializers.
+     *
+     * @returns A map of terminal rule names to their corresponding serializer functions
+     */
+    getPrimitiveSerializers(): Map<string, (primitive: PrimitiveValue<unknown>) => string>;
+
+    /**
      * Guesses formatting options based on the content of the given document.
      *
      * @param document The Langium document to analyze

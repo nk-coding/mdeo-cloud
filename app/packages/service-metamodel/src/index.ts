@@ -44,6 +44,13 @@ const metamodelLanguagePlugin: LanguagePlugin = {
     isGenerated: false
 };
 
+initializePluginContext();
+
+const { metamodelPluginProvider } = await import("@mdeo/language-metamodel");
+const { createMetamodelConfigContributionPlugin } = await import("./metamodelConfigContributionPlugin.js");
+
+const envConfig = parseServiceConfigFromEnv();
+
 /**
  * Plugin definition for the metamodel service.
  */
@@ -53,14 +60,13 @@ const metamodelServicePlugin: ServicePluginDefinition = {
     description: "Language support for metamodel definitions (.mm files)",
     icon: convertIcon(Network),
     languagePlugins: [metamodelLanguagePlugin],
-    contributionPlugins: []
+    contributionPlugins: [{
+        languageId: "config",
+        description: "Provides metamodel type exports for config language",
+        additionalKeywords: [],
+        serverContributionPlugins: [createMetamodelConfigContributionPlugin()]
+    }]
 };
-
-initializePluginContext();
-
-const { metamodelPluginProvider } = await import("@mdeo/language-metamodel");
-
-const envConfig = parseServiceConfigFromEnv();
 
 /**
  * Language configuration for the metamodel language.

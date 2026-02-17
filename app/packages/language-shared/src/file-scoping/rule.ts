@@ -18,6 +18,9 @@ import type { FileScopingConfig } from "./config.js";
  * @param importType The interface type for a single import (typically from generateImportTypes)
  * @param fileImportType The interface type for a file import statement (typically from generateImportTypes)
  * @param terminal Optional terminal rule to use for entity references (if not provided, uses default cross-reference)
+ * @param idTerminal Optional terminal rule for identifiers (default: ID)
+ * @param stringTerminal Optional terminal rule for strings (default: STRING)
+ * @param newlineTerminal Optional terminal rule for newlines (default: NEWLINE)
  * @param newlineAwareMode Whether to make the rules newline-aware (default: true)
  * @returns An object containing the importRule and fileImportRule
  */
@@ -25,13 +28,16 @@ export function generateImportRules<T extends AstNode>(
     config: FileScopingConfig<T>,
     importType: ImportType<T>,
     fileImportType: FileImportType<T>,
-    terminal?: TerminalRule<any>,
+    terminal: TerminalRule<any>,
+    idTerminal: TerminalRule<any> = ID,
+    stringTerminal: TerminalRule<any> = STRING,
+    newlineTerminal: TerminalRule<any> = NEWLINE,
     newlineAwareMode: boolean = true
 ) {
-    const newlineTokens = newlineAwareMode ? [many(NEWLINE)] : [];
+    const newlineTokens = newlineAwareMode ? [many(newlineTerminal)] : [];
     const importRule = createRule(config.importRuleName)
         .returns(importType)
-        .as(({ set }) => [set("entity", ref(config.type, terminal)), optional("as", set("name", ID))]);
+        .as(({ set }) => [set("entity", ref(config.type, terminal)), optional("as", set("name", idTerminal))]);
     const fileImportRule = createRule(config.fileImportRuleName)
         .returns(fileImportType)
         .as(({ set, add }) => [
@@ -43,7 +49,7 @@ export function generateImportRules<T extends AstNode>(
             ...newlineTokens,
             "}",
             "from",
-            set("file", STRING)
+            set("file", stringTerminal)
         ]);
 
     return { importRule, fileImportRule };

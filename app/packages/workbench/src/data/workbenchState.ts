@@ -1,4 +1,4 @@
-import { computed, nextTick, ref, shallowRef, watch, type Reactive } from "vue";
+import { computed, nextTick, ref, shallowRef, toRaw, watch, type Reactive } from "vue";
 import type { EditorTab } from "./tab/editorTab";
 import type { BackendApi } from "./api/backendApi";
 import type { MonacoApi } from "@/lib/monacoPlugin";
@@ -138,7 +138,7 @@ export class WorkbenchState {
                 if (!contributionPluginsByLanguage.has(contributionPlugin.languageId)) {
                     contributionPluginsByLanguage.set(contributionPlugin.languageId, []);
                 }
-                contributionPluginsByLanguage.get(contributionPlugin.languageId)!.push(contributionPlugin);
+                contributionPluginsByLanguage.get(contributionPlugin.languageId)!.push(toRaw(contributionPlugin));
             }
         }
 

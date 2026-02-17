@@ -1,10 +1,3 @@
-/**
- * @module associationResolver
- *
- * Provides utilities for resolving associations between classes in metamodels.
- * Used by validators to check link validity and by TypedAst converters to
- * extract association property names.
- */
 import type { AstReflection } from "@mdeo/language-common";
 import {
     Association,

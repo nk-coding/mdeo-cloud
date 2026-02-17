@@ -1,0 +1,32 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "references": [
+        {
+            "path": "../plugin"
+        },
+        {
+            "path": "../language-common"
+        },
+        {
+            "path": "../language-config"
+        },
+        {
+            "path": "../language-config-optimization"
+        },
+        {
+            "path": "../language-metamodel"
+        },
+        {
+            "path": "../language-shared"
+        },
+        {
+            "path": "../service-common"
+        }
+    ],
+    "include": ["src/**/*.ts"],
+    "exclude": ["dist", "node_modules"]
+}

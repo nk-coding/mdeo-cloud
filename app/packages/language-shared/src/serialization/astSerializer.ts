@@ -262,8 +262,8 @@ export class DefaultAstSerializer implements AstSerializer {
         const plugin = pluginGenerator.generate(
             node,
             document,
-            this.nodePrinters,
-            this.primitiveSerializers,
+            this.getNodeSerializers(),
+            this.getPrimitiveSerializers(),
             this.astReflection,
             this.getPrimitive.bind(this)
         );
@@ -289,6 +289,14 @@ export class DefaultAstSerializer implements AstSerializer {
 
     registerPrimitiveSerializer<T>(rule: TerminalRule<T>, serializer: (primitive: PrimitiveValue<T>) => string): void {
         this.primitiveSerializers.set(rule.name, serializer as (primitive: PrimitiveValue<any>) => string);
+    }
+
+    getNodeSerializers(): Map<string, (context: PrintContext) => Doc> {
+        return this.nodePrinters;
+    }
+
+    getPrimitiveSerializers(): Map<string, (primitive: PrimitiveValue<unknown>) => string> {
+        return this.primitiveSerializers;
     }
 
     guessFormattingOptions(document: LangiumDocument): FormattingOptions {

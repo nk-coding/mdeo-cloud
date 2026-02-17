@@ -41,6 +41,18 @@ export default defineConfig({
                 secure: false,
                 rewrite: (path) => path.replace(/^\/plugin\/script/, "")
             },
+            "/plugin/config-optimization": {
+                target: "http://localhost:3005",
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/plugin\/config-optimization/, "")
+            },
+            "/plugin/config": {
+                target: "http://localhost:3004",
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/plugin\/config/, "")
+            },
             "/api": {
                 target: "http://localhost:8080",
                 changeOrigin: true,

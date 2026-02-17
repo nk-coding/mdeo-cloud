@@ -122,7 +122,11 @@ const modelTransformationLanguagePlugin: LanguagePlugin = {
             ]
         })
     },
-    graphicalEditorPlugin: undefined,
+    graphicalEditorPlugin: {
+        import: "static/editor.js",
+        stylesUrl: "static/styles.css",
+        stylesCls: "editor-model-transformation"
+    },
     isGenerated: false
 };
 

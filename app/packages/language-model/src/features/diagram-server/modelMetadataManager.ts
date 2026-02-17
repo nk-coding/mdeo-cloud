@@ -36,7 +36,7 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
             return NodeLayoutMetadataUtil.verify(model.meta, 250);
         }
 
-        if (model.type === ModelElementType.NODE_LINK_SOURCE || model.type === ModelElementType.NODE_LINK_TARGET) {
+        if (model.type === ModelElementType.NODE_LINK_END) {
             return NodeLayoutMetadataUtil.verify(model.meta);
         }
 
