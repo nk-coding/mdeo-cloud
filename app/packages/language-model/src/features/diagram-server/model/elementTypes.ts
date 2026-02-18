@@ -34,5 +34,5 @@ export enum ModelElementType {
     /**
      * Label at the end of a link (source or target)
      */
-    LABEL_LINK_END = "label:link-end",
+    LABEL_LINK_END = "label:link-end"
 }

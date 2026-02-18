@@ -8,7 +8,6 @@ import {
     type ASTType
 } from "@mdeo/language-common";
 import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
-import type { AstNode } from "langium";
 import type { ClassType, PropertyType } from "@mdeo/language-metamodel";
 import type { FunctionType } from "@mdeo/language-script";
 
@@ -82,8 +81,9 @@ export const configOptimizationFileScopingConfig = new FileScopingConfig<Functio
 /**
  * Generated import types for functions using the file-scoping pattern.
  */
-export const { importType: FunctionImport, fileImportType: FunctionFileImport } =
-    generateImportTypes(configOptimizationFileScopingConfig);
+export const { importType: FunctionImport, fileImportType: FunctionFileImport } = generateImportTypes(
+    configOptimizationFileScopingConfig
+);
 
 /**
  * Type representing a FunctionImport AST node.
@@ -99,11 +99,10 @@ export type FunctionFileImportType = ASTType<typeof FunctionFileImport>;
  * Problem section interface.
  * Defines the metamodel and model file paths for the optimization problem.
  */
-export const ProblemSection = createInterface("ConfigProblemSection")
-    .attrs({
-        metamodel: String,
-        model: String
-    });
+export const ProblemSection = createInterface("ConfigProblemSection").attrs({
+    metamodel: String,
+    model: String
+});
 
 /**
  * Type representing a ProblemSection AST node.
@@ -157,13 +156,12 @@ export type RefinementType = ASTType<typeof Refinement>;
  * Goal section interface.
  * Contains function imports, constraints, objectives, and refinements.
  */
-export const GoalSection = createInterface("ConfigGoalSection")
-    .attrs({
-        imports: [FunctionFileImport],
-        constraints: [ConstraintReference],
-        objectives: [Objective],
-        refinements: [Refinement]
-    });
+export const GoalSection = createInterface("ConfigGoalSection").attrs({
+    imports: [FunctionFileImport],
+    constraints: [ConstraintReference],
+    objectives: [Objective],
+    refinements: [Refinement]
+});
 
 /**
  * Type representing a GoalSection AST node.

@@ -1,4 +1,4 @@
-export * from "./features/associationEndCache.js";
+export * from "./features/optimizationExternalReferenceCollector.js";
 export * from "./features/optimizationScopeProvider.js";
 export * from "./features/optimizationSerializers.js";
 export * from "./grammar/optimizationRules.js";

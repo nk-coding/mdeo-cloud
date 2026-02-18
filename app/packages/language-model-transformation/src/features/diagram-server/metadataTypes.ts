@@ -82,9 +82,7 @@ export namespace NodeLayoutMetadataUtil {
         }
 
         const meta = obj as Partial<NodeLayoutMetadata>;
-        return (
-            typeof meta.prefWidth === "number" || meta.prefWidth === undefined
-        );
+        return typeof meta.prefWidth === "number" || meta.prefWidth === undefined;
     }
 
     /**

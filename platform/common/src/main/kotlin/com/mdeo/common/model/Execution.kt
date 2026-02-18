@@ -90,7 +90,10 @@ data class PluginCreateExecutionRequest(
     val executionId: String,
     val project: String,
     val filePath: String,
-    val data: JsonElement
+    val fileContent: String,
+    val fileVersion: Int,
+    val data: JsonElement,
+    val contributionPlugins: List<JsonElement> = emptyList()
 )
 
 /**

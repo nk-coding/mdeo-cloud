@@ -156,6 +156,9 @@ export class WorkbenchState {
     readonly languagePluginByExtension = computed<Map<string, ResolvedWorkbenchLanguagePlugin>>(() => {
         const map = new Map<string, ResolvedWorkbenchLanguagePlugin>();
         for (const langPlugin of this.languagePlugins.value) {
+            if (!langPlugin.extension) {
+                continue;
+            }
             if (map.has(langPlugin.extension)) {
                 throw new Error(`Multiple language plugins registered for extension ${langPlugin.extension}`);
             }

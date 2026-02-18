@@ -122,7 +122,6 @@ function printProblemSection(context: PrintContext<ProblemSectionType>): Doc {
  * @returns The formatted goal section content
  */
 function printGoalSection(context: PrintContext<GoalSectionType>): Doc {
-    const { path, print } = context;
     const docs: Doc[] = [];
 
     docs.push("{");

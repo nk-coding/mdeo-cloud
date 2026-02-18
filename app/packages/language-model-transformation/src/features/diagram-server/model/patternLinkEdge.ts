@@ -1,5 +1,6 @@
 import { GEdge, GEdgeBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType, PatternModifierKind } from "./elementTypes.js";
+import type { PatternModifierKind } from "./elementTypes.js";
+import { ModelTransformationElementType } from "./elementTypes.js";
 
 /**
  * Edge representing a pattern link between two instances.

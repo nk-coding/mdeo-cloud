@@ -33,6 +33,7 @@ export function createScriptConfigContributionPlugin(): ConfigContributionPlugin
         grammar: serializer.grammar,
         sections: [],
         dependencies: [],
-        exportedTypes: [Function.name]
+        exportedTypes: [Function.name],
+        sectionDependencies: []
     };
 }

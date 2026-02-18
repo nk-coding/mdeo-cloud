@@ -15,7 +15,6 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class ModelTransformationDiagramModule extends BaseDiagramModule {
-    
     protected override bindDiagramConfiguration(): BindingTarget<DiagramConfiguration> {
         return ModelTransformationDiagramConfiguration;
     }

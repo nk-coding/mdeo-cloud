@@ -30,7 +30,7 @@ export enum ExecutionState {
 
 /**
  * Context provided to execution handlers.
- * Contains only the minimal data provided by ExecutionService.kt.
+ * Contains the minimal data needed to setup a langium instance and execute.
  */
 export interface ExecutionContext {
     /**
@@ -49,6 +49,16 @@ export interface ExecutionContext {
     filePath: string;
 
     /**
+     * Content of the source file
+     */
+    fileContent: string;
+
+    /**
+     * Version of the source file
+     */
+    fileVersion: number;
+
+    /**
      * Arbitrary data for the execution request
      */
     data: object;
@@ -57,6 +67,11 @@ export interface ExecutionContext {
      * JWT token for authentication
      */
     jwt: string;
+
+    /**
+     * Contribution plugins for the language
+     */
+    contributionPlugins: object[];
 }
 
 /**

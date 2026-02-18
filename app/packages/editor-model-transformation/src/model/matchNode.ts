@@ -1,8 +1,15 @@
 import { GNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
 import type { GModelElement } from "@eclipse-glsp/sprotty";
 
-const { connectableFeature, deletableFeature, selectFeature, boundsFeature, moveFeature, fadeFeature, layoutContainerFeature } =
-    sharedImport("@eclipse-glsp/sprotty");
+const {
+    connectableFeature,
+    deletableFeature,
+    selectFeature,
+    boundsFeature,
+    moveFeature,
+    fadeFeature,
+    layoutContainerFeature
+} = sharedImport("@eclipse-glsp/sprotty");
 const { resizeFeature } = sharedImport("@eclipse-glsp/client");
 
 /**

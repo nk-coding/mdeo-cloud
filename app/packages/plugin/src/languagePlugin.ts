@@ -36,7 +36,7 @@ export interface LanguagePlugin {
     /**
      * The file extension associated with the language (including the dot)
      */
-    extension: string;
+    extension?: string;
     /**
      * When true, an action dialog will be triggered when a new file is created
      */

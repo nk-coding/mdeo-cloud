@@ -76,12 +76,14 @@ const scriptServicePlugin: ServicePluginDefinition = {
     description: "Language support for script definitions (.s files)",
     icon: convertIcon(FileCode),
     languagePlugins: [scriptLanguagePlugin],
-    contributionPlugins: [{
-        languageId: "config",
-        description: "Provides script function type exports for config language",
-        additionalKeywords: [],
-        serverContributionPlugins: [createScriptConfigContributionPlugin()]
-    }]
+    contributionPlugins: [
+        {
+            languageId: "config",
+            description: "Provides script function type exports for config language",
+            additionalKeywords: [],
+            serverContributionPlugins: [createScriptConfigContributionPlugin()]
+        }
+    ]
 };
 
 /**
@@ -102,7 +104,7 @@ const scriptExecutionHandler = new ScriptExecutionHandler(scriptExecutionService
 const scriptLanguageConfig: LanguageServiceConfig<ScriptServices> = {
     languagePlugin: scriptLanguagePlugin,
     languagePluginProvider: scriptPluginProvider,
-    handlers: {
+    fileDataHandlers: {
         [AST_HANDLER_KEY]: astHandler,
         [TYPED_AST_HANDLER_KEY]: typedAstHandler
     },

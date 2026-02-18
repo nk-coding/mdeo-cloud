@@ -62,6 +62,7 @@ export function createMetamodelConfigContributionPlugin(): ConfigContributionPlu
         grammar: serializer.grammar,
         sections: [],
         dependencies: [],
-        exportedTypes: interfaces.map((i) => i.name)
+        exportedTypes: interfaces.map((i) => i.name),
+        sectionDependencies: []
     };
 }

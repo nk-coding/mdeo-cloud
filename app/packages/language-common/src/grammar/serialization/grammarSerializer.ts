@@ -314,7 +314,6 @@ export class GrammarSerializer {
         const existing = this.ruleLookup.get(rule.name);
         if (existing) {
             if (existing.node !== rule) {
-                console.trace()
                 throw new Error(`Duplicate rule name: ${rule.name}`);
             }
             return existing.ref;

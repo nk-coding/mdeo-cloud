@@ -27,7 +27,9 @@ export class GControlFlowLabelNode extends GNode {
  * Builder for GControlFlowLabelNode instances.
  * Provides fluent API for constructing control flow label nodes.
  */
-export class GControlFlowLabelNodeBuilder<T extends GControlFlowLabelNode = GControlFlowLabelNode> extends GNodeBuilder<T> {
+export class GControlFlowLabelNodeBuilder<
+    T extends GControlFlowLabelNode = GControlFlowLabelNode
+> extends GNodeBuilder<T> {
     /**
      * Sets the end position for the label node.
      *

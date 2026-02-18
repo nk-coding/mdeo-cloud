@@ -1,5 +1,6 @@
 import { GNode, GNodeBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType, PatternModifierKind } from "./elementTypes.js";
+import type { PatternModifierKind } from "./elementTypes.js";
+import { ModelTransformationElementType } from "./elementTypes.js";
 
 /**
  * Node representing a pattern object instance.
@@ -37,7 +38,9 @@ export class GPatternInstanceNode extends GNode {
  * Builder for GPatternInstanceNode instances.
  * Provides fluent API for constructing pattern instance nodes.
  */
-export class GPatternInstanceNodeBuilder<T extends GPatternInstanceNode = GPatternInstanceNode> extends GNodeBuilder<T> {
+export class GPatternInstanceNodeBuilder<
+    T extends GPatternInstanceNode = GPatternInstanceNode
+> extends GNodeBuilder<T> {
     /**
      * Sets the name of the pattern instance.
      *

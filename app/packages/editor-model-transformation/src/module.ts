@@ -53,7 +53,12 @@ export const modelTransformationDiagramModule = new FeatureModule(
 
         // Basic compartment and divider configuration
         configureModelElement(context, ModelTransformationElementType.COMPARTMENT, GCompartment, GCompartmentView);
-        configureModelElement(context, ModelTransformationElementType.DIVIDER, GHorizontalDivider, GHorizontalDividerView);
+        configureModelElement(
+            context,
+            ModelTransformationElementType.DIVIDER,
+            GHorizontalDivider,
+            GHorizontalDividerView
+        );
 
         // Pattern instance elements
         configureModelElement(
@@ -120,20 +125,10 @@ export const modelTransformationDiagramModule = new FeatureModule(
         );
 
         // Match node (container for pattern elements)
-        configureModelElement(
-            context,
-            ModelTransformationElementType.NODE_MATCH,
-            GMatchNode,
-            GMatchNodeView
-        );
+        configureModelElement(context, ModelTransformationElementType.NODE_MATCH, GMatchNode, GMatchNodeView);
 
         // Constraint labels
-        configureModelElement(
-            context,
-            ModelTransformationElementType.LABEL_VARIABLE,
-            GVariableLabel,
-            GLabelView
-        );
+        configureModelElement(context, ModelTransformationElementType.LABEL_VARIABLE, GVariableLabel, GLabelView);
         configureModelElement(
             context,
             ModelTransformationElementType.LABEL_WHERE_CLAUSE,

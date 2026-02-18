@@ -22,7 +22,7 @@ const icon = convertIcon(Settings2);
 const configOptimizationLanguagePlugin: LanguagePlugin = {
     id: "config-optimization",
     name: "Config Optimization",
-    extension: ".config_opt",
+    extension: undefined,
     newFileAction: false,
     icon,
     serverPlugin: {
@@ -35,7 +35,10 @@ const configOptimizationLanguagePlugin: LanguagePlugin = {
 
 initializePluginContext();
 
-const { configOptimizationPluginProvider, createOptimizationContributionPlugin } = await import("@mdeo/language-config-optimization");
+const { configOptimizationPluginProvider, createOptimizationContributionPlugin } =
+    await import("@mdeo/language-config-optimization");
+const { optimizationRequestHandler, OPTIMIZATION_REQUEST_KEY } =
+    await import("./handler/optimizationRequestHandler.js");
 
 /**
  * Plugin definition for the config-optimization service.
@@ -46,12 +49,26 @@ const configOptimizationServicePlugin: ServicePluginDefinition = {
     description: "Language support for config optimization sections",
     icon,
     languagePlugins: [configOptimizationLanguagePlugin],
-    contributionPlugins: [{
-        languageId: "config",
-        description: "Provides optimization section support for config language",
-        additionalKeywords: [],
-        serverContributionPlugins: [createOptimizationContributionPlugin()]
-    }]
+    contributionPlugins: [
+        {
+            languageId: "config",
+            description: "Provides optimization section support for config language",
+            additionalKeywords: [
+                "problem",
+                "goal",
+                "metamodel",
+                "model",
+                "constraint",
+                "maximize",
+                "minimize",
+                "refine",
+                "import",
+                "as",
+                "from"
+            ],
+            serverContributionPlugins: [createOptimizationContributionPlugin()]
+        }
+    ]
 };
 
 const envConfig = parseServiceConfigFromEnv();
@@ -62,8 +79,11 @@ const envConfig = parseServiceConfigFromEnv();
 const configOptimizationLanguageConfig: LanguageServiceConfig<ExternalReferenceAdditionalServices> = {
     languagePlugin: configOptimizationLanguagePlugin,
     languagePluginProvider: configOptimizationPluginProvider,
-    handlers: {
+    fileDataHandlers: {
         [AST_HANDLER_KEY]: astHandler
+    },
+    requestHandlers: {
+        [OPTIMIZATION_REQUEST_KEY]: optimizationRequestHandler
     }
 };
 

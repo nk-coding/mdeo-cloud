@@ -15,18 +15,19 @@ const { doc } = sharedImport("prettier");
  */
 export function registerConfigSerializers(
     services: LangiumCoreServices & AstSerializerAdditionalServices,
-    resolvedPlugins?: ResolvedConfigContributionPlugins
+    resolvedPlugins: ResolvedConfigContributionPlugins
 ): void {
     const { AstSerializer } = services;
 
     AstSerializer.registerNodeSerializer(Config, (ctx) => printConfig(ctx));
 
-    if (resolvedPlugins) {
-        for (const sectionInfo of resolvedPlugins.sections.values()) {
-            AstSerializer.registerNodeSerializer(sectionInfo.interface, (ctx) =>
-                printConfigSectionWrapper(ctx, sectionInfo)
-            );
-        }
+    for (const sectionInfo of resolvedPlugins.sections.values()) {
+        AstSerializer.registerNodeSerializer(sectionInfo.interface, (ctx) =>
+            printConfigSectionWrapper(
+                ctx as unknown as PrintContext<BaseConfigSectionType & { content: AstNode }>,
+                sectionInfo
+            )
+        );
     }
 }
 
@@ -48,10 +49,10 @@ function printConfig(context: PrintContext<ConfigType>): Doc {
  * @returns The formatted config section with keyword
  */
 function printConfigSectionWrapper(
-    context: PrintContext<BaseConfigSectionType & { content: AstNode}>,
+    context: PrintContext<BaseConfigSectionType & { content: AstNode }>,
     sectionInfo: SectionNamingInfo
 ): Doc {
-    const {  path, print } = context;
+    const { path, print } = context;
     const docs: Doc[] = [];
 
     const keyword = sectionInfo.requiresQualifiedName ? sectionInfo.qualifiedName : sectionInfo.sectionName;

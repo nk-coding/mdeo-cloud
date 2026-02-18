@@ -41,7 +41,7 @@ data class PluginManifest(
 data class ManifestLanguagePlugin(
     val id: String,
     val name: String,
-    val extension: String,
+    val extension: String? = null,
     val newFileAction: Boolean = false,
     val serverPlugin: ManifestServerPlugin,
     val graphicalEditorPlugin: ManifestGraphicalEditorPlugin? = null,
@@ -561,7 +561,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             val result = LanguagePluginsTable.selectAll()
                 .where {
                     (LanguagePluginsTable.pluginId inList projectPluginIds) and
-                            (LanguagePluginsTable.extension eq extensionWithDot)
+                            (LanguagePluginsTable.extension eq extensionWithDot) and
+                            (LanguagePluginsTable.extension.isNotNull())
                 }
                 .firstOrNull() ?: return@transaction null
 

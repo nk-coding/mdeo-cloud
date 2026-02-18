@@ -130,7 +130,7 @@ object LanguagePluginsTable : Table("language_plugins") {
     val id = varchar("id", 255)
     val pluginId = uuid("plugin_id").references(PluginsTable.id, onDelete = ReferenceOption.CASCADE)
     val name = varchar("name", 255)
-    val extension = varchar("extension", 64)
+    val extension = varchar("extension", 64).nullable()
     val newFileAction = bool("new_file_action").default(false)
     val serverPluginImport = varchar("server_plugin_import", 2048)
     val graphicalEditorPluginImport = varchar("graphical_editor_plugin_import", 2048).nullable()

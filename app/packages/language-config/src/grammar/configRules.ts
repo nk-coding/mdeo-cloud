@@ -28,7 +28,6 @@ export function createConfigRule(resolvedPlugins: ResolvedConfigContributionPlug
     }
 
     const sectionRules = resolvedPlugins.rules;
-    console.log(sectionRules)
 
     return createRule("ConfigRule")
         .returns(Config)

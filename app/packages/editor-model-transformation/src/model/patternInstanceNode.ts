@@ -1,6 +1,6 @@
 import { GRectangularNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
 import type { GModelElement } from "@eclipse-glsp/sprotty";
-import { PatternModifierKind } from "./elementTypes.js";
+import type { PatternModifierKind } from "./elementTypes.js";
 
 const { connectableFeature, deletableFeature, selectFeature, boundsFeature, moveFeature, fadeFeature } =
     sharedImport("@eclipse-glsp/sprotty");

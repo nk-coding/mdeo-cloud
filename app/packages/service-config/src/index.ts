@@ -11,13 +11,12 @@ import {
     type ServicePluginDefinition,
     type LanguageServiceConfig,
     initializePluginContext,
-    astHandler,
-    AST_HANDLER_KEY,
     startLanguageService
 } from "@mdeo/service-common";
 import { convertIcon } from "@mdeo/language-common";
 import type { ConfigAdditionalServices } from "@mdeo/language-config";
 import type { LanguagePlugin } from "@mdeo/plugin";
+import { DefaultScopeProvider } from "langium";
 
 const icon: ActionIconNode = convertIcon(Settings);
 
@@ -38,7 +37,7 @@ const configLanguagePlugin: LanguagePlugin = {
         languageConfiguration: defaultLanguageConfiguration,
         monarchTokensProvider: serializeMonarchTokensProvider({
             ...defaultMonarchTokenProvider,
-            keywords: ["problem", "goal", "metamodel", "model", "constraint", "maximize", "minimize", "refine"]
+            keywords: []
         })
     },
     isGenerated: false
@@ -59,6 +58,7 @@ const configServicePlugin: ServicePluginDefinition = {
 initializePluginContext();
 
 const { configPluginProvider } = await import("@mdeo/language-config");
+const { configDataHandler, CONFIG_DATA_KEY } = await import("./handler/configFileDataHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
 
@@ -68,8 +68,13 @@ const envConfig = parseServiceConfigFromEnv();
 const configLanguageConfig: LanguageServiceConfig<ConfigAdditionalServices> = {
     languagePlugin: configLanguagePlugin,
     languagePluginProvider: configPluginProvider,
-    handlers: {
-        [AST_HANDLER_KEY]: astHandler
+    serviceModule: {
+        references: {
+            ScopeProvider: (services) => new DefaultScopeProvider(services)
+        }
+    },
+    fileDataHandlers: {
+        [CONFIG_DATA_KEY]: configDataHandler
     }
 };
 
@@ -80,4 +85,3 @@ const config: ServiceConfig<any> = {
 };
 
 await startLanguageService(config);
-

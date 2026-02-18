@@ -27,7 +27,6 @@ function getServicesByLanguageId(registry: ServiceRegistry, languageId: string):
  * When serializing a section node, it delegates to the appropriate plugin's AstSerializer if available.
  */
 export class ConfigAstSerializer extends DefaultAstSerializer {
-
     /**
      * The service registry for accessing plugin language services.
      */
@@ -55,11 +54,7 @@ export class ConfigAstSerializer extends DefaultAstSerializer {
      * @param serviceRegistry The service registry for accessing plugin services
      * @param plugins The config contribution plugins
      */
-    constructor(
-        services: LangiumCoreServices,
-        serviceRegistry: ServiceRegistry,
-        plugins: ConfigContributionPlugin[]
-    ) {
+    constructor(services: LangiumCoreServices, serviceRegistry: ServiceRegistry, plugins: ConfigContributionPlugin[]) {
         super(services);
         this.serviceRegistry = serviceRegistry;
         this.plugins = plugins;

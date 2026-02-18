@@ -300,7 +300,7 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
      */
     private registerPatternVariableValidationRule(): void {
         this.registerValidationRule(PatternVariable, (node, accept) => {
-            if (node.type == undefined) {
+            if (node.value == undefined || node.type == undefined) {
                 return;
             }
 

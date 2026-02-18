@@ -109,7 +109,7 @@ const content = computedAsync(async () => {
 const embeddableExtensions = computed(() => {
     const extensions = new Set<string>();
     for (const plugin of languagePluginByExtension.value.values()) {
-        if (plugin.graphicalEditorPlugin != undefined) {
+        if (plugin.graphicalEditorPlugin != undefined && plugin.extension) {
             extensions.add(plugin.extension);
         }
     }

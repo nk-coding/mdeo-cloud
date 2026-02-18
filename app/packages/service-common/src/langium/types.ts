@@ -1,7 +1,8 @@
-import type { LangiumLanguagePluginProvider } from "@mdeo/language-common";
+import type { LangiumLanguagePluginProvider, LanguageServices, PartialLanguageServices } from "@mdeo/language-common";
 import type { HttpServerApi } from "../service/serverApi.js";
 import type { JsonAstSerializer } from "./jsonAstSerializer.js";
 import type { ExtendedIndexManager } from "./extendedIndexManager.js";
+import type { DeepPartial, Module } from "langium";
 
 /**
  * Additional shared services for the service context
@@ -35,7 +36,7 @@ export interface ServiceAdditionalServices {
 /**
  * Configuration for the Langium instance pool
  */
-export interface LangiumPoolConfig {
+export interface LangiumPoolConfig<T = object> {
     /**
      * Maximum number of instances to keep in the pool
      */
@@ -44,7 +45,12 @@ export interface LangiumPoolConfig {
     /**
      * The language plugin to use for creating instances
      */
-    languagePluginProvider: LangiumLanguagePluginProvider<any>;
+    languagePluginProvider: LangiumLanguagePluginProvider<T>;
+
+    /**
+     * Optional service-specific module
+     */
+    serviceModule: Module<LanguageServices & T, PartialLanguageServices & DeepPartial<T>> | undefined;
 
     /**
      * The language ID

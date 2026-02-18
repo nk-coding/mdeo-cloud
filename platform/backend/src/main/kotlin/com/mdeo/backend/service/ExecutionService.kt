@@ -164,6 +164,18 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 "Plugin URL not found"
             )
 
+        val fileContent = when (val result = fileService.readFile(projectId, normalizedPath)) {
+            is ApiResult.Success -> String(result.value, Charsets.UTF_8)
+            is ApiResult.Failure -> return ApiResult.Failure(result.error)
+        }
+
+        val fileVersion = when (val result = fileService.getFileVersion(projectId, normalizedPath)) {
+            is ApiResult.Success -> result.value
+            is ApiResult.Failure -> return ApiResult.Failure(result.error)
+        }
+
+        val contributionPlugins = pluginService.getContributionPluginsForLanguage(projectId, languagePlugin.id)
+
         val executionId = UUID.randomUUID()
         val now = Instant.now()
 
@@ -188,7 +200,10 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 executionId,
                 projectId,
                 normalizedPath,
-                data
+                fileContent,
+                fileVersion,
+                data,
+                contributionPlugins
             )
         } catch (e: Exception) {
             logger.error("Failed to create execution via plugin", e)
@@ -682,7 +697,10 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         executionId: UUID,
         projectId: UUID,
         filePath: String,
-        data: JsonElement
+        fileContent: String,
+        fileVersion: Int,
+        data: JsonElement,
+        contributionPlugins: List<JsonElement>
     ): CreateExecutionResponse {
         return withContext(Dispatchers.IO) {
             val token =
@@ -693,7 +711,10 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                     executionId = executionId.toString(),
                     project = projectId.toString(),
                     filePath = filePath,
-                    data = data
+                    fileContent = fileContent,
+                    fileVersion = fileVersion,
+                    data = data,
+                    contributionPlugins = contributionPlugins
                 )
             )
 

@@ -164,11 +164,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param idRegistry The model ID registry
      * @returns The ID of the created end node
      */
-    private createEndNode(
-        graph: GGraphType,
-        stmt: StopStatementType,
-        idRegistry: ModelIdRegistry
-    ): string {
+    private createEndNode(graph: GGraphType, stmt: StopStatementType, idRegistry: ModelIdRegistry): string {
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const nodeId = idRegistry.getId(stmt);
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
@@ -549,13 +545,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         // Process then branch
         const thenStatements = stmt.thenBlock?.statements ?? [];
-        const thenResult = this.processStatementsWithEdge(
-            graph,
-            thenStatements,
-            diamondId,
-            "true",
-            idRegistry
-        );
+        const thenResult = this.processStatementsWithEdge(graph, thenStatements, diamondId, "true", idRegistry);
         branchResults.push(thenResult);
 
         // Process else-if branches
@@ -1091,12 +1081,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const typeName = instance.class?.$refText ?? instance.class?.ref?.name ?? undefined;
         const modifier = this.getPatternModifierKind(instance.modifier?.modifier);
 
-        const node = GPatternInstanceNode.builder()
-            .id(nodeId)
-            .name(name)
-            .modifier(modifier)
-            .meta(metadata)
-            .build();
+        const node = GPatternInstanceNode.builder().id(nodeId).name(name).modifier(modifier).meta(metadata).build();
 
         if (typeName != undefined) {
             node.typeName = typeName;
@@ -1158,22 +1143,14 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param typeName The optional type name
      * @returns Array of header elements
      */
-    private createPatternInstanceHeader(
-        nodeId: string,
-        name: string,
-        typeName: string | undefined
-    ): GModelElement[] {
+    private createPatternInstanceHeader(nodeId: string, name: string, typeName: string | undefined): GModelElement[] {
         const compartment = GCompartment.builder()
             .type(ModelTransformationElementType.COMPARTMENT)
             .id(`${nodeId}#header`)
             .build();
 
         const labelText = typeName != undefined ? `${name} : ${typeName}` : name;
-        const label = GPatternInstanceNameLabel.builder()
-            .id(`${nodeId}#name`)
-            .text(labelText)
-            .readonly(true)
-            .build();
+        const label = GPatternInstanceNameLabel.builder().id(`${nodeId}#name`).text(labelText).readonly(true).build();
 
         compartment.children.push(label);
         return [compartment];
@@ -1422,11 +1399,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const nodeId = ModelTransformationIdGenerator.patternLinkSourceEndNode(edgeId);
             const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
-            const endNode = GPatternLinkEndNode.builder()
-                .id(nodeId)
-                .end("target")
-                .meta(metadata)
-                .build();
+            const endNode = GPatternLinkEndNode.builder().id(nodeId).end("target").meta(metadata).build();
 
             const label = GPatternLinkEndLabel.builder()
                 .id(ModelTransformationIdGenerator.patternLinkSourceEndLabel(edgeId))
@@ -1442,11 +1415,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const nodeId = ModelTransformationIdGenerator.patternLinkTargetEndNode(edgeId);
             const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
-            const endNode = GPatternLinkEndNode.builder()
-                .id(nodeId)
-                .end("source")
-                .meta(metadata)
-                .build();
+            const endNode = GPatternLinkEndNode.builder().id(nodeId).end("source").meta(metadata).build();
 
             const label = GPatternLinkEndLabel.builder()
                 .id(ModelTransformationIdGenerator.patternLinkTargetEndLabel(edgeId))
@@ -1514,15 +1483,12 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const edgeId = ModelTransformationIdGenerator.controlFlowEdge(sourceId, targetId);
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = validatedMetadata.edges[edgeId]?.meta;
-        const edgeMeta = metadata != undefined && EdgeLayoutMetadataUtil.isValid(metadata)
-            ? metadata
-            : EdgeLayoutMetadataUtil.create();
+        const edgeMeta =
+            metadata != undefined && EdgeLayoutMetadataUtil.isValid(metadata)
+                ? metadata
+                : EdgeLayoutMetadataUtil.create();
 
-        const edge = GControlFlowEdge.builder()
-            .id(edgeId)
-            .sourceId(sourceId)
-            .targetId(targetId)
-            .build();
+        const edge = GControlFlowEdge.builder().id(edgeId).sourceId(sourceId).targetId(targetId).build();
 
         edge.meta = edgeMeta;
 
@@ -1531,11 +1497,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const labelNodeId = ModelTransformationIdGenerator.controlFlowEdgeLabelNode(edgeId);
             const labelMetadata = this.getNodeMetadata(validatedMetadata, labelNodeId);
 
-            const labelNode = GControlFlowLabelNode.builder()
-                .id(labelNodeId)
-                .end("source")
-                .meta(labelMetadata)
-                .build();
+            const labelNode = GControlFlowLabelNode.builder().id(labelNodeId).end("source").meta(labelMetadata).build();
 
             const labelElement = GControlFlowLabel.builder()
                 .id(ModelTransformationIdGenerator.controlFlowEdgeLabel(edgeId))

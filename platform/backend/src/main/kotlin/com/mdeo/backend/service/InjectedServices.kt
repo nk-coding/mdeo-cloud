@@ -62,4 +62,9 @@ interface InjectedServices {
      * Service for managing WebSocket connections and broadcasting notifications.
      */
     val webSocketNotificationService: WebSocketNotificationService
+
+    /**
+     * Service for executing language plugin requests.
+     */
+    val languagePluginRequestService: LanguagePluginRequestService
 }

@@ -6,24 +6,24 @@ import {
     getExportedEntitiesFromGlobalScope,
     getImportedEntitiesFromCurrentFile
 } from "@mdeo/language-shared";
-import type { AstNode, LangiumDocuments, ReferenceInfo, Scope } from "langium";
+import type { AstNode, AstNodeDescriptionProvider, LangiumDocuments, ReferenceInfo, Scope } from "langium";
 import { Config, type ConfigType } from "@mdeo/language-config";
-import { resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
-import { AssociationEndCache } from "./associationEndCache.js";
+import { getWrapperInterfaceName } from "@mdeo/language-config";
+import { getScopeFromMetamodelFile, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import {
     configOptimizationFileScopingConfig,
     ConstraintReference,
     Objective,
     Refinement,
-    MetamodelClass,
     type RefinementType,
     type GoalSectionType,
-    GoalSection,
     type ProblemSectionType,
-    ProblemSection
+    GoalSection
 } from "../grammar/optimizationTypes.js";
+import { OPTIMIZATION_PLUGIN_NAME } from "../plugin/optimizationContributionPlugin.js";
+import { AssociationEndCache } from "@mdeo/language-model";
 
-const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE, StreamScope, stream } = sharedImport("langium");
+const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE } = sharedImport("langium");
 
 /**
  * Scope provider for the config-optimization language.
@@ -50,6 +50,11 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
     private readonly associationEndCache: AssociationEndCache;
 
     /**
+     * The description provider for creating AST node descriptions.
+     */
+    private readonly descriptionProvider: AstNodeDescriptionProvider;
+
+    /**
      * Constructs a new OptimizationScopeProvider.
      *
      * @param services The extended Langium services.
@@ -59,6 +64,7 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
         this.astReflection = services.shared.AstReflection;
         this.documents = services.shared.workspace.LangiumDocuments;
         this.associationEndCache = new AssociationEndCache(services);
+        this.descriptionProvider = services.workspace.AstNodeDescriptionProvider;
     }
 
     /**
@@ -70,7 +76,6 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
     override getScope(context: ReferenceInfo): Scope {
         const document = AstUtils.getDocument(context.container);
 
-        // Handle import references (entity in import statement)
         if (isImportReference(context, configOptimizationFileScopingConfig)) {
             return getExportedEntitiesFromGlobalScope(
                 document,
@@ -80,7 +85,6 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
             );
         }
 
-        // Handle constraint function references
         if (
             context.property === "constraint" &&
             this.astReflection.isInstance(context.container, ConstraintReference)
@@ -88,17 +92,14 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
             return this.getFunctionScope(context);
         }
 
-        // Handle objective function references
         if (context.property === "objective" && this.astReflection.isInstance(context.container, Objective)) {
             return this.getFunctionScope(context);
         }
 
-        // Handle class references in refinements
         if (context.property === "class" && this.astReflection.isInstance(context.container, Refinement)) {
             return this.getClassScope(context);
         }
 
-        // Handle field references in refinements
         if (context.property === "field" && this.astReflection.isInstance(context.container, Refinement)) {
             return this.getFieldScope(context);
         }
@@ -114,11 +115,13 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
      * @returns Scope with imported functions
      */
     private getFunctionScope(context: ReferenceInfo): Scope {
-        const goalSection = this.findContainingGoalSection(context.container);
+        const goalSection = AstUtils.getContainerOfType(
+            context.container,
+            (node): node is GoalSectionType => node.$type === GoalSection.name
+        );
         if (goalSection == undefined) {
             return EMPTY_SCOPE;
         }
-
         return getImportedEntitiesFromCurrentFile(goalSection.imports, this.nameProvider, this.descriptions);
     }
 
@@ -141,11 +144,14 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
             return EMPTY_SCOPE;
         }
 
-        // Get classes from the metamodel file
-        const targetUri = resolveRelativePath(document, metamodelPath).toString();
-        const classDescriptions = this.indexManager.allElements(MetamodelClass.name, new Set([targetUri])).toArray();
+        const targetUri = resolveRelativePath(document, metamodelPath);
+        const targetDoc = this.documents.getDocument(targetUri);
 
-        return new StreamScope(stream(classDescriptions));
+        if (targetDoc == undefined) {
+            return EMPTY_SCOPE;
+        }
+
+        return getScopeFromMetamodelFile(targetDoc, this.documents, this.descriptionProvider);
     }
 
     /**
@@ -184,55 +190,25 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
     }
 
     /**
-     * Finds the containing goal section for an AST node.
-     *
-     * @param node The AST node
-     * @returns The goal section, or undefined if not found
-     */
-    private findContainingGoalSection(node: AstNode): GoalSectionType | undefined {
-        let current: AstNode | undefined = node;
-        while (current != undefined) {
-            if (this.astReflection.isInstance(current, GoalSection)) {
-                return current as GoalSectionType;
-            }
-            // Also check if current is a wrapper with a content field
-            const anyNode = current as any;
-            if (anyNode.content && this.astReflection.isInstance(anyNode.content, GoalSection)) {
-                return anyNode.content as GoalSectionType;
-            }
-            current = current.$container;
-        }
-        return undefined;
-    }
-
-    /**
      * Finds the problem section in the config document.
+     * Navigates up to the Config root (by checking for a node with no $container),
+     * then searches config.sections for the wrapper whose $type matches the
+     * optimization problem wrapper name, returning its content.
      *
      * @param node Any AST node in the config document
      * @returns The problem section, or undefined if not found
      */
     private findProblemSection(node: AstNode): ProblemSectionType | undefined {
-        // Navigate up to the Config root
-        let current: AstNode | undefined = node;
-        while (current != undefined && !this.astReflection.isInstance(current, Config)) {
-            current = current.$container;
-        }
+        const config = AstUtils.findRootNode(node) as ConfigType;
 
-        if (current == undefined) {
+        if (config.$type !== Config.name) {
             return undefined;
         }
 
-        // Find the problem section among the config sections
-        const config = current as ConfigType;
+        const problemWrapperType = getWrapperInterfaceName("problem", OPTIMIZATION_PLUGIN_NAME);
         for (const section of config.sections) {
-            // Check if the section itself is a ProblemSection
-            if (this.astReflection.isInstance(section, ProblemSection)) {
-                return section as ProblemSectionType;
-            }
-            // Also check if section is a wrapper with a content field
-            const anySection = section as any;
-            if (anySection.content && this.astReflection.isInstance(anySection.content, ProblemSection)) {
-                return anySection.content as ProblemSectionType;
+            if (section.$type === problemWrapperType) {
+                return (section as AstNode & { content: AstNode }).content as ProblemSectionType;
             }
         }
 

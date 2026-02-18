@@ -21,11 +21,11 @@
 
         <Separator />
 
-        <div v-if="plugin.languagePlugins && plugin.languagePlugins.length > 0" class="mt-6">
+        <div v-if="visibleLanguagePlugins.length > 0" class="mt-6">
             <h3 class="text-lg font-semibold text-foreground mb-3">Language Plugins</h3>
             <div class="space-y-2">
                 <div
-                    v-for="langPlugin in plugin.languagePlugins"
+                    v-for="langPlugin in visibleLanguagePlugins"
                     :key="langPlugin.id"
                     class="p-3 rounded-md border border-border bg-card"
                 >
@@ -79,8 +79,13 @@
 import type { Plugin } from "@mdeo/plugin";
 import { Link, Icon } from "lucide-vue-next";
 import { Separator } from "@/components/ui/separator";
+import { computed } from "vue";
 
 const props = defineProps<{
     plugin: Plugin;
 }>();
+
+const visibleLanguagePlugins = computed(() => {
+    return props.plugin.languagePlugins?.filter((langPlugin) => langPlugin.extension != null) ?? [];
+});
 </script>

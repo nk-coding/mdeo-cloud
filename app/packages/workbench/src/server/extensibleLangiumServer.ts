@@ -144,9 +144,10 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
 
     for (const plugin of resolvedPlugins) {
         const grammar = languageModule.grammars.get(plugin.languagePlugin)!;
+        const fileExtensions = plugin.extension ? [plugin.extension] : [];
         const languageMetaData: LanguageMetaData = {
             languageId: plugin.id,
-            fileExtensions: [plugin.extension],
+            fileExtensions,
             caseInsensitive: false,
             mode: "development"
         };

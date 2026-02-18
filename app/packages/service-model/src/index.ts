@@ -107,7 +107,7 @@ const envConfig = parseServiceConfigFromEnv();
 const modelLanguageConfig: LanguageServiceConfig<ModelServices> = {
     languagePlugin: modelLanguagePlugin,
     languagePluginProvider: modelPluginProvider,
-    handlers: {
+    fileDataHandlers: {
         [AST_HANDLER_KEY]: astHandler,
         [MODEL_DATA_HANDLER_KEY]: modelDataHandler
     }
@@ -119,7 +119,7 @@ const modelLanguageConfig: LanguageServiceConfig<ModelServices> = {
 const generatedModelLanguageConfig: LanguageServiceConfig<GeneratedModelServices> = {
     languagePlugin: generatedModelLanguagePlugin,
     languagePluginProvider: generatedModelPluginProvider,
-    handlers: {
+    fileDataHandlers: {
         [AST_HANDLER_KEY]: astHandler
     }
 };

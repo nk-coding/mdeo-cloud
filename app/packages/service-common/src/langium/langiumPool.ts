@@ -44,7 +44,7 @@ export class LangiumInstancePool<T> {
      */
     private readonly instanceWaitQueue: ((instance: LangiumInstance<T>) => void)[] = [];
 
-    constructor(private readonly config: LangiumPoolConfig) {
+    constructor(private readonly config: LangiumPoolConfig<T>) {
         this.config = config;
     }
 
@@ -201,9 +201,10 @@ export class LangiumInstancePool<T> {
         );
 
         const grammar = languageModule.grammars.get(plugin)!;
+        const fileExtensions = this.config.extension ? [this.config.extension] : [];
         const languageMetaData: LanguageMetaData = {
             languageId: this.config.languageId,
-            fileExtensions: [this.config.extension],
+            fileExtensions,
             caseInsensitive: false,
             mode: "development"
         };
@@ -217,7 +218,8 @@ export class LangiumInstancePool<T> {
         const services = langium.inject(
             createDefaultModule({ shared }),
             generatedModule,
-            plugin.module
+            plugin.module,
+            this.config.serviceModule
         ) as LanguageServices & { shared: ServiceAdditionalSharedServices } & T;
 
         shared.ServiceRegistry.register(services);

@@ -1,8 +1,9 @@
-import type { LangiumLanguagePluginProvider } from "@mdeo/language-common";
+import type { LangiumLanguagePluginProvider, LanguageServices, PartialLanguageServices } from "@mdeo/language-common";
 import type { Plugin, LanguagePlugin } from "@mdeo/plugin";
 import type { FastifyInstance } from "fastify";
-import type { FileDataHandler, FileDataResult } from "../handler/types.js";
+import type { FileDataHandler, FileDataResult, RequestHandler } from "../handler/types.js";
 import type { ExecutionHandler } from "../execution/types.js";
+import type { DeepPartial, Module } from "langium";
 
 /**
  * Plugin definition for the service.
@@ -38,9 +39,19 @@ export interface LanguageServiceConfig<T = object> {
     languagePluginProvider: LangiumLanguagePluginProvider<T>;
 
     /**
+     * Optional service-specific module
+     */
+    serviceModule?: Module<LanguageServices & T, PartialLanguageServices &  DeepPartial<T>>;
+
+    /**
      * File data handlers keyed by data key (e.g., "ast", "diagram")
      */
-    handlers: Record<string, FileDataHandler<unknown, T>>;
+    fileDataHandlers: Record<string, FileDataHandler<unknown, T>>;
+
+    /**
+     * Request handlers for general language plugin requests keyed by request key
+     */
+    requestHandlers?: Record<string, RequestHandler<unknown, T>>;
 
     /**
      * Execution handlers for processing execution requests (optional)

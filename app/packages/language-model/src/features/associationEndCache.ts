@@ -48,8 +48,6 @@ export class AssociationEndCache {
         this.astReflection = services.shared.AstReflection;
         this.sharedServices = services.shared;
 
-        // Create a document-based cache that invalidates when documents are indexed
-        // We use DocumentState.Linked to ensure the cache is cleared after references are resolved
         this.cache = new DocumentCache(services.shared, DocumentState.Linked);
     }
 
@@ -67,19 +65,16 @@ export class AssociationEndCache {
      * @returns Array of association ends that reference this class
      */
     getAssociationEndsForClass(classType: ClassType): AssociationEndType[] {
-        // Get the document containing the class
         const document = AstUtils.getDocument(classType);
         if (!document) {
             return [];
         }
 
-        // Try to get from cache first
         const cachedResult = this.cache.get(document.uri, classType);
         if (cachedResult !== undefined) {
             return cachedResult;
         }
 
-        // Compute and cache the result
         const associationEnds = this.computeAssociationEndsForClass(classType, document.uri);
         this.cache.set(document.uri, classType, associationEnds);
 
@@ -99,30 +94,24 @@ export class AssociationEndCache {
     private computeAssociationEndsForClass(targetClass: ClassType, documentUri: URI): AssociationEndType[] {
         const result: AssociationEndType[] = [];
 
-        // Get the metamodel document
         const document = this.sharedServices.workspace.LangiumDocuments.getDocument(documentUri);
         if (!document || !document.parseResult || !document.parseResult.value) {
             return result;
         }
 
-        // Get the metamodel root
         const metamodel = document.parseResult.value;
         if (!this.astReflection.isInstance(metamodel, MetaModel)) {
             return result;
         }
 
-        // Extract all associations from the metamodel
         const associations = this.extractAssociations(metamodel);
 
-        // For each association, check if any end references our target class
         for (const association of associations) {
-            // Check source end - association.source.class now directly references Class
             const sourceClass = association.source?.class?.ref as ClassType | undefined;
             if (sourceClass === targetClass && association.source.name) {
                 result.push(association.source);
             }
 
-            // Check target end - association.target.class now directly references Class
             const targetClassRef = association.target?.class?.ref as ClassType | undefined;
             if (targetClassRef === targetClass && association.target.name) {
                 result.push(association.target);

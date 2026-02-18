@@ -3,6 +3,7 @@ import type { URI } from "vscode-uri";
 import type { LangiumInstance } from "../langium/langiumInstance.js";
 import type { ServerApi } from "../service/serverApi.js";
 import type { ServiceAdditionalServices } from "../langium/types.js";
+import type { ServerContributionPlugin } from "@mdeo/plugin";
 
 /**
  * Handler for file data computation requests
@@ -11,6 +12,14 @@ import type { ServiceAdditionalServices } from "../langium/types.js";
  * @template S The type of LanguageServices used
  */
 export type FileDataHandler<T = unknown, S = object> = (context: FileDataContext<S>) => Promise<FileDataResult<T>>;
+
+/**
+ * Handler for general language plugin requests
+ *
+ * @template T The return type of the handler
+ * @template S The type of LanguageServices used
+ */
+export type RequestHandler<T = unknown, S = object> = (context: RequestContext<S>) => Promise<T>;
 
 /**
  * File information for file data handlers.
@@ -52,6 +61,42 @@ export interface FileDataContext<T = object> {
      * Server API for accessing backend endpoints
      */
     serverApi: ServerApi;
+
+    /**
+     * The contribution plugins active for this request.
+     * Useful for handlers that need to inspect or forward plugin configurations.
+     */
+    contributionPlugins: ServerContributionPlugin[];
+}
+
+/**
+ * Context provided to request handlers
+ */
+export interface RequestContext<T = object> {
+    /**
+     * The request body data
+     */
+    body: unknown;
+
+    /**
+     * The Langium instance to use for processing
+     */
+    instance: LangiumInstance<T>;
+
+    /**
+     * The Langium services for this language
+     */
+    services: LanguageServices & ServiceAdditionalServices & T;
+
+    /**
+     * Server API for accessing backend endpoints
+     */
+    serverApi: ServerApi;
+
+    /**
+     * The contribution plugins active for this request.
+     */
+    contributionPlugins: ServerContributionPlugin[];
 }
 
 /**

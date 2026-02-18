@@ -111,14 +111,7 @@ export class GMatchNodeView implements IView {
             rootClasses["[&>rect:first-child]:stroke-sky-500"] = true;
         }
 
-        const children: VNode[] = [
-            border,
-            header,
-            divider,
-            patternGroup,
-            ...edgeElements,
-            ...selectionElements
-        ];
+        const children: VNode[] = [border, header, divider, patternGroup, ...edgeElements, ...selectionElements];
 
         if (constraintSection) {
             children.push(constraintSection);
@@ -222,7 +215,10 @@ export class GMatchNodeView implements IView {
 
         for (const child of children) {
             // Get the position from the child's meta
-            const position = (child as { meta?: { position?: { x: number; y: number } } }).meta?.position ?? { x: 0, y: 0 };
+            const position = (child as { meta?: { position?: { x: number; y: number } } }).meta?.position ?? {
+                x: 0,
+                y: 0
+            };
 
             // Render the child
             const renderedChild = context.renderElement(child);

@@ -86,6 +86,31 @@ export interface ConfigContributionPlugin extends ServerContributionPlugin {
      * that depend on this one.
      */
     exportedTypes: string[];
+
+    /**
+     * Section-level dependencies required for file-data computation.
+     * Before this plugin's request handler is invoked, the specified sections from
+     * the listed plugins must have already been computed and their results are
+     * forwarded as dependency data in the request.
+     * These are distinct from `dependencies` (which are grammar-level dependencies).
+     */
+    sectionDependencies: SectionDependency[];
+}
+
+/**
+ * A dependency on a specific section from another contribution plugin.
+ * Used during config file-data computation to determine plugin execution order.
+ */
+export interface SectionDependency {
+    /**
+     * The short name of the plugin that contributes the required section.
+     */
+    pluginName: string;
+
+    /**
+     * The name of the required section within that plugin.
+     */
+    sectionName: string;
 }
 
 export namespace ConfigContributionPlugin {

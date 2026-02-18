@@ -1,25 +1,11 @@
-import type { AstNode, LangiumCoreServices, ReferenceInfo, Scope, ServiceRegistry } from "langium";
-import { DefaultScopeProvider, EMPTY_SCOPE } from "langium";
+import type { LangiumCoreServices, ReferenceInfo, Scope, ServiceRegistry } from "langium";
 import type { ConfigContributionPlugin } from "../plugin/configContributionPlugin.js";
 import type { BaseConfigSectionType } from "../grammar/configTypes.js";
 import type { ResolvedConfigContributionPlugins } from "../plugin/resolvePlugins.js";
+import { sharedImport } from "@mdeo/language-shared";
+import { getServicesByLanguageId } from "./util.js";
 
-/**
- * Gets a language services by its language ID from the Langium ServiceRegistry.
- *
- * @param registry The Langium service registry
- * @param languageId The language ID to find
- * @returns The language services, or undefined if not found
- */
-function getServicesByLanguageId(registry: ServiceRegistry, languageId: string): LangiumCoreServices | undefined {
-    // Use the 'all' property to iterate through registered services
-    for (const services of registry.all) {
-        if (services.LanguageMetaData.languageId === languageId) {
-            return services;
-        }
-    }
-    return undefined;
-}
+const { EMPTY_SCOPE, DefaultScopeProvider, AstUtils } = sharedImport("langium");
 
 /**
  * A delegating scope provider for the config language.
@@ -57,25 +43,14 @@ export class ConfigDelegatingScopeProvider extends DefaultScopeProvider {
         services: LangiumCoreServices,
         serviceRegistry: ServiceRegistry,
         plugins: ConfigContributionPlugin[],
-        resolvedPlugins?: ResolvedConfigContributionPlugins
+        resolvedPlugins: ResolvedConfigContributionPlugins
     ) {
         super(services);
         this.serviceRegistry = serviceRegistry;
         this.plugins = plugins;
 
-        // Build section to plugin mapping using wrapper type names
-        if (resolvedPlugins) {
-            for (const [qualifiedName, sectionInfo] of resolvedPlugins.sections) {
-                // Map the wrapper interface name to the plugin
-                this.sectionToPlugin.set(sectionInfo.interface.name, sectionInfo.plugin);
-            }
-        } else {
-            // Fallback: map section names (without wrappers)
-            for (const plugin of plugins) {
-                for (const section of plugin.sections) {
-                    this.sectionToPlugin.set(section.name, plugin);
-                }
-            }
+        for (const sectionInfo of resolvedPlugins.sections.values()) {
+            this.sectionToPlugin.set(sectionInfo.interface.name, sectionInfo.plugin);
         }
     }
 
@@ -86,58 +61,27 @@ export class ConfigDelegatingScopeProvider extends DefaultScopeProvider {
      * @returns The scope for the reference
      */
     override getScope(context: ReferenceInfo): Scope {
-        // Find which section wrapper this node belongs to
-        const sectionWrapper = this.findContainingSection(context.container);
-        if (!sectionWrapper) {
-            return super.getScope(context);
-        }
-
-        // Get the plugin for this section wrapper
-        const plugin = this.getPluginForSection(sectionWrapper);
-        if (!plugin) {
-            return super.getScope(context);
-        }
-
-        // Get the services for the plugin language
-        const pluginServices = getServicesByLanguageId(this.serviceRegistry, plugin.languageKey);
-        if (!pluginServices) {
-            console.warn(`No services found for language '${plugin.languageKey}'`);
+        const sectionWrapper = AstUtils.getContainerOfType(context.container, (node): node is BaseConfigSectionType =>
+            this.sectionToPlugin.has(node.$type)
+        );
+        if (sectionWrapper == undefined) {
             return EMPTY_SCOPE;
         }
 
-        // Delegate to the plugin's scope provider
-        // Note: The context.container is already within the content field, so we don't need to unwrap it
+        const plugin = this.getPluginForSection(sectionWrapper);
+        if (plugin == undefined) {
+            return EMPTY_SCOPE;
+        }
+
+        const pluginServices = getServicesByLanguageId(this.serviceRegistry, plugin.languageKey);
+        if (pluginServices == undefined) {
+            throw new Error(
+                `No language services found for plugin '${plugin.id}' with language key '${plugin.languageKey}'. Make sure the plugin's language is registered in the service registry.`
+            );
+        }
+
         const scopeProvider = pluginServices.references.ScopeProvider;
         return scopeProvider.getScope(context);
-    }
-
-    /**
-     * Finds the containing section for an AST node.
-     *
-     * @param node The AST node
-     * @returns The section node, or undefined if not in a section
-     */
-    protected findContainingSection(node: AstNode): BaseConfigSectionType | undefined {
-        let current: AstNode | undefined = node;
-        while (current) {
-            if (this.isConfigSection(current)) {
-                return current as BaseConfigSectionType;
-            }
-            current = current.$container;
-        }
-        return undefined;
-    }
-
-    /**
-     * Checks if an AST node is a config section.
-     *
-     * @param node The AST node to check
-     * @returns True if the node is a config section
-     */
-    protected isConfigSection(node: AstNode): boolean {
-        // Check if the node's type is one of the known section types
-        // Section types include both the direct section rule names and interfaces
-        return this.sectionToPlugin.has(node.$type);
     }
 
     /**

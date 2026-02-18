@@ -8,4 +8,7 @@ import { DEFAULT_MODULES } from "@mdeo/editor-shared";
  * - Default shared modules for diagram editing
  * - Model transformation diagram module for transformation-specific elements and views
  */
-export const modelTransformationEditorPlugin: ContainerConfiguration = [...DEFAULT_MODULES, modelTransformationDiagramModule];
+export const modelTransformationEditorPlugin: ContainerConfiguration = [
+    ...DEFAULT_MODULES,
+    modelTransformationDiagramModule
+];

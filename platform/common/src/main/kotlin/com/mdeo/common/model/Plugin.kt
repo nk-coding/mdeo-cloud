@@ -85,7 +85,7 @@ data class BackendContributionPlugin(
 data class BackendLanguagePlugin(
     val id: String,
     val name: String,
-    val extension: String,
+    val extension: String? = null,
     val newFileAction: Boolean = false,
     val serverPlugin: LanguageServerPlugin,
     val graphicalEditorPlugin: LanguageGraphicalEditorPlugin? = null,
@@ -276,4 +276,29 @@ data class AdditionalFileData(
 data class FileDataResponse(
     val data: JsonElement,
     val version: Int? = null
+)
+
+/**
+ * Request payload for language plugin requests.
+ * This is a general request mechanism that forwards the body to the plugin.
+ *
+ * @property project Project ID the request belongs to
+ * @property body Arbitrary JSON body to be forwarded to the plugin
+ * @property contributionPlugins Server contribution plugins associated with this language
+ */
+@Serializable
+data class LanguagePluginRequest(
+    val project: String,
+    val body: JsonElement,
+    val contributionPlugins: List<JsonObject> = emptyList()
+)
+
+/**
+ * Response from language plugin request.
+ *
+ * @property data Response data as JSON
+ */
+@Serializable
+data class LanguagePluginResponse(
+    val data: JsonElement
 )

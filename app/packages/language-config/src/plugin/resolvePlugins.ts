@@ -8,10 +8,13 @@ import {
     type TerminalRule,
     createInterface,
     createRule,
-    or
+    or,
+    many,
+    NEWLINE
 } from "@mdeo/language-common";
 import type { ConfigContributionPlugin } from "./configContributionPlugin.js";
-import { BaseConfigSection } from "../grammar/configTypes.js";
+import { BaseConfigSection, Config } from "../grammar/configTypes.js";
+import type { AstNode } from "langium";
 
 /**
  * Information about a section's naming requirements
@@ -41,12 +44,12 @@ export interface SectionNamingInfo {
     /**
      * The resolved grammar interface for this section
      */
-    interface: Interface<any>;
+    interface: Interface<AstNode>;
 
     /**
      * The resolved parser rule for this section
      */
-    rule: ParserRule<any>;
+    rule: ParserRule<AstNode>;
 }
 
 /**
@@ -72,12 +75,7 @@ export interface ResolvedConfigContributionPlugins {
     /**
      * All parser rules from all plugins
      */
-    rules: ParserRule<any>[];
-
-    /**
-     * All interfaces from all plugins
-     */
-    interfaces: Interface<any>[];
+    rules: ParserRule<AstNode>[];
 }
 
 /**
@@ -156,20 +154,18 @@ class ConfigPluginResolver {
     private readonly sections: Map<string, SectionNamingInfo>;
     private readonly sectionNameToQualified: Map<string, string[]>;
     private readonly keywords: string[];
-    private readonly allRules: ParserRule<any>[];
-    private readonly allInterfaces: Interface<any>[];
-    private readonly exportedTypes: (Interface<any> | Type<any>)[];
-    private readonly baseTypes: (Interface<any> | Type<any>)[];
-    private readonly baseRules: ParserRule<any>[];
-    private readonly baseTerminals: TerminalRule<any>[];
+    private readonly rules: ParserRule<AstNode>[];
+    private readonly exportedTypes: (Interface<AstNode> | Type<AstNode>)[];
+    private readonly baseTypes: (Interface<AstNode> | Type<AstNode>)[];
+    private readonly baseRules: ParserRule<AstNode>[];
+    private readonly baseTerminals: TerminalRule<AstNode>[];
     private readonly sectionNameCounts: Map<string, number>;
 
     constructor(sortedPlugins: ConfigContributionPlugin[], deserializationContext: GrammarDeserializationContext) {
         this.sections = new Map();
         this.sectionNameToQualified = new Map();
         this.keywords = [];
-        this.allRules = [];
-        this.allInterfaces = [];
+        this.rules = [];
         this.exportedTypes = [];
         this.baseTypes = Array.from(deserializationContext.types?.values() ?? []);
         this.baseRules = Array.from(deserializationContext.parserRules?.values() ?? []);
@@ -192,8 +188,7 @@ class ConfigPluginResolver {
             sections: this.sections,
             sectionNameToQualified: this.sectionNameToQualified,
             keywords: this.keywords,
-            rules: this.allRules,
-            interfaces: this.allInterfaces
+            rules: this.rules
         };
     }
 
@@ -213,20 +208,19 @@ class ConfigPluginResolver {
         const deserializer = new GrammarDeserializer(plugin.grammar, pluginDeserializationContext);
         const grammar = deserializer.deserializeGrammar();
 
-        const ruleMap = new Map<string, ParserRule<any>>();
+        const ruleMap = new Map<string, ParserRule<AstNode>>();
         for (const rule of grammar.rules) {
             if (!isTerminalRule(rule)) {
                 ruleMap.set(rule.name, rule);
             }
         }
 
-        const interfaceMap = new Map<string, Interface<any>>();
+        const interfaceMap = new Map<string, Interface<AstNode>>();
         for (const iface of grammar.interfaces) {
             interfaceMap.set(iface.name, iface);
-            this.allInterfaces.push(iface);
         }
 
-        const typeMap = new Map<string, Type<any>>();
+        const typeMap = new Map<string, Type<AstNode>>();
         for (const type of grammar.types) {
             typeMap.set(type.name, type);
         }
@@ -258,8 +252,8 @@ class ConfigPluginResolver {
     private processPluginSection(
         section: ConfigContributionPlugin["sections"][number],
         plugin: ConfigContributionPlugin,
-        ruleMap: Map<string, ParserRule<any>>,
-        interfaceMap: Map<string, Interface<any>>
+        ruleMap: Map<string, ParserRule<AstNode>>,
+        interfaceMap: Map<string, Interface<AstNode>>
     ): void {
         const pluginShortName = plugin.shortName;
         const qualifiedName = `${section.name}.${pluginShortName}`;
@@ -287,8 +281,7 @@ class ConfigPluginResolver {
             sectionInterface
         );
 
-        this.allRules.push(wrapperRule);
-        this.allInterfaces.push(wrapperInterface);
+        this.rules.push(wrapperRule);
 
         const namingInfo: SectionNamingInfo = {
             sectionName: section.name,
@@ -327,30 +320,122 @@ class ConfigPluginResolver {
         section: ConfigContributionPlugin["sections"][number],
         plugin: ConfigContributionPlugin,
         requiresQualifiedName: boolean,
-        sectionRule: ParserRule<any>,
-        sectionInterface: Interface<any>
-    ): { wrapperInterface: Interface<any>; wrapperRule: ParserRule<any> } {
+        sectionRule: ParserRule<AstNode>,
+        sectionInterface: Interface<AstNode>
+    ): { wrapperInterface: Interface<AstNode>; wrapperRule: ParserRule<AstNode> } {
         const pluginShortName = plugin.shortName;
-        const wrapperInterfaceName = `Config${section.name.charAt(0).toUpperCase()}${section.name.slice(1)}Section_${pluginShortName}`;
+        const wrapperInterfaceName = getWrapperInterfaceName(section.name, pluginShortName);
         const wrapperInterface = createInterface(wrapperInterfaceName).extends(BaseConfigSection).attrs({
             content: sectionInterface
         });
 
-        const wrapperRuleName = `Config${section.name.charAt(0).toUpperCase()}${section.name.slice(1)}SectionWrapper_${pluginShortName}`;
+        const wrapperRuleName = getWrapperRuleName(section.name, pluginShortName);
 
-        let wrapperRule: ParserRule<any>;
+        let wrapperRule: ParserRule<AstNode>;
         if (requiresQualifiedName) {
             wrapperRule = createRule(wrapperRuleName)
                 .returns(wrapperInterface)
-                .as(({ add }) => [`${section.name}.${pluginShortName}`, add("content", sectionRule)]);
+                .as(({ set }) => [`${section.name}.${pluginShortName}`, set("content", sectionRule)]);
         } else {
             wrapperRule = createRule(wrapperRuleName)
                 .returns(wrapperInterface)
-                .as(({ add }) => [or(section.name, `${section.name}.${pluginShortName}`), add("content", sectionRule)]);
+                .as(({ set }) => [or(section.name, `${section.name}.${pluginShortName}`), set("content", sectionRule)]);
         }
 
         return { wrapperInterface, wrapperRule };
     }
+}
+
+/**
+ * Returns the wrapper interface name for a given section and plugin.
+ * The wrapper interface extends BaseConfigSection and holds the section content.
+ *
+ * @param sectionName The section name (e.g., "problem")
+ * @param pluginShortName The short name of the plugin (e.g., "optimization")
+ * @returns The wrapper interface name (e.g., "ConfigProblemSection_optimization")
+ */
+export function getWrapperInterfaceName(sectionName: string, pluginShortName: string): string {
+    return `Config${sectionName.charAt(0).toUpperCase()}${sectionName.slice(1)}Section_${pluginShortName}`;
+}
+
+/**
+ * Returns the wrapper parser rule name for a given section and plugin.
+ *
+ * @param sectionName The section name (e.g., "problem")
+ * @param pluginShortName The short name of the plugin (e.g., "optimization")
+ * @returns The wrapper rule name (e.g., "ConfigProblemSectionWrapper_optimization")
+ */
+export function getWrapperRuleName(sectionName: string, pluginShortName: string): string {
+    return `Config${sectionName.charAt(0).toUpperCase()}${sectionName.slice(1)}SectionWrapper_${pluginShortName}`;
+}
+
+/**
+ * Generates the grammar for the standalone (artificial) language of a contribution plugin.
+ * This is used by the plugin's own language service to parse partial config files that
+ * contain only sections from this plugin (without disambiguation/qualified keywords).
+ *
+ * The generated grammar:
+ * - Deserializes the plugin's contribution grammar
+ * - Creates wrapper rules/interfaces for each section using simple (non-qualified) keywords
+ * - Creates a root rule returning Config that alternates between all section wrappers
+ *
+ * @param plugin The contribution plugin whose standalone grammar is to be generated
+ * @param deserializationContext Context for resolving external type/rule references in the plugin's grammar
+ * @returns The root parser rule for the standalone grammar
+ */
+export function generateContributionPluginGrammar(
+    plugin: ConfigContributionPlugin,
+    deserializationContext: GrammarDeserializationContext
+): ParserRule<AstNode> {
+    const deserializer = new GrammarDeserializer(plugin.grammar, deserializationContext);
+    const grammar = deserializer.deserializeGrammar();
+
+    const ruleMap = new Map<string, ParserRule<AstNode>>();
+    for (const rule of grammar.rules) {
+        if (!isTerminalRule(rule)) {
+            ruleMap.set(rule.name, rule);
+        }
+    }
+
+    const interfaceMap = new Map<string, Interface<AstNode>>();
+    for (const iface of grammar.interfaces) {
+        interfaceMap.set(iface.name, iface);
+    }
+
+    const wrapperRules: ParserRule<AstNode>[] = [];
+
+    for (const section of plugin.sections) {
+        const sectionRule = ruleMap.get(section.ruleName);
+        if (sectionRule == undefined) {
+            throw new Error(
+                `Section '${section.name}' in plugin '${plugin.id}' references rule '${section.ruleName}' which does not exist.`
+            );
+        }
+
+        const sectionInterface = interfaceMap.get(section.interfaceName);
+        if (sectionInterface == undefined) {
+            throw new Error(
+                `Section '${section.name}' in plugin '${plugin.id}' references interface '${section.interfaceName}' which does not exist.`
+            );
+        }
+
+        const wrapperInterfaceName = getWrapperInterfaceName(section.name, plugin.shortName);
+        const wrapperRuleName = getWrapperRuleName(section.name, plugin.shortName);
+
+        const wrapperInterface = createInterface(wrapperInterfaceName).extends(BaseConfigSection).attrs({
+            content: sectionInterface
+        });
+
+        const wrapperRule = createRule(wrapperRuleName)
+            .returns(wrapperInterface)
+            .as(({ set }) => [section.name, set("content", sectionRule)]);
+
+        wrapperRules.push(wrapperRule);
+    }
+
+    return createRule(`${plugin.shortName.charAt(0).toUpperCase()}${plugin.shortName.slice(1)}PluginConfigRule`)
+        .returns(Config)
+        .as(({ add }) => [many(or(...wrapperRules.map((r) => add("sections", r)), NEWLINE))]);
 }
 
 /**

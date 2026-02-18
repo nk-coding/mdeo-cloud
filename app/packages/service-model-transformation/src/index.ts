@@ -171,7 +171,7 @@ const modelTransformationExecutionHandler = new ModelTransformationExecutionHand
 const modelTransformationLanguageConfig: LanguageServiceConfig<ModelTransformationServices> = {
     languagePlugin: modelTransformationLanguagePlugin,
     languagePluginProvider: modelTransformationPluginProvider,
-    handlers: {
+    fileDataHandlers: {
         [AST_HANDLER_KEY]: astHandler,
         [TYPED_AST_HANDLER_KEY]: typedAstHandler
     },

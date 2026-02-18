@@ -30,39 +30,27 @@ export const OPTIMIZATION_PLUGIN_ID = "config-optimization";
 export const CONFIG_OPTIMIZATION_LANGUAGE_KEY = "config-optimization";
 
 /**
- * Plugin ID for the metamodel config contribution plugin (must match what service-metamodel exports).
- */
-const METAMODEL_CONFIG_PLUGIN_ID = "config-metamodel";
-
-/**
- * Plugin ID for the script config contribution plugin (must match what service-script exports).
- */
-const SCRIPT_CONFIG_PLUGIN_ID = "config-script";
-
-/**
  * Creates the serialized grammar for all optimization rules.
  * This grammar contains all parser rules and interfaces used by the plugin.
  *
  * @returns The serialized grammar
  */
 function createOptimizationGrammar(): SerializedGrammar {
-    const serializer = new GrammarSerializer(
-        {
-            rules: [
-                ProblemSectionContentRule,
-                GoalSectionContentRule,
-                SingleMultiplicityRule,
-                RangeMultiplicityRule,
-                MultiplicityRule,
-                ConstraintReferenceRule,
-                ObjectiveRule,
-                RefinementRule,
-                FunctionImportRule,
-                FunctionFileImportRule
-            ],
-            additionalTerminals: []
-        }
-    );
+    const serializer = new GrammarSerializer({
+        rules: [
+            ProblemSectionContentRule,
+            GoalSectionContentRule,
+            SingleMultiplicityRule,
+            RangeMultiplicityRule,
+            MultiplicityRule,
+            ConstraintReferenceRule,
+            ObjectiveRule,
+            RefinementRule,
+            FunctionImportRule,
+            FunctionFileImportRule
+        ],
+        additionalTerminals: []
+    });
     return serializer.grammar;
 }
 
@@ -91,7 +79,8 @@ export function createOptimizationContributionPlugin(): ConfigContributionPlugin
                 interfaceName: GoalSection.name
             }
         ],
-        dependencies: [METAMODEL_CONFIG_PLUGIN_ID, SCRIPT_CONFIG_PLUGIN_ID],
-        exportedTypes: []
+        dependencies: ["config-metamodel", "config-script"],
+        exportedTypes: [],
+        sectionDependencies: []
     };
 }

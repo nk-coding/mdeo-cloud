@@ -64,15 +64,15 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         });
     }
 
-    // Create language handlers map with instance pools
     const languageHandlers = new Map<string, LanguageHandler<T>>();
     for (const langConfig of config.languages) {
         const languageId = langConfig.languagePlugin.id;
         const pool = new LangiumInstancePool<T>({
             maxInstances: config.maxLangiumInstances ?? 5,
             languagePluginProvider: langConfig.languagePluginProvider,
+            serviceModule: langConfig.serviceModule,
             languageId,
-            extension: langConfig.languagePlugin.extension,
+            extension: langConfig.languagePlugin.extension ?? "",
             backendUrl: config.backendApiUrl
         });
         languageHandlers.set(languageId, { config: langConfig, pool });
@@ -113,7 +113,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
 
             const jwt = extractJwtFromRequest(request);
 
-            const handler = languageHandler.config.handlers[key];
+            const handler = languageHandler.config.fileDataHandlers[key];
             if (handler == undefined) {
                 return reply.status(404).send({ error: `No handler registered for key: ${key}` });
             }
@@ -136,7 +136,8 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                     fileInfo,
                     instance,
                     services: instance.services,
-                    serverApi: instance.services.shared.ServerApi
+                    serverApi: instance.services.shared.ServerApi,
+                    contributionPlugins: serverContributionPlugins
                 });
 
                 const response: FileDataComputeResponse = {
@@ -151,6 +152,59 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         }
     );
 
+    const hasRequestHandlers = config.languages.some(
+        (lang) => lang.requestHandlers && Object.keys(lang.requestHandlers).length > 0
+    );
+
+    if (hasRequestHandlers) {
+        fastify.post<{
+            Params: { languageId: string; key: string };
+            Body: { project: string; body: unknown; contributionPlugins?: object[] };
+        }>(
+            "/request/:languageId/:key",
+            {
+                preHandler: jwtAuth.authenticate.bind(jwtAuth)
+            },
+            async (request, reply) => {
+                const { languageId, key } = request.params;
+                const { project, body, contributionPlugins } = request.body;
+
+                if (!JwtAuthMiddleware.hasScope(request, "file-data:read")) {
+                    return reply.status(403).send({ error: "Insufficient permissions: file-data:read scope required" });
+                }
+
+                const languageHandler = languageHandlers.get(languageId);
+                if (!languageHandler) {
+                    return reply.status(404).send({ error: `Unknown language: ${languageId}` });
+                }
+
+                const jwt = extractJwtFromRequest(request);
+
+                const handler = languageHandler.config.requestHandlers?.[key];
+                if (handler == undefined) {
+                    return reply.status(404).send({ error: `No request handler registered for key: ${key}` });
+                }
+
+                const serverContributionPlugins = (contributionPlugins ?? []) as unknown as ServerContributionPlugin[];
+                const instance = await languageHandler.pool.acquire(serverContributionPlugins, jwt, project);
+
+                try {
+                    const result = await handler({
+                        body,
+                        instance,
+                        services: instance.services,
+                        serverApi: instance.services.shared.ServerApi,
+                        contributionPlugins: serverContributionPlugins
+                    });
+
+                    return reply.send({ data: result });
+                } finally {
+                    languageHandler.pool.release(instance);
+                }
+            }
+        );
+    }
+
     // Check if any language has execution handlers
     const hasExecutionHandlers = config.languages.some(
         (lang) => lang.executionHandlers && lang.executionHandlers.length > 0
@@ -164,7 +218,15 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
          */
         fastify.post<{
             Params: { languageId: string };
-            Body: { executionId: string; project: string; filePath: string; data: object };
+            Body: {
+                executionId: string;
+                project: string;
+                filePath: string;
+                fileContent: string;
+                fileVersion: number;
+                data: object;
+                contributionPlugins?: object[];
+            };
         }>(
             "/:languageId/executions",
             {
@@ -172,7 +234,8 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             },
             async (request, reply) => {
                 const { languageId } = request.params;
-                const { executionId, project, filePath, data } = request.body;
+                const { executionId, project, filePath, fileContent, fileVersion, data, contributionPlugins } =
+                    request.body;
 
                 if (!JwtAuthMiddleware.hasScope(request, "execution:write")) {
                     return reply
@@ -194,30 +257,39 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                     return reply.status(503).send({ error: "Execution service not available for this language" });
                 }
 
+                const serverContributionPlugins = (contributionPlugins ?? []) as unknown as ServerContributionPlugin[];
+                const instance = await languageHandler.pool.acquire(serverContributionPlugins, jwt, project);
+
+                const uri = URI.parse(filePath);
+                instance.services.shared.workspace.LangiumDocuments.createDocument(uri, fileContent);
+
                 const executionContext: ExecutionContext = {
                     executionId,
                     project,
                     filePath,
+                    fileContent,
+                    fileVersion,
                     data: data ?? {},
-                    jwt
+                    jwt,
+                    contributionPlugins: contributionPlugins ?? []
                 };
 
-                let selectedHandler = null;
-                for (const handler of languageHandler.config.executionHandlers) {
-                    const canHandleResult = await handler.canHandle(executionContext);
-                    if (canHandleResult.canHandle) {
-                        selectedHandler = handler;
-                        break;
-                    }
-                }
-
-                if (!selectedHandler) {
-                    return reply.status(400).send({
-                        error: "No handler available for this execution request"
-                    });
-                }
-
                 try {
+                    let selectedHandler = null;
+                    for (const handler of languageHandler.config.executionHandlers) {
+                        const canHandleResult = await handler.canHandle(executionContext);
+                        if (canHandleResult.canHandle) {
+                            selectedHandler = handler;
+                            break;
+                        }
+                    }
+
+                    if (!selectedHandler) {
+                        return reply.status(400).send({
+                            error: "No handler available for this execution request"
+                        });
+                    }
+
                     const result = await selectedHandler.execute(executionContext);
                     return reply.send(result);
                 } catch (error) {
@@ -225,6 +297,8 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                     return reply.status(500).send({
                         error: error instanceof Error ? error.message : "Execution failed"
                     });
+                } finally {
+                    languageHandler.pool.release(instance);
                 }
             }
         );

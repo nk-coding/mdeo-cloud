@@ -60,12 +60,14 @@ const metamodelServicePlugin: ServicePluginDefinition = {
     description: "Language support for metamodel definitions (.mm files)",
     icon: convertIcon(Network),
     languagePlugins: [metamodelLanguagePlugin],
-    contributionPlugins: [{
-        languageId: "config",
-        description: "Provides metamodel type exports for config language",
-        additionalKeywords: [],
-        serverContributionPlugins: [createMetamodelConfigContributionPlugin()]
-    }]
+    contributionPlugins: [
+        {
+            languageId: "config",
+            description: "Provides metamodel type exports for config language",
+            additionalKeywords: [],
+            serverContributionPlugins: [createMetamodelConfigContributionPlugin()]
+        }
+    ]
 };
 
 /**
@@ -74,7 +76,7 @@ const metamodelServicePlugin: ServicePluginDefinition = {
 const metamodelLanguageConfig: LanguageServiceConfig<MetamodelServices> = {
     languagePlugin: metamodelLanguagePlugin,
     languagePluginProvider: metamodelPluginProvider,
-    handlers: {
+    fileDataHandlers: {
         [AST_HANDLER_KEY]: astHandler
     }
 };

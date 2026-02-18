@@ -1,38 +1,63 @@
-import { type LangiumLanguagePlugin, type LangiumLanguagePluginProvider, type ExternalReferenceCollector, type ExternalReferences, type ExternalReferenceAdditionalServices, createRule, createInterface, ML_COMMENT, SL_COMMENT } from "@mdeo/language-common";
+import {
+    type LangiumLanguagePlugin,
+    type LangiumLanguagePluginProvider,
+    type ExternalReferenceAdditionalServices,
+    GrammarDeserializationContext,
+    ID,
+    NEWLINE,
+    INT,
+    STRING,
+    FLOAT,
+    HIDDEN_NEWLINE
+} from "@mdeo/language-common";
 import {
     DefaultAstSerializer,
     IdValueConverter,
     SerializerFormatter,
-    registerDefaultTokenSerializers
+    registerDefaultTokenSerializers,
+    NewlineAwareTokenBuilder
 } from "@mdeo/language-shared";
+import { generateContributionPluginGrammar, ConfigTerminals } from "@mdeo/language-config";
 import { OptimizationScopeProvider } from "./features/optimizationScopeProvider.js";
+import { OptimizationExternalReferenceCollector } from "./features/optimizationExternalReferenceCollector.js";
 import { registerOptimizationSerializers } from "./features/optimizationSerializers.js";
-import type { LangiumDocument } from "langium";
+import { createOptimizationContributionPlugin } from "./plugin/optimizationContributionPlugin.js";
+import { Class, Property } from "@mdeo/language-metamodel";
+import { Function } from "@mdeo/language-script";
 
 /**
- * External reference collector for the config-optimization language.
- * Since optimization sections are embedded within config files, we don't need external reference tracking.
+ * Deserialization context for the optimization grammar.
+ * Provides the external interface types (from metamodel/script languages) and common terminals
+ * so the optimization grammar can be deserialized from its serialized form.
  */
-class OptimizationExternalReferenceCollector implements ExternalReferenceCollector {
-    findExternalReferences(docs: LangiumDocument[]): ExternalReferences {
-        return {
-            local: [],
-            external: []
-        };
-    }
-}
+const optimizationDeserializationContext = GrammarDeserializationContext.create(
+    [Class, Function, Property],
+    [],
+    [ID, NEWLINE, HIDDEN_NEWLINE, INT, FLOAT, STRING]
+);
+
+/**
+ * The root rule for the standalone config-optimization language.
+ * Generated from the optimization contribution plugin's grammar, it produces
+ * a Config root with ConfigProblemSection_optimization / ConfigGoalSection_optimization
+ * children — matching the structure of the full config language.
+ */
+const optimizationRootRule = generateContributionPluginGrammar(
+    createOptimizationContributionPlugin(),
+    optimizationDeserializationContext
+);
 
 /**
  * The plugin for the Config Optimization generated language.
- * This language is marked as generated, meaning it doesn't have its own root file type
- * but provides services (scope provider, serializers) for the config language's
- * optimization sections.
+ * Uses a proper grammar derived from the contribution plugin definition,
+ * enabling parsing of partial config files containing only optimization sections.
  */
 const configOptimizationPlugin: LangiumLanguagePlugin<ExternalReferenceAdditionalServices> = {
-    rootRule: createRule("EMPTY").returns(createInterface("EMPTY").attrs({})).as(() => []),
-    additionalTerminals: [SL_COMMENT, ML_COMMENT],
+    rootRule: optimizationRootRule,
+    additionalTerminals: ConfigTerminals,
     module: {
         parser: {
+            TokenBuilder: () => new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
             ValueConverter: () => new IdValueConverter()
         },
         references: {

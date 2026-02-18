@@ -60,6 +60,18 @@ export interface ServerApi {
      * @returns Map of file paths to their corresponding file data
      */
     getFileDataByKey(key: string): Map<string, FileData>;
+
+    /**
+     * Sends a request to a plugin's request handler via the backend proxy.
+     * The backend forwards the request to the appropriate plugin service.
+     * Contribution plugins are automatically determined server-side.
+     *
+     * @param languageId The language ID of the target plugin
+     * @param key The request handler key
+     * @param body The request body to forward
+     * @returns The response data from the plugin request handler
+     */
+    sendPluginRequest(languageId: string, key: string, body: unknown): Promise<unknown>;
 }
 
 /**
@@ -258,5 +270,35 @@ export class HttpServerApi implements ServerApi {
 
     getFileDataByKey(key: string): Map<string, FileData> {
         return this.fileDataCache.get(key) ?? new Map();
+    }
+
+    /**
+     * Sends a request to a plugin's request handler via the backend proxy.
+     * The backend forwards the request to the appropriate plugin service.
+     * Contribution plugins are automatically determined server-side.
+     *
+     * @param languageId The language ID of the target plugin
+     * @param key The request handler key
+     * @param body The request body to forward
+     * @returns The response data from the plugin request handler
+     */
+    async sendPluginRequest(languageId: string, key: string, body: any): Promise<unknown> {
+        const encodedLanguageId = encodeURIComponent(languageId);
+        const encodedKey = encodeURIComponent(key);
+        const response = await fetch(`${this.projectBackendUrl}/request/${encodedLanguageId}/${encodedKey}`, {
+            method: "POST",
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            console.log(await response.json())
+            throw new Error(
+                `Plugin request failed for ${languageId}/${key}: ${response.status} ${response.statusText}`
+            );
+        }
+
+        const result = await response.json();
+        return result.data;
     }
 }
