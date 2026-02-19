@@ -5,7 +5,7 @@ import type {
     ConfigPluginRequestBody,
     ConfigType
 } from "@mdeo/language-config";
-import type { FileDataHandler } from "@mdeo/service-common";
+import { hasParserErrors, type FileDataHandler } from "@mdeo/service-common";
 import type { AstNode } from "langium";
 
 /**
@@ -22,6 +22,93 @@ export type { ConfigPluginDependencyData, ConfigPluginRequestBody } from "@mdeo/
  * (typically a mapping from section name to section-specific data).
  */
 export type ConfigFileData = Record<string, Record<string, unknown>>;
+
+/**
+ * Information about a section type derived from a config contribution plugin.
+ */
+interface SectionTypeInfo {
+    /**
+     * The plugin that contributes this section.
+     */
+    plugin: ConfigContributionPlugin;
+    /**
+     * The qualified name of the section (sectionName.pluginShortName).
+     */
+    qualifiedName: string;
+}
+
+/**
+ * Builds a map from section wrapper `$type` to its info for all active config plugins.
+ *
+ * @param plugins The active config contribution plugins
+ * @returns A map from `$type` string to section type info
+ */
+function buildSectionTypeMap(plugins: ConfigContributionPlugin[]): Map<string, SectionTypeInfo> {
+    const map = new Map<string, SectionTypeInfo>();
+    for (const plugin of plugins) {
+        for (const section of plugin.sections) {
+            const type = getWrapperInterfaceName(section.name, plugin.shortName);
+            map.set(type, {
+                plugin,
+                qualifiedName: `${section.name}.${plugin.shortName}`
+            });
+        }
+    }
+    return map;
+}
+
+/**
+ * Checks whether the config document contains any duplicate sections.
+ * A section is considered a duplicate if its `$type` appears more than once.
+ * Uses the same logic as {@link ConfigValidator.validateSectionUniqueness}.
+ *
+ * @param config The parsed config root node
+ * @returns True if any section type appears more than once
+ */
+function hasDuplicateSections(config: ConfigType): boolean {
+    const typeCounts = new Map<string, number>();
+    for (const section of config.sections ?? []) {
+        typeCounts.set(section.$type, (typeCounts.get(section.$type) ?? 0) + 1);
+    }
+    for (const count of typeCounts.values()) {
+        if (count > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Checks whether all section dependencies declared by each present plugin section are satisfied.
+ * Uses the same logic as {@link ConfigValidator.validateSectionDependencies}.
+ *
+ * @param config The parsed config root node
+ * @param sectionTypeMap The map from `$type` to section type info
+ * @returns True if any required dependency section is absent
+ */
+function hasMissingSectionDependencies(config: ConfigType, sectionTypeMap: Map<string, SectionTypeInfo>): boolean {
+    const presentQualifiedNames = new Set<string>();
+    for (const section of config.sections ?? []) {
+        const info = sectionTypeMap.get(section.$type);
+        if (info != undefined) {
+            presentQualifiedNames.add(info.qualifiedName);
+        }
+    }
+
+    for (const section of config.sections ?? []) {
+        const info = sectionTypeMap.get(section.$type);
+        if (info == undefined) {
+            continue;
+        }
+        for (const dep of info.plugin.sectionDependencies) {
+            const depQualifiedName = `${dep.sectionName}.${dep.pluginName}`;
+            if (!presentQualifiedNames.has(depQualifiedName)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 /**
  * Sorts ConfigContributionPlugins in topological order based on their sectionDependencies.
@@ -68,8 +155,17 @@ function sortBySectionDependencies(plugins: ConfigContributionPlugin[]): ConfigC
  * File-data handler that computes structured data for all contribution plugin sections
  * in a config file.
  *
+ * Returns `null` when the config document cannot be processed correctly, specifically:
+ * - When there are lexer or parser errors in the document.
+ * - When any section appears more than once (duplicate sections).
+ * - When a section's required dependency sections are absent.
+ * This mirrors the null-return behaviour of the typed-AST handler in service-script.
+ * Langium validation diagnostics (e.g. unresolved references) are deliberately excluded
+ * from this check because the service does not have access to the other languages that
+ * implement the referenced sections.
+ *
  * Algorithm:
- * 1. Parses the config file and extracts section nodes per plugin.
+ * 1. Parses the config file and validates it structurally.
  * 2. Processes plugins in topological order based on sectionDependencies.
  * 3. For each plugin:
  *    a. Builds a partial config text containing only that plugin's sections,
@@ -77,22 +173,35 @@ function sortBySectionDependencies(plugins: ConfigContributionPlugin[]): ConfigC
  *    b. Sends a plugin request to the plugin's language service via the backend proxy,
  *       including previously computed dependency data.
  *    c. Collects the plugin's result (a section-name → data map).
- * 4. Returns a map of plugin short name → plugin result.
+ * 4. Returns a map of plugin short name → plugin result, or `null` on any error.
  */
-export const configDataHandler: FileDataHandler<ConfigFileData, ConfigAdditionalServices> = async (context) => {
+export const configDataHandler: FileDataHandler<ConfigFileData | null, ConfigAdditionalServices> = async (context) => {
     const { fileInfo, instance, contributionPlugins, serverApi } = context;
 
     if (fileInfo == undefined) {
-        return { data: {}, fileDependencies: [], dataDependencies: [] };
+        return { data: null, fileDependencies: [], dataDependencies: [] };
     }
 
     const document = await instance.buildDocument(fileInfo.uri);
     const config = document.parseResult.value as ConfigType | undefined;
     if (config == undefined || !Array.isArray(config.sections)) {
-        return { data: {}, fileDependencies: [], dataDependencies: [] };
+        return { data: null, fileDependencies: [], dataDependencies: [] };
+    }
+
+    if (hasParserErrors(document)) {
+        return { data: null, fileDependencies: [], dataDependencies: [] };
     }
 
     const activeConfigPlugins = contributionPlugins.filter(ConfigContributionPlugin.is);
+    const sectionTypeMap = buildSectionTypeMap(activeConfigPlugins);
+
+    if (hasDuplicateSections(config)) {
+        return { data: null, fileDependencies: [], dataDependencies: [] };
+    }
+
+    if (hasMissingSectionDependencies(config, sectionTypeMap)) {
+        return { data: null, fileDependencies: [], dataDependencies: [] };
+    }
 
     const sortedPlugins = sortBySectionDependencies(activeConfigPlugins);
 
@@ -137,7 +246,11 @@ export const configDataHandler: FileDataHandler<ConfigFileData, ConfigAdditional
             plugin.languageKey,
             CONFIG_DATA_KEY,
             requestBody
-        )) as Record<string, unknown>;
+        )) as Record<string, unknown> | null;
+
+        if (pluginResult == null) {
+            return { data: null, fileDependencies: [], dataDependencies: [] };
+        }
 
         result[plugin.shortName] = pluginResult;
     }

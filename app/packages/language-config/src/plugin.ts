@@ -23,6 +23,7 @@ import {
 } from "@mdeo/language-shared";
 import { registerConfigSerializers } from "./features/configSerializers.js";
 import { ConfigExternalReferenceCollector } from "./features/configExternalReferenceCollector.js";
+import { registerConfigValidationChecks } from "./validation/configValidator.js";
 
 /**
  * Additional services for the Config language.
@@ -74,6 +75,12 @@ export const configPluginProvider: LangiumLanguagePluginProvider<ConfigAdditiona
             postCreate(services) {
                 registerDefaultTokenSerializers(services);
                 registerConfigSerializers(services, resolvedPlugins);
+                registerConfigValidationChecks(
+                    services,
+                    services.shared.ServiceRegistry,
+                    configPlugins,
+                    resolvedPlugins
+                );
             }
         };
     }

@@ -3,41 +3,25 @@
  */
 export interface ProblemSectionData {
     /**
-     * Relative path to the .metamodel file.
+     * Absolute path to the .metamodel file.
      */
     metamodel: string;
     /**
-     * Relative path to the .model file.
+     * Absolute path to the .model file.
      */
     model: string;
 }
 
 /**
- * A single import entry from a function file import statement.
+ * A multiplicity with explicit lower and upper bounds.
+ * Use -1 for upper to indicate an unbounded (∞) upper limit.
  */
-export interface FunctionImportData {
+export interface MultiplicityData {
+    lower: number;
     /**
-     * The function name as referenced in the source.
+     * -1 means unbounded (∞).
      */
-    entity: string;
-    /**
-     * Optional alias name.
-     */
-    alias?: string;
-}
-
-/**
- * A file import block (e.g. `import { fn1, fn2 } from "./script.fn"`).
- */
-export interface FunctionFileImportData {
-    /**
-     * The relative path of the imported file.
-     */
-    file: string;
-    /**
-     * All named imports from this file.
-     */
-    imports: FunctionImportData[];
+    upper: number;
 }
 
 /**
@@ -45,7 +29,11 @@ export interface FunctionFileImportData {
  */
 export interface ConstraintData {
     /**
-     * The referenced constraint function name.
+     * Absolute path to the script file that contains the constraint function.
+     */
+    path: string;
+    /**
+     * The name of the constraint function as declared in the script file.
      */
     functionName: string;
 }
@@ -59,25 +47,14 @@ export interface ObjectiveData {
      */
     type: "maximize" | "minimize";
     /**
-     * The referenced objective function name.
+     * Absolute path to the script file that contains the objective function.
+     */
+    path: string;
+    /**
+     * The name of the objective function as declared in the script file.
      */
     functionName: string;
 }
-
-/**
- * A single multiplicity (numeric or symbolic: *, +, ?).
- */
-export type SingleMultiplicityData = { kind: "single"; value: string | number };
-
-/**
- * A range multiplicity (e.g., 0..*, 1..5).
- */
-export type RangeMultiplicityData = { kind: "range"; lower: number; upper: "*" | number };
-
-/**
- * Union of single and range multiplicity data.
- */
-export type MultiplicityData = SingleMultiplicityData | RangeMultiplicityData;
 
 /**
  * A refinement specification in the goal section (e.g., `refine Class.field[0..*]`).
@@ -102,15 +79,11 @@ export interface RefinementData {
  */
 export interface GoalSectionData {
     /**
-     * Function file imports declared in this goal section.
-     */
-    imports: FunctionFileImportData[];
-    /**
-     * Constraint function references.
+     * Constraint function references with their absolute file paths.
      */
     constraints: ConstraintData[];
     /**
-     * Objective function references with direction.
+     * Objective function references with direction and absolute file paths.
      */
     objectives: ObjectiveData[];
     /**

@@ -41,7 +41,7 @@ export interface LanguageServiceConfig<T = object> {
     /**
      * Optional service-specific module
      */
-    serviceModule?: Module<LanguageServices & T, PartialLanguageServices &  DeepPartial<T>>;
+    serviceModule?: Module<LanguageServices & T, PartialLanguageServices & DeepPartial<T>>;
 
     /**
      * File data handlers keyed by data key (e.g., "ast", "diagram")

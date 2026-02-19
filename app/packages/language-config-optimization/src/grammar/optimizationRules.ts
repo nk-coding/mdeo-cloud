@@ -1,4 +1,4 @@
-import { createRule, or, many, ref, createExternalTerminalRule, unorderedGroup, group } from "@mdeo/language-common";
+import { createRule, or, many, ref, createExternalTerminalRule, group } from "@mdeo/language-common";
 import { generateImportRules } from "@mdeo/language-shared";
 import {
     ProblemSection,
@@ -64,12 +64,12 @@ export const MultiplicityRule = createRule("ConfigMultiplicityRule")
  */
 export const ProblemSectionContentRule = createRule("ProblemSectionContentRule")
     .returns(ProblemSection)
-    .as(({ set }) => [
+    .as(({ add }) => [
         "{",
         many(NEWLINE),
-        unorderedGroup(
-            group("metamodel", "=", set("metamodel", STRING), many(NEWLINE)),
-            group("model", "=", set("model", STRING), many(NEWLINE))
+        many(
+            or(group("metamodel", "=", add("metamodel", STRING)), group("model", "=", add("model", STRING))),
+            many(NEWLINE)
         ),
         "}"
     ]);

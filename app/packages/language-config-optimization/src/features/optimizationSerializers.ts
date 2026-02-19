@@ -94,21 +94,22 @@ function printRangeMultiplicity(context: PrintContext<RangeMultiplicityType>): D
  * @returns The formatted problem section content
  */
 function printProblemSection(context: PrintContext<ProblemSectionType>): Doc {
-    const { ctx, printPrimitive, getPrimitive } = context;
+    const { ctx, printPrimitive } = context;
     const docs: Doc[] = [];
+    const contentDocs: Doc[] = [];
+
+    if (ctx.metamodel.length > 0) {
+        contentDocs.push(["metamodel = ", printPrimitive({ value: ctx.metamodel[0] } as any, STRING)]);
+    }
+    if (ctx.model.length > 0) {
+        contentDocs.push(["model = ", printPrimitive({ value: ctx.model[0] } as any, STRING)]);
+    }
 
     docs.push("{");
-    docs.push(
-        indent([
-            hardline,
-            "metamodel = ",
-            printPrimitive(getPrimitive(ctx, "metamodel"), STRING),
-            hardline,
-            "model = ",
-            printPrimitive(getPrimitive(ctx, "model"), STRING)
-        ])
-    );
-    docs.push(hardline);
+    if (contentDocs.length > 0) {
+        docs.push(indent([hardline, doc.builders.join(hardline, contentDocs)]));
+        docs.push(hardline);
+    }
     docs.push("}");
 
     return group(docs);

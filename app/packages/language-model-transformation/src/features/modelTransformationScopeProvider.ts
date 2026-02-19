@@ -169,7 +169,7 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
             return EMPTY_SCOPE;
         }
 
-        let classRef: ClassType | undefined = undefined;
+        let classRef: ClassType | undefined;
         if (this.astReflection.isInstance(objectInstance, PatternObjectInstance)) {
             classRef = objectInstance.class?.ref as ClassType | undefined;
         } else {

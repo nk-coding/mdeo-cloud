@@ -2,8 +2,9 @@ import tseslint from "typescript-eslint";
 import prettier from "eslint-plugin-prettier";
 import prettierRecommended from "eslint-plugin-prettier/recommended";
 import eslint from "@eslint/js";
+import { defineConfig } from "eslint/config";
 
-export default tseslint.config(
+export default defineConfig(
     {
         ignores: ["packages/*/dist/", "packages/*/static/"]
     },

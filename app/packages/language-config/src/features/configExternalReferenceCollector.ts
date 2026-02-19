@@ -1,5 +1,4 @@
 import type { ExternalReferenceCollector, ExternalReferences } from "@mdeo/language-common";
-import type { LangiumDocument } from "langium";
 
 /**
  * External reference collector for the config language.
@@ -7,7 +6,7 @@ import type { LangiumDocument } from "langium";
  * so this returns empty collections.
  */
 export class ConfigExternalReferenceCollector implements ExternalReferenceCollector {
-    findExternalReferences(docs: LangiumDocument[]): ExternalReferences {
+    findExternalReferences(): ExternalReferences {
         return {
             local: [],
             external: []

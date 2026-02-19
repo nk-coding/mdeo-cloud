@@ -292,7 +292,6 @@ export class HttpServerApi implements ServerApi {
         });
 
         if (!response.ok) {
-            console.log(await response.json())
             throw new Error(
                 `Plugin request failed for ${languageId}/${key}: ${response.status} ${response.statusText}`
             );

@@ -752,7 +752,7 @@ export class GenericResolver<Specifics extends TypirSpecifics> {
         }
 
         let isAllowed: boolean;
-        let actualTypeArgs: Map<string, CustomValueType> | undefined = undefined;
+        let actualTypeArgs: Map<string, CustomValueType> | undefined;
 
         if (!allowSubtypes) {
             isAllowed =

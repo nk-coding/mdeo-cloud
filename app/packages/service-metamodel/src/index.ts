@@ -48,6 +48,8 @@ initializePluginContext();
 
 const { metamodelPluginProvider } = await import("@mdeo/language-metamodel");
 const { createMetamodelConfigContributionPlugin } = await import("./metamodelConfigContributionPlugin.js");
+const { metamodelAstDataHandler, METAMODEL_AST_DATA_HANDLER_KEY } =
+    await import("./handler/metamodelAstDataHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
 
@@ -77,7 +79,8 @@ const metamodelLanguageConfig: LanguageServiceConfig<MetamodelServices> = {
     languagePlugin: metamodelLanguagePlugin,
     languagePluginProvider: metamodelPluginProvider,
     fileDataHandlers: {
-        [AST_HANDLER_KEY]: astHandler
+        [AST_HANDLER_KEY]: astHandler,
+        [METAMODEL_AST_DATA_HANDLER_KEY]: metamodelAstDataHandler
     }
 };
 

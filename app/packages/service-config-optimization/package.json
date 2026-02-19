@@ -27,7 +27,7 @@
     "devDependencies": {
         "langium": "^4.2.1",
         "prettier": "^3.8.1",
-        "tsx": "~4.19.2",
-        "vite": "~6.0.7"
+        "tsx": "~4.21.0",
+        "vite": "~7.3.1"
     }
 }

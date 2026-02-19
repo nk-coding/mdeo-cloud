@@ -134,7 +134,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                        `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`,
+                    { cause: error }
                 );
             }
             throw error;
@@ -173,7 +174,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                        `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`,
+                    { cause: error }
                 );
             }
             throw error;
@@ -231,7 +233,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                        `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`,
+                    { cause: error }
                 );
             }
             throw error;
@@ -266,7 +269,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to script-execution backend at ${this.backendUrl}. ` +
-                        `Please ensure the service is running and accessible. Original error: ${error.message}`
+                        `Please ensure the service is running and accessible. Original error: ${error.message}`,
+                    { cause: error }
                 );
             }
             throw error;

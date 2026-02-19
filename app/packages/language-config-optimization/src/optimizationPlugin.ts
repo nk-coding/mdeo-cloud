@@ -15,7 +15,8 @@ import {
     IdValueConverter,
     SerializerFormatter,
     registerDefaultTokenSerializers,
-    NewlineAwareTokenBuilder
+    NewlineAwareTokenBuilder,
+    addExternalReferenceCollectionPhase
 } from "@mdeo/language-shared";
 import { generateContributionPluginGrammar, ConfigTerminals } from "@mdeo/language-config";
 import { OptimizationScopeProvider } from "./features/optimizationScopeProvider.js";
@@ -24,6 +25,7 @@ import { registerOptimizationSerializers } from "./features/optimizationSerializ
 import { createOptimizationContributionPlugin } from "./plugin/optimizationContributionPlugin.js";
 import { Class, Property } from "@mdeo/language-metamodel";
 import { Function } from "@mdeo/language-script";
+import { registerOptimizationValidationChecks } from "./validation/optimizationValidator.js";
 
 /**
  * Deserialization context for the optimization grammar.
@@ -72,6 +74,8 @@ const configOptimizationPlugin: LangiumLanguagePlugin<ExternalReferenceAdditiona
     postCreate(services) {
         registerDefaultTokenSerializers(services);
         registerOptimizationSerializers(services);
+        registerOptimizationValidationChecks(services);
+        addExternalReferenceCollectionPhase(services);
     }
 };
 

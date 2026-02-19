@@ -55,7 +55,7 @@
             </template>
             <template v-if="entry.type === FileType.Directory">
                 <ContextMenuItem
-                    v-for="fileType in languagePlugins.filter(plugin => !plugin.isGenerated)"
+                    v-for="fileType in languagePlugins.filter((plugin) => !plugin.isGenerated)"
                     :key="fileType.id"
                     @click="() => handleCreateFileOfType(fileType)"
                 >

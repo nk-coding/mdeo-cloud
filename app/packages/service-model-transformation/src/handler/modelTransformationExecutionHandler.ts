@@ -256,7 +256,8 @@ export class ModelTransformationExecutionHandler implements ExecutionHandler<Exe
             if (error instanceof TypeError && error.message.includes("fetch")) {
                 throw new Error(
                     `Failed to connect to model-transformation-execution backend at ${this.backendUrl}. ` +
-                        `Please ensure the service is running and accessible. Original error: ${(error as Error).message}`
+                        `Please ensure the service is running and accessible. Original error: ${(error as Error).message}`,
+                    { cause: error }
                 );
             }
             throw error;

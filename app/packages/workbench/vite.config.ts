@@ -47,6 +47,12 @@ export default defineConfig({
                 secure: false,
                 rewrite: (path) => path.replace(/^\/plugin\/config-optimization/, "")
             },
+            "/plugin/config-mdeo": {
+                target: "http://localhost:3006",
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/plugin\/config-mdeo/, "")
+            },
             "/plugin/config": {
                 target: "http://localhost:3004",
                 changeOrigin: true,

@@ -482,8 +482,8 @@ export abstract class GEdgeView implements IView {
             const width = attachment.bounds.width;
             const height = attachment.bounds.height;
 
-            let centerX = baseLineX;
-            let centerY = baseLineY;
+            let centerX: number;
+            let centerY: number;
 
             if (isHorizontal) {
                 const verticalDir = isLeftSide ? -1 : 1;

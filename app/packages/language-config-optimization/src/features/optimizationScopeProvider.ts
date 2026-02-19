@@ -139,7 +139,7 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
             return EMPTY_SCOPE;
         }
 
-        const metamodelPath = problemSection.metamodel;
+        const metamodelPath = problemSection.metamodel[0];
         if (metamodelPath == undefined) {
             return EMPTY_SCOPE;
         }

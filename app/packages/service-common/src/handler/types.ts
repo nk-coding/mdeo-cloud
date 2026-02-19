@@ -19,7 +19,7 @@ export type FileDataHandler<T = unknown, S = object> = (context: FileDataContext
  * @template T The return type of the handler
  * @template S The type of LanguageServices used
  */
-export type RequestHandler<T = unknown, S = object> = (context: RequestContext<S>) => Promise<T>;
+export type RequestHandler<T = unknown, S = object> = (context: RequestContext<S>) => Promise<T | null>;
 
 /**
  * File information for file data handlers.

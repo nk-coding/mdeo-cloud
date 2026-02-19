@@ -100,8 +100,8 @@ export type FunctionFileImportType = ASTType<typeof FunctionFileImport>;
  * Defines the metamodel and model file paths for the optimization problem.
  */
 export const ProblemSection = createInterface("ConfigProblemSection").attrs({
-    metamodel: String,
-    model: String
+    metamodel: [String],
+    model: [String]
 });
 
 /**

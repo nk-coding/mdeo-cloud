@@ -135,7 +135,12 @@ const renderedResult = computed<{ html: string; embeds: FileEmbed[] }>(() => {
         const result = remark()
             .use(remarkGfm)
             .use(remarkRehype, { allowDangerousHtml: true })
-            .use(rehypeFileEmbed, (embed) => embeds.push(embed), embeddableExtensions.value, () => `${baseId}-${embedCounter++}`)
+            .use(
+                rehypeFileEmbed,
+                (embed) => embeds.push(embed),
+                embeddableExtensions.value,
+                () => `${baseId}-${embedCounter++}`
+            )
             .use(rehypeAddClasses)
             .use(rehypeStringify, { allowDangerousHtml: true })
             .processSync(content.value);
@@ -154,7 +159,7 @@ const renderedResult = computed<{ html: string; embeds: FileEmbed[] }>(() => {
  *   and resolved relative to the current execution context.
  * - **Absolute paths** (e.g. `/files/model.m`) are treated as regular project files.
  *
- * @param src - The raw `src` attribute from the markdown image node
+ * @param src The raw `src` attribute from the markdown image node
  * @returns The resolved URI
  */
 function resolveEmbedUri(src: string): Uri {
@@ -173,7 +178,7 @@ function resolveEmbedUri(src: string): Uri {
 /**
  * Checks whether a file exists by attempting to read a model reference.
  *
- * @param uri - The URI to check
+ * @param uri The URI to check
  * @returns `true` if the file exists and is readable
  */
 async function checkFileExists(uri: Uri): Promise<boolean> {
@@ -234,7 +239,7 @@ watch(
 /**
  * Opens the given file URI in a new editor tab.
  *
- * @param uri - The URI of the file to open
+ * @param uri The URI of the file to open
  */
 function openInNewTab(uri: Uri): void {
     monacoApi.editorService.openEditor({

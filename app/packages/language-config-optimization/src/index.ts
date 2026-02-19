@@ -4,4 +4,5 @@ export * from "./features/optimizationSerializers.js";
 export * from "./grammar/optimizationRules.js";
 export * from "./grammar/optimizationTypes.js";
 export * from "./plugin/optimizationContributionPlugin.js";
+export * from "./validation/optimizationValidator.js";
 export * from "./optimizationPlugin.js";

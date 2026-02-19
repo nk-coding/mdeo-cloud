@@ -1,0 +1,501 @@
+import type {
+    ValidationAcceptor,
+    ValidationChecks,
+    LangiumDocuments,
+    LangiumDocument,
+    AstNode,
+    Properties
+} from "langium";
+import type { ExtendedLangiumServices } from "@mdeo/language-common";
+import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
+import { MetaModel } from "@mdeo/language-metamodel";
+import { Model } from "@mdeo/language-model";
+import {
+    RangeMultiplicity,
+    type ProblemSectionType,
+    type GoalSectionType,
+    type ObjectiveType,
+    type ConstraintReferenceType,
+    type RefinementType,
+    type MultiplicityType,
+    type RangeMultiplicityType
+} from "../grammar/optimizationTypes.js";
+import type { Range } from "vscode-languageserver-types";
+
+const { AstUtils, CstUtils, isLeafCstNode, GrammarUtils } = sharedImport("langium");
+
+/**
+ * Numeric type names accepted for objective function return types.
+ * These correspond to the primitive types supported by the Script language.
+ */
+const NUMERIC_TYPE_NAMES = new Set(["int", "double", "float", "long"]);
+
+/**
+ * Boolean type name accepted for constraint function return types.
+ */
+const BOOLEAN_TYPE_NAME = "boolean";
+
+/**
+ * Interface mapping for optimization AST types used in validation checks.
+ */
+interface OptimizationAstTypes {
+    ConfigProblemSection: ProblemSectionType;
+    ConfigGoalSection: GoalSectionType;
+    ConfigRefinement: RefinementType;
+}
+
+/**
+ * Registers validation checks for the config-optimization language.
+ *
+ * @param services The extended Langium services
+ */
+export function registerOptimizationValidationChecks(services: ExtendedLangiumServices): void {
+    const registry = services.validation.ValidationRegistry;
+    const validator = new OptimizationValidator(services);
+
+    const checks: ValidationChecks<OptimizationAstTypes> = {
+        ConfigProblemSection: validator.validateProblemSection.bind(validator),
+        ConfigGoalSection: validator.validateGoalSection.bind(validator),
+        ConfigRefinement: validator.validateRefinement.bind(validator)
+    };
+
+    registry.register(checks, validator);
+}
+
+/**
+ * Validator for config-optimization language constructs.
+ * Checks path validity, cross-file references, and function signatures
+ * using only AST-level information (no type system).
+ */
+export class OptimizationValidator {
+    private readonly documents: LangiumDocuments;
+
+    /**
+     * Constructs a new OptimizationValidator.
+     *
+     * @param services The extended Langium services
+     */
+    constructor(private readonly services: ExtendedLangiumServices) {
+        this.documents = services.shared.workspace.LangiumDocuments;
+    }
+
+    /**
+     * Validates a refinement node.
+     * Checks that if a range multiplicity is used, the upper bound is >= the lower bound.
+     * Mirrors the multiplicity validation from the metamodel language.
+     *
+     * @param refinement The refinement node to validate
+     * @param accept The validation acceptor for reporting diagnostics
+     */
+    validateRefinement(refinement: RefinementType, accept: ValidationAcceptor): void {
+        if (refinement.multiplicity) {
+            this.validateMultiplicityRange(refinement.multiplicity, refinement, accept);
+        }
+    }
+
+    /**
+     * Validates a problem section:
+     * - Both metamodel and model paths must be provided
+     * - The metamodel path must resolve to a valid metamodel document
+     * - The model path must resolve to a valid model document
+     * - The model must reference the same metamodel
+     *
+     * @param problem The problem section node to validate
+     * @param accept The validation acceptor for reporting diagnostics
+     */
+    validateProblemSection(problem: ProblemSectionType, accept: ValidationAcceptor): void {
+        this.checkNoDuplicateKeys(problem, "metamodel", accept);
+        this.checkNoDuplicateKeys(problem, "model", accept);
+        this.validatePathsPresent(problem, accept);
+        this.validateMetamodelPath(problem, accept);
+        this.validateModelPath(problem, accept);
+    }
+
+    /**
+     * Validates a goal section:
+     * - At least one objective must be defined
+     * - All referenced objective functions must take no arguments and return a numeric type
+     * - All referenced constraint functions must take no arguments and return boolean
+     *
+     * @param goal The goal section node to validate
+     * @param accept The validation acceptor for reporting diagnostics
+     */
+    validateGoalSection(goal: GoalSectionType, accept: ValidationAcceptor): void {
+        this.validateAtLeastOneObjective(goal, accept);
+        this.validateObjectiveFunctions(goal, accept);
+        this.validateConstraintFunctions(goal, accept);
+    }
+
+    /**
+     * Checks that both metamodel and model paths are provided in the problem section.
+     *
+     * @param problem The problem section to check
+     * @param accept The validation acceptor
+     */
+    private validatePathsPresent(problem: ProblemSectionType, accept: ValidationAcceptor): void {
+        if (problem.metamodel.length === 0) {
+            accept("error", "A metamodel path is required in the problem section.", {
+                node: problem,
+                range: this.findSectionRange(problem)
+            });
+        }
+        if (problem.model.length === 0) {
+            accept("error", "A model path is required in the problem section.", {
+                node: problem.$container!,
+                range: this.findSectionRange(problem)
+            });
+        }
+    }
+
+    /**
+     * Checks that the metamodel path resolves to a document whose root is a MetaModel node.
+     *
+     * @param problem The problem section with the metamodel path
+     * @param accept The validation acceptor
+     */
+    private validateMetamodelPath(problem: ProblemSectionType, accept: ValidationAcceptor): void {
+        if (problem.metamodel.length === 0) {
+            return;
+        }
+        const metamodel = problem.metamodel[0];
+
+        const document = AstUtils.getDocument(problem);
+        const targetDoc = this.resolveDocument(document, metamodel);
+
+        if (targetDoc == undefined) {
+            accept("error", `Cannot resolve metamodel path '${metamodel}'. The file does not exist or is not loaded.`, {
+                node: problem,
+                property: "metamodel",
+                index: 0
+            });
+            return;
+        }
+
+        const root = targetDoc.parseResult?.value;
+        if (root == undefined || root.$type !== MetaModel.name) {
+            accept("error", `The path '${metamodel}' does not point to a metamodel file.`, {
+                node: problem,
+                property: "metamodel",
+                index: 0
+            });
+        }
+    }
+
+    /**
+     * Checks that the model path resolves to a document whose root is a Model node,
+     * and that the model references the same metamodel as the problem section.
+     *
+     * @param problem The problem section with metamodel and model paths
+     * @param accept The validation acceptor
+     */
+    private validateModelPath(problem: ProblemSectionType, accept: ValidationAcceptor): void {
+        if (problem.model.length === 0) {
+            return;
+        }
+        const model = problem.model[0];
+
+        const document = AstUtils.getDocument(problem);
+        const targetDoc = this.resolveDocument(document, model);
+
+        if (targetDoc == undefined) {
+            accept("error", `Cannot resolve model path '${model}'. The file does not exist or is not loaded.`, {
+                node: problem,
+                property: "model",
+                index: 0
+            });
+            return;
+        }
+
+        const root = targetDoc.parseResult?.value;
+        if (root == undefined || root.$type !== Model.name) {
+            accept("error", `The path '${model}' does not point to a model file.`, {
+                node: problem,
+                property: "model",
+                index: 0
+            });
+            return;
+        }
+
+        if (problem.metamodel.length > 0) {
+            this.validateModelMetamodelConsistency(problem, document, targetDoc, accept);
+        }
+    }
+
+    /**
+     * Checks that the model's metamodel import references the same file as the problem section's metamodel path.
+     *
+     * @param problem The problem section
+     * @param sourceDocument The config document (used to resolve paths)
+     * @param modelDocument The resolved model document
+     * @param accept The validation acceptor
+     */
+    private validateModelMetamodelConsistency(
+        problem: ProblemSectionType,
+        sourceDocument: LangiumDocument,
+        modelDocument: LangiumDocument,
+        accept: ValidationAcceptor
+    ): void {
+        const modelRoot = modelDocument.parseResult.value as { import?: { file?: string } };
+        const modelMetamodelRelativePath = modelRoot.import?.file;
+
+        if (!modelMetamodelRelativePath) {
+            accept("error", `The model at '${problem.model[0]}' does not reference any metamodel.`, {
+                node: problem,
+                property: "model",
+                index: 0
+            });
+            return;
+        }
+
+        const expectedMetamodelUri = this.resolveDocument(sourceDocument, problem.metamodel[0])?.uri.toString();
+        const actualMetamodelUri = this.resolveDocument(modelDocument, modelMetamodelRelativePath)?.uri.toString();
+
+        if (expectedMetamodelUri == undefined || actualMetamodelUri == undefined) {
+            return;
+        }
+
+        if (expectedMetamodelUri !== actualMetamodelUri) {
+            accept(
+                "error",
+                `The model at '${problem.model[0]}' references a different metamodel than the one specified in the problem section.`,
+                {
+                    node: problem,
+                    property: "model",
+                    index: 0
+                }
+            );
+        }
+    }
+
+    /**
+     * Checks that the goal section defines at least one objective.
+     *
+     * @param goal The goal section to check
+     * @param accept The validation acceptor
+     */
+    private validateAtLeastOneObjective(goal: GoalSectionType, accept: ValidationAcceptor): void {
+        if (!goal.objectives || goal.objectives.length === 0) {
+            accept("error", "At least one objective must be defined in the goal section.", {
+                node: goal
+            });
+        }
+    }
+
+    /**
+     * Validates that all functions referenced in objectives take no arguments and return a numeric type.
+     * Uses only AST-level information (no type system).
+     *
+     * @param goal The goal section containing objectives
+     * @param accept The validation acceptor
+     */
+    private validateObjectiveFunctions(goal: GoalSectionType, accept: ValidationAcceptor): void {
+        for (const objectiveRef of goal.objectives ?? []) {
+            this.validateObjectiveFunction(objectiveRef, accept);
+        }
+    }
+
+    /**
+     * Validates a single objective's function reference signature.
+     *
+     * @param objective The objective node to check
+     * @param accept The validation acceptor
+     */
+    private validateObjectiveFunction(objective: ObjectiveType, accept: ValidationAcceptor): void {
+        const fn = objective.objective?.ref;
+        if (fn == undefined) {
+            return;
+        }
+
+        const parameters = fn.parameterList?.parameters ?? [];
+        if (parameters.length > 0) {
+            accept(
+                "error",
+                `Objective function '${fn.name}' must take no arguments, but has ${parameters.length} parameter(s).`,
+                {
+                    node: objective,
+                    property: "objective"
+                }
+            );
+        }
+
+        const returnType = fn.returnType;
+        if (returnType == undefined) {
+            accept(
+                "error",
+                `Objective function '${fn.name}' must declare a return type (int, double, float, or long).`,
+                {
+                    node: objective,
+                    property: "objective"
+                }
+            );
+            return;
+        }
+
+        const typeName = this.extractTypeName(returnType);
+        if (typeName == undefined || !NUMERIC_TYPE_NAMES.has(typeName)) {
+            accept(
+                "error",
+                `Objective function '${fn.name}' must return a numeric type (int, double, float, or long), but returns '${typeName ?? "unknown"}'.`,
+                {
+                    node: objective,
+                    property: "objective"
+                }
+            );
+        }
+    }
+
+    /**
+     * Validates that all functions referenced in constraints take no arguments and return boolean.
+     * Uses only AST-level information (no type system).
+     *
+     * @param goal The goal section containing constraints
+     * @param accept The validation acceptor
+     */
+    private validateConstraintFunctions(goal: GoalSectionType, accept: ValidationAcceptor): void {
+        for (const constraintRef of goal.constraints ?? []) {
+            this.validateConstraintFunction(constraintRef, accept);
+        }
+    }
+
+    /**
+     * Validates a single constraint's function reference signature.
+     *
+     * @param constraintRef The constraint reference node to check
+     * @param accept The validation acceptor
+     */
+    private validateConstraintFunction(constraintRef: ConstraintReferenceType, accept: ValidationAcceptor): void {
+        const fn = constraintRef.constraint?.ref;
+        if (fn == undefined) {
+            return;
+        }
+
+        const parameters = fn.parameterList?.parameters ?? [];
+        if (parameters.length > 0) {
+            accept(
+                "error",
+                `Constraint function '${fn.name}' must take no arguments, but has ${parameters.length} parameter(s).`,
+                {
+                    node: constraintRef,
+                    property: "constraint"
+                }
+            );
+        }
+
+        const returnType = fn.returnType;
+        if (returnType == undefined) {
+            accept("error", `Constraint function '${fn.name}' must declare a return type (boolean).`, {
+                node: constraintRef,
+                property: "constraint"
+            });
+            return;
+        }
+
+        const typeName = this.extractTypeName(returnType);
+        if (typeName !== BOOLEAN_TYPE_NAME) {
+            accept(
+                "error",
+                `Constraint function '${fn.name}' must return boolean, but returns '${typeName ?? "unknown"}'.`,
+                {
+                    node: constraintRef,
+                    property: "constraint"
+                }
+            );
+        }
+    }
+
+    /**
+     * Validates that a range multiplicity has a valid range (upper >= lower).
+     * Mirrors the check from the metamodel language.
+     * Has no effect on single multiplicities.
+     *
+     * @param multiplicity The multiplicity node to check
+     * @param node The parent AST node used for error reporting
+     * @param accept The validation acceptor
+     */
+    private validateMultiplicityRange(multiplicity: MultiplicityType, node: AstNode, accept: ValidationAcceptor): void {
+        if (multiplicity.$type === RangeMultiplicity.name) {
+            const range = multiplicity as RangeMultiplicityType;
+            if (range.upper === "*") {
+                return;
+            }
+            if (range.upperNumeric !== undefined && range.upperNumeric < range.lower) {
+                accept(
+                    "error",
+                    `Invalid multiplicity range: upper bound (${range.upperNumeric}) must be >= lower bound (${range.lower}).`,
+                    { node, property: "multiplicity" }
+                );
+            }
+        }
+    }
+
+    /**
+     * Extracts the type name from a return type AST node.
+     * Handles both class types (with a name field) and void types.
+     *
+     * @param returnType The return type AST node (a union of base type and void type)
+     * @returns The type name string or undefined if it cannot be determined
+     */
+    private extractTypeName(returnType: { $type: string; name?: string }): string | undefined {
+        if ("name" in returnType && typeof returnType.name === "string") {
+            return returnType.name;
+        }
+        if (returnType.$type.toLowerCase().includes("void")) {
+            return "void";
+        }
+        return undefined;
+    }
+
+    /**
+     * Resolves a relative file path from a document and returns the corresponding LangiumDocument.
+     *
+     * @param fromDocument The document from which the relative path is resolved
+     * @param relativePath The relative path to resolve
+     * @returns The resolved LangiumDocument or undefined
+     */
+    private resolveDocument(fromDocument: LangiumDocument, relativePath: string): LangiumDocument | undefined {
+        const uri = resolveRelativePath(fromDocument, relativePath);
+        return this.documents.getDocument(uri);
+    }
+
+    /**
+     * Reports an error for every duplicate entry after the first in a scalar-array field
+     * whose elements are primitive values (strings, numbers).
+     * Index 0 is accepted; indices >= 1 are reported as duplicates.
+     *
+     * @param node The parent AST node
+     * @param property The name of the array property holding primitive values
+     * @param accept The validation acceptor
+     */
+    private checkNoDuplicateKeys<T extends AstNode>(
+        node: T,
+        property: Properties<T> & keyof T,
+        accept: ValidationAcceptor
+    ): void {
+        const arr = node[property];
+        if (!Array.isArray(arr)) {
+            return;
+        }
+        for (let i = 1; i < arr.length; i++) {
+            const cstNode = GrammarUtils.findNodeForKeyword(node.$cstNode, property, i);
+            accept("error", `Duplicate '${property}' key.`, { node, range: cstNode?.range });
+        }
+    }
+
+    /**
+     * Finds the range of the section keyword for error reporting
+     *
+     * @param section the section node to find the keyword range for
+     * @returns the range of the section keyword, or undefined if it cannot be determined
+     */
+    private findSectionRange(section: AstNode): Range | undefined {
+        const cstNode = section.$container?.$cstNode;
+        if (cstNode == undefined) {
+            return undefined;
+        }
+        const keywordNode = CstUtils.streamCst(cstNode).find((node) => isLeafCstNode(node) && !node.hidden);
+        if (keywordNode == undefined) {
+            return undefined;
+        }
+        return keywordNode.range;
+    }
+}

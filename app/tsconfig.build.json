@@ -30,6 +30,9 @@
             "path": "packages/language-config-optimization"
         },
         {
+            "path": "packages/language-config-mdeo"
+        },
+        {
             "path": "packages/language-script"
         },
         {
@@ -58,6 +61,9 @@
         },
         {
             "path": "packages/service-config-optimization"
+        },
+        {
+            "path": "packages/service-config-mdeo"
         },
         {
             "path": "packages/service-metamodel"

@@ -1,4 +1,5 @@
 import type { RequestHandler } from "@mdeo/service-common";
+import { hasErrors } from "@mdeo/service-common";
 import type { ExternalReferenceAdditionalServices } from "@mdeo/language-common";
 import { getWrapperInterfaceName } from "@mdeo/language-config";
 import type { ConfigPluginRequestBody } from "@mdeo/language-config";
@@ -10,17 +11,17 @@ import type {
     RangeMultiplicityType
 } from "@mdeo/language-config-optimization";
 import { TextDocument } from "langium";
+import type { LangiumDocument } from "langium";
 import type {
     ProblemSectionData,
     GoalSectionData,
     OptimizationRequestResponse,
     MultiplicityData,
-    FunctionFileImportData,
-    FunctionImportData,
     ConstraintData,
     ObjectiveData,
     RefinementData
 } from "./optimizationRequestTypes.js";
+import { resolveRelativePath } from "@mdeo/language-shared";
 
 /**
  * Key used for the optimization plugin request handler.
@@ -28,47 +29,76 @@ import type {
  */
 export const OPTIMIZATION_REQUEST_KEY = "config";
 
-function extractProblemData(section: ProblemSectionType): ProblemSectionData {
+function extractProblemData(section: ProblemSectionType, document: LangiumDocument): ProblemSectionData {
+    const metamodel = section.metamodel[0];
+    const model = section.model[0];
     return {
-        metamodel: section.metamodel ?? "",
-        model: section.model ?? ""
+        metamodel: metamodel ? resolveRelativePath(document, metamodel).fsPath : "",
+        model: model ? resolveRelativePath(document, model).fsPath : ""
     };
 }
 
 function extractMultiplicity(mult: any): MultiplicityData {
     if (mult == undefined) {
-        return { kind: "single", value: 1 };
+        return { lower: 1, upper: 1 };
     }
-    if (mult.$type?.includes("Range")) {
+    if ((mult.$type as string | undefined)?.includes("Range")) {
         const range = mult as RangeMultiplicityType;
-        const upper: "*" | number = range.upper != undefined ? "*" : (range.upperNumeric ?? 0);
-        return { kind: "range", lower: range.lower ?? 0, upper };
+        const upper = range.upper === "*" ? -1 : (range.upperNumeric ?? 0);
+        return { lower: range.lower ?? 0, upper };
     }
     const single = mult as SingleMultiplicityType;
-    return {
-        kind: "single",
-        value: single.value != undefined ? single.value : (single.numericValue ?? 1)
-    };
+    if (single.value === "*") return { lower: 0, upper: -1 };
+    if (single.value === "+") return { lower: 1, upper: -1 };
+    if (single.value === "?") return { lower: 0, upper: 1 };
+    const n = single.numericValue;
+    if (n != undefined) return { lower: n, upper: n };
+    return { lower: 1, upper: 1 };
 }
 
-function extractGoalData(section: GoalSectionType): GoalSectionData {
-    const imports: FunctionFileImportData[] = (section.imports ?? []).map((fileImport: any) => ({
-        file: fileImport.file ?? "",
-        imports: (fileImport.imports ?? []).map((imp: any) => {
-            const entry: FunctionImportData = { entity: imp.entity?.$refText ?? "" };
-            if (imp.name != undefined) entry.alias = imp.name;
-            return entry;
-        })
-    }));
+/**
+ * Builds a lookup map from the textual reference name used in the config source
+ * (may be an alias) to the absolute path of the providing script file and the
+ * original function name declared in that file.
+ */
+function buildFunctionLookup(
+    section: GoalSectionType,
+    document: LangiumDocument
+): Map<string, { path: string; functionName: string }> {
+    const lookup = new Map<string, { path: string; functionName: string }>();
+    for (const fileImport of (section.imports ?? []) as any[]) {
+        const relativePath: string = fileImport.file ?? "";
+        const absolutePath = resolveRelativePath(document, relativePath).fsPath;
+        for (const imp of (fileImport.imports ?? []) as any[]) {
+            const originalName: string = imp.entity?.$refText ?? "";
+            const refName: string = imp.name != undefined ? imp.name : originalName;
+            lookup.set(refName, { path: absolutePath, functionName: originalName });
+        }
+    }
+    return lookup;
+}
 
-    const constraints: ConstraintData[] = (section.constraints ?? []).map((c: any) => ({
-        functionName: c.constraint?.$refText ?? ""
-    }));
+function extractGoalData(section: GoalSectionType, document: LangiumDocument): GoalSectionData {
+    const functionLookup = buildFunctionLookup(section, document);
 
-    const objectives: ObjectiveData[] = (section.objectives ?? []).map((o: any) => ({
-        type: (o.type === "maximize" ? "maximize" : "minimize") as "maximize" | "minimize",
-        functionName: o.objective?.$refText ?? ""
-    }));
+    const constraints: ConstraintData[] = (section.constraints ?? []).map((c: any) => {
+        const refText: string = c.constraint?.$refText ?? "";
+        const resolved = functionLookup.get(refText);
+        return {
+            path: resolved?.path ?? "",
+            functionName: resolved?.functionName ?? refText
+        };
+    });
+
+    const objectives: ObjectiveData[] = (section.objectives ?? []).map((o: any) => {
+        const refText: string = o.objective?.$refText ?? "";
+        const resolved = functionLookup.get(refText);
+        return {
+            type: (o.type === "maximize" ? "maximize" : "minimize") as "maximize" | "minimize",
+            path: resolved?.path ?? "",
+            functionName: resolved?.functionName ?? refText
+        };
+    });
 
     const refinements: RefinementData[] = (section.refinements ?? []).map((r: any) => ({
         className: r.class?.$refText ?? "",
@@ -76,7 +106,7 @@ function extractGoalData(section: GoalSectionType): GoalSectionData {
         multiplicity: extractMultiplicity(r.multiplicity)
     }));
 
-    return { imports, constraints, objectives, refinements };
+    return { constraints, objectives, refinements };
 }
 
 /**
@@ -85,15 +115,18 @@ function extractGoalData(section: GoalSectionType): GoalSectionData {
  * dependency data from plugins this plugin depends on, parses the text using the
  * optimization language services, and extracts structured data for each section.
  *
+ * Returns `null` when the text contains lexer or parser errors, mirroring the
+ * null-return behaviour of the file-data handlers.
+ *
  * The handler is invoked by the config service's file-data handler via the backend
  * plugin request proxy.
  *
- * Response format: `{ problem?: ProblemSectionData, goal?: GoalSectionData }`
+ * Response format: `{ problem?: ProblemSectionData, goal?: GoalSectionData }` or `null`
  */
 export const optimizationRequestHandler: RequestHandler<
     OptimizationRequestResponse,
     ExternalReferenceAdditionalServices
-> = async (context): Promise<OptimizationRequestResponse> => {
+> = async (context): Promise<OptimizationRequestResponse | null> => {
     const requestBody = context.body as ConfigPluginRequestBody;
     const text = requestBody?.text ?? "";
 
@@ -102,8 +135,12 @@ export const optimizationRequestHandler: RequestHandler<
     }
 
     const textDocument = TextDocument.create(requestBody.configFileUri, CONFIG_OPTIMIZATION_LANGUAGE_KEY, 0, text);
-    context.services.shared.workspace.TextDocuments.set(textDocument)
+    context.services.shared.workspace.TextDocuments.set(textDocument);
     const document = context.services.shared.workspace.LangiumDocumentFactory.fromTextDocument(textDocument);
+    await context.services.shared.workspace.DocumentBuilder.build([document], { validation: true });
+    if (hasErrors(document)) {
+        return null;
+    }
 
     const root = document.parseResult?.value as { sections?: any[] } | undefined;
     if (root == undefined || !Array.isArray(root.sections)) {
@@ -117,9 +154,9 @@ export const optimizationRequestHandler: RequestHandler<
 
     for (const section of root.sections) {
         if (section.$type === problemWrapperType) {
-            response.problem = extractProblemData(section.content as ProblemSectionType);
+            response.problem = extractProblemData(section.content as ProblemSectionType, document);
         } else if (section.$type === goalWrapperType) {
-            response.goal = extractGoalData(section.content as GoalSectionType);
+            response.goal = extractGoalData(section.content as GoalSectionType, document);
         }
     }
 
