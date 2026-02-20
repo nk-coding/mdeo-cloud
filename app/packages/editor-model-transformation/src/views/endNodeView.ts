@@ -1,6 +1,6 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
+import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport } from "@mdeo/editor-shared";
+import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
 import type { GEndNode } from "../model/endNode.js";
 import { EndNodeKind } from "../model/elementTypes.js";
 
@@ -12,9 +12,10 @@ const { svg } = sharedImport("@eclipse-glsp/sprotty");
  * Renders differently based on kind:
  * - STOP: Filled circle with hollow outer ring (bullseye)
  * - KILL: X mark (cross)
+ * Selection and resize handles are provided by the base GNodeView.
  */
 @injectable()
-export class GEndNodeView implements IView {
+export class GEndNodeView extends GNodeViewBase {
     /**
      * The outer radius of the end node
      */
@@ -32,25 +33,17 @@ export class GEndNodeView implements IView {
 
     /**
      * Renders the end node based on its kind.
+     * Selection and resize handles are provided by the base GNodeView.
      *
-     * @param model The end node model
+     * @param model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    render(model: Readonly<GEndNode>, _context: RenderingContext): VNode {
-        const rootClasses: Record<string, boolean> = {
-            "cursor-pointer": true
-        };
-        if (model.selected) {
-            rootClasses["[&_circle]:stroke-sky-500"] = true;
-            rootClasses["[&_line]:stroke-sky-500"] = true;
-        }
+    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
+        const endModel = model as GEndNode;
+        const svgChildren = endModel.kind === EndNodeKind.KILL ? this.renderKillNode() : this.renderStopNode();
 
-        if (model.kind === EndNodeKind.KILL) {
-            return svg("g", { class: rootClasses }, ...this.renderKillNode());
-        } else {
-            return svg("g", { class: rootClasses }, ...this.renderStopNode());
-        }
+        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), ...svgChildren);
     }
 
     /**

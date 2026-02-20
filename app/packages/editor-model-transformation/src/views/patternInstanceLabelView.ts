@@ -4,18 +4,18 @@ import { sharedImport } from "@mdeo/editor-shared";
 import type { VNode } from "snabbdom";
 
 const { injectable } = sharedImport("inversify");
-const { svg, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
+const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering pattern instance name labels in model transformation diagrams.
- * Renders the combined instance name and optional type with underline styling (UML convention for instances).
- * Format: "name" or "name : type"
- * Uses pure SVG text rendering since it's inside an SVG context.
+ * Renders the combined instance name and optional type with underline styling
+ * (UML convention for instances). Uses HTML since the pattern instance node is
+ * now rendered as a foreign-object HTML box.
  */
 @injectable()
 export class GPatternInstanceLabelView implements IView {
     /**
-     * Renders the pattern instance label as SVG text with underline.
+     * Renders the pattern instance label as an underlined HTML span.
      *
      * @param model The label model being rendered
      * @param _context The rendering context
@@ -24,21 +24,14 @@ export class GPatternInstanceLabelView implements IView {
     render(model: Readonly<GLabel>, _context: RenderingContext): VNode {
         const text = model.text ?? "";
 
-        return svg(
-            "text",
+        return html(
+            "span",
             {
                 class: {
-                    "fill-foreground": true,
                     "text-sm": true,
-                    "pointer-events-none": true
-                },
-                attrs: {
-                    x: 0,
-                    y: 0,
-                    "text-anchor": "start",
-                    "dominant-baseline": "hanging",
-                    "text-decoration": "underline",
-                    [ATTR_BBOX_ELEMENT]: true
+                    underline: true,
+                    "text-center": true,
+                    block: true
                 }
             },
             text

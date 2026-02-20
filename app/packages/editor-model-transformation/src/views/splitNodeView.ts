@@ -6,36 +6,43 @@ const { injectable } = sharedImport("inversify");
 const { svg } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
- * View for rendering merge nodes.
- * Renders a small diamond shape where control flow branches merge back together.
- * Selection and resize handles are provided by the base GNodeView.
+ * View for rendering split nodes.
+ * Renders a diamond shape used for if/while branching (activity diagram split).
  */
 @injectable()
-export class GMergeNodeView extends GNodeViewBase {
+export class GSplitNodeView extends GNodeViewBase {
     /**
-     * The size of the merge node diamond
+     * The width of the split node
      */
-    static readonly SIZE = 20;
+    static readonly WIDTH = 80;
 
     /**
-     * Renders the merge node as a small diamond.
-     * Selection and resize handles are provided by the base GNodeView.
+     * The height of the split node
+     */
+    static readonly HEIGHT = 50;
+
+    /**
+     * Renders the split node as a diamond shape for if/while branching.
+     * Selection and resize handles are provided by the base GNodeViewBase.
      *
      * @param model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
     override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
-        const size = GMergeNodeView.SIZE;
-        const half = size / 2;
+        const width = GSplitNodeView.WIDTH;
+        const height = GSplitNodeView.HEIGHT;
+        const halfWidth = width / 2;
+        const halfHeight = height / 2;
 
         // Diamond points: top, right, bottom, left
-        const diamondPoints = `${half},0 ${size},${half} ${half},${size} 0,${half}`;
+        const diamondPoints = `${halfWidth},0 ${width},${halfHeight} ${halfWidth},${height} 0,${halfHeight}`;
 
         const diamond = svg("polygon", {
             class: {
-                "fill-foreground": true,
+                "fill-background": true,
                 "stroke-foreground": true,
+                "stroke-[1.5px]": true,
                 "cursor-pointer": true
             },
             attrs: {

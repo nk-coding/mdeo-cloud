@@ -1,44 +1,6 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
-import type { GLabel } from "@mdeo/editor-shared";
-import { sharedImport } from "@mdeo/editor-shared";
-import type { VNode } from "snabbdom";
+import { GLabelView, sharedImport } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");
-const { svg, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 
-/**
- * View for rendering pattern link end labels in model transformation diagrams.
- * Uses pure SVG text rendering since it's inside an SVG context (edge attachment).
- */
 @injectable()
-export class GPatternLinkEndLabelView implements IView {
-    /**
-     * Renders the pattern link end label as SVG text.
-     *
-     * @param model The label model being rendered
-     * @param _context The rendering context
-     * @returns The rendered VNode
-     */
-    render(model: Readonly<GLabel>, _context: RenderingContext): VNode {
-        const text = model.text ?? "";
-
-        return svg(
-            "text",
-            {
-                class: {
-                    "fill-foreground": true,
-                    "text-sm": true,
-                    "pointer-events-none": true
-                },
-                attrs: {
-                    x: 0,
-                    y: 0,
-                    "text-anchor": "start",
-                    "dominant-baseline": "hanging",
-                    [ATTR_BBOX_ELEMENT]: true
-                }
-            },
-            text
-        );
-    }
-}
+export class GPatternLinkEndLabelView extends GLabelView {}

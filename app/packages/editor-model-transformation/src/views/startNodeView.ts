@@ -1,7 +1,6 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
+import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport } from "@mdeo/editor-shared";
-import type { GStartNode } from "../model/startNode.js";
+import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");
 const { svg } = sharedImport("@eclipse-glsp/sprotty");
@@ -9,9 +8,10 @@ const { svg } = sharedImport("@eclipse-glsp/sprotty");
 /**
  * View for rendering start nodes.
  * Renders a filled black circle representing the start of a control flow, similar to UML activity diagrams.
+ * Selection and resize handles are provided by the base GNodeView.
  */
 @injectable()
-export class GStartNodeView implements IView {
+export class GStartNodeView extends GNodeViewBase {
     /**
      * The radius of the start node circle
      */
@@ -19,12 +19,13 @@ export class GStartNodeView implements IView {
 
     /**
      * Renders the start node as a filled black circle.
+     * Selection and resize handles are provided by the base GNodeView.
      *
-     * @param model The start node model
+     * @param model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    render(model: Readonly<GStartNode>, _context: RenderingContext): VNode {
+    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
         const radius = GStartNodeView.RADIUS;
 
         const circle = svg("circle", {
@@ -40,14 +41,6 @@ export class GStartNodeView implements IView {
             }
         });
 
-        const rootClasses: Record<string, boolean> = {
-            "cursor-pointer": true
-        };
-        if (model.selected) {
-            rootClasses["[&_circle]:stroke-sky-500"] = true;
-            rootClasses["[&_circle]:stroke-2"] = true;
-        }
-
-        return svg("g", { class: rootClasses }, circle);
+        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), circle);
     }
 }

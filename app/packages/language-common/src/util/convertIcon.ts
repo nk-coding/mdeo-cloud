@@ -15,9 +15,11 @@ export function convertIcon(icon: IconNode): ActionIconNode {
         return [
             entry[0],
             Object.fromEntries(
-                Object.entries(entry[1]).map(([key, value]) => {
-                    return [key, value.toString()];
-                })
+                Object.entries(entry[1])
+                    .filter(([_key, value]) => value != undefined)
+                    .map(([key, value]) => {
+                        return [key, value!.toString()];
+                    })
             )
         ];
     });

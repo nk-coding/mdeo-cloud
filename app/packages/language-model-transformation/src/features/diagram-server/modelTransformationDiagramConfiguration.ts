@@ -4,7 +4,7 @@ import { ModelTransformationElementType } from "./model/elementTypes.js";
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GMatchNode } from "./model/matchNode.js";
-import { GDiamondNode } from "./model/diamondNode.js";
+import { GSplitNode } from "./model/splitNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { GControlFlowEdge } from "./model/controlFlowEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
@@ -44,7 +44,7 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
         mapping.set(ModelTransformationElementType.NODE_START, GStartNode);
         mapping.set(ModelTransformationElementType.NODE_END, GEndNode);
         mapping.set(ModelTransformationElementType.NODE_MATCH, GMatchNode);
-        mapping.set(ModelTransformationElementType.NODE_DIAMOND, GDiamondNode);
+        mapping.set(ModelTransformationElementType.NODE_SPLIT, GSplitNode);
         mapping.set(ModelTransformationElementType.NODE_MERGE, GMergeNode);
 
         // Control flow edges and labels
@@ -71,7 +71,6 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
 
     /**
      * Returns the shape type hints for model transformation diagram elements.
-     * For readonly diagrams, elements are not repositionable, deletable, or resizable.
      *
      * @returns Array of shape type hints
      */
@@ -79,44 +78,44 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
         return [
             {
                 elementTypeId: ModelTransformationElementType.NODE_START,
-                repositionable: false,
+                repositionable: true,
                 deletable: false,
                 resizable: false,
                 reparentable: false
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_END,
-                repositionable: false,
+                repositionable: true,
                 deletable: false,
                 resizable: false,
                 reparentable: false
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_MATCH,
-                repositionable: false,
+                repositionable: true,
                 deletable: false,
-                resizable: false,
+                resizable: true,
                 reparentable: false
             },
             {
-                elementTypeId: ModelTransformationElementType.NODE_DIAMOND,
-                repositionable: false,
+                elementTypeId: ModelTransformationElementType.NODE_SPLIT,
+                repositionable: true,
                 deletable: false,
                 resizable: false,
                 reparentable: false
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_MERGE,
-                repositionable: false,
+                repositionable: true,
                 deletable: false,
                 resizable: false,
                 reparentable: false
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
-                repositionable: false,
+                repositionable: true,
                 deletable: false,
-                resizable: false,
+                resizable: true,
                 reparentable: false
             }
         ];
@@ -137,13 +136,13 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                 sourceElementTypeIds: [
                     ModelTransformationElementType.NODE_START,
                     ModelTransformationElementType.NODE_MATCH,
-                    ModelTransformationElementType.NODE_DIAMOND,
+                    ModelTransformationElementType.NODE_SPLIT,
                     ModelTransformationElementType.NODE_MERGE
                 ],
                 targetElementTypeIds: [
                     ModelTransformationElementType.NODE_END,
                     ModelTransformationElementType.NODE_MATCH,
-                    ModelTransformationElementType.NODE_DIAMOND,
+                    ModelTransformationElementType.NODE_SPLIT,
                     ModelTransformationElementType.NODE_MERGE
                 ]
             },

@@ -68,7 +68,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             model.type === ModelTransformationElementType.NODE_START ||
             model.type === ModelTransformationElementType.NODE_END ||
             model.type === ModelTransformationElementType.NODE_MATCH ||
-            model.type === ModelTransformationElementType.NODE_DIAMOND ||
+            model.type === ModelTransformationElementType.NODE_SPLIT ||
             model.type === ModelTransformationElementType.NODE_MERGE ||
             model.type === ModelTransformationElementType.NODE_PATTERN_INSTANCE
         ) {

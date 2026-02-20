@@ -1,17 +1,17 @@
-import type { IView, RenderingContext } from "@eclipse-glsp/sprotty";
+import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport } from "@mdeo/editor-shared";
-import type { GDiamondNode } from "../model/diamondNode.js";
+import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
+import type { GSplitNode } from "../model/splitNode.js";
 
 const { injectable } = sharedImport("inversify");
 const { svg } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
- * View for rendering diamond nodes.
- * Renders a diamond shape with the expression text inside, used for if/while branching.
+ * View for rendering split nodes.
+ * Renders a diamond shape used for if/while branching (activity diagram split).
  */
 @injectable()
-export class GDiamondNodeView implements IView {
+export class GSplitNodeView extends GNodeViewBase {
     /**
      * The width of the diamond
      */
@@ -23,20 +23,18 @@ export class GDiamondNodeView implements IView {
     static readonly HEIGHT = 50;
 
     /**
-     * Maximum characters to display before truncating
-     */
-    static readonly MAX_TEXT_LENGTH = 15;
-
-    /**
      * Renders the diamond node with expression text inside.
+     * Selection and resize handles are provided by the base GNodeViewBase.
      *
-     * @param model The diamond node model
+     * @param model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    render(model: Readonly<GDiamondNode>, _context: RenderingContext): VNode {
-        const width = GDiamondNodeView.WIDTH;
-        const height = GDiamondNodeView.HEIGHT;
+    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
+        const splitModel = model as GSplitNode;
+        void splitModel;
+        const width = GSplitNodeView.WIDTH;
+        const height = GSplitNodeView.HEIGHT;
         const halfWidth = width / 2;
         const halfHeight = height / 2;
 
@@ -55,38 +53,6 @@ export class GDiamondNodeView implements IView {
             }
         });
 
-        // Truncate expression text if too long
-        let displayText = model.expression ?? "";
-        if (displayText.length > GDiamondNodeView.MAX_TEXT_LENGTH) {
-            displayText = displayText.substring(0, GDiamondNodeView.MAX_TEXT_LENGTH - 1) + "…";
-        }
-
-        const text = svg(
-            "text",
-            {
-                class: {
-                    "fill-foreground": true,
-                    "text-xs": true,
-                    "pointer-events-none": true
-                },
-                attrs: {
-                    x: halfWidth,
-                    y: halfHeight,
-                    "text-anchor": "middle",
-                    "dominant-baseline": "middle"
-                }
-            },
-            displayText
-        );
-
-        const rootClasses: Record<string, boolean> = {
-            "cursor-pointer": true
-        };
-        if (model.selected) {
-            rootClasses["[&_polygon]:stroke-sky-500"] = true;
-            rootClasses["[&_polygon]:stroke-2"] = true;
-        }
-
-        return svg("g", { class: rootClasses }, diamond, text);
+        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), diamond);
     }
 }

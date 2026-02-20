@@ -2,14 +2,14 @@ import type { BindingContext } from "@eclipse-glsp/sprotty";
 import {
     sharedImport,
     GCompartmentView,
-    GHorizontalDividerView,
-    GHorizontalDivider,
     GLabelView,
     configureDefaultModelElements,
-    GCompartment
+    GCompartment,
+    GHorizontalDivider
 } from "@mdeo/editor-shared";
 import { ModelTransformationElementType } from "./model/elementTypes.js";
 import { GPatternInstanceNode } from "./model/patternInstanceNode.js";
+import { GPatternModifierTitleCompartment } from "./model/patternModifierTitleCompartment.js";
 import { GPatternInstanceNameLabel } from "./model/patternInstanceNameLabel.js";
 import { GPatternPropertyLabel } from "./model/patternPropertyLabel.js";
 import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
@@ -17,20 +17,22 @@ import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkEndLabel } from "./model/patternLinkEndLabel.js";
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
-import { GDiamondNode } from "./model/diamondNode.js";
+import { GSplitNode } from "./model/splitNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { GControlFlowEdge } from "./model/controlFlowEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
 import { GControlFlowLabel } from "./model/controlFlowLabel.js";
 import { GPatternInstanceNodeView } from "./views/patternInstanceNodeView.js";
+import { GPatternModifierTitleCompartmentView } from "./views/patternModifierTitleCompartmentView.js";
 import { GPatternInstanceLabelView } from "./views/patternInstanceLabelView.js";
 import { GPatternPropertyLabelView } from "./views/patternPropertyLabelView.js";
+import { GPatternInstanceDividerView } from "./views/patternInstanceDividerView.js";
 import { GPatternLinkEdgeView } from "./views/patternLinkEdgeView.js";
 import { GPatternLinkEndNodeView } from "./views/patternLinkEndNodeView.js";
 import { GPatternLinkEndLabelView } from "./views/patternLinkEndLabelView.js";
 import { GStartNodeView } from "./views/startNodeView.js";
 import { GEndNodeView } from "./views/endNodeView.js";
-import { GDiamondNodeView } from "./views/diamondNodeView.js";
+import { GSplitNodeView } from "./views/splitNodeView.js";
 import { GMergeNodeView } from "./views/mergeNodeView.js";
 import { GControlFlowEdgeView } from "./views/controlFlowEdgeView.js";
 import { GControlFlowLabelNodeView } from "./views/controlFlowLabelNodeView.js";
@@ -51,13 +53,15 @@ export const modelTransformationDiagramModule = new FeatureModule(
 
         configureDefaultModelElements(context);
 
-        // Basic compartment and divider configuration
+        // Basic compartment configuration
         configureModelElement(context, ModelTransformationElementType.COMPARTMENT, GCompartment, GCompartmentView);
+
+        // Horizontal divider inside pattern instance nodes: colour matches the node's modifier border.
         configureModelElement(
             context,
             ModelTransformationElementType.DIVIDER,
             GHorizontalDivider,
-            GHorizontalDividerView
+            GPatternInstanceDividerView
         );
 
         // Pattern instance elements
@@ -66,6 +70,13 @@ export const modelTransformationDiagramModule = new FeatureModule(
             ModelTransformationElementType.NODE_PATTERN_INSTANCE,
             GPatternInstanceNode,
             GPatternInstanceNodeView
+        );
+        // Modifier title compartment: renders «create»/«delete»/«forbid» stereotype + name
+        configureModelElement(
+            context,
+            ModelTransformationElementType.COMPARTMENT_MODIFIER_TITLE,
+            GPatternModifierTitleCompartment,
+            GPatternModifierTitleCompartmentView
         );
         configureModelElement(
             context,
@@ -103,7 +114,7 @@ export const modelTransformationDiagramModule = new FeatureModule(
         // Control flow elements
         configureModelElement(context, ModelTransformationElementType.NODE_START, GStartNode, GStartNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_END, GEndNode, GEndNodeView);
-        configureModelElement(context, ModelTransformationElementType.NODE_DIAMOND, GDiamondNode, GDiamondNodeView);
+        configureModelElement(context, ModelTransformationElementType.NODE_SPLIT, GSplitNode, GSplitNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_MERGE, GMergeNode, GMergeNodeView);
         configureModelElement(
             context,

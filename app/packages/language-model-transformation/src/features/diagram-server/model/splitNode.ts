@@ -12,9 +12,9 @@ export class GSplitNode extends GNode {
     expression!: string;
 
     /**
-     * Creates a builder for GDiamondNode instances.
+     * Creates a builder for GSplitNode instances.
      *
-     * @returns A new GDiamondNodeBuilder
+     * @returns A new GSplitNodeBuilder
      */
     static builder(): GSplitNodeBuilder {
         return new GSplitNodeBuilder(GSplitNode).type(ModelTransformationElementType.NODE_SPLIT);

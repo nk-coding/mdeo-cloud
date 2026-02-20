@@ -41,13 +41,14 @@ import {
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GMatchNode } from "./model/matchNode.js";
-import { GDiamondNode } from "./model/diamondNode.js";
+import { GSplitNode } from "./model/splitNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { GControlFlowEdge } from "./model/controlFlowEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
 import { GControlFlowLabel } from "./model/controlFlowLabel.js";
 import { GPatternInstanceNode } from "./model/patternInstanceNode.js";
 import { GPatternInstanceNameLabel } from "./model/patternInstanceNameLabel.js";
+import { GPatternModifierTitleCompartment } from "./model/patternModifierTitleCompartment.js";
 import { GPatternPropertyLabel } from "./model/patternPropertyLabel.js";
 import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
@@ -505,7 +506,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
     /**
      * Processes an if-expression statement.
-     * Creates a diamond node for the condition and branches.
+     * Creates a split node for the condition and branches.
      *
      * @param graph The graph to add elements to
      * @param stmt The if-expression statement
@@ -521,13 +522,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     ): ScopeProcessingResult {
         const stmtId = idRegistry.getId(stmt);
 
-        // Create diamond node for the condition
-        const diamondId = `${stmtId}_diamond`;
+        // Create split node for the condition
+        const splitId = `${stmtId}_split`;
         const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createDiamondNode(graph, diamondId, conditionText, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, diamondId, undefined, idRegistry);
+        this.createSplitNode(graph, splitId, conditionText, idRegistry);
+        this.createControlFlowEdge(graph, previousNodeId, splitId, undefined, idRegistry);
 
-        return this.processIfExpressionStatementBranches(graph, stmt, stmtId, diamondId, idRegistry);
+        return this.processIfExpressionStatementBranches(graph, stmt, stmtId, splitId, idRegistry);
     }
 
     /**
@@ -537,7 +538,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         graph: GGraphType,
         stmt: IfExpressionStatementType,
         stmtId: string,
-        diamondId: string,
+        splitId: string,
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         // Track branch results
@@ -545,30 +546,30 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         // Process then branch
         const thenStatements = stmt.thenBlock?.statements ?? [];
-        const thenResult = this.processStatementsWithEdge(graph, thenStatements, diamondId, "true", idRegistry);
+        const thenResult = this.processStatementsWithEdge(graph, thenStatements, splitId, "true", idRegistry);
         branchResults.push(thenResult);
 
         // Process else-if branches
-        let lastElseIfDiamondId = diamondId;
+        let lastElseIfSplitId = splitId;
         for (let i = 0; i < (stmt.elseIfBranches?.length ?? 0); i++) {
             const elseIfBranch = stmt.elseIfBranches![i] as ElseIfBranchType;
-            const elseIfDiamondId = `${stmtId}_elseif_${i}_diamond`;
+            const elseIfSplitId = `${stmtId}_elseif_${i}_split`;
             const elseIfConditionText = elseIfBranch.condition?.$cstNode?.text ?? "?";
 
-            this.createDiamondNode(graph, elseIfDiamondId, elseIfConditionText, idRegistry);
-            this.createControlFlowEdge(graph, lastElseIfDiamondId, elseIfDiamondId, "false", idRegistry);
+            this.createSplitNode(graph, elseIfSplitId, elseIfConditionText, idRegistry);
+            this.createControlFlowEdge(graph, lastElseIfSplitId, elseIfSplitId, "false", idRegistry);
 
             const elseIfStatements = elseIfBranch.block?.statements ?? [];
             const elseIfResult = this.processStatementsWithEdge(
                 graph,
                 elseIfStatements,
-                elseIfDiamondId,
+                elseIfSplitId,
                 "true",
                 idRegistry
             );
             branchResults.push(elseIfResult);
 
-            lastElseIfDiamondId = elseIfDiamondId;
+            lastElseIfSplitId = elseIfSplitId;
         }
 
         // Process else branch
@@ -577,14 +578,14 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const elseResult = this.processStatementsWithEdge(
                 graph,
                 elseStatements,
-                lastElseIfDiamondId,
+                lastElseIfSplitId,
                 "false",
                 idRegistry
             );
             branchResults.push(elseResult);
         } else {
-            // No else block - the false branch from last diamond goes to merge
-            branchResults.push({ lastNodeId: lastElseIfDiamondId });
+            // No else block - the false branch from last split goes to merge
+            branchResults.push({ lastNodeId: lastElseIfSplitId });
         }
 
         // Create merge node if any branch doesn't terminate
@@ -594,7 +595,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             this.createMergeNode(graph, mergeNodeId, idRegistry);
 
             for (const result of nonTerminatingBranches) {
-                if (result.lastNodeId === lastElseIfDiamondId && stmt.elseBlock == undefined) {
+                if (result.lastNodeId === lastElseIfSplitId && stmt.elseBlock == undefined) {
                     // Connect the false branch to merge
                     this.createControlFlowEdge(graph, result.lastNodeId, mergeNodeId, "false", idRegistry);
                 } else {
@@ -611,13 +612,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
     /**
      * Processes a while-expression statement.
-     * Creates a diamond node for the condition with a loop.
+     * Creates a split node for the condition with a loop.
      *
      * @param graph The graph to add elements to
      * @param stmt The while-expression statement
      * @param previousNodeId The ID of the previous node to connect from
      * @param idRegistry The model ID registry
-     * @returns The result containing the diamond node ID as exit point
+     * @returns The result containing the split node ID as exit point
      */
     private processWhileExpressionStatement(
         graph: GGraphType,
@@ -627,13 +628,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     ): ScopeProcessingResult {
         const stmtId = idRegistry.getId(stmt);
 
-        // Create diamond node for the condition
-        const diamondId = `${stmtId}_diamond`;
+        // Create split node for the condition
+        const splitId = `${stmtId}_split`;
         const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createDiamondNode(graph, diamondId, conditionText, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, diamondId, undefined, idRegistry);
+        this.createSplitNode(graph, splitId, conditionText, idRegistry);
+        this.createControlFlowEdge(graph, previousNodeId, splitId, undefined, idRegistry);
 
-        return this.processWhileExpressionStatementBody(graph, stmt, diamondId, idRegistry);
+        return this.processWhileExpressionStatementBody(graph, stmt, splitId, idRegistry);
     }
 
     /**
@@ -642,20 +643,20 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     private processWhileExpressionStatementBody(
         graph: GGraphType,
         stmt: WhileExpressionStatementType,
-        diamondId: string,
+        splitId: string,
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         // Process loop body
         const bodyStatements = stmt.block?.statements ?? [];
-        const bodyResult = this.processStatementsWithEdge(graph, bodyStatements, diamondId, "true", idRegistry);
+        const bodyResult = this.processStatementsWithEdge(graph, bodyStatements, splitId, "true", idRegistry);
 
         // Loop back if body doesn't terminate
         if (bodyResult.lastNodeId != undefined) {
-            this.createControlFlowEdge(graph, bodyResult.lastNodeId, diamondId, undefined, idRegistry);
+            this.createControlFlowEdge(graph, bodyResult.lastNodeId, splitId, undefined, idRegistry);
         }
 
-        // The diamond is the exit point (when condition is false)
-        return { lastNodeId: diamondId };
+        // The split node is the exit point (when condition is false)
+        return { lastNodeId: splitId };
     }
 
     /**
@@ -908,11 +909,11 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const stmtId = idRegistry.getId(stmt);
-        const diamondId = `${stmtId}_diamond`;
+        const splitId = `${stmtId}_split`;
         const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createDiamondNode(graph, diamondId, conditionText, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, diamondId, edgeLabel, idRegistry);
-        return this.processIfExpressionStatementBranches(graph, stmt, stmtId, diamondId, idRegistry);
+        this.createSplitNode(graph, splitId, conditionText, idRegistry);
+        this.createControlFlowEdge(graph, previousNodeId, splitId, edgeLabel, idRegistry);
+        return this.processIfExpressionStatementBranches(graph, stmt, stmtId, splitId, idRegistry);
     }
 
     /**
@@ -926,11 +927,11 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const stmtId = idRegistry.getId(stmt);
-        const diamondId = `${stmtId}_diamond`;
+        const splitId = `${stmtId}_split`;
         const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createDiamondNode(graph, diamondId, conditionText, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, diamondId, edgeLabel, idRegistry);
-        return this.processWhileExpressionStatementBody(graph, stmt, diamondId, idRegistry);
+        this.createSplitNode(graph, splitId, conditionText, idRegistry);
+        this.createControlFlowEdge(graph, previousNodeId, splitId, edgeLabel, idRegistry);
+        return this.processWhileExpressionStatementBody(graph, stmt, splitId, idRegistry);
     }
 
     /**
@@ -1087,9 +1088,26 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             node.typeName = typeName;
         }
 
-        // Create header with name label
-        const headerChildren = this.createPatternInstanceHeader(nodeId, name, typeName);
-        node.children.push(...headerChildren);
+        if (modifier !== PatternModifierKind.NONE) {
+            // Combine modifier stereotype and instance name in one compartment.
+            // The client-side view resolves the modifier at render time from the parent node,
+            // so there is no need to store it in the compartment model.
+            const modifierCompartment = GPatternModifierTitleCompartment.builder()
+                .id(`${nodeId}#modifier-title`)
+                .build();
+            const labelText = typeName != undefined ? `${name} : ${typeName}` : name;
+            const label = GPatternInstanceNameLabel.builder()
+                .id(`${nodeId}#name`)
+                .text(labelText)
+                .readonly(true)
+                .build();
+            modifierCompartment.children.push(label);
+            node.children.push(modifierCompartment);
+        } else {
+            // No modifier — use a plain header compartment for the instance name
+            const headerChildren = this.createPatternInstanceHeader(nodeId, name, typeName);
+            node.children.push(...headerChildren);
+        }
 
         // Create property assignments
         const propertyChildren = this.createPatternPropertyAssignments(nodeId, instance.properties ?? [], idRegistry);
@@ -1175,12 +1193,6 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         const children: GModelElement[] = [];
 
-        const divider = GHorizontalDivider.builder()
-            .type(ModelTransformationElementType.DIVIDER)
-            .id(`${nodeId}#divider`)
-            .build();
-        children.push(divider);
-
         const compartment = GCompartment.builder()
             .type(ModelTransformationElementType.COMPARTMENT)
             .id(`${nodeId}#properties`)
@@ -1204,6 +1216,12 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             compartment.children.push(label);
         }
 
+        const divider = GHorizontalDivider.builder()
+            .type(ModelTransformationElementType.DIVIDER)
+            .id(`${nodeId}#divider`)
+            .build();
+
+        children.push(divider);
         children.push(compartment);
         return children;
     }
@@ -1264,35 +1282,23 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
         }
 
-        // Create where clauses compartment (if any)
         if (whereClauseLabels.length > 0) {
-            const divider = GHorizontalDivider.builder()
-                .type(ModelTransformationElementType.DIVIDER)
-                .id(`${nodeId}#where-divider`)
-                .build();
-
             const compartment = GCompartment.builder()
                 .type(ModelTransformationElementType.COMPARTMENT)
                 .id(`${nodeId}#where-clauses`)
                 .build();
 
-            compartment.children.push(divider, ...whereClauseLabels);
+            compartment.children.push(...whereClauseLabels);
             result.push(compartment);
         }
 
-        // Create variables compartment (if any)
         if (variableLabels.length > 0) {
-            const divider = GHorizontalDivider.builder()
-                .type(ModelTransformationElementType.DIVIDER)
-                .id(`${nodeId}#variables-divider`)
-                .build();
-
             const compartment = GCompartment.builder()
                 .type(ModelTransformationElementType.COMPARTMENT)
                 .id(`${nodeId}#variables`)
                 .build();
 
-            compartment.children.push(divider, ...variableLabels);
+            compartment.children.push(...variableLabels);
             result.push(compartment);
         }
 
@@ -1334,11 +1340,20 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const sourceProperty = link.source?.property?.$refText;
         const targetProperty = link.target?.property?.$refText;
 
+        // Retrieve layout metadata (routing points) for this edge
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+        const rawEdgeMeta = validatedMetadata.edges[edgeId]?.meta;
+        const edgeMeta =
+            rawEdgeMeta != undefined && EdgeLayoutMetadataUtil.isValid(rawEdgeMeta)
+                ? rawEdgeMeta
+                : EdgeLayoutMetadataUtil.create();
+
         const edgeBuilder = GPatternLinkEdge.builder()
             .id(edgeId)
             .sourceId(sourceId)
             .targetId(targetId)
-            .modifier(modifier);
+            .modifier(modifier)
+            .meta(edgeMeta);
 
         if (sourceProperty != undefined) {
             edgeBuilder.sourceProperty(sourceProperty);
@@ -1429,23 +1444,18 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     }
 
     /**
-     * Creates a diamond node for branching.
+     * Creates a split node for branching.
      *
      * @param graph The graph to add the node to
      * @param nodeId The node ID
      * @param expression The condition expression text
      * @param idRegistry The model ID registry
      */
-    private createDiamondNode(
-        graph: GGraphType,
-        nodeId: string,
-        expression: string,
-        idRegistry: ModelIdRegistry
-    ): void {
+    private createSplitNode(graph: GGraphType, nodeId: string, expression: string, idRegistry: ModelIdRegistry): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
-        const node = GDiamondNode.builder().id(nodeId).expression(expression).meta(metadata).build();
+        const node = GSplitNode.builder().id(nodeId).expression(expression).meta(metadata).build();
         graph.children.push(node);
     }
 

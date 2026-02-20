@@ -31,6 +31,13 @@ export function generateIcon(icon: IconNode, classes: string[] = []): VNode {
                 ...classObj
             }
         },
-        ...icon.map(([tag, attrs]) => html(tag, { attrs }))
+        ...icon.map(([tag, attrs]) =>
+            html(tag, {
+                attrs: Object.fromEntries(Object.entries(attrs).filter(([_, value]) => value != undefined)) as Record<
+                    string,
+                    string | number
+                >
+            })
+        )
     );
 }

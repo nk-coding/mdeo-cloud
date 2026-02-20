@@ -75,6 +75,7 @@ export * from "./views/graphView.js";
 export * from "./views/horizontalDividerView.js";
 export * from "./views/labelView.js";
 export * from "./views/nodeView.js";
+export * from "./views/nodeViewBase.js";
 export * from "./views/rectangularNodeView.js";
 export * from "./views/simpleNodeView.js";
 export * from "./views/verticalDividerView.js";

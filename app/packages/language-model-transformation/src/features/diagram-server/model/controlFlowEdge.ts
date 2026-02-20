@@ -3,7 +3,7 @@ import { ModelTransformationElementType } from "./elementTypes.js";
 
 /**
  * Edge representing control flow between nodes.
- * Connects start, match, diamond, merge, and end nodes.
+ * Connects start, match, split, merge, and end nodes.
  */
 export class GControlFlowEdge extends GEdge {
     /**

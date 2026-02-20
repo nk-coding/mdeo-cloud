@@ -42,7 +42,7 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                 const matchNode = this.transformMatchNode(child, bounds);
                 nodes.push(matchNode);
             } else if (child instanceof GNode) {
-                // Other nodes: start, end, diamond, merge
+                // Other nodes: start, end, split, merge
                 nodes.push({
                     id: child.id,
                     width: bounds[child.id]?.width,

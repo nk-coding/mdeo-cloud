@@ -23,9 +23,9 @@ export enum ModelTransformationElementType {
     NODE_MATCH = "node:match",
 
     /**
-     * Diamond node for if/while expression branching
+     * Split node for if/while expression branching
      */
-    NODE_DIAMOND = "node:diamond",
+    NODE_SPLIT = "node:split",
 
     /**
      * Merge node where branches join back together
@@ -92,14 +92,19 @@ export enum ModelTransformationElementType {
     LABEL_VARIABLE = "label:variable",
 
     /**
+     * Horizontal divider line between compartments
+     */
+    DIVIDER = "divider:horizontal",
+
+    /**
      * Compartment container for grouping elements
      */
     COMPARTMENT = "comp:compartment",
 
     /**
-     * Horizontal divider line
+     * Modifier title compartment (renders «create», «delete», «forbid» + name label)
      */
-    DIVIDER = "divider:horizontal"
+    COMPARTMENT_MODIFIER_TITLE = "comp:modifier-title"
 }
 
 /**
