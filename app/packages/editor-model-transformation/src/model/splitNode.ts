@@ -17,6 +17,12 @@ export class GSplitNode extends GNode {
         nodeLayoutMetadataFeature
     ];
 
+    constructor() {
+        super();
+        this.vAlign = "center";
+        this.hAlign = "center";
+    }
+
     /**
      * The expression text displayed in the diamond
      */

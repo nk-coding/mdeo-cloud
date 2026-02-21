@@ -18,13 +18,6 @@ const { svg } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export class GLinkEdgeView extends GEdgeView {
-    /**
-     * Gets edge attachments for link edges including source and target label nodes.
-     *
-     * @param model The link edge model
-     * @param context The rendering context
-     * @returns An array of edge attachments
-     */
     protected override getEdgeAttachments(model: Readonly<GLinkEdge>, context: RenderingContext): EdgeAttachment[] {
         const attachments: EdgeAttachment[] = [];
 
@@ -43,17 +36,7 @@ export class GLinkEdgeView extends GEdgeView {
         return attachments;
     }
 
-    /**
-     * Renders the target marker as an arrow indicating the link direction.
-     *
-     * @param _model - The link edge model
-     * @param _context - The rendering context
-     * @returns Edge marker data with arrow shape
-     */
-    protected override renderTargetMarker(
-        _model: Readonly<GLinkEdge>,
-        _context: RenderingContext
-    ): EdgeMarkerData | undefined {
+    protected override renderTargetMarker(): EdgeMarkerData | undefined {
         const arrow = svg("polygon", {
             class: {
                 "fill-foreground": true,

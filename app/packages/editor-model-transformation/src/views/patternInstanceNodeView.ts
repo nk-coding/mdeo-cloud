@@ -30,8 +30,6 @@ export class GPatternInstanceNodeView extends GRectangularNodeView {
     protected override getClasses(model: Readonly<GRectangularNode>): Record<string, boolean> {
         const instanceModel = model as GPatternInstanceNode;
         const modifier = instanceModel.modifier;
-        const cssClasses: string[] = (instanceModel as unknown as { cssClasses?: string[] }).cssClasses ?? [];
-        const isReferenced = cssClasses.includes("referenced");
 
         return {
             "border-2": true,
@@ -44,8 +42,7 @@ export class GPatternInstanceNodeView extends GRectangularNodeView {
             flex: true,
             "flex-col": true,
             "w-fit": true,
-            "cursor-pointer": true,
-            "opacity-70": isReferenced
+            "cursor-pointer": true
         };
     }
 

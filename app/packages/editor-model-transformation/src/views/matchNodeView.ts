@@ -1,14 +1,15 @@
 import type { RenderingContext, GModelElement, Bounds as BoundsType } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport, GNodeViewBase, GCompartment, type GNode } from "@mdeo/editor-shared";
+import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
 import type { GMatchNode } from "../model/matchNode.js";
 import { isPatternInstanceNode } from "../model/patternInstanceNode.js";
 import { ModelTransformationElementType } from "../model/elementTypes.js";
+import { GMatchNodeCompartments } from "../model/matchNodeCompartments.js";
 
 const { injectable } = sharedImport("inversify");
 const { svg, html, ATTR_BBOX_ELEMENT, Bounds } = sharedImport("@eclipse-glsp/sprotty");
 
-const INNER_PADDING = 8;
+const INNER_PADDING = 20;
 
 const MIN_CONTENT_SIZE = 80;
 
@@ -17,18 +18,17 @@ export class GMatchNodeView extends GNodeViewBase {
     override render(model: Readonly<GNode>, context: RenderingContext): VNode | undefined {
         const matchModel = model as GMatchNode;
 
-        // Separate children into pattern instance nodes, pattern link edges and compartments
         const patternChildren: GModelElement[] = [];
         const edgeChildren: GModelElement[] = [];
-        const compartmentChildren: GModelElement[] = [];
+        let containerNode: GModelElement | undefined;
 
         for (const child of matchModel.children) {
             if (isPatternInstanceNode(child)) {
                 patternChildren.push(child);
             } else if (child.type === ModelTransformationElementType.EDGE_PATTERN_LINK) {
                 edgeChildren.push(child);
-            } else if (child instanceof GCompartment) {
-                compartmentChildren.push(child);
+            } else if (child instanceof GMatchNodeCompartments) {
+                containerNode = child;
             }
         }
 
@@ -37,23 +37,17 @@ export class GMatchNodeView extends GNodeViewBase {
         const patternContentRight = INNER_PADDING + patternBbox.width + INNER_PADDING;
         const patternAreaHeight = INNER_PADDING + patternBbox.height + INNER_PADDING;
 
-        const compartmentHeights = compartmentChildren.map(
-            (comp) => (comp as { bounds?: { height: number } }).bounds?.height ?? 60
-        );
-        const DIVIDER_HEIGHT = 1;
-        const compartmentBlockHeight =
-            compartmentHeights.length > 0
-                ? compartmentHeights.reduce((sum, h) => sum + h, 0) + (compartmentHeights.length - 1) * DIVIDER_HEIGHT
-                : 0;
+        const containerBounds = (containerNode as GMatchNodeCompartments | undefined)?.bounds;
+        const containerBoundsValid =
+            containerBounds !== undefined && containerBounds.width >= 0 && containerBounds.height >= 0;
+        const containerHeight = containerBoundsValid ? containerBounds.height : 0;
+        const containerWidth = containerBoundsValid ? containerBounds.width : 0;
 
-        const hasCompartments = compartmentChildren.length > 0;
-        const compartmentSeparatorHeight = hasCompartments ? DIVIDER_HEIGHT : 0;
-
-        const totalWidth = Math.max(patternContentRight, MIN_CONTENT_SIZE + INNER_PADDING * 2);
+        const totalWidth = Math.max(patternContentRight, MIN_CONTENT_SIZE + INNER_PADDING * 2, containerWidth);
         const patternAreaBottomY = patternAreaHeight;
-        const totalHeight = patternAreaBottomY + compartmentSeparatorHeight + compartmentBlockHeight;
+        const totalHeight = patternAreaBottomY + containerHeight;
 
-        const outline = this.renderOutline(totalWidth, totalHeight, matchModel.multiple);
+        const outlines = this.renderOutlines(totalWidth, totalHeight, matchModel.multiple);
 
         const translateX = INNER_PADDING - patternBbox.x;
         const translateY = INNER_PADDING - patternBbox.y;
@@ -68,21 +62,15 @@ export class GMatchNodeView extends GNodeViewBase {
                 .filter((vnode): vnode is VNode => vnode !== undefined)
         );
 
-        const compartmentVNodes = this.renderCompartments(
-            compartmentChildren,
-            compartmentHeights,
-            context,
-            totalWidth,
-            patternAreaBottomY
-        );
+        const bottomVNodes = this.renderContainerArea(containerNode, context, totalWidth, patternAreaBottomY);
 
         return svg(
             "g",
             { class: { "cursor-pointer": true } },
             ...this.renderControlElements(model),
-            outline,
+            ...outlines,
             innerGroup,
-            ...compartmentVNodes
+            ...bottomVNodes
         );
     }
 
@@ -101,87 +89,119 @@ export class GMatchNodeView extends GNodeViewBase {
         return combined ?? { x: 0, y: 0, width: MIN_CONTENT_SIZE, height: MIN_CONTENT_SIZE };
     }
 
-    private renderOutline(width: number, height: number, isMultiple: boolean): VNode {
-        const borderClasses: Record<string, boolean> = {
-            "fill-background": true,
-            "stroke-foreground": true,
-            "stroke-[1.5px]": true
-        };
-        if (isMultiple) {
-            borderClasses["stroke-[3px]"] = true;
-        }
-
-        const border = svg("rect", {
-            class: borderClasses,
-            attrs: {
-                x: 0,
-                y: 0,
-                width,
-                height,
-                rx: 4,
-                ry: 4,
-                [ATTR_BBOX_ELEMENT]: true
+    private renderOutlineDiv(width: number, height: number): VNode {
+        return html("div", {
+            class: {
+                "bg-background": true,
+                "border-foreground": true,
+                "border-2": true,
+                rounded: true,
+                "box-border": true
+            },
+            style: {
+                width: `${width}px`,
+                height: `${height}px`
             }
         });
-
-        return svg("g", null, border);
     }
 
-    private renderCompartments(
-        children: GModelElement[],
-        heights: number[],
+    private renderOutlines(width: number, height: number, isMultiple: boolean): VNode[] {
+        const SHADOW_OFFSET = 4;
+
+        const divChildren: VNode[] = [];
+
+        if (isMultiple) {
+            divChildren.push(
+                html("div", {
+                    style: {
+                        position: "absolute",
+                        top: `${SHADOW_OFFSET}px`,
+                        left: `${SHADOW_OFFSET}px`
+                    }
+                }, this.renderOutlineDiv(width, height))
+            );
+        }
+
+        divChildren.push(
+            html("div", {
+                style: {
+                    position: "absolute",
+                    top: "0",
+                    left: "0"
+                }
+            }, this.renderOutlineDiv(width, height))
+        );
+
+        return [
+            svg(
+                "foreignObject",
+                {
+                    attrs: {
+                        x: 0,
+                        y: 0,
+                        width,
+                        height,
+                        [ATTR_BBOX_ELEMENT]: true
+                    }
+                },
+                html("div", {
+                    style: {
+                        position: "relative",
+                        width: `${width}px`,
+                        height: `${height}px`,
+                        overflow: "visible"
+                    }
+                }, ...divChildren)
+            )
+        ];
+    }
+
+    private renderContainerArea(
+        containerNode: GModelElement | undefined,
         context: RenderingContext,
         totalWidth: number,
         yOffset: number
     ): VNode[] {
-        if (children.length === 0) {
+        if (!containerNode) {
             return [];
         }
 
-        const DIVIDER_HEIGHT = 1;
-
-        const topSeparator = svg("line", {
-            class: { "stroke-foreground": true, "stroke-1": true },
-            attrs: { x1: 0, y1: yOffset, x2: totalWidth, y2: yOffset }
-        });
-
-        const htmlChildren: VNode[] = [];
-        const dividerVNodes: VNode[] = [];
-
-        let currentY = 0;
-        for (let i = 0; i < children.length; i++) {
-            if (i > 0) {
-                dividerVNodes.push(
-                    svg("line", {
-                        class: { "stroke-foreground": true, "stroke-1": true },
-                        attrs: {
-                            x1: 0,
-                            y1: yOffset + currentY,
-                            x2: totalWidth,
-                            y2: yOffset + currentY
-                        }
-                    })
-                );
-                currentY += DIVIDER_HEIGHT;
-            }
-            const rendered = context.renderElement(children[i]);
-            if (rendered) {
-                htmlChildren.push(html("div", {}, rendered));
-            }
-            currentY += heights[i] ?? 60;
+        const rendered = context.renderElement(containerNode);
+        if (!rendered) {
+            return [];
         }
 
-        const totalBlockHeight = currentY;
+        const containerBounds = (containerNode as GMatchNodeCompartments).bounds;
+        const boundsIsValid = containerBounds.width >= 0 && containerBounds.height >= 0;
+        const foWidth = boundsIsValid ? totalWidth : 99999;
+        const foHeight = boundsIsValid ? containerBounds.height : 99999;
 
         const foreignObject = svg(
             "foreignObject",
             {
-                class: { "pointer-events-none": true, "[&_*]:pointer-events-auto": true },
-                attrs: { x: 0, y: yOffset + DIVIDER_HEIGHT, width: totalWidth, height: totalBlockHeight }
+                class: {
+                    "pointer-events-none": true,
+                    "[&_*]:pointer-events-auto": true
+                },
+                attrs: {
+                    x: 0,
+                    y: yOffset,
+                    width: foWidth,
+                    height: foHeight
+                }
             },
-            html("div", { style: { width: `${totalWidth}px` } }, ...htmlChildren)
+            html(
+                "div",
+                {
+                    style: boundsIsValid ? { width: `${totalWidth}px` } : {},
+                    class: {
+                        "w-fit": !boundsIsValid
+                    }
+                },
+                rendered
+            )
         );
 
-        return [topSeparator, ...dividerVNodes, foreignObject];
+        return [foreignObject];
     }
 }

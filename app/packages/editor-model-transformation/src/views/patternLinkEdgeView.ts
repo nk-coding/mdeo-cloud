@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { Point, RenderingContext } from "@eclipse-glsp/sprotty";
 import {
     sharedImport,
     GEdgeView,
@@ -8,8 +8,10 @@ import {
     type GEdge
 } from "@mdeo/editor-shared";
 import type { GPatternLinkEdge } from "../model/patternLinkEdge.js";
-import type { GPatternLinkEndNode } from "../model/patternLinkEndNode.js";
+import { GPatternLinkEndNode } from "../model/patternLinkEndNode.js";
+import { GPatternLinkModifierLabel } from "../model/patternLinkModifierLabel.js";
 import { PatternModifierKind } from "../model/elementTypes.js";
+import type { VNode } from "snabbdom";
 
 const { injectable } = sharedImport("inversify");
 const { svg } = sharedImport("@eclipse-glsp/sprotty");
@@ -23,11 +25,11 @@ const { svg } = sharedImport("@eclipse-glsp/sprotty");
 function getStrokeClassForModifier(modifier: PatternModifierKind): string {
     switch (modifier) {
         case PatternModifierKind.CREATE:
-            return "stroke-green-600";
+            return "stroke-create";
         case PatternModifierKind.DELETE:
-            return "stroke-red-600";
+            return "stroke-delete";
         case PatternModifierKind.FORBID:
-            return "stroke-amber-600";
+            return "stroke-forbid";
         default:
             return "stroke-foreground";
     }
@@ -42,11 +44,11 @@ function getStrokeClassForModifier(modifier: PatternModifierKind): string {
 function getFillClassForModifier(modifier: PatternModifierKind): string {
     switch (modifier) {
         case PatternModifierKind.CREATE:
-            return "fill-green-600";
+            return "fill-create";
         case PatternModifierKind.DELETE:
-            return "fill-red-600";
+            return "fill-delete";
         case PatternModifierKind.FORBID:
-            return "fill-amber-600";
+            return "fill-forbid";
         default:
             return "fill-foreground";
     }
@@ -59,27 +61,23 @@ function getFillClassForModifier(modifier: PatternModifierKind): string {
  */
 @injectable()
 export class GPatternLinkEdgeView extends GEdgeView {
-    /**
-     * Gets edge attachments for pattern link edges including source and target label nodes.
-     *
-     * @param model The pattern link edge model
-     * @param context The rendering context
-     * @returns An array of edge attachments
-     */
     protected override getEdgeAttachments(model: Readonly<GEdge>, context: RenderingContext): EdgeAttachment[] {
         const attachments: EdgeAttachment[] = [];
 
         for (const child of model.children) {
-            // Check if child has 'end' property (is a GPatternLinkEndNode)
-            const endNode = child as unknown as GPatternLinkEndNode;
-            if (endNode.end !== undefined) {
+            if (child instanceof GPatternLinkEndNode) {
                 const attachment: EdgeAttachment = {
                     vnode: context.renderElement(child),
-                    bounds: endNode.bounds,
+                    bounds: child.bounds,
                     position:
-                        endNode.end === "source"
-                            ? EdgeAttachmentPosition.SOURCE_LEFT
-                            : EdgeAttachmentPosition.TARGET_LEFT
+                        child.end === "source" ? EdgeAttachmentPosition.SOURCE_LEFT : EdgeAttachmentPosition.TARGET_LEFT
+                };
+                attachments.push(attachment);
+            } else if (child instanceof GPatternLinkModifierLabel) {
+                const attachment: EdgeAttachment = {
+                    vnode: context.renderElement(child),
+                    bounds: child.bounds,
+                    position: EdgeAttachmentPosition.MIDDLE_LEFT
                 };
                 attachments.push(attachment);
             }
@@ -88,14 +86,6 @@ export class GPatternLinkEdgeView extends GEdgeView {
         return attachments;
     }
 
-    /**
-     * Renders the target marker as an arrow indicating the link direction.
-     * The arrow color matches the modifier styling.
-     *
-     * @param model The pattern link edge model
-     * @param _context The rendering context
-     * @returns Edge marker data with arrow shape
-     */
     protected override renderTargetMarker(
         model: Readonly<GEdge>,
         _context: RenderingContext
@@ -120,5 +110,20 @@ export class GPatternLinkEdgeView extends GEdgeView {
             strokeOffset: 12,
             elementOffset: 6
         };
+    }
+
+    protected override renderVisiblePath(route: Point[], model: Readonly<GEdge>): VNode {
+        const pathData = this.createPathData(route);
+
+        return svg("path", {
+            class: {
+                [getStrokeClassForModifier((model as GPatternLinkEdge).modifier)]: true,
+                "fill-none": true,
+                "stroke-[1.5px]": true
+            },
+            attrs: {
+                d: pathData
+            }
+        });
     }
 }

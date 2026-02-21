@@ -1,48 +1,63 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
+import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
+const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering merge nodes.
- * Renders a small diamond shape where control flow branches merge back together.
- * Selection and resize handles are provided by the base GNodeView.
+ * Renders a small filled diamond where control flow branches merge back together.
+ * Uses an HTML div (rotated inner square) so the bounding box correctly includes the border.
  */
 @injectable()
-export class GMergeNodeView extends GNodeViewBase {
+export class GMergeNodeView extends GNodeView {
     /**
-     * The size of the merge node diamond
+     * The bounding-box size of the merge node diamond (width == height)
      */
-    static readonly SIZE = 20;
+    static readonly SIZE = 25;
 
     /**
-     * Renders the merge node as a small diamond.
-     * Selection and resize handles are provided by the base GNodeView.
+     * Renders the merge node as a filled diamond using a rotated HTML div.
+     * The outer container defines the bounding box; an inner square rotated 45°
+     * produces the diamond shape.
      *
-     * @param model The node model
+     * @param _model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
+    protected override renderForeignElement(_model: Readonly<GNode>, _context: RenderingContext): VNode {
         const size = GMergeNodeView.SIZE;
-        const half = size / 2;
-
-        // Diamond points: top, right, bottom, left
-        const diamondPoints = `${half},0 ${size},${half} ${half},${size} 0,${half}`;
-
-        const diamond = svg("polygon", {
+        const innerSize = Math.round(size / Math.SQRT2);
+        const offset = (size - innerSize) / 2;
+        const innerDiamond = html("div", {
             class: {
-                "fill-foreground": true,
-                "stroke-foreground": true,
-                "cursor-pointer": true
+                "bg-foreground": true,
+                "box-border": true
             },
-            attrs: {
-                points: diamondPoints
+            style: {
+                width: `${innerSize}px`,
+                height: `${innerSize}px`,
+                position: "absolute",
+                top: `${offset}px`,
+                left: `${offset}px`,
+                transform: "rotate(45deg)"
             }
         });
-
-        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), diamond);
+        return html(
+            "div",
+            {
+                class: {
+                    "box-border": true,
+                    "cursor-pointer": true
+                },
+                style: {
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    position: "relative"
+                }
+            },
+            innerDiamond
+        );
     }
 }

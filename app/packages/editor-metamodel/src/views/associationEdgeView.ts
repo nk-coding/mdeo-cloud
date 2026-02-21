@@ -22,13 +22,6 @@ const { svg } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export class GAssociationEdgeView extends GEdgeView {
-    /**
-     * Gets edge attachments for association edges including multiplicity and property labels.
-     *
-     * @param model The association edge model
-     * @param context The rendering context
-     * @returns An array of edge attachments
-     */
     protected override getEdgeAttachments(
         model: Readonly<GAssociationEdge>,
         context: RenderingContext
@@ -80,31 +73,11 @@ export class GAssociationEdgeView extends GEdgeView {
         };
     }
 
-    /**
-     * Renders the source marker based on the sourceKind property.
-     *
-     * @param model The association edge model
-     * @param context The rendering context
-     * @returns Edge marker data for the source end
-     */
-    protected override renderSourceMarker(
-        model: Readonly<GAssociationEdge>,
-        _context: RenderingContext
-    ): EdgeMarkerData | undefined {
+    protected override renderSourceMarker(model: Readonly<GAssociationEdge>): EdgeMarkerData | undefined {
         return this.createMarkerForKind(model.sourceKind, true);
     }
 
-    /**
-     * Renders the target marker based on the targetKind property.
-     *
-     * @param model The association edge model
-     * @param context The rendering context
-     * @returns Edge marker data for the target end
-     */
-    protected override renderTargetMarker(
-        model: Readonly<GAssociationEdge>,
-        _context: RenderingContext
-    ): EdgeMarkerData | undefined {
+    protected override renderTargetMarker(model: Readonly<GAssociationEdge>): EdgeMarkerData | undefined {
         return this.createMarkerForKind(model.targetKind, false);
     }
 

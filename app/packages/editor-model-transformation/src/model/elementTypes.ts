@@ -92,6 +92,11 @@ export enum ModelTransformationElementType {
     LABEL_VARIABLE = "label:variable",
 
     /**
+     * Modifier label shown in the middle of a pattern link edge (create/delete/forbid)
+     */
+    LABEL_PATTERN_LINK_MODIFIER = "label:pattern-link-modifier",
+
+    /**
      * Horizontal divider line between compartments
      */
     DIVIDER = "divider:horizontal",
@@ -100,6 +105,12 @@ export enum ModelTransformationElementType {
      * Compartment container for grouping elements
      */
     COMPARTMENT = "comp:compartment",
+
+    /**
+     * Container wrapping the bottom compartments of a match node (where-clauses, variables).
+     * Includes the horizontal dividers between compartments.
+     */
+    MATCH_NODE_COMPARTMENTS = "comp:match-node-compartments",
 
     /**
      * Modifier title compartment (renders «create», «delete», «forbid» + name label)

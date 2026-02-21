@@ -676,7 +676,7 @@ export abstract class GEdgeView implements IView {
      * @param points The route points
      * @returns The SVG path data string
      */
-    private createPathData(points: Point[]): string {
+    protected createPathData(points: Point[]): string {
         if (points.length === 0) {
             return "";
         }

@@ -36,6 +36,16 @@ export class GNode extends GShapeElement implements Selectable, Fadeable, Hovera
     isReconnectTarget: boolean = false;
 
     /**
+     * Vertical alignment of the node. Defaults to "top".
+     */
+    vAlign: "top" | "center" | "bottom" = "top";
+
+    /**
+     * Horizontal alignment of the node. Defaults to "left".
+     */
+    hAlign: "left" | "center" | "right" = "left";
+
+    /**
      * Creates a new GNode instance.
      */
     constructor() {

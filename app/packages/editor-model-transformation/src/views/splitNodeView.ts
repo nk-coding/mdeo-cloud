@@ -1,55 +1,63 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
+import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
+const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering split nodes.
- * Renders a diamond shape used for if/while branching (activity diagram split).
+ * Renders a small filled diamond where control flow branches split back together.
+ * Uses an HTML div (rotated inner square) so the bounding box correctly includes the border.
  */
 @injectable()
-export class GSplitNodeView extends GNodeViewBase {
+export class GSplitNodeView extends GNodeView {
     /**
-     * The width of the split node
+     * The bounding-box size of the split node diamond (width == height)
      */
-    static readonly WIDTH = 80;
+    static readonly SIZE = 25;
 
     /**
-     * The height of the split node
-     */
-    static readonly HEIGHT = 50;
-
-    /**
-     * Renders the split node as a diamond shape for if/while branching.
-     * Selection and resize handles are provided by the base GNodeViewBase.
+     * Renders the split node as a filled diamond using a rotated HTML div.
+     * The outer container defines the bounding box; an inner square rotated 45°
+     * produces the diamond shape.
      *
-     * @param model The node model
+     * @param _model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
-        const width = GSplitNodeView.WIDTH;
-        const height = GSplitNodeView.HEIGHT;
-        const halfWidth = width / 2;
-        const halfHeight = height / 2;
-
-        // Diamond points: top, right, bottom, left
-        const diamondPoints = `${halfWidth},0 ${width},${halfHeight} ${halfWidth},${height} 0,${halfHeight}`;
-
-        const diamond = svg("polygon", {
+    protected override renderForeignElement(_model: Readonly<GNode>, _context: RenderingContext): VNode {
+        const size = GSplitNodeView.SIZE;
+        const innerSize = Math.round(size / Math.SQRT2);
+        const offset = (size - innerSize) / 2;
+        const innerDiamond = html("div", {
             class: {
-                "fill-background": true,
-                "stroke-foreground": true,
-                "stroke-[1.5px]": true,
-                "cursor-pointer": true
+                "bg-foreground": true,
+                "box-border": true
             },
-            attrs: {
-                points: diamondPoints
+            style: {
+                width: `${innerSize}px`,
+                height: `${innerSize}px`,
+                position: "absolute",
+                top: `${offset}px`,
+                left: `${offset}px`,
+                transform: "rotate(45deg)"
             }
         });
-
-        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), diamond);
+        return html(
+            "div",
+            {
+                class: {
+                    "box-border": true,
+                    "cursor-pointer": true
+                },
+                style: {
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    position: "relative"
+                }
+            },
+            innerDiamond
+        );
     }
 }

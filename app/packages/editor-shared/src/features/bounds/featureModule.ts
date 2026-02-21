@@ -1,4 +1,3 @@
-import type { ContainerModule } from "inversify";
 import { sharedImport } from "../../sharedImport.js";
 import { HiddenBoundsUpdater } from "./hiddenBoundsUpdater.js";
 import { ResetCanvasBoundsCommand } from "./resetCanvasBoundsCommand.js";
@@ -14,7 +13,7 @@ const { GLSPHiddenBoundsUpdater } = sharedImport("@eclipse-glsp/client");
  * - HiddenBoundsUpdater: Handles bounds computation for foreign objects
  * - ResetCanvasBoundsCommand: Handles canvas bounds reset on resize
  */
-export const boundsModule: ContainerModule = new FeatureModule(
+export const boundsModule = new FeatureModule(
     (bind, unbind, isBound, rebind) => {
         bind(HiddenBoundsUpdater).toSelf().inSingletonScope();
         rebind(GLSPHiddenBoundsUpdater).toService(HiddenBoundsUpdater);

@@ -1,30 +1,25 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
+import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 import type { GEndNode } from "../model/endNode.js";
 import { EndNodeKind } from "../model/elementTypes.js";
 
 const { injectable } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
+const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering end nodes.
  * Renders differently based on kind:
  * - STOP: Filled circle with hollow outer ring (bullseye)
  * - KILL: X mark (cross)
- * Selection and resize handles are provided by the base GNodeView.
+ * Uses HTML divs so the bounding box correctly includes the border (box-border).
  */
 @injectable()
-export class GEndNodeView extends GNodeViewBase {
+export class GEndNodeView extends GNodeView {
     /**
      * The outer radius of the end node
      */
     static readonly OUTER_RADIUS = 14;
-
-    /**
-     * The inner radius for stop nodes (bullseye)
-     */
-    static readonly INNER_RADIUS = 8;
 
     /**
      * The size of the kill node
@@ -33,94 +28,96 @@ export class GEndNodeView extends GNodeViewBase {
 
     /**
      * Renders the end node based on its kind.
-     * Selection and resize handles are provided by the base GNodeView.
      *
      * @param model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
+    protected override renderForeignElement(model: Readonly<GNode>, _context: RenderingContext): VNode {
         const endModel = model as GEndNode;
-        const svgChildren = endModel.kind === EndNodeKind.KILL ? this.renderKillNode() : this.renderStopNode();
-
-        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), ...svgChildren);
+        return endModel.kind === EndNodeKind.KILL ? this.renderKillNode() : this.renderStopNode();
     }
 
     /**
-     * Renders a stop node as a bullseye (filled circle with outer ring).
+     * Renders a stop node as a bullseye (outer ring div + inner filled circle div).
      *
-     * @returns Array of VNodes for the stop node
+     * @returns VNode for the stop node
      */
-    private renderStopNode(): VNode[] {
-        const outerRadius = GEndNodeView.OUTER_RADIUS;
-        const innerRadius = GEndNodeView.INNER_RADIUS;
-        const center = outerRadius;
+    private renderStopNode(): VNode {
+        const outerDiameter = GEndNodeView.OUTER_RADIUS * 2;
 
-        const outerCircle = svg("circle", {
+        const innerCircle = html("div", {
             class: {
-                "fill-none": true,
-                "stroke-foreground": true,
-                "stroke-2": true
-            },
-            attrs: {
-                cx: center,
-                cy: center,
-                r: outerRadius
+                "bg-foreground": true,
+                "rounded-full": true,
+                "w-full": true,
+                "h-full": true
             }
         });
 
-        const innerCircle = svg("circle", {
-            class: {
-                "fill-foreground": true,
-                "stroke-foreground": true
+        return html(
+            "div",
+            {
+                class: {
+                    "border-2": true,
+                    "border-foreground": true,
+                    "rounded-full": true,
+                    "box-border": true,
+                    "cursor-pointer": true,
+                    "p-[3px]": true
+                },
+                style: {
+                    width: `${outerDiameter}px`,
+                    height: `${outerDiameter}px`,
+                    position: "relative"
+                }
             },
-            attrs: {
-                cx: center,
-                cy: center,
-                r: innerRadius
-            }
-        });
-
-        return [outerCircle, innerCircle];
+            innerCircle
+        );
     }
 
     /**
-     * Renders a kill node as an X mark (cross).
+     * Renders a kill node as an X mark using two rotated div bars.
      *
-     * @returns Array of VNodes for the kill node
+     * @returns VNode for the kill node
      */
-    private renderKillNode(): VNode[] {
+    private renderKillNode(): VNode {
         const size = GEndNodeView.KILL_SIZE;
+        const barThickness = 3;
         const padding = 4;
+        const lineLength = Math.round(Math.SQRT2 * (size - 2 * padding));
 
-        const line1 = svg("line", {
-            class: {
-                "stroke-foreground": true,
-                "stroke-[3px]": true
-            },
-            attrs: {
-                x1: padding,
-                y1: padding,
-                x2: size - padding,
-                y2: size - padding,
-                "stroke-linecap": "round"
-            }
+        const barStyle = {
+            position: "absolute",
+            width: `${lineLength}px`,
+            height: `${barThickness}px`,
+            top: `${(size - barThickness) / 2}px`,
+            left: `${(size - lineLength) / 2}px`,
+            borderRadius: "2px"
+        };
+
+        const line1 = html("div", {
+            class: { "bg-foreground": true, "box-border": true },
+            style: { ...barStyle, transform: "rotate(45deg)" }
         });
 
-        const line2 = svg("line", {
-            class: {
-                "stroke-foreground": true,
-                "stroke-[3px]": true
-            },
-            attrs: {
-                x1: size - padding,
-                y1: padding,
-                x2: padding,
-                y2: size - padding,
-                "stroke-linecap": "round"
-            }
+        const line2 = html("div", {
+            class: { "bg-foreground": true, "box-border": true },
+            style: { ...barStyle, transform: "rotate(-45deg)" }
         });
 
-        return [line1, line2];
+        return html(
+            "div",
+            {
+                class: { "box-border": true, "cursor-pointer": true },
+                style: {
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    position: "relative"
+                }
+            },
+            line1,
+            line2
+        );
     }
 }

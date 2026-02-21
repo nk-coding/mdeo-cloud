@@ -7,6 +7,7 @@ export * from "./features/diagram-server/model/splitNode.js";
 export * from "./features/diagram-server/model/elementTypes.js";
 export * from "./features/diagram-server/model/endNode.js";
 export * from "./features/diagram-server/model/matchNode.js";
+export * from "./features/diagram-server/model/matchNodeCompartments.js";
 export * from "./features/diagram-server/model/mergeNode.js";
 export * from "./features/diagram-server/model/patternInstanceNameLabel.js";
 export * from "./features/diagram-server/model/patternInstanceNode.js";

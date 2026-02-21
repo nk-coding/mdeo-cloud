@@ -10,6 +10,7 @@ import { pointerToolModule } from "./pointer-tool/featureModule.js";
 import { reconnectEdgeModule } from "./reconnect-edge/featureModule.js";
 import { viewportModule } from "./viewport/featureModule.js";
 import { toolboxModule } from "./toolbox/featureModule.js";
+import { gridModule } from "./grid/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
@@ -24,7 +25,9 @@ import { toolboxModule } from "./toolbox/featureModule.js";
  * - moveModule: Enhanced move command with custom edge morphing animations
  * - pointerToolModule: Pointer event handling and capture support
  * - reconnectEdgeModule: Reconnect edge operation support with metadata updates
+ * - viewportModule: Viewport management and fit-to-screen functionality
  * - toolboxModule: Toolbox UI for tool selection and element palette
+ * - gridModule: Grid snapping functionality for element alignment
  */
 export const DEFAULT_MODULES = [
     boundsModule,
@@ -38,5 +41,6 @@ export const DEFAULT_MODULES = [
     pointerToolModule,
     reconnectEdgeModule,
     viewportModule,
-    toolboxModule
+    toolboxModule,
+    gridModule
 ];

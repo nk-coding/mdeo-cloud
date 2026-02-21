@@ -1,5 +1,13 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
-import { sharedImport, GEdgeView, type EdgeMarkerData, type GEdge } from "@mdeo/editor-shared";
+import {
+    sharedImport,
+    GEdgeView,
+    type EdgeMarkerData,
+    type GEdge,
+    type EdgeAttachment,
+    EdgeAttachmentPosition
+} from "@mdeo/editor-shared";
+import { GControlFlowLabelNode } from "../model/controlFlowLabelNode.js";
 
 const { injectable } = sharedImport("inversify");
 const { svg } = sharedImport("@eclipse-glsp/sprotty");
@@ -10,14 +18,24 @@ const { svg } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export class GControlFlowEdgeView extends GEdgeView {
-    /**
-     * Renders the target marker as an arrow indicating the flow direction.
-     *
-     * @param _model The control flow edge model
-     * @param _context The rendering context
-     * @returns Edge marker data with arrow shape
-     */
-    protected override renderTargetMarker(_model: Readonly<GEdge>, _context: RenderingContext): EdgeMarkerData {
+    protected override getEdgeAttachments(model: Readonly<GEdge>, context: RenderingContext): EdgeAttachment[] {
+        const attachments: EdgeAttachment[] = [];
+
+        for (const child of model.children) {
+            if (child instanceof GControlFlowLabelNode) {
+                const attachment: EdgeAttachment = {
+                    vnode: context.renderElement(child),
+                    bounds: child.bounds,
+                    position: EdgeAttachmentPosition.MIDDLE_LEFT
+                };
+                attachments.push(attachment);
+            }
+        }
+
+        return attachments;
+    }
+
+    protected override renderTargetMarker(): EdgeMarkerData {
         const arrow = svg("polygon", {
             class: {
                 "fill-foreground": true,

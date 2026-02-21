@@ -29,7 +29,7 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
      * @param cause the action that caused the update
      */
     override postUpdate(cause?: Action): void {
-        if (cause === undefined || cause.kind !== RequestBoundsAction.KIND) {
+        if (!this.shouldHandle(cause)) {
             return;
         }
 
@@ -48,16 +48,33 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
                     newSize: {
                         width: boundsData.bounds.width,
                         height: boundsData.bounds.height
-                    },
-                    newPosition: {
-                        x: boundsData.bounds.x,
-                        y: boundsData.bounds.y
                     }
                 };
                 resizes.push(resize);
             }
         });
 
+        this.submitResponse(cause, resizes);
+        this.getElement2BoundsData().clear();
+    }
+
+    /**
+     * Determines whether the bounds updater should handle the given cause action.
+     *
+     * @param cause the action that may have caused a bounds update
+     * @returns true if the cause is defined and is a RequestBoundsAction, false otherwise
+     */
+    protected shouldHandle(cause: Action | undefined): cause is Action {
+        return cause !== undefined && RequestBoundsAction.is(cause);
+    }
+
+    /**
+     * Submits the computed bounds as a response to the cause action.
+     *
+     * @param cause the action that caused the bounds update, used to correlate the response
+     * @param resizes the list of elements with their new bounds to be included in the response
+     */
+    protected submitResponse(cause: Action, resizes: ElementAndBounds[]): void {
         const responseId = (cause as RequestBoundsActionType).requestId;
         const revision = this.root !== undefined ? this.root.revision : undefined;
         const computedBoundsAction = ComputedBoundsAction.create(resizes, { revision, responseId });
@@ -65,8 +82,6 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
             LocalComputedBoundsAction.mark(computedBoundsAction);
         }
         this.actionDispatcher.dispatch(computedBoundsAction);
-
-        this.getElement2BoundsData().clear();
     }
 
     /**
@@ -78,7 +93,15 @@ export class HiddenBoundsUpdater extends GLSPHiddenBoundsUpdater {
      * @returns The bounds of the element
      */
     public override getBounds(elm: Node, element: GModelElement & BoundsAware): Bounds {
-        if (!isSVGGraphicsElement(elm) || elm.nodeName !== "foreignObject") {
+        if (!isSVGGraphicsElement(elm)) {
+            const bounds = (elm as Element).getBoundingClientRect();
+            return {
+                x: bounds.x,
+                y: bounds.y,
+                width: bounds.width,
+                height: bounds.height
+            };
+        } else if (elm.nodeName !== "foreignObject") {
             return super.getBounds(elm, element);
         }
         const firstChild = (elm as SVGForeignObjectElement).firstElementChild;

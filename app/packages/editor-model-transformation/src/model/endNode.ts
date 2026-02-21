@@ -18,6 +18,12 @@ export class GEndNode extends GNode {
         nodeLayoutMetadataFeature
     ];
 
+    constructor() {
+        super();
+        this.vAlign = "center";
+        this.hAlign = "center";
+    }
+
     /**
      * The kind of end node (stop or kill)
      */

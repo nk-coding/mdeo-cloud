@@ -1,4 +1,3 @@
-import type { ContainerModule } from "inversify";
 import { sharedImport } from "../../sharedImport.js";
 import { SetBoundsFeedbackCommand } from "../metadata/setBoundsFeedbackCommand.js";
 
@@ -8,7 +7,7 @@ const { SetBoundsFeedbackCommand: GLSPSetBoundsFeedbackCommand } = sharedImport(
 /**
  * Feature module for metadata related functionalities.
  */
-export const metadataModule: ContainerModule = new FeatureModule(
+export const metadataModule = new FeatureModule(
     (bind, unbind, isBound, rebind) => {
         bind(SetBoundsFeedbackCommand).toSelf();
         rebind(GLSPSetBoundsFeedbackCommand).toService(SetBoundsFeedbackCommand);

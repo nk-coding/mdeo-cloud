@@ -19,6 +19,9 @@ import type {
     WhileMatchStatementType,
     UntilMatchStatementType,
     ForMatchStatementType,
+    IfExpressionStatementType,
+    WhileExpressionStatementType,
+    ElseIfBranchType,
     PatternType,
     PatternObjectInstanceType,
     PatternLinkType,
@@ -31,6 +34,8 @@ import {
     WhileMatchStatement,
     UntilMatchStatement,
     ForMatchStatement,
+    IfExpressionStatement,
+    WhileExpressionStatement,
     PatternObjectInstance,
     PatternLink,
     PatternObjectInstanceReference,
@@ -63,7 +68,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      * @returns Corrected metadata if invalid, undefined if valid
      */
     protected override verifyMetadata(model: NodeMetadata | EdgeMetadata): object | undefined {
-        // Main layout nodes
         if (
             model.type === ModelTransformationElementType.NODE_START ||
             model.type === ModelTransformationElementType.NODE_END ||
@@ -75,7 +79,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             return NodeLayoutMetadataUtil.verify(model.meta, 250);
         }
 
-        // Edge labels
         if (
             model.type === ModelTransformationElementType.NODE_CONTROL_FLOW_LABEL ||
             model.type === ModelTransformationElementType.NODE_PATTERN_LINK_END
@@ -83,7 +86,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             return NodeLayoutMetadataUtil.verify(model.meta);
         }
 
-        // Control flow and pattern edges
         if (
             model.type === ModelTransformationElementType.EDGE_CONTROL_FLOW ||
             model.type === ModelTransformationElementType.EDGE_PATTERN_LINK
@@ -116,7 +118,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             return 2;
         }
 
-        // For nodes with the same type, compare by attributes
         if (type1 === ModelTransformationElementType.NODE_MATCH) {
             return this.calculateMatchSimilarity(node1, node2);
         }
@@ -140,7 +141,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      * @returns Cost based on similarity
      */
     private calculateMatchSimilarity(node1: NodeAttributes, node2: NodeAttributes): number {
-        // Compare by label attribute if available
         const label1 = node1.label as string | undefined;
         const label2 = node2.label as string | undefined;
 
@@ -158,7 +158,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      * @returns Cost based on similarity
      */
     private calculatePatternInstanceSimilarity(node1: NodeAttributes, node2: NodeAttributes): number {
-        // Compare by name and type attributes
         const name1 = node1.name as string | undefined;
         const name2 = node2.name as string | undefined;
         const type1Attr = node1.typeName as string | undefined;
@@ -194,7 +193,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             return 2;
         }
 
-        // Same type edges have low substitution cost
         return 1;
     }
 
@@ -214,18 +212,15 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
 
         const idRegistry = new DefaultModelIdRegistry(sourceModel, this.modelIdProvider);
 
-        // Create start node
         const startNodeId = "start";
         nodes[startNodeId] = {
             type: ModelTransformationElementType.NODE_START,
             attrs: {}
         };
 
-        // Process statements
         const statements = sourceModel.statements ?? [];
         const result = this.processStatements(statements, startNodeId, idRegistry, nodes, edges);
 
-        // If the last statement doesn't terminate, create an implicit end node
         if (result.lastNodeId != undefined) {
             const endNodeId = "implicit_end";
             nodes[endNodeId] = {
@@ -305,7 +300,24 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 edges
             );
         }
-        // Handle stop statements
+        if (this.reflection.isInstance(stmt, IfExpressionStatement)) {
+            return this.processIfExpressionStatement(
+                stmt as IfExpressionStatementType,
+                previousNodeId,
+                idRegistry,
+                nodes,
+                edges
+            );
+        }
+        if (this.reflection.isInstance(stmt, WhileExpressionStatement)) {
+            return this.processWhileExpressionStatement(
+                stmt as WhileExpressionStatementType,
+                previousNodeId,
+                idRegistry,
+                nodes,
+                edges
+            );
+        }
         if ((stmt as { keyword?: string }).keyword === "stop" || (stmt as { keyword?: string }).keyword === "kill") {
             const nodeId = idRegistry.getId(stmt);
             nodes[nodeId] = {
@@ -352,14 +364,12 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         this.addMatchNode(matchNodeId, "if match", pattern, idRegistry, nodes, edges);
         this.addControlFlowEdge(previousNodeId, matchNodeId, undefined, edges);
 
-        // Process then branch
         const thenStatements = stmt.ifBlock?.thenBlock?.statements ?? [];
         let thenResult: { lastNodeId: string | undefined } = { lastNodeId: matchNodeId };
         if (thenStatements.length > 0) {
             const firstStmt = thenStatements[0];
             if (firstStmt != undefined) {
                 const firstResult = this.processStatement(firstStmt, matchNodeId, idRegistry, nodes, edges);
-                // Add edge from match to first statement with "then" label
                 this.addControlFlowEdge(matchNodeId, this.getFirstNodeId(firstStmt, idRegistry), "then", edges);
                 thenResult = this.processStatements(
                     thenStatements.slice(1),
@@ -374,7 +384,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             }
         }
 
-        // Process else branch
         let elseResult: { lastNodeId: string | undefined } = { lastNodeId: matchNodeId };
         const elseStatements = stmt.elseBlock?.statements ?? [];
         if (elseStatements.length > 0) {
@@ -395,7 +404,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             }
         }
 
-        // Create merge node if needed
         if (thenResult.lastNodeId != undefined || elseResult.lastNodeId != undefined) {
             const mergeNodeId = ModelTransformationIdGenerator.mergeNode(stmtId);
             nodes[mergeNodeId] = {
@@ -447,7 +455,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     nodes,
                     edges
                 );
-                // Loop back
                 if (doResult.lastNodeId != undefined) {
                     this.addControlFlowEdge(doResult.lastNodeId, matchNodeId, undefined, edges);
                 }
@@ -486,7 +493,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     nodes,
                     edges
                 );
-                // Loop back
                 if (doResult.lastNodeId != undefined) {
                     this.addControlFlowEdge(doResult.lastNodeId, matchNodeId, undefined, edges);
                 }
@@ -552,13 +558,11 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             attrs: { label }
         };
 
-        // Collect instances declared in this pattern
         const localInstances = new Map<string, PatternObjectInstanceType>();
         const referencedInstances = new Set<string>();
         const deletedInstances = new Set<string>();
 
         if (pattern?.elements != undefined) {
-            // First pass: collect what's declared, referenced, and deleted
             for (const element of pattern.elements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
                     const instance = element as PatternObjectInstanceType;
@@ -582,7 +586,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 }
                 if (this.reflection.isInstance(element, PatternLink)) {
                     const link = element as PatternLinkType;
-                    // Collect referenced instances from link ends
                     const sourceInstanceName = link.source?.object?.ref?.name;
                     const targetInstanceName = link.target?.object?.ref?.name;
                     if (sourceInstanceName && !localInstances.has(sourceInstanceName)) {
@@ -594,7 +597,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 }
             }
 
-            // Add nodes for instances declared in this pattern
             for (const [instanceName, instance] of localInstances) {
                 const instanceNodeId = idRegistry.getId(instance);
                 const typeName =
@@ -608,15 +610,11 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     }
                 };
 
-                // CRITICAL: Add edge from instance TO match for graph edit distance
-                // This prevents instances from being matched with instances in different match nodes
                 this.addInstanceToMatchEdge(instanceNodeId, matchNodeId, edges);
 
-                // Register instance for future references
                 this.declaredInstances.set(instanceName, instanceNodeId);
             }
 
-            // Add nodes for referenced instances (from previous matches)
             for (const instanceName of referencedInstances) {
                 if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
                     const previousNodeId = this.declaredInstances.get(instanceName);
@@ -630,13 +628,11 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                             }
                         };
 
-                        // Add edge from referenced instance TO match
                         this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
                     }
                 }
             }
 
-            // Add pattern link edges
             for (const element of pattern.elements) {
                 if (this.reflection.isInstance(element, PatternLink)) {
                     this.addPatternLinkEdge(element as PatternLinkType, matchNodeId, idRegistry, nodes, edges);
@@ -700,7 +696,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             }
         };
 
-        // Add link end nodes if properties are specified
         if (link.source?.property != undefined) {
             nodes[ModelTransformationIdGenerator.patternLinkSourceEndNode(edgeId)] = {
                 type: ModelTransformationElementType.NODE_PATTERN_LINK_END,
@@ -719,17 +714,17 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      * Resolves a pattern instance node ID by name.
      */
     private resolveInstanceNodeId(instanceName: string, matchNodeId: string): string | undefined {
-        // Check if it's in declared instances
         const declaredId = this.declaredInstances.get(instanceName);
         if (declaredId != undefined) {
             return declaredId;
         }
-        // Check if it's a reference in the current match
         return ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
     }
 
     /**
      * Gets the first node ID for a statement (for creating edges).
+     * For match-based statements this is the match node; for expression-based
+     * branching statements it is the split node.
      */
     private getFirstNodeId(stmt: BaseTransformationStatementType, idRegistry: ModelIdRegistry): string {
         if (this.reflection.isInstance(stmt, IfMatchStatement)) {
@@ -744,7 +739,187 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         if (this.reflection.isInstance(stmt, ForMatchStatement)) {
             return ModelTransformationIdGenerator.matchNode(idRegistry.getId(stmt));
         }
+        if (
+            this.reflection.isInstance(stmt, IfExpressionStatement) ||
+            this.reflection.isInstance(stmt, WhileExpressionStatement)
+        ) {
+            return `${idRegistry.getId(stmt)}_split`;
+        }
         return idRegistry.getId(stmt);
+    }
+
+    /**
+     * Processes an if-expression statement.
+     * Mirrors the factory's processIfExpressionStatement/processIfExpressionStatementBranches.
+     */
+    private processIfExpressionStatement(
+        stmt: IfExpressionStatementType,
+        previousNodeId: string,
+        idRegistry: ModelIdRegistry,
+        nodes: Record<string, NodeMetadata>,
+        edges: Record<string, EdgeMetadata>
+    ): { lastNodeId: string | undefined } {
+        const stmtId = idRegistry.getId(stmt);
+        const splitId = `${stmtId}_split`;
+
+        nodes[splitId] = {
+            type: ModelTransformationElementType.NODE_SPLIT,
+            attrs: {}
+        };
+        this.addControlFlowEdge(previousNodeId, splitId, undefined, edges);
+
+        return this.processIfExpressionStatementBranches(stmt, stmtId, splitId, idRegistry, nodes, edges);
+    }
+
+    /**
+     * Processes the branches of an if-expression statement.
+     * Mirrors the factory's processIfExpressionStatementBranches with deduplication.
+     */
+    private processIfExpressionStatementBranches(
+        stmt: IfExpressionStatementType,
+        stmtId: string,
+        splitId: string,
+        idRegistry: ModelIdRegistry,
+        nodes: Record<string, NodeMetadata>,
+        edges: Record<string, EdgeMetadata>
+    ): { lastNodeId: string | undefined } {
+        const branchResults: { lastNodeId: string | undefined }[] = [];
+
+        const thenStatements = stmt.thenBlock?.statements ?? [];
+        const thenResult = this.processBranchStatements(thenStatements, splitId, "true", idRegistry, nodes, edges);
+        branchResults.push(thenResult);
+
+        let lastElseIfSplitId = splitId;
+        for (let i = 0; i < (stmt.elseIfBranches?.length ?? 0); i++) {
+            const elseIfBranch = stmt.elseIfBranches![i] as ElseIfBranchType;
+            const elseIfSplitId = `${stmtId}_elseif_${i}_split`;
+
+            nodes[elseIfSplitId] = {
+                type: ModelTransformationElementType.NODE_SPLIT,
+                attrs: {}
+            };
+            this.addControlFlowEdge(lastElseIfSplitId, elseIfSplitId, "false", edges);
+
+            const elseIfStatements = elseIfBranch.block?.statements ?? [];
+            const elseIfResult = this.processBranchStatements(
+                elseIfStatements,
+                elseIfSplitId,
+                "true",
+                idRegistry,
+                nodes,
+                edges
+            );
+            branchResults.push(elseIfResult);
+            lastElseIfSplitId = elseIfSplitId;
+        }
+
+        if (stmt.elseBlock != undefined) {
+            const elseStatements = stmt.elseBlock.statements ?? [];
+            const elseResult = this.processBranchStatements(
+                elseStatements,
+                lastElseIfSplitId,
+                "false",
+                idRegistry,
+                nodes,
+                edges
+            );
+            branchResults.push(elseResult);
+        } else {
+            branchResults.push({ lastNodeId: lastElseIfSplitId });
+        }
+
+        const nonTerminating = branchResults.filter((r) => r.lastNodeId != undefined);
+        if (nonTerminating.length > 0) {
+            const mergeNodeId = ModelTransformationIdGenerator.mergeNode(stmtId);
+            nodes[mergeNodeId] = {
+                type: ModelTransformationElementType.NODE_MERGE,
+                attrs: {}
+            };
+
+            const connectedToMerge = new Set<string>();
+            for (const result of nonTerminating) {
+                const sourceId = result.lastNodeId!;
+                if (connectedToMerge.has(sourceId)) {
+                    continue;
+                }
+                connectedToMerge.add(sourceId);
+
+                if (sourceId === lastElseIfSplitId && stmt.elseBlock == undefined) {
+                    this.addControlFlowEdge(sourceId, mergeNodeId, "false", edges);
+                } else {
+                    this.addControlFlowEdge(sourceId, mergeNodeId, undefined, edges);
+                }
+            }
+
+            return { lastNodeId: mergeNodeId };
+        }
+
+        return { lastNodeId: undefined };
+    }
+
+    /**
+     * Processes a while-expression statement.
+     * Mirrors the factory's processWhileExpressionStatement.
+     */
+    private processWhileExpressionStatement(
+        stmt: WhileExpressionStatementType,
+        previousNodeId: string,
+        idRegistry: ModelIdRegistry,
+        nodes: Record<string, NodeMetadata>,
+        edges: Record<string, EdgeMetadata>
+    ): { lastNodeId: string | undefined } {
+        const stmtId = idRegistry.getId(stmt);
+        const splitId = `${stmtId}_split`;
+
+        nodes[splitId] = {
+            type: ModelTransformationElementType.NODE_SPLIT,
+            attrs: {}
+        };
+        this.addControlFlowEdge(previousNodeId, splitId, undefined, edges);
+
+        const bodyStatements = stmt.block?.statements ?? [];
+        const bodyResult = this.processBranchStatements(bodyStatements, splitId, "true", idRegistry, nodes, edges);
+
+        if (bodyResult.lastNodeId != undefined) {
+            this.addControlFlowEdge(bodyResult.lastNodeId, splitId, undefined, edges);
+        }
+
+        return { lastNodeId: splitId };
+    }
+
+    /**
+     * Processes a linear sequence of statements for a branch, creating the initial
+     * labeled edge from sourceNodeId to the first statement's entry node.
+     * Returns sourceNodeId unchanged when the list is empty (no edge emitted).
+     */
+    private processBranchStatements(
+        statements: BaseTransformationStatementType[],
+        sourceNodeId: string,
+        label: string,
+        idRegistry: ModelIdRegistry,
+        nodes: Record<string, NodeMetadata>,
+        edges: Record<string, EdgeMetadata>
+    ): { lastNodeId: string | undefined } {
+        if (statements.length === 0) {
+            return { lastNodeId: sourceNodeId };
+        }
+
+        const firstStmt = statements[0]!;
+        const firstNodeId = this.getFirstNodeId(firstStmt, idRegistry);
+        const firstResult = this.processStatement(firstStmt, sourceNodeId, idRegistry, nodes, edges);
+        this.addControlFlowEdge(sourceNodeId, firstNodeId, label, edges);
+
+        let currentNodeId = firstResult.lastNodeId;
+        for (let i = 1; i < statements.length; i++) {
+            const stmt = statements[i];
+            if (stmt == undefined || currentNodeId == undefined) {
+                continue;
+            }
+            const result = this.processStatement(stmt, currentNodeId, idRegistry, nodes, edges);
+            currentNodeId = result.lastNodeId;
+        }
+
+        return { lastNodeId: currentNodeId };
     }
 
     /**
@@ -763,7 +938,5 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             to: targetId,
             attrs: { label }
         };
-
-        // Add label node if specified - not needed for metadata
     }
 }

@@ -16,4 +16,10 @@ export class GMergeNode extends GNode {
         connectableFeature,
         nodeLayoutMetadataFeature
     ];
+
+    constructor() {
+        super();
+        this.vAlign = "center";
+        this.hAlign = "center";
+    }
 }

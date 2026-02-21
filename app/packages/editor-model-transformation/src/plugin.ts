@@ -1,6 +1,7 @@
 import type { ContainerConfiguration } from "@eclipse-glsp/sprotty";
 import { modelTransformationDiagramModule } from "./module.js";
 import { DEFAULT_MODULES } from "@mdeo/editor-shared";
+import { modelTransformationBoundsModule } from "./features/bounds/featureModule.js";
 
 /**
  * Editor plugin for the model transformation editor.
@@ -10,5 +11,6 @@ import { DEFAULT_MODULES } from "@mdeo/editor-shared";
  */
 export const modelTransformationEditorPlugin: ContainerConfiguration = [
     ...DEFAULT_MODULES,
+    modelTransformationBoundsModule,
     modelTransformationDiagramModule
 ];

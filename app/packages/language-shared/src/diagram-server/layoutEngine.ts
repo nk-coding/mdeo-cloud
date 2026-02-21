@@ -84,9 +84,7 @@ export abstract class BaseLayoutEngine {
                     continue;
                 }
                 const edgeMeta = this.extractEdgeMetadata(edge as ElkExtendedEdge);
-                if (edgeMeta != undefined) {
-                    edits.edges[edge.id] = { meta: edgeMeta };
-                }
+                edits.edges[edge.id] = { meta: edgeMeta };
             }
             for (const child of node.children ?? []) {
                 traverse(child);
@@ -115,12 +113,14 @@ export abstract class BaseLayoutEngine {
      * Extracts layout metadata from the given ELK edge
      *
      * @param edge the ELK edge to extract metadata from
-     * @returns the extracted edge layout metadata, or undefined if no metadata is available
+     * @returns the extracted edge layout metadata
      */
-    protected extractEdgeMetadata(edge: ElkExtendedEdge): EdgeLayoutMetadata | undefined {
+    protected extractEdgeMetadata(edge: ElkExtendedEdge): EdgeLayoutMetadata {
         const section = edge.sections?.[0];
         if (section?.bendPoints == undefined) {
-            return undefined;
+            return {
+                routingPoints: []
+            };
         }
         const points =
             section.bendPoints.length > 0

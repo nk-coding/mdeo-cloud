@@ -37,9 +37,13 @@ import { GMergeNodeView } from "./views/mergeNodeView.js";
 import { GControlFlowEdgeView } from "./views/controlFlowEdgeView.js";
 import { GControlFlowLabelNodeView } from "./views/controlFlowLabelNodeView.js";
 import { GMatchNode } from "./model/matchNode.js";
+import { GMatchNodeCompartments } from "./model/matchNodeCompartments.js";
 import { GVariableLabel } from "./model/variableLabel.js";
 import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GMatchNodeView } from "./views/matchNodeView.js";
+import { GMatchNodeCompartmentsView } from "./views/matchNodeCompartmentsView.js";
+import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
+import { GPatternLinkModifierLabelView } from "./views/patternLinkModifierLabelView.js";
 
 const { FeatureModule, configureModelElement } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -137,6 +141,12 @@ export const modelTransformationDiagramModule = new FeatureModule(
 
         // Match node (container for pattern elements)
         configureModelElement(context, ModelTransformationElementType.NODE_MATCH, GMatchNode, GMatchNodeView);
+        configureModelElement(
+            context,
+            ModelTransformationElementType.MATCH_NODE_COMPARTMENTS,
+            GMatchNodeCompartments,
+            GMatchNodeCompartmentsView
+        );
 
         // Constraint labels
         configureModelElement(context, ModelTransformationElementType.LABEL_VARIABLE, GVariableLabel, GLabelView);
@@ -145,6 +155,12 @@ export const modelTransformationDiagramModule = new FeatureModule(
             ModelTransformationElementType.LABEL_WHERE_CLAUSE,
             GWhereClauseLabel,
             GLabelView
+        );
+        configureModelElement(
+            context,
+            ModelTransformationElementType.LABEL_PATTERN_LINK_MODIFIER,
+            GPatternLinkModifierLabel,
+            GPatternLinkModifierLabelView
         );
     },
     { featureId: Symbol("modelTransformationDiagram") }

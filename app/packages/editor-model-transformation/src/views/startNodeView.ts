@@ -1,46 +1,42 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
+import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
+const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering start nodes.
- * Renders a filled black circle representing the start of a control flow, similar to UML activity diagrams.
- * Selection and resize handles are provided by the base GNodeView.
+ * Renders a filled circle representing the start of a control flow, similar to UML activity diagrams.
+ * Uses an HTML div with border-radius so the bounding box correctly includes the border.
  */
 @injectable()
-export class GStartNodeView extends GNodeViewBase {
+export class GStartNodeView extends GNodeView {
     /**
      * The radius of the start node circle
      */
     static readonly RADIUS = 12;
 
     /**
-     * Renders the start node as a filled black circle.
-     * Selection and resize handles are provided by the base GNodeView.
+     * Renders the start node as a filled circle using an HTML div.
      *
-     * @param model The node model
+     * @param _model The node model
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    override render(model: Readonly<GNode>, _context: RenderingContext): VNode | undefined {
-        const radius = GStartNodeView.RADIUS;
-
-        const circle = svg("circle", {
+    protected override renderForeignElement(_model: Readonly<GNode>, _context: RenderingContext): VNode {
+        const diameter = GStartNodeView.RADIUS * 2;
+        return html("div", {
             class: {
-                "fill-foreground": true,
-                "stroke-foreground": true,
+                "bg-foreground": true,
+                "rounded-full": true,
+                "box-border": true,
                 "cursor-pointer": true
             },
-            attrs: {
-                cx: radius,
-                cy: radius,
-                r: radius
+            style: {
+                width: `${diameter}px`,
+                height: `${diameter}px`
             }
         });
-
-        return svg("g", { class: { "cursor-pointer": true } }, ...this.renderControlElements(model), circle);
     }
 }
