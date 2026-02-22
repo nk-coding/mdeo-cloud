@@ -44,7 +44,6 @@ fun createFloatType(): GremlinTypeDefinition {
             GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("round", "", 0) { receiver, _ ->
-            // Gremlin math doesn't have round, use floor(x + 0.5) as approximation
             val traversal = (receiver as GraphTraversal<Any, Any>).math("floor(_ + 0.5)")
             GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }

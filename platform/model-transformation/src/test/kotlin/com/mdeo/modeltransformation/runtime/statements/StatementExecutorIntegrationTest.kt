@@ -44,7 +44,7 @@ class StatementExecutorIntegrationTest {
         
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
+            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
         )
@@ -64,7 +64,7 @@ class StatementExecutorIntegrationTest {
             
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://metamodel",
+                metamodelPath = "test://metamodel",
                 statements = listOf(
                     TypedMatchStatement(
                         pattern = TypedPattern(
@@ -104,7 +104,7 @@ class StatementExecutorIntegrationTest {
             
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://metamodel",
+                metamodelPath = "test://metamodel",
                 statements = listOf(
                     TypedMatchStatement(
                         pattern = TypedPattern(
@@ -148,7 +148,7 @@ class StatementExecutorIntegrationTest {
             
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://metamodel",
+                metamodelPath = "test://metamodel",
                 statements = listOf(
                     TypedMatchStatement(
                         pattern = TypedPattern(
@@ -267,7 +267,7 @@ class StatementExecutorIntegrationTest {
         fun `kill terminates execution immediately`() {
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://metamodel",
+                metamodelPath = "test://metamodel",
                 statements = listOf(
                     TypedStopStatement(keyword = "kill")
                 )
@@ -295,7 +295,7 @@ class StatementExecutorIntegrationTest {
         fun `empty ast returns success`() {
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://metamodel",
+                metamodelPath = "test://metamodel",
                 statements = emptyList()
             )
             

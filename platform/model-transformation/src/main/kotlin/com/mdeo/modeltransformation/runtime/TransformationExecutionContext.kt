@@ -121,5 +121,26 @@ class TransformationExecutionContext private constructor(
                 parentContext = null
             )
         }
+
+        /**
+         * Creates a root execution context at scope index 1 pre-populated with enum container bindings.
+         *
+         * @param enumNames The names of enum containers to register at scope index 1.
+         * @return A new [TransformationExecutionContext] with enum-aware global scope.
+         */
+        fun emptyWithEnums(enumNames: List<String>): TransformationExecutionContext {
+            val enumBindings = enumNames.associate { name ->
+                name to VariableBinding.ValueBinding(value = null)
+            }
+            val transformationScope = VariableScope(
+                scopeIndex = 1,
+                bindings = enumBindings.toMutableMap(),
+                parent = null
+            )
+            return TransformationExecutionContext(
+                variableScope = transformationScope,
+                parentContext = null
+            )
+        }
     }
 }

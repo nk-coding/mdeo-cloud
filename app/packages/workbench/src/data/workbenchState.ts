@@ -604,7 +604,6 @@ export class WorkbenchState {
         });
         this.languageClient.value = languageClient;
 
-        // Create the central GLSP client
         this.glspClient.value = new MonacoGLSPClient({
             client: languageClient,
             id: "workbench-glsp-client"

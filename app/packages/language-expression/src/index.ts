@@ -1,6 +1,7 @@
 export * from "./features/metamodel/classTypeGenerator.js";
 export * from "./features/metamodel/metamodelClassExtractor.js";
 export * from "./features/metamodel/metamodelClassInfo.js";
+export * from "./features/metamodel/metamodelEnumInfo.js";
 export * from "./features/expressionSerializers.js";
 export * from "./features/inferLambdaType.js";
 export * from "./features/precedenceHelper.js";

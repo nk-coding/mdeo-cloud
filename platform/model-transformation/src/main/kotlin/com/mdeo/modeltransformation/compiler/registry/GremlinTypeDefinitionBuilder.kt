@@ -156,6 +156,25 @@ class GremlinTypeDefinitionBuilder(
     }
 
     /**
+     * Adds an enum entry property to this type.
+     *
+     * Enum entries are constant values that don't result in graph traversals.
+     * Instead, accessing an entry produces a constant string value in the format
+     * `EnumName`.`entryName` (with backticks in the actual string).
+     *
+     * This is used for enum-container types where accessing `MyEnum.VALUE`
+     * produces the string literal "`MyEnum`.`VALUE`".
+     *
+     * @param name The entry name.
+     * @param value The constant string value this entry produces.
+     * @return This builder, for method chaining.
+     */
+    fun enumEntry(name: String, value: String): GremlinTypeDefinitionBuilder {
+        properties[name] = EnumEntryPropertyDefinition(name, value)
+        return this
+    }
+
+    /**
      * Adds an association (edge traversal) to this type.
      *
      * Associations represent relations between model classes and are compiled
@@ -298,6 +317,34 @@ class AssociationGremlinPropertyDefinition(
         }
         
         return GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+    }
+}
+
+/**
+ * Enum entry property definition that produces a constant string value.
+ *
+ * When accessing an enum entry like `MyEnum.VALUE`, this property produces
+ * the constant string "`MyEnum`.`VALUE`" without performing any graph traversal.
+ *
+ * @param name The entry name.
+ * @param value The constant string value this entry produces.
+ */
+class EnumEntryPropertyDefinition(
+    override val name: String,
+    private val value: String
+) : GremlinPropertyDefinition {
+
+    /**
+     * Compiles an enum entry access to a constant value traversal.
+     *
+     * This does NOT perform any graph traversal. Instead, it returns a
+     * ValueResult containing the constant enum value string.
+     *
+     * @param receiver The receiver traversal (ignored for enum entries)
+     * @return The compilation result containing the constant enum value string
+     */
+    override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
+        return GremlinCompilationResult.constant<Any, String>(value, null)
     }
 }
 

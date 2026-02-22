@@ -61,7 +61,6 @@ class ReturnStatementCompiler : StatementCompiler {
         val functionReturnType = context.getFunctionReturnType()
         val exprType = context.getType(returnValue.evalType)
         
-        // Compile the expression with coercion to the function return type
         context.compileExpression(returnValue, mv, functionReturnType ?: exprType)
         
         emitTypedReturn(functionReturnType ?: exprType, mv)

@@ -149,7 +149,6 @@ export class ModelValidator extends BaseModelValidator {
             }
         }
 
-        // Check all properties in the class chain
         for (const cls of classChain) {
             for (const prop of cls.properties ?? []) {
                 if (!prop.name) {
@@ -175,8 +174,7 @@ export class ModelValidator extends BaseModelValidator {
     protected override isRequiredProperty(property: PropertyType): boolean {
         const multiplicity = property.multiplicity;
 
-        if (!multiplicity) {
-            // No multiplicity means exactly 1, which is required
+        if (multiplicity == undefined) {
             return true;
         }
 
@@ -214,9 +212,6 @@ export class ModelValidator extends BaseModelValidator {
         if (!propRef) {
             return;
         }
-
-        // The property reference might be a Property from the metamodel
-        // We need to handle this properly
         const property = propRef as PropertyType;
         if (!property.type) {
             return;
@@ -227,10 +222,8 @@ export class ModelValidator extends BaseModelValidator {
             return;
         }
 
-        // Validate multiplicity (number of values)
         this.validateValueMultiplicity(value, property, propAssign, accept);
 
-        // Validate value type
         this.validateValueType(value, property, propAssign, accept);
     }
 
@@ -262,7 +255,6 @@ export class ModelValidator extends BaseModelValidator {
                 return;
             }
 
-            // Check bounds
             const bounds = this.getMultiplicityBounds(multiplicity);
             if (count < bounds.lower) {
                 accept(
@@ -285,7 +277,6 @@ export class ModelValidator extends BaseModelValidator {
                 );
             }
         } else {
-            // Single value
             if (isMultiple) {
                 const bounds = this.getMultiplicityBounds(multiplicity);
                 if (bounds.lower > 1) {

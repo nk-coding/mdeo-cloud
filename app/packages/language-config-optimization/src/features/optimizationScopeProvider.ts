@@ -169,21 +169,16 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
             return EMPTY_SCOPE;
         }
 
-        // Get the class chain (includes parent classes)
         const classChain = resolveClassChain(classRef, this.astReflection);
 
-        // Collect properties from all classes in the chain
         const properties = classChain.flatMap((cls) => cls.properties);
 
-        // Collect association ends that reference any class in the chain
         const allAssociationEnds = classChain.flatMap((cls) => {
             return this.associationEndCache.getAssociationEndsForClass(cls);
         });
 
-        // Deduplicate association ends by name
         const uniqueAssociationEnds = Array.from(new Map(allAssociationEnds.map((end) => [end.name, end])).values());
 
-        // Combine properties and association ends
         const allFields: AstNode[] = [...properties, ...uniqueAssociationEnds];
 
         return this.createScopeForNodes(allFields);

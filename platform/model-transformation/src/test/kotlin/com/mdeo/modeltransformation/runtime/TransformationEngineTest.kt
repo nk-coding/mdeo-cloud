@@ -30,7 +30,7 @@ class TransformationEngineTest {
         registry = StatementExecutorRegistry()
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
+            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
         )
@@ -48,7 +48,7 @@ class TransformationEngineTest {
         fun `execute empty AST returns Success`() {
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = emptyList()
             )
             
@@ -70,7 +70,7 @@ class TransformationEngineTest {
             val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
             val ast = TypedAst(
                 types = listOf(intType, stringType),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = emptyList()
             )
             
@@ -93,7 +93,7 @@ class TransformationEngineTest {
             
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = listOf(TypedStopStatement(keyword = "stop"))
             )
             
@@ -119,7 +119,7 @@ class TransformationEngineTest {
             
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = listOf(
                     TypedStopStatement(keyword = "stop"),
                     TypedStopStatement(keyword = "stop"),
@@ -146,7 +146,7 @@ class TransformationEngineTest {
             
             val ast = TypedAst(
                 types = emptyList(),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = listOf(
                     TypedStopStatement(keyword = "stop"),
                     TypedStopStatement(keyword = "stop")
@@ -253,7 +253,7 @@ class TransformationEngineTest {
             val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
             val ast = TypedAst(
                 types = listOf(intType, booleanType, stringType),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = emptyList()
             )
             engine = TransformationEngine(
@@ -274,7 +274,7 @@ class TransformationEngineTest {
             val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
             val ast = TypedAst(
                 types = listOf(intType),
-                metamodelUri = "test://model",
+                metamodelPath = "test://model",
                 statements = emptyList()
             )
             engine = TransformationEngine(
@@ -294,7 +294,7 @@ class TransformationEngineTest {
 
         @Test
         fun `create returns configured engine`() {
-            val ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList())
+            val ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList())
             val newEngine = TransformationEngine.create(graph.traversal(), ast)
             
             // Should have all default executors registered

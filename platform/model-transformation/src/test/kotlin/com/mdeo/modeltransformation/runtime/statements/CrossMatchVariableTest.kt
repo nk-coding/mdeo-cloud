@@ -85,7 +85,7 @@ class CrossMatchVariableTest {
         // Create AST with empty statements - we'll execute statements individually
         val ast = TypedAst(
             types = listOf(stringType, intType, houseTypeRef, roomTypeRef),
-            metamodelUri = "test://model",
+            metamodelPath = "test://model",
             statements = emptyList()
         )
         

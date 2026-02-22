@@ -297,8 +297,7 @@ export abstract class BaseModelValidator {
     protected isRequiredProperty(property: PropertyType): boolean {
         const multiplicity = property.multiplicity;
 
-        if (!multiplicity) {
-            // No multiplicity means exactly 1, which is required
+        if (multiplicity == undefined) {
             return true;
         }
 

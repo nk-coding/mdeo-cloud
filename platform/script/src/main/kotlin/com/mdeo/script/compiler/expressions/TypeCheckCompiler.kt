@@ -137,32 +137,26 @@ class TypeCheckCompiler : ExpressionCompiler() {
         val sourceIsNullable = sourceType.isNullable
         val checkIsNullable = checkType.isNullable
 
-        // Can't determine at compile time for Any
         if (sourceType.type == "builtin.any") {
             return null
         }
 
-        // Same type name
         if (sourceType.type == checkType.type) {
             return handleSameTypeName(sourceIsNullable, checkIsNullable)
         }
 
-        // Different primitives are incompatible (unless nullable)
         if (sourceIsPrimitive && checkIsPrimitive && !sourceIsNullable) {
             return false
         }
 
-        // Non-nullable primitive is always an instance of any
         if (sourceIsPrimitive && !sourceIsNullable && checkType.type == "builtin.any") {
             return true
         }
 
-        // Check reference type hierarchy
         if (!sourceIsPrimitive && !checkIsPrimitive) {
             return handleReferenceTypeCheck(sourceType, checkType, context)
         }
 
-        // Nullable primitives need runtime check
         if (sourceIsNullable && sourceIsPrimitive && checkIsPrimitive) {
             return null
         }
@@ -203,7 +197,6 @@ class TypeCheckCompiler : ExpressionCompiler() {
             return if (sourceType.isNullable && !checkType.isNullable) null else true
         }
 
-        // If not a subtype and check is non-nullable, it's definitely false
         if (!checkType.isNullable) {
             return false
         }
@@ -241,7 +234,6 @@ class TypeCheckCompiler : ExpressionCompiler() {
     private fun getInstanceOfClass(checkType: ReturnType, context: CompilationContext): String {
         val ref = checkType as ClassTypeRef
         
-        // For instanceof, we always use the wrapper/reference class (nullable or not)
         val jvmClass = context.typeRegistry.getJvmClassName(ref.type, true)
         
         return jvmClass ?: "java/lang/Object"

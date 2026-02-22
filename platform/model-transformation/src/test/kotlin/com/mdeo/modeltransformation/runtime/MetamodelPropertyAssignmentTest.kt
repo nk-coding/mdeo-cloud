@@ -1,10 +1,13 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.expression.ast.types.AssociationData
+import com.mdeo.expression.ast.types.AssociationEndData
+import com.mdeo.expression.ast.types.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.TypedClass
-import com.mdeo.expression.ast.types.TypedProperty
-import com.mdeo.expression.ast.types.TypedRelation
+import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.expression.ast.types.MultiplicityData
+import com.mdeo.expression.ast.types.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
@@ -24,14 +27,14 @@ import org.junit.jupiter.api.Test
 
 /**
  * Tests that reproduce the real-world scenario where metamodel types
- * (e.g., metamodel./metamodel.mm.House) are used with their fully-qualified names.
+ * (e.g., class.House) are used with their class-prefixed names.
  *
  * This test matches the exact typed AST that the language frontend produces,
- * where eval types reference metamodel classes like "metamodel./metamodel.mm.House"
+ * where eval types reference metamodel classes like "class.House"
  * rather than simplified types like "__GraphNode".
  *
  * The bug: When creating a Room with `category = house.address`,
- * the MemberAccessCompiler looks up "address" on "metamodel./metamodel.mm.House"
+ * the MemberAccessCompiler looks up "address" on "class.House"
  * in the type registry. If that metamodel type is NOT registered, the compiler
  * throws an exception which is silently caught, causing the property to be skipped.
  */
@@ -50,7 +53,7 @@ class MetamodelPropertyAssignmentTest {
     // Index 4: Any? (nullable)
     // Index 5: builtin.List<Room>
     // Index 6: builtin.int
-    // Index 7: metamodel./metamodel.mm.House
+    // Index 7: class.House
     private val types: List<ReturnType> = listOf<ReturnType>(
         VoidType(),                                                             // 0
         ClassTypeRef(type = "builtin.string", isNullable = false),              // 1
@@ -59,43 +62,34 @@ class MetamodelPropertyAssignmentTest {
         ClassTypeRef(type = "Any", isNullable = true),                          // 4
         ClassTypeRef(type = "builtin.List", isNullable = false),                // 5
         ClassTypeRef(type = "builtin.int", isNullable = false),                 // 6
-        ClassTypeRef(type = "metamodel./metamodel.mm.House", isNullable = false) // 7
+        ClassTypeRef(type = "class.House", isNullable = false)                   // 7
     )
 
-    private val classes = listOf(
-        TypedClass(
-            name = "House",
-            `package` = "metamodel./metamodel.mm",
-            superClasses = emptySet(),
-            properties = listOf(
-                TypedProperty(name = "address", typeIndex = 1)
+    private val metamodelData = MetamodelData(
+        classes = listOf(
+            ClassData(
+                name = "House",
+                isAbstract = false,
+                extends = emptyList(),
+                properties = listOf(
+                    PropertyData(name = "address", primitiveType = "string", multiplicity = MultiplicityData.single())
+                )
             ),
-            relations = listOf(
-                TypedRelation(
-                    property = "rooms",
-                    oppositeProperty = "house",
-                    oppositeClassName = "metamodel./metamodel.mm.Room",
-                    isOutgoing = true,
-                    typeIndex = 5
+            ClassData(
+                name = "Room",
+                isAbstract = false,
+                extends = emptyList(),
+                properties = listOf(
+                    PropertyData(name = "category", primitiveType = "string", multiplicity = MultiplicityData.single()),
+                    PropertyData(name = "value", primitiveType = "int", multiplicity = MultiplicityData.single())
                 )
             )
         ),
-        TypedClass(
-            name = "Room",
-            `package` = "metamodel./metamodel.mm",
-            superClasses = emptySet(),
-            properties = listOf(
-                TypedProperty(name = "category", typeIndex = 1),
-                TypedProperty(name = "value", typeIndex = 6)
-            ),
-            relations = listOf(
-                TypedRelation(
-                    property = "house",
-                    oppositeProperty = "rooms",
-                    oppositeClassName = "metamodel./metamodel.mm.House",
-                    isOutgoing = false,
-                    typeIndex = 7
-                )
+        associations = listOf(
+            AssociationData(
+                source = AssociationEndData(className = "House", name = "rooms", multiplicity = MultiplicityData.many()),
+                operator = "<>->",
+                target = AssociationEndData(className = "Room", name = "house", multiplicity = MultiplicityData.single())
             )
         )
     )
@@ -110,7 +104,8 @@ class MetamodelPropertyAssignmentTest {
 
         engine = TransformationEngine(
             traversalSource = g,
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()), // Dummy AST for manual setup
+            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()), // Dummy AST for manual setup
+            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -137,12 +132,12 @@ class MetamodelPropertyAssignmentTest {
     private fun registerMetamodelTypes() {
         val typeRegistry = GremlinTypeRegistry.GLOBAL
 
-        val houseType = gremlinType("metamodel./metamodel.mm.House")
+        val houseType = gremlinType("class.House")
             .graphProperty("address")
             .build()
         typeRegistry.register(houseType)
 
-        val roomType = gremlinType("metamodel./metamodel.mm.Room")
+        val roomType = gremlinType("class.Room")
             .graphProperty("category")
             .graphProperty("value")
             .build()
@@ -161,12 +156,12 @@ class MetamodelPropertyAssignmentTest {
      *       create house -- newRoom
      *   }
      *
-     * The identifier `house` has evalType=7 (metamodel./metamodel.mm.House), scope=1.
+     * The identifier `house` has evalType=7 (class.House), scope=1.
      * The member access `house.address` has evalType=1 (builtin.string).
      *
      * Without registering metamodel types in the type registry, the category property
      * is silently skipped because the MemberAccessCompiler can't find "address" on
-     * "metamodel./metamodel.mm.House".
+     * "class.House".
      */
     @Test
     fun `category from house_address should be set on created Room with metamodel types`() {
@@ -267,19 +262,18 @@ class MetamodelPropertyAssignmentTest {
      * This test demonstrates the bug WITHOUT manually registered metamodel types.
      * It shows that without type registration, the property is silently skipped.
      *
-     * After the fix (TransformationEngine auto-registers metamodel types from ast.classes),
-     * this test should also pass when using engine.execute() with a full TypedAst.
+     * After the fix (TransformationEngine auto-registers metamodel types from MetamodelData),
+     * this test should also pass when using engine.execute() with MetamodelData.
      */
     @Test
-    fun `engine execute should auto-register metamodel types from ast classes`() {
+    fun `engine execute should auto-register metamodel types from metamodelData`() {
         // Create a House vertex in the graph
         g.addV("House").property("address", "456 Oak Ave").next()
 
-        // Build a full TypedAst with classes - this is what the real system produces
+        // Build a full TypedAst - this is what the real system produces
         val ast = TypedAst(
             types = types,
-            metamodelUri = "./metamodel.mm",
-            classes = classes,
+            metamodelPath = "./metamodel.mm",
             statements = listOf(
                 TypedMatchStatement(
                     pattern = TypedPattern(
@@ -348,6 +342,7 @@ class MetamodelPropertyAssignmentTest {
         val testEngine = TransformationEngine(
              traversalSource = g,
              ast = ast,
+             metamodelData = metamodelData,
              expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
              statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )

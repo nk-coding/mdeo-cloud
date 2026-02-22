@@ -1,9 +1,8 @@
 package com.mdeo.modeltransformationexecution.service
 
-import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.expression.ast.types.MetamodelData
 import com.mdeo.expression.ast.types.ReturnType
-import com.mdeo.expression.ast.types.TypedClass
-import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
@@ -14,7 +13,6 @@ import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Edge
 import org.apache.tinkerpop.gremlin.structure.Vertex
-import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import org.slf4j.LoggerFactory
 
 /**
@@ -31,14 +29,13 @@ import org.slf4j.LoggerFactory
  * Uses metamodel type information to determine which properties are collection types.
  */
 class GraphToModelDataConverter(
-    private val metamodelClasses: List<TypedClass>,
+    private val metamodelData: MetamodelData,
     private val types: List<ReturnType>,
     private val typeRegistry: GremlinTypeRegistry
 ) {
     private val logger = LoggerFactory.getLogger(GraphToModelDataConverter::class.java)
     
-    // Cache for looking up TypedClass by fully qualified name
-    private val classMap: Map<String, TypedClass> = metamodelClasses.associateBy { 
+    private val classMap: Map<String, ClassData> = metamodelData.classes.associateBy { 
         it.name
     }
     
@@ -98,48 +95,66 @@ class GraphToModelDataConverter(
     }
     
     /**
+     * Looks up a PropertyData for the given class and property name, traversing the
+     * class hierarchy to find inherited properties.
+     *
+     * @param className The class to start the search from
+     * @param propertyName The property name to find
+     * @return The PropertyData if found, or null if not found in the hierarchy
+     */
+    private fun findPropertyInHierarchy(className: String, propertyName: String): com.mdeo.expression.ast.types.PropertyData? {
+        val classData = classMap[className] ?: return null
+        val property = classData.properties.find { it.name == propertyName }
+        if (property != null) return property
+        for (parentName in classData.extends) {
+            val parentProperty = findPropertyInHierarchy(parentName, propertyName)
+            if (parentProperty != null) return parentProperty
+        }
+        return null
+    }
+
+    /**
      * Extracts properties from a vertex, handling list properties correctly.
      * 
      * Uses metamodel type information to determine which properties are collection types.
      * Properties stored with Cardinality.list will have multiple VertexProperty instances
-     * with the same key. These are collected into a ListValue based on their metamodel type.
+     * with the same key. These are collected into a ListValue based on their metamodel multiplicity.
+     * 
+     * Enum properties are stored in the graph as `EnumName`.`entryName` strings and are
+     * parsed back to EnumValue using the metamodel property type information.
      */
     private fun extractProperties(vertex: Vertex, className: String): Map<String, ModelDataPropertyValue> {
-        val typedClass = classMap[className]
-        if (typedClass == null) {
+        val classData = classMap[className]
+        if (classData == null) {
             throw IllegalStateException("No metamodel class found for $className")
         }
         
-        val propertyTypes = typedClass.properties.associate { prop ->
-            prop.name to prop.typeIndex
-        }
-        
-        val propertyMap = mutableMapOf<String, MutableList<Any?>>()
+        val vertexPropertyMap = mutableMapOf<String, MutableList<Any?>>()
         vertex.properties<Any>().forEachRemaining { vertexProperty ->
             val key = vertexProperty.key()
-            if (!propertyMap.containsKey(key)) {
-                propertyMap[key] = mutableListOf()
+            if (!vertexPropertyMap.containsKey(key)) {
+                vertexPropertyMap[key] = mutableListOf()
             }
-            propertyMap[key]!!.add(vertexProperty.value())
+            vertexPropertyMap[key]!!.add(vertexProperty.value())
         }
         
-        return propertyMap.mapNotNull { (propertyName, values) ->
-            val typeIndex = propertyTypes[propertyName]
-            if (typeIndex == null) {
+        return vertexPropertyMap.mapNotNull { (propertyName, values) ->
+            val propData = findPropertyInHierarchy(className, propertyName)
+            if (propData == null) {
                 throw IllegalStateException("No type information found for property $propertyName of class $className in metamodel")
             }
             
-            val isCollectionType = isCollectionProperty(typeIndex)
+            val isCollectionType = propData.multiplicity.isMultiple()
             
             val propertyValue = if (isCollectionType) {
                 ModelDataPropertyValue.ListValue(
-                    values.map { convertToScalarPropertyValue(it) }
+                    values.map { convertToScalarPropertyValue(it, propData.enumType) }
                 )
             } else {
                 if (values.size > 1) {
                     throw IllegalStateException("Multiple values found for non-collection property $propertyName of class $className in vertex ${vertex.id()}")
                 }
-                convertToScalarPropertyValue(values.firstOrNull())
+                convertToScalarPropertyValue(values.firstOrNull(), propData.enumType)
             }
             
             propertyName to propertyValue
@@ -150,17 +165,17 @@ class GraphToModelDataConverter(
      * Extracts properties without type information, falling back to heuristic approach.
      */
     private fun extractPropertiesWithoutTypeInfo(vertex: Vertex): Map<String, ModelDataPropertyValue> {
-        val propertyMap = mutableMapOf<String, MutableList<Any?>>()
+        val vertexPropertyMap = mutableMapOf<String, MutableList<Any?>>()
         
         vertex.properties<Any>().forEachRemaining { vertexProperty ->
             val key = vertexProperty.key()
-            if (!propertyMap.containsKey(key)) {
-                propertyMap[key] = mutableListOf()
+            if (!vertexPropertyMap.containsKey(key)) {
+                vertexPropertyMap[key] = mutableListOf()
             }
-            propertyMap[key]!!.add(vertexProperty.value())
+            vertexPropertyMap[key]!!.add(vertexProperty.value())
         }
         
-        return propertyMap.mapValues { (_, values) ->
+        return vertexPropertyMap.mapValues { (_, values) ->
             if (values.size > 1) {
                 ModelDataPropertyValue.ListValue(
                     values.map { convertToScalarPropertyValue(it) }
@@ -172,31 +187,46 @@ class GraphToModelDataConverter(
     }
     
     /**
-     * Checks if a property type (by type index) is a collection type.
-     */
-    private fun isCollectionProperty(typeIndex: Int): Boolean {
-        if (typeIndex < 0 || typeIndex >= types.size) return false
-        
-        val type = types[typeIndex] as? ValueType ?: return false
-        if (type !is ClassTypeRef) return false
-        
-        val typeDefinition = typeRegistry.getType(type.type) ?: return false
-        val cardinality = typeDefinition.cardinality
-        
-        return cardinality == VertexProperty.Cardinality.list || cardinality == VertexProperty.Cardinality.set
-    }
-    
-    /**
      * Converts a single scalar value to ModelDataPropertyValue.
+     *
+     * When [enumTypeName] is non-null, the value is expected to be a backtick-formatted
+     * enum string (e.g., "`Status`.`ACTIVE`") and is parsed into an [ModelDataPropertyValue.EnumValue]
+     * containing only the entry name (e.g., "ACTIVE").
+     *
+     * @param value The raw graph property value.
+     * @param enumTypeName The enum type name if this property is an enum type, or null otherwise.
      */
-    private fun convertToScalarPropertyValue(value: Any?): ModelDataPropertyValue {
+    private fun convertToScalarPropertyValue(
+        value: Any?,
+        enumTypeName: String? = null
+    ): ModelDataPropertyValue {
         return when (value) {
             null -> ModelDataPropertyValue.NullValue
-            is String -> ModelDataPropertyValue.StringValue(value)
+            is String -> {
+                if (enumTypeName != null) {
+                    ModelDataPropertyValue.EnumValue(parseEnumEntryName(value))
+                } else {
+                    ModelDataPropertyValue.StringValue(value)
+                }
+            }
             is Number -> ModelDataPropertyValue.NumberValue(value.toDouble())
             is Boolean -> ModelDataPropertyValue.BooleanValue(value)
             else -> ModelDataPropertyValue.StringValue(value.toString())
         }
+    }
+
+    /**
+     * Parses an enum entry name from the backtick-formatted enum string used in the graph.
+     *
+     * Expected format: `` `EnumName`.`entryName` ``
+     *
+     * @param value The backtick-formatted enum string.
+     * @return The entry name, or the original value if parsing fails.
+     */
+    private fun parseEnumEntryName(value: String): String {
+        val regex = Regex("`[^`]+`\\.`([^`]+)`")
+        val match = regex.matchEntire(value)
+        return match?.groupValues?.get(1) ?: value
     }
     
     /**

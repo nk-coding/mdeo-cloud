@@ -95,7 +95,6 @@ function printStopStatement(context: PrintContext<StopStatementType>): Doc {
 export function registerModelTransformationSerializers(services: ModelTransformationLanguageServices): void {
     const { AstSerializer } = services;
 
-    // Pattern elements
     AstSerializer.registerNodeSerializer(PatternModifier, (ctx) => printPatternModifier(ctx));
     AstSerializer.registerNodeSerializer(PatternVariable, (ctx) => printPatternVariable(ctx));
     AstSerializer.registerNodeSerializer(PatternPropertyAssignment, (ctx) => printPatternPropertyAssignment(ctx));
@@ -109,7 +108,6 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(WhereClause, (ctx) => printWhereClause(ctx));
     AstSerializer.registerNodeSerializer(Pattern, (ctx) => printPattern(ctx));
 
-    // Statements
     AstSerializer.registerNodeSerializer(StatementsScope, (ctx) => printStatementsScope(ctx));
     AstSerializer.registerNodeSerializer(MatchStatement, (ctx) => printMatchStatement(ctx));
     AstSerializer.registerNodeSerializer(IfMatchConditionAndBlock, (ctx) => printIfMatchCondition(ctx));
@@ -122,12 +120,10 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(WhileExpressionStatement, (ctx) => printWhileExpressionStatement(ctx));
     AstSerializer.registerNodeSerializer(StopStatement, (ctx) => printStopStatement(ctx));
 
-    // Lambda expressions
     AstSerializer.registerNodeSerializer(LambdaParameter, (ctx) => printLambdaParameter(ctx));
     AstSerializer.registerNodeSerializer(LambdaParameters, (ctx) => printLambdaParameters(ctx));
     AstSerializer.registerNodeSerializer(LambdaExpression, (ctx) => printLambdaExpression(ctx));
 
-    // Root
     AstSerializer.registerNodeSerializer(MetamodelFileImport, (ctx) => printMetamodelFileImport(ctx));
     AstSerializer.registerNodeSerializer(ModelTransformation, (ctx) => printModelTransformation(ctx));
 }

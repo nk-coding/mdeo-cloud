@@ -2,16 +2,25 @@ import {
     BaseScopeProvider,
     DefaultScope,
     inferLambdaTypeFromContext,
+    extractMetamodelEntities,
+    DefaultCollectionTypeFactory,
     type BoundScope,
     type Scope,
     type ScopeEntry,
     type ScopeLocalInitialization,
     type ExpressionTypirServices,
-    type LambdaTypeInferenceResult
+    type LambdaTypeInferenceResult,
+    type MetamodelEnumInfo,
+    ENUM_CONTAINER_PACKAGE
 } from "@mdeo/language-expression";
+import { getExportedEntitiesFromMetamodelFile } from "@mdeo/language-metamodel";
+import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
+import type { LangiumDocuments } from "langium";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { AstReflection } from "@mdeo/language-common";
 import type { TypeInferenceCollector } from "typir";
+
+const { AstUtils } = sharedImport("langium");
 import {
     ModelTransformation,
     StatementsScope,
@@ -150,13 +159,90 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         node: ModelTransformationType,
         parentScope: BoundScope<TypirLangiumSpecifics> | undefined
     ): Scope<TypirLangiumSpecifics> {
+        const enumInfos = this.extractEnumInfos(node);
         return new DefaultScope<TypirLangiumSpecifics>(
             parentScope,
-            (scope) => this.getStatementsScopeEntries(node, scope),
+            (scope) => [
+                ...this.getStatementsScopeEntries(node, scope),
+                ...this.getEnumContainerScopeEntries(enumInfos, scope)
+            ],
             () => [],
-            this.getStatementsScopeInitializations(node),
+            [
+                ...this.getStatementsScopeInitializations(node),
+                ...this.getEnumContainerInitializations(enumInfos)
+            ],
             node
         );
+    }
+
+    /**
+     * Extracts enum infos from the metamodel file referenced by the transformation's import statement.
+     *
+     * @param node The root ModelTransformation node
+     * @returns Array of MetamodelEnumInfo for all exported enums
+     */
+    private extractEnumInfos(node: ModelTransformationType): MetamodelEnumInfo[] {
+        const importFile = node.import?.file;
+        if (importFile == undefined) {
+            return [];
+        }
+
+        const langiumServices = this.typir.langium.LangiumServices;
+        const document = AstUtils.getDocument(node);
+        const metamodelUri = resolveRelativePath(document, importFile);
+        const documents = langiumServices.workspace.LangiumDocuments;
+        const metamodelDoc = documents.getDocument(metamodelUri);
+        if (metamodelDoc == undefined) {
+            return [];
+        }
+
+        const { enums } = getExportedEntitiesFromMetamodelFile(metamodelDoc, documents);
+        const { enums: enumInfos } = extractMetamodelEntities(
+            [],
+            [...enums],
+            langiumServices.AstReflection,
+            DefaultCollectionTypeFactory
+        );
+
+        return enumInfos;
+    }
+
+    /**
+     * Returns scope entries for all enum container types from the pre-extracted enum infos.
+     * Creates scope entries for enum namespaces (e.g. `Status.ACTIVE`).
+     *
+     * @param enumInfos The pre-extracted enum infos
+     * @param scope The scope to define entries in
+     * @returns Array of scope entries for enum container types
+     */
+    private getEnumContainerScopeEntries(
+        enumInfos: MetamodelEnumInfo[],
+        scope: Scope<TypirLangiumSpecifics>
+    ): ScopeEntry<TypirLangiumSpecifics>[] {
+        return enumInfos.map((enumInfo) => {
+            const containerId = `${ENUM_CONTAINER_PACKAGE}.${enumInfo.name}`;
+            return {
+                name: enumInfo.name,
+                definingScope: scope,
+                position: -1,
+                inferType: () =>
+                    this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                        type: containerId,
+                        isNullable: false
+                    }),
+                readonly: true
+            } satisfies ScopeEntry<TypirLangiumSpecifics>;
+        });
+    }
+
+    /**
+     * Returns local initializations for all enum container types.
+     *
+     * @param enumInfos The pre-extracted enum infos
+     * @returns Array of local initialization records for enum containers
+     */
+    private getEnumContainerInitializations(enumInfos: MetamodelEnumInfo[]): ScopeLocalInitialization[] {
+        return enumInfos.map((enumInfo) => ({ name: enumInfo.name, position: -1 }));
     }
 
     /**

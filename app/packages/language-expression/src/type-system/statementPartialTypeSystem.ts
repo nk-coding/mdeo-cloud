@@ -93,6 +93,26 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                     });
                 }
             }
+
+            const variableType =
+                node.type != undefined
+                    ? this.inference.inferType(node.type)
+                    : node.initialValue != undefined
+                      ? this.inference.inferType(node.initialValue)
+                      : undefined;
+            if (
+                variableType != undefined &&
+                !Array.isArray(variableType) &&
+                isCustomClassType(variableType) &&
+                variableType.details.definition.isVirtual === true
+            ) {
+                accept({
+                    $problem: this.validationProblem,
+                    languageNode: node,
+                    message: `Cannot declare a variable with a virtual type.`,
+                    severity: "error"
+                });
+            }
         });
     }
 

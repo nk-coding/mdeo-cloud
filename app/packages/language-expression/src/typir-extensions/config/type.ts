@@ -169,6 +169,12 @@ export interface ClassType {
      * Optional list of super types that this type extends
      */
     superTypes?: BaseClassTypeRef[];
+    /**
+     * Whether this class type is virtual.
+     * A virtual type cannot be used as a value directly (e.g., you cannot declare a variable of this type),
+     * but its members can still be accessed (e.g., `myEnum.SOME_VALUE`).
+     */
+    isVirtual?: boolean;
 }
 
 /**

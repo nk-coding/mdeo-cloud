@@ -1,5 +1,4 @@
-import type { ReturnType, TypedClass } from "@mdeo/language-expression";
-import { type TypedExpression } from "@mdeo/language-expression";
+import type { ReturnType, TypedExpression } from "@mdeo/language-expression";
 
 /**
  * Root of the TypedAST containing all program information.
@@ -13,19 +12,14 @@ export interface TypedAst {
     types: ReturnType[];
 
     /**
-     * URI of the imported metamodel file.
+     * Absolute path of the imported metamodel file.
      */
-    metamodelUri: string;
-
-    /**
-     * Array of metamodel classes with their type information.
-     * Each class contains properties, relations, and inheritance info.
-     */
-    classes: TypedClass[];
+    metamodelPath: string;
 
     /**
      * All top-level transformation statements.
      */
+
     statements: TypedTransformationStatement[];
 }
 

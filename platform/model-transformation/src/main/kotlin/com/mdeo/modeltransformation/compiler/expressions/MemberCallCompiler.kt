@@ -49,23 +49,18 @@ class MemberCallCompiler(
     ): GremlinCompilationResult {
         val memberCall = expression as TypedMemberCallExpression
         
-        // Compile the receiver expression
         val receiverResult = registry.compile(memberCall.expression, context, initialTraversal)
         
-        // Get the receiver type name for method lookup
         val receiverTypeName = getTypeName(memberCall.expression, context)
         
-        // Get the overload key from arguments
         val overloadKey = getOverloadKey(memberCall.arguments, context)
         
-        // Look up the method in the type registry
         val methodDef = context.typeRegistry.lookupMethod(receiverTypeName, memberCall.member, overloadKey)
             ?: throw IllegalArgumentException(
                 "Method '${memberCall.member}' not found on type '$receiverTypeName' " +
                 "with overload key '$overloadKey'"
             )
         
-        // Check if this is a lambda method with lambda argument
         val firstArg = memberCall.arguments.firstOrNull()
         if (firstArg is TypedLambdaExpression && methodDef is LambdaMethodDefinition) {
             return methodDef.compileWithLambda(
@@ -76,7 +71,6 @@ class MemberCallCompiler(
             )
         }
         
-        // Standard method: compile all arguments and call method compile
         val argResults = memberCall.arguments.map { arg ->
             registry.compile(arg, context, null)
         }
@@ -129,12 +123,10 @@ class MemberCallCompiler(
         
         val firstArg = arguments.first()
         
-        // Lambda methods have empty string as overload key
         if (firstArg is TypedLambdaExpression) {
             return ""
         }
         
-        // For other methods, use the first argument's type
         val argType = context.resolveTypeOrNull(firstArg.evalType)
         return when (argType) {
             is ClassTypeRef -> argType.type

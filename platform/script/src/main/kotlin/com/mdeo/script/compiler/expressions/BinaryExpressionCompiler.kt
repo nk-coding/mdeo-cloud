@@ -77,31 +77,20 @@ class BinaryExpressionCompiler : ExpressionCompiler() {
         val rightType = context.getType(binaryExpr.right.evalType)
         
         when (binaryExpr.operator) {
-            // Arithmetic operations
             "+" -> ArithmeticOperationHelper.compileAddition(binaryExpr, context, mv, leftType, rightType, resultType)
             "-" -> ArithmeticOperationHelper.compileSubtraction(binaryExpr, context, mv, leftType, rightType, resultType)
             "*" -> ArithmeticOperationHelper.compileMultiplication(binaryExpr, context, mv, leftType, rightType, resultType)
             "/" -> ArithmeticOperationHelper.compileDivision(binaryExpr, context, mv, leftType, rightType, resultType)
             "%" -> ArithmeticOperationHelper.compileModulo(binaryExpr, context, mv, leftType, rightType, resultType)
-            
-            // Comparison operations
             "<" -> ComparisonOperationHelper.compileLessThan(binaryExpr, context, mv, leftType, rightType)
             ">" -> ComparisonOperationHelper.compileGreaterThan(binaryExpr, context, mv, leftType, rightType)
             "<=" -> ComparisonOperationHelper.compileLessThanOrEqual(binaryExpr, context, mv, leftType, rightType)
             ">=" -> ComparisonOperationHelper.compileGreaterThanOrEqual(binaryExpr, context, mv, leftType, rightType)
-            
-            // Structural equality operations (uses .equals())
             "==" -> EqualityOperationHelper.compileEquality(binaryExpr, context, mv, leftType, rightType, true)
             "!=" -> EqualityOperationHelper.compileEquality(binaryExpr, context, mv, leftType, rightType, false)
-            
-            // Strict/reference equality operations
             "===" -> EqualityOperationHelper.compileStrictEquality(binaryExpr, context, mv, leftType, rightType, true)
             "!==" -> EqualityOperationHelper.compileStrictEquality(binaryExpr, context, mv, leftType, rightType, false)
-            
-            // Null coalescing operator
             "??" -> NullCoalescingHelper.compileNullCoalescing(binaryExpr, context, mv)
-            
-            // Logical operations
             "&&" -> LogicalOperationHelper.compileLogicalAnd(binaryExpr, context, mv)
             "||" -> LogicalOperationHelper.compileLogicalOr(binaryExpr, context, mv)
             

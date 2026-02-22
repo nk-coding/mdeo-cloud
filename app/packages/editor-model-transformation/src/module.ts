@@ -57,10 +57,8 @@ export const modelTransformationDiagramModule = new FeatureModule(
 
         configureDefaultModelElements(context);
 
-        // Basic compartment configuration
         configureModelElement(context, ModelTransformationElementType.COMPARTMENT, GCompartment, GCompartmentView);
 
-        // Horizontal divider inside pattern instance nodes: colour matches the node's modifier border.
         configureModelElement(
             context,
             ModelTransformationElementType.DIVIDER,
@@ -68,14 +66,12 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GPatternInstanceDividerView
         );
 
-        // Pattern instance elements
         configureModelElement(
             context,
             ModelTransformationElementType.NODE_PATTERN_INSTANCE,
             GPatternInstanceNode,
             GPatternInstanceNodeView
         );
-        // Modifier title compartment: renders «create»/«delete»/«forbid» stereotype + name
         configureModelElement(
             context,
             ModelTransformationElementType.COMPARTMENT_MODIFIER_TITLE,
@@ -95,7 +91,6 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GPatternPropertyLabelView
         );
 
-        // Pattern link elements
         configureModelElement(
             context,
             ModelTransformationElementType.EDGE_PATTERN_LINK,
@@ -115,7 +110,6 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GPatternLinkEndLabelView
         );
 
-        // Control flow elements
         configureModelElement(context, ModelTransformationElementType.NODE_START, GStartNode, GStartNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_END, GEndNode, GEndNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_SPLIT, GSplitNode, GSplitNodeView);
@@ -139,7 +133,6 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GLabelView
         );
 
-        // Match node (container for pattern elements)
         configureModelElement(context, ModelTransformationElementType.NODE_MATCH, GMatchNode, GMatchNodeView);
         configureModelElement(
             context,
@@ -148,7 +141,6 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GMatchNodeCompartmentsView
         );
 
-        // Constraint labels
         configureModelElement(context, ModelTransformationElementType.LABEL_VARIABLE, GVariableLabel, GLabelView);
         configureModelElement(
             context,

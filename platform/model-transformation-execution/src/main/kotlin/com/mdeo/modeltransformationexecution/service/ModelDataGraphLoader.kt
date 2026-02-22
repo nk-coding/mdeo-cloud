@@ -1,5 +1,8 @@
 package com.mdeo.modeltransformationexecution.service
 
+import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.expression.ast.types.PropertyData
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
@@ -22,6 +25,9 @@ import org.slf4j.LoggerFactory
  * List properties are stored using VertexProperty.Cardinality.list, with each
  * element added as a separate property value. This ensures portability to
  * remote graph databases.
+ * 
+ * Enum values are stored using the backtick format `EnumName`.`entryName` that
+ * matches the format used for enum values in the transformation scope.
  */
 class ModelDataGraphLoader {
     private val logger = LoggerFactory.getLogger(ModelDataGraphLoader::class.java)
@@ -32,14 +38,17 @@ class ModelDataGraphLoader {
      * @param g The graph traversal source
      * @param modelData The model data to load
      * @param nameRegistry Registry for tracking vertex ID to name mappings
+     * @param metamodelData The metamodel data used to look up enum type names for enum properties
      * @return Map of instance names to their vertices
      */
     fun load(
         g: GraphTraversalSource,
         modelData: ModelData,
-        nameRegistry: InstanceNameRegistry
+        nameRegistry: InstanceNameRegistry,
+        metamodelData: MetamodelData
     ): Map<String, Vertex> {
-        val vertexMap = createVertices(g, modelData.instances, nameRegistry)
+        val classMap = metamodelData.classes.associateBy { it.name }
+        val vertexMap = createVertices(g, modelData.instances, nameRegistry, classMap)
         createEdges(g, modelData, vertexMap)
         return vertexMap
     }
@@ -50,10 +59,11 @@ class ModelDataGraphLoader {
     private fun createVertices(
         g: GraphTraversalSource,
         instances: List<ModelDataInstance>,
-        nameRegistry: InstanceNameRegistry
+        nameRegistry: InstanceNameRegistry,
+        classMap: Map<String, ClassData>
     ): Map<String, Vertex> {
         return instances.associate { instance ->
-            instance.name to createVertex(g, instance, nameRegistry)
+            instance.name to createVertex(g, instance, nameRegistry, classMap)
         }
     }
     
@@ -67,12 +77,13 @@ class ModelDataGraphLoader {
     private fun createVertex(
         g: GraphTraversalSource,
         instance: ModelDataInstance,
-        nameRegistry: InstanceNameRegistry
+        nameRegistry: InstanceNameRegistry,
+        classMap: Map<String, ClassData>
     ): Vertex {
         var traversal = g.addV(instance.className)
         
         for ((propertyName, propertyValue) in instance.properties) {
-            traversal = addPropertyValue(traversal, propertyName, propertyValue)
+            traversal = addPropertyValue(traversal, instance.className, propertyName, propertyValue, classMap)
         }
         
         val vertex = traversal.next()
@@ -89,14 +100,16 @@ class ModelDataGraphLoader {
      */
     private fun addPropertyValue(
         traversal: org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal<Vertex, Vertex>,
+        className: String,
         propertyName: String,
-        propertyValue: ModelDataPropertyValue
+        propertyValue: ModelDataPropertyValue,
+        classMap: Map<String, ClassData>
     ): org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal<Vertex, Vertex> {
         return when (propertyValue) {
             is ModelDataPropertyValue.ListValue -> {
                 var result = traversal
                 for (element in propertyValue.values) {
-                    val value = convertScalarPropertyValue(element)
+                    val value = convertScalarPropertyValue(element, className, propertyName, classMap)
                     if (value != null) {
                         result = result.property(VertexProperty.Cardinality.list, propertyName, value)
                     }
@@ -104,7 +117,7 @@ class ModelDataGraphLoader {
                 result
             }
             else -> {
-                val value = convertScalarPropertyValue(propertyValue)
+                val value = convertScalarPropertyValue(propertyValue, className, propertyName, classMap)
                 if (value != null) {
                     traversal.property(propertyName, value)
                 } else {
@@ -117,16 +130,65 @@ class ModelDataGraphLoader {
     /**
      * Converts ModelDataPropertyValue to a Gremlin-compatible scalar value.
      * Does not handle ListValue - that is handled separately in addPropertyValue.
+     *
+     * Enum values are formatted as `EnumName`.`entryName` using the metamodel to
+     * look up the enum type name for the given class property, considering the
+     * class hierarchy.
      */
-    private fun convertScalarPropertyValue(value: ModelDataPropertyValue): Any? {
+    private fun convertScalarPropertyValue(
+        value: ModelDataPropertyValue,
+        className: String,
+        propertyName: String,
+        classMap: Map<String, ClassData>
+    ): Any? {
         return when (value) {
             is ModelDataPropertyValue.NullValue -> null
             is ModelDataPropertyValue.StringValue -> value.value
             is ModelDataPropertyValue.NumberValue -> value.value
             is ModelDataPropertyValue.BooleanValue -> value.value
-            is ModelDataPropertyValue.EnumValue -> value.enumEntry
+            is ModelDataPropertyValue.EnumValue -> {
+                val propData = findPropertyInHierarchy(classMap, className, propertyName)
+                    ?: throw IllegalStateException("No property metadata found for $propertyName on class $className")
+                val enumTypeName = propData.enumType
+                    ?: throw IllegalStateException("Property $propertyName on class $className is not an enum property in the metamodel")
+                formatEnumEntry(enumTypeName, value.enumEntry)
+            }
             is ModelDataPropertyValue.ListValue -> throw IllegalArgumentException("Lists should be handled by addPropertyValue, not convertScalarPropertyValue")
         }
+    }
+    
+    /**
+     * Formats an enum entry into the backtick-quoted string used in the transformation scope.
+     *
+     * @param enumTypeName The name of the enum type (e.g., "Status")
+     * @param entryName The name of the enum entry (e.g., "ACTIVE")
+     * @return The formatted string (e.g., "`Status`.`ACTIVE`")
+     */
+    private fun formatEnumEntry(enumTypeName: String, entryName: String): String =
+        "`$enumTypeName`.`$entryName`"
+    
+    /**
+     * Looks up a PropertyData by name for the given class, traversing the class
+     * hierarchy to find inherited properties.
+     *
+     * @param classMap Map of class name to ClassData for the full metamodel
+     * @param className The class to start the search from
+     * @param propertyName The property name to find
+     * @return The PropertyData if found, or null if not found in the hierarchy
+     */
+    private fun findPropertyInHierarchy(
+        classMap: Map<String, ClassData>,
+        className: String,
+        propertyName: String
+    ): PropertyData? {
+        val classData = classMap[className] ?: return null
+        val property = classData.properties.find { it.name == propertyName }
+        if (property != null) return property
+        for (parentName in classData.extends) {
+            val parentProperty = findPropertyInHierarchy(classMap, parentName, propertyName)
+            if (parentProperty != null) return parentProperty
+        }
+        return null
     }
     
     /**

@@ -345,6 +345,7 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     members: Record<string, Member> = {};
     private genericNames?: string[];
     private superTypes: BaseClassTypeRef[] = [];
+    private _isVirtual: boolean = false;
 
     constructor(name: string, pkg: string = "builtin") {
         this.name = name;
@@ -424,6 +425,16 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     }
 
     /**
+     * Mark this class type as virtual.
+     * A virtual type cannot be used as a value directly (e.g., you cannot declare a variable of this type),
+     * but its members can still be accessed (e.g., `myEnum.SOME_VALUE`).
+     */
+    virtual(): this {
+        this._isVirtual = true;
+        return this;
+    }
+
+    /**
      * Create a new builder based on this type, keeping only specified members.
      *
      * @param memberNames Array of member names to keep
@@ -469,6 +480,10 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
 
         if (this.superTypes.length > 0) {
             result.superTypes = this.superTypes;
+        }
+
+        if (this._isVirtual) {
+            result.isVirtual = true;
         }
 
         return result as TypedClassType<T>;

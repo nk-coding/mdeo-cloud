@@ -42,13 +42,11 @@ class InstanceNameRegistry {
      * @return The actual name assigned (may have a suffix if the requested name was taken)
      */
     fun registerWithUniqueName(vertexId: Any, requestedName: String): String {
-        // If name is available, use it
         if (!nameToId.containsKey(requestedName)) {
             register(vertexId, requestedName)
             return requestedName
         }
         
-        // Name is taken, find a unique suffix
         val counter = nameCounters.getOrDefault(requestedName, 1)
         var uniqueName: String
         var attempt = counter

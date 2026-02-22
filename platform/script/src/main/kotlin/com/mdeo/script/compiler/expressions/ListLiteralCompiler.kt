@@ -35,11 +35,9 @@ class ListLiteralCompiler : ExpressionCompiler() {
     override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val listExpr = expression as TypedListLiteralExpression
 
-        // Create new ArrayList with initial capacity
         mv.visitTypeInsn(Opcodes.NEW, "java/util/ArrayList")
         mv.visitInsn(Opcodes.DUP)
 
-        // Push initial capacity based on element count
         val elementCount = listExpr.elements.size
         when {
             elementCount >= -1 && elementCount <= 5 -> mv.visitInsn(Opcodes.ICONST_0 + elementCount)
@@ -47,7 +45,6 @@ class ListLiteralCompiler : ExpressionCompiler() {
             else -> mv.visitLdcInsn(elementCount)
         }
 
-        // Call ArrayList constructor with initial capacity
         mv.visitMethodInsn(
             Opcodes.INVOKESPECIAL,
             "java/util/ArrayList",
@@ -56,9 +53,8 @@ class ListLiteralCompiler : ExpressionCompiler() {
             false
         )
 
-        // Add each element to the list
         for (element in listExpr.elements) {
-            mv.visitInsn(Opcodes.DUP) // Duplicate list reference for add call
+            mv.visitInsn(Opcodes.DUP)
             context.compileExpression(element, mv, getElementType(listExpr, context))
             mv.visitMethodInsn(
                 Opcodes.INVOKEINTERFACE,

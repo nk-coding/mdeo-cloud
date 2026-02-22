@@ -30,7 +30,7 @@ class StatementExecutorRegistryTest {
         graph = TinkerGraph.open()
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
+            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
         )

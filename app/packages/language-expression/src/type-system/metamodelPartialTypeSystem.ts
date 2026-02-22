@@ -1,9 +1,9 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
 import { PartialTypeSystem } from "./partialTypeSystem.js";
 import { Class, Enum } from "@mdeo/language-metamodel";
-import { getPackage } from "../features/metamodel/metamodelClassExtractor.js";
 import type { InferenceProblem } from "typir";
 import type { ClassTypeRef } from "../typir-extensions/config/type.js";
+import { CLASS_PACKAGE, ENUM_PACKAGE } from "../index.js";
 
 /**
  * Type system for the Metamodel language.
@@ -23,7 +23,7 @@ export class MetamodelPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
      */
     private registerClassRules(): void {
         this.registerInferenceRule(Class, (node) => {
-            const classPackage = getPackage(node);
+            const classPackage = CLASS_PACKAGE;
             const className = `${classPackage}.${node.name}`;
             const classType = this.typir.TypeDefinitions.getClassTypeIfExisting(className);
             if (classType == undefined) {
@@ -47,7 +47,7 @@ export class MetamodelPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
      */
     private registerEnumRules(): void {
         this.registerInferenceRule(Enum, (node) => {
-            const enumPackage = getPackage(node);
+            const enumPackage = ENUM_PACKAGE;
             const enumName = `${enumPackage}.${node.name}`;
             const enumType = this.typir.TypeDefinitions.getClassTypeIfExisting(enumName);
             if (enumType == undefined) {

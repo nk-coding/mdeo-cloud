@@ -10,9 +10,6 @@ import kotlinx.serialization.json.JsonElement
  */
 object TypedStatementSerializer : com.mdeo.expression.ast.statements.TypedStatementSerializer() {
     override fun selectDeserializer(element: JsonElement): DeserializationStrategy<TypedStatement> {
-        // Currently, there are no script-specific statement types.
-        // This object exists to maintain consistency with TypedExpressionSerializer
-        // and allow for future extensibility.
         return super.selectDeserializer(element)
     }
 }

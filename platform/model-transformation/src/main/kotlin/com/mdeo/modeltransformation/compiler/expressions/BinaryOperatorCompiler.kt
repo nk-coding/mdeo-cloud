@@ -230,8 +230,6 @@ class BinaryOperatorCompiler(
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
     ): GremlinCompilationResult {
-        // Special case: Handle string concatenation with + operator
-        // Must check BEFORE compiling operands to avoid treating strings as numbers
         if (expr.operator == OPERATOR_ADD && isStringConcatenation(expr, context)) {
             val leftResult = registry.compile(expr.left, context, initialTraversal)
             val rightResult = registry.compile(expr.right, context, null)
@@ -297,8 +295,6 @@ class BinaryOperatorCompiler(
             return false
         }
         
-        // Check operand types using static type information
-        // If either operand is a string, this is string concatenation
         return isStringType(expr.left, context) || isStringType(expr.right, context)
     }
 
@@ -322,7 +318,6 @@ class BinaryOperatorCompiler(
         rightResult: GremlinCompilationResult,
         context: CompilationContext
     ): GremlinCompilationResult {
-        // Use the general pattern: store both values and concatenate
         val leftLabel = context.getUniqueId()
         val rightLabel = context.getUniqueId()
         val traversal = (leftResult.traversal as GraphTraversal<Any, Any>)
@@ -330,8 +325,6 @@ class BinaryOperatorCompiler(
             .flatMap<Any>(rightResult.traversal as GraphTraversal<Any, Any>)
             .`as`(rightLabel)
             .map<String> { traverser ->
-                // Get the penultimate and last objects from the path
-                // The penultimate is the left value, the last is the right value (current)
                 val pathObjects = traverser.path().objects()
                 val leftVal = if (pathObjects.size >= 2) {
                     pathObjects[pathObjects.size - 2].toString()
@@ -366,7 +359,6 @@ class BinaryOperatorCompiler(
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
-        // Use dynamic comparison pattern with math step
         val traversal = buildDynamicComparisonTraversal(
             expr.operator,
             leftResult.traversal as GraphTraversal<Any, Any>,
@@ -482,14 +474,12 @@ class BinaryOperatorCompiler(
         rightTraversal: GraphTraversal<Any, Any>,
         context: CompilationContext
     ): GraphTraversal<Any, Boolean> {
-        // For != we use eq internally and invert the result
         val (effectiveOperator, invertResult) = if (operator == OPERATOR_NOT_EQUALS) {
             OPERATOR_EQUALS to true
         } else {
             operator to false
         }
 
-        // Build the comparison predicate based on the operator
         val predicate: P<Double> = when (effectiveOperator) {
             OPERATOR_EQUALS -> P.eq(0.0)
             OPERATOR_LESS_THAN -> P.lt(0.0)

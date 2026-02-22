@@ -58,7 +58,6 @@ object StdlibRegistrar {
      */
     fun createAllTypes(): List<GremlinTypeDefinition> {
         return listOf(
-            // Primitive types
             createAnyType(),
             createBooleanType(),
             createIntType(),
@@ -66,7 +65,6 @@ object StdlibRegistrar {
             createFloatType(),
             createDoubleType(),
             createStringType(),
-            // Collection types
             createCollectionType(),
             createOrderedCollectionType(),
             createListType(),

@@ -30,21 +30,17 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 fun createIntType(): GremlinTypeDefinition {
     return gremlinType("builtin.int")
         .extends("builtin.any")
-        // abs() - Absolute value
         .method("abs", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).math("abs(_)")
             GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("floor", "", 0) { receiver, _ ->
-            // Floor is identity for integers
             GremlinCompilationResult.of(receiver as GraphTraversal<Any, Any>)
         }
         .method("ceiling", "", 0) { receiver, _ ->
-            // Ceiling is identity for integers
             GremlinCompilationResult.of(receiver as GraphTraversal<Any, Any>)
         }
         .method("round", "", 0) { receiver, _ ->
-            // Round is identity for integers
             GremlinCompilationResult.of(receiver as GraphTraversal<Any, Any>)
         }
         .method("log", "", 0) { receiver, _ ->

@@ -54,6 +54,15 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                 };
             }
 
+            if (classTypeDef.isVirtual === true) {
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `Type '${typeName}' is a virtual type and cannot be used as a type annotation.`,
+                    subProblems: []
+                };
+            }
+
             const expectedGenericCount = classTypeDef.generics?.length ?? 0;
             const providedGenericCount = providedTypeArgs.length;
 

@@ -1,14 +1,11 @@
 import type { AstReflection } from "@mdeo/language-common";
 import {
     TypedAstConverter,
-    type TypedClass,
-    type TypedExpression,
-    extractMetamodelClasses,
-    TypedClassConverter,
-    DefaultCollectionTypeFactory,
-    type MetamodelClassInfo
+    type TypedExpression
 } from "@mdeo/language-expression";
 import { AssociationResolver } from "@mdeo/language-model";
+import { resolveRelativePath } from "@mdeo/language-shared";
+import type { LangiumDocument } from "langium";
 import {
     expressionTypes,
     type ModelTransformationTypirServices,
@@ -69,13 +66,10 @@ import {
 } from "@mdeo/language-model-transformation";
 import {
     Class,
-    MetaModel,
-    type MetaModelType,
     type ClassType as MetamodelClassType,
     type PropertyType
 } from "@mdeo/language-metamodel";
-import { resolveRelativePath } from "@mdeo/language-shared";
-import type { AstNode, LangiumDocument } from "langium";
+import type { AstNode } from "langium";
 
 /**
  * Model Transformation-specific extension of ExpressionTypedAstConverter.
@@ -109,114 +103,24 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
 
     /**
      * Converts a ModelTransformation AST node to a TypedAst.
-     * This method is now async to support metamodel resolution.
      *
-     * @param document The transformation document
      * @param transformation The ModelTransformation AST node
+     * @param document The Langium document containing the transformation (used to resolve absolute paths)
      * @returns The TypedAst representation
      */
     async convertModelTransformation(
-        document: LangiumDocument,
-        transformation: ModelTransformationType
+        transformation: ModelTransformationType,
+        document: LangiumDocument
     ): Promise<TypedAst> {
-        const classes = await this.extractTypedClassesFromMetamodel(document, transformation);
-
         const statements: TypedTransformationStatement[] = transformation.statements.map((stmt) =>
             this.convertTransformationStatement(stmt)
         );
 
         return {
             types: this.types,
-            metamodelUri: transformation.import.file,
-            classes,
+            metamodelPath: resolveRelativePath(document, transformation.import.file).fsPath,
             statements
         };
-    }
-
-    /**
-     * Extracts TypedClasses from the metamodel referenced by a transformation.
-     * Resolves the metamodel file, extracts class information, and converts to TypedClasses.
-     *
-     * @param document The transformation document
-     * @param transformation The transformation AST node
-     * @returns Array of TypedClasses extracted from the metamodel
-     */
-    private async extractTypedClassesFromMetamodel(
-        document: LangiumDocument,
-        transformation: ModelTransformationType
-    ): Promise<TypedClass[]> {
-        const metamodel = await this.loadMetamodel(document, transformation);
-        if (metamodel == undefined) {
-            return [];
-        }
-
-        const classes = this.extractClasses(metamodel);
-        if (classes.length === 0) {
-            return [];
-        }
-
-        const classInfos = extractMetamodelClasses(classes, this.reflection, DefaultCollectionTypeFactory);
-
-        return this.convertToTypedClasses(classInfos);
-    }
-
-    /**
-     * Loads the metamodel document referenced by a transformation.
-     *
-     * @param document The transformation document
-     * @param transformation The transformation AST node
-     * @returns The metamodel AST or undefined if not found
-     */
-    private async loadMetamodel(
-        document: LangiumDocument,
-        transformation: ModelTransformationType
-    ): Promise<MetaModelType | undefined> {
-        const importFile = transformation.import?.file;
-        if (importFile == undefined) {
-            return undefined;
-        }
-
-        const metamodelUri = resolveRelativePath(document, importFile);
-        const documents = (this.typir.langium.LangiumServices as any).workspace.LangiumDocuments;
-        const metamodelDoc = await documents.getOrCreateDocument(metamodelUri);
-
-        const metamodelRoot = metamodelDoc.parseResult?.value;
-        if (metamodelRoot == undefined || !this.reflection.isInstance(metamodelRoot, MetaModel)) {
-            return undefined;
-        }
-
-        return metamodelRoot;
-    }
-
-    /**
-     * Extracts local classes from a metamodel.
-     * With the simplified import system, only Class nodes in the metamodel elements are collected.
-     *
-     * @param metamodel The metamodel AST
-     * @returns Array of classes
-     */
-    private extractClasses(metamodel: MetaModelType): MetamodelClassType[] {
-        const result: MetamodelClassType[] = [];
-
-        for (const element of metamodel.elements ?? []) {
-            if (this.reflection.isInstance(element, Class)) {
-                result.push(element);
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Converts extracted class information to TypedClasses.
-     *
-     * @param classInfos The extracted class information
-     * @returns Array of TypedClasses
-     */
-    private convertToTypedClasses(classInfos: MetamodelClassInfo[]): TypedClass[] {
-        const typeDefinitions = this.typir.TypeDefinitions;
-        const typedClassConverter = new TypedClassConverter(typeDefinitions, this);
-        return typedClassConverter.convertToTypedClasses(classInfos);
     }
 
     /**

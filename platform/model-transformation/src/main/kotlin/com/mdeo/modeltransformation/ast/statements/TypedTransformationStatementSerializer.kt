@@ -34,18 +34,13 @@ object TypedTransformationStatementSerializer : JsonContentPolymorphicSerializer
             ?: throw IllegalArgumentException("Missing 'kind' field in transformation statement: $element")
         
         return when (kindValue) {
-            // Pattern-based statements
             "match" -> TypedMatchStatement.serializer()
             "ifMatch" -> TypedIfMatchStatement.serializer()
             "whileMatch" -> TypedWhileMatchStatement.serializer()
             "untilMatch" -> TypedUntilMatchStatement.serializer()
             "forMatch" -> TypedForMatchStatement.serializer()
-            
-            // Expression-based statements
             "ifExpression" -> TypedIfExpressionStatement.serializer()
             "whileExpression" -> TypedWhileExpressionStatement.serializer()
-            
-            // Control flow statements
             "stop" -> TypedStopStatement.serializer()
             
             else -> throw IllegalArgumentException("Unknown transformation statement kind: $kindValue")

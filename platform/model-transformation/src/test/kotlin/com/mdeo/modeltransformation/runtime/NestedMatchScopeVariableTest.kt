@@ -1,10 +1,13 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.expression.ast.types.AssociationData
+import com.mdeo.expression.ast.types.AssociationEndData
+import com.mdeo.expression.ast.types.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.TypedClass
-import com.mdeo.expression.ast.types.TypedProperty
-import com.mdeo.expression.ast.types.TypedRelation
+import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.expression.ast.types.MultiplicityData
+import com.mdeo.expression.ast.types.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
@@ -63,7 +66,7 @@ class NestedMatchScopeVariableTest {
     // Index 4: Any? (nullable)
     // Index 5: builtin.List<Room>
     // Index 6: builtin.int
-    // Index 7: metamodel./metamodel.mm.House
+    // Index 7: class.House
     private val types: List<ReturnType> = listOf<ReturnType>(
         VoidType(),                                                                   // 0
         ClassTypeRef(type = "builtin.string", isNullable = false),                    // 1
@@ -71,46 +74,37 @@ class NestedMatchScopeVariableTest {
         ClassTypeRef(type = "builtin.boolean", isNullable = false),                   // 3
         ClassTypeRef(type = "Any", isNullable = true),                                // 4
         ClassTypeRef(type = "builtin.List", isNullable = false, typeArgs = mapOf(
-            "T" to ClassTypeRef(type = "metamodel./metamodel.mm.Room", isNullable = false, typeArgs = emptyMap())
+            "T" to ClassTypeRef(type = "class.Room", isNullable = false, typeArgs = emptyMap())
         )),                                                                          // 5
         ClassTypeRef(type = "builtin.int", isNullable = false),                      // 6
-        ClassTypeRef(type = "metamodel./metamodel.mm.House", isNullable = false)     // 7
+        ClassTypeRef(type = "class.House", isNullable = false)                       // 7
     )
 
-    private val classes = listOf(
-        TypedClass(
-            name = "House",
-            `package` = "metamodel./metamodel.mm",
-            superClasses = emptySet(),
-            properties = listOf(
-                TypedProperty(name = "address", typeIndex = 1)
+    private val metamodelData = MetamodelData(
+        classes = listOf(
+            ClassData(
+                name = "House",
+                isAbstract = false,
+                extends = emptyList(),
+                properties = listOf(
+                    PropertyData(name = "address", primitiveType = "string", multiplicity = MultiplicityData.single())
+                )
             ),
-            relations = listOf(
-                TypedRelation(
-                    property = "rooms",
-                    oppositeProperty = "house",
-                    oppositeClassName = "metamodel./metamodel.mm.Room",
-                    isOutgoing = true,
-                    typeIndex = 5
+            ClassData(
+                name = "Room",
+                isAbstract = false,
+                extends = emptyList(),
+                properties = listOf(
+                    PropertyData(name = "category", primitiveType = "string", multiplicity = MultiplicityData.single()),
+                    PropertyData(name = "value", primitiveType = "int", multiplicity = MultiplicityData.single())
                 )
             )
         ),
-        TypedClass(
-            name = "Room",
-            `package` = "metamodel./metamodel.mm",
-            superClasses = emptySet(),
-            properties = listOf(
-                TypedProperty(name = "category", typeIndex = 1),
-                TypedProperty(name = "value", typeIndex = 6)
-            ),
-            relations = listOf(
-                TypedRelation(
-                    property = "house",
-                    oppositeProperty = "rooms",
-                    oppositeClassName = "metamodel./metamodel.mm.House",
-                    isOutgoing = false,
-                    typeIndex = 7
-                )
+        associations = listOf(
+            AssociationData(
+                source = AssociationEndData(className = "House", name = "rooms", multiplicity = MultiplicityData.many()),
+                operator = "<>->",
+                target = AssociationEndData(className = "Room", name = "house", multiplicity = MultiplicityData.single())
             )
         )
     )
@@ -123,12 +117,12 @@ class NestedMatchScopeVariableTest {
         // Register metamodel types in the global type registry
         val typeRegistry = GremlinTypeRegistry.GLOBAL
 
-        val houseType = gremlinType("metamodel./metamodel.mm.House")
+        val houseType = gremlinType("class.House")
             .graphProperty("address")
             .build()
         typeRegistry.register(houseType)
 
-        val roomType = gremlinType("metamodel./metamodel.mm.Room")
+        val roomType = gremlinType("class.Room")
             .graphProperty("category")
             .graphProperty("value")
             .build()
@@ -140,14 +134,14 @@ class NestedMatchScopeVariableTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelUri = "./metamodel.mm",
-            statements = emptyList(),
-            classes = classes
+            metamodelPath = "./metamodel.mm",
+            statements = emptyList()
         )
 
         engine = TransformationEngine(
             traversalSource = g,
             ast = ast,
+            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )

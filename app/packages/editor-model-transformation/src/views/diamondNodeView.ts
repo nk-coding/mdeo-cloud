@@ -38,7 +38,6 @@ export class GSplitNodeView extends GNodeViewBase {
         const halfWidth = width / 2;
         const halfHeight = height / 2;
 
-        // Diamond points: top, right, bottom, left
         const diamondPoints = `${halfWidth},0 ${width},${halfHeight} ${halfWidth},${height} 0,${halfHeight}`;
 
         const diamond = svg("polygon", {

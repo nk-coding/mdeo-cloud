@@ -37,24 +37,6 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * The [compile] method accepts an optional [initialTraversal] parameter.
  * This is passed to the compiler for expressions that need to be prefixed
  * (e.g., in match contexts where `__.as()` is required).
- *
- * Example usage:
- * ```kotlin
- * val registry = ExpressionCompilerRegistry()
- * registry.register(IntLiteralCompiler())
- * registry.register(StringLiteralCompiler())
- * registry.register(BinaryExpressionTraversalCompiler(registry))
- *
- * // Normal compilation
- * val result = registry.compile(expression, context)
- *
- * // Compilation with initial traversal (for match contexts)
- * val matchResult = registry.compile(expression, context, __.as("a"))
- * ```
- *
- * @see ExpressionCompiler
- * @see GremlinCompilationResult
- * @see CompilationContext
  */
 class ExpressionCompilerRegistry {
 

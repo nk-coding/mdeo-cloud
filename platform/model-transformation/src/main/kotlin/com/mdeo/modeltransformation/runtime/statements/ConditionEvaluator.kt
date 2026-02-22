@@ -118,10 +118,8 @@ class ConditionEvaluator(private val engine: TransformationEngine) {
         referencedIdentifiers: Set<String>,
         instances: Map<String, Any>
     ): Boolean {
-        // Start with inject(1)
         var setupTraversal: GraphTraversal<Any, Any> = engine.traversalSource.inject(1 as Any) as GraphTraversal<Any, Any>
         
-        // For each referenced instance that exists in the context, add it to the traversal with a step label
         for (name in referencedIdentifiers) {
             val vertexId = instances[name]
             if (vertexId != null) {
@@ -130,7 +128,6 @@ class ConditionEvaluator(private val engine: TransformationEngine) {
             }
         }
         
-        // Execute the condition traversal in the context where instances are labeled
         val result = setupTraversal.flatMap(traversal as GraphTraversal<*, Boolean>)
         
         return if (result.hasNext()) {

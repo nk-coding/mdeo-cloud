@@ -41,7 +41,6 @@ export class ModelToolPaletteItemProvider extends BaseToolPaletteItemProvider {
         const sourceModel = this.modelState.sourceModel as PartialModel;
         const hasImport = sourceModel?.import != undefined;
 
-        // If no import, show setup section
         if (!hasImport) {
             return [
                 {
@@ -58,8 +57,7 @@ export class ModelToolPaletteItemProvider extends BaseToolPaletteItemProvider {
         const items = await this.getGroupedItems();
         const createItems = items.get("create-group");
 
-        // If create group is empty or undefined, don't show it
-        if (!createItems || createItems.length === 0) {
+        if (createItems == undefined || createItems.length === 0) {
             return [];
         }
 

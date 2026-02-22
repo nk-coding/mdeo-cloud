@@ -6,7 +6,7 @@ import {
     isCustomValueType,
     isCustomVoidType,
     isCustomLambdaType,
-    type BaseExpressionType
+    type BaseExpressionType,
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { ValidationProblemAcceptor, Type } from "typir";

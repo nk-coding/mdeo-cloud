@@ -18,8 +18,5 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
 fun createStringType(): GremlinTypeDefinition {
     return gremlinType("builtin.string")
         .extends("builtin.any")
-        // Note: String methods removed as they require Kotlin lambdas
-        // Methods like toLowerCase, toUpperCase, trim, substring, etc.
-        // cannot be implemented as pure Gremlin traversals
         .build()
 }

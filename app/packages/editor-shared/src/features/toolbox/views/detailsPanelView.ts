@@ -39,7 +39,6 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
             {
                 class: {
                     "toolbox-details": true,
-                    // relative: true,
                     "rounded-md": true,
                     border: true,
                     "border-border": true,

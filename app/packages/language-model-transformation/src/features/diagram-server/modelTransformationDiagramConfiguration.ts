@@ -40,29 +40,24 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
     get typeMapping(): Map<string, GModelElementConstructor> {
         const mapping = getDefaultMapping();
 
-        // Outer control flow graph nodes
         mapping.set(ModelTransformationElementType.NODE_START, GStartNode);
         mapping.set(ModelTransformationElementType.NODE_END, GEndNode);
         mapping.set(ModelTransformationElementType.NODE_MATCH, GMatchNode);
         mapping.set(ModelTransformationElementType.NODE_SPLIT, GSplitNode);
         mapping.set(ModelTransformationElementType.NODE_MERGE, GMergeNode);
 
-        // Control flow edges and labels
         mapping.set(ModelTransformationElementType.EDGE_CONTROL_FLOW, GControlFlowEdge);
         mapping.set(ModelTransformationElementType.NODE_CONTROL_FLOW_LABEL, GControlFlowLabelNode);
         mapping.set(ModelTransformationElementType.LABEL_CONTROL_FLOW, GControlFlowLabel);
 
-        // Inner pattern elements - instances
         mapping.set(ModelTransformationElementType.NODE_PATTERN_INSTANCE, GPatternInstanceNode);
         mapping.set(ModelTransformationElementType.LABEL_PATTERN_INSTANCE_NAME, GPatternInstanceNameLabel);
         mapping.set(ModelTransformationElementType.LABEL_PATTERN_PROPERTY, GPatternPropertyLabel);
 
-        // Inner pattern elements - links
         mapping.set(ModelTransformationElementType.EDGE_PATTERN_LINK, GPatternLinkEdge);
         mapping.set(ModelTransformationElementType.NODE_PATTERN_LINK_END, GPatternLinkEndNode);
         mapping.set(ModelTransformationElementType.LABEL_PATTERN_LINK_END, GPatternLinkEndLabel);
 
-        // Inner pattern elements - constraints
         mapping.set(ModelTransformationElementType.LABEL_WHERE_CLAUSE, GWhereClauseLabel);
         mapping.set(ModelTransformationElementType.LABEL_VARIABLE, GVariableLabel);
 

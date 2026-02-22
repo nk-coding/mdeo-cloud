@@ -3,9 +3,6 @@
  * These must match the client-side element types.
  */
 export enum ModelTransformationElementType {
-    // ===================
-    // Outer Control Flow Graph
-    // ===================
 
     /**
      * Start node of the transformation
@@ -46,10 +43,6 @@ export enum ModelTransformationElementType {
      * Label on a control flow edge
      */
     LABEL_CONTROL_FLOW = "label:control-flow",
-
-    // ===================
-    // Inner Pattern Elements
-    // ===================
 
     /**
      * Pattern object instance node

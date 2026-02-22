@@ -60,14 +60,12 @@ class TernaryExpressionCompiler : ExpressionCompiler() {
         context.compileExpression(ternaryExpr.condition, mv, conditionType)
         mv.visitJumpInsn(Opcodes.IFEQ, falseLabel)
         
-        // Compile true branch with coercion to result type
         context.compileExpression(ternaryExpr.trueExpression, mv, resultType)
         
         mv.visitJumpInsn(Opcodes.GOTO, endLabel)
         
         mv.visitLabel(falseLabel)
         
-        // Compile false branch with coercion to result type
         context.compileExpression(ternaryExpr.falseExpression, mv, resultType)
         
         mv.visitLabel(endLabel)

@@ -19,6 +19,20 @@ export interface MultiplicityData {
 }
 
 /**
+ * Data for a single enum definition in the metamodel.
+ */
+export interface EnumData {
+    /**
+     * The enum name.
+     */
+    name: string;
+    /**
+     * List of enum entry names.
+     */
+    entries: string[];
+}
+
+/**
  * Data for a single property of a metamodel class.
  */
 export interface PropertyData {
@@ -27,9 +41,15 @@ export interface PropertyData {
      */
     name: string;
     /**
-     * The property type: a primitive type name or an enum name.
+     * The enum name if this property has an enum type.
+     * Mutually exclusive with primitiveType.
      */
-    type: string;
+    enumType?: string;
+    /**
+     * The primitive type name if this property has a primitive type.
+     * Mutually exclusive with enumType.
+     */
+    primitiveType?: string;
     /**
      * The multiplicity of the property, defaulting to {lower: 1, upper: 1} if not specified.
      */
@@ -93,6 +113,10 @@ export interface MetamodelAstData {
      * All class definitions in the metamodel (enums are excluded).
      */
     classes: ClassData[];
+    /**
+     * All enum definitions in the metamodel.
+     */
+    enums: EnumData[];
     /**
      * All association definitions in the metamodel.
      */
@@ -166,6 +190,7 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
     });
 
     const classes: ClassData[] = [];
+    const enums: EnumData[] = [];
     const associations: AssociationData[] = [];
 
     for (const element of root.elements) {
@@ -179,18 +204,24 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
                 extends: (cls.extensions?.extensions ?? []).map((ext: any) => ext.class?.$refText ?? ""),
                 properties: (cls.properties ?? []).map((prop: any) => {
                     const propType = (prop.type as any)?.$type as string | undefined;
-                    let typeName: string;
-                    if (propType?.includes("EnumTypeReference")) {
-                        typeName = (prop.type as any).enum?.$refText ?? "";
-                    } else {
-                        typeName = (prop.type as any)?.name ?? "";
-                    }
-                    return {
+                    const isEnumType = propType?.includes("EnumTypeReference");
+                    const result: PropertyData = {
                         name: prop.name ?? "",
-                        type: typeName,
                         multiplicity: convertMultiplicity(prop.multiplicity)
-                    } satisfies PropertyData;
+                    };
+                    if (isEnumType) {
+                        result.enumType = (prop.type as any).enum?.$refText ?? "";
+                    } else {
+                        result.primitiveType = (prop.type as any)?.name ?? "";
+                    }
+                    return result;
                 })
+            });
+        } else if (elementType === "Enum") {
+            const enumDef = element as any;
+            enums.push({
+                name: enumDef.name ?? "",
+                entries: (enumDef.entries ?? []).map((entry: any) => entry.name ?? "")
             });
         } else if (elementType === "Association") {
             const assoc = element as any;
@@ -210,11 +241,10 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
                 target: mapEnd(assoc.target)
             });
         }
-        // Enums are intentionally omitted from the output
     }
 
     return {
-        data: { classes, associations, importedMetamodelPaths },
+        data: { classes, enums, associations, importedMetamodelPaths },
         ...serverApi.getTrackedRequests()
     };
 };

@@ -256,12 +256,10 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * @param accept The validation acceptor
      */
     validateObjectInstance(obj: PatternObjectInstanceType, accept: ValidationAcceptor): void {
-        // Only validate class-specific constraints if class is present
         if (obj.class != undefined) {
             this.validateClassNotAbstract(obj, accept);
             this.validateRequiredPropertiesForCreate(obj, accept);
         } else {
-            // For references to previously matched nodes, ensure no create modifier
             if (obj.modifier?.modifier === "create") {
                 accept("error", `Cannot use 'create' modifier without specifying a class type.`, {
                     node: obj,

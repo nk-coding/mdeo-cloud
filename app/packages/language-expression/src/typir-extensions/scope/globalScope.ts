@@ -18,6 +18,11 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
      */
     private readonly entriesMap: Map<string, ScopeEntry<Specifics>> = new Map();
 
+    /**
+     * Stored reference to the Typir services, used for resolving types in addEntry.
+     */
+    private readonly typir: ExtendedTypirServices<Specifics>;
+
     readonly executionGuaranteedUntil: number | undefined = undefined;
 
     /**
@@ -34,22 +39,42 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
         protected readonly entries: Member[],
         typir: ExtendedTypirServices<Specifics>
     ) {
+        this.typir = typir;
         for (const entry of entries) {
-            let type: Type;
-            if (entry.isProperty) {
-                type = typir.TypeDefinitions.resolveCustomClassOrLambdaType(entry.type as ValueType);
-            } else {
-                type = typir.TypeDefinitions.resolveCustomFunctionType(entry.type as FunctionType, entry.name);
-            }
-            const scopeEntry: ScopeEntry<Specifics> = {
-                name: entry.name,
-                definingScope: this,
-                position: -1,
-                inferType: () => type,
-                readonly: entry.readonly
-            };
-            this.entriesMap.set(entry.name, scopeEntry);
+            this.resolveAndAdd(entry);
         }
+    }
+
+    /**
+     * Dynamically adds a new entry to the global scope after construction.
+     * The type referenced by the entry must already be registered in the type definitions.
+     *
+     * @param entry The member to add to the global scope
+     */
+    addEntry(entry: Member): void {
+        this.resolveAndAdd(entry);
+    }
+
+    /**
+     * Resolves the type for a member and stores it in the entries map.
+     *
+     * @param entry The member whose type should be resolved and added
+     */
+    private resolveAndAdd(entry: Member): void {
+        let type: Type;
+        if (entry.isProperty) {
+            type = this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(entry.type as ValueType);
+        } else {
+            type = this.typir.TypeDefinitions.resolveCustomFunctionType(entry.type as FunctionType, entry.name);
+        }
+        const scopeEntry: ScopeEntry<Specifics> = {
+            name: entry.name,
+            definingScope: this,
+            position: -1,
+            inferType: () => type,
+            readonly: entry.readonly
+        };
+        this.entriesMap.set(entry.name, scopeEntry);
     }
 
     getEntry(name: string): ScopeEntry<Specifics> | undefined {

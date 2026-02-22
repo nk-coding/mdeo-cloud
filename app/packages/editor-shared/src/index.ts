@@ -24,6 +24,8 @@ export * from "./features/edit-label/featureModule.js";
 export * from "./features/edit-label/updateLabelEditAction.js";
 export * from "./features/element-finder/elementFinder.js";
 export * from "./features/element-finder/featureModule.js";
+export * from "./features/grid/featureModule.js";
+export * from "./features/grid/gridSnapper.js";
 export * from "./features/metadata/featureModule.js";
 export * from "./features/metadata/nodeMetadata.js";
 export * from "./features/metadata/setBoundsFeedbackCommand.js";

@@ -43,7 +43,7 @@ class IfMatchStatementExecutorTest {
         
         engine = TransformationEngine(
             traversalSource = graph.traversal(),
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()), // Dummy AST
+            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()), // Dummy AST
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = statementRegistry
         )

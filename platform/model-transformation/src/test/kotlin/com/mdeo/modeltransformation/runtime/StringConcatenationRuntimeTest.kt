@@ -44,7 +44,7 @@ class StringConcatenationRuntimeTest {
         
         engine = TransformationEngine(
             traversalSource = g,
-            ast = TypedAst(types = types, metamodelUri = "test://model", statements = emptyList()),
+            ast = TypedAst(types = types, metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )

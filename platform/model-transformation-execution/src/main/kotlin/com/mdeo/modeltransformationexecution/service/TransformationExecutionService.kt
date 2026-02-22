@@ -192,9 +192,12 @@ class TransformationExecutionService(
         val modelData = fetchModelData(executionId, projectId, modelPath, jwtToken)
             ?: return
 
+        val metamodelData = fetchMetamodelData(executionId, projectId, typedAst.metamodelPath, jwtToken)
+            ?: return
+
         updateState(executionId, ExecutionState.RUNNING, "Executing transformation...", jwtToken)
 
-        val resultModel = runTransformation(executionId, typedAst, modelData, jwtToken)
+        val resultModel = runTransformation(executionId, typedAst, metamodelData, modelData, jwtToken)
             ?: return
 
         storeResult(executionId, resultModel)
@@ -225,6 +228,29 @@ class TransformationExecutionService(
         }
         return typedAst
     }
+
+    private suspend fun fetchMetamodelData(
+        executionId: UUID,
+        projectId: UUID,
+        metamodelPath: String,
+        jwtToken: String
+    ): com.mdeo.expression.ast.types.MetamodelData? {
+        val metamodelData = apiClient.getMetamodelData(
+            projectId.toString(),
+            metamodelPath,
+            jwtToken
+        )
+        
+        if (metamodelData == null) {
+            updateState(
+                executionId,
+                ExecutionState.FAILED,
+                "Failed to fetch metamodel data for $metamodelPath",
+                jwtToken
+            )
+        }
+        return metamodelData
+    }
     
     private suspend fun fetchModelData(
         executionId: UUID,
@@ -248,6 +274,7 @@ class TransformationExecutionService(
     private fun runTransformation(
         executionId: UUID,
         typedAst: com.mdeo.modeltransformation.ast.TypedAst,
+        metamodelData: com.mdeo.expression.ast.types.MetamodelData,
         modelData: ModelData,
         jwtToken: String
     ): ModelData? {
@@ -255,14 +282,14 @@ class TransformationExecutionService(
         
         return try {
             val g = graph.traversal()
-            val engine = TransformationEngine.create(g, typedAst)
+            val engine = TransformationEngine.create(g, typedAst, metamodelData)
             
-            graphLoader.load(g, modelData, engine.instanceNameRegistry)
+            graphLoader.load(g, modelData, engine.instanceNameRegistry, metamodelData)
             
             val result = engine.execute()
             
             val graphConverter = GraphToModelDataConverter(
-                metamodelClasses = engine.ast.classes,
+                metamodelData = engine.metamodelData,
                 types = engine.types,
                 typeRegistry = engine.typeRegistry
             )

@@ -573,3 +573,30 @@ export interface TypedClass {
      */
     relations: TypedRelation[];
 }
+
+/**
+ * Represents an enum from the metamodel with full type information.
+ * A TypedEnum contains the value type name, its container type name, all entry names,
+ * and the package in which the enum is defined.
+ */
+export interface TypedEnum {
+    /**
+     * The name of the value type for this enum (same as the enum's simple name,
+     * e.g., "Status").
+     */
+    valueName: string;
+    /**
+     * The name of the container type for this enum
+     * (e.g., "Status__Container").
+     */
+    containerName: string;
+    /**
+     * List of entry names defined in this enum (e.g., ["ACTIVE", "INACTIVE"]).
+     */
+    entries: string[];
+    /**
+     * The package name where this enum is defined
+     * (e.g., "metamodel./path/to/file.mm").
+     */
+    package: string;
+}

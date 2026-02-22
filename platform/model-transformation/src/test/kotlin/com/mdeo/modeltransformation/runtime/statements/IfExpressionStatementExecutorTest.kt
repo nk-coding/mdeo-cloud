@@ -74,7 +74,7 @@ class IfExpressionStatementExecutorTest {
         
         engine = TransformationEngine(
             traversalSource = g,
-            ast = TypedAst(types = emptyList(), metamodelUri = "test://model", statements = emptyList()),
+            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = registry,
             statementExecutorRegistry = statementRegistry
         )

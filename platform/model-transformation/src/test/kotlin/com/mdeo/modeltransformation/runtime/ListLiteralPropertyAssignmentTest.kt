@@ -65,7 +65,7 @@ class ListLiteralPropertyAssignmentTest {
         
         engine = TransformationEngine(
             traversalSource = g,
-            ast = TypedAst(types = emptyList(), metamodelUri = "./metamodel.mm", statements = emptyList()),
+            ast = TypedAst(types = emptyList(), metamodelPath = "./metamodel.mm", statements = emptyList()),
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )

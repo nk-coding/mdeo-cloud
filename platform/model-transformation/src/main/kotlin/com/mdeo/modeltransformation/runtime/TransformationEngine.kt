@@ -1,7 +1,9 @@
 package com.mdeo.modeltransformation.runtime
 
+import com.mdeo.expression.ast.types.AssociationData
+import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.expression.ast.types.MetamodelData
 import com.mdeo.expression.ast.types.ReturnType
-import com.mdeo.expression.ast.types.TypedClass
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
@@ -22,12 +24,15 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * doesn't apply when required), the transformation terminates with a failure result.
  *
  * @param traversalSource The Gremlin GraphTraversalSource for graph operations.
+ * @param ast The TypedAst containing transformation statements.
+ * @param metamodelData The metamodel data containing class and association definitions.
  * @param expressionCompilerRegistry Registry for compiling expressions to GraphTraversal.
  * @param statementExecutorRegistry Registry for executing transformation statements.
  */
 class TransformationEngine(
     val traversalSource: GraphTraversalSource,
     val ast: TypedAst,
+    val metamodelData: MetamodelData = MetamodelData.empty(),
     val expressionCompilerRegistry: ExpressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
     val statementExecutorRegistry: StatementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
 ) {
@@ -43,16 +48,16 @@ class TransformationEngine(
     /**
      * Dynamic type registry that includes both standard library types and metamodel types.
      *
-     * This registry is built during initialization using the TypedAst. It uses the GLOBAL
+     * This registry is built during initialization using the MetamodelData. It uses the GLOBAL
      * registry as a parent, so all stdlib types remain available.
      *
-     * Metamodel types (e.g., "metamodel./metamodel.mm.House") are registered with their
-     * fully qualified names and include graph properties and edge associations.
+     * Metamodel types (e.g., "class.House") are registered with their
+     * simple names prefixed with "class." and include graph properties and edge associations.
      */
     val typeRegistry: GremlinTypeRegistry
 
     init {
-        typeRegistry = createTypeRegistry(ast.classes)
+        typeRegistry = createTypeRegistry(metamodelData)
     }
 
     /**
@@ -65,7 +70,7 @@ class TransformationEngine(
      * @return The result of the transformation execution.
      */
     fun execute(): TransformationExecutionResult {
-        var context = TransformationExecutionContext.empty()
+        var context = TransformationExecutionContext.emptyWithEnums(metamodelData.enums.map { it.name })
         var accumulatedResult = TransformationExecutionResult.Success()
 
         for (statement in ast.statements) {
@@ -156,36 +161,48 @@ class TransformationEngine(
     }
 
     /**
-     * Creates a dynamic type registry including metamodel classes.
+     * Creates a dynamic type registry including metamodel classes and enums.
+     * 
+     * Type references use the following formats:
+     * - "class.ClassName" for metamodel classes
+     * - "enum.EnumName" for enum value types (stored on properties)
+     * - "enum-container.EnumName" for enum container types (the singleton for accessing enum values)
      *
-     * @param classes The metamodel class definitions from the TypedAst.
+     * @param metamodelData The metamodel data containing class, enum, and association definitions.
      */
-    private fun createTypeRegistry(classes: List<TypedClass>): GremlinTypeRegistry {
+    private fun createTypeRegistry(metamodelData: MetamodelData): GremlinTypeRegistry {
         val dynamicRegistry = GremlinTypeRegistry(parent = GremlinTypeRegistry.GLOBAL)
 
-        for (typedClass in classes) {
-            val fqn = typedClass.`package` + "." + typedClass.name
+        registerEnumTypes(dynamicRegistry, metamodelData)
+
+        val classAssociations = buildClassAssociationsMap(metamodelData.associations)
+
+        for (classData in metamodelData.classes) {
+            val fqn = "class.${classData.name}"
 
             val builder = gremlinType(fqn)
 
-            for (superClass in typedClass.superClasses) {
-                builder.extends(superClass)
+            for (superClass in classData.extends) {
+                builder.extends("class.$superClass")
             }
 
-            for (property in typedClass.properties) {
+            for (property in classData.properties) {
                 builder.graphProperty(property.name)
             }
 
-            for (relation in typedClass.relations) {
-                val edgeLabel = if (relation.isOutgoing) {
-                    EdgeLabelUtils.computeEdgeLabel(relation.property, relation.oppositeProperty)
-                } else {
-                    EdgeLabelUtils.computeEdgeLabel(relation.oppositeProperty, relation.property)
-                }
+            val associations = classAssociations[classData.name] ?: emptyList()
+            for ((assoc, isSource) in associations) {
+                val thisEnd = if (isSource) assoc.source else assoc.target
+                val otherEnd = if (isSource) assoc.target else assoc.source
+                
+                val propertyName = thisEnd.name ?: continue
+                val oppositePropertyName = otherEnd.name
+                
+                val edgeLabel = EdgeLabelUtils.computeEdgeLabel(propertyName, oppositePropertyName)
                 builder.association(
-                    propertyName = relation.property,
+                    propertyName = propertyName,
                     edgeLabel = edgeLabel,
-                    isOutgoing = relation.isOutgoing
+                    isOutgoing = isSource
                 )
             }
 
@@ -195,18 +212,73 @@ class TransformationEngine(
         return dynamicRegistry
     }
 
+    /**
+     * Registers enum types in the type registry.
+     * 
+     * For each enum in the metamodel, two types are registered:
+     * 
+     * 1. "enum-container.EnumName" - The container type (singleton) used to access enum values.
+     *    Each entry is a property that returns a constant string in the format `EnumName`.`entryName`.
+     *    Accessing an entry like `EnumName.entryName` produces this string literal.
+     * 
+     * 2. "enum.EnumName" - The actual enum value type, used when a property has an enum type.
+     *    This represents the stored enum value on an object property.
+     * 
+     * @param registry The registry to add enum types to.
+     * @param metamodelData The metamodel data containing enum definitions.
+     */
+    private fun registerEnumTypes(registry: GremlinTypeRegistry, metamodelData: MetamodelData) {
+        for (enumData in metamodelData.enums) {
+            val enumName = enumData.name
+
+            val containerBuilder = gremlinType("enum-container.$enumName")
+            for (entryName in enumData.entries) {
+                val enumValueString = "`$enumName`.`$entryName`"
+                containerBuilder.enumEntry(entryName, enumValueString)
+            }
+            registry.register(containerBuilder.build())
+
+            val valueTypeBuilder = gremlinType("enum.$enumName")
+            registry.register(valueTypeBuilder.build())
+        }
+    }
+
+    /**
+     * Builds a map from class name to list of (association, isSource) pairs.
+     * isSource is true if the class is the source end of the association.
+     */
+    private fun buildClassAssociationsMap(associations: List<AssociationData>): Map<String, List<Pair<AssociationData, Boolean>>> {
+        val result = mutableMapOf<String, MutableList<Pair<AssociationData, Boolean>>>()
+        
+        for (assoc in associations) {
+            result.getOrPut(assoc.source.className) { mutableListOf() }
+                .add(assoc to true)
+            
+            result.getOrPut(assoc.target.className) { mutableListOf() }
+                .add(assoc to false)
+        }
+        
+        return result
+    }
+
     companion object {
         /**
          * Creates a TransformationEngine with default registries.
          *
          * @param traversalSource The Gremlin GraphTraversalSource.
          * @param ast The TypedAst to execute.
+         * @param metamodelData The metamodel data containing class and association definitions.
          * @return A new TransformationEngine with default configuration.
          */
-        fun create(traversalSource: GraphTraversalSource, ast: TypedAst): TransformationEngine {
+        fun create(
+            traversalSource: GraphTraversalSource, 
+            ast: TypedAst,
+            metamodelData: MetamodelData = MetamodelData.empty()
+        ): TransformationEngine {
             return TransformationEngine(
                 traversalSource = traversalSource,
                 ast = ast,
+                metamodelData = metamodelData,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
             )

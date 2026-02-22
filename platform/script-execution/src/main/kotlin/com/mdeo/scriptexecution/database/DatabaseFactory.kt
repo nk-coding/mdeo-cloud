@@ -23,10 +23,8 @@ object DatabaseFactory {
     fun init(config: DatabaseConfig) {
         logger.info("Initializing script-execution database")
         
-        // Use execution-common's database factory for connection management
         commonFactory.init(config)
         
-        // Create script-execution specific tables
         transaction {
             SchemaUtils.create(ExecutionsTable)
         }

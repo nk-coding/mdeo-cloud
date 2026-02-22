@@ -124,7 +124,6 @@ class AssignmentCompiler : StatementCompiler {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        // Compile expression with coercion to target type
         context.compileExpression(assignment.right, mv, targetType)
 
         val storeOpcode = ASMUtil.getStoreOpcode(targetType)
@@ -153,7 +152,6 @@ class AssignmentCompiler : StatementCompiler {
     ) {
         mv.visitVarInsn(Opcodes.ALOAD, variable.slotIndex)
 
-        // Compile expression with coercion to target type
         context.compileExpression(assignment.right, mv, targetType)
 
         val refClassName = RefTypeUtil.getRefClassName(targetType)
@@ -183,7 +181,6 @@ class AssignmentCompiler : StatementCompiler {
 
         context.compileExpression(left.expression, mv, targetObjectType)
 
-        // Compile expression with coercion to property type
         context.compileExpression(assignment.right, mv, propertyType)
 
         emitPropertySet(context, left.member, targetObjectType, propertyType, mv)

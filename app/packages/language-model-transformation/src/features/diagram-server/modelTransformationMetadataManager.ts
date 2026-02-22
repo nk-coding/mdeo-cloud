@@ -531,7 +531,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     nodes,
                     edges
                 );
-                // Loop back
                 if (doResult.lastNodeId != undefined) {
                     this.addControlFlowEdge(doResult.lastNodeId, matchNodeId, undefined, edges);
                 }
@@ -654,7 +653,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
     ): void {
         const edgeId = ModelTransformationIdGenerator.instanceToMatchEdge(instanceNodeId, matchNodeId);
         edges[edgeId] = {
-            type: ModelTransformationElementType.EDGE_CONTROL_FLOW, // Reuse edge type
+            type: ModelTransformationElementType.EDGE_CONTROL_FLOW,
             from: instanceNodeId,
             to: matchNodeId,
             attrs: { isContainment: true }

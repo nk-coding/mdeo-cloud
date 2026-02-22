@@ -13,13 +13,11 @@ import {
     isMultipleMultiplicity,
     isOptionalMultiplicity
 } from "@mdeo/language-metamodel";
-import { sharedImport } from "@mdeo/language-shared";
 import type { ValueType } from "../../typir-extensions/config/type.js";
 import type { MetamodelClassInfo, MetamodelPropertyInfo, MetamodelRelationInfo } from "./metamodelClassInfo.js";
 import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
 import { typeRef } from "../../typir-extensions/config/typeBuilder.js";
-
-const { AstUtils } = sharedImport("langium");
+import type { MetamodelEnumInfo } from "./metamodelEnumInfo.js";
 
 /**
  * Configuration for creating collection types from element types.
@@ -43,55 +41,55 @@ export const DefaultCollectionTypeFactory: CollectionTypeFactory = {
 };
 
 /**
- * Extracts class information from metamodel classes.
- * This function creates a new extractor instance, processes the classes, and returns the results.
+ * Extracts class and enum information from metamodel entities.
+ * This function creates a new extractor instance, processes the classes and enums, and returns the results.
  * The extractor should not be reused.
  *
- * With the simplified import system, the naming scheme uses the file where each class is DEFINED,
- * not the file that imports it. This ensures that the same class referenced from different files
- * has the same type identity.
- *
  * @param classes The classes to analyze (directly defined, not imports)
+ * @param enums The enums to analyze (directly defined, not imports)
  * @param reflection The AST reflection for type checking
  * @param collectionTypeFactory Factory for creating list types
- * @returns Array of MetamodelClassInfo representing the extracted classes
+ * @returns Object containing arrays of MetamodelClassInfo and MetamodelEnumInfo
  */
-export function extractMetamodelClasses(
+export function extractMetamodelEntities(
     classes: MetamodelClassType[],
+    enums: MetamodelEnumType[],
     reflection: AstReflection,
     collectionTypeFactory: CollectionTypeFactory
-): MetamodelClassInfo[] {
+): { classes: MetamodelClassInfo[], enums: MetamodelEnumInfo[] } {
     const extractor = new MetamodelClassExtractor(reflection, collectionTypeFactory);
-    return extractor.extractClasses(classes);
+    const classInfos = extractor.extractClasses(classes);
+    const enumInfos: MetamodelEnumInfo[] = enums.map((enumNode) => ({
+        name: enumNode.name,
+        package: ENUM_PACKAGE,
+        entries: enumNode.entries.map((e) => e.name)
+    }));
+    return { classes: classInfos, enums: enumInfos };
 }
 
 /**
- * Gets the package name for a metamodel class or enum based on its document path.
- * Uses the class's own document, not the importing metamodel's document.
- * This ensures consistent type identity across different import locations.
- *
- * @param node The class or enum to get the package for
- * @returns The package name as a string
+ * The package name for classes, fixed to string "class" for all classes.
  */
-export function getPackage(node: MetamodelClassType | MetamodelEnumType): string {
-    const document = AstUtils.getDocument(node);
-    if (document == undefined) {
-        throw new Error("Class or enum does not belong to a document");
-    }
-    const path = document.uri.path;
-    return `metamodel.${path}`;
-}
+export const CLASS_PACKAGE = "class";
+
+/**
+ * The package name for enums, fixed to string "enum" for all enums. 
+ */
+export const ENUM_PACKAGE = "enum";
+
+/**
+ * The package name for enums defined within classes, fixed to string "enum-container" for all such enums.
+ */
+export const ENUM_CONTAINER_PACKAGE = "enum-container";
 
 /**
  * Internal class for extracting class information from metamodel AST nodes.
- * Generates an intermediate representation that can be converted to TypedClasses or ClassTypes.
- * Should not be instantiated directly; use extractMetamodelClasses() instead.
+ * Generates an intermediate representation that can be converted to ClassTypes.
+ * Should not be instantiated directly; use extractMetamodelEntities() instead.
  *
- * With the new import system, each class's package is determined by its own document path,
- * ensuring consistent type identity regardless of where the class is imported from.
+ * All classes share the 'class' package identifier; all enums share 'enum'.
  */
 class MetamodelClassExtractor {
-    private readonly reservedNames = new Set<string>();
     private readonly classNameMap = new Map<MetamodelClassType, string>();
     private readonly allClassesSet = new Set<MetamodelClassType>();
 
@@ -118,15 +116,20 @@ class MetamodelClassExtractor {
     }
 
     /**
-     * Processes top-level classes to reserve names and build the class map.
+     * Processes top-level classes to build the class name map.
+     * Duplicate names (direct or from the inheritance chain) are silently ignored.
      *
      * @param classes The classes to analyze
      */
     private processTopLevelClasses(classes: MetamodelClassType[]): void {
+        const usedNames = new Set<string>();
+
         for (const classNode of classes) {
-            const name = this.getClassName(classNode);
-            this.reservedNames.add(name);
-            this.classNameMap.set(classNode, name);
+            const name = classNode.name;
+            if (!usedNames.has(name)) {
+                usedNames.add(name);
+                this.classNameMap.set(classNode, name);
+            }
         }
 
         for (const classNode of classes) {
@@ -134,67 +137,14 @@ class MetamodelClassExtractor {
             for (const chainClass of classChain) {
                 this.allClassesSet.add(chainClass);
                 if (!this.classNameMap.has(chainClass)) {
-                    const chainName = this.generateUniqueClassName(this.getClassName(chainClass));
-                    this.classNameMap.set(chainClass, chainName);
+                    const chainName = chainClass.name;
+                    if (!usedNames.has(chainName)) {
+                        usedNames.add(chainName);
+                        this.classNameMap.set(chainClass, chainName);
+                    }
                 }
             }
         }
-    }
-
-    /**
-     * Gets the name of a class. Helper to work around type inference issues.
-     *
-     * @param classNode The class node
-     * @returns The class name
-     */
-    private getClassName(classNode: MetamodelClassType): string {
-        return (classNode as unknown as { name: string }).name;
-    }
-
-    /**
-     * Gets the extensions of a class. Helper to work around type inference issues.
-     *
-     * @param classNode The class node
-     * @returns The extensions list or undefined
-     */
-    private getClassExtensions(
-        classNode: MetamodelClassType
-    ): { extensions: Array<{ class: { ref?: MetamodelClassType } }> } | undefined {
-        return (classNode as unknown as { extensions?: { extensions: Array<{ class: { ref?: MetamodelClassType } }> } })
-            .extensions;
-    }
-
-    /**
-     * Gets the properties of a class. Helper to work around type inference issues.
-     *
-     * @param classNode The class node
-     * @returns The properties list
-     */
-    private getClassProperties(classNode: MetamodelClassType): PropertyType[] {
-        return (classNode as unknown as { properties: PropertyType[] }).properties;
-    }
-
-    /**
-     * Generates a unique class name by appending #N suffix if needed.
-     * Ensures no naming conflicts in the extracted class set.
-     *
-     * @param baseName The base name to make unique
-     * @returns A unique class name
-     */
-    private generateUniqueClassName(baseName: string): string {
-        if (!this.reservedNames.has(baseName)) {
-            this.reservedNames.add(baseName);
-            return baseName;
-        }
-
-        let counter = 1;
-        let candidateName = `${baseName}#${counter}`;
-        while (this.reservedNames.has(candidateName)) {
-            counter++;
-            candidateName = `${baseName}#${counter}`;
-        }
-        this.reservedNames.add(candidateName);
-        return candidateName;
     }
 
     /**
@@ -261,7 +211,6 @@ class MetamodelClassExtractor {
 
     /**
      * Builds complete class information including properties, relations, and superclasses.
-     * Uses the class's own document path for package naming, not the importing file.
      *
      * @param classNode The metamodel class node
      * @param simpleName The unique name assigned to this class
@@ -273,7 +222,7 @@ class MetamodelClassExtractor {
         simpleName: string,
         associations: AssociationType[]
     ): MetamodelClassInfo {
-        const classPackage = getPackage(classNode);
+        const classPackage = CLASS_PACKAGE;
         const superClasses = this.extractSuperClasses(classNode);
         const properties = this.extractProperties(classNode);
         const relations = this.extractRelations(classNode, associations);
@@ -288,14 +237,14 @@ class MetamodelClassExtractor {
     }
 
     /**
-     * Builds the fully qualified class name using the class's own document path.
+     * Builds the fully qualified class name using the 'class' package prefix.
      *
      * @param classNode The class node to build the name for
      * @param simpleName The simple class name
-     * @returns The fully qualified class name
+     * @returns The fully qualified class name (e.g. "class.Person")
      */
     private buildFullClassName(classNode: MetamodelClassType, simpleName: string): string {
-        const classPackage = getPackage(classNode);
+        const classPackage = CLASS_PACKAGE;
         return `${classPackage}.${simpleName}`;
     }
 
@@ -307,7 +256,7 @@ class MetamodelClassExtractor {
      */
     private extractSuperClasses(classNode: MetamodelClassType): string[] {
         const superClasses: string[] = [];
-        const extensions = this.getClassExtensions(classNode);
+        const extensions = classNode.extensions;
         for (const extension of extensions?.extensions ?? []) {
             const parentClass = extension.class.ref;
             if (parentClass != undefined) {
@@ -327,7 +276,7 @@ class MetamodelClassExtractor {
      * @returns Array of property information
      */
     private extractProperties(classNode: MetamodelClassType): MetamodelPropertyInfo[] {
-        return this.getClassProperties(classNode).map((prop) => ({
+        return classNode.properties.map((prop) => ({
             name: prop.name,
             valueType: this.resolvePropertyType(prop)
         }));

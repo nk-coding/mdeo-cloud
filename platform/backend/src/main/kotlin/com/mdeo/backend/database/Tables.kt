@@ -253,8 +253,6 @@ object DataDependenciesTable : Table("data_dependencies") {
     }
 }
 
-// ExecutionState is centralized in `com.mdeo.common.model.ExecutionState`.
-
 /**
  * Executions table schema for storing execution metadata.
  * Files are not cascade deleted (executions persist after source file deletion),

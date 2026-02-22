@@ -56,12 +56,10 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
      * @returns The generated name/ID or undefined
      */
     getName(node: AstNode): string | undefined {
-        // Root transformation
         if (this.reflection.isInstance(node, ModelTransformation)) {
             return this.getTransformationName();
         }
 
-        // Statements
         if (this.reflection.isInstance(node, MatchStatement)) {
             return this.getMatchStatementName(node);
         }
@@ -87,12 +85,10 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
             return this.getStopStatementName(node);
         }
 
-        // Pattern
         if (this.reflection.isInstance(node, Pattern)) {
             return this.getPatternName(node);
         }
 
-        // Pattern elements
         if (this.reflection.isInstance(node, PatternObjectInstance)) {
             return this.getPatternObjectInstanceName(node);
         }

@@ -205,7 +205,6 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         );
     }
 
-    // Check if any language has execution handlers
     const hasExecutionHandlers = config.languages.some(
         (lang) => lang.executionHandlers && lang.executionHandlers.length > 0
     );

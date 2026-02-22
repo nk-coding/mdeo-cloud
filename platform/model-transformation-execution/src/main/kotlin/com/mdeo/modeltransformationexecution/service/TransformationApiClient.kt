@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformationexecution.service
 
 import com.mdeo.execution.common.api.BackendApiClient
+import com.mdeo.expression.ast.types.MetamodelData
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
@@ -97,6 +98,41 @@ class TransformationApiClient(baseUrl: String) : BackendApiClient(
         }
     }
 
+    /**
+     * Fetches the metamodel data for a metamodel file.
+     *
+     * @param projectId UUID of the project
+     * @param filePath Path to the metamodel file
+     * @param jwtToken JWT token for authentication
+     * @return MetamodelData or null if not found/error
+     */
+    suspend fun getMetamodelData(
+        projectId: String,
+        filePath: String,
+        jwtToken: String
+    ): MetamodelData? {
+        return try {
+            logger.debug("Fetching metamodel data for $filePath")
+            
+            val response = client.get("$baseUrl/projects/$projectId/file-data/metamodel") {
+                parameter("path", filePath)
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer $jwtToken")
+            }
+
+            if (response.status == HttpStatusCode.OK) {
+                val result = response.body<MetamodelDataFileDataResponse>()
+                result.data
+            } else {
+                logger.warn("Failed to fetch metamodel data: ${response.status}")
+                null
+            }
+        } catch (e: Exception) {
+            logger.error("Error fetching metamodel data", e)
+            null
+        }
+    }
+
     companion object {
         private fun createTransformationSerializersModule(): SerializersModule {
             return SerializersModule {
@@ -123,5 +159,14 @@ internal data class TypedAstFileDataResponse(
 @Serializable
 internal data class ModelDataFileDataResponse(
     val data: ModelData?,
+    val version: Int? = null
+)
+
+/**
+ * Response wrapper for metamodel file data endpoint.
+ */
+@Serializable
+internal data class MetamodelDataFileDataResponse(
+    val data: MetamodelData?,
     val version: Int? = null
 )

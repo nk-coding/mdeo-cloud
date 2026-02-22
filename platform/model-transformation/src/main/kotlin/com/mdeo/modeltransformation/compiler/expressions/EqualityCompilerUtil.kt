@@ -47,6 +47,11 @@ object EqualityCompilerUtil {
      *       __.constant(false)
      *     )
      * ```
+     *
+     * ## Enum Type Handling
+     * When comparing an enum value (type starting with "enum.") with a non-enum value,
+     * the comparison always returns false for == and true for !=. This prevents
+     * accidental matches when comparing enum values with plain strings.
      * 
      * @param operator The equality operator ("==" or "!=")
      * @param leftTraversal The traversal that produces the left operand value
@@ -70,6 +75,18 @@ object EqualityCompilerUtil {
         leftLabel: String,
         rightLabel: String
     ): GraphTraversal<Any, Boolean> {
+        val leftIsEnum = isEnumType(leftType)
+        val rightIsEnum = isEnumType(rightType)
+        
+        if (leftIsEnum != rightIsEnum) {
+            val result = when (operator) {
+                "==" -> false
+                "!=" -> true
+                else -> throw IllegalArgumentException("Unsupported equality operator: $operator. Expected '==' or '!='")
+            }
+            return AnonymousTraversal.constant<Any>(result) as GraphTraversal<Any, Boolean>
+        }
+        
         val predicate: P<String> = when (operator) {
             "==" -> P.eq(rightLabel)
             "!=" -> P.neq(rightLabel)
@@ -88,6 +105,22 @@ object EqualityCompilerUtil {
                 AnonymousTraversal.constant(true),
                 AnonymousTraversal.constant(false)
             ) as GraphTraversal<Any, Boolean>
+    }
+
+    /**
+     * Checks if a type is an enum value type.
+     *
+     * Enum value types use the format "enum.EnumName" in the type registry.
+     * This is distinct from "enum-container.EnumName" which is the container
+     * type used to access enum entries.
+     *
+     * @param type The value type to check
+     * @return true if the type is an enum value type (starts with "enum."), false otherwise
+     */
+    private fun isEnumType(type: ValueType?): Boolean {
+        if (type == null) return false
+        if (type !is ClassTypeRef) return false
+        return type.type.startsWith("enum.")
     }
 
     /**

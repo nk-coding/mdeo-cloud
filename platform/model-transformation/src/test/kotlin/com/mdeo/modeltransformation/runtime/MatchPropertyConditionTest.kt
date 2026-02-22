@@ -1,9 +1,11 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
+import com.mdeo.expression.ast.types.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.TypedClass
-import com.mdeo.expression.ast.types.TypedProperty
+import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.expression.ast.types.MultiplicityData
+import com.mdeo.expression.ast.types.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
@@ -75,22 +77,23 @@ class MatchPropertyConditionTest {
     // Type indices:
     // Index 0: void
     // Index 1: builtin.string
-    // Index 2: metamodel./metamodel.mm.House
+    // Index 2: class.House
     private val types: List<ReturnType> = listOf<ReturnType>(
         VoidType(),                                                                   // 0
         ClassTypeRef(type = "builtin.string", isNullable = false),                    // 1
-        ClassTypeRef(type = "metamodel./metamodel.mm.House", isNullable = false)     // 2
+        ClassTypeRef(type = "class.House", isNullable = false)                        // 2
     )
 
-    private val classes = listOf(
-        TypedClass(
-            name = "House",
-            `package` = "metamodel./metamodel.mm",
-            superClasses = emptySet(),
-            properties = listOf(
-                TypedProperty(name = "address", typeIndex = 1)
-            ),
-            relations = emptyList()
+    private val metamodelData = MetamodelData(
+        classes = listOf(
+            ClassData(
+                name = "House",
+                isAbstract = false,
+                extends = emptyList(),
+                properties = listOf(
+                    PropertyData(name = "address", primitiveType = "string", multiplicity = MultiplicityData.single())
+                )
+            )
         )
     )
 
@@ -102,7 +105,7 @@ class MatchPropertyConditionTest {
         // Register metamodel types in the global type registry
         val typeRegistry = GremlinTypeRegistry.GLOBAL
 
-        val houseType = gremlinType("metamodel./metamodel.mm.House")
+        val houseType = gremlinType("class.House")
             .graphProperty("address")
             .build()
         typeRegistry.register(houseType)
@@ -113,20 +116,21 @@ class MatchPropertyConditionTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelUri = "./metamodel.mm",
-            statements = emptyList(),
-            classes = classes
+            metamodelPath = "./metamodel.mm",
+            statements = emptyList()
         )
 
         engine = TransformationEngine(
             traversalSource = g,
             ast = ast,
+            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
 
         context = TransformationExecutionContext.empty()
     }
+
 
     @AfterEach
     fun tearDown() {

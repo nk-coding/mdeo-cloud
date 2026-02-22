@@ -14,21 +14,8 @@ import com.mdeo.modeltransformation.stdlib.StdlibRegistrar
  * The [GLOBAL] static registry contains all stdlib entries and is typically used
  * as the parent for dynamic registries.
  *
- * Example usage:
- * ```kotlin
- * // Create a local registry with GLOBAL as parent
- * val registry = GremlinTypeRegistry(parent = GremlinTypeRegistry.GLOBAL)
- * registry.register(MyCustomTypeDefinition())
- *
- * // Type lookup will first check local, then fall back to GLOBAL
- * val property = registry.lookupProperty("builtin.string", "length")
- * ```
- *
  * @param parent Optional parent registry for fallback lookups. When set, [getType]
  *               will search the parent if a type is not found locally.
- * @see GremlinTypeDefinition
- * @see GremlinPropertyDefinition
- * @see GremlinMethodDefinition
  */
 class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
 

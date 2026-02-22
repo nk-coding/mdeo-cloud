@@ -450,26 +450,17 @@ object CoercionUtil {
         val sourceTypeName = sourceType.type
         val targetTypeName = targetType.type
         
-        // Upcasts to Any/Any? don't need CHECKCAST (automatic in JVM)
         if (targetTypeName == "builtin.any") {
             return false
         }
         
-        // If types are identical, no conversion needed
         if (sourceTypeName == targetTypeName && sourceType.isNullable == targetType.isNullable) {
             return false
         }
         
-        // For any downcast or cross-cast, emit CHECKCAST
-        // This includes:
-        // - Any? -> string, Any? -> CustomType
-        // - Object -> Integer (wrapper), Object -> String
-        // - string -> CustomType (invalid at runtime, but let JVM handle it)
-        // - Nullable wrapper to non-nullable wrapper of same type
         if (sourceTypeName != targetTypeName || sourceType.isNullable != targetType.isNullable) {
             val targetDescriptor = ASMUtil.getTypeDescriptor(targetType)
             if (targetDescriptor.startsWith("L") && targetDescriptor.endsWith(";")) {
-                // Extract internal name from descriptor (e.g., "Ljava/lang/String;" -> "java/lang/String")
                 val internalName = targetDescriptor.substring(1, targetDescriptor.length - 1)
                 mv.visitTypeInsn(Opcodes.CHECKCAST, internalName)
                 return true
