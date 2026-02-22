@@ -1,9 +1,7 @@
 import type { GModelRoot } from "@eclipse-glsp/server";
 import type { LayoutOperation } from "@mdeo/editor-protocol";
-import type { NodePositionMetadata, EdgeLayoutMetadata } from "@mdeo/editor-protocol";
 import { BaseLayoutEngine, GEdge, GNode, sharedImport } from "@mdeo/language-shared";
 import type { ElkExtendedEdge, ElkNode } from "elkjs";
-import type { MetadataEdits } from "@mdeo/language-shared";
 import { GMatchNode } from "./model/matchNode.js";
 import { GMatchNodeCompartments } from "./model/matchNodeCompartments.js";
 import { GPatternInstanceNode } from "./model/patternInstanceNode.js";
@@ -13,7 +11,6 @@ import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
 
 const { injectable } = sharedImport("inversify");
-const { Point } = sharedImport("@eclipse-glsp/protocol");
 
 /**
  * Layout engine for model transformation diagrams.
@@ -107,7 +104,10 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                     sources: [child.sourceId],
                     targets: [child.targetId],
                     labels: child.children
-                        .filter((label) => label instanceof GPatternLinkEndNode || label instanceof GPatternLinkModifierLabel)
+                        .filter(
+                            (label) =>
+                                label instanceof GPatternLinkEndNode || label instanceof GPatternLinkModifierLabel
+                        )
                         .map((label) => {
                             if (label instanceof GPatternLinkEndNode) {
                                 return {
@@ -150,5 +150,4 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
             edges: childEdges
         };
     }
-
 }

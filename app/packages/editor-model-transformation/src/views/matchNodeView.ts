@@ -112,24 +112,32 @@ export class GMatchNodeView extends GNodeViewBase {
 
         if (isMultiple) {
             divChildren.push(
-                html("div", {
-                    style: {
-                        position: "absolute",
-                        top: `${SHADOW_OFFSET}px`,
-                        left: `${SHADOW_OFFSET}px`
-                    }
-                }, this.renderOutlineDiv(width, height))
+                html(
+                    "div",
+                    {
+                        style: {
+                            position: "absolute",
+                            top: `${SHADOW_OFFSET}px`,
+                            left: `${SHADOW_OFFSET}px`
+                        }
+                    },
+                    this.renderOutlineDiv(width, height)
+                )
             );
         }
 
         divChildren.push(
-            html("div", {
-                style: {
-                    position: "absolute",
-                    top: "0",
-                    left: "0"
-                }
-            }, this.renderOutlineDiv(width, height))
+            html(
+                "div",
+                {
+                    style: {
+                        position: "absolute",
+                        top: "0",
+                        left: "0"
+                    }
+                },
+                this.renderOutlineDiv(width, height)
+            )
         );
 
         return [
@@ -144,14 +152,18 @@ export class GMatchNodeView extends GNodeViewBase {
                         [ATTR_BBOX_ELEMENT]: true
                     }
                 },
-                html("div", {
-                    style: {
-                        position: "relative",
-                        width: `${width}px`,
-                        height: `${height}px`,
-                        overflow: "visible"
-                    }
-                }, ...divChildren)
+                html(
+                    "div",
+                    {
+                        style: {
+                            position: "relative",
+                            width: `${width}px`,
+                            height: `${height}px`,
+                            overflow: "visible"
+                        }
+                    },
+                    ...divChildren
+                )
             )
         ];
     }

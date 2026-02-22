@@ -56,7 +56,7 @@ export function extractMetamodelEntities(
     enums: MetamodelEnumType[],
     reflection: AstReflection,
     collectionTypeFactory: CollectionTypeFactory
-): { classes: MetamodelClassInfo[], enums: MetamodelEnumInfo[] } {
+): { classes: MetamodelClassInfo[]; enums: MetamodelEnumInfo[] } {
     const extractor = new MetamodelClassExtractor(reflection, collectionTypeFactory);
     const classInfos = extractor.extractClasses(classes);
     const enumInfos: MetamodelEnumInfo[] = enums.map((enumNode) => ({
@@ -73,7 +73,7 @@ export function extractMetamodelEntities(
 export const CLASS_PACKAGE = "class";
 
 /**
- * The package name for enums, fixed to string "enum" for all enums. 
+ * The package name for enums, fixed to string "enum" for all enums.
  */
 export const ENUM_PACKAGE = "enum";
 

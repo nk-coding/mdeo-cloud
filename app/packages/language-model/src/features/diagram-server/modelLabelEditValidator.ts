@@ -502,7 +502,10 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
 
         const trimmed = valueStr.trim();
         const enumEntries = enumDef.entries ?? [];
-        const validEntries = enumEntries.map((entry) => entry.name).filter((name) => name != undefined);
+        const validEntries = enumEntries
+            .map((entry) => entry.name)
+            .filter((name) => name != undefined)
+            .map((name) => `${enumDef?.name ?? "?"}.${name}`);
 
         if (!validEntries.includes(trimmed)) {
             return this.error(`Invalid enum value. Expected one of: ${validEntries.join(", ")}, got '${trimmed}'.`);

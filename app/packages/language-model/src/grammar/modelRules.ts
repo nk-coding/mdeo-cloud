@@ -15,7 +15,7 @@ import {
     optional,
     group
 } from "@mdeo/language-common";
-import { Class, EnumEntry, Property } from "@mdeo/language-metamodel";
+import { Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
 import {
     SimpleValue,
     EnumValue,
@@ -50,11 +50,11 @@ export const SimpleValueRule = createRule("SimpleValueRule")
 
 /**
  * Enum value rule.
- * Matches a reference to an enum entry identifier.
+ * Matches an enum entry using EnumName.Entry syntax.
  */
 export const EnumValueRule = createRule("EnumValueRule")
     .returns(EnumValue)
-    .as(({ set }) => [set("value", ref(EnumEntry, ID))]);
+    .as(({ set }) => [set("enumRef", ref(Enum, ID)), ".", set("value", ref(EnumEntry, ID))]);
 
 /**
  * Single value rule.

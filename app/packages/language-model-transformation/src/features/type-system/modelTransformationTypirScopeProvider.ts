@@ -15,7 +15,6 @@ import {
 } from "@mdeo/language-expression";
 import { getExportedEntitiesFromMetamodelFile } from "@mdeo/language-metamodel";
 import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
-import type { LangiumDocuments } from "langium";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { AstReflection } from "@mdeo/language-common";
 import type { TypeInferenceCollector } from "typir";
@@ -167,10 +166,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
                 ...this.getEnumContainerScopeEntries(enumInfos, scope)
             ],
             () => [],
-            [
-                ...this.getStatementsScopeInitializations(node),
-                ...this.getEnumContainerInitializations(enumInfos)
-            ],
+            [...this.getStatementsScopeInitializations(node), ...this.getEnumContainerInitializations(enumInfos)],
             node
         );
     }

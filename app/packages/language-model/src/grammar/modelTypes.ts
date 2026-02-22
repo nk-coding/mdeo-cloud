@@ -1,5 +1,5 @@
 import { createInterface, createType, Optional, Ref, type ASTType, type BaseType } from "@mdeo/language-common";
-import { Class, EnumEntry, Property } from "@mdeo/language-metamodel";
+import { Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
 /**
@@ -19,9 +19,11 @@ export type SimpleValueType = ASTType<typeof SimpleValue>;
 
 /**
  * Enum value for property assignments.
- * References an enum entry from the metamodel.
+ * References an enum and one of its entries from the metamodel.
+ * Written as EnumName.Entry in the model language.
  */
 export const EnumValue = createInterface("EnumValue").attrs({
+    enumRef: Ref(() => Enum),
     value: Ref(() => EnumEntry)
 });
 

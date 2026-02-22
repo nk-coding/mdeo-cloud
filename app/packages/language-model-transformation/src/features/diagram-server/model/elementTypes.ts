@@ -3,7 +3,6 @@
  * These must match the client-side element types.
  */
 export enum ModelTransformationElementType {
-
     /**
      * Start node of the transformation
      */

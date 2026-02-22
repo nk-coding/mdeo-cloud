@@ -528,7 +528,10 @@ export class ModelValidator extends BaseModelValidator {
 
         const entryParent = valueRef.$container;
         if (entryParent !== enumType) {
-            const validEntries = (enumType.entries ?? []).map((e) => e.name).filter((n) => n !== undefined);
+            const validEntries = (enumType.entries ?? [])
+                .map((entry) => entry.name)
+                .filter((name) => name !== undefined)
+                .map((name) => `${enumType.name ?? "?"}.${name}`);
             accept(
                 "error",
                 `Invalid enum value for property '${property.name}'. Expected one of: ${validEntries.join(", ")}.`,

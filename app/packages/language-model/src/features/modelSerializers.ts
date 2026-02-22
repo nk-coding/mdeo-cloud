@@ -68,14 +68,16 @@ function printSimpleValue(context: PrintContext<SimpleValueType>): Doc {
 }
 
 /**
- * Prints an enum value node.
+ * Prints an enum value node using EnumName.Entry syntax.
  *
  * @param context The print context
  * @returns The formatted enum value
  */
 function printEnumValue(context: PrintContext<EnumValueType>): Doc {
     const { path, printReference } = context;
-    return path.call((ref) => printReference(ref, ID), "value");
+    const enumRef = path.call((ref) => printReference(ref, ID), "enumRef");
+    const entry = path.call((ref) => printReference(ref, ID), "value");
+    return [enumRef, ".", entry];
 }
 
 /**

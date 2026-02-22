@@ -1,8 +1,5 @@
 import type { AstReflection } from "@mdeo/language-common";
-import {
-    TypedAstConverter,
-    type TypedExpression
-} from "@mdeo/language-expression";
+import { TypedAstConverter, type TypedExpression } from "@mdeo/language-expression";
 import { AssociationResolver } from "@mdeo/language-model";
 import { resolveRelativePath } from "@mdeo/language-shared";
 import type { LangiumDocument } from "langium";
@@ -64,11 +61,7 @@ import {
     type PatternObjectInstanceReferenceType,
     PatternObjectInstanceReference
 } from "@mdeo/language-model-transformation";
-import {
-    Class,
-    type ClassType as MetamodelClassType,
-    type PropertyType
-} from "@mdeo/language-metamodel";
+import { Class, type ClassType as MetamodelClassType, type PropertyType } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
 /**

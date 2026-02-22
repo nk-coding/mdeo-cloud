@@ -350,6 +350,7 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
             }
             return {
                 $type: EnumValue.name,
+                enumRef: { $refText: enumType.name, ref: undefined },
                 value: { $refText: enumEntry, ref: undefined }
             };
         }

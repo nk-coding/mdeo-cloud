@@ -10,15 +10,17 @@ import {
     type ObjectInstanceType,
     type PropertyAssignmentType,
     type LinkEndType,
+    type EnumValueType,
     Model
 } from "../grammar/modelTypes.js";
 import {
     EnumTypeReference,
     getScopeFromMetamodelFile,
+    getExportedEntitiesFromMetamodelFile,
+    createScopeFromDescriptions,
     resolveClassChain,
     type ClassType,
-    type EnumType,
-    type PropertyType
+    type EnumType
 } from "@mdeo/language-metamodel";
 import { AssociationEndCache } from "./associationEndCache.js";
 
@@ -75,6 +77,9 @@ export class ModelScopeProvider extends DefaultScopeProvider {
         }
         if (context.property === "name" && this.astReflection.isInstance(context.container, PropertyAssignment)) {
             return this.getPropertyNameScope(context);
+        }
+        if (context.property === "enumRef" && this.astReflection.isInstance(context.container, EnumValue)) {
+            return this.getEnumRefScope(context, document);
         }
         if (context.property === "value" && this.astReflection.isInstance(context.container, EnumValue)) {
             return this.getEnumValueScope(context);
@@ -137,21 +142,47 @@ export class ModelScopeProvider extends DefaultScopeProvider {
     }
 
     /**
-     * Gets the scope for enum value references.
+     * Gets the scope for enum references (the EnumName part of EnumName.Entry).
+     * Returns all enums from the imported metamodel file.
+     *
+     * @param context The reference context
+     * @param document The current document
+     * @returns The scope containing all enums from the metamodel
+     */
+    private getEnumRefScope(context: ReferenceInfo, document: any): Scope {
+        const model = AstUtils.getContainerOfType(context.container, (node) =>
+            this.astReflection.isInstance(node, Model)
+        ) as ModelType | undefined;
+        const relativePath = model?.import?.file;
+        if (relativePath == undefined) {
+            return EMPTY_SCOPE;
+        }
+        const metamodelUri = resolveRelativePath(document, relativePath);
+        const metamodelDoc = this.documents.getDocument(metamodelUri);
+        if (metamodelDoc == undefined) {
+            return EMPTY_SCOPE;
+        }
+        const exports = getExportedEntitiesFromMetamodelFile(metamodelDoc, this.documents);
+        const enumDescriptions = Array.from(exports.enums).map((e) =>
+            this.descriptionProvider.createDescription(e, e.name ?? "")
+        );
+        return createScopeFromDescriptions(enumDescriptions);
+    }
+
+    /**
+     * Gets the scope for enum value references (the Entry part of EnumName.Entry).
+     * Returns all entries of the enum referenced by enumRef.
      *
      * @param context The reference context
      * @returns The scope containing the enum entries
      */
     private getEnumValueScope(context: ReferenceInfo): Scope {
-        const propertyAssignment = this.findPropertyAssignment(context.container);
-        if (propertyAssignment == undefined) {
-            return EMPTY_SCOPE;
+        const enumValue = context.container as EnumValueType;
+        const enumRef = enumValue.enumRef?.ref as EnumType | undefined;
+        if (enumRef != undefined) {
+            return this.createScopeForNodes(enumRef.entries);
         }
-        const propertyRef = propertyAssignment.name?.ref as PropertyType | undefined;
-        if (propertyRef?.type == undefined) {
-            return EMPTY_SCOPE;
-        }
-        return this.getEnumEntriesFromType(propertyRef.type);
+        return EMPTY_SCOPE;
     }
 
     /**

@@ -259,16 +259,15 @@ export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
     }
 
     /**
-     * Formats an enum value.
+     * Formats an enum value using EnumName.Entry syntax.
      *
      * @param value The enum value
      * @returns The formatted string
      */
     private formatEnumValue(value: EnumValueType): string {
-        return this.modelState.languageServices.AstSerializer.serializePrimitive(
-            { value: value.value?.$refText ?? "?" },
-            ID
-        );
+        const enumName = value.enumRef?.$refText ?? "?";
+        const entryName = value.value?.$refText ?? "?";
+        return `${enumName}.${entryName}`;
     }
 
     /**

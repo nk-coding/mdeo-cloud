@@ -12,7 +12,7 @@ import {
     type MetamodelEnumInfo,
     typeRef,
     MetamodelPartialTypeSystem,
-    ENUM_CONTAINER_PACKAGE,
+    ENUM_CONTAINER_PACKAGE
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { LangiumDocument, LangiumDocuments, URI } from "langium";
@@ -156,7 +156,12 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
             metamodelDoc,
             typir.langium.LangiumServices.workspace.LangiumDocuments
         );
-        const { classes: classInfos, enums: enumInfos } = extractMetamodelEntities([...classes], [...enums], reflection, DefaultCollectionTypeFactory);
+        const { classes: classInfos, enums: enumInfos } = extractMetamodelEntities(
+            [...classes],
+            [...enums],
+            reflection,
+            DefaultCollectionTypeFactory
+        );
         const classTypes = generateClassTypes(classInfos);
 
         this.registerClassTypes(classTypes, typir);
@@ -295,6 +300,4 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
             }
         }
     }
-
 }
-
