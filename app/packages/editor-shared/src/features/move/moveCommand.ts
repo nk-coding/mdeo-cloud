@@ -2,7 +2,7 @@ import { sharedImport } from "../../sharedImport.js";
 import type { GEdge } from "../../model/edge.js";
 import { GNode } from "../../model/node.js";
 import type { EdgeMemento } from "./edgeMemento.js";
-import { EdgeRouter } from "../edge-rourting/edgeRouter.js";
+import { EdgeRouter } from "../edge-routing/edgeRouter.js";
 import type { Point, MoveAction } from "@eclipse-glsp/protocol";
 import type {
     CommandExecutionContext,

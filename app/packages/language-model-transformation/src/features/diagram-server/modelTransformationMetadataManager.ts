@@ -416,7 +416,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             }
             if (elseResult.lastNodeId != undefined && elseStatements.length > 0) {
                 this.addControlFlowEdge(elseResult.lastNodeId, mergeNodeId, undefined, edges);
-            } else if (elseResult.lastNodeId != undefined) {
+            } else if (elseResult.lastNodeId != undefined && thenResult.lastNodeId !== matchNodeId) {
                 this.addControlFlowEdge(matchNodeId, mergeNodeId, "else", edges);
             }
 

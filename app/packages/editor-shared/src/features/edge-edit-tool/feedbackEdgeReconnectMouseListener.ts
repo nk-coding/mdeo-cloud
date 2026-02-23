@@ -10,10 +10,12 @@ import type { EdgeEditTool } from "./edgeEditTool.js";
 import type { EdgeAnchor, ReconnectEdgeOperation } from "@mdeo/editor-protocol";
 import { GNode } from "../../model/node.js";
 import { GEdge, type ReconnectEnd } from "../../model/edge.js";
-import { isConnectable } from "../edge-rourting/connectable.js";
+import { isConnectable } from "../edge-routing/connectable.js";
+import { getRelativePosition } from "../../base/getRelativePosition.js";
 
-const { DragAwareMouseListener, getAbsolutePosition, findParentByFeature, isSelected, cursorFeedbackAction } =
+const { DragAwareMouseListener, findParentByFeature, isSelected, cursorFeedbackAction } =
     sharedImport("@eclipse-glsp/client");
+const { GChildElement } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * CSS class for edge reconnect cursor.
@@ -131,7 +133,20 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
             actualTarget = target;
         }
 
-        const position = getAbsolutePosition(actualTarget, event);
+        let position: Point;
+        if (this.initialTargetId != undefined) {
+            const initialTarget = target.root.index.getById(this.initialTargetId);
+            let relativeTarget: GModelElement;
+            if (initialTarget != undefined) {
+                relativeTarget = initialTarget instanceof GChildElement ? initialTarget.parent : initialTarget;
+            } else {
+                relativeTarget = target;
+            }
+            position = getRelativePosition(relativeTarget, event);
+        } else {
+            position = getRelativePosition(actualTarget, event);
+        }
+
         const targetInfo = this.findReconnectTarget(actualTarget, position);
 
         let actions: Action[];

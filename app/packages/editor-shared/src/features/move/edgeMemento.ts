@@ -1,5 +1,5 @@
 import type { GEdge } from "../../model/edge.js";
-import type { RouteComputationResult } from "../edge-rourting/edgeRouter.js";
+import type { RouteComputationResult } from "../edge-routing/edgeRouter.js";
 
 /**
  * Stores before and after snapshots of an edge's routing state.

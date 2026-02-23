@@ -1,8 +1,8 @@
 import type { Action, Point, GModelElement, BoundsAware } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 import { GEdge } from "../../model/edge.js";
-import type { EdgeRouter } from "../edge-rourting/edgeRouter.js";
-import { Orientation } from "../edge-rourting/edgeRouter.js";
+import type { EdgeRouter } from "../edge-routing/edgeRouter.js";
+import { Orientation } from "../edge-routing/edgeRouter.js";
 import { SetEdgeRoutingFeedbackAction } from "./edgeRoutingFeedback.js";
 import type { EdgeEditTool } from "./edgeEditTool.js";
 import type {
@@ -15,6 +15,7 @@ import type { Bounds as BoundsType } from "@eclipse-glsp/protocol";
 
 const { DragAwareMouseListener, getAbsolutePosition, cursorFeedbackAction, isSelected } =
     sharedImport("@eclipse-glsp/client");
+const { findParentByFeature, isViewport, translatePoint } = sharedImport("@eclipse-glsp/sprotty");
 const { Point: PointUtil } = sharedImport("@eclipse-glsp/protocol");
 
 /**
@@ -53,9 +54,9 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
     protected edgeRouter: EdgeRouter;
 
     /**
-     * The initial mouse position when drag started.
+     * The offset to apply to
      */
-    protected initialMousePosition?: Point;
+    protected offset?: Point;
 
     /**
      * Feedback emitter for cursor changes.
@@ -104,7 +105,12 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
                 targetAnchor: routeResult.targetAnchor
             };
             this.isTracking = true;
-            this.initialMousePosition = getAbsolutePosition(target, event);
+            const viewport = findParentByFeature(target, isViewport);
+            if (viewport != undefined) {
+                this.offset = translatePoint(PointUtil.ORIGIN, viewport, target);
+            } else {
+                this.offset = PointUtil.ORIGIN;
+            }
             this.cursorFeedback.add(cursorFeedbackAction(CSS_EDGE_SEGMENT_MOVE), cursorFeedbackAction()).submit();
         }
 
@@ -114,11 +120,11 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
     override draggingMouseMove(target: GModelElement, event: MouseEvent): Action[] {
         super.draggingMouseMove(target, event);
 
-        if (!this.isTracking || !this.edge || this.segmentIndex === undefined) {
+        if (!this.isTracking || this.edge == undefined || this.segmentIndex == undefined || this.offset == undefined) {
             return [];
         }
 
-        const mousePosition = getAbsolutePosition(target, event);
+        const mousePosition = PointUtil.add(getAbsolutePosition(target, event), this.offset);
         const newMeta = this.computeRouteWithEditedSegment(this.edge, this.segmentIndex, mousePosition);
 
         return [
@@ -137,14 +143,14 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
     }
 
     override draggingMouseUp(target: GModelElement, event: MouseEvent): Action[] {
-        if (!this.isTracking || !this.edge || this.segmentIndex === undefined || !this.initialMousePosition) {
+        if (!this.isTracking || this.edge == undefined || this.segmentIndex == undefined || this.offset == undefined) {
             this.resetTracking();
             this.cursorFeedback.add(cursorFeedbackAction(), cursorFeedbackAction()).submit();
             return [];
         }
 
         const edge = this.edge;
-        const mousePosition = getAbsolutePosition(target, event);
+        const mousePosition = PointUtil.add(getAbsolutePosition(target, event), this.offset);
         const newMeta = this.computeRouteWithEditedSegment(edge, this.segmentIndex, mousePosition);
 
         const routingUpdate = {
@@ -193,7 +199,7 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
         this.segmentIndex = undefined;
         this.startMeta = undefined;
         this.isTracking = false;
-        this.initialMousePosition = undefined;
+        this.offset = undefined;
     }
 
     override dispose(): void {

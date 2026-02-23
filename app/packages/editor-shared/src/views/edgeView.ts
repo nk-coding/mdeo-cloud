@@ -2,7 +2,7 @@ import type { RenderingContext, IView, Point, Bounds } from "@eclipse-glsp/sprot
 import { sharedImport } from "../sharedImport.js";
 import type { GEdge, EdgeReconnectData } from "../model/edge.js";
 import type { VNode } from "snabbdom";
-import { EdgeRouter, type RouteComputationResult } from "../features/edge-rourting/edgeRouter.js";
+import { EdgeRouter, type RouteComputationResult } from "../features/edge-routing/edgeRouter.js";
 import type { AnchorSide } from "@mdeo/editor-protocol";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 

@@ -1,63 +1,51 @@
-import type { RenderingContext, GModelElement, Bounds as BoundsType } from "@eclipse-glsp/sprotty";
+import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
-import { sharedImport, GNodeViewBase, type GNode } from "@mdeo/editor-shared";
+import { sharedImport, GNodeViewBase } from "@mdeo/editor-shared";
 import type { GMatchNode } from "../model/matchNode.js";
-import { isPatternInstanceNode } from "../model/patternInstanceNode.js";
-import { ModelTransformationElementType } from "../model/elementTypes.js";
-import { GMatchNodeCompartments } from "../model/matchNodeCompartments.js";
+import type { GMatchNodeCompartments } from "../model/matchNodeCompartments.js";
 
 const { injectable } = sharedImport("inversify");
-const { svg, html, ATTR_BBOX_ELEMENT, Bounds } = sharedImport("@eclipse-glsp/sprotty");
-
-const INNER_PADDING = 20;
-
-const MIN_CONTENT_SIZE = 80;
+const { svg, html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 
 @injectable()
 export class GMatchNodeView extends GNodeViewBase {
-    override render(model: Readonly<GNode>, context: RenderingContext): VNode | undefined {
-        const matchModel = model as GMatchNode;
+    /**
+     * Padding between the pattern content (instances, links) and the match node's outline/container area.
+     */
+    static readonly INNER_PADDING = 20;
 
-        const patternChildren: GModelElement[] = [];
-        const edgeChildren: GModelElement[] = [];
-        let containerNode: GModelElement | undefined;
+    /**
+     * Minimum width/height for the pattern content area, to ensure a reasonable size when no pattern elements are present or when they have zero-size bounds.
+     */
+    static readonly MIN_CONTENT_SIZE = 80;
 
-        for (const child of matchModel.children) {
-            if (isPatternInstanceNode(child)) {
-                patternChildren.push(child);
-            } else if (child.type === ModelTransformationElementType.EDGE_PATTERN_LINK) {
-                edgeChildren.push(child);
-            } else if (child instanceof GMatchNodeCompartments) {
-                containerNode = child;
-            }
-        }
+    override render(model: Readonly<GMatchNode>, context: RenderingContext): VNode | undefined {
+        const { innerChildren, containerNode, innerChildrenBounds, innerChildrenTranslation } = model.getRenderInfo();
 
-        const patternBbox = this.computePatternBounds(patternChildren, matchModel);
+        const patternContentRight = innerChildrenBounds.width + GMatchNodeView.INNER_PADDING * 2;
+        const patternAreaHeight = innerChildrenBounds.height + GMatchNodeView.INNER_PADDING * 2;
 
-        const patternContentRight = INNER_PADDING + patternBbox.width + INNER_PADDING;
-        const patternAreaHeight = INNER_PADDING + patternBbox.height + INNER_PADDING;
-
-        const containerBounds = (containerNode as GMatchNodeCompartments | undefined)?.bounds;
+        const containerBounds = containerNode?.bounds;
         const containerBoundsValid =
-            containerBounds !== undefined && containerBounds.width >= 0 && containerBounds.height >= 0;
+            containerBounds != undefined && containerBounds.width >= 0 && containerBounds.height >= 0;
         const containerHeight = containerBoundsValid ? containerBounds.height : 0;
         const containerWidth = containerBoundsValid ? containerBounds.width : 0;
 
-        const totalWidth = Math.max(patternContentRight, MIN_CONTENT_SIZE + INNER_PADDING * 2, containerWidth);
+        const totalWidth = Math.max(
+            patternContentRight,
+            GMatchNodeView.MIN_CONTENT_SIZE + GMatchNodeView.INNER_PADDING * 2,
+            containerWidth
+        );
         const patternAreaBottomY = patternAreaHeight;
         const totalHeight = patternAreaBottomY + containerHeight;
 
-        const outlines = this.renderOutlines(totalWidth, totalHeight, matchModel.multiple);
+        const outlines = this.renderOutlines(totalWidth, totalHeight, model.multiple);
 
-        const translateX = INNER_PADDING - patternBbox.x;
-        const translateY = INNER_PADDING - patternBbox.y;
+        const { x: translateX, y: translateY } = innerChildrenTranslation;
         const innerGroup = svg(
             "g",
             { attrs: { transform: `translate(${translateX}, ${translateY})` } },
-            ...patternChildren
-                .map((child) => context.renderElement(child))
-                .filter((vnode): vnode is VNode => vnode !== undefined),
-            ...edgeChildren
+            ...innerChildren
                 .map((child) => context.renderElement(child))
                 .filter((vnode): vnode is VNode => vnode !== undefined)
         );
@@ -72,21 +60,6 @@ export class GMatchNodeView extends GNodeViewBase {
             innerGroup,
             ...bottomVNodes
         );
-    }
-
-    private computePatternBounds(patternChildren: GModelElement[], _matchModel: GMatchNode): BoundsType {
-        if (patternChildren.length === 0) {
-            return { x: 0, y: 0, width: MIN_CONTENT_SIZE, height: MIN_CONTENT_SIZE };
-        }
-
-        let combined: BoundsType | undefined;
-        for (const child of patternChildren) {
-            const b = (child as { bounds?: BoundsType }).bounds;
-            if (!b) continue;
-            combined = combined === undefined ? b : Bounds.combine(combined, b);
-        }
-
-        return combined ?? { x: 0, y: 0, width: MIN_CONTENT_SIZE, height: MIN_CONTENT_SIZE };
     }
 
     private renderOutlineDiv(width: number, height: number): VNode {
@@ -169,7 +142,7 @@ export class GMatchNodeView extends GNodeViewBase {
     }
 
     private renderContainerArea(
-        containerNode: GModelElement | undefined,
+        containerNode: GMatchNodeCompartments | undefined,
         context: RenderingContext,
         totalWidth: number,
         yOffset: number
@@ -183,7 +156,7 @@ export class GMatchNodeView extends GNodeViewBase {
             return [];
         }
 
-        const containerBounds = (containerNode as GMatchNodeCompartments).bounds;
+        const containerBounds = containerNode.bounds;
         const boundsIsValid = containerBounds.width >= 0 && containerBounds.height >= 0;
         const foWidth = boundsIsValid ? totalWidth : 99999;
         const foHeight = boundsIsValid ? containerBounds.height : 99999;

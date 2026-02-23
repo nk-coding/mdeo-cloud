@@ -327,11 +327,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
             if (elseResult.lastNodeId != undefined && stmt.elseBlock != undefined) {
                 if (elseResult.lastNodeId === matchNodeId) {
-                    this.createControlFlowEdge(graph, matchNodeId, mergeNodeId, "else");
+                    if (thenResult.lastNodeId !== matchNodeId) {
+                        this.createControlFlowEdge(graph, matchNodeId, mergeNodeId, "else");
+                    }
                 } else {
                     this.createControlFlowEdge(graph, elseResult.lastNodeId, mergeNodeId, undefined);
                 }
-            } else if (elseResult.lastNodeId != undefined) {
+            } else if (elseResult.lastNodeId != undefined && thenResult.lastNodeId !== matchNodeId) {
                 this.createControlFlowEdge(graph, matchNodeId, mergeNodeId, "else");
             }
 

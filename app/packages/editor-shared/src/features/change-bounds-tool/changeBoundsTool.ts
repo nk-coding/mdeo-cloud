@@ -3,7 +3,7 @@ import type { MouseListener } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 import { ChangeBoundsListener } from "./changeBoundsListener.js";
 import { FeedbackMoveMouseListener } from "./feedbackMoveMouseListener.js";
-import { EdgeRouter } from "../edge-rourting/edgeRouter.js";
+import { EdgeRouter } from "../edge-routing/edgeRouter.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ChangeBoundsTool: GLSPChangeBoundsTool } = sharedImport("@eclipse-glsp/client");

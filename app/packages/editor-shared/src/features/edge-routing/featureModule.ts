@@ -1,5 +1,5 @@
 import { sharedImport } from "../../sharedImport.js";
-import { EdgeRouter } from "../edge-rourting/edgeRouter.js";
+import { EdgeRouter } from "./edgeRouter.js";
 
 const { FeatureModule } = sharedImport("@eclipse-glsp/client");
 

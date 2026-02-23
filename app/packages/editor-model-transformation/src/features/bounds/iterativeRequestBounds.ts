@@ -12,7 +12,12 @@ import type {
 import { sharedImport } from "@mdeo/editor-shared";
 
 const { injectable, inject } = sharedImport("inversify");
-const { HiddenCommand, TYPES } = sharedImport("@eclipse-glsp/sprotty");
+const {
+    HiddenCommand,
+    TYPES,
+    RequestBoundsCommand: SprottyRequestBoundsCommand
+} = sharedImport("@eclipse-glsp/sprotty");
+const { ComputedBoundsAction } = sharedImport("@eclipse-glsp/protocol");
 
 /**
  * An action to trigger an iterative request bounds process, which allows for multiple rounds of bounds computation.
@@ -91,5 +96,19 @@ export class IterativeRequestBoundsCommand extends HiddenCommand {
             modelChanged: true,
             cause: this.action
         };
+    }
+
+    get blockUntil(): (action: Action) => boolean {
+        return (action) => action.kind === ComputedBoundsAction.KIND;
+    }
+}
+
+/**
+ * Custom RequestBoundsCommand that blocks until the iterative bounds computation is complete
+ */
+@injectable()
+export class RequestBoundsCommand extends SprottyRequestBoundsCommand {
+    override get blockUntil(): (action: Action) => boolean {
+        return (action) => action.kind === IterativeRequestBoundsAction.KIND;
     }
 }

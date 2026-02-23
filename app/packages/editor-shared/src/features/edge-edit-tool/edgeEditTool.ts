@@ -1,5 +1,5 @@
 import { sharedImport } from "../../sharedImport.js";
-import { EdgeRouter } from "../edge-rourting/edgeRouter.js";
+import { EdgeRouter } from "../edge-routing/edgeRouter.js";
 import { FeedbackEdgeRouteMovingMouseListener } from "./feedbackEdgeRouteMovingMouseListener.js";
 import { FeedbackEdgeReconnectMouseListener } from "./feedbackEdgeReconnectMouseListener.js";
 import type { SelectionService } from "@eclipse-glsp/client";

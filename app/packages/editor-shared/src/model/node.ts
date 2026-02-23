@@ -2,7 +2,7 @@ import type { Fadeable, FluentIterable, Hoverable, Point, Selectable } from "@ec
 import { sharedImport } from "../sharedImport.js";
 import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 import { GEdge } from "./edge.js";
-import type { Connectable } from "../features/edge-rourting/connectable.js";
+import type { Connectable } from "../features/edge-routing/connectable.js";
 
 const { GShapeElement } = sharedImport("@eclipse-glsp/sprotty");
 
