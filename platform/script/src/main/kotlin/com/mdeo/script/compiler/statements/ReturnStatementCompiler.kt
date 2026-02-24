@@ -101,14 +101,16 @@ class ReturnStatementCompiler : StatementCompiler {
         if (classType.isNullable) {
             return Opcodes.ARETURN
         }
-        
-        return when (classType.type) {
-            "builtin.int" -> Opcodes.IRETURN
-            "builtin.long" -> Opcodes.LRETURN
-            "builtin.float" -> Opcodes.FRETURN
-            "builtin.double" -> Opcodes.DRETURN
-            "builtin.boolean" -> Opcodes.IRETURN
-            else -> Opcodes.ARETURN
+        if (classType.`package` == "builtin") {
+            return when (classType.type) {
+                "int" -> Opcodes.IRETURN
+                "long" -> Opcodes.LRETURN
+                "float" -> Opcodes.FRETURN
+                "double" -> Opcodes.DRETURN
+                "boolean" -> Opcodes.IRETURN
+                else -> Opcodes.ARETURN
+            }
         }
+        return Opcodes.ARETURN
     }
 }

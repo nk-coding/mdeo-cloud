@@ -196,6 +196,11 @@ export const { importType: FunctionImport, fileImportType: FunctionFileImport } 
     generateImportTypes(scriptFileScopingConfig);
 
 /**
+ * Type representing a FunctionImport AST node.
+ */
+export type FunctionFileImportType = ASTType<typeof FunctionFileImport>;
+
+/**
  * Union type for Function or FunctionImport.
  */
 export const FunctionOrImport = createType("ScriptFunctionOrImport").types(Function, FunctionImport);
@@ -206,9 +211,22 @@ export const FunctionOrImport = createType("ScriptFunctionOrImport").types(Funct
 export type FunctionOrImportType = ASTType<typeof FunctionOrImport>;
 
 /**
+ * Metamodel file import for the script.
+ */
+export const MetamodelFileImport = createInterface("ScriptMetamodelFileImport").attrs({
+    file: String
+});
+
+/**
+ * Type representing a MetamodelFileImport AST node.
+ */
+export type MetamodelFileImportType = ASTType<typeof MetamodelFileImport>;
+
+/**
  * The root Script type.
  */
 export const Script = createInterface("Script").attrs({
+    metamodelImport: Optional(MetamodelFileImport),
     imports: [FunctionFileImport],
     functions: [Function]
 });

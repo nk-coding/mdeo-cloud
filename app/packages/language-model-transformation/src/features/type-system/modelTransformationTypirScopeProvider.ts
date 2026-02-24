@@ -10,10 +10,9 @@ import {
     type ScopeLocalInitialization,
     type ExpressionTypirServices,
     type LambdaTypeInferenceResult,
-    type MetamodelEnumInfo,
-    ENUM_CONTAINER_PACKAGE
+    type MetamodelEnumInfo
 } from "@mdeo/language-expression";
-import { getExportedEntitiesFromMetamodelFile } from "@mdeo/language-metamodel";
+import { getExportedEntitiesByPath } from "@mdeo/language-metamodel";
 import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { AstReflection } from "@mdeo/language-common";
@@ -192,15 +191,21 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             return [];
         }
 
-        const { enums } = getExportedEntitiesFromMetamodelFile(metamodelDoc, documents);
-        const { enums: enumInfos } = extractMetamodelEntities(
-            [],
-            [...enums],
-            langiumServices.AstReflection,
-            DefaultCollectionTypeFactory
-        );
+        const entitiesByPath = getExportedEntitiesByPath(metamodelDoc, documents);
 
-        return enumInfos;
+        const allEnumInfos: MetamodelEnumInfo[] = [];
+        for (const docEntities of entitiesByPath) {
+            const { enums: enumInfos } = extractMetamodelEntities(
+                [],
+                docEntities.enums,
+                langiumServices.AstReflection,
+                DefaultCollectionTypeFactory,
+                docEntities.absolutePath
+            );
+            allEnumInfos.push(...enumInfos);
+        }
+
+        return allEnumInfos;
     }
 
     /**
@@ -215,20 +220,21 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         enumInfos: MetamodelEnumInfo[],
         scope: Scope<TypirLangiumSpecifics>
     ): ScopeEntry<TypirLangiumSpecifics>[] {
-        return enumInfos.map((enumInfo) => {
-            const containerId = `${ENUM_CONTAINER_PACKAGE}.${enumInfo.name}`;
-            return {
-                name: enumInfo.name,
-                definingScope: scope,
-                position: -1,
-                inferType: () =>
-                    this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
-                        type: containerId,
-                        isNullable: false
-                    }),
-                readonly: true
-            } satisfies ScopeEntry<TypirLangiumSpecifics>;
-        });
+        return enumInfos.map(
+            (enumInfo) =>
+                ({
+                    name: enumInfo.name,
+                    definingScope: scope,
+                    position: -1,
+                    inferType: () =>
+                        this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                            package: enumInfo.containerPackage,
+                            type: enumInfo.name,
+                            isNullable: false
+                        }),
+                    readonly: true
+                }) satisfies ScopeEntry<TypirLangiumSpecifics>
+        );
     }
 
     /**

@@ -9,8 +9,8 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  * List is a mutable ordered collection that allows duplicates.
  */
 fun createListType(): TypeDefinition {
-    return typeDefinition("builtin.List") {
+    return typeDefinition("builtin", "List") {
         jvmClass("java/util/List")
-        extends("builtin.OrderedCollection")
+        extends("builtin", "OrderedCollection")
     }
 }

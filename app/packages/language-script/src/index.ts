@@ -9,6 +9,7 @@ export * from "./features/scriptActionProvider.js";
 export * from "./features/scriptExternalReferenceCollector.js";
 export * from "./features/scriptScopeProvider.js";
 export * from "./features/scriptSerializers.js";
+export * from "./features/scriptValidator.js";
 export * from "./grammar/scriptRules.js";
 export * from "./grammar/scriptTypes.js";
 export * from "./plugin/resolvePlugins.js";

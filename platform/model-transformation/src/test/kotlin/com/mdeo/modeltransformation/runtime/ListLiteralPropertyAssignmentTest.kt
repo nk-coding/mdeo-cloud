@@ -49,13 +49,13 @@ class ListLiteralPropertyAssignmentTest {
         val typeRegistry = GremlinTypeRegistry(parent = GremlinTypeRegistry.GLOBAL)
         
         // Register __GraphNode with the properties that will be accessed in tests
-        val graphNodeType = gremlinType("__GraphNode")
+        val graphNodeType = gremlinType("builtin", "__GraphNode")
             .graphProperty("values")
             .build()
         typeRegistry.register(graphNodeType)
         
-        val nodeType = gremlinType("Node")
-            .extends("__GraphNode")
+        val nodeType = gremlinType("builtin", "Node")
+            .extends("builtin", "__GraphNode")
             .graphProperty("values")
             .build()
         typeRegistry.register(nodeType)
@@ -80,14 +80,14 @@ class ListLiteralPropertyAssignmentTest {
         // Type 4: Any (nullable)
         // Type 5: builtin.List<builtin.int>
         // Type 6: builtin.int
-        val voidType = ClassTypeRef(type = "void", isNullable = false)
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
-        val doubleType = ClassTypeRef(type = "builtin.double", isNullable = false)
-        val booleanType = ClassTypeRef(type = "builtin.boolean", isNullable = false)
-        val anyType = ClassTypeRef(type = "Any", isNullable = true)
-        val listIntType = ClassTypeRef(type = "builtin.List", isNullable = false)
-        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
-        val graphNodeTypeRef = ClassTypeRef(type = "__GraphNode", isNullable = false)
+        val voidType = ClassTypeRef(`package` = "builtin", type = "void", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
+        val doubleType = ClassTypeRef(`package` = "builtin", type = "double", isNullable = false)
+        val booleanType = ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false)
+        val anyType = ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true)
+        val listIntType = ClassTypeRef(`package` = "builtin", type = "List", isNullable = false)
+        val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
+        val graphNodeTypeRef = ClassTypeRef(`package` = "builtin", type = "__GraphNode", isNullable = false)
         
         // Use reflection to set the types field since it has a private setter
         val typesField = TransformationEngine::class.java.getDeclaredField("types")

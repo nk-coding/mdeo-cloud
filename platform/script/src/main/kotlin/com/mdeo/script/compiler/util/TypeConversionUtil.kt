@@ -32,22 +32,21 @@ object TypeConversionUtil {
      * Higher priority wins when determining the result type.
      */
     private val numericPriority = mapOf(
-        "builtin.int" to 1,
-        "builtin.long" to 2,
-        "builtin.float" to 3,
-        "builtin.double" to 4
+        "int" to 1,
+        "long" to 2,
+        "float" to 3,
+        "double" to 4
     )
     
     /**
      * Gets the type name from a ReturnType if it's a numeric type.
      * 
      * @param type The return type to check.
-     * @return The type name if numeric, null otherwise.
+     * @return The full type name (fqn) if numeric, null otherwise.
      */
     fun getNumericTypeName(type: ReturnType): String? {
-        if (type !is ClassTypeRef) {
-            return null
-        }
+        if (type !is ClassTypeRef) return null
+        if (type.`package` != "builtin") return null
         return if (type.type in numericPriority.keys) type.type else null
     }
     
@@ -79,7 +78,7 @@ object TypeConversionUtil {
      */
     fun isIntegerType(type: ReturnType): Boolean {
         val typeName = getNumericTypeName(type) ?: return false
-        return typeName == "builtin.int" || typeName == "builtin.long"
+        return typeName == "int" || typeName == "long"
     }
     
     /**
@@ -90,7 +89,7 @@ object TypeConversionUtil {
      */
     fun isFloatingPointType(type: ReturnType): Boolean {
         val typeName = getNumericTypeName(type) ?: return false
-        return typeName == "builtin.float" || typeName == "builtin.double"
+        return typeName == "float" || typeName == "double"
     }
     
     /**
@@ -126,19 +125,19 @@ object TypeConversionUtil {
         }
         
         when (fromType) {
-            "builtin.int" -> when (toType) {
-                "builtin.long" -> mv.visitInsn(Opcodes.I2L)
-                "builtin.float" -> mv.visitInsn(Opcodes.I2F)
-                "builtin.double" -> mv.visitInsn(Opcodes.I2D)
+            "int" -> when (toType) {
+                "long" -> mv.visitInsn(Opcodes.I2L)
+                "float" -> mv.visitInsn(Opcodes.I2F)
+                "double" -> mv.visitInsn(Opcodes.I2D)
                 else -> return false
             }
-            "builtin.long" -> when (toType) {
-                "builtin.float" -> mv.visitInsn(Opcodes.L2F)
-                "builtin.double" -> mv.visitInsn(Opcodes.L2D)
+            "long" -> when (toType) {
+                "float" -> mv.visitInsn(Opcodes.L2F)
+                "double" -> mv.visitInsn(Opcodes.L2D)
                 else -> return false
             }
-            "builtin.float" -> when (toType) {
-                "builtin.double" -> mv.visitInsn(Opcodes.F2D)
+            "float" -> when (toType) {
+                "double" -> mv.visitInsn(Opcodes.F2D)
                 else -> return false
             }
             else -> return false
@@ -169,10 +168,10 @@ object TypeConversionUtil {
      */
     fun getTypedOpcode(operation: Int, typeName: String): Int {
         val offset = when (typeName) {
-            "builtin.int" -> 0
-            "builtin.long" -> 1
-            "builtin.float" -> 2
-            "builtin.double" -> 3
+            "int" -> 0
+            "long" -> 1
+            "float" -> 2
+            "double" -> 3
             else -> 0
         }
         return operation + offset
@@ -233,17 +232,17 @@ object TypeConversionUtil {
      * @return true if the type is builtin.string.
      */
     fun isStringType(type: ReturnType): Boolean {
-        return type is ClassTypeRef && type.type == "builtin.string"
+        return type is ClassTypeRef && type.`package` == "builtin" && type.type == "string"
     }
     
     /**
-     * Checks if a type name represents the string type.
+     * Checks if a type name represents the string type (simple name).
      * 
-     * @param typeName The type name to check.
+     * @param typeName The simple type name to check (e.g. "string").
      * @return true if the type is builtin.string.
      */
     fun isStringType(typeName: String): Boolean {
-        return typeName == "builtin.string"
+        return typeName == "string"
     }
     
     /**
@@ -253,6 +252,6 @@ object TypeConversionUtil {
      * @return true if the type is builtin.boolean.
      */
     fun isBooleanType(type: ReturnType): Boolean {
-        return type is ClassTypeRef && type.type == "builtin.boolean"
+        return type is ClassTypeRef && type.`package` == "builtin" && type.type == "boolean"
     }
 }

@@ -158,7 +158,7 @@ object EqualityOperationHelper {
      */
     private fun isNumericOrNullableNumeric(type: ReturnType): Boolean {
         if (type !is ClassTypeRef) return false
-        return type.type in listOf("builtin.int", "builtin.long", "builtin.float", "builtin.double")
+        return type.`package` == "builtin" && type.type in setOf("int", "long", "float", "double")
     }
 
     /**
@@ -300,11 +300,11 @@ object EqualityOperationHelper {
         if (leftIsNullable || rightIsNullable) {
             context.compileExpression(expr.left, mv, leftType)
             if (!leftIsNullable) {
-                CoercionUtil.emitBoxing("builtin.boolean", mv)
+                CoercionUtil.emitBoxing(ClassTypeRef("builtin", "boolean", false), mv)
             }
             context.compileExpression(expr.right, mv, rightType)
             if (!rightIsNullable) {
-                CoercionUtil.emitBoxing("builtin.boolean", mv)
+                CoercionUtil.emitBoxing(ClassTypeRef("builtin", "boolean", false), mv)
             }
             mv.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
@@ -404,21 +404,21 @@ object EqualityOperationHelper {
         val endLabel = Label()
         
         when (promotedType) {
-            "builtin.int" -> {
+            "int" -> {
                 val jumpOpcode = if (isEquals) Opcodes.IF_ICMPEQ else Opcodes.IF_ICMPNE
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
-            "builtin.long" -> {
+            "long" -> {
                 mv.visitInsn(Opcodes.LCMP)
                 val jumpOpcode = if (isEquals) Opcodes.IFEQ else Opcodes.IFNE
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
-            "builtin.float" -> {
+            "float" -> {
                 mv.visitInsn(Opcodes.FCMPL)
                 val jumpOpcode = if (isEquals) Opcodes.IFEQ else Opcodes.IFNE
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
-            "builtin.double" -> {
+            "double" -> {
                 mv.visitInsn(Opcodes.DCMPL)
                 val jumpOpcode = if (isEquals) Opcodes.IFEQ else Opcodes.IFNE
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
@@ -469,13 +469,13 @@ object EqualityOperationHelper {
         val rightTypeName = (rightType as ClassTypeRef).type
         
         if (leftIsNullable && !rightIsNullable) {
-            compileOneNullableNumericEquality(expr, context, mv, leftTypeName, rightTypeName, 
+            compileOneNullableNumericEquality(expr, context, mv, leftType, rightType,
                 true, isEquals)
             return
         }
         
         if (!leftIsNullable && rightIsNullable) {
-            compileOneNullableNumericEquality(expr, context, mv, leftTypeName, rightTypeName,
+            compileOneNullableNumericEquality(expr, context, mv, leftType, rightType,
                 false, isEquals)
             return
         }
@@ -499,11 +499,11 @@ object EqualityOperationHelper {
         mv.visitInsn(Opcodes.DUP)
         mv.visitJumpInsn(Opcodes.IFNULL, leftNotNullRightNullLabel)
         
-        CoercionUtil.emitUnboxing(rightTypeName, mv)
+        CoercionUtil.emitUnboxing(rightType, mv)
         TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
         
         when (promotedType) {
-            "builtin.long", "builtin.double" -> {
+            "long", "double" -> {
                 mv.visitInsn(Opcodes.DUP2_X1)
                 mv.visitInsn(Opcodes.POP2)
             }
@@ -512,7 +512,7 @@ object EqualityOperationHelper {
             }
         }
         
-        CoercionUtil.emitUnboxing(leftTypeName, mv)
+        CoercionUtil.emitUnboxing(leftType, mv)
         TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
         emitSwap(promotedType, mv)
         
@@ -549,8 +549,8 @@ object EqualityOperationHelper {
      * @param expr The binary expression AST node
      * @param context The compilation context
      * @param mv The ASM method visitor
-     * @param leftTypeName The type name of the left operand
-     * @param rightTypeName The type name of the right operand
+     * @param leftType The ClassTypeRef of the left operand
+     * @param rightType The ClassTypeRef of the right operand
      * @param leftIsNullable true if the left operand is the nullable one
      * @param isEquals true for ==, false for !=
      */
@@ -558,11 +558,13 @@ object EqualityOperationHelper {
         expr: TypedBinaryExpression,
         context: CompilationContext,
         mv: MethodVisitor,
-        leftTypeName: String,
-        rightTypeName: String,
+        leftType: ClassTypeRef,
+        rightType: ClassTypeRef,
         leftIsNullable: Boolean,
         isEquals: Boolean
     ) {
+        val leftTypeName = leftType.type
+        val rightTypeName = rightType.type
         val promotedType = TypeConversionUtil.getPromotedType(leftTypeName, rightTypeName)
         
         if (leftIsNullable) {
@@ -570,16 +572,16 @@ object EqualityOperationHelper {
             val trueLabel = Label()
             val endLabel = Label()
             
-            val leftType = context.getType(expr.left.evalType)
-            context.compileExpression(expr.left, mv, leftType)
+            val leftExprType = context.getType(expr.left.evalType)
+            context.compileExpression(expr.left, mv, leftExprType)
             mv.visitInsn(Opcodes.DUP)
             mv.visitJumpInsn(Opcodes.IFNULL, falseLabel)
             
-            CoercionUtil.emitUnboxing(leftTypeName, mv)
+            CoercionUtil.emitUnboxing(leftType, mv)
             TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
             
-            val rightType = context.getType(expr.right.evalType)
-            context.compileExpression(expr.right, mv, rightType)
+            val rightType2 = context.getType(expr.right.evalType)
+            context.compileExpression(expr.right, mv, rightType2)
             TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
             
             emitPrimitiveComparison(promotedType, if (isEquals) Opcodes.IFEQ else Opcodes.IFNE, trueLabel, mv)
@@ -601,16 +603,16 @@ object EqualityOperationHelper {
             val trueLabel = Label()
             val endLabel = Label()
             
-            val rightType = context.getType(expr.right.evalType)
-            context.compileExpression(expr.right, mv, rightType)
+            val rightExprType = context.getType(expr.right.evalType)
+            context.compileExpression(expr.right, mv, rightExprType)
             mv.visitInsn(Opcodes.DUP)
             mv.visitJumpInsn(Opcodes.IFNULL, falseLabel)
             
-            CoercionUtil.emitUnboxing(rightTypeName, mv)
+            CoercionUtil.emitUnboxing(rightType, mv)
             TypeConversionUtil.emitConversion(rightTypeName, promotedType, mv)
             
-            val leftType = context.getType(expr.left.evalType)
-            context.compileExpression(expr.left, mv, leftType)
+            val leftType2 = context.getType(expr.left.evalType)
+            context.compileExpression(expr.left, mv, leftType2)
             TypeConversionUtil.emitConversion(leftTypeName, promotedType, mv)
             
             emitSwap(promotedType, mv)
@@ -646,19 +648,19 @@ object EqualityOperationHelper {
      */
     private fun emitPrimitiveComparison(typeName: String, jumpOpcode: Int, trueLabel: Label, mv: MethodVisitor) {
         when (typeName) {
-            "builtin.int" -> {
+            "int" -> {
                 mv.visitInsn(Opcodes.ISUB)
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
-            "builtin.long" -> {
+            "long" -> {
                 mv.visitInsn(Opcodes.LCMP)
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
-            "builtin.float" -> {
+            "float" -> {
                 mv.visitInsn(Opcodes.FCMPL)
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
-            "builtin.double" -> {
+            "double" -> {
                 mv.visitInsn(Opcodes.DCMPL)
                 mv.visitJumpInsn(jumpOpcode, trueLabel)
             }
@@ -677,7 +679,7 @@ object EqualityOperationHelper {
      */
     private fun emitSwap(typeName: String, mv: MethodVisitor) {
         when (typeName) {
-            "builtin.long", "builtin.double" -> {
+            "long", "double" -> {
                 mv.visitInsn(Opcodes.DUP2_X2)
                 mv.visitInsn(Opcodes.POP2)
             }

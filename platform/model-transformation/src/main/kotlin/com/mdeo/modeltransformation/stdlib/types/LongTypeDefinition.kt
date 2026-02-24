@@ -28,8 +28,8 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  */
 @Suppress("UNCHECKED_CAST")
 fun createLongType(): GremlinTypeDefinition {
-    return gremlinType("builtin.long")
-        .extends("builtin.any")
+    return gremlinType("builtin", "long")
+        .extends("builtin", "any")
         .method("abs", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).math("abs(_)")
             GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)

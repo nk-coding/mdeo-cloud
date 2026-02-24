@@ -46,10 +46,10 @@ class MemberAccessCompilerIntegrationTest {
         
         context = CompilationContext(
             types = listOf(
-                ClassTypeRef("Person", isNullable = false),
-                ClassTypeRef("builtin.string", isNullable = false),
-                ClassTypeRef("Address", isNullable = false),
-                ClassTypeRef("builtin.int", isNullable = false)
+                ClassTypeRef("class", "Person", isNullable = false),
+                ClassTypeRef("builtin", "string", isNullable = false),
+                ClassTypeRef("class", "Address", isNullable = false),
+                ClassTypeRef("builtin", "int", isNullable = false)
             ),
             currentScope = VariableScope.empty(),
             traversalSource = graph.traversal(),
@@ -70,14 +70,14 @@ class MemberAccessCompilerIntegrationTest {
         val registry = GremlinTypeRegistry(parent)
         
         // Define Person type with properties and associations
-        val personType = gremlinType("Person")
+        val personType = gremlinType("class", "Person")
             .graphProperty("name")
             .graphProperty("age")
             .association("address", "lives_at", isOutgoing = true, isNullable = false)
             .build()
         
         // Define Address type with properties and incoming association
-        val addressType = gremlinType("Address")
+        val addressType = gremlinType("class", "Address")
             .graphProperty("city")
             .graphProperty("street")
             .association("residents", "lives_at", isOutgoing = false, isNullable = false)
@@ -213,7 +213,7 @@ class MemberAccessCompilerIntegrationTest {
             person2.addEdge("lives_at", address)
             
             // Create context with address variable in scope
-            val addressType = ClassTypeRef("Address", isNullable = false)
+            val addressType = ClassTypeRef("class", "Address", isNullable = false)
             val contextWithAddressType = CompilationContext(
                 types = listOf(addressType),
                 currentScope = context.currentScope,

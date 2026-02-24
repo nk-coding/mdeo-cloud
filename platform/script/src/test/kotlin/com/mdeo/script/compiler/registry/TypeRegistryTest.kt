@@ -14,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.mdeo.expression.ast.types.ClassTypeRef
 
 /**
  * Comprehensive tests for the TypeRegistry infrastructure.
@@ -38,29 +39,30 @@ class TypeRegistryTest {
 
         @Test
         fun `can register and retrieve a type`() {
-            val typeDef = typeDefinition("test.MyType") {}
+            val typeDef = typeDefinition("test", "MyType") {}
             registry.register(typeDef)
 
-            val retrieved = registry.getType("test.MyType")
+            val retrieved = registry.getType(ClassTypeRef("test", "MyType", false))
             assertNotNull(retrieved)
-            assertEquals("test.MyType", retrieved.typeName)
+            assertEquals("test", retrieved.typePackage)
+            assertEquals("MyType", retrieved.typeName)
         }
 
         @Test
         fun `returns null for unregistered type`() {
-            val retrieved = registry.getType("nonexistent.Type")
+            val retrieved = registry.getType(ClassTypeRef("nonexistent", "Type", false))
             assertNull(retrieved)
         }
 
         @Test
         fun `can register multiple types`() {
-            registry.register(typeDefinition("type.A") {})
-            registry.register(typeDefinition("type.B") {})
-            registry.register(typeDefinition("type.C") {})
+            registry.register(typeDefinition("type", "A") {})
+            registry.register(typeDefinition("type", "B") {})
+            registry.register(typeDefinition("type", "C") {})
 
-            assertNotNull(registry.getType("type.A"))
-            assertNotNull(registry.getType("type.B"))
-            assertNotNull(registry.getType("type.C"))
+            assertNotNull(registry.getType(ClassTypeRef("type", "A", false)))
+            assertNotNull(registry.getType(ClassTypeRef("type", "B", false)))
+            assertNotNull(registry.getType(ClassTypeRef("type", "C", false)))
         }
     }
 
@@ -69,30 +71,30 @@ class TypeRegistryTest {
 
         @Test
         fun `can lookup method by overload key`() {
-            val typeDef = typeDefinition("test.Type") {
+            val typeDef = typeDefinition("test", "Type") {
                 staticMethod("doSomething") {
                     overload("", "(I)I", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(typeDef)
 
-            val method = registry.lookupMethod("test.Type", "doSomething", "")
+            val method = registry.lookupMethod(ClassTypeRef("test", "Type", false), "doSomething", "")
             assertNotNull(method)
             assertEquals("", method.overloadKey)
         }
 
         @Test
         fun `returns null for nonexistent method`() {
-            val typeDef = typeDefinition("test.Type") {}
+            val typeDef = typeDefinition("test", "Type") {}
             registry.register(typeDef)
 
-            val method = registry.lookupMethod("test.Type", "nonexistent", "")
+            val method = registry.lookupMethod(ClassTypeRef("test", "Type", false), "nonexistent", "")
             assertNull(method)
         }
 
         @Test
         fun `can lookup method with parameters`() {
-            val typeDef = typeDefinition("test.Type") {
+            val typeDef = typeDefinition("test", "Type") {
                 staticMethod("add") {
                     overload("", "(II)I", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.INT), returnType = BuiltinTypes.INT)
                     overload("", "(ID)D", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
@@ -100,8 +102,8 @@ class TypeRegistryTest {
             }
             registry.register(typeDef)
 
-            val intMethod = registry.lookupMethod("test.Type", "add", "")
-            val doubleMethod = registry.lookupMethod("test.Type", "add", "")
+            val intMethod = registry.lookupMethod(ClassTypeRef("test", "Type", false), "add", "")
+            val doubleMethod = registry.lookupMethod(ClassTypeRef("test", "Type", false), "add", "")
 
             assertNotNull(intMethod)
             assertNotNull(doubleMethod)
@@ -111,21 +113,21 @@ class TypeRegistryTest {
 
         @Test
         fun `can lookup instance method`() {
-            val typeDef = typeDefinition("test.Type") {
+            val typeDef = typeDefinition("test", "Type") {
                 instanceMethod("getValue") {
                     overload("", "()I", "test/Type", parameterTypes = emptyList(), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(typeDef)
 
-            val method = registry.lookupMethod("test.Type", "getValue", "")
+            val method = registry.lookupMethod(ClassTypeRef("test", "Type", false), "getValue", "")
             assertNotNull(method)
             assertTrue(method is InstanceMethodDefinition)
         }
 
         @Test
         fun `can lookup all overloads of a method`() {
-            val typeDef = typeDefinition("test.Type") {
+            val typeDef = typeDefinition("test", "Type") {
                 staticMethod("add") {
                     overload("", "(II)I", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.INT), returnType = BuiltinTypes.INT)
                     overload("", "(ID)D", "test/Helper", parameterTypes = listOf(BuiltinTypes.INT, BuiltinTypes.DOUBLE), returnType = BuiltinTypes.DOUBLE)
@@ -134,7 +136,7 @@ class TypeRegistryTest {
             }
             registry.register(typeDef)
 
-            val methods = registry.lookupMethods("test.Type", "add")
+            val methods = registry.lookupMethods(ClassTypeRef("test", "Type", false), "add")
             assertEquals(3, methods.size)
         }
     }
@@ -145,7 +147,7 @@ class TypeRegistryTest {
         @Test
         fun `can lookup method from parent type`() {
             // Parent type
-            val parentDef = typeDefinition("base.Parent") {
+            val parentDef = typeDefinition("base", "Parent") {
                 staticMethod("parentMethod") {
                     overload("", "(Ljava/lang/Object;)I", "base/ParentHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
@@ -153,8 +155,8 @@ class TypeRegistryTest {
             registry.register(parentDef)
 
             // Child type extends parent
-            val childDef = typeDefinition("child.Child") {
-                extends("base.Parent")
+            val childDef = typeDefinition("child", "Child") {
+                extends("base", "Parent")
                 staticMethod("childMethod") {
                     overload("", "(Ljava/lang/Object;)I", "child/ChildHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
@@ -162,29 +164,29 @@ class TypeRegistryTest {
             registry.register(childDef)
 
             // Should find method from parent through hierarchy
-            val method = registry.lookupMethod("child.Child", "parentMethod", "")
+            val method = registry.lookupMethod(ClassTypeRef("child", "Child", false), "parentMethod", "")
             assertNotNull(method)
             assertEquals("", method.overloadKey)
         }
 
         @Test
         fun `child method overrides parent method`() {
-            val parentDef = typeDefinition("base.Parent") {
+            val parentDef = typeDefinition("base", "Parent") {
                 staticMethod("getValue") {
                     overload("", "(Ljava/lang/Object;)I", "base/ParentHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(parentDef)
 
-            val childDef = typeDefinition("child.Child") {
-                extends("base.Parent")
+            val childDef = typeDefinition("child", "Child") {
+                extends("base", "Parent")
                 staticMethod("getValue") {
                     overload("", "(Ljava/lang/Object;)I", "child/ChildHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(childDef)
 
-            val method = registry.lookupMethod("child.Child", "getValue", "")
+            val method = registry.lookupMethod(ClassTypeRef("child", "Child", false), "getValue", "")
             assertNotNull(method)
             // Should find child's version (first in hierarchy)
             assertTrue((method as StaticMethodDefinition).ownerClass == "child/ChildHelper")
@@ -192,24 +194,24 @@ class TypeRegistryTest {
 
         @Test
         fun `multi-level inheritance works`() {
-            val grandparentDef = typeDefinition("base.Grandparent") {
+            val grandparentDef = typeDefinition("base", "Grandparent") {
                 staticMethod("grandparentMethod") {
                     overload("", "(Ljava/lang/Object;)I", "base/GrandparentHelper", parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.INT)
                 }
             }
             registry.register(grandparentDef)
 
-            val parentDef = typeDefinition("base.Parent") {
-                extends("base.Grandparent")
+            val parentDef = typeDefinition("base", "Parent") {
+                extends("base", "Grandparent")
             }
             registry.register(parentDef)
 
-            val childDef = typeDefinition("child.Child") {
-                extends("base.Parent")
+            val childDef = typeDefinition("child", "Child") {
+                extends("base", "Parent")
             }
             registry.register(childDef)
 
-            val method = registry.lookupMethod("child.Child", "grandparentMethod", "")
+            val method = registry.lookupMethod(ClassTypeRef("child", "Child", false), "grandparentMethod", "")
             assertNotNull(method)
         }
     }
@@ -219,7 +221,7 @@ class TypeRegistryTest {
 
         @Test
         fun `can lookup static property`() {
-            val typeDef = typeDefinition("test.Type") {
+            val typeDef = typeDefinition("test", "Type") {
                 staticProperty("PI") {
                     returns("D")
                     owner("test/MathHelper")
@@ -228,14 +230,14 @@ class TypeRegistryTest {
             }
             registry.register(typeDef)
 
-            val prop = registry.lookupProperty("test.Type", "PI")
+            val prop = registry.lookupProperty(ClassTypeRef("test", "Type", false), "PI")
             assertNotNull(prop)
             assertTrue(prop is StaticPropertyDefinition)
         }
 
         @Test
         fun `can lookup instance property`() {
-            val typeDef = typeDefinition("test.Type") {
+            val typeDef = typeDefinition("test", "Type") {
                 instanceProperty("value") {
                     returns("I")
                     owner("test/Type")
@@ -244,17 +246,17 @@ class TypeRegistryTest {
             }
             registry.register(typeDef)
 
-            val prop = registry.lookupProperty("test.Type", "value")
+            val prop = registry.lookupProperty(ClassTypeRef("test", "Type", false), "value")
             assertNotNull(prop)
             assertTrue(prop is InstancePropertyDefinition)
         }
 
         @Test
         fun `returns null for nonexistent property`() {
-            val typeDef = typeDefinition("test.Type") {}
+            val typeDef = typeDefinition("test", "Type") {}
             registry.register(typeDef)
 
-            val prop = registry.lookupProperty("test.Type", "nonexistent")
+            val prop = registry.lookupProperty(ClassTypeRef("test", "Type", false), "nonexistent")
             assertNull(prop)
         }
     }
@@ -264,39 +266,39 @@ class TypeRegistryTest {
 
         @Test
         fun `global registry contains any type`() {
-            val anyType = TypeRegistry.GLOBAL.getType("builtin.any")
+            val anyType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "any", false))
             assertNotNull(anyType)
         }
 
         @Test
         fun `global registry contains int type`() {
-            val intType = TypeRegistry.GLOBAL.getType("builtin.int")
+            val intType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
         }
 
         @Test
         fun `global registry contains string type`() {
-            val stringType = TypeRegistry.GLOBAL.getType("builtin.string")
+            val stringType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "string", false))
             assertNotNull(stringType)
         }
 
         @Test
         fun `int type extends any type`() {
-            val intType = TypeRegistry.GLOBAL.getType("builtin.int")
+            val intType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
-            assertTrue(intType.extends.contains("builtin.any"))
+            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `can lookup inherited method on int`() {
             // Int should inherit toString from Any
-            val method = TypeRegistry.GLOBAL.lookupMethod("builtin.int", "toString", "")
+            val method = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "int", false), "toString", "")
             assertNotNull(method)
         }
 
         @Test
         fun `can lookup abs method on int`() {
-            val method = TypeRegistry.GLOBAL.lookupMethod("builtin.int", "abs", "")
+            val method = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "int", false), "abs", "")
             assertNotNull(method)
         }
     }

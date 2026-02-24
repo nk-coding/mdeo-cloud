@@ -72,6 +72,7 @@ export abstract class TypedAstConverter {
      * The Any? type used for generic type parameter replacement.
      */
     protected readonly anyNullableType: ClassTypeRef = {
+        package: "builtin",
         type: DefaultTypeNames.Any,
         isNullable: true
     };
@@ -118,13 +119,25 @@ export abstract class TypedAstConverter {
     ) {
         this.voidTypeIndex = this.getTypeIndexForType(typir.factory.CustomVoid.getOrCreate());
         this.stringTypeIndex = this.getTypeIndexForType(
-            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.String, isNullable: false })
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                package: "builtin",
+                type: DefaultTypeNames.String,
+                isNullable: false
+            })
         );
         this.doubleTypeIndex = this.getTypeIndexForType(
-            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.Double, isNullable: false })
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                package: "builtin",
+                type: DefaultTypeNames.Double,
+                isNullable: false
+            })
         );
         this.booleanTypeIndex = this.getTypeIndexForType(
-            typir.TypeDefinitions.resolveCustomClassOrLambdaType({ type: DefaultTypeNames.Boolean, isNullable: false })
+            typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                package: "builtin",
+                type: DefaultTypeNames.Boolean,
+                isNullable: false
+            })
         );
         this.nullTypeIndex = this.getTypeIndexForType(typir.factory.CustomNull.getOrCreate());
     }
@@ -523,7 +536,7 @@ export abstract class TypedAstConverter {
     /**
      * Gets the index of a type in the types array.
      * Adds the type to the types array if not already present.
-     * This method is public to allow external converters (e.g., TypedClassConverter) to resolve types.
+     * This method is public to allow external converters to resolve types.
      *
      * @param type The type to get the index for
      * @returns The index into the types array
@@ -566,6 +579,7 @@ export abstract class TypedAstConverter {
             return this.anyNullableType;
         } else if ("type" in type) {
             return {
+                package: type.package,
                 type: type.type,
                 isNullable: type.isNullable,
                 typeArgs:

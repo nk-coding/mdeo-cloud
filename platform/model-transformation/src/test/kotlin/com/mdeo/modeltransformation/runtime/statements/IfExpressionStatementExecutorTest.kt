@@ -51,18 +51,18 @@ class IfExpressionStatementExecutorTest {
         
         // Set up type registry with __GraphNode, House and Room types
         val typeRegistry = GremlinTypeRegistry.GLOBAL
-        val graphNodeType = gremlinType("__GraphNode")
+        val graphNodeType = gremlinType("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("size")
             .build()
         typeRegistry.register(graphNodeType)
-        val houseType = gremlinType("House")
-            .extends("__GraphNode")
+        val houseType = gremlinType("builtin", "House")
+            .extends("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("size")
             .build()
-        val roomType = gremlinType("Room")
-            .extends("__GraphNode")
+        val roomType = gremlinType("builtin", "Room")
+            .extends("builtin", "__GraphNode")
             .build()
         typeRegistry.register(houseType)
         typeRegistry.register(roomType)
@@ -80,9 +80,9 @@ class IfExpressionStatementExecutorTest {
         )
         
         // Set up the types array for expression compilers to resolve types
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
-        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
-        val graphNodeTypeRef = ClassTypeRef(type = "__GraphNode", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
+        val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
+        val graphNodeTypeRef = ClassTypeRef(`package` = "builtin", type = "__GraphNode", isNullable = false)
         val typesField = TransformationEngine::class.java.getDeclaredField("types")
         typesField.isAccessible = true
         typesField.set(engine, listOf(graphNodeTypeRef, stringType, graphNodeTypeRef, intType))

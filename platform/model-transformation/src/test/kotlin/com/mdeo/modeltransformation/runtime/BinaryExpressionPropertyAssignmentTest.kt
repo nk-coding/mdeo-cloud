@@ -38,19 +38,19 @@ class BinaryExpressionPropertyAssignmentTest {
         val typeRegistry = GremlinTypeRegistry.GLOBAL
         
         // Register __GraphNode with the properties that will be accessed in tests
-        val graphNodeType = gremlinType("__GraphNode")
+        val graphNodeType = gremlinType("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("value")
             .build()
         typeRegistry.register(graphNodeType)
         
-        val houseType = gremlinType("House")
-            .extends("__GraphNode")
+        val houseType = gremlinType("builtin", "House")
+            .extends("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("value")
             .build()
-        val roomType = gremlinType("Room")
-            .extends("__GraphNode")
+        val roomType = gremlinType("builtin", "Room")
+            .extends("builtin", "__GraphNode")
             .graphProperty("category")
             .graphProperty("value")
             .build()
@@ -69,9 +69,9 @@ class BinaryExpressionPropertyAssignmentTest {
         
         // Set up the types array that would normally come from a TypedAst
         // We need this for the expression compilers to resolve types
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
-        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
-        val graphNodeTypeRef = ClassTypeRef(type = "__GraphNode", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
+        val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
+        val graphNodeTypeRef = ClassTypeRef(`package` = "builtin", type = "__GraphNode", isNullable = false)
         
         // Use reflection to set the types field since it has a private setter
         val typesField = TransformationEngine::class.java.getDeclaredField("types")

@@ -86,7 +86,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
         mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
         val effectiveTargetType = if (targetType is ClassTypeRef && targetType.isNullable && CoercionUtil.isPrimitiveType(targetType)) {
-            ClassTypeRef("builtin.any", false)
+            ClassTypeRef("builtin", "any", false)
         } else {
             targetType
         }
@@ -94,7 +94,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
         emitMemberCall(memberCall, context, mv, effectiveTargetType, resultType)
 
         if (resultType is ClassTypeRef && resultType.isNullable && CoercionUtil.isPrimitiveType(resultType)) {
-            CoercionUtil.emitBoxing(resultType.type, mv)
+            CoercionUtil.emitBoxing(resultType, mv)
         }
 
         mv.visitJumpInsn(Opcodes.GOTO, endLabel)
@@ -134,16 +134,16 @@ class MemberCallCompiler : AbstractCallCompiler() {
         targetType: ReturnType,
         resultType: ReturnType
     ) {
-        val lookupType = if (targetType is LambdaType) {
-            "builtin.any"
+        val lookupTypeRef = if (targetType is LambdaType) {
+            ClassTypeRef("builtin", "any", false)
         } else if (targetType is ClassTypeRef) {
-            targetType.type
+            targetType
         } else {
             throw UnsupportedOperationException("Cannot call member on non-class/lambda type")
         }
 
-        val methodDef = context.typeRegistry.lookupMethod(lookupType, memberCall.member, memberCall.overload)
-            ?: throw UnsupportedOperationException("Method ${memberCall.member} not found on type $lookupType")
+        val methodDef = context.typeRegistry.lookupMethod(lookupTypeRef, memberCall.member, memberCall.overload)
+            ?: throw UnsupportedOperationException("Method ${memberCall.member} not found on type ${lookupTypeRef.`package`}.${lookupTypeRef.type}")
 
         emitRegistryMethodCall(memberCall, context, mv, methodDef, resultType)
     }
@@ -168,7 +168,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
         
         if (needsReceiverBoxing(targetType, methodDef)) {
             if (targetType is ClassTypeRef) {
-                CoercionUtil.emitBoxing(targetType.type, mv)
+                CoercionUtil.emitBoxing(targetType, mv)
             }
         }
 

@@ -19,8 +19,8 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
  */
 @Suppress("UNCHECKED_CAST")
 fun createOrderedCollectionType(): GremlinTypeDefinition {
-    return gremlinType("builtin.OrderedCollection")
-        .extends("builtin.Collection")
+    return gremlinType("builtin", "OrderedCollection")
+        .extends("builtin", "Collection")
         .cardinality(VertexProperty.Cardinality.list)
         .build()
 }

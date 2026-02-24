@@ -3,11 +3,15 @@ import {
     IterableType,
     StatementsScopeProvider,
     inferLambdaTypeFromContext,
+    extractMetamodelEntities,
+    DefaultCollectionTypeFactory,
     type BoundScope,
     type LambdaTypeInferenceResult,
     type Scope,
     type ScopeEntry,
-    type ScopeLocalInitialization
+    type ScopeLocalInitialization,
+    type MetamodelEnumInfo,
+    type MetamodelClassInfo
 } from "@mdeo/language-expression";
 import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
 import {
@@ -21,6 +25,10 @@ import {
     type ScriptType
 } from "../../grammar/scriptTypes.js";
 import { LambdaScope } from "./lambdaScope.js";
+import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
+import { getExportedEntitiesByPath } from "@mdeo/language-metamodel";
+
+const { AstUtils } = sharedImport("langium");
 
 /**
  * The scope provider for the Script language.
@@ -101,23 +109,155 @@ export class ScriptScopeProvider extends StatementsScopeProvider<ScriptTypirSpec
 
     /**
      * Creates a scope for a script node.
-     * Script scopes include all top-level functions defined in the script as scope entries.
+     * Script scopes include all top-level functions defined in the script as scope entries,
+     * plus enum and class singletons from the imported metamodel.
      *
      * @param node The script node to create a scope for
      * @param parentScope The parent scope of this script scope
-     * @returns A new scope containing the script's functions
+     * @returns A new scope containing the script's functions and metamodel singletons
      */
     private createScopeForScriptNode(
         node: ScriptType,
         parentScope: BoundScope<ScriptTypirSpecifics> | undefined
     ): Scope<ScriptTypirSpecifics> {
+        const { enumInfos, classInfos } = this.extractMetamodelInfos(node);
         return new DefaultScope<ScriptTypirSpecifics>(
             parentScope,
-            (scope) => this.getScriptScopeEntries(node, scope),
+            (scope) => [
+                ...this.getScriptScopeEntries(node, scope),
+                ...this.getEnumContainerScopeEntries(enumInfos, scope),
+                ...this.getClassContainerScopeEntries(classInfos, scope)
+            ],
             () => [],
-            this.getScriptLocalInitializations(node),
+            [
+                ...this.getScriptLocalInitializations(node),
+                ...this.getEnumContainerInitializations(enumInfos),
+                ...this.getClassContainerInitializations(classInfos)
+            ],
             node
         );
+    }
+
+    /**
+     * Extracts enum and class infos from the metamodel file referenced by the script's import statement.
+     *
+     * @param node The root Script node
+     * @returns Object containing arrays of MetamodelEnumInfo and MetamodelClassInfo
+     */
+    private extractMetamodelInfos(node: ScriptType): {
+        enumInfos: MetamodelEnumInfo[];
+        classInfos: MetamodelClassInfo[];
+    } {
+        const importFile = node.metamodelImport?.file;
+        if (importFile == undefined) {
+            return { enumInfos: [], classInfos: [] };
+        }
+
+        const langiumServices = this.typir.langium.LangiumServices;
+        const document = AstUtils.getDocument(node);
+        const metamodelUri = resolveRelativePath(document, importFile);
+        const documents = langiumServices.workspace.LangiumDocuments;
+        const metamodelDoc = documents.getDocument(metamodelUri);
+        if (metamodelDoc == undefined) {
+            return { enumInfos: [], classInfos: [] };
+        }
+
+        const entitiesByPath = getExportedEntitiesByPath(metamodelDoc, documents);
+
+        const allEnumInfos: MetamodelEnumInfo[] = [];
+        const allClassInfos: MetamodelClassInfo[] = [];
+
+        for (const docEntities of entitiesByPath) {
+            const { classes: classInfos, enums: enumInfos } = extractMetamodelEntities(
+                docEntities.classes,
+                docEntities.enums,
+                langiumServices.AstReflection,
+                DefaultCollectionTypeFactory,
+                docEntities.absolutePath
+            );
+            allEnumInfos.push(...enumInfos);
+            allClassInfos.push(...classInfos);
+        }
+
+        return { enumInfos: allEnumInfos, classInfos: allClassInfos };
+    }
+
+    /**
+     * Returns scope entries for all enum container types from the pre-extracted enum infos.
+     * Creates scope entries for enum namespaces (e.g. `Status.ACTIVE`).
+     *
+     * @param enumInfos The pre-extracted enum infos
+     * @param scope The scope to define entries in
+     * @returns Array of scope entries for enum container types
+     */
+    private getEnumContainerScopeEntries(
+        enumInfos: MetamodelEnumInfo[],
+        scope: Scope<ScriptTypirSpecifics>
+    ): ScopeEntry<ScriptTypirSpecifics>[] {
+        return enumInfos.map(
+            (enumInfo) =>
+                ({
+                    name: enumInfo.name,
+                    definingScope: scope,
+                    position: -1,
+                    inferType: () =>
+                        this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                            package: enumInfo.containerPackage,
+                            type: enumInfo.name,
+                            isNullable: false
+                        }),
+                    readonly: true
+                }) satisfies ScopeEntry<ScriptTypirSpecifics>
+        );
+    }
+
+    /**
+     * Returns local initializations for all enum container types.
+     *
+     * @param enumInfos The pre-extracted enum infos
+     * @returns Array of local initialization records for enum containers
+     */
+    private getEnumContainerInitializations(enumInfos: MetamodelEnumInfo[]): ScopeLocalInitialization[] {
+        return enumInfos.map((enumInfo) => ({ name: enumInfo.name, position: -1 }));
+    }
+
+    /**
+     * Returns scope entries for all class container types from the pre-extracted class infos.
+     * Creates scope entries for class namespaces (e.g. `Person.all()`).
+     *
+     * @param classInfos The pre-extracted class infos
+     * @param scope The scope to define entries in
+     * @returns Array of scope entries for class container types
+     */
+    private getClassContainerScopeEntries(
+        classInfos: MetamodelClassInfo[],
+        scope: Scope<ScriptTypirSpecifics>
+    ): ScopeEntry<ScriptTypirSpecifics>[] {
+        return classInfos.map(
+            (classInfo) =>
+                ({
+                    name: classInfo.name,
+                    definingScope: scope,
+                    position: -1,
+                    inferType: () =>
+                        this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+                            package: classInfo.containerPackage,
+                            type: classInfo.name,
+                            isNullable: false
+                        }),
+                    readonly: true
+                }) satisfies ScopeEntry<ScriptTypirSpecifics>
+        );
+    }
+
+    /**
+     * Returns local initializations for all class container types.
+     *
+     * @param classInfos The pre-extracted class infos
+     * @returns Array of local initialization records for class containers
+     */
+    private getClassContainerInitializations(classInfos: MetamodelClassInfo[]): ScopeLocalInitialization[] {
+        return classInfos.map((classInfo) => ({ name: classInfo.name, position: -1 }));
     }
 
     /**

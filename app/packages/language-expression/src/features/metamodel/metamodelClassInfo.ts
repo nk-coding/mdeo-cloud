@@ -48,14 +48,29 @@ export interface MetamodelRelationInfo {
 }
 
 /**
+ * A reference to another metamodel class, split into its package and simple name.
+ * Using a structured reference avoids later string-splitting of fully qualified names.
+ */
+export interface MetamodelClassRef {
+    /**
+     * The package where the referenced class is defined (e.g. "class/path/to/file.mm").
+     */
+    package: string;
+
+    /**
+     * The simple (unqualified) name of the referenced class (e.g. "Person").
+     */
+    name: string;
+}
+
+/**
  * Represents class information extracted from a metamodel.
  * This is an intermediate representation that can be converted to:
- * - TypedClass for the TypedAst
  * - ClassType for the Typir type system
  */
 export interface MetamodelClassInfo {
     /**
-     * The fully qualified name of the class (e.g., "metamodel.Person").
+     * The  name of the class
      */
     name: string;
 
@@ -65,9 +80,15 @@ export interface MetamodelClassInfo {
     package: string;
 
     /**
-     * Fully qualified names of direct superclasses.
+     * The container package for this class (e.g. `"class-container/path/to/file.mm"`).
+     * Derived directly from {@link package} by replacing the `class/` prefix with `class-container`.
      */
-    superClasses: string[];
+    containerPackage: string;
+
+    /**
+     * Direct superclasses, each represented as a structured reference with a separate package and name.
+     */
+    superClasses: MetamodelClassRef[];
 
     /**
      * Properties defined on this class (not inherited).

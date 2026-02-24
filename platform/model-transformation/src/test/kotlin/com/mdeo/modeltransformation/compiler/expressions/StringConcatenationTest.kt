@@ -42,7 +42,7 @@ class StringConcatenationTest {
         
         // Set up types list with string type at index 0
         val types = listOf(
-            ClassTypeRef(type = "builtin.string", isNullable = false)
+            ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
         )
         
         context = CompilationContext(

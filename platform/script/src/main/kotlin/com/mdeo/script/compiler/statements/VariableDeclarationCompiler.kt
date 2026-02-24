@@ -114,22 +114,26 @@ class VariableDeclarationCompiler : StatementCompiler {
                 mv.visitInsn(Opcodes.ACONST_NULL)
                 return
             }
-            when (type.type) {
-                "builtin.int", "builtin.boolean" -> {
-                    mv.visitInsn(Opcodes.ICONST_0)
+            if (type.`package` == "builtin") {
+                when (type.type) {
+                    "int", "boolean" -> {
+                        mv.visitInsn(Opcodes.ICONST_0)
+                    }
+                    "long" -> {
+                        mv.visitInsn(Opcodes.LCONST_0)
+                    }
+                    "float" -> {
+                        mv.visitInsn(Opcodes.FCONST_0)
+                    }
+                    "double" -> {
+                        mv.visitInsn(Opcodes.DCONST_0)
+                    }
+                    else -> {
+                        mv.visitInsn(Opcodes.ACONST_NULL)
+                    }
                 }
-                "builtin.long" -> {
-                    mv.visitInsn(Opcodes.LCONST_0)
-                }
-                "builtin.float" -> {
-                    mv.visitInsn(Opcodes.FCONST_0)
-                }
-                "builtin.double" -> {
-                    mv.visitInsn(Opcodes.DCONST_0)
-                }
-                else -> {
-                    mv.visitInsn(Opcodes.ACONST_NULL)
-                }
+            } else {
+                mv.visitInsn(Opcodes.ACONST_NULL)
             }
         } else {
             mv.visitInsn(Opcodes.ACONST_NULL)
@@ -183,18 +187,18 @@ class VariableDeclarationCompiler : StatementCompiler {
      * @return the JVM method descriptor string for the Ref constructor
      */
     private fun getRefConstructorDescriptor(type: ReturnType): String {
-        if (type is ClassTypeRef) {
+        if (type is ClassTypeRef && type.`package` == "builtin") {
             return when (type.type) {
-                "builtin.int" -> {
+                "int" -> {
                     "(I)V"
                 }
-                "builtin.long" -> {
+                "long" -> {
                     "(J)V"
                 }
-                "builtin.float" -> {
+                "float" -> {
                     "(F)V"
                 }
-                "builtin.double" -> {
+                "double" -> {
                     "(D)V"
                 }
                 else -> {

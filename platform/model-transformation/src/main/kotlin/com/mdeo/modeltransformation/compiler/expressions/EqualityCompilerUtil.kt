@@ -110,17 +110,29 @@ object EqualityCompilerUtil {
     /**
      * Checks if a type is an enum value type.
      *
-     * Enum value types use the format "enum.EnumName" in the type registry.
-     * This is distinct from "enum-container.EnumName" which is the container
+     * Enum value types have a package starting with "enum/", e.g., "enum/path/to/file".
+     * Also supports the prefix "enum" (without trailing slash) for short paths
+     * and backward compatibility with old format where the fqn was in the type field.
+     *
+     * This is distinct from "enum-container/..." which is the container
      * type used to access enum entries.
      *
      * @param type The value type to check
-     * @return true if the type is an enum value type (starts with "enum."), false otherwise
+     * @return true if the type is an enum value type, false otherwise
      */
     private fun isEnumType(type: ValueType?): Boolean {
         if (type == null) return false
         if (type !is ClassTypeRef) return false
-        return type.type.startsWith("enum.")
+        // Check new format: package starts with "enum/"
+        if (type.`package`.startsWith("enum/")) return true
+        // Check for short format: package equals "enum" or starts with "enum." or "enum-"
+        // but NOT "enum-container" which is different
+        if (type.`package` == "enum") return true
+        if (type.`package`.startsWith("enum.")) return true
+        // Backward compatibility: if package is empty, check if fqn (old type field) starts with enum prefix
+        if (type.`package`.isEmpty() && type.type.startsWith("enum/")) return true
+        if (type.`package`.isEmpty() && type.type.startsWith("enum.")) return true
+        return false
     }
 
     /**
@@ -144,7 +156,7 @@ object EqualityCompilerUtil {
             return false
         }
                 
-        val typeDefinition = registry.getType(type.type)!!
+        val typeDefinition = registry.getType(type) ?: return false
         val registryCardinality = typeDefinition.cardinality
         return registryCardinality == VertexProperty.Cardinality.list || registryCardinality == VertexProperty.Cardinality.set
     }

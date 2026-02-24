@@ -9,8 +9,8 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  * Bag is a mutable collection that allows duplicates with count tracking.
  */
 fun createBagType(): TypeDefinition {
-    return typeDefinition("builtin.Bag") {
-        extends("builtin.ReadonlyBag")
-        extends("builtin.Collection")
+    return typeDefinition("builtin", "Bag") {
+        extends("builtin", "ReadonlyBag")
+        extends("builtin", "Collection")
     }
 }

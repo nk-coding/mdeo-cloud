@@ -50,22 +50,24 @@ export interface TypeDefinitionService {
     removeClassType(classType: ClassType): void;
 
     /**
-     * Look up a class type by its identifier (package.name).
+     * Look up a class type by its name and package.
      * Throws an error if the type is not found.
      *
-     * @param identifier The fully qualified identifier (e.g., "builtin.string")
+     * @param name The name of the type (e.g., "MyClass", "string")
+     * @param pkg The package of the type (e.g., "builtin", "class/path/to/file")
      * @returns The class type definition
      * @throws Error if the type is not found
      */
-    getClassType(identifier: string): ClassType;
+    getClassType(name: string, pkg: string): ClassType;
 
     /**
-     * Look up a class type by its identifier (package.name) if it exists.
+     * Look up a class type by its name and package if it exists.
      *
-     * @param identifier The fully qualified identifier (e.g., "builtin.string")
+     * @param name The name of the type (e.g., "MyClass", "string")
+     * @param pkg The package of the type (e.g., "builtin", "class/path/to/file")
      * @returns The class type definition or undefined if not found
      */
-    getClassTypeIfExisting(identifier: string): ClassType | undefined;
+    getClassTypeIfExisting(name: string, pkg: string): ClassType | undefined;
 
     /**
      * Get all registered class types.
@@ -73,6 +75,15 @@ export interface TypeDefinitionService {
      * @returns Array of all registered class types
      */
     getAllClassTypes(): ClassType[];
+
+    /**
+     * Get all class types with a given name (without package prefix).
+     * This is useful for resolving type references when the package is not specified.
+     *
+     * @param name The name of the type (without package prefix)
+     * @returns Array of all class types with the given name across all packages
+     */
+    getClassTypesByName(name: string): readonly ClassType[];
 
     /**
      * Resolve a ValueType to a CustomClassType or CustomLambdaType.
@@ -160,9 +171,11 @@ export interface TypeDefinitionService {
  */
 export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> implements TypeDefinitionService {
     /**
-     * Map of type identifiers to class type definitions
+     * Map of type names to package maps to class type definitions.
+     * Outer map key: type name (e.g., "MyClass")
+     * Inner map key: package (e.g., "class/path/to/file")
      */
-    private readonly typeMap = new Map<string, ClassType>();
+    private readonly typeMap = new Map<string, Map<string, ClassType>>();
 
     /**
      * List of registered listeners
@@ -182,13 +195,17 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
     constructor(private readonly services: ExtendedTypirServices<Specifics>) {}
 
     addClassType(classType: ClassType): void {
-        const identifier = `${classType.package}.${classType.name}`;
-
-        if (this.typeMap.has(identifier)) {
-            throw new Error(`Type '${identifier}' already exists in the registry`);
+        let nameMap = this.typeMap.get(classType.name);
+        if (nameMap == undefined) {
+            nameMap = new Map<string, ClassType>();
+            this.typeMap.set(classType.name, nameMap);
         }
 
-        this.typeMap.set(identifier, classType);
+        if (nameMap.has(classType.package)) {
+            throw new Error(`Type '${classType.package}.${classType.name}' already exists in the registry`);
+        }
+
+        nameMap.set(classType.package, classType);
 
         for (const listener of this.listeners) {
             listener.onAddedClassType?.(classType);
@@ -196,11 +213,19 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
     }
 
     removeClassType(classType: ClassType): void {
-        const identifier = `${classType.package}.${classType.name}`;
-        const existingClassType = this.typeMap.get(identifier);
+        const nameMap = this.typeMap.get(classType.name);
+        if (nameMap == undefined) {
+            return;
+        }
 
+        const existingClassType = nameMap.get(classType.package);
         if (existingClassType != undefined) {
-            this.typeMap.delete(identifier);
+            nameMap.delete(classType.package);
+
+            // Clean up empty name map
+            if (nameMap.size === 0) {
+                this.typeMap.delete(classType.name);
+            }
 
             for (const listener of this.listeners) {
                 listener.onRemovedClassType?.(existingClassType);
@@ -209,14 +234,25 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
     }
 
     getAllClassTypes(): ClassType[] {
-        return Array.from(this.typeMap.values());
+        const result: ClassType[] = [];
+        for (const nameMap of this.typeMap.values()) {
+            for (const classType of nameMap.values()) {
+                result.push(classType);
+            }
+        }
+        return result;
+    }
+
+    getClassTypesByName(name: string): readonly ClassType[] {
+        const nameMap = this.typeMap.get(name);
+        return nameMap ? Array.from(nameMap.values()) : [];
     }
 
     resolveCustomClassOrLambdaType(type: ValueType, genericTypeArgs?: Map<string, CustomValueType>): CustomValueType {
         if (GenericTypeRef.is(type)) {
             return this.resolveGenericTypeRef(type, genericTypeArgs);
         } else if (ClassTypeRef.is(type)) {
-            const classTypeDef = this.getClassType(type.type);
+            const classTypeDef = this.getClassType(type.type, type.package);
 
             return this.services.factory.CustomClasses.getOrCreate({
                 definition: classTypeDef,
@@ -245,19 +281,20 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
         }
     }
 
-    getClassType(typeIdentifier: string): ClassType {
-        const identifier = typeIdentifier.includes(".") ? typeIdentifier : `builtin.${typeIdentifier}`;
-
-        const classType = this.typeMap.get(identifier);
-        if (classType === undefined) {
-            throw new Error(`Type '${typeIdentifier}' not found in type definitions`);
+    getClassType(name: string, pkg: string): ClassType {
+        const nameMap = this.typeMap.get(name);
+        if (nameMap == undefined) {
+            throw new Error(`Type '${name}' not found in type definitions`);
+        }
+        const classType = nameMap.get(pkg);
+        if (classType == undefined) {
+            throw new Error(`Type '${name}' with package '${pkg}' not found in type definitions`);
         }
         return classType;
     }
 
-    getClassTypeIfExisting(typeIdentifier: string): ClassType | undefined {
-        const identifier = typeIdentifier.includes(".") ? typeIdentifier : `builtin.${typeIdentifier}`;
-        return this.typeMap.get(identifier);
+    getClassTypeIfExisting(name: string, pkg: string): ClassType | undefined {
+        return this.typeMap.get(name)?.get(pkg);
     }
 
     private resolveGenericTypeRef(
@@ -308,7 +345,8 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
             throw new Error("Any type not registered. Call registerAnyType first.");
         }
         return this.resolveCustomClassOrLambdaType({
-            type: `${this.anyType.package}.${this.anyType.name}`,
+            package: this.anyType.package,
+            type: this.anyType.name,
             isNullable
         });
     }
@@ -327,13 +365,13 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
     convertCustomTypeToValueType(type: CustomValueType): ValueType {
         if (isCustomClassType(type)) {
             const definition = type.details.definition;
-            const identifier = `${definition.package}.${definition.name}`;
             const typeArgs: Record<string, ValueType> = {};
             for (const [key, value] of type.details.typeArgs.entries()) {
                 typeArgs[key] = this.convertCustomTypeToValueType(value);
             }
             return {
-                type: identifier,
+                package: definition.package,
+                type: definition.name,
                 isNullable: type.isNullable,
                 typeArgs: Object.keys(typeArgs).length > 0 ? typeArgs : undefined
             };

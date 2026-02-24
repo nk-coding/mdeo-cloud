@@ -12,7 +12,7 @@ import { globalFunction, typeRef, voidType, genericTypeRef } from "@mdeo/languag
  * println(string) - prints a string followed by a newline.
  */
 export const printlnFunction: Member = globalFunction("println")
-    .signature((sig) => sig.param("message", typeRef("string").build()).returns(voidType()))
+    .signature((sig) => sig.param("message", typeRef("builtin", "string").build()).returns(voidType()))
     .build();
 
 /**
@@ -28,7 +28,7 @@ export const listOfFunction: Member = globalFunction("listOf")
             .param("elements", genericTypeRef("T"))
             .varArgs()
             .returns(
-                typeRef("List")
+                typeRef("builtin", "List")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -48,7 +48,7 @@ export const setOfFunction: Member = globalFunction("setOf")
             .param("elements", genericTypeRef("T"))
             .varArgs()
             .returns(
-                typeRef("Set")
+                typeRef("builtin", "Set")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -68,7 +68,7 @@ export const bagOfFunction: Member = globalFunction("bagOf")
             .param("elements", genericTypeRef("T"))
             .varArgs()
             .returns(
-                typeRef("Bag")
+                typeRef("builtin", "Bag")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -88,7 +88,7 @@ export const orderedSetOfFunction: Member = globalFunction("orderedSetOf")
             .param("elements", genericTypeRef("T"))
             .varArgs()
             .returns(
-                typeRef("OrderedSet")
+                typeRef("builtin", "OrderedSet")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -104,7 +104,7 @@ export const orderedSetOfFunction: Member = globalFunction("orderedSetOf")
 export const emptyListFunction: Member = globalFunction("emptyList")
     .signature((sig) =>
         sig.generics("T").returns(
-            typeRef("List")
+            typeRef("builtin", "List")
                 .withTypeArgs({ T: genericTypeRef("T") })
                 .build()
         )
@@ -120,7 +120,7 @@ export const emptyListFunction: Member = globalFunction("emptyList")
 export const emptySetFunction: Member = globalFunction("emptySet")
     .signature((sig) =>
         sig.generics("T").returns(
-            typeRef("Set")
+            typeRef("builtin", "Set")
                 .withTypeArgs({ T: genericTypeRef("T") })
                 .build()
         )
@@ -136,7 +136,7 @@ export const emptySetFunction: Member = globalFunction("emptySet")
 export const emptyBagFunction: Member = globalFunction("emptyBag")
     .signature((sig) =>
         sig.generics("T").returns(
-            typeRef("Bag")
+            typeRef("builtin", "Bag")
                 .withTypeArgs({ T: genericTypeRef("T") })
                 .build()
         )
@@ -152,7 +152,7 @@ export const emptyBagFunction: Member = globalFunction("emptyBag")
 export const emptyOrderedSetFunction: Member = globalFunction("emptyOrderedSet")
     .signature((sig) =>
         sig.generics("T").returns(
-            typeRef("OrderedSet")
+            typeRef("builtin", "OrderedSet")
                 .withTypeArgs({ T: genericTypeRef("T") })
                 .build()
         )

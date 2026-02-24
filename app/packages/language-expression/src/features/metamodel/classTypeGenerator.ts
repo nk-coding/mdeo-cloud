@@ -1,16 +1,38 @@
+import { FunctionSignature } from "../../typir-extensions/config/type.js";
 import type { ClassType, Member } from "../../typir-extensions/config/type.js";
+import { getClassContainerPackage, getClassPackage } from "./metamodelClassExtractor.js";
 import type { MetamodelClassInfo, MetamodelPropertyInfo, MetamodelRelationInfo } from "./metamodelClassInfo.js";
+
+/**
+ * Result of generating class types from metamodel class information.
+ */
+export interface ClassTypeGenerationResult {
+    /**
+     * The class types representing metamodel classes (package = "class").
+     */
+    types: ClassType[];
+    /**
+     * The virtual container types exposing an all() method for each class (package = "class-container").
+     */
+    containerTypes: ClassType[];
+}
 
 /**
  * Generates ClassType definitions from MetamodelClassInfo for the Typir type system.
  * This function creates a new generator instance, processes the classes, and returns the results.
  * The generator should not be reused.
  *
+ * For each class:
+ * - A *class type* is created representing the metamodel class (package from classInfo).
+ * - A *container type* is created (`isVirtual: true`) with an `all()` method
+ *   that returns a Collection of that class type. Allows access like `Person.all()` in the DSL.
+ *
  * @param classInfos The intermediate class representations to convert
- * @returns Array of ClassType definitions for Typir
+ * @param absolutePath The absolute path of the metamodel file for generating container package names
+ * @returns Object containing both types (class types) and containerTypes (virtual container types)
  */
-export function generateClassTypes(classInfos: MetamodelClassInfo[]): ClassType[] {
-    const generator = new ClassTypeGenerator();
+export function generateClassTypes(classInfos: MetamodelClassInfo[], absolutePath: string): ClassTypeGenerationResult {
+    const generator = new ClassTypeGenerator(absolutePath);
     return generator.generateClassTypes(classInfos);
 }
 
@@ -19,23 +41,40 @@ export function generateClassTypes(classInfos: MetamodelClassInfo[]): ClassType[
  * Should not be instantiated directly; use generateClassTypes() instead.
  */
 class ClassTypeGenerator {
-    /**
-     * Converts a list of MetamodelClassInfo to ClassType definitions.
-     *
-     * @param classInfos The intermediate class representations to convert
-     * @returns Array of ClassType definitions for Typir
-     */
-    generateClassTypes(classInfos: MetamodelClassInfo[]): ClassType[] {
-        return classInfos.map((info) => this.generateClassType(info));
+    private readonly classPackage: string;
+    private readonly classContainerPackage: string;
+
+    constructor(absolutePath: string) {
+        this.classPackage = getClassPackage(absolutePath);
+        this.classContainerPackage = getClassContainerPackage(absolutePath);
     }
 
     /**
-     * Converts a single MetamodelClassInfo to a ClassType.
+     * Generates class types and container types for each MetamodelClassInfo.
+     *
+     * @param classInfos The intermediate class representations to convert
+     * @returns Object containing both types (class types) and containerTypes (virtual container types)
+     */
+    generateClassTypes(classInfos: MetamodelClassInfo[]): ClassTypeGenerationResult {
+        const types: ClassType[] = [];
+        const containerTypes: ClassType[] = [];
+
+        for (const classInfo of classInfos) {
+            const { classType, containerType } = this.generateClassType(classInfo);
+            types.push(classType);
+            containerTypes.push(containerType);
+        }
+
+        return { types, containerTypes };
+    }
+
+    /**
+     * Generates both the class type and container type for a single class.
      *
      * @param info The class information to convert
-     * @returns The generated ClassType
+     * @returns Object containing the class type and container type
      */
-    private generateClassType(info: MetamodelClassInfo): ClassType {
+    private generateClassType(info: MetamodelClassInfo): { classType: ClassType; containerType: ClassType } {
         const members: Record<string, Member> = {};
 
         for (const prop of info.properties) {
@@ -46,13 +85,56 @@ class ClassTypeGenerator {
             members[rel.property] = this.createRelationMember(rel);
         }
 
-        return {
+        const classType: ClassType = {
             name: info.name,
             package: info.package,
             members,
             superTypes: info.superClasses.map((superClass) => ({
-                type: superClass
+                package: superClass.package,
+                type: superClass.name
             }))
+        };
+
+        const containerType = this.createContainerType(info.name);
+
+        return { classType, containerType };
+    }
+
+    /**
+     * Creates a virtual container type for a class with an all() method.
+     * The all() method returns a Collection of the class type.
+     *
+     * @param className The name of the class
+     * @returns The container type with an all() method
+     */
+    private createContainerType(className: string): ClassType {
+        const allMethodSignature: FunctionSignature = {
+            returnType: {
+                package: "builtin",
+                type: "Collection",
+                isNullable: false,
+                typeArgs: {
+                    T: { package: this.classPackage, type: className, isNullable: false }
+                }
+            },
+            parameters: []
+        };
+
+        const allMethod: Member = {
+            name: "all",
+            isProperty: false,
+            type: {
+                signatures: {
+                    [FunctionSignature.DEFAULT_SIGNATURE]: allMethodSignature
+                }
+            }
+        };
+
+        return {
+            name: className,
+            package: this.classContainerPackage,
+            members: { all: allMethod },
+            isVirtual: true
         };
     }
 

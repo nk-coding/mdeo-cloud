@@ -29,8 +29,8 @@ class CallCompilerRefactoringTest {
             val intType = intType()
             val longType = longType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.long", false),
-                "x" to ClassTypeRef("builtin.long", false)
+                ClassTypeRef("builtin", "long", false),
+                "x" to ClassTypeRef("builtin", "long", false)
             )
             function(
                 name = "testFunction",
@@ -73,8 +73,8 @@ class CallCompilerRefactoringTest {
             val intType = intType()
             val doubleType = doubleType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.double", false),
-                "x" to ClassTypeRef("builtin.double", false)
+                ClassTypeRef("builtin", "double", false),
+                "x" to ClassTypeRef("builtin", "double", false)
             )
             function(
                 name = "testFunction",
@@ -117,8 +117,8 @@ class CallCompilerRefactoringTest {
             val intType = intType()
             val intNullableType = intNullableType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", true),
-                "x" to ClassTypeRef("builtin.int", true)
+                ClassTypeRef("builtin", "int", true),
+                "x" to ClassTypeRef("builtin", "int", true)
             )
             function(
                 name = "testFunction",
@@ -155,10 +155,10 @@ class CallCompilerRefactoringTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false),
-                "c" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false),
+                "c" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -211,10 +211,10 @@ class CallCompilerRefactoringTest {
             val longType = longType()
             val doubleType = doubleType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.long", false),
-                "i" to ClassTypeRef("builtin.int", false),
-                "l" to ClassTypeRef("builtin.long", false),
-                "d" to ClassTypeRef("builtin.double", false)
+                ClassTypeRef("builtin", "long", false),
+                "i" to ClassTypeRef("builtin", "int", false),
+                "l" to ClassTypeRef("builtin", "long", false),
+                "d" to ClassTypeRef("builtin", "double", false)
             )
             function(
                 name = "testFunction",
@@ -262,9 +262,9 @@ class CallCompilerRefactoringTest {
             val intType = intType()
             val longType = longType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.long", false),
-                "a" to ClassTypeRef("builtin.long", false),
-                "b" to ClassTypeRef("builtin.long", false)
+                ClassTypeRef("builtin", "long", false),
+                "a" to ClassTypeRef("builtin", "long", false),
+                "b" to ClassTypeRef("builtin", "long", false)
             )
             function(
                 name = "testFunction",
@@ -409,8 +409,8 @@ class CallCompilerRefactoringTest {
             val intType = intType()
             val stringType = stringType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -461,7 +461,7 @@ class CallCompilerRefactoringTest {
             val intType = intType()
             val stringType = stringType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.string", false)
+                ClassTypeRef("builtin", "string", false)
             )
             function(
                 name = "testFunction",
@@ -504,8 +504,8 @@ class CallCompilerRefactoringTest {
         val ast = buildTypedAst {
             val intNullableType = intNullableType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", true),
-                "x" to ClassTypeRef("builtin.int", true)
+                ClassTypeRef("builtin", "int", true),
+                "x" to ClassTypeRef("builtin", "int", true)
             )
             function(
                 name = "testFunction",
@@ -543,8 +543,8 @@ class CallCompilerRefactoringTest {
         val ast = buildTypedAst {
             val intType = intType()
             val intToIntLambda = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",

@@ -651,7 +651,7 @@ class StringMethodsIntegrationTest {
         fun `split divides string by delimiter`() {
             val ast = buildTypedAst {
                 val stringType = stringType()
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -853,7 +853,7 @@ class StringMethodsIntegrationTest {
         fun `toCharSequence returns list of characters`() {
             val ast = buildTypedAst {
                 val stringType = stringType()
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",

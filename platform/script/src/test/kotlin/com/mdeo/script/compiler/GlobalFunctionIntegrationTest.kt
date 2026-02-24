@@ -36,7 +36,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can assign listOf result to variable`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -75,7 +75,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can assign setOf result to variable`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val stringTypeIndex = stringType()
 
                 function(
@@ -111,7 +111,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can assign emptyList result to variable`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
 
                 function(
                     name = "testFunction",
@@ -142,7 +142,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can assign emptySet result to variable`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
 
                 function(
                     name = "testFunction",
@@ -177,7 +177,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can call size on assigned list variable`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -220,7 +220,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can call size on assigned set variable with deduplication`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -267,7 +267,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can chain size call directly on listOf`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -306,7 +306,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `can chain size call directly on setOf`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -345,7 +345,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `emptyList has size zero`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -380,7 +380,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `emptySet has size zero`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -419,7 +419,7 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `listOf with mixed types works`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -465,8 +465,8 @@ class GlobalFunctionIntegrationTest {
         @Test
         fun `multiple collection variables work correctly`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val intTypeIndex = intType()
 
                 function(

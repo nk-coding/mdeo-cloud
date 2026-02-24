@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.compiler.registry
 
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.stdlib.StdlibRegistrar
 
 /**
@@ -19,7 +20,8 @@ import com.mdeo.modeltransformation.stdlib.StdlibRegistrar
  */
 class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
 
-    private val types: MutableMap<String, GremlinTypeDefinition> = mutableMapOf()
+    // Double map: package -> name -> GremlinTypeDefinition
+    private val types: MutableMap<String, MutableMap<String, GremlinTypeDefinition>> = mutableMapOf()
 
     companion object {
         /**
@@ -55,7 +57,7 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * @return This registry, for method chaining.
      */
     fun register(type: GremlinTypeDefinition): GremlinTypeRegistry {
-        types[type.typeName] = type
+        types.getOrPut(type.typePackage) { mutableMapOf() }[type.typeName] = type
         return this
     }
 
@@ -66,61 +68,61 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * @return This registry, for method chaining.
      */
     fun registerAll(vararg typesToRegister: GremlinTypeDefinition): GremlinTypeRegistry {
-        typesToRegister.forEach { types[it.typeName] = it }
+        typesToRegister.forEach { types.getOrPut(it.typePackage) { mutableMapOf() }[it.typeName] = it }
         return this
     }
 
     /**
-     * Gets a type definition by name from this registry.
+     * Gets a type definition by [ClassTypeRef] from this registry.
      *
      * If the type is not found locally and a parent registry is set,
      * the lookup will fall back to the parent.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference (package + simple name).
      * @return The type definition, or null if not found in this registry or any parent.
      */
-    fun getType(typeName: String): GremlinTypeDefinition? {
-        return types[typeName] ?: parent?.getType(typeName)
+    fun getType(typeRef: ClassTypeRef): GremlinTypeDefinition? {
+        return types[typeRef.`package`]?.get(typeRef.type) ?: parent?.getType(typeRef)
     }
 
     /**
-     * Looks up a property definition by type name and property name.
+     * Looks up a property definition by type ref and property name.
      *
      * Searches the type and its parent types (via extends) for the property.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference ([ClassTypeRef]: package + simple name).
      * @param propertyName The property name.
      * @return The property definition, or null if not found.
      */
-    fun lookupProperty(typeName: String, propertyName: String): GremlinPropertyDefinition? {
-        return lookupPropertyInHierarchy(typeName, propertyName, mutableSetOf())
+    fun lookupProperty(typeRef: ClassTypeRef, propertyName: String): GremlinPropertyDefinition? {
+        return lookupPropertyInHierarchy(typeRef, propertyName, mutableSetOf())
     }
 
     /**
-     * Looks up a method definition by type name, method name, and overload key.
+     * Looks up a method definition by type ref, method name, and overload key.
      *
      * Searches the type and its parent types (via extends) for the method.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference ([ClassTypeRef]: package + simple name).
      * @param methodName The method name.
      * @param overloadKey The overload key.
      * @return The method definition, or null if not found.
      */
-    fun lookupMethod(typeName: String, methodName: String, overloadKey: String): GremlinMethodDefinition? {
-        return lookupMethodInHierarchy(typeName, methodName, overloadKey, mutableSetOf())
+    fun lookupMethod(typeRef: ClassTypeRef, methodName: String, overloadKey: String): GremlinMethodDefinition? {
+        return lookupMethodInHierarchy(typeRef, methodName, overloadKey, mutableSetOf())
     }
 
     /**
-     * Looks up all method overloads by type name and method name.
+     * Looks up all method overloads by type ref and method name.
      *
      * Searches the type and its parent types for all methods with the given name.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference ([ClassTypeRef]: package + simple name).
      * @param methodName The method name.
      * @return List of all method definitions with this name in the type hierarchy.
      */
-    fun lookupMethods(typeName: String, methodName: String): List<GremlinMethodDefinition> {
-        return lookupMethodsInHierarchy(typeName, methodName, mutableSetOf())
+    fun lookupMethods(typeRef: ClassTypeRef, methodName: String): List<GremlinMethodDefinition> {
+        return lookupMethodsInHierarchy(typeRef, methodName, mutableSetOf())
     }
 
     /**
@@ -128,7 +130,7 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      *
      * @return The number of registered types.
      */
-    fun size(): Int = types.size
+    fun size(): Int = types.values.sumOf { it.size }
 
     /**
      * Clears all registered types.
@@ -140,11 +142,11 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
     /**
      * Checks if a type is registered.
      *
-     * @param typeName The type name to check.
+     * @param typeRef The type reference to check.
      * @return True if the type is registered, false otherwise.
      */
-    fun hasType(typeName: String): Boolean {
-        return types.containsKey(typeName)
+    fun hasType(typeRef: ClassTypeRef): Boolean {
+        return types[typeRef.`package`]?.containsKey(typeRef.type) == true
     }
     
     /**
@@ -152,17 +154,17 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * 
      * The check includes both direct equality and inheritance through the extends chain.
      * 
-     * @param typeName The type to check
-     * @param parentTypeName The potential parent type
-     * @return True if typeName is the same as or inherits from parentTypeName
+     * @param typeRef The type to check.
+     * @param parentRef The potential parent type.
+     * @return True if typeRef is the same as or inherits from parentRef.
      */
-    fun isSubtypeOf(typeName: String, parentTypeName: String): Boolean {
-        if (typeName == parentTypeName) return true
+    fun isSubtypeOf(typeRef: ClassTypeRef, parentRef: ClassTypeRef): Boolean {
+        if (typeRef == parentRef) return true
         
-        val type = getType(typeName) ?: return false
+        val type = getType(typeRef) ?: return false
         
-        for (extendedType in type.extends) {
-            if (isSubtypeOf(extendedType, parentTypeName)) {
+        for (extendedRef in type.extends) {
+            if (isSubtypeOf(extendedRef, parentRef)) {
                 return true
             }
         }
@@ -176,25 +178,25 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * Recursively searches the type and its parent types for the property.
      * Uses a visited set to prevent infinite loops in circular inheritance.
      *
-     * @param typeName The type name to search
-     * @param propertyName The property name to find
-     * @param visited Set of already visited types to prevent circular lookups
-     * @return The property definition, or null if not found
+     * @param typeRef The type reference to search.
+     * @param propertyName The property name to find.
+     * @param visited Set of already visited types to prevent circular lookups.
+     * @return The property definition, or null if not found.
      */
     private fun lookupPropertyInHierarchy(
-        typeName: String,
+        typeRef: ClassTypeRef,
         propertyName: String,
-        visited: MutableSet<String>
+        visited: MutableSet<ClassTypeRef>
     ): GremlinPropertyDefinition? {
-        if (typeName in visited) return null
-        visited.add(typeName)
+        if (typeRef in visited) return null
+        visited.add(typeRef)
 
-        val type = getType(typeName) ?: return null
+        val type = getType(typeRef) ?: return null
         val property = type.getProperty(propertyName)
         if (property != null) return property
 
-        for (parentName in type.extends) {
-            val parentProperty = lookupPropertyInHierarchy(parentName, propertyName, visited)
+        for (parentRef in type.extends) {
+            val parentProperty = lookupPropertyInHierarchy(parentRef, propertyName, visited)
             if (parentProperty != null) return parentProperty
         }
 
@@ -208,27 +210,27 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * the specified overload key. Uses a visited set to prevent infinite loops
      * in circular inheritance.
      *
-     * @param typeName The type name to search
-     * @param methodName The method name to find
-     * @param overloadKey The overload key to match
-     * @param visited Set of already visited types to prevent circular lookups
-     * @return The method definition, or null if not found
+     * @param typeRef The type reference to search.
+     * @param methodName The method name to find.
+     * @param overloadKey The overload key to match.
+     * @param visited Set of already visited types to prevent circular lookups.
+     * @return The method definition, or null if not found.
      */
     private fun lookupMethodInHierarchy(
-        typeName: String,
+        typeRef: ClassTypeRef,
         methodName: String,
         overloadKey: String,
-        visited: MutableSet<String>
+        visited: MutableSet<ClassTypeRef>
     ): GremlinMethodDefinition? {
-        if (typeName in visited) return null
-        visited.add(typeName)
+        if (typeRef in visited) return null
+        visited.add(typeRef)
 
-        val type = getType(typeName) ?: return null
+        val type = getType(typeRef) ?: return null
         val method = type.getMethod(methodName, overloadKey)
         if (method != null) return method
 
-        for (parentName in type.extends) {
-            val parentMethod = lookupMethodInHierarchy(parentName, methodName, overloadKey, visited)
+        for (parentRef in type.extends) {
+            val parentMethod = lookupMethodInHierarchy(parentRef, methodName, overloadKey, visited)
             if (parentMethod != null) return parentMethod
         }
 
@@ -242,26 +244,26 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * and its parent types. Uses a visited set to prevent infinite loops in
      * circular inheritance.
      *
-     * @param typeName The type name to search
-     * @param methodName The method name to find
-     * @param visited Set of already visited types to prevent circular lookups
-     * @return List of all method definitions with this name in the hierarchy
+     * @param typeRef The type reference to search.
+     * @param methodName The method name to find.
+     * @param visited Set of already visited types to prevent circular lookups.
+     * @return List of all method definitions with this name in the hierarchy.
      */
     private fun lookupMethodsInHierarchy(
-        typeName: String,
+        typeRef: ClassTypeRef,
         methodName: String,
-        visited: MutableSet<String>
+        visited: MutableSet<ClassTypeRef>
     ): List<GremlinMethodDefinition> {
-        if (typeName in visited) return emptyList()
-        visited.add(typeName)
+        if (typeRef in visited) return emptyList()
+        visited.add(typeRef)
 
-        val type = getType(typeName) ?: return emptyList()
+        val type = getType(typeRef) ?: return emptyList()
         val result = mutableListOf<GremlinMethodDefinition>()
 
         result.addAll(type.getMethods(methodName))
 
-        for (parentName in type.extends) {
-            result.addAll(lookupMethodsInHierarchy(parentName, methodName, visited))
+        for (parentRef in type.extends) {
+            result.addAll(lookupMethodsInHierarchy(parentRef, methodName, visited))
         }
 
         return result

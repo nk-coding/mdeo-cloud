@@ -1,14 +1,11 @@
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import {
     sharedImport,
-    resolveRelativePath,
     isImportReference,
     getExportedEntitiesFromGlobalScope,
     getImportedEntitiesFromCurrentFile
 } from "@mdeo/language-shared";
 import type { AstNode, AstNodeDescriptionProvider, LangiumDocuments, ReferenceInfo, Scope } from "langium";
-import { Config, type ConfigType } from "@mdeo/language-config";
-import { getWrapperInterfaceName } from "@mdeo/language-config";
 import { getScopeFromMetamodelFile, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import {
     configOptimizationFileScopingConfig,
@@ -17,11 +14,10 @@ import {
     Refinement,
     type RefinementType,
     type GoalSectionType,
-    type ProblemSectionType,
     GoalSection
 } from "../grammar/optimizationTypes.js";
-import { OPTIMIZATION_PLUGIN_NAME } from "../plugin/optimizationContributionPlugin.js";
 import { AssociationEndCache } from "@mdeo/language-model";
+import { findProblemSection, getMetamodelUri } from "./util.js";
 
 const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE } = sharedImport("langium");
 
@@ -134,19 +130,17 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
      */
     private getClassScope(context: ReferenceInfo): Scope {
         const document = AstUtils.getDocument(context.container);
-        const problemSection = this.findProblemSection(context.container);
+        const problemSection = findProblemSection(context.container);
         if (problemSection == undefined) {
             return EMPTY_SCOPE;
         }
 
-        const metamodelPath = problemSection.metamodel[0];
-        if (metamodelPath == undefined) {
+        const targetUri = getMetamodelUri(document, problemSection);
+        if (targetUri == undefined) {
             return EMPTY_SCOPE;
         }
 
-        const targetUri = resolveRelativePath(document, metamodelPath);
         const targetDoc = this.documents.getDocument(targetUri);
-
         if (targetDoc == undefined) {
             return EMPTY_SCOPE;
         }
@@ -182,31 +176,5 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
         const allFields: AstNode[] = [...properties, ...uniqueAssociationEnds];
 
         return this.createScopeForNodes(allFields);
-    }
-
-    /**
-     * Finds the problem section in the config document.
-     * Navigates up to the Config root (by checking for a node with no $container),
-     * then searches config.sections for the wrapper whose $type matches the
-     * optimization problem wrapper name, returning its content.
-     *
-     * @param node Any AST node in the config document
-     * @returns The problem section, or undefined if not found
-     */
-    private findProblemSection(node: AstNode): ProblemSectionType | undefined {
-        const config = AstUtils.findRootNode(node) as ConfigType;
-
-        if (config.$type !== Config.name) {
-            return undefined;
-        }
-
-        const problemWrapperType = getWrapperInterfaceName("problem", OPTIMIZATION_PLUGIN_NAME);
-        for (const section of config.sections) {
-            if (section.$type === problemWrapperType) {
-                return (section as AstNode & { content: AstNode }).content as ProblemSectionType;
-            }
-        }
-
-        return undefined;
     }
 }

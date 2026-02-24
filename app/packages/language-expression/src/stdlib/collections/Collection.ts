@@ -8,34 +8,38 @@ export const CollectionType = classType("Collection")
     .generics("T")
     .extends("ReadonlyCollection", { T: genericTypeRef("T") })
     .method("add", (m) =>
-        m.signature((s) => s.param("item", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.String).build()))
+        m.signature((s) =>
+            s.param("item", genericTypeRef("T")).returns(typeRef("builtin", DefaultTypeNames.String).build())
+        )
     )
     .method("addAll", (m) =>
         m.signature((s) =>
             s
                 .param(
                     "col",
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
-                .returns(typeRef(DefaultTypeNames.String).build())
+                .returns(typeRef("builtin", DefaultTypeNames.String).build())
         )
     )
     .method("clear", (m) => m.signature((s) => s.returns(voidType())))
     .method("remove", (m) =>
-        m.signature((s) => s.param("item", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.String).build()))
+        m.signature((s) =>
+            s.param("item", genericTypeRef("T")).returns(typeRef("builtin", DefaultTypeNames.String).build())
+        )
     )
     .method("removeAll", (m) =>
         m.signature((s) =>
             s
                 .param(
                     "col",
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
-                .returns(typeRef(DefaultTypeNames.String).build())
+                .returns(typeRef("builtin", DefaultTypeNames.String).build())
         )
     )
     .build();

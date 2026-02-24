@@ -51,13 +51,13 @@ class MemberCallCompiler(
         
         val receiverResult = registry.compile(memberCall.expression, context, initialTraversal)
         
-        val receiverTypeName = getTypeName(memberCall.expression, context)
+        val receiverType = getTypeName(memberCall.expression, context)
         
         val overloadKey = getOverloadKey(memberCall.arguments, context)
         
-        val methodDef = context.typeRegistry.lookupMethod(receiverTypeName, memberCall.member, overloadKey)
+        val methodDef = context.typeRegistry.lookupMethod(receiverType, memberCall.member, overloadKey)
             ?: throw IllegalArgumentException(
-                "Method '${memberCall.member}' not found on type '$receiverTypeName' " +
+                "Method '${memberCall.member}' not found on type '${receiverType.`package`}.${receiverType.type}' " +
                 "with overload key '$overloadKey'"
             )
         
@@ -92,14 +92,14 @@ class MemberCallCompiler(
      * @param context The compilation context containing type resolution information
      * @return The type name string for method lookup ("builtin.any" for unknown types)
      */
-    private fun getTypeName(expression: TypedExpression, context: CompilationContext): String {
+    private fun getTypeName(expression: TypedExpression, context: CompilationContext): ClassTypeRef {
         val type = context.resolveTypeOrNull(expression.evalType)
         return when (type) {
-            is ClassTypeRef -> type.type
-            is GenericTypeRef -> "builtin.any"
-            is LambdaType -> "builtin.any"
-            null -> "builtin.any"
-            else -> "builtin.any"
+            is ClassTypeRef -> type
+            is GenericTypeRef -> ClassTypeRef("builtin", "any", false)
+            is LambdaType -> ClassTypeRef("builtin", "any", false)
+            null -> ClassTypeRef("builtin", "any", false)
+            else -> ClassTypeRef("builtin", "any", false)
         }
     }
 
@@ -129,7 +129,7 @@ class MemberCallCompiler(
         
         val argType = context.resolveTypeOrNull(firstArg.evalType)
         return when (argType) {
-            is ClassTypeRef -> argType.type
+            is ClassTypeRef -> if (argType.`package`.isEmpty()) argType.type else "${argType.`package`}.${argType.type}"
             is GenericTypeRef -> ""
             is LambdaType -> ""
             null -> ""

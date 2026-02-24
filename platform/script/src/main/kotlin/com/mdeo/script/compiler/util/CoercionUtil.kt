@@ -31,11 +31,11 @@ import org.objectweb.asm.Type
 object CoercionUtil {
     
     private val PRIMITIVE_TYPES = setOf(
-        "builtin.int",
-        "builtin.long",
-        "builtin.float",
-        "builtin.double",
-        "builtin.boolean"
+        "int",
+        "long",
+        "float",
+        "double",
+        "boolean"
     )
     
     /**
@@ -45,7 +45,7 @@ object CoercionUtil {
      * @return true if it's a primitive type (int, long, float, double, boolean).
      */
     fun isPrimitiveType(type: ReturnType): Boolean {
-        return type is ClassTypeRef && PRIMITIVE_TYPES.contains(type.type)
+        return type is ClassTypeRef && type.`package` == "builtin" && PRIMITIVE_TYPES.contains(type.type)
     }
     
     /**
@@ -103,14 +103,16 @@ object CoercionUtil {
     /**
      * Emits boxing bytecode for a primitive type.
      * Uses valueOf methods: Integer.valueOf(int), Long.valueOf(long), etc.
-     * 
-     * @param primitiveTypeName The primitive type name (e.g., "builtin.int")
+     *
+     * @param typeRef The ClassTypeRef of the primitive type (e.g., builtin.int)
      * @param mv The method visitor
      * @return true if boxing was emitted
      */
-    fun emitBoxing(primitiveTypeName: String, mv: MethodVisitor): Boolean {
+    fun emitBoxing(typeRef: ClassTypeRef, mv: MethodVisitor): Boolean = emitBoxingByName(typeRef.type, mv)
+
+    private fun emitBoxingByName(primitiveTypeName: String, mv: MethodVisitor): Boolean {
         return when (primitiveTypeName) {
-            "builtin.int" -> {
+            "int" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
                     "java/lang/Integer",
@@ -120,7 +122,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.long" -> {
+            "long" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
                     "java/lang/Long",
@@ -130,7 +132,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.float" -> {
+            "float" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
                     "java/lang/Float",
@@ -140,7 +142,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.double" -> {
+            "double" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
                     "java/lang/Double",
@@ -150,7 +152,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.boolean" -> {
+            "boolean" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
                     "java/lang/Boolean",
@@ -167,14 +169,16 @@ object CoercionUtil {
     /**
      * Emits unboxing bytecode for a wrapper type.
      * Uses instance methods: intValue(), longValue(), etc.
-     * 
-     * @param primitiveTypeName The primitive type name to unbox to (e.g., "builtin.int")
+     *
+     * @param typeRef The ClassTypeRef of the primitive type to unbox to (e.g., builtin.int)
      * @param mv The method visitor
      * @return true if unboxing was emitted
      */
-    fun emitUnboxing(primitiveTypeName: String, mv: MethodVisitor): Boolean {
+    fun emitUnboxing(typeRef: ClassTypeRef, mv: MethodVisitor): Boolean = emitUnboxingByName(typeRef.type, mv)
+
+    private fun emitUnboxingByName(primitiveTypeName: String, mv: MethodVisitor): Boolean {
         return when (primitiveTypeName) {
-            "builtin.int" -> {
+            "int" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKEVIRTUAL,
                     "java/lang/Integer",
@@ -184,7 +188,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.long" -> {
+            "long" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKEVIRTUAL,
                     "java/lang/Long",
@@ -194,7 +198,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.float" -> {
+            "float" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKEVIRTUAL,
                     "java/lang/Float",
@@ -204,7 +208,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.double" -> {
+            "double" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKEVIRTUAL,
                     "java/lang/Double",
@@ -214,7 +218,7 @@ object CoercionUtil {
                 )
                 true
             }
-            "builtin.boolean" -> {
+            "boolean" -> {
                 mv.visitMethodInsn(
                     Opcodes.INVOKEVIRTUAL,
                     "java/lang/Boolean",
@@ -279,14 +283,14 @@ object CoercionUtil {
         
         val sourceIsPrimitive = isPrimitiveType(sourceType)
         val targetIsPrimitive = isPrimitiveType(targetType)
-        val sourceIsAny = sourceTypeName == "builtin.any"
+        val sourceIsAny = sourceType.`package` == "builtin" && sourceType.type == "any"
         
         if (sourceIsPrimitive && !sourceIsNullable && targetIsPrimitive && targetIsNullable) {
             return emitPrimitiveToBoxedConversion(sourceTypeName, targetTypeName, mv)
         }
         
         if (sourceIsPrimitive && !sourceIsNullable && !targetIsPrimitive) {
-            return emitBoxing(sourceTypeName, mv)
+            return emitBoxingByName(sourceTypeName, mv)
         }
         
         if (sourceIsAny && !targetIsNullable && targetIsPrimitive) {
@@ -313,7 +317,8 @@ object CoercionUtil {
             return emitBoxedToBoxedConversion(sourceTypeName, targetTypeName, mv)
         }
 
-        if (!sourceIsPrimitive && !targetIsPrimitive && sourceTypeName != targetTypeName) {
+        if (!sourceIsPrimitive && !targetIsPrimitive && 
+            (sourceType.`package` != targetType.`package` || sourceType.type != targetType.type)) {
             return emitReferenceTypeConversion(sourceType, targetType, mv)
         }
         
@@ -331,7 +336,7 @@ object CoercionUtil {
     private fun emitAnyToPrimitiveConversion(targetTypeName: String, mv: MethodVisitor): Boolean {
         val wrapperClass = getWrapperClassName(targetTypeName) ?: return false
         mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
-        return emitUnboxing(targetTypeName, mv)
+        return emitUnboxingByName(targetTypeName, mv)
     }
     
     /**
@@ -356,11 +361,11 @@ object CoercionUtil {
      */
     private fun getWrapperClassName(primitiveTypeName: String): String? {
         return when (primitiveTypeName) {
-            "builtin.int" -> "java/lang/Integer"
-            "builtin.long" -> "java/lang/Long"
-            "builtin.float" -> "java/lang/Float"
-            "builtin.double" -> "java/lang/Double"
-            "builtin.boolean" -> "java/lang/Boolean"
+            "int" -> "java/lang/Integer"
+            "long" -> "java/lang/Long"
+            "float" -> "java/lang/Float"
+            "double" -> "java/lang/Double"
+            "boolean" -> "java/lang/Boolean"
             else -> null
         }
     }
@@ -382,7 +387,7 @@ object CoercionUtil {
         if (sourceTypeName != targetTypeName && TypeConversionUtil.isNumericType(sourceTypeName) && TypeConversionUtil.isNumericType(targetTypeName)) {
             TypeConversionUtil.emitConversion(sourceTypeName, targetTypeName, mv)
         }
-        return emitBoxing(targetTypeName, mv)
+        return emitBoxingByName(targetTypeName, mv)
     }
     
     /**
@@ -399,7 +404,7 @@ object CoercionUtil {
         targetTypeName: String,
         mv: MethodVisitor
     ): Boolean {
-        emitUnboxing(sourceTypeName, mv)
+        emitUnboxingByName(sourceTypeName, mv)
         if (sourceTypeName != targetTypeName && TypeConversionUtil.isNumericType(sourceTypeName) && TypeConversionUtil.isNumericType(targetTypeName)) {
             TypeConversionUtil.emitConversion(sourceTypeName, targetTypeName, mv)
         }
@@ -420,9 +425,9 @@ object CoercionUtil {
         targetTypeName: String,
         mv: MethodVisitor
     ): Boolean {
-        emitUnboxing(sourceTypeName, mv)
+        emitUnboxingByName(sourceTypeName, mv)
         TypeConversionUtil.emitConversion(sourceTypeName, targetTypeName, mv)
-        emitBoxing(targetTypeName, mv)
+        emitBoxingByName(targetTypeName, mv)
         return true
     }
     
@@ -447,24 +452,20 @@ object CoercionUtil {
         targetType: ClassTypeRef,
         mv: MethodVisitor
     ): Boolean {
-        val sourceTypeName = sourceType.type
-        val targetTypeName = targetType.type
-        
-        if (targetTypeName == "builtin.any") {
+        if (targetType.`package` == "builtin" && targetType.type == "any") {
             return false
         }
         
-        if (sourceTypeName == targetTypeName && sourceType.isNullable == targetType.isNullable) {
+        if (sourceType.`package` == targetType.`package` && sourceType.type == targetType.type 
+            && sourceType.isNullable == targetType.isNullable) {
             return false
         }
         
-        if (sourceTypeName != targetTypeName || sourceType.isNullable != targetType.isNullable) {
-            val targetDescriptor = ASMUtil.getTypeDescriptor(targetType)
-            if (targetDescriptor.startsWith("L") && targetDescriptor.endsWith(";")) {
-                val internalName = targetDescriptor.substring(1, targetDescriptor.length - 1)
-                mv.visitTypeInsn(Opcodes.CHECKCAST, internalName)
-                return true
-            }
+        val targetDescriptor = ASMUtil.getTypeDescriptor(targetType)
+        if (targetDescriptor.startsWith("L") && targetDescriptor.endsWith(";")) {
+            val internalName = targetDescriptor.substring(1, targetDescriptor.length - 1)
+            mv.visitTypeInsn(Opcodes.CHECKCAST, internalName)
+            return true
         }
         
         return false
@@ -473,14 +474,14 @@ object CoercionUtil {
     
     /**
      * Gets the primitive type descriptor for JVM.
-     * 
+     *
      * Delegates to ASMUtil for consistency.
-     * 
-     * @param primitiveTypeName The primitive type name (e.g., "builtin.int").
+     *
+     * @param typeRef The ClassTypeRef of the primitive type (e.g., builtin.int).
      * @return The JVM type descriptor (e.g., "I" for int), or null if not a primitive type.
      */
-    fun getPrimitiveDescriptor(primitiveTypeName: String): String? {
-        return ASMUtil.getPrimitiveDescriptor(primitiveTypeName)
+    fun getPrimitiveDescriptor(typeRef: ClassTypeRef): String? {
+        return ASMUtil.getPrimitiveDescriptor(typeRef)
     }
     
     /**
@@ -799,14 +800,15 @@ object CoercionUtil {
      */
     private fun getBoxedTypeDescriptor(type: ReturnType): String {
         if (type !is ClassTypeRef) return "Ljava/lang/Object;"
+        if (type.`package` != "builtin") return "Ljava/lang/Object;"
         
         return when (type.type) {
-            "builtin.int" -> "Ljava/lang/Integer;"
-            "builtin.long" -> "Ljava/lang/Long;"
-            "builtin.float" -> "Ljava/lang/Float;"
-            "builtin.double" -> "Ljava/lang/Double;"
-            "builtin.boolean" -> "Ljava/lang/Boolean;"
-            "builtin.string" -> "Ljava/lang/String;"
+            "int" -> "Ljava/lang/Integer;"
+            "long" -> "Ljava/lang/Long;"
+            "float" -> "Ljava/lang/Float;"
+            "double" -> "Ljava/lang/Double;"
+            "boolean" -> "Ljava/lang/Boolean;"
+            "string" -> "Ljava/lang/String;"
             else -> "Ljava/lang/Object;"
         }
     }
@@ -818,12 +820,16 @@ object CoercionUtil {
         when {
             returnType is VoidType -> mv.visitInsn(Opcodes.RETURN)
             returnType is ClassTypeRef && !returnType.isNullable -> {
-                when (returnType.type) {
-                    "builtin.int", "builtin.boolean" -> mv.visitInsn(Opcodes.IRETURN)
-                    "builtin.long" -> mv.visitInsn(Opcodes.LRETURN)
-                    "builtin.float" -> mv.visitInsn(Opcodes.FRETURN)
-                    "builtin.double" -> mv.visitInsn(Opcodes.DRETURN)
-                    else -> mv.visitInsn(Opcodes.ARETURN)
+                if (returnType.`package` == "builtin") {
+                    when (returnType.type) {
+                        "int", "boolean" -> mv.visitInsn(Opcodes.IRETURN)
+                        "long" -> mv.visitInsn(Opcodes.LRETURN)
+                        "float" -> mv.visitInsn(Opcodes.FRETURN)
+                        "double" -> mv.visitInsn(Opcodes.DRETURN)
+                        else -> mv.visitInsn(Opcodes.ARETURN)
+                    }
+                } else {
+                    mv.visitInsn(Opcodes.ARETURN)
                 }
             }
             else -> mv.visitInsn(Opcodes.ARETURN)

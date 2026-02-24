@@ -272,7 +272,7 @@ class BinaryOperatorCompiler(
                 expression
             )
         return type is com.mdeo.expression.ast.types.ClassTypeRef && 
-            (type.type == "builtin.string" || type.type == "string")
+            type.`package` == "builtin" && type.type == "string"
     }
 
     /**

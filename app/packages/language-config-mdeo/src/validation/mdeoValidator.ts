@@ -1,4 +1,11 @@
-import type { ValidationAcceptor, ValidationChecks, AstNode, Properties } from "langium";
+import type {
+    ValidationAcceptor,
+    ValidationChecks,
+    AstNode,
+    Properties,
+    LangiumDocument,
+    LangiumDocuments
+} from "langium";
 import type { ExtendedLangiumServices } from "@mdeo/language-common";
 import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
 import {
@@ -9,7 +16,9 @@ import {
     type MutationBlockType,
     type ArchiveBlockType
 } from "../grammar/mdeoTypes.js";
-import { ModelTransformation } from "@mdeo/language-model-transformation";
+import { ModelTransformation, type ModelTransformationType } from "@mdeo/language-model-transformation";
+import { isMetamodelCompatible } from "@mdeo/language-metamodel";
+import type { MdeoMetamodelResolver } from "../features/mdeoMetamodelResolver.js";
 import type { Range } from "vscode-languageserver-types";
 
 const { AstUtils, CstUtils, isLeafCstNode, GrammarUtils } = sharedImport("langium");
@@ -57,7 +66,9 @@ interface MdeoAstTypes {
  *
  * @param services The extended Langium services
  */
-export function registerMdeoValidationChecks(services: ExtendedLangiumServices): void {
+export function registerMdeoValidationChecks(
+    services: ExtendedLangiumServices & { MdeoMetamodelResolver: MdeoMetamodelResolver }
+): void {
     const registry = services.validation.ValidationRegistry;
     const validator = new MdeoValidator(services);
 
@@ -75,14 +86,16 @@ export function registerMdeoValidationChecks(services: ExtendedLangiumServices):
  */
 export class MdeoValidator {
     private readonly services: ExtendedLangiumServices;
+    private readonly metamodelResolver: MdeoMetamodelResolver;
 
     /**
      * Constructs a new MdeoValidator.
      *
      * @param services The extended Langium services
      */
-    constructor(services: ExtendedLangiumServices) {
+    constructor(services: ExtendedLangiumServices & { MdeoMetamodelResolver: MdeoMetamodelResolver }) {
         this.services = services;
+        this.metamodelResolver = services.MdeoMetamodelResolver;
     }
 
     /**
@@ -125,7 +138,8 @@ export class MdeoValidator {
 
     /**
      * Validates a using path.
-     * Checks that the path resolves to a valid model transformation file.
+     * Checks that the path resolves to a valid model transformation file
+     * and that the transformation's metamodel is compatible with the problem section's metamodel.
      *
      * @param usingPath The using path to validate
      * @param accept The validation acceptor
@@ -150,7 +164,76 @@ export class MdeoValidator {
                 node: usingPath,
                 property: "path"
             });
+            return;
         }
+
+        this.validateTransformationMetamodelCompatibility(usingPath, document, targetDoc, documents, accept);
+    }
+
+    /**
+     * Validates that a model transformation's metamodel is compatible with the problem section's metamodel.
+     *
+     * @param usingPath The using path being validated
+     * @param document The current document
+     * @param targetDoc The target model transformation document
+     * @param documents The Langium documents service
+     * @param accept The validation acceptor
+     */
+    private validateTransformationMetamodelCompatibility(
+        usingPath: UsingPathType,
+        document: LangiumDocument,
+        targetDoc: LangiumDocument,
+        documents: LangiumDocuments,
+        accept: ValidationAcceptor
+    ): void {
+        const transformation = targetDoc.parseResult?.value as ModelTransformationType;
+        const transformationMetamodelPath = transformation.import?.file;
+
+        if (transformationMetamodelPath == undefined) {
+            return;
+        }
+
+        const configMetamodelUri = this.metamodelResolver.getMetamodelUri(document);
+        if (configMetamodelUri == undefined) {
+            return;
+        }
+        const configMetamodelDoc = documents.getDocument(configMetamodelUri);
+        if (configMetamodelDoc == undefined) {
+            return;
+        }
+
+        const transformationMetamodelDoc = this.resolveDocument(targetDoc, transformationMetamodelPath, documents);
+        if (transformationMetamodelDoc == undefined) {
+            return;
+        }
+
+        if (!isMetamodelCompatible(transformationMetamodelDoc, configMetamodelDoc, documents)) {
+            accept(
+                "error",
+                `The model transformation at '${usingPath.path}' uses a metamodel that is not compatible with the problem section's metamodel.`,
+                {
+                    node: usingPath,
+                    property: "path"
+                }
+            );
+        }
+    }
+
+    /**
+     * Resolves a relative path to a document.
+     *
+     * @param fromDocument The document from which to resolve
+     * @param relativePath The relative path
+     * @param documents The Langium documents service
+     * @returns The resolved document, or undefined if not found
+     */
+    private resolveDocument(
+        fromDocument: LangiumDocument,
+        relativePath: string,
+        documents: LangiumDocuments
+    ): LangiumDocument | undefined {
+        const uri = resolveRelativePath(fromDocument, relativePath);
+        return documents.getDocument(uri);
     }
 
     /**

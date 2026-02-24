@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.compiler.registry
 
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.VertexProperty
@@ -21,17 +22,22 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
 interface GremlinTypeDefinition {
 
     /**
-     * The unique name of this type (e.g., "builtin.int", "builtin.string").
+     * The package part of this type's fully qualified name (e.g., "builtin", "class/path/to/file").
+     */
+    val typePackage: String
+
+    /**
+     * The simple name of this type (e.g., "int", "string").
      */
     val typeName: String
 
     /**
-     * The names of types this type extends.
+     * The types this type extends, expressed as [ClassTypeRef].
      *
      * Members from parent types are inherited and can be looked up.
-     * For example, all types typically extend "builtin.any".
+     * For example, all types typically extend the "any" type in the "builtin" package.
      */
-    val extends: List<String>
+    val extends: List<ClassTypeRef>
     
     /**
      * The cardinality of this type for graph property storage.

@@ -1,4 +1,4 @@
-import { createInterface, createType, type ASTType } from "@mdeo/language-common";
+import { createInterface, createType, Optional, type ASTType } from "@mdeo/language-common";
 import type { TypeConfig } from "./typeConfig.js";
 
 /**
@@ -17,6 +17,7 @@ export function generateTypeTypes(config: TypeConfig) {
     const classTypeType = createInterface(config.classTypeTypeName)
         .extends(baseTypeType)
         .attrs({
+            packageName: Optional(String),
             name: String,
             typeArgs: [baseTypeType],
             isNullable: Boolean

@@ -17,8 +17,8 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * @return The Bag type definition for the Gremlin type registry
  */
 fun createBagType(): GremlinTypeDefinition {
-    return gremlinType("builtin.Bag")
-        .extends("builtin.Collection")
+    return gremlinType("builtin", "Bag")
+        .extends("builtin", "Collection")
         .cardinality(VertexProperty.Cardinality.list)
         .build()
 }

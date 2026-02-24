@@ -32,7 +32,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can create bag with bagOf`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -67,7 +67,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can create empty bag with emptyBag`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
 
                 function(
                     name = "testFunction",
@@ -97,7 +97,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `bag allows duplicate elements`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -140,7 +140,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can create ordered set with orderedSetOf`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -175,7 +175,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can create empty ordered set with emptyOrderedSet`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
 
                 function(
                     name = "testFunction",
@@ -205,7 +205,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `ordered set removes duplicate elements`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -248,7 +248,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can call size on bag`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -287,7 +287,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `emptyBag is empty`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val boolTypeIndex = booleanType()
 
                 function(
@@ -322,7 +322,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `non-empty bag returns true for notEmpty`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val intTypeIndex = intType()
                 val boolTypeIndex = booleanType()
 
@@ -365,7 +365,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can call size on ordered set`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -404,7 +404,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `emptyOrderedSet is empty`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val boolTypeIndex = booleanType()
 
                 function(
@@ -439,9 +439,9 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can call at on ordered set`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin.any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
 
                 function(
                     name = "testFunction",
@@ -481,9 +481,9 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can call first on ordered set`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin.any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
 
                 function(
                     name = "testFunction",
@@ -521,9 +521,9 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can call last on ordered set`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin.any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
 
                 function(
                     name = "testFunction",
@@ -565,7 +565,7 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can assign bag to variable and call methods`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -607,9 +607,9 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `can assign ordered set to variable and call at`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin.any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
 
                 function(
                     name = "testFunction",
@@ -657,12 +657,12 @@ class BagAndOrderedSetIntegrationTest {
         @Test
         fun `set forEach with lambda expression`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val intTypeIndex = intType()
                 val voidTypeIndex = voidType()
                 
                 // Create consumer lambda type: (int) -> void
-                val consumerLambdaType = addType(consumer(ClassTypeRef("builtin.int", false)))
+                val consumerLambdaType = addType(consumer(ClassTypeRef("builtin", "int", false)))
                 
                 function(
                     name = "testFunction",

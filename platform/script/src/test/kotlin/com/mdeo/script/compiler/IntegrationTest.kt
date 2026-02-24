@@ -176,8 +176,8 @@ class IntegrationTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             
             function(
@@ -228,8 +228,8 @@ class IntegrationTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             
             function(
@@ -501,7 +501,7 @@ class IntegrationTest {
         // addOne() + addTen() + addOne() -> 1 + 11 + 12 = 24
         val ast = buildTypedAst {
             val intType = intType()
-            val lambdaTypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
+            val lambdaTypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
             
             function(
                 name = "testFunction",
@@ -933,7 +933,7 @@ class IntegrationTest {
             val voidType = voidType()
             val lambdaTypeIdx = lambdaType(
                 VoidType(),
-                "x" to ClassTypeRef("builtin.int", false)
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             
             function(
@@ -1343,8 +1343,8 @@ class IntegrationTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             
             function(
@@ -1421,7 +1421,7 @@ class IntegrationTest {
         // = 1 + 2 + 3 + 2 + 0 + 1 = 9
         val ast = buildTypedAst {
             val intType = intType()
-            val lambdaTypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
+            val lambdaTypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
             
             function(
                 name = "testFunction",

@@ -54,10 +54,10 @@ class LambdaMethodDefinitionsTest {
         g = graph.traversal()
         
         val types = listOf(
-            ClassTypeRef(type = "builtin.int", isNullable = false),
-            ClassTypeRef(type = "builtin.boolean", isNullable = false),
-            ClassTypeRef(type = "builtin.Collection", isNullable = false),
-            ClassTypeRef(type = "builtin.List", isNullable = false)
+            ClassTypeRef(`package` = "builtin", type = "int", isNullable = false),
+            ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false),
+            ClassTypeRef(`package` = "builtin", type = "Collection", isNullable = false),
+            ClassTypeRef(`package` = "builtin", type = "List", isNullable = false)
         )
         
         context = CompilationContext(

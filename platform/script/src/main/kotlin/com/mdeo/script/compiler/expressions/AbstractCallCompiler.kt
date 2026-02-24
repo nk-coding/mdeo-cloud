@@ -49,11 +49,11 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
         }
 
         val isReturnNullable = actualReturnType.isNullable
-        val returnBaseName = actualReturnType.type
+        val isReturnAny = actualReturnType.`package` == "builtin" && actualReturnType.type == "any"
 
-        if ((returnBaseName == "builtin.any" || isReturnNullable) &&
+        if ((isReturnAny || isReturnNullable) &&
             !expectedType.isNullable && CoercionUtil.isPrimitiveType(expectedType)) {
-            CoercionUtil.emitUnboxing(expectedType.type, mv)
+            CoercionUtil.emitUnboxing(expectedType, mv)
         }
     }
 
@@ -85,7 +85,7 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
             context.compileExpression(arg, mv, argType)
 
             if (argType is ClassTypeRef && !argType.isNullable && CoercionUtil.isPrimitiveType(argType)) {
-                CoercionUtil.emitBoxing(argType.type, mv)
+                CoercionUtil.emitBoxing(argType, mv)
             }
 
             mv.visitInsn(Opcodes.AASTORE)

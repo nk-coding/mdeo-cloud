@@ -12,6 +12,9 @@
             "path": "../language-common"
         },
         {
+            "path": "../language-script"
+        },
+        {
             "path": "../language-shared"
         },
         {

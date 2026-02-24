@@ -210,20 +210,20 @@ class TypeCastCompiler : ExpressionCompiler() {
         }
 
         when (sourceName) {
-            "builtin.long" -> when (targetName) {
-                "builtin.int" -> mv.visitInsn(Opcodes.L2I)
-                "builtin.float" -> mv.visitInsn(Opcodes.L2F)
-                "builtin.double" -> mv.visitInsn(Opcodes.L2D)
+            "long" -> when (targetName) {
+                "int" -> mv.visitInsn(Opcodes.L2I)
+                "float" -> mv.visitInsn(Opcodes.L2F)
+                "double" -> mv.visitInsn(Opcodes.L2D)
             }
-            "builtin.float" -> when (targetName) {
-                "builtin.int" -> mv.visitInsn(Opcodes.F2I)
-                "builtin.long" -> mv.visitInsn(Opcodes.F2L)
-                "builtin.double" -> mv.visitInsn(Opcodes.F2D)
+            "float" -> when (targetName) {
+                "int" -> mv.visitInsn(Opcodes.F2I)
+                "long" -> mv.visitInsn(Opcodes.F2L)
+                "double" -> mv.visitInsn(Opcodes.F2D)
             }
-            "builtin.double" -> when (targetName) {
-                "builtin.int" -> mv.visitInsn(Opcodes.D2I)
-                "builtin.long" -> mv.visitInsn(Opcodes.D2L)
-                "builtin.float" -> mv.visitInsn(Opcodes.D2F)
+            "double" -> when (targetName) {
+                "int" -> mv.visitInsn(Opcodes.D2I)
+                "long" -> mv.visitInsn(Opcodes.D2L)
+                "float" -> mv.visitInsn(Opcodes.D2F)
             }
         }
     }
@@ -237,22 +237,23 @@ class TypeCastCompiler : ExpressionCompiler() {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        val targetName = (targetType as ClassTypeRef).type
+        val targetRef = targetType as ClassTypeRef
+        val targetName = targetRef.type
         val sourceRef = sourceType as ClassTypeRef
 
-        if (sourceRef.type == "builtin.any") {
-            val wrapperClass = context.typeRegistry.getWrapperClassName(targetName) ?: "java/lang/Object"
+        if (sourceRef.`package` == "builtin" && sourceRef.type == "any") {
+            val wrapperClass = context.typeRegistry.getWrapperClassName(targetRef) ?: "java/lang/Object"
             mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
-            CoercionUtil.emitUnboxing(targetName, mv)
+            CoercionUtil.emitUnboxing(targetRef, mv)
         } else if (CoercionUtil.isPrimitiveType(sourceType) && sourceRef.isNullable) {
-            CoercionUtil.emitUnboxing(sourceRef.type, mv)
+            CoercionUtil.emitUnboxing(sourceRef, mv)
             if (sourceRef.type != targetName) {
                 emitNarrowingOrWideningConversion(sourceRef.type, targetName, mv)
             }
         } else {
-            val wrapperClass = context.typeRegistry.getWrapperClassName(targetName) ?: "java/lang/Object"
+            val wrapperClass = context.typeRegistry.getWrapperClassName(targetRef) ?: "java/lang/Object"
             mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
-            CoercionUtil.emitUnboxing(targetName, mv)
+            CoercionUtil.emitUnboxing(targetRef, mv)
         }
     }
 
@@ -264,8 +265,8 @@ class TypeCastCompiler : ExpressionCompiler() {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        val targetName = (targetType as ClassTypeRef).type
-        val wrapperClass = context.typeRegistry.getWrapperClassName(targetName) ?: "java/lang/Object"
+        val targetRef = targetType as ClassTypeRef
+        val wrapperClass = context.typeRegistry.getWrapperClassName(targetRef) ?: "java/lang/Object"
         mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
     }
 
@@ -278,11 +279,11 @@ class TypeCastCompiler : ExpressionCompiler() {
         mv: MethodVisitor
     ) {
         val targetRef = targetType as ClassTypeRef
-        if (targetRef.type == "builtin.any") {
+        if (targetRef.`package` == "builtin" && targetRef.type == "any") {
             return
         }
 
-        val targetClass = context.typeRegistry.getJvmClassName(targetRef.type, false) ?: "java/lang/Object"
+        val targetClass = context.typeRegistry.getJvmClassName(targetRef, false) ?: "java/lang/Object"
         mv.visitTypeInsn(Opcodes.CHECKCAST, targetClass)
     }
 
@@ -294,11 +295,13 @@ class TypeCastCompiler : ExpressionCompiler() {
             return false
         }
 
-        if (sourceType.type == targetType.type && !sourceType.isNullable && !targetType.isNullable) {
+        if (sourceType.`package` == targetType.`package` && sourceType.type == targetType.type
+            && !sourceType.isNullable && !targetType.isNullable) {
             return true
         }
 
-        if (sourceType.type == "builtin.any" && targetType.type == "builtin.any") {
+        if (sourceType.`package` == "builtin" && sourceType.type == "any"
+            && targetType.`package` == "builtin" && targetType.type == "any") {
             return true
         }
 
@@ -317,11 +320,12 @@ class TypeCastCompiler : ExpressionCompiler() {
             return false
         }
 
-        if (sourceType.type == targetType.type && !sourceType.isNullable) {
+        if (sourceType.`package` == targetType.`package` && sourceType.type == targetType.type
+            && !sourceType.isNullable) {
             return true
         }
 
-        if (!sourceType.isNullable && context.typeRegistry.isSubtype(sourceType.type, targetType.type)) {
+        if (!sourceType.isNullable && context.typeRegistry.isSubtype(sourceType, targetType)) {
             return true
         }
 
@@ -344,7 +348,7 @@ class TypeCastCompiler : ExpressionCompiler() {
         val targetIsPrimitive = CoercionUtil.isPrimitiveType(targetType)
 
         if (sourceIsPrimitive && !sourceType.isNullable && targetIsPrimitive && !targetType.isNullable) {
-            if (sourceType.type != targetType.type && !areConvertiblePrimitives(sourceType.type, targetType.type)) {
+            if (sourceType != targetType && !areConvertiblePrimitives(sourceType, targetType)) {
                 return false
             }
         }
@@ -355,9 +359,8 @@ class TypeCastCompiler : ExpressionCompiler() {
     /**
      * Checks if two primitive types can be converted (numerics are convertible).
      */
-    private fun areConvertiblePrimitives(source: String, target: String): Boolean {
-        val numericTypes = setOf("builtin.int", "builtin.long", "builtin.float", "builtin.double")
-        return source in numericTypes && target in numericTypes
+    private fun areConvertiblePrimitives(source: ClassTypeRef, target: ClassTypeRef): Boolean {
+        return TypeConversionUtil.isNumericType(source) && TypeConversionUtil.isNumericType(target)
     }
 
     /**
@@ -373,17 +376,16 @@ class TypeCastCompiler : ExpressionCompiler() {
      * Boxes a primitive value on the stack.
      */
     private fun boxPrimitive(type: ReturnType, mv: MethodVisitor) {
-        val typeName = (type as ClassTypeRef).type
-        CoercionUtil.emitBoxing(typeName, mv)
+        CoercionUtil.emitBoxing(type as ClassTypeRef, mv)
     }
 
     /**
      * Pops a value from the stack, accounting for long/double taking 2 slots.
      */
     private fun popValue(type: ReturnType, mv: MethodVisitor) {
-        if (type is ClassTypeRef && !type.isNullable) {
+        if (type is ClassTypeRef && !type.isNullable && type.`package` == "builtin") {
             when (type.type) {
-                "builtin.long", "builtin.double" -> mv.visitInsn(Opcodes.POP2)
+                "long", "double" -> mv.visitInsn(Opcodes.POP2)
                 else -> mv.visitInsn(Opcodes.POP)
             }
         } else {
@@ -397,7 +399,7 @@ class TypeCastCompiler : ExpressionCompiler() {
     private fun getInstanceOfClass(targetType: ReturnType, context: CompilationContext): String {
         val ref = targetType as ClassTypeRef
         
-        val jvmClass = context.typeRegistry.getJvmClassName(ref.type, true)
+        val jvmClass = context.typeRegistry.getJvmClassName(ref, true)
         
         return jvmClass ?: "java/lang/Object"
     }

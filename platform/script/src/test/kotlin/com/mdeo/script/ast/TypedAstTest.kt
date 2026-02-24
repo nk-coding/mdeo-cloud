@@ -124,8 +124,8 @@ class TypedAstTest {
     fun `deserialize complete TypedAst`() {
         val jsonString = """{
             "types": [
-                {"type": "builtin.int", "isNullable": false},
-                {"type": "builtin.string", "isNullable": false}
+                {"package": "builtin", "type": "int", "isNullable": false},
+                {"package": "builtin", "type": "string", "isNullable": false}
             ],
             "imports": [
                 {"name": "log", "ref": "console_log", "uri": "file:///stdlib.ms"}
@@ -147,7 +147,8 @@ class TypedAstTest {
         
         assertEquals(2, result.types.size)
         assertIs<ClassTypeRef>(result.types[0])
-        assertEquals("builtin.int", (result.types[0] as ClassTypeRef).type)
+        assertEquals("int", (result.types[0] as ClassTypeRef).type)
+        assertEquals("builtin", (result.types[0] as ClassTypeRef).`package`)
         
         assertEquals(1, result.imports.size)
         assertEquals("log", result.imports[0].name)
@@ -183,9 +184,9 @@ class TypedAstTest {
         val jsonString = """{
             "types": [
                 {
-                    "returnType": {"type": "builtin.int", "isNullable": false},
+                    "returnType": {"package": "builtin", "type": "int", "isNullable": false},
                     "parameters": [
-                        {"name": "x", "type": {"type": "builtin.int", "isNullable": false}}
+                        {"name": "x", "type": {"package": "builtin", "type": "int", "isNullable": false}}
                     ],
                     "isNullable": false
                 }

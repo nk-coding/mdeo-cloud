@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
+import com.mdeo.expression.ast.types.ClassTypeRef
 
 /**
  * Integration tests for the registry-based member call functionality.
@@ -25,7 +26,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `can lookup int abs method`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.int",
+                ClassTypeRef("builtin", "int", false),
                 "abs",
                 ""
             )
@@ -36,7 +37,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `can lookup int max method with int arg`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.int",
+                ClassTypeRef("builtin", "int", false),
                 "max",
                 "int"
             )
@@ -46,7 +47,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `can lookup int max method with long arg`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.int",
+                ClassTypeRef("builtin", "int", false),
                 "max",
                 "long"
             )
@@ -56,7 +57,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `can lookup string length method`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.string",
+                ClassTypeRef("builtin", "string", false),
                 "length",
                 ""
             )
@@ -66,7 +67,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `can lookup string substring method`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.string",
+                ClassTypeRef("builtin", "string", false),
                 "substring",
                 "1"
             )
@@ -77,7 +78,7 @@ class RegistryMemberCallCompilerTest {
         fun `can lookup double floor method`() {
             // Double.floor() returns long
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.double",
+                ClassTypeRef("builtin", "double", false),
                 "floor",
                 ""
             )
@@ -88,7 +89,7 @@ class RegistryMemberCallCompilerTest {
         fun `can lookup float ceiling method`() {
             // Float.ceiling() returns int
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.float",
+                ClassTypeRef("builtin", "float", false),
                 "ceiling",
                 ""
             )
@@ -99,7 +100,7 @@ class RegistryMemberCallCompilerTest {
         fun `can lookup boolean toString method`() {
             // Boolean doesn't have negate, but has toString
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.boolean",
+                ClassTypeRef("builtin", "boolean", false),
                 "toString",
                 ""
             )
@@ -113,7 +114,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `int inherits toString from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.int",
+                ClassTypeRef("builtin", "int", false),
                 "toString",
                 ""
             )
@@ -123,7 +124,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `long inherits toString from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.long",
+                ClassTypeRef("builtin", "long", false),
                 "toString",
                 ""
             )
@@ -133,7 +134,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `double inherits asBoolean from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.double",
+                ClassTypeRef("builtin", "double", false),
                 "asBoolean",
                 ""
             )
@@ -143,7 +144,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `float inherits asInteger from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.float",
+                ClassTypeRef("builtin", "float", false),
                 "asInteger",
                 ""
             )
@@ -153,7 +154,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `string inherits format from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.string",
+                ClassTypeRef("builtin", "string", false),
                 "format",
                 ""
             )
@@ -163,7 +164,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `boolean inherits hasProperty from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.boolean",
+                ClassTypeRef("builtin", "boolean", false),
                 "hasProperty",
                 ""
             )
@@ -176,19 +177,19 @@ class RegistryMemberCallCompilerTest {
 
         @Test
         fun `int has multiple max overloads`() {
-            val methods = TypeRegistry.GLOBAL.lookupMethods("builtin.int", "max")
+            val methods = TypeRegistry.GLOBAL.lookupMethods(ClassTypeRef("builtin", "int", false), "max")
             assertTrue(methods.size >= 2, "Expected at least 2 max overloads, got ${methods.size}")
         }
 
         @Test
         fun `string has multiple substring overloads`() {
             val oneArg = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.string",
+                ClassTypeRef("builtin", "string", false),
                 "substring",
                 "1"
             )
             val twoArg = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.string",
+                ClassTypeRef("builtin", "string", false),
                 "substring",
                 "2"
             )
@@ -199,8 +200,8 @@ class RegistryMemberCallCompilerTest {
 
         @Test
         fun `int has min overloads for int and long`() {
-            val intMin = TypeRegistry.GLOBAL.lookupMethod("builtin.int", "min", "int")
-            val longMin = TypeRegistry.GLOBAL.lookupMethod("builtin.int", "min", "long")
+            val intMin = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "int", false), "min", "int")
+            val longMin = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "int", false), "min", "long")
 
             assertNotNull(intMin)
             assertNotNull(longMin)
@@ -208,10 +209,10 @@ class RegistryMemberCallCompilerTest {
 
         @Test
         fun `double has multiple arithmetic methods`() {
-            val abs = TypeRegistry.GLOBAL.lookupMethod("builtin.double", "abs", "")
-            val floor = TypeRegistry.GLOBAL.lookupMethod("builtin.double", "floor", "")
-            val ceiling = TypeRegistry.GLOBAL.lookupMethod("builtin.double", "ceiling", "")
-            val round = TypeRegistry.GLOBAL.lookupMethod("builtin.double", "round", "")
+            val abs = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "double", false), "abs", "")
+            val floor = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "double", false), "floor", "")
+            val ceiling = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "double", false), "ceiling", "")
+            val round = TypeRegistry.GLOBAL.lookupMethod(ClassTypeRef("builtin", "double", false), "round", "")
 
             assertNotNull(abs)
             assertNotNull(floor)
@@ -226,7 +227,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `static method has correct descriptor`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.int",
+                ClassTypeRef("builtin", "int", false),
                 "abs",
                 ""
             )
@@ -239,7 +240,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `string method has correct descriptor`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.string",
+                ClassTypeRef("builtin", "string", false),
                 "length",
                 ""
             )
@@ -251,7 +252,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `method with parameter has correct descriptor`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.int",
+                ClassTypeRef("builtin", "int", false),
                 "max",
                 "int"
             )
@@ -263,7 +264,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `inherited method from any has correct owner`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                "builtin.any",
+                ClassTypeRef("builtin", "any", false),
                 "toString",
                 ""
             )
@@ -277,44 +278,44 @@ class RegistryMemberCallCompilerTest {
 
         @Test
         fun `int extends any`() {
-            val intType = TypeRegistry.GLOBAL.getType("builtin.int")
+            val intType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
-            assertTrue(intType.extends.contains("builtin.any"))
+            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `long extends any`() {
-            val longType = TypeRegistry.GLOBAL.getType("builtin.long")
+            val longType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "long", false))
             assertNotNull(longType)
-            assertTrue(longType.extends.contains("builtin.any"))
+            assertTrue(longType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `double extends any`() {
-            val doubleType = TypeRegistry.GLOBAL.getType("builtin.double")
+            val doubleType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "double", false))
             assertNotNull(doubleType)
-            assertTrue(doubleType.extends.contains("builtin.any"))
+            assertTrue(doubleType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `float extends any`() {
-            val floatType = TypeRegistry.GLOBAL.getType("builtin.float")
+            val floatType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "float", false))
             assertNotNull(floatType)
-            assertTrue(floatType.extends.contains("builtin.any"))
+            assertTrue(floatType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `string extends any`() {
-            val stringType = TypeRegistry.GLOBAL.getType("builtin.string")
+            val stringType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "string", false))
             assertNotNull(stringType)
-            assertTrue(stringType.extends.contains("builtin.any"))
+            assertTrue(stringType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `boolean extends any`() {
-            val booleanType = TypeRegistry.GLOBAL.getType("builtin.boolean")
+            val booleanType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "boolean", false))
             assertNotNull(booleanType)
-            assertTrue(booleanType.extends.contains("builtin.any"))
+            assertTrue(booleanType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
     }
 }

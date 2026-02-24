@@ -23,7 +23,7 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -59,8 +59,8 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -103,8 +103,8 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -149,7 +149,7 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -205,8 +205,8 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "cond" to ClassTypeRef("builtin.boolean", false)
+                ClassTypeRef("builtin", "int", false),
+                "cond" to ClassTypeRef("builtin", "boolean", false)
             )
             function(
                 name = "testFunction",
@@ -254,8 +254,8 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "n" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "n" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -325,7 +325,7 @@ class LambdaCompilerTest {
             val intType = intType()
             val voidType = voidType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -409,8 +409,8 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -452,9 +452,9 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -503,8 +503,8 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "n" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "n" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -566,8 +566,8 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "n" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "n" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -681,8 +681,8 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "n" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "n" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -757,8 +757,8 @@ class LambdaCompilerTest {
             val longType = longType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "n" to ClassTypeRef("builtin.long", false)
+                ClassTypeRef("builtin", "int", false),
+                "n" to ClassTypeRef("builtin", "long", false)
             )
             function(
                 name = "testFunction",
@@ -808,7 +808,7 @@ class LambdaCompilerTest {
             val doubleType = doubleType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -873,7 +873,7 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -935,7 +935,7 @@ class LambdaCompilerTest {
             val intType = intType()
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -1021,8 +1021,8 @@ class LambdaCompilerTest {
          */
         val ast = buildTypedAst {
             val intType = intType()
-            val outerLambdaTypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
-            val innerLambdaTypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
+            val outerLambdaTypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
+            val innerLambdaTypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
             
             function(
                 name = "testFunction",
@@ -1078,7 +1078,7 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val voidType = voidType()
-            val outerLambdaTypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
+            val outerLambdaTypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
             val innerLambdaTypeIdx = lambdaType(VoidType())
             
             function(
@@ -1145,9 +1145,9 @@ class LambdaCompilerTest {
          */
         val ast = buildTypedAst {
             val intType = intType()
-            val f1TypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
-            val f2TypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
-            val f3TypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
+            val f1TypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
+            val f2TypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
+            val f3TypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
             
             function(
                 name = "testFunction",
@@ -1223,7 +1223,7 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val listType = listType()
-            val lambdaTypeIdx = lambdaType(ClassTypeRef("builtin.int", false))
+            val lambdaTypeIdx = lambdaType(ClassTypeRef("builtin", "int", false))
             
             function(
                 name = "testFunction",
@@ -1281,7 +1281,7 @@ class LambdaCompilerTest {
         val ast = buildTypedAst {
             val stringType = stringType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -1327,14 +1327,14 @@ class LambdaCompilerTest {
             val intType = intType()
             // Actual lambda type: (int) => int
             val actualLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             // Expected lambda type: (int, int) => int
             val expectedLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -1383,13 +1383,13 @@ class LambdaCompilerTest {
             val intNullable = intNullableType()
             // Actual lambda type: (int) => int
             val actualLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             // Expected lambda type: (int?) => int
             val expectedLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", true)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", true)
             )
             function(
                 name = "testFunction",
@@ -1434,11 +1434,11 @@ class LambdaCompilerTest {
             val intNullable = intNullableType()
             // Actual lambda type: () => int
             val actualLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             // Expected lambda type: () => int?
             val expectedLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", true)
+                ClassTypeRef("builtin", "int", true)
             )
             function(
                 name = "testFunction",
@@ -1476,14 +1476,14 @@ class LambdaCompilerTest {
             val intNullable = intNullableType()
             // Actual: (int) => int
             val actualLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             // Expected: (int?, int) => int
             val expectedLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", true),
-                "b" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", true),
+                "b" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -1538,14 +1538,14 @@ class LambdaCompilerTest {
             val intType = intType()
             // Source lambda type: (int) => int
             val sourceLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             // Target lambda type: (int, int) => int
             val targetLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -1602,13 +1602,13 @@ class LambdaCompilerTest {
             val intNullable = intNullableType()
             // Source lambda type: (int) => int
             val sourceLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             // Target lambda type: (int?) => int
             val targetLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", true)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", true)
             )
             function(
                 name = "testFunction",
@@ -1661,11 +1661,11 @@ class LambdaCompilerTest {
             val intNullable = intNullableType()
             // Source lambda type: () => int
             val sourceLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             // Target lambda type: () => int?
             val targetLambdaType = lambdaType(
-                ClassTypeRef("builtin.int", true)
+                ClassTypeRef("builtin", "int", true)
             )
             function(
                 name = "testFunction",
@@ -1710,21 +1710,21 @@ class LambdaCompilerTest {
             val intType = intType()
             // Lambda type with 1 param
             val type1 = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             // Lambda type with 2 params
             val type2 = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false)
             )
             // Lambda type with 3 params
             val type3 = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false),
-                "c" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false),
+                "c" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -1777,8 +1777,8 @@ class LambdaCompilerTest {
             
             // Lambda type: (string) => int
             val lambdaType = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.string", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "string", false)
             )
             
             function(

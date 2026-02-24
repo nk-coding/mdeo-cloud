@@ -8,7 +8,9 @@ export const OrderedCollectionType = classType("OrderedCollection")
     .generics("T")
     .extends("ReadonlyOrderedCollection", { T: genericTypeRef("T") })
     .method("removeAt", (m) =>
-        m.signature((s) => s.param("index", typeRef(DefaultTypeNames.Int).build()).returns(genericTypeRef("T")))
+        m.signature((s) =>
+            s.param("index", typeRef("builtin", DefaultTypeNames.Int).build()).returns(genericTypeRef("T"))
+        )
     )
     .method("sortBy", (m) =>
         m.signature((s) =>
@@ -16,7 +18,7 @@ export const OrderedCollectionType = classType("OrderedCollection")
                 .generics("U")
                 .param("iterator", lambdaType().param("it", genericTypeRef("T")).returns(genericTypeRef("U")))
                 .returns(
-                    typeRef("OrderedCollection")
+                    typeRef("builtin", "OrderedCollection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )

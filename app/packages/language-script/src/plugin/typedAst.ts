@@ -1,4 +1,4 @@
-import type { ReturnType, TypedClass } from "@mdeo/language-expression";
+import type { ReturnType } from "@mdeo/language-expression";
 import { type TypedExpression, type TypedCallableBody } from "@mdeo/language-expression";
 
 export type { TypedCallableBody } from "@mdeo/language-expression";
@@ -13,12 +13,6 @@ export interface TypedAst {
      * Indexed by typeIndex in expressions.
      */
     types: ReturnType[];
-
-    /**
-     * Array of metamodel classes with their type information.
-     * For scripts, this is always an empty array as class support is not present.
-     */
-    classes: TypedClass[];
 
     /**
      * All imports in the program.

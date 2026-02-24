@@ -18,7 +18,11 @@ export interface GenericTypeRef {
 
 export interface BaseClassTypeRef {
     /**
-     * The type being referenced (a string identifier like "builtin.string")
+     * The package of the type being referenced (e.g., "class/path/to/file", "enum/path", "builtin")
+     */
+    package: string;
+    /**
+     * The name of the type being referenced (e.g., "MyClass", "string")
      */
     type: string;
     /**
@@ -183,13 +187,13 @@ export interface ClassType {
 export namespace ClassTypeRef {
     /**
      * Type guard to check if a ReturnType is a ClassTypeRef.
-     * A ClassTypeRef has a 'type' property (which is a string identifier).
+     * A ClassTypeRef has a 'type' property (which is a string identifier) and a 'package' property.
      *
      * @param type The type to check
      * @returns true if the type is a ClassTypeRef
      */
     export function is(type: ReturnType): type is ClassTypeRef {
-        return typeof type === "object" && type !== null && "type" in type;
+        return typeof type === "object" && type !== null && "type" in type && "package" in type;
     }
 }
 

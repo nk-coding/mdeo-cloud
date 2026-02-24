@@ -36,6 +36,7 @@ const scriptLanguagePlugin: LanguagePlugin = {
             ...defaultMonarchTokenProvider,
             keywords: [
                 "import",
+                "using",
                 "from",
                 "as",
                 "fun",

@@ -740,7 +740,10 @@ export class GenericResolver<Specifics extends TypirSpecifics> {
         actualType: CustomValueType,
         allowSubtypes: boolean
     ): boolean {
-        const declaredTypeDefinition = this.typeDefinitionsService.getClassType(declaredType.type);
+        const declaredTypeDefinition = this.typeDefinitionsService.getClassType(
+            declaredType.type,
+            declaredType.package
+        );
         if (actualType.isNullable && !declaredType.isNullable) {
             return false;
         }

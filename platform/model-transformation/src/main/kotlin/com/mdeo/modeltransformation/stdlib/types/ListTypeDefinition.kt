@@ -16,8 +16,8 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * @return The List type definition for the Gremlin type registry
  */
 fun createListType(): GremlinTypeDefinition {
-    return gremlinType("builtin.List")
-        .extends("builtin.OrderedCollection")
+    return gremlinType("builtin", "List")
+        .extends("builtin", "OrderedCollection")
         .cardinality(VertexProperty.Cardinality.list)
         .build()
 }

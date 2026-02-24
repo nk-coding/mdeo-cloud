@@ -91,10 +91,10 @@ class EnumSupportTest {
         val typeRegistry = engine.typeRegistry
 
         // Check that enum-container types are registered
-        val testEnumContainer = typeRegistry.getType("enum-container.TestEnum")
+        val testEnumContainer = typeRegistry.getType(ClassTypeRef(engine.enumContainerPackage, "TestEnum", false))
         assertNotNull(testEnumContainer, "enum-container.TestEnum should be registered")
 
-        val statusEnumContainer = typeRegistry.getType("enum-container.StatusEnum")
+        val statusEnumContainer = typeRegistry.getType(ClassTypeRef(engine.enumContainerPackage, "StatusEnum", false))
         assertNotNull(statusEnumContainer, "enum-container.StatusEnum should be registered")
     }
 
@@ -103,10 +103,10 @@ class EnumSupportTest {
         val typeRegistry = engine.typeRegistry
 
         // Check that enum value types are registered
-        val testEnumType = typeRegistry.getType("enum.TestEnum")
+        val testEnumType = typeRegistry.getType(ClassTypeRef(engine.enumPackage, "TestEnum", false))
         assertNotNull(testEnumType, "enum.TestEnum should be registered")
 
-        val statusEnumType = typeRegistry.getType("enum.StatusEnum")
+        val statusEnumType = typeRegistry.getType(ClassTypeRef(engine.enumPackage, "StatusEnum", false))
         assertNotNull(statusEnumType, "enum.StatusEnum should be registered")
     }
 
@@ -114,7 +114,7 @@ class EnumSupportTest {
     fun `enum container has properties for each entry`() {
         val typeRegistry = engine.typeRegistry
 
-        val testEnumContainer = typeRegistry.getType("enum-container.TestEnum")!!
+        val testEnumContainer = typeRegistry.getType(ClassTypeRef(engine.enumContainerPackage, "TestEnum", false))!!
 
         // Check that each entry is a property
         val propertyA = testEnumContainer.getProperty("A")
@@ -134,7 +134,7 @@ class EnumSupportTest {
     fun `enum entry produces backtick-formatted string`() {
         val typeRegistry = engine.typeRegistry
 
-        val testEnumContainer = typeRegistry.getType("enum-container.TestEnum")!!
+        val testEnumContainer = typeRegistry.getType(ClassTypeRef(engine.enumContainerPackage, "TestEnum", false))!!
         val propertyA = testEnumContainer.getProperty("A")!!
 
         // Compile the property access (the receiver is ignored for enum entries)
@@ -151,7 +151,7 @@ class EnumSupportTest {
     fun `different enum entries produce correct backtick-formatted strings`() {
         val typeRegistry = engine.typeRegistry
 
-        val statusEnumContainer = typeRegistry.getType("enum-container.StatusEnum")!!
+        val statusEnumContainer = typeRegistry.getType(ClassTypeRef(engine.enumContainerPackage, "StatusEnum", false))!!
 
         // Test ACTIVE entry
         val activeProperty = statusEnumContainer.getProperty("ACTIVE")!!
@@ -177,8 +177,8 @@ class EnumSupportTest {
     @Test
     @Suppress("UNCHECKED_CAST")
     fun `equality comparison between enum and non-enum type returns constant false`() {
-        val enumType = ClassTypeRef(type = "enum.TestEnum", isNullable = false)
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+        val enumType = ClassTypeRef(`package` = "enum", type = "TestEnum", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
 
         val leftTraversal = AnonymousTraversal.constant<String>("`TestEnum`.`A`") as GraphTraversal<Any, Any>
         val rightTraversal = AnonymousTraversal.constant<String>("someString") as GraphTraversal<Any, Any>
@@ -202,8 +202,8 @@ class EnumSupportTest {
     @Test
     @Suppress("UNCHECKED_CAST")
     fun `inequality comparison between enum and non-enum type returns constant true`() {
-        val enumType = ClassTypeRef(type = "enum.TestEnum", isNullable = false)
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+        val enumType = ClassTypeRef(`package` = "enum", type = "TestEnum", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
 
         val leftTraversal = AnonymousTraversal.constant<String>("`TestEnum`.`A`") as GraphTraversal<Any, Any>
         val rightTraversal = AnonymousTraversal.constant<String>("someString") as GraphTraversal<Any, Any>
@@ -227,7 +227,7 @@ class EnumSupportTest {
     @Test
     @Suppress("UNCHECKED_CAST")
     fun `equality comparison between same enum type values works normally`() {
-        val enumType = ClassTypeRef(type = "enum.TestEnum", isNullable = false)
+        val enumType = ClassTypeRef(`package` = "enum", type = "TestEnum", isNullable = false)
 
         // Compare two equal enum values
         val leftTraversal = AnonymousTraversal.constant<String>("`TestEnum`.`A`") as GraphTraversal<Any, Any>
@@ -252,7 +252,7 @@ class EnumSupportTest {
     @Test
     @Suppress("UNCHECKED_CAST")
     fun `equality comparison between different enum values of same type returns false`() {
-        val enumType = ClassTypeRef(type = "enum.TestEnum", isNullable = false)
+        val enumType = ClassTypeRef(`package` = "enum", type = "TestEnum", isNullable = false)
 
         // Compare two different enum values
         val leftTraversal = AnonymousTraversal.constant<String>("`TestEnum`.`A`") as GraphTraversal<Any, Any>
@@ -277,8 +277,8 @@ class EnumSupportTest {
     @Test
     @Suppress("UNCHECKED_CAST")
     fun `non-enum to enum comparison also returns constant false`() {
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
-        val enumType = ClassTypeRef(type = "enum.TestEnum", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
+        val enumType = ClassTypeRef(`package` = "enum", type = "TestEnum", isNullable = false)
 
         // Non-enum on left, enum on right
         val leftTraversal = AnonymousTraversal.constant<String>("someString") as GraphTraversal<Any, Any>

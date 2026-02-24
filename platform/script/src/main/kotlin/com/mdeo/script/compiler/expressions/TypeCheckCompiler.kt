@@ -137,11 +137,11 @@ class TypeCheckCompiler : ExpressionCompiler() {
         val sourceIsNullable = sourceType.isNullable
         val checkIsNullable = checkType.isNullable
 
-        if (sourceType.type == "builtin.any") {
+        if (sourceType.`package` == "builtin" && sourceType.type == "any") {
             return null
         }
 
-        if (sourceType.type == checkType.type) {
+        if (sourceType.`package` == checkType.`package` && sourceType.type == checkType.type) {
             return handleSameTypeName(sourceIsNullable, checkIsNullable)
         }
 
@@ -149,7 +149,7 @@ class TypeCheckCompiler : ExpressionCompiler() {
             return false
         }
 
-        if (sourceIsPrimitive && !sourceIsNullable && checkType.type == "builtin.any") {
+        if (sourceIsPrimitive && !sourceIsNullable && checkType.`package` == "builtin" && checkType.type == "any") {
             return true
         }
 
@@ -188,11 +188,11 @@ class TypeCheckCompiler : ExpressionCompiler() {
         checkType: ClassTypeRef,
         context: CompilationContext
     ): Boolean? {
-        if (checkType.type == "builtin.any" && checkType.isNullable) {
+        if (checkType.`package` == "builtin" && checkType.type == "any" && checkType.isNullable) {
             return true
         }
 
-        val isSubtype = context.typeRegistry.isSubtype(sourceType.type, checkType.type)
+        val isSubtype = context.typeRegistry.isSubtype(sourceType, checkType)
         if (isSubtype) {
             return if (sourceType.isNullable && !checkType.isNullable) null else true
         }
@@ -209,8 +209,7 @@ class TypeCheckCompiler : ExpressionCompiler() {
      */
     private fun ensureObjectOnStack(sourceType: ReturnType, mv: MethodVisitor) {
         if (CoercionUtil.producesStackPrimitive(sourceType)) {
-            val typeName = (sourceType as ClassTypeRef).type
-            CoercionUtil.emitBoxing(typeName, mv)
+            CoercionUtil.emitBoxing(sourceType as ClassTypeRef, mv)
         }
     }
 
@@ -218,9 +217,9 @@ class TypeCheckCompiler : ExpressionCompiler() {
      * Pops a value from the stack, accounting for long/double taking 2 slots.
      */
     private fun popValue(type: ReturnType, mv: MethodVisitor) {
-        if (type is ClassTypeRef && !type.isNullable) {
+        if (type is ClassTypeRef && !type.isNullable && type.`package` == "builtin") {
             when (type.type) {
-                "builtin.long", "builtin.double" -> mv.visitInsn(Opcodes.POP2)
+                "long", "double" -> mv.visitInsn(Opcodes.POP2)
                 else -> mv.visitInsn(Opcodes.POP)
             }
         } else {
@@ -234,7 +233,7 @@ class TypeCheckCompiler : ExpressionCompiler() {
     private fun getInstanceOfClass(checkType: ReturnType, context: CompilationContext): String {
         val ref = checkType as ClassTypeRef
         
-        val jvmClass = context.typeRegistry.getJvmClassName(ref.type, true)
+        val jvmClass = context.typeRegistry.getJvmClassName(ref, true)
         
         return jvmClass ?: "java/lang/Object"
     }

@@ -37,7 +37,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `listOf with all null values`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val nullableInt = intNullableType()
 
                 function(
@@ -76,7 +76,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `setOf with multiple null values creates set with one null`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val nullableString = stringNullableType()
 
                 function(
@@ -116,7 +116,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `listOf with many elements`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 // Create 100 integer arguments
@@ -157,7 +157,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `listOf with zero arguments creates empty list`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
 
                 function(
                     name = "testFunction",
@@ -187,7 +187,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `listOf with single argument creates single element list`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -223,7 +223,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `listOf result can have size called on it`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -262,7 +262,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `emptyList result has size zero when queried`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intTypeIndex = intType()
 
                 function(
@@ -301,7 +301,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `listOf boxes all primitive types correctly`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
 
                 function(
                     name = "testFunction",
@@ -348,7 +348,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `orderedSetOf maintains insertion order`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
 
                 function(
                     name = "testFunction",
@@ -388,7 +388,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `orderedSetOf deduplicates while maintaining order`() {
             val ast = buildTypedAst {
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
 
                 function(
                     name = "testFunction",
@@ -433,7 +433,7 @@ class GlobalFunctionEdgeCasesTest {
         @Test
         fun `bagOf allows duplicates`() {
             val ast = buildTypedAst {
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
 
                 function(
                     name = "testFunction",

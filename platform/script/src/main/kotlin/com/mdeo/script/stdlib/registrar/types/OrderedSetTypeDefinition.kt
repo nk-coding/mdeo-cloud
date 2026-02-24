@@ -10,8 +10,8 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  * and does not allow duplicates.
  */
 fun createOrderedSetType(): TypeDefinition {
-    return typeDefinition("builtin.OrderedSet") {
-        extends("builtin.ReadonlyOrderedSet")
-        extends("builtin.OrderedCollection")
+    return typeDefinition("builtin", "OrderedSet") {
+        extends("builtin", "ReadonlyOrderedSet")
+        extends("builtin", "OrderedCollection")
     }
 }

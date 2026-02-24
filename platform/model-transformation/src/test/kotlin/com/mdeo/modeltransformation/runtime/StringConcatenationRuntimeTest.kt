@@ -31,7 +31,7 @@ class StringConcatenationRuntimeTest {
     
     // Type list with string type at index 0
     private val types = listOf(
-        ClassTypeRef(type = "builtin.string", isNullable = false)
+        ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
     )
     
     @BeforeEach

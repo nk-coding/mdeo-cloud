@@ -36,6 +36,7 @@ import { registerScriptSerializers } from "./features/scriptSerializers.js";
 import { expressionConfig, expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
 import { ScriptLangiumScopeProvider } from "./features/scriptScopeProvider.js";
 import { ScriptExternalReferenceCollector } from "./features/scriptExternalReferenceCollector.js";
+import { registerScriptValidationChecks } from "./features/scriptValidator.js";
 import type { ResolvedScriptContributionPlugins, ScriptContributionPlugin } from "./plugin/scriptContributionPlugin.js";
 import { generateScriptRule } from "./grammar/scriptRules.js";
 import type { AbstractAstReflection } from "langium";
@@ -124,6 +125,7 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
                 registerExpressionSerializers(services, expressionTypes);
                 registerStatementSerializers(services, statementTypes);
                 registerScriptSerializers(services);
+                registerScriptValidationChecks(services);
                 addExternalReferenceCollectionPhase(services);
             }
         };

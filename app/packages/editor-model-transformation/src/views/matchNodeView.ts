@@ -79,7 +79,7 @@ export class GMatchNodeView extends GNodeViewBase {
     }
 
     private renderOutlines(width: number, height: number, isMultiple: boolean): VNode[] {
-        const SHADOW_OFFSET = 4;
+        const SHADOW_OFFSET = 8;
 
         const divChildren: VNode[] = [];
 
@@ -89,9 +89,9 @@ export class GMatchNodeView extends GNodeViewBase {
                     "div",
                     {
                         style: {
-                            position: "absolute",
-                            top: `${SHADOW_OFFSET}px`,
-                            left: `${SHADOW_OFFSET}px`
+                            gridArea: "1 / 1",
+                            "margin-left": `${SHADOW_OFFSET}px`,
+                            "margin-top": `${SHADOW_OFFSET}px`
                         }
                     },
                     this.renderOutlineDiv(width, height)
@@ -104,9 +104,7 @@ export class GMatchNodeView extends GNodeViewBase {
                 "div",
                 {
                     style: {
-                        position: "absolute",
-                        top: "0",
-                        left: "0"
+                        gridArea: "1 / 1"
                     }
                 },
                 this.renderOutlineDiv(width, height)
@@ -120,19 +118,17 @@ export class GMatchNodeView extends GNodeViewBase {
                     attrs: {
                         x: 0,
                         y: 0,
-                        width,
-                        height,
+                        width: width + SHADOW_OFFSET,
+                        height: height + SHADOW_OFFSET,
                         [ATTR_BBOX_ELEMENT]: true
                     }
                 },
                 html(
                     "div",
                     {
-                        style: {
-                            position: "relative",
-                            width: `${width}px`,
-                            height: `${height}px`,
-                            overflow: "visible"
+                        class: {
+                            grid: true,
+                            "w-fit": true
                         }
                     },
                     ...divChildren

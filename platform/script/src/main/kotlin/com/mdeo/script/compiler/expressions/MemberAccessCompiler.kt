@@ -81,7 +81,7 @@ class MemberAccessCompiler : ExpressionCompiler() {
         emitMemberAccess(context, memberAccess.member, targetType, resultType, mv)
 
         if (CoercionUtil.isPrimitiveType(resultType)) {
-            CoercionUtil.emitBoxing((resultType as ClassTypeRef).type, mv)
+            CoercionUtil.emitBoxing(resultType as ClassTypeRef, mv)
         }
 
         mv.visitJumpInsn(Opcodes.GOTO, endLabel)
@@ -121,16 +121,16 @@ class MemberAccessCompiler : ExpressionCompiler() {
         resultType: ReturnType,
         mv: MethodVisitor
     ) {
-        val lookupType = if (targetType is LambdaType) {
-            "builtin.any"
+        val lookupTypeRef = if (targetType is LambdaType) {
+            ClassTypeRef("builtin", "any", false)
         } else if (targetType is ClassTypeRef) {
-            targetType.type
+            targetType
         } else {
             throw UnsupportedOperationException("Cannot access member on non-class/lambda type")
         }
 
-        val propertyDef = context.typeRegistry.lookupProperty(lookupType, memberName)
-            ?: throw UnsupportedOperationException("Property '$memberName' not found in type registry for type '$lookupType'")
+        val propertyDef = context.typeRegistry.lookupProperty(lookupTypeRef, memberName)
+            ?: throw UnsupportedOperationException("Property '$memberName' not found in type registry for type '${lookupTypeRef.`package`}.${lookupTypeRef.type}'")
 
         propertyDef.emitAccess(mv)
     }

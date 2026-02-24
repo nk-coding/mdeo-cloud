@@ -10,8 +10,8 @@ private const val FLOAT_HELPER = "com/mdeo/script/stdlib/impl/primitives/FloatHe
  * Creates the Float type definition.
  */
 fun createFloatType(): TypeDefinition {
-    return typeDefinition("builtin.float") {
-        extends("builtin.any")
+    return typeDefinition("builtin", "float") {
+        extends("builtin", "any")
         primitiveDesc("F")
         wrapperClass("java/lang/Float")
 

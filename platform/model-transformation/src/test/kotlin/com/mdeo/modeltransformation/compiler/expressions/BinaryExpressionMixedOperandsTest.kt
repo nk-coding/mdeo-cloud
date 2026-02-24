@@ -36,7 +36,7 @@ class BinaryExpressionMixedOperandsTest {
         registry = ExpressionCompilerRegistry.createDefaultRegistry()
         
         // Create context with string type at index 1
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
         val types = listOf(stringType, stringType)
         
         context = CompilationContext(

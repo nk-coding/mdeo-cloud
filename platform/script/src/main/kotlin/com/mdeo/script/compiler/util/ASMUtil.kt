@@ -42,30 +42,34 @@ object ASMUtil {
      * @return The JVM type descriptor string.
      */
     private fun getClassTypeDescriptor(classType: ClassTypeRef): String {
-        return when (classType.type) {
-            "builtin.int" -> if (classType.isNullable) "Ljava/lang/Integer;" else "I"
-            "builtin.long" -> if (classType.isNullable) "Ljava/lang/Long;" else "J"
-            "builtin.float" -> if (classType.isNullable) "Ljava/lang/Float;" else "F"
-            "builtin.double" -> if (classType.isNullable) "Ljava/lang/Double;" else "D"
-            "builtin.boolean" -> if (classType.isNullable) "Ljava/lang/Boolean;" else "Z"
-            "builtin.string" -> "Ljava/lang/String;"
-            else -> "Ljava/lang/Object;"
+        if (classType.`package` == "builtin") {
+            return when (classType.type) {
+                "int" -> if (classType.isNullable) "Ljava/lang/Integer;" else "I"
+                "long" -> if (classType.isNullable) "Ljava/lang/Long;" else "J"
+                "float" -> if (classType.isNullable) "Ljava/lang/Float;" else "F"
+                "double" -> if (classType.isNullable) "Ljava/lang/Double;" else "D"
+                "boolean" -> if (classType.isNullable) "Ljava/lang/Boolean;" else "Z"
+                "string" -> "Ljava/lang/String;"
+                else -> "Ljava/lang/Object;"
+            }
         }
+        return "Ljava/lang/Object;"
     }
     
     /**
      * Gets the primitive type descriptor for JVM.
-     * 
-     * @param primitiveTypeName The primitive type name (e.g., "builtin.int").
+     *
+     * @param typeRef The ClassTypeRef of the primitive type.
      * @return The JVM type descriptor (e.g., "I" for int), or null if not a primitive type.
      */
-    fun getPrimitiveDescriptor(primitiveTypeName: String): String? {
-        return when (primitiveTypeName) {
-            "builtin.int" -> "I"
-            "builtin.long" -> "J"
-            "builtin.float" -> "F"
-            "builtin.double" -> "D"
-            "builtin.boolean" -> "Z"
+    fun getPrimitiveDescriptor(typeRef: ClassTypeRef): String? {
+        if (typeRef.`package` != "builtin") return null
+        return when (typeRef.type) {
+            "int" -> "I"
+            "long" -> "J"
+            "float" -> "F"
+            "double" -> "D"
+            "boolean" -> "Z"
             else -> null
         }
     }
@@ -88,12 +92,14 @@ object ASMUtil {
             if (type.isNullable) {
                 return Opcodes.ALOAD
             }
-            return when (type.type) {
-                "builtin.int", "builtin.boolean" -> Opcodes.ILOAD
-                "builtin.long" -> Opcodes.LLOAD
-                "builtin.float" -> Opcodes.FLOAD
-                "builtin.double" -> Opcodes.DLOAD
-                else -> Opcodes.ALOAD
+            if (type.`package` == "builtin") {
+                return when (type.type) {
+                    "int", "boolean" -> Opcodes.ILOAD
+                    "long" -> Opcodes.LLOAD
+                    "float" -> Opcodes.FLOAD
+                    "double" -> Opcodes.DLOAD
+                    else -> Opcodes.ALOAD
+                }
             }
         }
         return Opcodes.ALOAD
@@ -117,12 +123,14 @@ object ASMUtil {
             if (type.isNullable) {
                 return Opcodes.ASTORE
             }
-            return when (type.type) {
-                "builtin.int", "builtin.boolean" -> Opcodes.ISTORE
-                "builtin.long" -> Opcodes.LSTORE
-                "builtin.float" -> Opcodes.FSTORE
-                "builtin.double" -> Opcodes.DSTORE
-                else -> Opcodes.ASTORE
+            if (type.`package` == "builtin") {
+                return when (type.type) {
+                    "int", "boolean" -> Opcodes.ISTORE
+                    "long" -> Opcodes.LSTORE
+                    "float" -> Opcodes.FSTORE
+                    "double" -> Opcodes.DSTORE
+                    else -> Opcodes.ASTORE
+                }
             }
         }
         return Opcodes.ASTORE
@@ -142,10 +150,13 @@ object ASMUtil {
         if (type.isNullable) {
             return 1
         }
-        return when (type.type) {
-            "builtin.long", "builtin.double" -> 2
-            else -> 1
+        if (type.`package` == "builtin") {
+            return when (type.type) {
+                "long", "double" -> 2
+                else -> 1
+            }
         }
+        return 1
     }
     
     /**
@@ -161,9 +172,11 @@ object ASMUtil {
         }
 
         if (type is ClassTypeRef && !type.isNullable) {
-            return when (type.type) {
-                "builtin.long", "builtin.double" -> 2
-                else -> 1
+            if (type.`package` == "builtin") {
+                return when (type.type) {
+                    "long", "double" -> 2
+                    else -> 1
+                }
             }
         }
         return 1
@@ -185,27 +198,25 @@ object ASMUtil {
         if (targetType !is ClassTypeRef) {
             return
         }
-
-        val typeName = targetType.type     
-        when (typeName) {
-            "builtin.int", "builtin.long", "builtin.float", "builtin.double", "builtin.boolean" -> {
-                val wrapperClass = when (typeName) {
-                    "builtin.int" -> "java/lang/Integer"
-                    "builtin.long" -> "java/lang/Long"
-                    "builtin.float" -> "java/lang/Float"
-                    "builtin.double" -> "java/lang/Double"
-                    "builtin.boolean" -> "java/lang/Boolean"
-                    else -> throw IllegalStateException("Unexpected type: $typeName")
+        if (targetType.`package` == "builtin") {
+            when (targetType.type) {
+                "int", "long", "float", "double", "boolean" -> {
+                    val wrapperClass = when (targetType.type) {
+                        "int" -> "java/lang/Integer"
+                        "long" -> "java/lang/Long"
+                        "float" -> "java/lang/Float"
+                        "double" -> "java/lang/Double"
+                        "boolean" -> "java/lang/Boolean"
+                        else -> throw IllegalStateException("Unexpected type: ${targetType.type}")
+                    }
+                    mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
+                    if (!targetType.isNullable) {
+                        CoercionUtil.emitUnboxing(targetType, mv)
+                    }
                 }
-                
-                mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
-                
-                if (!targetType.isNullable) {
-                    CoercionUtil.emitUnboxing(typeName, mv)
+                "string" -> {
+                    mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String")
                 }
-            }
-            "builtin.string" -> {
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String")
             }
         }
     }

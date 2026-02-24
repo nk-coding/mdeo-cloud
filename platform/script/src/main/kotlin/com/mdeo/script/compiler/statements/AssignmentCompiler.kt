@@ -208,16 +208,16 @@ class AssignmentCompiler : StatementCompiler {
         propertyType: ReturnType,
         mv: MethodVisitor
     ) {
-        val lookupType = if (targetType is LambdaType) {
-            "builtin.any"
+        val lookupTypeRef = if (targetType is LambdaType) {
+            ClassTypeRef("builtin", "any", false)
         } else if (targetType is ClassTypeRef) {
-            targetType.type
+            targetType
         } else {
             throw UnsupportedOperationException("Cannot set property on non-class/lambda type")
         }
 
-        val propertyDef = context.typeRegistry.lookupProperty(lookupType, memberName)
-            ?: throw UnsupportedOperationException("Property $memberName not found on type $lookupType")
+        val propertyDef = context.typeRegistry.lookupProperty(lookupTypeRef, memberName)
+            ?: throw UnsupportedOperationException("Property $memberName not found on type ${lookupTypeRef.`package`}.${lookupTypeRef.type}")
         
         val valueDescriptor = ASMUtil.getTypeDescriptor(propertyType)
         propertyDef.emitSet(mv, valueDescriptor)

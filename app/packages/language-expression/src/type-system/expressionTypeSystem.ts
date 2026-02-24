@@ -201,6 +201,7 @@ export class ExpressionTypeSystem<
         isNullable: boolean
     ): CustomClassType {
         return typeDefinitions.resolveCustomClassOrLambdaType({
+            package: type.package,
             type: type.name,
             isNullable: isNullable
         }) as CustomClassType;

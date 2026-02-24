@@ -78,14 +78,14 @@ class TraversalCompilerTest {
 
     // Type list for compilation context
     private val types = listOf(
-        ClassTypeRef(type = "builtin.int", isNullable = false),      // 0
-        ClassTypeRef(type = "builtin.long", isNullable = false),     // 1
-        ClassTypeRef(type = "builtin.double", isNullable = false),   // 2
-        ClassTypeRef(type = "builtin.float", isNullable = false),    // 3
-        ClassTypeRef(type = "builtin.string", isNullable = false),   // 4
-        ClassTypeRef(type = "builtin.boolean", isNullable = false),  // 5
-        ClassTypeRef(type = "builtin.any", isNullable = true),       // 6
-        ClassTypeRef(type = "List", isNullable = false)              // 7
+        ClassTypeRef(`package` = "builtin", type = "int", isNullable = false),      // 0
+        ClassTypeRef(`package` = "builtin", type = "long", isNullable = false),     // 1
+        ClassTypeRef(`package` = "builtin", type = "double", isNullable = false),   // 2
+        ClassTypeRef(`package` = "builtin", type = "float", isNullable = false),    // 3
+        ClassTypeRef(`package` = "builtin", type = "string", isNullable = false),   // 4
+        ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false),  // 5
+        ClassTypeRef(`package` = "builtin", type = "any", isNullable = true),       // 6
+        ClassTypeRef(`package` = "builtin", type = "List", isNullable = false)              // 7
     )
 
     @BeforeEach

@@ -31,7 +31,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `call imported function`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -116,8 +116,8 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `call imported function with type coercion`() {
-        val intType = ClassTypeRef("builtin.int", false)
-        val longType = ClassTypeRef("builtin.long", false)
+        val intType = ClassTypeRef("builtin", "int", false)
+        val longType = ClassTypeRef("builtin", "long", false)
         val types = listOf<ReturnType>(intType, longType)
 
         val fileA = TypedAst(
@@ -200,7 +200,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `call aliased imported function`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -282,8 +282,8 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `call imported function with int to double coercion`() {
-        val intType = ClassTypeRef("builtin.int", false)
-        val doubleType = ClassTypeRef("builtin.double", false)
+        val intType = ClassTypeRef("builtin", "int", false)
+        val doubleType = ClassTypeRef("builtin", "double", false)
         val types = listOf<ReturnType>(intType, doubleType)
 
         val fileA = TypedAst(
@@ -367,7 +367,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `call functions imported from multiple files`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -455,7 +455,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `local function shadows imported function`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -548,7 +548,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `imported function calls its own local functions`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -643,7 +643,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `imported function with string parameter`() {
-        val stringType = ClassTypeRef("builtin.string", false)
+        val stringType = ClassTypeRef("builtin", "string", false)
         val types = listOf<ReturnType>(stringType)
 
         val fileA = TypedAst(
@@ -713,8 +713,8 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `imported function return type is handled correctly`() {
-        val intType = ClassTypeRef("builtin.int", false)
-        val longType = ClassTypeRef("builtin.long", false)
+        val intType = ClassTypeRef("builtin", "int", false)
+        val longType = ClassTypeRef("builtin", "long", false)
         val types = listOf<ReturnType>(intType, longType)
 
         val fileA = TypedAst(
@@ -783,7 +783,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `chained calls to imported functions`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -879,9 +879,9 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `imported function with multiple parameter types`() {
-        val intType = ClassTypeRef("builtin.int", false)
-        val longType = ClassTypeRef("builtin.long", false)
-        val doubleType = ClassTypeRef("builtin.double", false)
+        val intType = ClassTypeRef("builtin", "int", false)
+        val longType = ClassTypeRef("builtin", "long", false)
+        val doubleType = ClassTypeRef("builtin", "double", false)
         val types = listOf<ReturnType>(intType, longType, doubleType)
 
         val fileA = TypedAst(
@@ -984,7 +984,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `transitive imports - A imports from B which imports from C`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileC = TypedAst(
@@ -1076,7 +1076,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `file using its own imported functions`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileC = TypedAst(
@@ -1167,7 +1167,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `direct re-export - A imports getValue from B which imports getValue from C`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileC = TypedAst(
@@ -1247,7 +1247,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `circular imports - A imports from B and B imports from A`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -1332,7 +1332,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `deeply nested imports - A to B to C to D chain`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileD = TypedAst(
@@ -1452,7 +1452,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `import shadows global function lookup order`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         // File A provides a function that will be imported
@@ -1523,7 +1523,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `local shadows import which shadows global - full hierarchy`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileA = TypedAst(
@@ -1599,7 +1599,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `chained aliased re-exports - multiple levels of renaming`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileD = TypedAst(
@@ -1682,7 +1682,7 @@ class ImportedFunctionCallTest {
      */
     @Test
     fun `re-exported function with parameters works correctly`() {
-        val intType = ClassTypeRef("builtin.int", false)
+        val intType = ClassTypeRef("builtin", "int", false)
         val types = listOf<ReturnType>(intType)
 
         val fileC = TypedAst(

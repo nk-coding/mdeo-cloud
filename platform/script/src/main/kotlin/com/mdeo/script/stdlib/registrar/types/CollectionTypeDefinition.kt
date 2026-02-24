@@ -12,8 +12,8 @@ private const val COLLECTION = "com/mdeo/script/stdlib/impl/collections/Collecti
  * Collection extends ReadonlyCollection and adds mutation operations.
  */
 fun createCollectionType(): TypeDefinition {
-    return typeDefinition("builtin.Collection") {
-        extends("builtin.ReadonlyCollection")
+    return typeDefinition("builtin", "Collection") {
+        extends("builtin", "ReadonlyCollection")
 
         instanceMethod("add") {
             overload(

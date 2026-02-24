@@ -40,11 +40,12 @@ class TypesTest {
     
     @Test
     fun `deserialize ClassTypeRef with nullable`() {
-        val jsonString = """{"type": "builtin.string", "isNullable": true}"""
+        val jsonString = """{"package": "builtin", "type": "string", "isNullable": true}"""
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
         
         assertIs<ClassTypeRef>(result)
-        assertEquals("builtin.string", result.type)
+        assertEquals("builtin", result.`package`)
+        assertEquals("string", result.type)
         assertEquals(true, result.isNullable)
         assertNull(result.typeArgs)
     }
@@ -52,22 +53,24 @@ class TypesTest {
     @Test
     fun `deserialize ClassTypeRef with type arguments`() {
         val jsonString = """{
-            "type": "builtin.List",
+            "package": "builtin",
+            "type": "List",
             "isNullable": false,
             "typeArgs": {
-                "T": {"type": "builtin.string", "isNullable": false}
+                "T": {"package": "builtin", "type": "string", "isNullable": false}
             }
         }"""
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
         
         assertIs<ClassTypeRef>(result)
-        assertEquals("builtin.List", result.type)
+        assertEquals("builtin", result.`package`)
+        assertEquals("List", result.type)
         assertEquals(false, result.isNullable)
         assertEquals(1, result.typeArgs?.size)
         
         val typeArg = result.typeArgs?.get("T")
         assertIs<ClassTypeRef>(typeArg)
-        assertEquals("builtin.string", typeArg.type)
+        assertEquals("string", typeArg.type)
     }
     
     @Test
@@ -93,10 +96,10 @@ class TypesTest {
     @Test
     fun `deserialize LambdaType`() {
         val jsonString = """{
-            "returnType": {"type": "builtin.int", "isNullable": false},
+            "returnType": {"package": "builtin", "type": "int", "isNullable": false},
             "parameters": [
-                {"name": "x", "type": {"type": "builtin.int", "isNullable": false}},
-                {"name": "y", "type": {"type": "builtin.int", "isNullable": false}}
+                {"name": "x", "type": {"package": "builtin", "type": "int", "isNullable": false}},
+                {"name": "y", "type": {"package": "builtin", "type": "int", "isNullable": false}}
             ],
             "isNullable": false
         }"""
@@ -110,7 +113,7 @@ class TypesTest {
         
         val returnType = result.returnType
         assertIs<ClassTypeRef>(returnType)
-        assertEquals("builtin.int", returnType.type)
+        assertEquals("int", returnType.type)
     }
     
     @Test
@@ -134,42 +137,43 @@ class TypesTest {
     fun `deserialize Parameter`() {
         val jsonString = """{
             "name": "param1",
-            "type": {"type": "builtin.double", "isNullable": false}
+            "type": {"package": "builtin", "type": "double", "isNullable": false}
         }"""
         val result = json.decodeFromString(Parameter.serializer(), jsonString)
         
         assertEquals("param1", result.name)
         val paramType = result.type
         assertIs<ClassTypeRef>(paramType)
-        assertEquals("builtin.double", paramType.type)
+        assertEquals("double", paramType.type)
     }
     
     @Test
     fun `deserialize nested type arguments`() {
         val jsonString = """{
-            "type": "builtin.map",
+            "package": "builtin",
+            "type": "map",
             "isNullable": false,
             "typeArgs": {
-                "K": {"type": "builtin.string", "isNullable": false},
-                "V": {"type": "builtin.List", "isNullable": false, "typeArgs": {"T": {"type": "builtin.int", "isNullable": false}}}
+                "K": {"package": "builtin", "type": "string", "isNullable": false},
+                "V": {"package": "builtin", "type": "List", "isNullable": false, "typeArgs": {"T": {"package": "builtin", "type": "int", "isNullable": false}}}
             }
         }"""
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
         
         assertIs<ClassTypeRef>(result)
-        assertEquals("builtin.map", result.type)
+        assertEquals("map", result.type)
         assertEquals(2, result.typeArgs?.size)
         
         val kType = result.typeArgs?.get("K")
         assertIs<ClassTypeRef>(kType)
-        assertEquals("builtin.string", kType.type)
+        assertEquals("string", kType.type)
         
         val vType = result.typeArgs?.get("V")
         assertIs<ClassTypeRef>(vType)
-        assertEquals("builtin.List", vType.type)
+        assertEquals("List", vType.type)
         
         val innerT = vType.typeArgs?.get("T")
         assertIs<ClassTypeRef>(innerT)
-        assertEquals("builtin.int", innerT.type)
+        assertEquals("int", innerT.type)
     }
 }

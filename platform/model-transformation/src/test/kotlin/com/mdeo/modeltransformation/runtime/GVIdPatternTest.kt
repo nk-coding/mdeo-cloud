@@ -50,7 +50,7 @@ class GVIdPatternTest {
         // Set up type registry with House and Room types
         val typeRegistry = GremlinTypeRegistry.GLOBAL
         
-        val graphNodeType = gremlinType("__GraphNode")
+        val graphNodeType = gremlinType("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("category")
             .graphProperty("value")
@@ -59,16 +59,16 @@ class GVIdPatternTest {
             .build()
         typeRegistry.register(graphNodeType)
         
-        val houseType = gremlinType("House")
-            .extends("__GraphNode")
+        val houseType = gremlinType("builtin", "House")
+            .extends("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("value")
             .graphProperty("count")
             .build()
         typeRegistry.register(houseType)
         
-        val roomType = gremlinType("Room")
-            .extends("__GraphNode")
+        val roomType = gremlinType("builtin", "Room")
+            .extends("builtin", "__GraphNode")
             .graphProperty("category")
             .graphProperty("value")
             .graphProperty("name")
@@ -79,11 +79,11 @@ class GVIdPatternTest {
         val statementRegistry = StatementExecutorRegistry.createDefaultRegistry()
         
         // Define types array that would come from a TypedAst
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
-        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
-        val booleanType = ClassTypeRef(type = "builtin.boolean", isNullable = false)
-        val houseTypeRef = ClassTypeRef(type = "House", isNullable = false)
-        val roomTypeRef = ClassTypeRef(type = "Room", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
+        val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
+        val booleanType = ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false)
+        val houseTypeRef = ClassTypeRef(`package` = "builtin", type = "House", isNullable = false)
+        val roomTypeRef = ClassTypeRef(`package` = "builtin", type = "Room", isNullable = false)
         
         // Create AST with empty statements - we'll execute statements individually
         val ast = TypedAst(

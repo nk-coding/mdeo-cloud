@@ -21,7 +21,7 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -56,8 +56,8 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -99,9 +99,9 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "a" to ClassTypeRef("builtin.int", false),
-                "b" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "a" to ClassTypeRef("builtin", "int", false),
+                "b" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -147,8 +147,8 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -193,7 +193,7 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",
@@ -247,7 +247,7 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val longType = longType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.long", false)
+                ClassTypeRef("builtin", "long", false)
             )
             function(
                 name = "testFunction",
@@ -282,7 +282,7 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val doubleType = doubleType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.double", false)
+                ClassTypeRef("builtin", "double", false)
             )
             function(
                 name = "testFunction",
@@ -317,7 +317,7 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val stringType = stringType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.string", false)
+                ClassTypeRef("builtin", "string", false)
             )
             function(
                 name = "testFunction",
@@ -352,7 +352,7 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val boolType = booleanType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.boolean", false)
+                ClassTypeRef("builtin", "boolean", false)
             )
             function(
                 name = "testFunction",
@@ -388,8 +388,8 @@ class ExpressionCallCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false),
-                "x" to ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false),
+                "x" to ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",

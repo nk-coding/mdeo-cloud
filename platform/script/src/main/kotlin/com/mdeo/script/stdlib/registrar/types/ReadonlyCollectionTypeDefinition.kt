@@ -13,8 +13,8 @@ private const val READONLY_COLLECTION = "com/mdeo/script/stdlib/impl/collections
  * It provides read-only operations like size(), isEmpty(), includes(), etc.
  */
 fun createReadonlyCollectionType(): TypeDefinition {
-    return typeDefinition("builtin.ReadonlyCollection") {
-        extends("builtin.any")
+    return typeDefinition("builtin", "ReadonlyCollection") {
+        extends("builtin", "any")
 
         instanceMethod("size") {
             overload("", "()I", READONLY_COLLECTION, isInterface = true,

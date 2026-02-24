@@ -1,8 +1,6 @@
 package com.mdeo.script.compiler.registry.type
 
-import com.mdeo.script.compiler.registry.type.TypeDefinition
-import com.mdeo.script.compiler.registry.type.MethodDefinition
-import com.mdeo.script.compiler.registry.type.PropertyDefinition
+import com.mdeo.expression.ast.types.ClassTypeRef
 
 /**
  * Registry for type definitions used during compilation.
@@ -21,7 +19,8 @@ import com.mdeo.script.compiler.registry.type.PropertyDefinition
  */
 class TypeRegistry(private val parent: TypeRegistry? = null) {
 
-    private val types: MutableMap<String, TypeDefinition> = mutableMapOf()
+    // Double map: package -> name -> TypeDefinition
+    private val types: MutableMap<String, MutableMap<String, TypeDefinition>> = mutableMapOf()
 
     companion object {
         /**
@@ -46,57 +45,57 @@ class TypeRegistry(private val parent: TypeRegistry? = null) {
      * @param type The type definition to register.
      */
     fun register(type: TypeDefinition) {
-        types[type.typeName] = type
+        types.getOrPut(type.typePackage) { mutableMapOf() }[type.typeName] = type
     }
 
     /**
-     * Gets a type definition by name from this registry.
+     * Gets a type definition by [ClassTypeRef] from this registry.
      *
      * If the type is not found locally and a parent registry is set,
      * the lookup will fall back to the parent.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference (package + simple name).
      * @return The type definition, or null if not found in this registry or any parent.
      */
-    fun getType(typeName: String): TypeDefinition? {
-        return types[typeName] ?: parent?.getType(typeName)
+    fun getType(typeRef: ClassTypeRef): TypeDefinition? {
+        return types[typeRef.`package`]?.get(typeRef.type) ?: parent?.getType(typeRef)
     }
 
     /**
-     * Looks up a method definition by type, method name, and overload key.
+     * Looks up a method definition by type ref, method name, and overload key.
      *
      * Searches the type and its parent types (via extends) for the method.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference ([ClassTypeRef]: package + simple name).
      * @param methodName The method name.
      * @param overloadKey The overload key.
      * @return The method definition, or null if not found.
      */
-    fun lookupMethod(typeName: String, methodName: String, overloadKey: String): MethodDefinition? {
-        return lookupMethodInHierarchy(typeName, methodName, overloadKey, mutableSetOf())
+    fun lookupMethod(typeRef: ClassTypeRef, methodName: String, overloadKey: String): MethodDefinition? {
+        return lookupMethodInHierarchy(typeRef, methodName, overloadKey, mutableSetOf())
     }
 
     /**
      * Recursive helper to look up a method in the type hierarchy.
      */
     private fun lookupMethodInHierarchy(
-        typeName: String,
+        typeRef: ClassTypeRef,
         methodName: String,
         overloadKey: String,
-        visited: MutableSet<String>
+        visited: MutableSet<ClassTypeRef>
     ): MethodDefinition? {
-        if (typeName in visited) return null
-        visited.add(typeName)
+        if (typeRef in visited) return null
+        visited.add(typeRef)
 
-        val type = getType(typeName) ?: return null
+        val type = getType(typeRef) ?: return null
 
         val method = type.getMethod(methodName, overloadKey)
         if (method != null) {
             return method
         }
 
-        for (parentName in type.extends) {
-            val parentMethod = lookupMethodInHierarchy(parentName, methodName, overloadKey, visited)
+        for (parentRef in type.extends) {
+            val parentMethod = lookupMethodInHierarchy(parentRef, methodName, overloadKey, visited)
             if (parentMethod != null) {
                 return parentMethod
             }
@@ -106,72 +105,72 @@ class TypeRegistry(private val parent: TypeRegistry? = null) {
     }
 
     /**
-     * Looks up all method overloads by type and method name.
+     * Looks up all method overloads by type ref and method name.
      *
      * Searches the type and its parent types for all methods with the given name.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference ([ClassTypeRef]: package + simple name).
      * @param methodName The method name.
      * @return List of all method definitions with this name in the type hierarchy.
      */
-    fun lookupMethods(typeName: String, methodName: String): List<MethodDefinition> {
-        return lookupMethodsInHierarchy(typeName, methodName, mutableSetOf())
+    fun lookupMethods(typeRef: ClassTypeRef, methodName: String): List<MethodDefinition> {
+        return lookupMethodsInHierarchy(typeRef, methodName, mutableSetOf())
     }
 
     /**
      * Recursive helper to look up all methods in the type hierarchy.
      */
     private fun lookupMethodsInHierarchy(
-        typeName: String,
+        typeRef: ClassTypeRef,
         methodName: String,
-        visited: MutableSet<String>
+        visited: MutableSet<ClassTypeRef>
     ): List<MethodDefinition> {
-        if (typeName in visited) return emptyList()
-        visited.add(typeName)
+        if (typeRef in visited) return emptyList()
+        visited.add(typeRef)
 
-        val type = getType(typeName) ?: return emptyList()
+        val type = getType(typeRef) ?: return emptyList()
         val result = mutableListOf<MethodDefinition>()
 
         result.addAll(type.getMethods(methodName))
 
-        for (parentName in type.extends) {
-            result.addAll(lookupMethodsInHierarchy(parentName, methodName, visited))
+        for (parentRef in type.extends) {
+            result.addAll(lookupMethodsInHierarchy(parentRef, methodName, visited))
         }
 
         return result
     }
 
     /**
-     * Looks up a property definition by type and property name.
+     * Looks up a property definition by type ref and property name.
      *
      * Searches the type and its parent types for the property.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference ([ClassTypeRef]: package + simple name).
      * @param propertyName The property name.
      * @return The property definition, or null if not found.
      */
-    fun lookupProperty(typeName: String, propertyName: String): PropertyDefinition? {
-        return lookupPropertyInHierarchy(typeName, propertyName, mutableSetOf())
+    fun lookupProperty(typeRef: ClassTypeRef, propertyName: String): PropertyDefinition? {
+        return lookupPropertyInHierarchy(typeRef, propertyName, mutableSetOf())
     }
 
     /**
      * Recursive helper to look up a property in the type hierarchy.
      */
     private fun lookupPropertyInHierarchy(
-        typeName: String,
+        typeRef: ClassTypeRef,
         propertyName: String,
-        visited: MutableSet<String>
+        visited: MutableSet<ClassTypeRef>
     ): PropertyDefinition? {
-        if (typeName in visited) return null
-        visited.add(typeName)
+        if (typeRef in visited) return null
+        visited.add(typeRef)
 
-        val type = getType(typeName) ?: return null
+        val type = getType(typeRef) ?: return null
 
         val property = type.getProperty(propertyName)
         if (property != null) return property
 
-        for (parentName in type.extends) {
-            val parentProperty = lookupPropertyInHierarchy(parentName, propertyName, visited)
+        for (parentRef in type.extends) {
+            val parentProperty = lookupPropertyInHierarchy(parentRef, propertyName, visited)
             if (parentProperty != null) return parentProperty
         }
 
@@ -179,43 +178,45 @@ class TypeRegistry(private val parent: TypeRegistry? = null) {
     }
 
     /**
-     * Gets all type names registered in this registry (not including global).
+     * Gets all type refs registered in this registry (not including global).
      */
-    val typeNames: Set<String>
-        get() = types.keys
+    val allTypeRefs: Set<ClassTypeRef>
+        get() = types.flatMap { (pkg, nameMap) ->
+            nameMap.keys.map { name -> ClassTypeRef(`package` = pkg, type = name, isNullable = false) }
+        }.toSet()
 
     /**
      * Checks if sourceType is a subtype of targetType.
      *
      * This traverses the type hierarchy via `extends` relationships.
      *
-     * @param sourceTypeName The source type name.
-     * @param targetTypeName The target type name.
+     * @param sourceRef The source type reference.
+     * @param targetRef The target type reference.
      * @return true if sourceType is a subtype of targetType (or the same type), false otherwise.
      */
-    fun isSubtype(sourceTypeName: String, targetTypeName: String): Boolean {
-        if (sourceTypeName == targetTypeName) return true
+    fun isSubtype(sourceRef: ClassTypeRef, targetRef: ClassTypeRef): Boolean {
+        if (sourceRef == targetRef) return true
 
-        return isSubtypeInHierarchy(sourceTypeName, targetTypeName, mutableSetOf())
+        return isSubtypeInHierarchy(sourceRef, targetRef, mutableSetOf())
     }
 
     /**
      * Recursive helper to check subtype relationship in the type hierarchy.
      */
     private fun isSubtypeInHierarchy(
-        sourceTypeName: String,
-        targetTypeName: String,
-        visited: MutableSet<String>
+        sourceRef: ClassTypeRef,
+        targetRef: ClassTypeRef,
+        visited: MutableSet<ClassTypeRef>
     ): Boolean {
-        if (sourceTypeName in visited) return false
-        visited.add(sourceTypeName)
+        if (sourceRef in visited) return false
+        visited.add(sourceRef)
 
-        if (sourceTypeName == targetTypeName) return true
+        if (sourceRef == targetRef) return true
 
-        val type = getType(sourceTypeName) ?: return false
+        val type = getType(sourceRef) ?: return false
 
-        for (parentName in type.extends) {
-            if (isSubtypeInHierarchy(parentName, targetTypeName, visited)) {
+        for (parentRef in type.extends) {
+            if (isSubtypeInHierarchy(parentRef, targetRef, visited)) {
                 return true
             }
         }
@@ -227,12 +228,12 @@ class TypeRegistry(private val parent: TypeRegistry? = null) {
      * Gets the JVM class name for instanceof/checkcast operations.
      * Returns the wrapper class for nullable primitives, and the reference class for others.
      *
-     * @param typeName The type name.
+     * @param typeRef The type reference.
      * @param isNullable Whether the type is nullable.
      * @return The JVM internal class name, or null if not found.
      */
-    fun getJvmClassName(typeName: String, isNullable: Boolean = false): String? {
-        val type = getType(typeName) ?: return null
+    fun getJvmClassName(typeRef: ClassTypeRef, isNullable: Boolean = false): String? {
+        val type = getType(typeRef) ?: return null
 
         return if (isNullable && type.wrapperClassName != null) {
             type.wrapperClassName
@@ -244,10 +245,10 @@ class TypeRegistry(private val parent: TypeRegistry? = null) {
     /**
      * Gets the JVM wrapper class name for a primitive type.
      *
-     * @param typeName The primitive type name.
+     * @param typeRef The type reference.
      * @return The JVM wrapper class name, or null if not a primitive or not found.
      */
-    fun getWrapperClassName(typeName: String): String? {
-        return getType(typeName)?.wrapperClassName
+    fun getWrapperClassName(typeRef: ClassTypeRef): String? {
+        return getType(typeRef)?.wrapperClassName
     }
 }

@@ -30,13 +30,17 @@ interface ValueType : ReturnType
 /**
  * A reference to a concrete type, optionally with type arguments.
  *
- * @param type The type being referenced (a string identifier like "builtin.string").
+ * @param package The package of the type (e.g., "builtin", "class/path/to/file", "enum/path").
+ *                Defaults to empty string for backward compatibility with old serialization format.
+ * @param type The simple type name being referenced (e.g., "string", "ClassName").
+ *             When package is empty, this may contain the fully qualified name for backward compatibility.
  * @param isNullable Whether this type reference can be null.
  * @param typeArgs Optional type arguments for generic types.
  */
 @Serializable
 @SerialName("class")
 data class ClassTypeRef(
+    val `package`: String = "",
     val type: String,
     val isNullable: Boolean,
     val typeArgs: Map<String, @Serializable(with = ValueTypeSerializer::class) ValueType>? = null

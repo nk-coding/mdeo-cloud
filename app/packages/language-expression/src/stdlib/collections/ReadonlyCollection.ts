@@ -11,7 +11,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .method("asBag", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("Bag")
+                typeRef("builtin", "Bag")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -20,7 +20,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .method("asOrderedSet", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("OrderedSet")
+                typeRef("builtin", "OrderedSet")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -29,7 +29,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .method("asList", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("List")
+                typeRef("builtin", "List")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -38,7 +38,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .method("asSet", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("Set")
+                typeRef("builtin", "Set")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -47,7 +47,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .method("clone", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("Collection")
+                typeRef("builtin", "Collection")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -55,30 +55,36 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     )
     .method("concat", (m) =>
         m
-            .signature("nosep", (s) => s.returns(typeRef(DefaultTypeNames.String).build()))
+            .signature("nosep", (s) => s.returns(typeRef("builtin", DefaultTypeNames.String).build()))
             .signature("sep", (s) =>
                 s
-                    .param("separator", typeRef(DefaultTypeNames.String).build())
-                    .returns(typeRef(DefaultTypeNames.String).build())
+                    .param("separator", typeRef("builtin", DefaultTypeNames.String).build())
+                    .returns(typeRef("builtin", DefaultTypeNames.String).build())
             )
     )
     .method("count", (m) =>
         m
             .signature("noit", (s) =>
-                s.param("item", typeRef(DefaultTypeNames.Any).build()).returns(typeRef(DefaultTypeNames.Int).build())
+                s
+                    .param("item", typeRef("builtin", DefaultTypeNames.Any).build())
+                    .returns(typeRef("builtin", DefaultTypeNames.Int).build())
             )
             .signature("it", (s) =>
                 s
                     .param(
                         "iterator",
-                        lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                        lambdaType()
+                            .param("it", genericTypeRef("T"))
+                            .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                     )
-                    .returns(typeRef(DefaultTypeNames.Int).build())
+                    .returns(typeRef("builtin", DefaultTypeNames.Int).build())
             )
     )
     .method("excludes", (m) =>
         m.signature((s) =>
-            s.param("item", typeRef(DefaultTypeNames.Any).build()).returns(typeRef(DefaultTypeNames.Boolean).build())
+            s
+                .param("item", typeRef("builtin", DefaultTypeNames.Any).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("excludesAll", (m) =>
@@ -86,17 +92,17 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "col",
-                    typeRef("Collection")
-                        .withTypeArgs({ T: typeRef(DefaultTypeNames.Any).build() })
+                    typeRef("builtin", "Collection")
+                        .withTypeArgs({ T: typeRef("builtin", DefaultTypeNames.Any).build() })
                         .build()
                 )
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("excluding", (m) =>
         m.signature((s) =>
-            s.param("item", typeRef(DefaultTypeNames.Any).build()).returns(
-                typeRef("Collection")
+            s.param("item", typeRef("builtin", DefaultTypeNames.Any).build()).returns(
+                typeRef("builtin", "Collection")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -107,12 +113,12 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "col",
-                    typeRef("Collection")
-                        .withTypeArgs({ T: typeRef(DefaultTypeNames.Any).build() })
+                    typeRef("builtin", "Collection")
+                        .withTypeArgs({ T: typeRef("builtin", DefaultTypeNames.Any).build() })
                         .build()
                 )
                 .returns(
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
@@ -121,15 +127,17 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .method("flatten", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("Collection")
-                    .withTypeArgs({ T: typeRef(DefaultTypeNames.Any).build() })
+                typeRef("builtin", "Collection")
+                    .withTypeArgs({ T: typeRef("builtin", DefaultTypeNames.Any).build() })
                     .build()
             )
         )
     )
     .method("includes", (m) =>
         m.signature((s) =>
-            s.param("item", typeRef(DefaultTypeNames.Any).build()).returns(typeRef(DefaultTypeNames.Boolean).build())
+            s
+                .param("item", typeRef("builtin", DefaultTypeNames.Any).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("includesAll", (m) =>
@@ -137,17 +145,17 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "col",
-                    typeRef("Collection")
-                        .withTypeArgs({ T: typeRef(DefaultTypeNames.Any).build() })
+                    typeRef("builtin", "Collection")
+                        .withTypeArgs({ T: typeRef("builtin", DefaultTypeNames.Any).build() })
                         .build()
                 )
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("including", (m) =>
         m.signature((s) =>
-            s.param("item", typeRef(DefaultTypeNames.Any).build()).returns(
-                typeRef("Collection")
+            s.param("item", typeRef("builtin", DefaultTypeNames.Any).build()).returns(
+                typeRef("builtin", "Collection")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )
@@ -158,31 +166,33 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "col",
-                    typeRef("Collection")
-                        .withTypeArgs({ T: typeRef(DefaultTypeNames.Any).build() })
+                    typeRef("builtin", "Collection")
+                        .withTypeArgs({ T: typeRef("builtin", DefaultTypeNames.Any).build() })
                         .build()
                 )
                 .returns(
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
         )
     )
-    .method("isEmpty", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Boolean).build())))
-    .method("notEmpty", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Boolean).build())))
-    .method("random", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Any).build())))
-    .method("size", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Int).build())))
-    .method("sum", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Double).build())))
+    .method("isEmpty", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Boolean).build())))
+    .method("notEmpty", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Boolean).build())))
+    .method("random", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Any).build())))
+    .method("size", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Int).build())))
+    .method("sum", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Double).build())))
     .method("atLeastNMatch", (m) =>
         m.signature((s) =>
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .param("n", typeRef(DefaultTypeNames.Int).build())
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .param("n", typeRef("builtin", DefaultTypeNames.Int).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("atMostNMatch", (m) =>
@@ -190,10 +200,12 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .param("n", typeRef(DefaultTypeNames.Int).build())
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .param("n", typeRef("builtin", DefaultTypeNames.Int).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("aggregate", (m) =>
@@ -201,13 +213,15 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Any).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Any).build())
                 )
                 .returns(
-                    typeRef("Map")
+                    typeRef("builtin", "Map")
                         .withTypeArgs({
-                            K: typeRef(DefaultTypeNames.Any).build(),
-                            V: typeRef(DefaultTypeNames.Any).build()
+                            K: typeRef("builtin", DefaultTypeNames.Any).build(),
+                            V: typeRef("builtin", DefaultTypeNames.Any).build()
                         })
                         .build()
                 )
@@ -219,7 +233,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
                 .generics("U")
                 .param("iterator", lambdaType().param("it", genericTypeRef("T")).returns(genericTypeRef("U")))
                 .returns(
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("U") })
                         .build()
                 )
@@ -230,9 +244,11 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("forEach", (m) =>
@@ -246,7 +262,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
                 .generics("U")
                 .param("iterator", lambdaType().param("it", genericTypeRef("T")).returns(genericTypeRef("U")))
                 .returns(
-                    typeRef("ReadonlyMap")
+                    typeRef("builtin", "ReadonlyMap")
                         .withTypeArgs({
                             K: genericTypeRef("T"),
                             V: genericTypeRef("U")
@@ -260,10 +276,12 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .param("n", typeRef(DefaultTypeNames.Int).build())
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .param("n", typeRef("builtin", DefaultTypeNames.Int).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("none", (m) =>
@@ -271,9 +289,11 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("one", (m) =>
@@ -281,9 +301,11 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("reject", (m) =>
@@ -291,10 +313,12 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
                 .returns(
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
@@ -305,10 +329,12 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
                 .returns(
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
@@ -319,10 +345,12 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
                 .returns(
-                    typeRef("Collection")
+                    typeRef("builtin", "Collection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )
@@ -333,9 +361,11 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .returns(typeRef(DefaultTypeNames.Boolean).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
         )
     )
     .method("find", (m) =>
@@ -343,9 +373,11 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             s
                 .param(
                     "iterator",
-                    lambdaType().param("it", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Boolean).build())
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(typeRef("builtin", DefaultTypeNames.Boolean).build())
                 )
-                .returns(typeRef(DefaultTypeNames.Any).build())
+                .returns(typeRef("builtin", DefaultTypeNames.Any).build())
         )
     )
     .method("sortedBy", (m) =>
@@ -354,7 +386,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
                 .generics("U")
                 .param("iterator", lambdaType().param("it", genericTypeRef("T")).returns(genericTypeRef("U")))
                 .returns(
-                    typeRef("ReadonlyOrderedCollection")
+                    typeRef("builtin", "ReadonlyOrderedCollection")
                         .withTypeArgs({ T: genericTypeRef("T") })
                         .build()
                 )

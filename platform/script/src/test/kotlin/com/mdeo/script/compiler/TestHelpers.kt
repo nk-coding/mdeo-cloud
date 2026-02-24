@@ -74,78 +74,78 @@ class TypedAstBuilder {
     /**
      * Adds a non-nullable int type and returns its index.
      */
-    fun intType(): Int = addType(ClassTypeRef("builtin.int", false))
+    fun intType(): Int = addType(ClassTypeRef("builtin", "int", false))
     
     /**
      * Adds a nullable int type and returns its index.
      */
-    fun intNullableType(): Int = addType(ClassTypeRef("builtin.int", true))
+    fun intNullableType(): Int = addType(ClassTypeRef("builtin", "int", true))
     
     /**
      * Adds a non-nullable long type and returns its index.
      */
-    fun longType(): Int = addType(ClassTypeRef("builtin.long", false))
+    fun longType(): Int = addType(ClassTypeRef("builtin", "long", false))
     
     /**
      * Adds a nullable long type and returns its index.
      */
-    fun longNullableType(): Int = addType(ClassTypeRef("builtin.long", true))
+    fun longNullableType(): Int = addType(ClassTypeRef("builtin", "long", true))
     
     /**
      * Adds a non-nullable float type and returns its index.
      */
-    fun floatType(): Int = addType(ClassTypeRef("builtin.float", false))
+    fun floatType(): Int = addType(ClassTypeRef("builtin", "float", false))
     
     /**
      * Adds a nullable float type and returns its index.
      */
-    fun floatNullableType(): Int = addType(ClassTypeRef("builtin.float", true))
+    fun floatNullableType(): Int = addType(ClassTypeRef("builtin", "float", true))
     
     /**
      * Adds a non-nullable double type and returns its index.
      */
-    fun doubleType(): Int = addType(ClassTypeRef("builtin.double", false))
+    fun doubleType(): Int = addType(ClassTypeRef("builtin", "double", false))
     
     /**
      * Adds a nullable double type and returns its index.
      */
-    fun doubleNullableType(): Int = addType(ClassTypeRef("builtin.double", true))
+    fun doubleNullableType(): Int = addType(ClassTypeRef("builtin", "double", true))
     
     /**
      * Adds a non-nullable boolean type and returns its index.
      */
-    fun booleanType(): Int = addType(ClassTypeRef("builtin.boolean", false))
+    fun booleanType(): Int = addType(ClassTypeRef("builtin", "boolean", false))
     
     /**
      * Adds a nullable boolean type and returns its index.
      */
-    fun booleanNullableType(): Int = addType(ClassTypeRef("builtin.boolean", true))
+    fun booleanNullableType(): Int = addType(ClassTypeRef("builtin", "boolean", true))
     
     /**
      * Adds a non-nullable string type and returns its index.
      */
-    fun stringType(): Int = addType(ClassTypeRef("builtin.string", false))
+    fun stringType(): Int = addType(ClassTypeRef("builtin", "string", false))
     
     /**
      * Adds a nullable string type and returns its index.
      */
-    fun stringNullableType(): Int = addType(ClassTypeRef("builtin.string", true))
+    fun stringNullableType(): Int = addType(ClassTypeRef("builtin", "string", true))
     
     /**
      * Adds a nullable Any type and returns its index.
      */
-    fun anyNullableType(): Int = addType(ClassTypeRef("builtin.any", true))
+    fun anyNullableType(): Int = addType(ClassTypeRef("builtin", "any", true))
     
     /**
      * Adds a non-nullable list type and returns its index.
      * Uses builtin.List which maps to java.util.List at runtime.
      */
-    fun listType(): Int = addType(ClassTypeRef("builtin.List", false))
+    fun listType(): Int = addType(ClassTypeRef("builtin", "List", false))
     
     /**
      * Adds a nullable list type and returns its index.
      */
-    fun listNullableType(): Int = addType(ClassTypeRef("builtin.List", true))
+    fun listNullableType(): Int = addType(ClassTypeRef("builtin", "List", true))
     
     /**
      * Adds a lambda type and returns its index.

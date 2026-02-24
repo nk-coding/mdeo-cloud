@@ -12,8 +12,8 @@ private const val READONLY_ORDERED_COLLECTION = "com/mdeo/script/stdlib/impl/col
  * ReadonlyOrderedCollection extends ReadonlyCollection and adds index-based access.
  */
 fun createReadonlyOrderedCollectionType(): TypeDefinition {
-    return typeDefinition("builtin.ReadonlyOrderedCollection") {
-        extends("builtin.ReadonlyCollection")
+    return typeDefinition("builtin", "ReadonlyOrderedCollection") {
+        extends("builtin", "ReadonlyCollection")
 
         instanceMethod("at") {
             overload(

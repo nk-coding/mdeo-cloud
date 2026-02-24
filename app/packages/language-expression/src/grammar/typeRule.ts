@@ -14,7 +14,7 @@ export function generateTypeRules(config: TypeConfig, types: TypeTypes) {
     const classTypeRule = createRule(config.classTypeRuleName)
         .returns(types.classTypeType)
         .as(({ set, add, flag }) => [
-            set("name", ID),
+            or(group(set("packageName", ID), ".", set("name", ID)), set("name", ID)),
             optional(
                 "<",
                 ...manySep(

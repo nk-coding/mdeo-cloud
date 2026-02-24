@@ -68,13 +68,13 @@ class MemberAccessCompiler(
         val memberAccess = expression as TypedMemberAccessExpression
         val objectResult = compileObjectExpression(memberAccess, context, initialTraversal)
         
-        val receiverTypeName = getTypeName(memberAccess.expression, context)
+        val receiverType = getTypeName(memberAccess.expression, context)
             ?: throw IllegalStateException(
                 "Cannot determine type for member access expression: ${memberAccess.member}. " +
                 "Type at index ${memberAccess.expression.evalType} is not a ClassTypeRef."
             )
         
-        return compilePropertyWithRegistry(objectResult, receiverTypeName, memberAccess.member, context)
+        return compilePropertyWithRegistry(objectResult, receiverType, memberAccess.member, context)
     }
 
     /**
@@ -107,11 +107,11 @@ class MemberAccessCompiler(
      * @param context The compilation context containing type resolution information
      * @return The type name string if the expression is a ClassTypeRef, null otherwise
      */
-    private fun getTypeName(expression: TypedExpression, context: CompilationContext): String? {
+    private fun getTypeName(expression: TypedExpression, context: CompilationContext): ClassTypeRef? {
         val evalType = expression.evalType
         val valueType = context.resolveTypeOrNull(evalType)
         return when (valueType) {
-            is ClassTypeRef -> valueType.type
+            is ClassTypeRef -> valueType
             else -> null
         }
     }
@@ -133,13 +133,13 @@ class MemberAccessCompiler(
     @Suppress("UNCHECKED_CAST")
     private fun compilePropertyWithRegistry(
         objectResult: GremlinCompilationResult,
-        typeName: String,
+        typeRef: ClassTypeRef,
         propertyName: String,
         context: CompilationContext
     ): GremlinCompilationResult {
-        val propertyDef = context.typeRegistry.lookupProperty(typeName, propertyName)
+        val propertyDef = context.typeRegistry.lookupProperty(typeRef, propertyName)
             ?: throw IllegalStateException(
-                "Property '$propertyName' not found on type '$typeName'. " +
+                "Property '$propertyName' not found on type '${typeRef.`package`}.${typeRef.type}'. " +
                 "Ensure the type registry is configured with all metamodel types."
             )
         

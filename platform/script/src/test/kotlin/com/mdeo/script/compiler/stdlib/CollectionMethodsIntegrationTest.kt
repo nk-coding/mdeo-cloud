@@ -42,7 +42,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `size returns number of elements in list`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -82,7 +82,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `isEmpty returns true for empty collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val boolType = booleanType()
                 function(
                     name = "testFunction",
@@ -112,7 +112,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `isEmpty returns false for non-empty collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -143,7 +143,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `notEmpty returns true for non-empty collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -174,7 +174,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `notEmpty returns false for empty collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val boolType = booleanType()
                 function(
                     name = "testFunction",
@@ -208,7 +208,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `includes returns true when element exists`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -243,7 +243,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `includes returns false when element does not exist`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -278,7 +278,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `excludes returns true when element does not exist`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -313,7 +313,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `excludes returns false when element exists`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -352,7 +352,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `sum returns sum of numeric elements`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val doubleType = doubleType()
                 function(
@@ -393,7 +393,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `concat without separator joins elements`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val stringType = stringType()
                 function(
                     name = "testFunction",
@@ -427,7 +427,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `concat with separator joins elements with separator`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val stringType = stringType()
                 function(
                     name = "testFunction",
@@ -469,7 +469,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `at returns element at index`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val anyType = anyNullableType()
                 function(
@@ -508,7 +508,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `first returns first element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val anyType = anyNullableType()
                 function(
@@ -543,7 +543,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `last returns last element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val anyType = anyNullableType()
                 function(
@@ -582,7 +582,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `indexOf returns index of element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -616,7 +616,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `indexOf returns -1 for missing element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -658,7 +658,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `add adds element to collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -708,7 +708,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `remove removes element from collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val boolType = booleanType()
                 function(
@@ -759,7 +759,7 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `clear removes all elements from collection`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val voidType = voidType()
                 function(
@@ -814,8 +814,8 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `asList converts set to list`() {
             val ast = buildTypedAst {
-                val setType = addType(ClassTypeRef("builtin.Set", false))
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -859,8 +859,8 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `asSet converts list to set with deduplication`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
-                val setType = addType(ClassTypeRef("builtin.Set", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val setType = addType(ClassTypeRef("builtin", "Set", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -905,8 +905,8 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `asBag converts list to bag preserving duplicates`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
-                val bagType = addType(ClassTypeRef("builtin.Bag", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val bagType = addType(ClassTypeRef("builtin", "Bag", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -951,8 +951,8 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `asOrderedSet converts list to ordered set`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
-                val orderedSetType = addType(ClassTypeRef("builtin.OrderedSet", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -1001,8 +1001,8 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `including returns new collection with added element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
-                val collectionType = addType(ClassTypeRef("builtin.Collection", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val collectionType = addType(ClassTypeRef("builtin", "Collection", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -1045,8 +1045,8 @@ class CollectionMethodsIntegrationTest {
         @Test
         fun `excluding returns new collection without element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
-                val collectionType = addType(ClassTypeRef("builtin.Collection", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val collectionType = addType(ClassTypeRef("builtin", "Collection", false))
                 val intType = intType()
                 function(
                     name = "testFunction",

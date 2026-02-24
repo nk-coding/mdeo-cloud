@@ -55,13 +55,13 @@ class MatchWhereClauseScopeTest {
     // Index 7: class.House
     private val types: List<ReturnType> = listOf<ReturnType>(
         VoidType(),                                                                   // 0
-        ClassTypeRef(type = "builtin.string", isNullable = false),                    // 1
-        ClassTypeRef(type = "builtin.double", isNullable = false),                    // 2
-        ClassTypeRef(type = "builtin.boolean", isNullable = false),                   // 3
-        ClassTypeRef(type = "Any", isNullable = true),                                // 4
+        ClassTypeRef(`package` = "builtin", type = "string", isNullable = false),                    // 1
+        ClassTypeRef(`package` = "builtin", type = "double", isNullable = false),                    // 2
+        ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false),                   // 3
+        ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true),                                // 4
         VoidType(),                                                                   // 5 (placeholder)
-        ClassTypeRef(type = "builtin.int", isNullable = false),                       // 6
-        ClassTypeRef(type = "class.House", isNullable = false)                        // 7
+        ClassTypeRef(`package` = "builtin", type = "int", isNullable = false),                       // 6
+        ClassTypeRef(`package` = "class", type = "House", isNullable = false)                        // 7
     )
 
     private val metamodelData = MetamodelData(
@@ -85,7 +85,7 @@ class MatchWhereClauseScopeTest {
         // Register metamodel types in the global type registry
         val typeRegistry = GremlinTypeRegistry.GLOBAL
 
-        val houseType = gremlinType("class.House")
+        val houseType = gremlinType("class", "House")
             .graphProperty("address")
             .build()
         typeRegistry.register(houseType)

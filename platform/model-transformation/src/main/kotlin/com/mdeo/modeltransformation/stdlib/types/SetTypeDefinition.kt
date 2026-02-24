@@ -16,8 +16,8 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * @return The Set type definition for the Gremlin type registry
  */
 fun createSetType(): GremlinTypeDefinition {
-    return gremlinType("builtin.Set")
-        .extends("builtin.Collection")
+    return gremlinType("builtin", "Set")
+        .extends("builtin", "Collection")
         .cardinality(VertexProperty.Cardinality.set)
         .build()
 }

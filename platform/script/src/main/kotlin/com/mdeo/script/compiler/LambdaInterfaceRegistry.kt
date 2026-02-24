@@ -40,7 +40,7 @@ class LambdaInterfaceRegistry {
      */
     private fun initializePredefinedInterfaces() {
         val basePackage = "com/mdeo/script/runtime"
-        val nullableAny = ClassTypeRef("builtin.any", isNullable = true)
+        val nullableAny = ClassTypeRef("builtin", "any", isNullable = true)
         val voidType = VoidType()
         
         registerPredefined(
@@ -60,7 +60,7 @@ class LambdaInterfaceRegistry {
             "$basePackage/interfaces/Action3"
         )
 
-        val nonNullBoolean = ClassTypeRef("builtin.boolean", isNullable = false)
+        val nonNullBoolean = ClassTypeRef("builtin", "boolean", isNullable = false)
         registerPredefined(
             createLambdaType(nonNullBoolean, listOf(nullableAny)),
             "$basePackage/interfaces/Predicate1"
@@ -115,7 +115,7 @@ class LambdaInterfaceRegistry {
      * @return A normalized lambda type suitable for use as a map key.
      */
     fun createKey(lambdaType: LambdaType): LambdaType {
-        val nullableAny = ClassTypeRef("builtin.any", isNullable = true)
+        val nullableAny = ClassTypeRef("builtin", "any", isNullable = true)
         
         return LambdaType(
             returnType = normalizeType(lambdaType.returnType, nullableAny),
@@ -193,10 +193,11 @@ class LambdaInterfaceRegistry {
             if (type is VoidType) return false
             if (type !is ClassTypeRef) return true
             if (type.isNullable) return true
+            if (type.`package` != "builtin") return true
             
             return when (type.type) {
-                "builtin.int", "builtin.long", "builtin.float", 
-                "builtin.double", "builtin.boolean" -> false
+                "int", "long", "float", 
+                "double", "boolean" -> false
                 else -> true
             }
         }

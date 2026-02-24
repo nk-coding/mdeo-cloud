@@ -45,8 +45,8 @@ class InstanceNameRegistryIntegrationTest {
         // Set up the types array that would normally come from a TypedAst
         // Type 0: builtin.string (used in expressions)
         // Type 1: builtin.int (used in expressions)
-        val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
-        val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
+        val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
+        val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
         
         // Use reflection to set the types field since it has a private setter
         val typesField = TransformationEngine::class.java.getDeclaredField("types")

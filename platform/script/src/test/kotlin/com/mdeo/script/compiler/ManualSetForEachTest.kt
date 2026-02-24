@@ -12,12 +12,12 @@ fun main() {
     val helper = CompilerTestHelper()
     
     val ast = buildTypedAst {
-        val setType = addType(ClassTypeRef("builtin.Set", false))
+        val setType = addType(ClassTypeRef("builtin", "Set", false))
         val intTypeIndex = intType()
         val voidTypeIndex = voidType()
         
         // Create consumer lambda type: (any?) -> void
-        val consumerLambdaType = addType(consumer(ClassTypeRef("builtin.any", true)))
+        val consumerLambdaType = addType(consumer(ClassTypeRef("builtin", "any", true)))
         
         function(
             name = "testFunction",

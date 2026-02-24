@@ -24,7 +24,7 @@ class ExpressionStatementCompilerTest {
         val ast = buildTypedAst {
             val intType = intType()
             val lambdaTypeIdx = lambdaType(
-                ClassTypeRef("builtin.int", false)
+                ClassTypeRef("builtin", "int", false)
             )
             function(
                 name = "testFunction",

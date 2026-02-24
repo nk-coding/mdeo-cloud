@@ -18,7 +18,7 @@ export const MapType = classType("Map")
             s
                 .param(
                     "map",
-                    typeRef("Map")
+                    typeRef("builtin", "Map")
                         .withTypeArgs({
                             K: genericTypeRef("K"),
                             V: genericTypeRef("V")

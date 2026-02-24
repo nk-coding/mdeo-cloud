@@ -17,34 +17,56 @@ fun voidType(): VoidType = VoidType()
 /**
  * Creates a non-nullable class type reference.
  *
- * @param typeName The type name (e.g., "builtin.int", "builtin.string").
+ * @param pkg The package of the type (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple type name (e.g., "int", "string", "ClassName").
  * @return A ClassTypeRef with isNullable = false.
  */
-fun classType(typeName: String): ClassTypeRef = 
-    ClassTypeRef(typeName, false, null)
+fun classType(pkg: String, typeName: String): ClassTypeRef = 
+    ClassTypeRef(pkg, typeName, false, null)
+
+/**
+ * Creates a non-nullable builtin class type reference.
+ *
+ * @param typeName The simple type name (e.g., "int", "string").
+ * @return A ClassTypeRef with package="builtin" and isNullable = false.
+ */
+fun builtinType(typeName: String): ClassTypeRef = 
+    ClassTypeRef("builtin", typeName, false, null)
 
 /**
  * Creates a nullable class type reference.
  *
- * @param typeName The type name (e.g., "builtin.int", "builtin.string").
+ * @param pkg The package of the type (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple type name (e.g., "int", "string", "ClassName").
  * @return A ClassTypeRef with isNullable = true.
  */
-fun nullableClassType(typeName: String): ClassTypeRef = 
-    ClassTypeRef(typeName, true, null)
+fun nullableClassType(pkg: String, typeName: String): ClassTypeRef = 
+    ClassTypeRef(pkg, typeName, true, null)
+
+/**
+ * Creates a nullable builtin class type reference.
+ *
+ * @param typeName The simple type name (e.g., "int", "string").
+ * @return A ClassTypeRef with package="builtin" and isNullable = true.
+ */
+fun nullableBuiltinType(typeName: String): ClassTypeRef = 
+    ClassTypeRef("builtin", typeName, true, null)
 
 /**
  * Creates a class type reference with generic type arguments.
  *
- * @param typeName The base type name (e.g., "builtin.List", "builtin.Map").
+ * @param pkg The package of the type (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple type name (e.g., "List", "Map").
  * @param isNullable Whether the type is nullable.
- * @param typeArgs The type arguments as a map (e.g., mapOf("T" to classType("builtin.string"))).
+ * @param typeArgs The type arguments as a map (e.g., mapOf("T" to builtinType("string"))).
  * @return A ClassTypeRef with type arguments.
  */
 fun genericClassType(
+    pkg: String,
     typeName: String,
     isNullable: Boolean = false,
     typeArgs: Map<String, ValueType>
-): ClassTypeRef = ClassTypeRef(typeName, isNullable, typeArgs)
+): ClassTypeRef = ClassTypeRef(pkg, typeName, isNullable, typeArgs)
 
 /**
  * Creates a lambda type.
@@ -84,30 +106,30 @@ fun lambdaType(
  * This avoids repeatedly constructing common types like int, string, boolean, etc.
  */
 object BuiltinTypes {
-    val INT = classType("builtin.int")
-    val LONG = classType("builtin.long")
-    val FLOAT = classType("builtin.float")
-    val DOUBLE = classType("builtin.double")
-    val BOOLEAN = classType("builtin.boolean")
-    val STRING = classType("builtin.string")
-    val ANY = classType("builtin.any")
-    val NULLABLE_INT = nullableClassType("builtin.int")
-    val NULLABLE_LONG = nullableClassType("builtin.long")
-    val NULLABLE_FLOAT = nullableClassType("builtin.float")
-    val NULLABLE_DOUBLE = nullableClassType("builtin.double")
-    val NULLABLE_BOOLEAN = nullableClassType("builtin.boolean")
-    val NULLABLE_STRING = nullableClassType("builtin.string")
-    val NULLABLE_ANY = nullableClassType("builtin.any")
-    val LIST = genericClassType("builtin.List", typeArgs = mapOf("T" to NULLABLE_ANY))
-    val SET = genericClassType("builtin.Set", typeArgs = mapOf("T" to NULLABLE_ANY))
-    val BAG = genericClassType("builtin.Bag", typeArgs = mapOf("T" to NULLABLE_ANY))
-    val ORDERED_SET = genericClassType("builtin.OrderedSet", typeArgs = mapOf("T" to NULLABLE_ANY))
-    val COLLECTION = classType("builtin.Collection")
-    val READONLY_COLLECTION = classType("builtin.ReadonlyCollection")
-    val READONLY_ORDERED_COLLECTION = classType("builtin.ReadonlyOrderedCollection")
-    val ORDERED_COLLECTION = classType("builtin.OrderedCollection")
-    val MAP = genericClassType("builtin.Map", typeArgs = mapOf("K" to NULLABLE_ANY, "V" to NULLABLE_ANY))
-    val READONLY_MAP = genericClassType("builtin.ReadonlyMap", typeArgs = mapOf("K" to NULLABLE_ANY, "V" to NULLABLE_ANY))
+    val INT = builtinType("int")
+    val LONG = builtinType("long")
+    val FLOAT = builtinType("float")
+    val DOUBLE = builtinType("double")
+    val BOOLEAN = builtinType("boolean")
+    val STRING = builtinType("string")
+    val ANY = builtinType("any")
+    val NULLABLE_INT = nullableBuiltinType("int")
+    val NULLABLE_LONG = nullableBuiltinType("long")
+    val NULLABLE_FLOAT = nullableBuiltinType("float")
+    val NULLABLE_DOUBLE = nullableBuiltinType("double")
+    val NULLABLE_BOOLEAN = nullableBuiltinType("boolean")
+    val NULLABLE_STRING = nullableBuiltinType("string")
+    val NULLABLE_ANY = nullableBuiltinType("any")
+    val LIST = genericClassType("builtin", "List", typeArgs = mapOf("T" to NULLABLE_ANY))
+    val SET = genericClassType("builtin", "Set", typeArgs = mapOf("T" to NULLABLE_ANY))
+    val BAG = genericClassType("builtin", "Bag", typeArgs = mapOf("T" to NULLABLE_ANY))
+    val ORDERED_SET = genericClassType("builtin", "OrderedSet", typeArgs = mapOf("T" to NULLABLE_ANY))
+    val COLLECTION = builtinType("Collection")
+    val READONLY_COLLECTION = builtinType("ReadonlyCollection")
+    val READONLY_ORDERED_COLLECTION = builtinType("ReadonlyOrderedCollection")
+    val ORDERED_COLLECTION = builtinType("OrderedCollection")
+    val MAP = genericClassType("builtin", "Map", typeArgs = mapOf("K" to NULLABLE_ANY, "V" to NULLABLE_ANY))
+    val READONLY_MAP = genericClassType("builtin", "ReadonlyMap", typeArgs = mapOf("K" to NULLABLE_ANY, "V" to NULLABLE_ANY))
     val VOID = voidType()
     
     /**

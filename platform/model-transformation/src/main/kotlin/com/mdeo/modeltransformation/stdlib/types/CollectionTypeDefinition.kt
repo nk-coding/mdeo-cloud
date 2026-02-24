@@ -46,8 +46,8 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
  */
 @Suppress("UNCHECKED_CAST")
 fun createCollectionType(): GremlinTypeDefinition {
-    return gremlinType("builtin.Collection")
-        .extends("builtin.any")
+    return gremlinType("builtin", "Collection")
+        .extends("builtin", "any")
         .cardinality(VertexProperty.Cardinality.list)
         .method("size", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().count()

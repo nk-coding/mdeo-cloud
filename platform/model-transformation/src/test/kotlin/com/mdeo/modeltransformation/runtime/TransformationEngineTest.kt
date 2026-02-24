@@ -66,8 +66,8 @@ class TransformationEngineTest {
 
         @Test
         fun `execute stores types from AST`() {
-            val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
-            val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+            val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
+            val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
             val ast = TypedAst(
                 types = listOf(intType, stringType),
                 metamodelPath = "test://model",
@@ -248,9 +248,9 @@ class TransformationEngineTest {
 
         @Test
         fun `getType returns correct type`() {
-            val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
-            val booleanType = ClassTypeRef(type = "builtin.boolean", isNullable = false)
-            val stringType = ClassTypeRef(type = "builtin.string", isNullable = false)
+            val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
+            val booleanType = ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false)
+            val stringType = ClassTypeRef(`package` = "builtin", type = "string", isNullable = false)
             val ast = TypedAst(
                 types = listOf(intType, booleanType, stringType),
                 metamodelPath = "test://model",
@@ -271,7 +271,7 @@ class TransformationEngineTest {
 
         @Test
         fun `getTypeOrNull returns null for invalid index`() {
-            val intType = ClassTypeRef(type = "builtin.int", isNullable = false)
+            val intType = ClassTypeRef(`package` = "builtin", type = "int", isNullable = false)
             val ast = TypedAst(
                 types = listOf(intType),
                 metamodelPath = "test://model",

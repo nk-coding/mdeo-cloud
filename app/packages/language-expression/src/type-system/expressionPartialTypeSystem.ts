@@ -524,7 +524,8 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
 
             if (elements.length === 0) {
                 const listType = this.typeSystemConfig.createListType({
-                    type: "builtin.Any",
+                    package: "builtin",
+                    type: "Any",
                     isNullable: true
                 });
                 return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(listType);

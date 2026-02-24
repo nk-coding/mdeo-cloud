@@ -9,7 +9,7 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  * ReadonlyBag is a readonly collection that allows duplicates with count tracking.
  */
 fun createReadonlyBagType(): TypeDefinition {
-    return typeDefinition("builtin.ReadonlyBag") {
-        extends("builtin.ReadonlyCollection")
+    return typeDefinition("builtin", "ReadonlyBag") {
+        extends("builtin", "ReadonlyCollection")
     }
 }

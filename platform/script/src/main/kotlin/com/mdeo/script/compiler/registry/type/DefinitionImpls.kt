@@ -1,5 +1,6 @@
 package com.mdeo.script.compiler.registry.type
 
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
 import org.objectweb.asm.MethodVisitor
@@ -9,15 +10,17 @@ import org.objectweb.asm.Opcodes
  * Implementation of a type definition with mutable collections
  * for building through the DSL.
  *
- * @param typeName The unique name of this type.
- * @param extends The names of types this type extends.
+ * @param typePackage The package part of this type's fully qualified name (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple name of this type (e.g., "int", "House").
+ * @param extends The types this type extends, as [ClassTypeRef].
  * @param jvmClassName The JVM internal class name (e.g., "java/lang/String").
  * @param primitiveDescriptor The JVM primitive descriptor (e.g., "I", "J").
  * @param wrapperClassName The JVM wrapper class name for primitives (e.g., "java/lang/Integer").
  */
 class TypeDefinitionImpl(
+    override val typePackage: String,
     override val typeName: String,
-    override val extends: List<String> = emptyList(),
+    override val extends: List<ClassTypeRef> = emptyList(),
     override val jvmClassName: String? = null,
     override val primitiveDescriptor: String? = null,
     override val wrapperClassName: String? = null

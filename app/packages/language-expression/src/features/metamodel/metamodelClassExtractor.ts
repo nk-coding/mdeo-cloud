@@ -14,10 +14,18 @@ import {
     isOptionalMultiplicity
 } from "@mdeo/language-metamodel";
 import type { ValueType } from "../../typir-extensions/config/type.js";
-import type { MetamodelClassInfo, MetamodelPropertyInfo, MetamodelRelationInfo } from "./metamodelClassInfo.js";
+import type {
+    MetamodelClassInfo,
+    MetamodelClassRef,
+    MetamodelPropertyInfo,
+    MetamodelRelationInfo
+} from "./metamodelClassInfo.js";
 import { DefaultTypeNames } from "../../type-system/typeSystemConfig.js";
 import { typeRef } from "../../typir-extensions/config/typeBuilder.js";
 import type { MetamodelEnumInfo } from "./metamodelEnumInfo.js";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Configuration for creating collection types from element types.
@@ -37,7 +45,7 @@ export interface CollectionTypeFactory {
  * Creates List types with the appropriate type arguments.
  */
 export const DefaultCollectionTypeFactory: CollectionTypeFactory = {
-    createListType: (elementType) => typeRef("List").withTypeArgs({ T: elementType }).build()
+    createListType: (elementType) => typeRef("builtin", "List").withTypeArgs({ T: elementType }).build()
 };
 
 /**
@@ -49,60 +57,94 @@ export const DefaultCollectionTypeFactory: CollectionTypeFactory = {
  * @param enums The enums to analyze (directly defined, not imports)
  * @param reflection The AST reflection for type checking
  * @param collectionTypeFactory Factory for creating list types
+ * @param absolutePath The absolute path of the metamodel file (e.g., "/path/to/file.mm")
  * @returns Object containing arrays of MetamodelClassInfo and MetamodelEnumInfo
  */
 export function extractMetamodelEntities(
     classes: MetamodelClassType[],
     enums: MetamodelEnumType[],
     reflection: AstReflection,
-    collectionTypeFactory: CollectionTypeFactory
+    collectionTypeFactory: CollectionTypeFactory,
+    absolutePath: string
 ): { classes: MetamodelClassInfo[]; enums: MetamodelEnumInfo[] } {
-    const extractor = new MetamodelClassExtractor(reflection, collectionTypeFactory);
+    const extractor = new MetamodelClassExtractor(reflection, collectionTypeFactory, absolutePath);
     const classInfos = extractor.extractClasses(classes);
+    const enumPackage = getEnumPackage(absolutePath);
+    const enumContainerPackage = getEnumContainerPackage(absolutePath);
     const enumInfos: MetamodelEnumInfo[] = enums.map((enumNode) => ({
         name: enumNode.name,
-        package: ENUM_PACKAGE,
+        package: enumPackage,
+        containerPackage: enumContainerPackage,
         entries: enumNode.entries.map((e) => e.name)
     }));
     return { classes: classInfos, enums: enumInfos };
 }
 
 /**
- * The package name for classes, fixed to string "class" for all classes.
+ * Generates the package name for a class given its absolute path.
+ * @param absolutePath The absolute path of the metamodel file (e.g., "/path/to/file")
+ * @returns The package name (e.g., "class/path/to/file")
  */
-export const CLASS_PACKAGE = "class";
+export function getClassPackage(absolutePath: string): string {
+    return `class${absolutePath}`;
+}
 
 /**
- * The package name for enums, fixed to string "enum" for all enums.
+ * Generates the package name for an enum given its absolute path.
+ * @param absolutePath The absolute path of the metamodel file (e.g., "/path/to/file")
+ * @returns The package name (e.g., "enum/path/to/file")
  */
-export const ENUM_PACKAGE = "enum";
+export function getEnumPackage(absolutePath: string): string {
+    return `enum${absolutePath}`;
+}
 
 /**
- * The package name for enums defined within classes, fixed to string "enum-container" for all such enums.
+ * Generates the package name for an enum container given its absolute path.
+ * @param absolutePath The absolute path of the metamodel file (e.g., "/path/to/file")
+ * @returns The package name (e.g., "enum-container/path/to/file")
  */
-export const ENUM_CONTAINER_PACKAGE = "enum-container";
+export function getEnumContainerPackage(absolutePath: string): string {
+    return `enum-container${absolutePath}`;
+}
+
+/**
+ * Generates the package name for a class container given its absolute path.
+ * @param absolutePath The absolute path of the metamodel file (e.g., "/path/to/file")
+ * @returns The package name (e.g., "class-container/path/to/file")
+ */
+export function getClassContainerPackage(absolutePath: string): string {
+    return `class-container${absolutePath}`;
+}
 
 /**
  * Internal class for extracting class information from metamodel AST nodes.
  * Generates an intermediate representation that can be converted to ClassTypes.
  * Should not be instantiated directly; use extractMetamodelEntities() instead.
  *
- * All classes share the 'class' package identifier; all enums share 'enum'.
+ * Package names are generated using the absolute file path (e.g., "class/path/to/file").
  */
 class MetamodelClassExtractor {
     private readonly classNameMap = new Map<MetamodelClassType, string>();
     private readonly allClassesSet = new Set<MetamodelClassType>();
+    private readonly directClassNodes = new Set<MetamodelClassType>();
+    private readonly classPackage: string;
+    private readonly classContainerPackage: string;
 
     /**
      * Creates a new MetamodelClassExtractor.
      *
      * @param reflection The AST reflection for type checking
      * @param collectionTypeFactory Factory for creating list types
+     * @param absolutePath The absolute path of the metamodel file
      */
     constructor(
         private readonly reflection: AstReflection,
-        private readonly collectionTypeFactory: CollectionTypeFactory
-    ) {}
+        private readonly collectionTypeFactory: CollectionTypeFactory,
+        absolutePath: string
+    ) {
+        this.classPackage = getClassPackage(absolutePath);
+        this.classContainerPackage = getClassContainerPackage(absolutePath);
+    }
 
     /**
      * Extracts class information from a list of metamodel classes.
@@ -129,6 +171,7 @@ class MetamodelClassExtractor {
             if (!usedNames.has(name)) {
                 usedNames.add(name);
                 this.classNameMap.set(classNode, name);
+                this.directClassNodes.add(classNode);
             }
         }
 
@@ -158,8 +201,10 @@ class MetamodelClassExtractor {
         const result: MetamodelClassInfo[] = [];
 
         for (const [classNode, simpleName] of this.classNameMap.entries()) {
-            const info = this.buildClassInfo(classNode, simpleName, associations);
-            result.push(info);
+            if (this.directClassNodes.has(classNode)) {
+                const info = this.buildClassInfo(classNode, simpleName, associations);
+                result.push(info);
+            }
         }
 
         return result;
@@ -213,23 +258,23 @@ class MetamodelClassExtractor {
      * Builds complete class information including properties, relations, and superclasses.
      *
      * @param classNode The metamodel class node
-     * @param simpleName The unique name assigned to this class
+     * @param name The unique name assigned to this class
      * @param associations All associations from the metamodel
      * @returns Complete MetamodelClassInfo
      */
     private buildClassInfo(
         classNode: MetamodelClassType,
-        simpleName: string,
+        name: string,
         associations: AssociationType[]
     ): MetamodelClassInfo {
-        const classPackage = CLASS_PACKAGE;
         const superClasses = this.extractSuperClasses(classNode);
         const properties = this.extractProperties(classNode);
         const relations = this.extractRelations(classNode, associations);
 
         return {
-            name: simpleName,
-            package: classPackage,
+            name: name,
+            package: this.classPackage,
+            containerPackage: this.classContainerPackage,
             superClasses,
             properties,
             relations
@@ -237,32 +282,37 @@ class MetamodelClassExtractor {
     }
 
     /**
-     * Builds the fully qualified class name using the 'class' package prefix.
+     * Determines the class package for any given class node by traversing up to the
+     * root AST node and reading the Langium document URI.
+     * Falls back to the current file's package when the document cannot be resolved.
      *
-     * @param classNode The class node to build the name for
-     * @param simpleName The simple class name
-     * @returns The fully qualified class name (e.g. "class.Person")
+     * @param classNode The class node whose actual source package should be returned
+     * @returns The class package string (e.g. "class/path/to/file.mm")
      */
-    private buildFullClassName(classNode: MetamodelClassType, simpleName: string): string {
-        const classPackage = CLASS_PACKAGE;
-        return `${classPackage}.${simpleName}`;
+    private getActualPackageForClass(classNode: MetamodelClassType): string {
+        const doc = AstUtils.getDocument(classNode);
+        if (doc?.uri?.path != undefined) {
+            return getClassPackage(doc.uri.path);
+        }
+        return this.classPackage;
     }
 
     /**
      * Extracts superclass references from a class's extension declarations.
      *
      * @param classNode The class to extract superclasses from
-     * @returns Array of fully qualified superclass names
+     * @returns Array of structured superclass references (package + name)
      */
-    private extractSuperClasses(classNode: MetamodelClassType): string[] {
-        const superClasses: string[] = [];
+    private extractSuperClasses(classNode: MetamodelClassType): MetamodelClassRef[] {
+        const superClasses: MetamodelClassRef[] = [];
         const extensions = classNode.extensions;
         for (const extension of extensions?.extensions ?? []) {
             const parentClass = extension.class.ref;
             if (parentClass != undefined) {
                 const parentName = this.classNameMap.get(parentClass);
                 if (parentName != undefined) {
-                    superClasses.push(this.buildFullClassName(parentClass, parentName));
+                    const parentPackage = this.getActualPackageForClass(parentClass);
+                    superClasses.push({ package: parentPackage, name: parentName });
                 }
             }
         }
@@ -305,7 +355,7 @@ class MetamodelClassExtractor {
         if (this.reflection.isInstance(typeValue, PrimitiveType)) {
             return this.resolvePrimitiveType(typeValue.name);
         }
-        return { type: DefaultTypeNames.String, isNullable: false };
+        return { package: "builtin", type: DefaultTypeNames.String, isNullable: false };
     }
 
     /**
@@ -323,7 +373,7 @@ class MetamodelClassExtractor {
             string: DefaultTypeNames.String,
             boolean: DefaultTypeNames.Boolean
         };
-        return { type: typeNameMap[name] ?? DefaultTypeNames.String, isNullable: false };
+        return { package: "builtin", type: typeNameMap[name] ?? DefaultTypeNames.String, isNullable: false };
     }
 
     /**
@@ -428,8 +478,9 @@ class MetamodelClassExtractor {
             return undefined;
         }
 
-        const oppositeClassName = this.buildFullClassName(oppositeClass, oppositeSimpleName);
-        const baseType: ValueType = { type: oppositeClassName, isNullable: false };
+        const oppositePackage = this.getActualPackageForClass(oppositeClass);
+        const oppositeClassName = `${oppositePackage}.${oppositeSimpleName}`;
+        const baseType: ValueType = { package: oppositePackage, type: oppositeSimpleName, isNullable: false };
         const valueType = this.applyMultiplicity(baseType, end.multiplicity);
 
         return {

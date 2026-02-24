@@ -20,7 +20,9 @@ import {
     LambdaExpression,
     Script,
     type FunctionType,
-    type ScriptType
+    type ScriptType,
+    type MetamodelFileImportType,
+    type FunctionFileImportType
 } from "../../grammar/scriptTypes.js";
 import { ScriptReturnStatementAccessor } from "./scriptReturnStatementAccessor.js";
 import { LambdaScope } from "./lambdaScope.js";
@@ -29,10 +31,12 @@ import type {
     ResolvedContributedExpression,
     ResolvedScriptContributionPlugins
 } from "../../plugin/scriptContributionPlugin.js";
-import { sharedImport } from "@mdeo/language-shared";
-import type { InferenceProblem, Type } from "typir";
+import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
+import type { InferenceProblem, Type, ValidationProblemAcceptor } from "typir";
+import { isMetamodelCompatible } from "@mdeo/language-metamodel";
+import type { LangiumDocument, LangiumDocuments } from "langium";
 
-const { isAstNode } = sharedImport("langium");
+const { isAstNode, AstUtils } = sharedImport("langium");
 
 /**
  * Partial type system implementation for Script-specific AST nodes.
@@ -74,6 +78,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
 
     override registerRules(): void {
         this.registerScriptNameConflictsValidationRule();
+        this.registerScriptImportCompatibilityValidationRule();
         this.registerFunctionInferenceRule();
         this.registerFunctionParameterInferenceRule();
         this.registerFunctionValidationRule();
@@ -133,6 +138,107 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 }
             }
         });
+    }
+
+    /**
+     * Registers a validation rule for Script to check import metamodel compatibility.
+     * Validates that imported files either have no `using` statement or have a compatible one.
+     * If the imported file has a `using`, the current file must also have one.
+     */
+    private registerScriptImportCompatibilityValidationRule(): void {
+        this.registerValidationRule(Script, (node, accept) => {
+            const document = AstUtils.getDocument(node);
+            const documents = this.typir.langium.LangiumServices.workspace.LangiumDocuments;
+
+            const currentMetamodelImport = node.metamodelImport;
+
+            for (const fileImport of node.imports) {
+                this.validateImportMetamodelCompatibility(
+                    fileImport,
+                    currentMetamodelImport,
+                    document,
+                    documents,
+                    accept
+                );
+            }
+        });
+    }
+
+    /**
+     * Validates that an imported file's metamodel is compatible with the current file's metamodel.
+     *
+     * @param fileImport The file import to validate
+     * @param currentMetamodelImport The current file's metamodel import (may be undefined)
+     * @param document The current document
+     * @param documents The Langium documents service
+     * @param accept The validation acceptor
+     */
+    private validateImportMetamodelCompatibility(
+        fileImport: FunctionFileImportType,
+        currentMetamodelImport: MetamodelFileImportType | undefined,
+        document: LangiumDocument,
+        documents: LangiumDocuments,
+        accept: ValidationProblemAcceptor<ScriptTypirSpecifics>
+    ): void {
+        const targetDoc = this.resolveDocument(document, fileImport.file, documents);
+        if (targetDoc == undefined) {
+            return;
+        }
+
+        const targetRoot = targetDoc.parseResult?.value;
+        if (targetRoot == undefined || targetRoot.$type !== Script.name) {
+            return;
+        }
+
+        const targetScript = targetRoot as ScriptType;
+        const targetMetamodelImport = targetScript.metamodelImport;
+
+        if (targetMetamodelImport == undefined) {
+            return;
+        }
+
+        if (currentMetamodelImport == undefined) {
+            accept({
+                languageNode: fileImport,
+                languageProperty: "file",
+                message: `Cannot import from '${fileImport.file}' which uses a metamodel. The current file must have a 'using' statement.`,
+                severity: "error"
+            });
+            return;
+        }
+
+        const currentMetamodelDoc = this.resolveDocument(document, currentMetamodelImport.file, documents);
+        const targetMetamodelDoc = this.resolveDocument(targetDoc, targetMetamodelImport.file, documents);
+
+        if (currentMetamodelDoc == undefined || targetMetamodelDoc == undefined) {
+            return;
+        }
+
+        if (!isMetamodelCompatible(targetMetamodelDoc, currentMetamodelDoc, documents)) {
+            accept({
+                languageNode: fileImport,
+                languageProperty: "file",
+                message: `The imported file '${fileImport.file}' uses a metamodel that is not compatible with the current file's metamodel.`,
+                severity: "error"
+            });
+        }
+    }
+
+    /**
+     * Resolves a relative path to a document.
+     *
+     * @param fromDocument The document from which to resolve
+     * @param relativePath The relative path
+     * @param documents The Langium documents service
+     * @returns The resolved document, or undefined if not found
+     */
+    private resolveDocument(
+        fromDocument: LangiumDocument,
+        relativePath: string,
+        documents: LangiumDocuments
+    ): LangiumDocument | undefined {
+        const uri = resolveRelativePath(fromDocument, relativePath);
+        return documents.getDocument(uri);
     }
 
     /**
@@ -684,6 +790,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
      */
     private createListTypeFromArguments(types: CustomValueType[]): CustomValueType {
         return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType({
+            package: "builtin",
             type: "List",
             isNullable: false,
             typeArgs: {

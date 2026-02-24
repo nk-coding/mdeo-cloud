@@ -70,17 +70,11 @@ class ExpressionStatementCompiler : StatementCompiler {
             is VoidType -> {
             }
             is ClassTypeRef -> {
-                when (resultType.type) {
-                    "builtin.long", "builtin.double" -> {
-                        if (!resultType.isNullable) {
-                            mv.visitInsn(Opcodes.POP2)
-                        } else {
-                            mv.visitInsn(Opcodes.POP)
-                        }
-                    }
-                    else -> {
-                        mv.visitInsn(Opcodes.POP)
-                    }
+                if (!resultType.isNullable && resultType.`package` == "builtin"
+                    && (resultType.type == "long" || resultType.type == "double")) {
+                    mv.visitInsn(Opcodes.POP2)
+                } else {
+                    mv.visitInsn(Opcodes.POP)
                 }
             }
             else -> {

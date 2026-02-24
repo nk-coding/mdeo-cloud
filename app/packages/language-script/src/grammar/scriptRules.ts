@@ -39,6 +39,7 @@ import {
     BaseExpression,
     BaseExtension,
     ExtensionExpression,
+    MetamodelFileImport,
     type ScriptType
 } from "./scriptTypes.js";
 import { generateImportRules, LeadingTrailing, manySep } from "@mdeo/language-shared";
@@ -180,11 +181,23 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
     );
 
     /**
+     * Metamodel file import rule.
+     * Format: using "filename"
+     */
+    const MetamodelFileImportRule = createRule("ScriptMetamodelFileImportRule")
+        .returns(MetamodelFileImport)
+        .as(({ set }) => ["using", set("file", STRING)]);
+
+    /**
      * The Script entry rule.
      */
     const ScriptRule = createRule("ScriptRule")
         .returns(Script)
-        .as(({ add }) => [many(or(add("imports", FunctionFileImportRule), add("functions", FunctionRule), NEWLINE))]);
+        .as(({ add, set }) => [
+            many(NEWLINE),
+            optional(set("metamodelImport", MetamodelFileImportRule)),
+            many(or(add("imports", FunctionFileImportRule), add("functions", FunctionRule), NEWLINE))
+        ]);
 
     return {
         rule: ScriptRule,

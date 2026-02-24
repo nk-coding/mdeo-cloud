@@ -200,19 +200,19 @@ object ComparisonOperationHelper {
         trueLabel: Label
     ) {
         when (promotedType) {
-            "builtin.int" -> {
+            "int" -> {
                 mv.visitJumpInsn(intCompareOp, trueLabel)
             }
-            "builtin.long" -> {
+            "long" -> {
                 mv.visitInsn(Opcodes.LCMP)
                 mv.visitJumpInsn(resultCompareOp, trueLabel)
             }
-            "builtin.float" -> {
+            "float" -> {
                 val cmpOp = getFloatingPointCompareOp(resultCompareOp, isDouble = false)
                 mv.visitInsn(cmpOp)
                 mv.visitJumpInsn(resultCompareOp, trueLabel)
             }
-            "builtin.double" -> {
+            "double" -> {
                 val cmpOp = getFloatingPointCompareOp(resultCompareOp, isDouble = true)
                 mv.visitInsn(cmpOp)
                 mv.visitJumpInsn(resultCompareOp, trueLabel)

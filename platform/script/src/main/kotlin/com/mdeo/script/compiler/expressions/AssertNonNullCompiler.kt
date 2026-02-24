@@ -77,8 +77,7 @@ class AssertNonNullCompiler : ExpressionCompiler() {
         mv.visitLabel(notNullLabel)
         
         if (CoercionUtil.isPrimitiveType(resultType) && (resultType as? ClassTypeRef)?.isNullable == false) {
-            val typeName = resultType.type
-            CoercionUtil.emitUnboxing(typeName, mv)
+            CoercionUtil.emitUnboxing(resultType, mv)
         }
     }
 }

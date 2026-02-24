@@ -80,8 +80,8 @@ class MatchPropertyConditionTest {
     // Index 2: class.House
     private val types: List<ReturnType> = listOf<ReturnType>(
         VoidType(),                                                                   // 0
-        ClassTypeRef(type = "builtin.string", isNullable = false),                    // 1
-        ClassTypeRef(type = "class.House", isNullable = false)                        // 2
+        ClassTypeRef(`package` = "builtin", type = "string", isNullable = false),                    // 1
+        ClassTypeRef(`package` = "class", type = "House", isNullable = false)                        // 2
     )
 
     private val metamodelData = MetamodelData(
@@ -105,7 +105,7 @@ class MatchPropertyConditionTest {
         // Register metamodel types in the global type registry
         val typeRegistry = GremlinTypeRegistry.GLOBAL
 
-        val houseType = gremlinType("class.House")
+        val houseType = gremlinType("class", "House")
             .graphProperty("address")
             .build()
         typeRegistry.register(houseType)

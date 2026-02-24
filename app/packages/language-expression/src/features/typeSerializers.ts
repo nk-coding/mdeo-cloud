@@ -34,7 +34,13 @@ export function registerTypeSerializers(
  */
 function printClassType(context: PrintContext<ClassTypeType>): Doc {
     const { ctx, printPrimitive, getPrimitive, path, print } = context;
-    const docs: Doc[] = [printPrimitive(getPrimitive(ctx, "name"), ID)];
+    const docs: Doc[] = [];
+
+    if (ctx.packageName) {
+        docs.push(printPrimitive(getPrimitive(ctx, "packageName"), ID), ".");
+    }
+
+    docs.push(printPrimitive(getPrimitive(ctx, "name"), ID));
 
     if (ctx.typeArgs && ctx.typeArgs.length > 0) {
         docs.push("<");

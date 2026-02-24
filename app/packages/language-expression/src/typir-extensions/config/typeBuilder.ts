@@ -19,18 +19,20 @@ import {
  * @example
  * ```typescript
  * // Simple type reference
- * typeRef('string').nullable().build()
+ * typeRef('builtin', 'string').nullable().build()
  *
  * // Type reference with type arguments
- * typeRef('Collection').withTypeArgs(new Map([['T', genericTypeRef('T')]])).build()
+ * typeRef('builtin', 'Collection').withTypeArgs(new Map([['T', genericTypeRef('T')]])).build()
  * ```
  */
 export class ValueTypeBuilder {
+    private package: string;
     private type: string;
     private isNullable: boolean = false;
     private typeArgs?: Record<string, ValueType>;
 
-    constructor(type: string) {
+    constructor(pkg: string, type: string) {
+        this.package = pkg;
         this.type = type;
     }
 
@@ -56,6 +58,7 @@ export class ValueTypeBuilder {
      */
     build(): ClassTypeRef {
         const result: ClassTypeRef = {
+            package: this.package,
             type: this.type,
             isNullable: this.isNullable
         };
@@ -68,10 +71,11 @@ export class ValueTypeBuilder {
 
 /**
  * Create a new ValueTypeBuilder for a class type reference.
+ * @param pkg The package identifier (e.g., 'builtin', 'class', 'enum')
  * @param type The type identifier (e.g., 'string', 'number', 'Collection')
  */
-export function typeRef(type: string): ValueTypeBuilder {
-    return new ValueTypeBuilder(type);
+export function typeRef(pkg: string, type: string): ValueTypeBuilder {
+    return new ValueTypeBuilder(pkg, type);
 }
 
 /**
@@ -102,9 +106,9 @@ export function voidType(): VoidType {
  * @example
  * ```typescript
  * lambdaType()
- *   .param('x', typeRef('number').build())
- *   .param('y', typeRef('number').build())
- *   .returns(typeRef('number').build())
+ *   .param('x', typeRef('builtin', 'number').build())
+ *   .param('y', typeRef('builtin', 'number').build())
+ *   .returns(typeRef('builtin', 'number').build())
  * ```
  */
 export class LambdaTypeBuilder {
@@ -156,9 +160,9 @@ export function lambdaType(): LambdaTypeBuilder {
  * @example
  * ```typescript
  * signature()
- *   .param('x', typeRef('number').build())
- *   .param('y', typeRef('number').build())
- *   .returns(typeRef('number').build())
+ *   .param('x', typeRef('builtin', 'number').build())
+ *   .param('y', typeRef('builtin', 'number').build())
+ *   .returns(typeRef('builtin', 'number').build())
  *   .build()
  * ```
  */
@@ -250,8 +254,8 @@ type SignatureNames = object;
  * ```typescript
  * method()
  *   .signature('default', sig => sig
- *     .param('x', typeRef('number').build())
- *     .returns(typeRef('string').build())
+ *     .param('x', typeRef('builtin', 'number').build())
+ *     .returns(typeRef('builtin', 'string').build())
  *   )
  *   .build()
  * ```
@@ -329,10 +333,10 @@ type TypedClassType<T extends MemberNames> = ClassType & {
  * @example
  * ```typescript
  * classType('string', 'builtin')
- *   .property('length', typeRef('number').build())
+ *   .property('length', typeRef('builtin', 'number').build())
  *   .method('upper', m => m
  *     .signature(sig => sig
- *       .returns(typeRef('string').build())
+ *       .returns(typeRef('builtin', 'string').build())
  *     )
  *   )
  *   .extends('any')
@@ -406,9 +410,10 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
      * Add a super type that this class extends.
      * @param type The type identifier of the super type
      * @param typeArgs Optional type arguments for the super type
+     * @param pkg The package of the super type (defaults to 'builtin')
      */
-    extends(type: string, typeArgs?: Record<string, ValueType>): this {
-        const superType: BaseClassTypeRef = { type };
+    extends(type: string, typeArgs?: Record<string, ValueType>, pkg: string = "builtin"): this {
+        const superType: BaseClassTypeRef = { package: pkg, type };
         if (typeArgs) {
             superType.typeArgs = typeArgs;
         }
@@ -527,7 +532,7 @@ export function classTypeFrom(
 
     if (existingType.superTypes) {
         for (const superType of existingType.superTypes) {
-            builder.extends(superType.type, superType.typeArgs);
+            builder.extends(superType.type, superType.typeArgs, superType.package);
         }
     }
 
@@ -544,7 +549,7 @@ export function classTypeFrom(
  * ```typescript
  * globalFunction('println')
  *   .signature(sig => sig
- *     .param('message', typeRef('string').build())
+ *     .param('message', typeRef('builtin', 'string').build())
  *     .returns(voidType())
  *   )
  *   .build()
@@ -617,7 +622,7 @@ export function globalFunction(name: string): GlobalFunctionBuilder {
  *
  * @example
  * ```typescript
- * globalProperty('PI', typeRef('double').build())
+ * globalProperty('PI', typeRef('builtin', 'double').build())
  * ```
  */
 export function globalProperty(name: string, type: ValueType, readonly: boolean = true): Member {

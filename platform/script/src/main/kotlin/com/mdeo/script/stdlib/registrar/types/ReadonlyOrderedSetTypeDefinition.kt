@@ -9,7 +9,7 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  * ReadonlyOrderedSet is a readonly ordered collection that does not allow duplicates.
  */
 fun createReadonlyOrderedSetType(): TypeDefinition {
-    return typeDefinition("builtin.ReadonlyOrderedSet") {
-        extends("builtin.ReadonlyOrderedCollection")
+    return typeDefinition("builtin", "ReadonlyOrderedSet") {
+        extends("builtin", "ReadonlyOrderedCollection")
     }
 }

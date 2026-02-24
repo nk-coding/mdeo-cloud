@@ -85,7 +85,7 @@ export interface AssociationEndData {
     /**
      * The name of the class at this end.
      */
-    class: string;
+    className: string;
     /**
      * Optional role name for this end.
      */
@@ -228,7 +228,7 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
 
             const mapEnd = (end: any): AssociationEndData => {
                 const result: AssociationEndData = {
-                    class: end.class?.$refText ?? "",
+                    className: end.class?.$refText ?? "",
                     multiplicity: convertMultiplicity(end.multiplicity)
                 };
                 if (end.name != undefined) result.name = end.name;

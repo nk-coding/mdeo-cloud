@@ -12,9 +12,9 @@ private const val ORDERED_COLLECTION = "com/mdeo/script/stdlib/impl/collections/
  * OrderedCollection extends ReadonlyOrderedCollection and adds mutation operations.
  */
 fun createOrderedCollectionType(): TypeDefinition {
-    return typeDefinition("builtin.OrderedCollection") {
-        extends("builtin.ReadonlyOrderedCollection")
-        extends("builtin.Collection")
+    return typeDefinition("builtin", "OrderedCollection") {
+        extends("builtin", "ReadonlyOrderedCollection")
+        extends("builtin", "Collection")
 
         instanceMethod("removeAt") {
             overload(

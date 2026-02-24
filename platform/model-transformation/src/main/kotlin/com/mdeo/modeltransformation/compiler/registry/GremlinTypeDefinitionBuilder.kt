@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.compiler.registry
 
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.VertexProperty
@@ -10,15 +11,17 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
  * This class provides a simple implementation that stores properties and methods
  * in maps for efficient lookup.
  *
- * @param typeName The unique name of this type.
- * @param extends The names of types this type extends.
+ * @param typePackage The package part of this type's fully qualified name (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple name of this type (e.g., "int", "string").
+ * @param extends The types this type extends, as [ClassTypeRef].
  * @param cardinality The cardinality for graph property storage (null for single).
  * @param properties A map of property name to property definition.
  * @param methods A map of method name to list of method definitions (overloads).
  */
 class SimpleGremlinTypeDefinition(
+    override val typePackage: String,
     override val typeName: String,
-    override val extends: List<String> = emptyList(),
+    override val extends: List<ClassTypeRef> = emptyList(),
     override val cardinality: VertexProperty.Cardinality? = null,
     private val properties: Map<String, GremlinPropertyDefinition> = emptyMap(),
     private val methods: Map<String, List<GremlinMethodDefinition>> = emptyMap()
@@ -69,20 +72,22 @@ class SimpleGremlinTypeDefinition(
  *
  * Example usage:
  * ```kotlin
- * val stringType = GremlinTypeDefinitionBuilder("builtin.string")
- *     .extends("builtin.any")
+ * val stringType = GremlinTypeDefinitionBuilder("builtin", "string")
+ *     .extends("builtin", "any")
  *     .property("length") { receiver ->
  *         GremlinCompilationResult.ValueResult((receiver as? String)?.length ?: 0)
  *     }
  *     .build()
  * ```
  *
- * @param typeName The unique name of the type being built.
+ * @param typePackage The package part of the type's fully qualified name (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple name of the type being built (e.g., "string", "House").
  */
 class GremlinTypeDefinitionBuilder(
+    private val typePackage: String,
     private val typeName: String
 ) {
-    private val extendsList = mutableListOf<String>()
+    private val extendsList = mutableListOf<ClassTypeRef>()
     private var cardinality: VertexProperty.Cardinality? = null
     private val properties = mutableMapOf<String, GremlinPropertyDefinition>()
     private val methods = mutableMapOf<String, MutableList<GremlinMethodDefinition>>()
@@ -90,11 +95,24 @@ class GremlinTypeDefinitionBuilder(
     /**
      * Adds a parent type that this type extends.
      *
-     * @param parentType The name of the parent type.
+     * @param parentType The parent type as a [ClassTypeRef].
      * @return This builder, for method chaining.
      */
-    fun extends(parentType: String): GremlinTypeDefinitionBuilder {
+    fun extends(parentType: ClassTypeRef): GremlinTypeDefinitionBuilder {
         extendsList.add(parentType)
+        return this
+    }
+
+    /**
+     * Adds a parent type that this type extends using package and name.
+     *
+     * @param pkg The package part of the parent type (e.g., "builtin").
+     * @param name The simple name of the parent type (e.g., "any").
+     * @param isNullable Whether the parent type reference is nullable.
+     * @return This builder, for method chaining.
+     */
+    fun extends(pkg: String, name: String, isNullable: Boolean = false): GremlinTypeDefinitionBuilder {
+        extendsList.add(ClassTypeRef(`package` = pkg, type = name, isNullable = isNullable))
         return this
     }
     
@@ -244,6 +262,7 @@ class GremlinTypeDefinitionBuilder(
      */
     fun build(): GremlinTypeDefinition {
         return SimpleGremlinTypeDefinition(
+            typePackage = typePackage,
             typeName = typeName,
             extends = extendsList.toList(),
             cardinality = cardinality,
@@ -383,11 +402,12 @@ class SimpleGremlinMethodDefinition(
 
 
 /**
- * Creates a type definition builder for the given type name.
+ * Creates a type definition builder for the given type package and name.
  *
- * @param typeName The unique name of the type.
+ * @param typePackage The package part of the type's fully qualified name (e.g., "builtin").
+ * @param typeName The simple name of the type (e.g., "string").
  * @return A new [GremlinTypeDefinitionBuilder].
  */
-fun gremlinType(typeName: String): GremlinTypeDefinitionBuilder {
-    return GremlinTypeDefinitionBuilder(typeName)
+fun gremlinType(typePackage: String, typeName: String): GremlinTypeDefinitionBuilder {
+    return GremlinTypeDefinitionBuilder(typePackage, typeName)
 }

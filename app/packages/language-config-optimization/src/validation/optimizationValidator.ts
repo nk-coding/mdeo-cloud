@@ -8,7 +8,7 @@ import type {
 } from "langium";
 import type { ExtendedLangiumServices } from "@mdeo/language-common";
 import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
-import { MetaModel } from "@mdeo/language-metamodel";
+import { MetaModel, isMetamodelCompatible } from "@mdeo/language-metamodel";
 import { Model } from "@mdeo/language-model";
 import {
     RangeMultiplicity,
@@ -18,9 +18,12 @@ import {
     type ConstraintReferenceType,
     type RefinementType,
     type MultiplicityType,
-    type RangeMultiplicityType
+    type RangeMultiplicityType,
+    type FunctionFileImportType
 } from "../grammar/optimizationTypes.js";
+import { findProblemSection, getMetamodelUri } from "../features/util.js";
 import type { Range } from "vscode-languageserver-types";
+import { Script, type ScriptType } from "@mdeo/language-script";
 
 const { AstUtils, CstUtils, isLeafCstNode, GrammarUtils } = sharedImport("langium");
 
@@ -42,6 +45,7 @@ interface OptimizationAstTypes {
     ConfigProblemSection: ProblemSectionType;
     ConfigGoalSection: GoalSectionType;
     ConfigRefinement: RefinementType;
+    ConfigOptimizationFunctionFileImport: FunctionFileImportType;
 }
 
 /**
@@ -56,7 +60,8 @@ export function registerOptimizationValidationChecks(services: ExtendedLangiumSe
     const checks: ValidationChecks<OptimizationAstTypes> = {
         ConfigProblemSection: validator.validateProblemSection.bind(validator),
         ConfigGoalSection: validator.validateGoalSection.bind(validator),
-        ConfigRefinement: validator.validateRefinement.bind(validator)
+        ConfigRefinement: validator.validateRefinement.bind(validator),
+        ConfigOptimizationFunctionFileImport: validator.validateFunctionFileImport.bind(validator)
     };
 
     registry.register(checks, validator);
@@ -222,7 +227,8 @@ export class OptimizationValidator {
     }
 
     /**
-     * Checks that the model's metamodel import references the same file as the problem section's metamodel path.
+     * Checks that the model's metamodel is compatible with the problem section's metamodel.
+     * A metamodel is compatible if it is the same or is transitively imported by the expected metamodel.
      *
      * @param problem The problem section
      * @param sourceDocument The config document (used to resolve paths)
@@ -247,17 +253,17 @@ export class OptimizationValidator {
             return;
         }
 
-        const expectedMetamodelUri = this.resolveDocument(sourceDocument, problem.metamodel[0])?.uri.toString();
-        const actualMetamodelUri = this.resolveDocument(modelDocument, modelMetamodelRelativePath)?.uri.toString();
+        const expectedMetamodelDoc = this.resolveDocument(sourceDocument, problem.metamodel[0]);
+        const actualMetamodelDoc = this.resolveDocument(modelDocument, modelMetamodelRelativePath);
 
-        if (expectedMetamodelUri == undefined || actualMetamodelUri == undefined) {
+        if (expectedMetamodelDoc == undefined || actualMetamodelDoc == undefined) {
             return;
         }
 
-        if (expectedMetamodelUri !== actualMetamodelUri) {
+        if (!isMetamodelCompatible(actualMetamodelDoc, expectedMetamodelDoc, this.documents)) {
             accept(
                 "error",
-                `The model at '${problem.model[0]}' references a different metamodel than the one specified in the problem section.`,
+                `The model at '${problem.model[0]}' references a metamodel that is not compatible with the one specified in the problem section.`,
                 {
                     node: problem,
                     property: "model",
@@ -497,5 +503,68 @@ export class OptimizationValidator {
             return undefined;
         }
         return keywordNode.range;
+    }
+
+    /**
+     * Validates a function file import.
+     * Checks that imported functions come from script files that either:
+     * - Have no `using` statement (no metamodel dependency), or
+     * - Have a `using` statement with a compatible metamodel
+     *
+     * @param fileImport The function file import to validate
+     * @param accept The validation acceptor
+     */
+    validateFunctionFileImport(fileImport: FunctionFileImportType, accept: ValidationAcceptor): void {
+        const document = AstUtils.getDocument(fileImport);
+        const scriptDoc = this.resolveDocument(document, fileImport.file);
+
+        if (scriptDoc == undefined) {
+            return;
+        }
+
+        const scriptRoot = scriptDoc.parseResult?.value;
+        if (scriptRoot == undefined || scriptRoot.$type !== Script.name) {
+            return;
+        }
+
+        const scriptNode = scriptRoot as ScriptType;
+        const scriptMetamodelPath = scriptNode.metamodelImport?.file;
+
+        if (scriptMetamodelPath == undefined) {
+            return;
+        }
+
+        const problemSection = findProblemSection(fileImport);
+        const configMetamodelUri = problemSection != undefined ? getMetamodelUri(document, problemSection) : undefined;
+        const configMetamodelDoc =
+            configMetamodelUri != undefined ? this.documents.getDocument(configMetamodelUri) : undefined;
+
+        if (configMetamodelDoc == undefined) {
+            accept(
+                "error",
+                `Cannot validate imported function from '${fileImport.file}': no metamodel specified in problem section.`,
+                {
+                    node: fileImport,
+                    property: "file"
+                }
+            );
+            return;
+        }
+
+        const scriptMetamodelDoc = this.resolveDocument(scriptDoc, scriptMetamodelPath);
+        if (scriptMetamodelDoc == undefined) {
+            return;
+        }
+
+        if (!isMetamodelCompatible(scriptMetamodelDoc, configMetamodelDoc, this.documents)) {
+            accept(
+                "error",
+                `The script file '${fileImport.file}' uses a metamodel that is not compatible with the problem section's metamodel.`,
+                {
+                    node: fileImport,
+                    property: "file"
+                }
+            );
+        }
     }
 }

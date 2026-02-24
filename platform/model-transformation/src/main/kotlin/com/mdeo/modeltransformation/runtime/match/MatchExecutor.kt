@@ -425,7 +425,7 @@ class MatchExecutor {
             return false
         }
                 
-        val typeDefinition = engine.typeRegistry.getType(type.type)!!
+        val typeDefinition = engine.typeRegistry.getType(type)!!
         val registryCardinality = typeDefinition.cardinality
         return registryCardinality == VertexProperty.Cardinality.list || registryCardinality == VertexProperty.Cardinality.set
     }

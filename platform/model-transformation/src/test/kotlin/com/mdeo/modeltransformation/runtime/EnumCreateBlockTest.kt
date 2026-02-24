@@ -83,12 +83,12 @@ class EnumCreateBlockTest {
     // Index 6: enum-container.TestEnum ← type of the "TestEnum" identifier itself
     private val types: List<ReturnType> = listOf(
         VoidType(),                                                                 // 0
-        ClassTypeRef(type = "builtin.string",            isNullable = false),      // 1
-        ClassTypeRef(type = "builtin.double",            isNullable = false),      // 2
-        ClassTypeRef(type = "builtin.boolean",           isNullable = false),      // 3
-        ClassTypeRef(type = "Any",                       isNullable = true),       // 4
-        ClassTypeRef(type = "enum.TestEnum",             isNullable = false),      // 5
-        ClassTypeRef(type = "enum-container.TestEnum",   isNullable = false)       // 6
+        ClassTypeRef(`package` = "builtin", type = "string",            isNullable = false),      // 1
+        ClassTypeRef(`package` = "builtin", type = "double",            isNullable = false),      // 2
+        ClassTypeRef(`package` = "builtin", type = "boolean",           isNullable = false),      // 3
+        ClassTypeRef(`package` = "builtin", type = "any",               isNullable = true),       // 4
+        ClassTypeRef(`package` = "enum", type = "TestEnum",             isNullable = false),      // 5
+        ClassTypeRef(`package` = "enum-container", type = "TestEnum",   isNullable = false)       // 6
     )
 
     private val metamodelData = MetamodelData(
@@ -132,7 +132,7 @@ class EnumCreateBlockTest {
     private fun buildAst(): TypedAst {
         return TypedAst(
             types = types,
-            metamodelPath = "/metamodel.mm",
+            metamodelPath = "",
             statements = listOf(
                 TypedMatchStatement(
                     pattern = TypedPattern(

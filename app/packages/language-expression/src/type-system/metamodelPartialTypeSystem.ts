@@ -3,7 +3,11 @@ import { PartialTypeSystem } from "./partialTypeSystem.js";
 import { Class, Enum } from "@mdeo/language-metamodel";
 import type { InferenceProblem } from "typir";
 import type { ClassTypeRef } from "../typir-extensions/config/type.js";
-import { CLASS_PACKAGE, ENUM_PACKAGE } from "../index.js";
+import { getClassPackage, getEnumPackage } from "../features/metamodel/metamodelClassExtractor.js";
+import { sharedImport } from "@mdeo/language-shared";
+import type { AstNode } from "langium";
+
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Type system for the Metamodel language.
@@ -19,13 +23,21 @@ export class MetamodelPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
     }
 
     /**
+     * Gets the absolute path from a node's document.
+     */
+    private getAbsolutePathFromNode(node: AstNode): string {
+        const document = AstUtils.getDocument(node);
+        return document.uri.path;
+    }
+
+    /**
      * Registers type inference rules for Metamodel Class nodes.
      */
     private registerClassRules(): void {
         this.registerInferenceRule(Class, (node) => {
-            const classPackage = CLASS_PACKAGE;
-            const className = `${classPackage}.${node.name}`;
-            const classType = this.typir.TypeDefinitions.getClassTypeIfExisting(className);
+            const absolutePath = this.getAbsolutePathFromNode(node);
+            const classPackage = getClassPackage(absolutePath);
+            const classType = this.typir.TypeDefinitions.getClassTypeIfExisting(node.name, classPackage);
             if (classType == undefined) {
                 return <InferenceProblem<Specifics>>{
                     $problem: this.inferenceProblem,
@@ -35,7 +47,8 @@ export class MetamodelPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                 };
             }
             const typeRef: ClassTypeRef = {
-                type: className,
+                package: classPackage,
+                type: node.name,
                 isNullable: false
             };
             return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(typeRef);
@@ -47,9 +60,9 @@ export class MetamodelPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
      */
     private registerEnumRules(): void {
         this.registerInferenceRule(Enum, (node) => {
-            const enumPackage = ENUM_PACKAGE;
-            const enumName = `${enumPackage}.${node.name}`;
-            const enumType = this.typir.TypeDefinitions.getClassTypeIfExisting(enumName);
+            const absolutePath = this.getAbsolutePathFromNode(node);
+            const enumPackage = getEnumPackage(absolutePath);
+            const enumType = this.typir.TypeDefinitions.getClassTypeIfExisting(node.name, enumPackage);
             if (enumType == undefined) {
                 return <InferenceProblem<Specifics>>{
                     $problem: this.inferenceProblem,
@@ -59,7 +72,8 @@ export class MetamodelPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                 };
             }
             const typeRef: ClassTypeRef = {
-                type: enumName,
+                package: enumPackage,
+                type: node.name,
                 isNullable: false
             };
             return this.typir.TypeDefinitions.resolveCustomClassOrLambdaType(typeRef);

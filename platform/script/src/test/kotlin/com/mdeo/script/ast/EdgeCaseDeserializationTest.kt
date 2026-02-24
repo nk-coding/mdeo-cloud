@@ -107,11 +107,11 @@ class EdgeCaseDeserializationTest {
     
     @Test
     fun `deserialize ClassTypeRef when typeArgs field is completely absent from JSON`() {
-        val jsonString = """{"type": "builtin.string", "isNullable": false}"""
+        val jsonString = """{"package": "builtin", "type": "string", "isNullable": false}"""
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
         
         assertIs<ClassTypeRef>(result)
-        assertEquals("builtin.string", result.type)
+        assertEquals("string", result.type)
         assertEquals(false, result.isNullable)
         assertNull(result.typeArgs)
     }
@@ -276,7 +276,7 @@ class EdgeCaseDeserializationTest {
     @Test
     fun `deserialize TypedAst with empty imports and functions`() {
         val jsonString = """{
-            "types": [{"type": "builtin.int", "isNullable": false}],
+            "types": [{"package": "builtin", "type": "int", "isNullable": false}],
             "imports": [],
             "functions": []
         }"""
@@ -342,20 +342,23 @@ class EdgeCaseDeserializationTest {
     @Test
     fun `deserialize deeply nested type arguments`() {
         val jsonString = """{
-            "type": "builtin.map",
+            "package": "builtin",
+            "type": "map",
             "isNullable": false,
             "typeArgs": {
-                "K": {"type": "builtin.string", "isNullable": false},
+                "K": {"package": "builtin", "type": "string", "isNullable": false},
                 "V": {
-                    "type": "builtin.List",
+                    "package": "builtin",
+                    "type": "List",
                     "isNullable": true,
                     "typeArgs": {
                         "T": {
-                            "type": "builtin.map",
+                            "package": "builtin",
+                            "type": "map",
                             "isNullable": false,
                             "typeArgs": {
-                                "K": {"type": "builtin.int", "isNullable": false},
-                                "V": {"type": "builtin.string", "isNullable": true}
+                                "K": {"package": "builtin", "type": "int", "isNullable": false},
+                                "V": {"package": "builtin", "type": "string", "isNullable": true}
                             }
                         }
                     }
@@ -365,16 +368,16 @@ class EdgeCaseDeserializationTest {
         val result = json.decodeFromString(ReturnTypeSerializer, jsonString)
         
         assertIs<ClassTypeRef>(result)
-        assertEquals("builtin.map", result.type)
+        assertEquals("map", result.type)
         
         val vType = result.typeArgs?.get("V")
         assertIs<ClassTypeRef>(vType)
-        assertEquals("builtin.List", vType.type)
+        assertEquals("List", vType.type)
         assertEquals(true, vType.isNullable)
         
         val innerT = vType.typeArgs?.get("T")
         assertIs<ClassTypeRef>(innerT)
-        assertEquals("builtin.map", innerT.type)
+        assertEquals("map", innerT.type)
     }
 
     // ============================================================
@@ -410,13 +413,14 @@ class EdgeCaseDeserializationTest {
     @Test
     fun `deserialize ClassTypeRef with lambda type argument`() {
         val jsonString = """{
-            "type": "builtin.List",
+            "package": "builtin",
+            "type": "List",
             "isNullable": false,
             "typeArgs": {
                 "T": {
-                    "returnType": {"type": "builtin.int", "isNullable": false},
+                    "returnType": {"package": "builtin", "type": "int", "isNullable": false},
                     "parameters": [
-                        {"name": "x", "type": {"type": "builtin.int", "isNullable": false}}
+                        {"name": "x", "type": {"package": "builtin", "type": "int", "isNullable": false}}
                     ],
                     "isNullable": false
                 }

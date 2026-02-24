@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * Tests for the Scope data structure.
  */
 class ScopeTest {
-    private fun type(name: String): ReturnType = ClassTypeRef("builtin.$name", false)
+    private fun type(name: String): ReturnType = ClassTypeRef("builtin", "$name", false)
     
 
     

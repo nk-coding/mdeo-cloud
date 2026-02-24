@@ -77,8 +77,8 @@ class ListLiteralCompiler : ExpressionCompiler() {
     private fun getElementType(listExpr: TypedListLiteralExpression, context: CompilationContext): com.mdeo.expression.ast.types.ReturnType {
         val listType = context.getType(listExpr.evalType)
         if (listType is ClassTypeRef && listType.typeArgs?.isNotEmpty() == true) {
-            return listType.typeArgs?.values?.first() ?: ClassTypeRef(type = "builtin.Any", isNullable = true)
+            return listType.typeArgs?.values?.first() ?: ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true)
         }
-        return ClassTypeRef(type = "builtin.Any", isNullable = true)
+        return ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true)
     }
 }

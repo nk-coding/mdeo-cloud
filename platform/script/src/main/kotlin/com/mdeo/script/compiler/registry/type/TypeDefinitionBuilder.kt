@@ -1,5 +1,6 @@
 package com.mdeo.script.compiler.registry.type
 
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.expression.ast.types.VoidType
@@ -13,8 +14,8 @@ import com.mdeo.expression.ast.types.VoidType
  *
  * Example usage:
  * ```kotlin
- * typeDefinition("builtin.int") {
- *     extends("builtin.any")
+ * typeDefinition("builtin", "int") {
+ *     extends("builtin", "any")
  *
  *     // Non-overloaded method: use empty string as overload key
  *     staticMethod("abs") {
@@ -28,8 +29,8 @@ import com.mdeo.expression.ast.types.VoidType
  * }
  * ```
  */
-fun typeDefinition(typeName: String, block: TypeDefinitionBuilder.() -> Unit): TypeDefinition {
-    val builder = TypeDefinitionBuilder(typeName)
+fun typeDefinition(typePackage: String, typeName: String, block: TypeDefinitionBuilder.() -> Unit): TypeDefinition {
+    val builder = TypeDefinitionBuilder(typePackage, typeName)
     builder.block()
     return builder.build()
 }
@@ -37,11 +38,12 @@ fun typeDefinition(typeName: String, block: TypeDefinitionBuilder.() -> Unit): T
 /**
  * Builder for TypeDefinition.
  *
- * @param typeName The type name being defined.
+ * @param typePackage The package part of the type's fully qualified name (e.g., "builtin", "class/path/to/file").
+ * @param typeName The simple name of the type being defined (e.g., "int", "House").
  */
-class TypeDefinitionBuilder(private val typeName: String) {
+class TypeDefinitionBuilder(private val typePackage: String, private val typeName: String) {
 
-    private val extends = mutableListOf<String>()
+    private val extends = mutableListOf<ClassTypeRef>()
     private val methods = mutableListOf<MethodDefinition>()
     private val properties = mutableListOf<PropertyDefinition>()
     private var jvmClassName: String? = null
@@ -51,10 +53,21 @@ class TypeDefinitionBuilder(private val typeName: String) {
     /**
      * Specifies that this type extends another type.
      *
-     * @param parentTypeName The parent type name.
+     * @param parentType The parent type as a [ClassTypeRef].
      */
-    fun extends(parentTypeName: String) {
-        extends.add(parentTypeName)
+    fun extends(parentType: ClassTypeRef) {
+        extends.add(parentType)
+    }
+
+    /**
+     * Specifies that this type extends another type using package and name.
+     *
+     * @param pkg The package part of the parent type (e.g., "builtin", "class/path/to/file").
+     * @param name The simple name of the parent type (e.g., "any", "House").
+     * @param isNullable Whether the parent type reference is nullable.
+     */
+    fun extends(pkg: String, name: String, isNullable: Boolean = false) {
+        extends.add(ClassTypeRef(`package` = pkg, type = name, isNullable = isNullable))
     }
 
     /**
@@ -136,7 +149,7 @@ class TypeDefinitionBuilder(private val typeName: String) {
      * Builds the type definition.
      */
     fun build(): TypeDefinition {
-        val typeDef = TypeDefinitionImpl(typeName, extends, jvmClassName, primitiveDescriptor, wrapperClassName)
+        val typeDef = TypeDefinitionImpl(typePackage, typeName, extends, jvmClassName, primitiveDescriptor, wrapperClassName)
         methods.forEach { typeDef.addMethod(it) }
         properties.forEach { typeDef.addProperty(it) }
         return typeDef

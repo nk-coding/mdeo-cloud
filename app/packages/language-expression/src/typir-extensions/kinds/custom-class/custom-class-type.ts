@@ -111,7 +111,8 @@ export class CustomClassTypeImplementation
                 typeArgs[argName] = argType.definition;
             }
             this._definition = {
-                type: `${definition.package}.${definition.name}`,
+                package: definition.package,
+                type: definition.name,
                 isNullable: this.isNullable,
                 typeArgs: typeArgs
             };
@@ -161,13 +162,42 @@ export function isCustomClassType(type: unknown): type is CustomClassType {
 }
 
 /**
- * Build a unique identifier for a custom class type.
- *
- * @param details The class type details
+ * Escapes special characters in a string for use in type identifiers.
+ * Special characters: . \ < > ?
+ * @param str The string to escape
+ * @returns The escaped string
+ */
+export function escapeIdentifierPart(str: string): string {
+    return str.replace(/[.\\<>?]/g, "\\$&");
+}
+
+/**
+ * Unescapes special characters in an identifier part.
+ * @param str The escaped string
+ * @returns The unescaped string
+ */
+export function unescapeIdentifierPart(str: string): string {
+    return str.replace(/\\([.\\<>?])/g, "$1");
+}
+
+/**
+ * Builds a unique identifier for a custom class type.
+ * Uses escaping to handle special characters in package and name.
+ * Format: escapedPackage.escapedName<typeArg1,typeArg2>?
+ * @param details The custom class details
  * @returns The unique identifier string
  */
 export function buildCustomClassIdentifier(details: CustomClassDetails<any>): string {
-    return buildCustomClassName(details, true);
+    const escapedPackage = escapeIdentifierPart(details.definition.package);
+    const escapedName = escapeIdentifierPart(details.definition.name);
+
+    const typeArgsStr = Array.from(details.typeArgs.values())
+        .map((typeArg) => typeArg.getIdentifier())
+        .join(",");
+
+    const baseName = `${escapedPackage}.${escapedName}`;
+    const withTypeArgs = typeArgsStr.length > 0 ? `${baseName}<${typeArgsStr}>` : baseName;
+    return details.isNullable ? `${withTypeArgs}?` : withTypeArgs;
 }
 
 /**
@@ -177,7 +207,7 @@ export function buildCustomClassIdentifier(details: CustomClassDetails<any>): st
  * @param isIdentifier Whether to build a full identifier (with package) or just a name
  * @returns The name string
  */
-export function buildCustomClassName(details: CustomClassDetails<any>, isIdentifier: boolean): string {
+function buildCustomClassName(details: CustomClassDetails<any>, isIdentifier: boolean): string {
     const name = isIdentifier ? details.definition.package + "." + details.definition.name : details.definition.name;
     const typeArgsStr = Array.from(details.typeArgs.values())
         .map((typeArg) => (isIdentifier ? typeArg.getIdentifier() : typeArg.getName()))

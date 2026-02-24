@@ -110,7 +110,8 @@ class TypeCheckCompiler(
         checkType: ClassTypeRef,
         isNegated: Boolean
     ): GremlinCompilationResult {
-        val typeName = extractTypeName(checkType.type)
+        // checkType.type is already the simple type name (e.g., "Person", not "class/path.Person")
+        val typeName = checkType.type
         val (trueValue, falseValue) = if (isNegated) Pair(false, true) else Pair(true, false)
 
         val traversal = (innerResult.traversal as GraphTraversal<Any, Any>).choose(
@@ -144,19 +145,5 @@ class TypeCheckCompiler(
         val result = if (isNegated) false else true
         val baseTraversal = innerResult.traversal as GraphTraversal<Any, Any>?
         return GremlinCompilationResult.constant<Any, Boolean>(result, baseTraversal)
-    }
-
-    /**
-     * Extracts the simple type name from a fully qualified type string.
-     *
-     * Type strings may be in the form "namespace.TypeName" and this method
-     * returns just the "TypeName" part for use with hasLabel(). For example,
-     * "myapp.Person" becomes "Person".
-     *
-     * @param typeString The fully qualified type name (may contain dots)
-     * @return The simple type name (everything after the last dot, or the whole string if no dots)
-     */
-    private fun extractTypeName(typeString: String): String {
-        return typeString.substringAfterLast(".")
     }
 }

@@ -344,7 +344,7 @@ class ScopeBuilder(
                 val forParamsScope = scope.createChild()
                 val varType = context.getType(statement.variableType)
                 forParamsScope.declareVariable(statement.variableName, varType)
-                val iteratorType = ClassTypeRef("java.util.Iterator", false)
+                val iteratorType = ClassTypeRef("java.util", "Iterator", false)
                 forParamsScope.declareVariable("\$iterator\$${statement.variableName}", iteratorType)
                 collectFromExpression(statement.iterable, scope)
                 val forBodyScope = forParamsScope.createChild()
@@ -599,12 +599,12 @@ object RefTypeUtil {
      * @return The internal class name of the Ref type.
      */
     fun getRefClassName(type: ReturnType): String {
-        if (type is ClassTypeRef) {
+        if (type is ClassTypeRef && type.`package` == "builtin") {
             return when (type.type) {
-                "builtin.int" -> "com/mdeo/script/runtime/refs/IntRef"
-                "builtin.long" -> "com/mdeo/script/runtime/refs/LongRef"
-                "builtin.float" -> "com/mdeo/script/runtime/refs/FloatRef"
-                "builtin.double" -> "com/mdeo/script/runtime/refs/DoubleRef"
+                "int" -> "com/mdeo/script/runtime/refs/IntRef"
+                "long" -> "com/mdeo/script/runtime/refs/LongRef"
+                "float" -> "com/mdeo/script/runtime/refs/FloatRef"
+                "double" -> "com/mdeo/script/runtime/refs/DoubleRef"
                 else -> "com/mdeo/script/runtime/refs/ObjectRef"
             }
         }
@@ -618,12 +618,12 @@ object RefTypeUtil {
      * @return The field descriptor.
      */
     fun getRefValueDescriptor(type: ReturnType): String {
-        if (type is ClassTypeRef) {
+        if (type is ClassTypeRef && type.`package` == "builtin") {
             return when (type.type) {
-                "builtin.int" -> "I"
-                "builtin.long" -> "J"
-                "builtin.float" -> "F"
-                "builtin.double" -> "D"
+                "int" -> "I"
+                "long" -> "J"
+                "float" -> "F"
+                "double" -> "D"
                 else -> "Ljava/lang/Object;"
             }
         }

@@ -13,7 +13,7 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * @return The Boolean type definition for the Gremlin type registry
  */
 fun createBooleanType(): GremlinTypeDefinition {
-    return gremlinType("builtin.boolean")
-        .extends("builtin.any")
+    return gremlinType("builtin", "boolean")
+        .extends("builtin", "any")
         .build()
 }

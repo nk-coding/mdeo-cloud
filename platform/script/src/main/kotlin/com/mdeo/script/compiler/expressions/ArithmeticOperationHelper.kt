@@ -199,13 +199,13 @@ object ArithmeticOperationHelper {
      */
     private fun appendToStringBuilder(type: ReturnType, mv: MethodVisitor) {
         val descriptor = when {
-            type is ClassTypeRef -> when (type.type) {
-                "builtin.int" -> "(I)Ljava/lang/StringBuilder;"
-                "builtin.long" -> "(J)Ljava/lang/StringBuilder;"
-                "builtin.float" -> "(F)Ljava/lang/StringBuilder;"
-                "builtin.double" -> "(D)Ljava/lang/StringBuilder;"
-                "builtin.boolean" -> "(Z)Ljava/lang/StringBuilder;"
-                "builtin.string" -> "(Ljava/lang/String;)Ljava/lang/StringBuilder;"
+            type is ClassTypeRef && type.`package` == "builtin" -> when (type.type) {
+                "int" -> "(I)Ljava/lang/StringBuilder;"
+                "long" -> "(J)Ljava/lang/StringBuilder;"
+                "float" -> "(F)Ljava/lang/StringBuilder;"
+                "double" -> "(D)Ljava/lang/StringBuilder;"
+                "boolean" -> "(Z)Ljava/lang/StringBuilder;"
+                "string" -> "(Ljava/lang/String;)Ljava/lang/StringBuilder;"
                 else -> "(Ljava/lang/Object;)Ljava/lang/StringBuilder;"
             }
             else -> "(Ljava/lang/Object;)Ljava/lang/StringBuilder;"
@@ -279,7 +279,7 @@ object ArithmeticOperationHelper {
     ) {
         context.compileExpression(operand, mv, operandType)
         if (operandType is ClassTypeRef && operandType.isNullable && CoercionUtil.isPrimitiveType(operandType)) {
-            CoercionUtil.emitUnboxing(operandTypeName, mv)
+            CoercionUtil.emitUnboxing(operandType, mv)
         }
         TypeConversionUtil.emitConversion(operandTypeName, targetTypeName, mv)
     }

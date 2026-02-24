@@ -138,21 +138,4 @@ export class AssociationEndCache {
 
         return associations;
     }
-
-    /**
-     * Clears the entire cache.
-     * Useful for testing or manual cache invalidation.
-     */
-    clear(): void {
-        this.cache.clear();
-    }
-
-    /**
-     * Clears the cache for a specific document.
-     *
-     * @param documentUri The URI of the document to clear
-     */
-    clearDocument(documentUri: URI): void {
-        this.cache.clear(documentUri);
-    }
 }

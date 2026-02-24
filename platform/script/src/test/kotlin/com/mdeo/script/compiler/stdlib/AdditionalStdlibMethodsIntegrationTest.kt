@@ -36,7 +36,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `int iota generates sequence from start to end with step`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -74,7 +74,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `int to generates sequence from this to end`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -225,7 +225,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `long iota generates sequence from start to end with step`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val longType = longType()
                 val intType = intType()
                 function(
@@ -264,7 +264,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `long to generates sequence from this to end`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val longType = longType()
                 val intType = intType()
                 function(
@@ -516,7 +516,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         fun `any asBoolean converts true string to boolean`() {
             val ast = buildTypedAst {
                 val stringType = stringType()
-                val anyType = addType(ClassTypeRef("builtin.any", false))
+                val anyType = addType(ClassTypeRef("builtin", "any", false))
                 val boolType = booleanType()
                 function(
                     name = "testFunction",
@@ -971,7 +971,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `collection count returns occurrences of element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -1007,7 +1007,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `collection count returns zero for missing element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 function(
                     name = "testFunction",
@@ -1045,7 +1045,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `ordered collection removeAt removes element at index`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val anyType = anyNullableType()
                 function(
@@ -1093,7 +1093,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         @Test
         fun `ordered collection removeAt returns removed element`() {
             val ast = buildTypedAst {
-                val listType = addType(ClassTypeRef("builtin.List", false))
+                val listType = addType(ClassTypeRef("builtin", "List", false))
                 val intType = intType()
                 val anyType = anyNullableType()
                 function(

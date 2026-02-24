@@ -51,10 +51,30 @@ class TransformationEngine(
      * This registry is built during initialization using the MetamodelData. It uses the GLOBAL
      * registry as a parent, so all stdlib types remain available.
      *
-     * Metamodel types (e.g., "class.House") are registered with their
-     * simple names prefixed with "class." and include graph properties and edge associations.
+     * Metamodel types are registered with package prefixes:
+     * - "class/path/to/metamodel.ClassName" for metamodel classes
+     * - "enum/path/to/metamodel.EnumName" for enum value types
+     * - "enum-container/path/to/metamodel.EnumName" for enum container types
      */
     val typeRegistry: GremlinTypeRegistry
+
+    /**
+     * The class package prefix derived from the metamodel path.
+     * Example: if metamodelPath is "/project/models/house", classPackage is "class/project/models/house"
+     */
+    val classPackage: String = "class${ast.metamodelPath}"
+
+    /**
+     * The enum package prefix derived from the metamodel path.
+     * Example: if metamodelPath is "/project/models/house", enumPackage is "enum/project/models/house"
+     */
+    val enumPackage: String = "enum${ast.metamodelPath}"
+
+    /**
+     * The enum container package prefix derived from the metamodel path.
+     * Example: if metamodelPath is "/project/models/house", enumContainerPackage is "enum-container/project/models/house"
+     */
+    val enumContainerPackage: String = "enum-container${ast.metamodelPath}"
 
     init {
         typeRegistry = createTypeRegistry(metamodelData)
@@ -164,9 +184,9 @@ class TransformationEngine(
      * Creates a dynamic type registry including metamodel classes and enums.
      * 
      * Type references use the following formats:
-     * - "class.ClassName" for metamodel classes
-     * - "enum.EnumName" for enum value types (stored on properties)
-     * - "enum-container.EnumName" for enum container types (the singleton for accessing enum values)
+     * - "class/path/to/metamodel.ClassName" for metamodel classes
+     * - "enum/path/to/metamodel.EnumName" for enum value types (stored on properties)
+     * - "enum-container/path/to/metamodel.EnumName" for enum container types (the singleton for accessing enum values)
      *
      * @param metamodelData The metamodel data containing class, enum, and association definitions.
      */
@@ -178,12 +198,10 @@ class TransformationEngine(
         val classAssociations = buildClassAssociationsMap(metamodelData.associations)
 
         for (classData in metamodelData.classes) {
-            val fqn = "class.${classData.name}"
-
-            val builder = gremlinType(fqn)
+            val builder = gremlinType(classPackage, classData.name)
 
             for (superClass in classData.extends) {
-                builder.extends("class.$superClass")
+                builder.extends(classPackage, superClass)
             }
 
             for (property in classData.properties) {
@@ -217,11 +235,11 @@ class TransformationEngine(
      * 
      * For each enum in the metamodel, two types are registered:
      * 
-     * 1. "enum-container.EnumName" - The container type (singleton) used to access enum values.
+     * 1. "enum-container/path/to/metamodel.EnumName" - The container type (singleton) used to access enum values.
      *    Each entry is a property that returns a constant string in the format `EnumName`.`entryName`.
      *    Accessing an entry like `EnumName.entryName` produces this string literal.
      * 
-     * 2. "enum.EnumName" - The actual enum value type, used when a property has an enum type.
+     * 2. "enum/path/to/metamodel.EnumName" - The actual enum value type, used when a property has an enum type.
      *    This represents the stored enum value on an object property.
      * 
      * @param registry The registry to add enum types to.
@@ -231,14 +249,14 @@ class TransformationEngine(
         for (enumData in metamodelData.enums) {
             val enumName = enumData.name
 
-            val containerBuilder = gremlinType("enum-container.$enumName")
+            val containerBuilder = gremlinType(enumContainerPackage, enumName)
             for (entryName in enumData.entries) {
                 val enumValueString = "`$enumName`.`$entryName`"
                 containerBuilder.enumEntry(entryName, enumValueString)
             }
             registry.register(containerBuilder.build())
 
-            val valueTypeBuilder = gremlinType("enum.$enumName")
+            val valueTypeBuilder = gremlinType(enumPackage, enumName)
             registry.register(valueTypeBuilder.build())
         }
     }

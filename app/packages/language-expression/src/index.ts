@@ -1,4 +1,5 @@
 export * from "./features/metamodel/classTypeGenerator.js";
+export * from "./features/metamodel/enumTypeGenerator.js";
 export * from "./features/metamodel/metamodelClassExtractor.js";
 export * from "./features/metamodel/metamodelClassInfo.js";
 export * from "./features/metamodel/metamodelEnumInfo.js";
@@ -23,7 +24,6 @@ export * from "./plugin/statementTypedAstConverter.js";
 export * from "./plugin/typedAst.js";
 export * from "./plugin/typedAstConverter.js";
 export * from "./plugin/typedAstMerger.js";
-export * from "./plugin/typedClassConverter.js";
 export * from "./stdlib/collections/Bag.js";
 export * from "./stdlib/collections/Collection.js";
 export * from "./stdlib/collections/Iterable.js";

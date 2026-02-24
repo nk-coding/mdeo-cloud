@@ -9,8 +9,8 @@ import com.mdeo.script.compiler.registry.type.typeDefinition
  * Set is a mutable collection that does not allow duplicates.
  */
 fun createSetType(): TypeDefinition {
-    return typeDefinition("builtin.Set") {
+    return typeDefinition("builtin", "Set") {
         jvmClass("java/util/Set")
-        extends("builtin.Collection")
+        extends("builtin", "Collection")
     }
 }

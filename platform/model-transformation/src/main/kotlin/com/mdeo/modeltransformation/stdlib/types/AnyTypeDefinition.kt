@@ -15,6 +15,6 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  * @return The Any type definition for the Gremlin type registry
  */
 fun createAnyType(): GremlinTypeDefinition {
-    return gremlinType("builtin.any")
+    return gremlinType("builtin", "any")
         .build()
 }

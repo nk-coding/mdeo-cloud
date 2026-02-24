@@ -1,5 +1,6 @@
 package com.mdeo.script.compiler.registry.type
 
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
 import org.objectweb.asm.MethodVisitor
@@ -12,15 +13,20 @@ import org.objectweb.asm.MethodVisitor
  */
 interface TypeDefinition {
     /**
-     * The unique name of this type (e.g., "builtin.int", "builtin.List").
+     * The package part of this type's fully qualified name (e.g., "builtin", "class/path/to/file").
+     */
+    val typePackage: String
+
+    /**
+     * The simple name of this type (e.g., "int", "House").
      */
     val typeName: String
 
     /**
-     * The names of types this type extends.
+     * The types this type extends, expressed as [ClassTypeRef].
      * Members from parent types are inherited and can be looked up.
      */
-    val extends: List<String>
+    val extends: List<ClassTypeRef>
 
     /**
      * The JVM internal class name for this type (e.g., "java/lang/String", "java/util/List").

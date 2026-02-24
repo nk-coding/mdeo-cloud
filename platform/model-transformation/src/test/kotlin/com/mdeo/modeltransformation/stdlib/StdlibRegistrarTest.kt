@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import com.mdeo.expression.ast.types.ClassTypeRef
 
 /**
  * Tests for [StdlibRegistrar] and standard library type definitions.
@@ -32,24 +33,24 @@ class StdlibRegistrarTest {
 
         @Test
         fun `registers all primitive types`() {
-            assertTrue(registry.hasType("builtin.any"))
-            assertTrue(registry.hasType("builtin.int"))
-            assertTrue(registry.hasType("builtin.long"))
-            assertTrue(registry.hasType("builtin.float"))
-            assertTrue(registry.hasType("builtin.double"))
-            assertTrue(registry.hasType("builtin.boolean"))
-            assertTrue(registry.hasType("builtin.string"))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "any", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "int", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "long", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "float", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "double", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "boolean", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "string", false)))
         }
 
         @Test
         fun `registers all collection types`() {
-            assertTrue(registry.hasType("builtin.Collection"))
-            assertTrue(registry.hasType("builtin.Collection"))
-            assertTrue(registry.hasType("builtin.OrderedCollection"))
-            assertTrue(registry.hasType("builtin.List"))
-            assertTrue(registry.hasType("builtin.Set"))
-            assertTrue(registry.hasType("builtin.OrderedSet"))
-            assertTrue(registry.hasType("builtin.Bag"))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "Collection", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "Collection", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "OrderedCollection", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "List", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "Set", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "OrderedSet", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "Bag", false)))
         }
     }
 
@@ -58,43 +59,43 @@ class StdlibRegistrarTest {
 
         @Test
         fun `int has abs method`() {
-            val method = registry.lookupMethod("builtin.int", "abs", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "abs", "")
             assertNotNull(method)
         }
 
         @Test
         fun `int has max method`() {
-            val method = registry.lookupMethod("builtin.int", "max", "builtin.int")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "max", "builtin.int")
             assertNotNull(method)
         }
 
         @Test
         fun `int has min method`() {
-            val method = registry.lookupMethod("builtin.int", "min", "builtin.int")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "min", "builtin.int")
             assertNotNull(method)
         }
 
         @Test
         fun `int has pow method`() {
-            val method = registry.lookupMethod("builtin.int", "pow", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "pow", "")
             assertNotNull(method)
         }
 
         @Test
         fun `int has mod method`() {
-            val method = registry.lookupMethod("builtin.int", "mod", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "mod", "")
             assertNotNull(method)
         }
 
         @Test
         fun `int has log method`() {
-            val method = registry.lookupMethod("builtin.int", "log", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "log", "")
             assertNotNull(method)
         }
 
         @Test
         fun `int has log10 method`() {
-            val method = registry.lookupMethod("builtin.int", "log10", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "int", false), "log10", "")
             assertNotNull(method)
         }
     }
@@ -104,13 +105,13 @@ class StdlibRegistrarTest {
 
         @Test
         fun `long has abs method`() {
-            val method = registry.lookupMethod("builtin.long", "abs", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "long", false), "abs", "")
             assertNotNull(method)
         }
 
         @Test
         fun `long has max method`() {
-            val method = registry.lookupMethod("builtin.long", "max", "builtin.long")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "long", false), "max", "builtin.long")
             assertNotNull(method)
         }
     }
@@ -120,25 +121,25 @@ class StdlibRegistrarTest {
 
         @Test
         fun `float has abs method`() {
-            val method = registry.lookupMethod("builtin.float", "abs", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "float", false), "abs", "")
             assertNotNull(method)
         }
 
         @Test
         fun `float has floor method`() {
-            val method = registry.lookupMethod("builtin.float", "floor", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "float", false), "floor", "")
             assertNotNull(method)
         }
 
         @Test
         fun `float has ceiling method`() {
-            val method = registry.lookupMethod("builtin.float", "ceiling", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "float", false), "ceiling", "")
             assertNotNull(method)
         }
 
         @Test
         fun `float has round method`() {
-            val method = registry.lookupMethod("builtin.float", "round", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "float", false), "round", "")
             assertNotNull(method)
         }
     }
@@ -148,13 +149,13 @@ class StdlibRegistrarTest {
 
         @Test
         fun `double has abs method`() {
-            val method = registry.lookupMethod("builtin.double", "abs", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "double", false), "abs", "")
             assertNotNull(method)
         }
 
         @Test
         fun `double has round method`() {
-            val method = registry.lookupMethod("builtin.double", "round", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "double", false), "round", "")
             assertNotNull(method)
         }
     }
@@ -164,85 +165,85 @@ class StdlibRegistrarTest {
 
         @Test
         fun `Collection has size method`() {
-            val method = registry.lookupMethod("builtin.Collection", "size", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "size", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has isEmpty method`() {
-            val method = registry.lookupMethod("builtin.Collection", "isEmpty", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "isEmpty", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has notEmpty method`() {
-            val method = registry.lookupMethod("builtin.Collection", "notEmpty", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "notEmpty", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has sum method`() {
-            val method = registry.lookupMethod("builtin.Collection", "sum", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "sum", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has first method`() {
-            val method = registry.lookupMethod("builtin.Collection", "first", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "first", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has last method`() {
-            val method = registry.lookupMethod("builtin.Collection", "last", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "last", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has filter lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "filter", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "filter", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has map lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "map", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "map", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has exists lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "exists", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "exists", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has all lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "all", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "all", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has none lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "none", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "none", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has one lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "one", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "one", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has find lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "find", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "find", "")
             assertNotNull(method)
         }
 
         @Test
         fun `Collection has reject lambda method`() {
-            val method = registry.lookupMethod("builtin.Collection", "reject", "")
+            val method = registry.lookupMethod(ClassTypeRef("builtin", "Collection", false), "reject", "")
             assertNotNull(method)
         }
     }
@@ -252,58 +253,58 @@ class StdlibRegistrarTest {
 
         @Test
         fun `Collection extends any`() {
-            val collectionType = registry.getType("builtin.Collection")
+            val collectionType = registry.getType(ClassTypeRef("builtin", "Collection", false))
             assertNotNull(collectionType)
-            assertTrue(collectionType.extends.contains("builtin.any"))
+            assertTrue(collectionType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `List extends OrderedCollection`() {
-            val listType = registry.getType("builtin.List")
+            val listType = registry.getType(ClassTypeRef("builtin", "List", false))
             assertNotNull(listType)
-            assertTrue(listType.extends.contains("builtin.OrderedCollection"))
+            assertTrue(listType.extends.contains(ClassTypeRef("builtin", "OrderedCollection", false)))
         }
 
         @Test
         fun `int extends any`() {
-            val intType = registry.getType("builtin.int")
+            val intType = registry.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
-            assertTrue(intType.extends.contains("builtin.any"))
+            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `string extends any`() {
-            val stringType = registry.getType("builtin.string")
+            val stringType = registry.getType(ClassTypeRef("builtin", "string", false))
             assertNotNull(stringType)
-            assertTrue(stringType.extends.contains("builtin.any"))
+            assertTrue(stringType.extends.contains(ClassTypeRef("builtin", "any", false)))
         }
 
         @Test
         fun `OrderedCollection extends Collection`() {
-            val orderedType = registry.getType("builtin.OrderedCollection")
+            val orderedType = registry.getType(ClassTypeRef("builtin", "OrderedCollection", false))
             assertNotNull(orderedType)
-            assertTrue(orderedType.extends.contains("builtin.Collection"))
+            assertTrue(orderedType.extends.contains(ClassTypeRef("builtin", "Collection", false)))
         }
 
         @Test
         fun `OrderedSet extends OrderedCollection`() {
-            val setType = registry.getType("builtin.OrderedSet")
+            val setType = registry.getType(ClassTypeRef("builtin", "OrderedSet", false))
             assertNotNull(setType)
-            assertTrue(setType.extends.contains("builtin.OrderedCollection"))
+            assertTrue(setType.extends.contains(ClassTypeRef("builtin", "OrderedCollection", false)))
         }
 
         @Test
         fun `Set extends Collection`() {
-            val setType = registry.getType("builtin.Set")
+            val setType = registry.getType(ClassTypeRef("builtin", "Set", false))
             assertNotNull(setType)
-            assertTrue(setType.extends.contains("builtin.Collection"))
+            assertTrue(setType.extends.contains(ClassTypeRef("builtin", "Collection", false)))
         }
 
         @Test
         fun `Bag extends Collection`() {
-            val bagType = registry.getType("builtin.Bag")
+            val bagType = registry.getType(ClassTypeRef("builtin", "Bag", false))
             assertNotNull(bagType)
-            assertTrue(bagType.extends.contains("builtin.Collection"))
+            assertTrue(bagType.extends.contains(ClassTypeRef("builtin", "Collection", false)))
         }
     }
 }

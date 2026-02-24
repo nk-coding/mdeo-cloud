@@ -8,27 +8,31 @@ export const ReadonlyMapType = classType("ReadonlyMap")
     .generics("K", "V")
     .extends(DefaultTypeNames.Any)
     .method("containsKey", (m) =>
-        m.signature((s) => s.param("key", genericTypeRef("K")).returns(typeRef(DefaultTypeNames.String).build()))
+        m.signature((s) =>
+            s.param("key", genericTypeRef("K")).returns(typeRef("builtin", DefaultTypeNames.String).build())
+        )
     )
     .method("containsValue", (m) =>
-        m.signature((s) => s.param("value", genericTypeRef("V")).returns(typeRef(DefaultTypeNames.String).build()))
+        m.signature((s) =>
+            s.param("value", genericTypeRef("V")).returns(typeRef("builtin", DefaultTypeNames.String).build())
+        )
     )
     .method("get", (m) => m.signature((s) => s.param("key", genericTypeRef("K")).returns(genericTypeRef("V"))))
-    .method("isEmpty", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.String).build())))
+    .method("isEmpty", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.String).build())))
     .method("keySet", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("ReadonlySet")
+                typeRef("builtin", "ReadonlySet")
                     .withTypeArgs({ T: genericTypeRef("K") })
                     .build()
             )
         )
     )
-    .method("size", (m) => m.signature((s) => s.returns(typeRef(DefaultTypeNames.Int).build())))
+    .method("size", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Int).build())))
     .method("values", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("ReadonlyBag")
+                typeRef("builtin", "ReadonlyBag")
                     .withTypeArgs({ T: genericTypeRef("V") })
                     .build()
             )

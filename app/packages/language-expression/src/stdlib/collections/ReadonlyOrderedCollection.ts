@@ -8,16 +8,20 @@ export const ReadonlyOrderedCollectionType = classType("ReadonlyOrderedCollectio
     .generics("T")
     .extends("ReadonlyCollection", { T: genericTypeRef("T") })
     .method("at", (m) =>
-        m.signature((s) => s.param("index", typeRef(DefaultTypeNames.Int).build()).returns(genericTypeRef("T")))
+        m.signature((s) =>
+            s.param("index", typeRef("builtin", DefaultTypeNames.Int).build()).returns(genericTypeRef("T"))
+        )
     )
     .method("first", (m) => m.signature((s) => s.returns(genericTypeRef("T"))))
     .method("indexOf", (m) =>
-        m.signature((s) => s.param("item", genericTypeRef("T")).returns(typeRef(DefaultTypeNames.Int).build()))
+        m.signature((s) =>
+            s.param("item", genericTypeRef("T")).returns(typeRef("builtin", DefaultTypeNames.Int).build())
+        )
     )
     .method("invert", (m) =>
         m.signature((s) =>
             s.returns(
-                typeRef("ReadonlyOrderedCollection")
+                typeRef("builtin", "ReadonlyOrderedCollection")
                     .withTypeArgs({ T: genericTypeRef("T") })
                     .build()
             )

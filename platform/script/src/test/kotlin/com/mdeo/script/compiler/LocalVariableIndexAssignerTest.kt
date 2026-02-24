@@ -14,13 +14,13 @@ class LocalVariableIndexAssignerTest {
     private fun createContext(vararg types: String): CompilationContext {
         val typeList = types.map { 
             when (it) {
-                "int" -> ClassTypeRef("builtin.int", false)
-                "long" -> ClassTypeRef("builtin.long", false)
-                "float" -> ClassTypeRef("builtin.float", false)
-                "double" -> ClassTypeRef("builtin.double", false)
-                "boolean" -> ClassTypeRef("builtin.boolean", false)
-                "string" -> ClassTypeRef("builtin.string", false)
-                else -> ClassTypeRef("builtin.any", true)
+                "int" -> ClassTypeRef("builtin", "int", false)
+                "long" -> ClassTypeRef("builtin", "long", false)
+                "float" -> ClassTypeRef("builtin", "float", false)
+                "double" -> ClassTypeRef("builtin", "double", false)
+                "boolean" -> ClassTypeRef("builtin", "boolean", false)
+                "string" -> ClassTypeRef("builtin", "string", false)
+                else -> ClassTypeRef("builtin", "any", true)
             }
         }
         val ast = TypedAst(types = typeList, imports = emptyList(), functions = emptyList())
@@ -28,13 +28,13 @@ class LocalVariableIndexAssignerTest {
     }
     
     private fun type(name: String): ReturnType = when (name) {
-        "int" -> ClassTypeRef("builtin.int", false)
-        "long" -> ClassTypeRef("builtin.long", false)
-        "float" -> ClassTypeRef("builtin.float", false)
-        "double" -> ClassTypeRef("builtin.double", false)
-        "boolean" -> ClassTypeRef("builtin.boolean", false)
-        "string" -> ClassTypeRef("builtin.string", false)
-        else -> ClassTypeRef("builtin.any", true)
+        "int" -> ClassTypeRef("builtin", "int", false)
+        "long" -> ClassTypeRef("builtin", "long", false)
+        "float" -> ClassTypeRef("builtin", "float", false)
+        "double" -> ClassTypeRef("builtin", "double", false)
+        "boolean" -> ClassTypeRef("builtin", "boolean", false)
+        "string" -> ClassTypeRef("builtin", "string", false)
+        else -> ClassTypeRef("builtin", "any", true)
     }
 
     

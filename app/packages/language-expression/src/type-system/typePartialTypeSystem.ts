@@ -1,12 +1,36 @@
 import type { TypirLangiumSpecifics } from "typir-langium";
 import { PartialTypeSystem } from "./partialTypeSystem.js";
-import type { TypeTypes } from "../grammar/typeTypes.js";
+import type { TypeTypes, ClassTypeType } from "../grammar/typeTypes.js";
 import type { ExpressionTypirServices } from "./services.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
+import type { ClassType } from "../typir-extensions/config/type.js";
+import type { LangiumDocument, WorkspaceCache as WorkspaceCacheType } from "langium";
+import { sharedImport } from "@mdeo/language-shared";
+
+const { WorkspaceCache, DocumentState, AstUtils } = sharedImport("langium");
+
+/**
+ * Result of resolving a class type from a type reference.
+ */
+type ClassTypeResolutionResult =
+    | { kind: "found"; classType: ClassType }
+    | { kind: "not-found"; typeName: string }
+    | { kind: "ambiguous"; typeName: string; matchingPackages: string[] }
+    | { kind: "invalid-package"; packageName: string; typeName: string };
+
+/**
+ * Cached per-document package map state, computed once per document lifecycle.
+ */
+type DocumentPackageCache = {
+    /** Map from user-visible package names to lists of internal packages. */
+    packageMap: Map<string, string[]>;
+    /** Set of all internal packages from all values of packageMap. */
+    allInternalPackages: Set<string>;
+};
 
 /**
  * Partial type system implementation for type-related AST nodes.
@@ -19,12 +43,33 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
     Specifics,
     TypeTypes
 > {
+    /**
+     * Workspace-scoped cache mapping document URI strings to their computed
+     * package map state. Invalidated whenever the workspace is rebuilt.
+     */
+    private readonly packageMapCache: WorkspaceCacheType<string, DocumentPackageCache>;
+
+    /**
+     * Creates a new TypePartialTypeSystem.
+     *
+     * @param typir The Typir services
+     * @param types The type types for the grammar
+     * @param nullableAny The nullable any type for fallback type arguments
+     * @param computePackageMap Callback invoked once per document to compute the package map.
+     *        The map's keys are the user-visible package names (e.g., "class", "enum", "builtin")
+     *        and the values are lists of the corresponding internal (file-specific) packages.
+     */
     constructor(
         typir: ExpressionTypirServices<Specifics>,
         types: TypeTypes,
-        protected readonly nullableAny: CustomClassType
+        protected readonly nullableAny: CustomClassType,
+        protected readonly computePackageMap: (document: LangiumDocument) => Map<string, string[]>
     ) {
         super(typir, types);
+        this.packageMapCache = new WorkspaceCache(
+            typir.langium.LangiumServices as any,
+            DocumentState.IndexedReferences
+        );
     }
 
     override registerRules(): void {
@@ -36,29 +81,148 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
     }
 
     /**
+     * Retrieves (or computes and caches) the package map state for the document
+     * that contains the given AST node.
+     *
+     * @param node Any AST node whose document should be used as the cache key
+     * @returns The cached DocumentPackageCache for that document
+     */
+    private getDocumentPackageCache(node: ClassTypeType): DocumentPackageCache {
+        const document = AstUtils.getDocument(node);
+        const key = document.uri.toString();
+        const existing = this.packageMapCache.get(key);
+        if (existing != undefined) {
+            return existing;
+        }
+        const packageMap = this.computePackageMap(document);
+        const allInternalPackages = new Set<string>();
+        for (const internalPackages of packageMap.values()) {
+            for (const pkg of internalPackages) {
+                allInternalPackages.add(pkg);
+            }
+        }
+        const entry: DocumentPackageCache = { packageMap, allInternalPackages };
+        this.packageMapCache.set(key, entry);
+        return entry;
+    }
+
+    /**
+     * Resolves a class type from a type reference node.
+     * Handles both qualified (package.name) and unqualified (name only) type references.
+     *
+     * For qualified references, the package name is looked up in the packageMap to find
+     * the list of internal packages to search. If multiple types are found across different
+     * internal packages, an ambiguous error is returned.
+     *
+     * @param node The class type AST node
+     * @returns The resolution result indicating found type, not found, ambiguous, or invalid package
+     */
+    private resolveClassType(node: ClassTypeType): ClassTypeResolutionResult {
+        const { packageMap, allInternalPackages } = this.getDocumentPackageCache(node);
+        const typeName = node.name;
+        const packageName = node.packageName;
+
+        if (packageName != undefined) {
+            const internalPackages = packageMap.get(packageName);
+
+            if (internalPackages == undefined) {
+                const classType = this.typir.TypeDefinitions.getClassTypeIfExisting(typeName, packageName);
+                if (classType == undefined) {
+                    return { kind: "invalid-package", packageName, typeName };
+                }
+                return { kind: "found", classType };
+            }
+
+            const matchingTypes: ClassType[] = [];
+            for (const internalPkg of internalPackages) {
+                const classType = this.typir.TypeDefinitions.getClassTypeIfExisting(typeName, internalPkg);
+                if (classType != undefined) {
+                    matchingTypes.push(classType);
+                }
+            }
+
+            if (matchingTypes.length === 0) {
+                return { kind: "not-found", typeName: `${packageName}.${typeName}` };
+            }
+
+            if (matchingTypes.length === 1) {
+                return { kind: "found", classType: matchingTypes[0] };
+            }
+
+            return {
+                kind: "ambiguous",
+                typeName,
+                matchingPackages: matchingTypes.map((t) => t.package)
+            };
+        }
+
+        const allTypesWithName = this.typir.TypeDefinitions.getClassTypesByName(typeName);
+        if (allTypesWithName.length === 0) {
+            return { kind: "not-found", typeName };
+        }
+
+        const relevantTypes = allTypesWithName.filter((t) => allInternalPackages.has(t.package));
+
+        if (relevantTypes.length === 0) {
+            return { kind: "not-found", typeName };
+        }
+
+        if (relevantTypes.length === 1) {
+            return { kind: "found", classType: relevantTypes[0] };
+        }
+
+        return {
+            kind: "ambiguous",
+            typeName,
+            matchingPackages: relevantTypes.map((t) => t.package)
+        };
+    }
+
+    /**
      * Registers type inference rule for class type declarations.
      * Handles type resolution with generic type arguments.
      */
     private registerClassTypeInferenceRule(): void {
         this.registerInferenceRule(this.types.classTypeType, (node) => {
-            const typeName = node.name;
             const providedTypeArgs = node.typeArgs;
+            const resolutionResult = this.resolveClassType(node);
 
-            const classTypeDef = this.typir.TypeDefinitions.getClassTypeIfExisting(typeName);
-            if (classTypeDef == undefined) {
+            if (resolutionResult.kind === "not-found") {
                 return {
                     $problem: this.inferenceProblem,
                     languageNode: node,
-                    location: `Type '${typeName}' is not defined.`,
+                    location: `Type '${resolutionResult.typeName}' is not defined.`,
                     subProblems: []
                 };
             }
 
-            if (classTypeDef.isVirtual === true) {
+            if (resolutionResult.kind === "invalid-package") {
                 return {
                     $problem: this.inferenceProblem,
                     languageNode: node,
-                    location: `Type '${typeName}' is a virtual type and cannot be used as a type annotation.`,
+                    location: `Package '${resolutionResult.packageName}' is not a valid package for type references.`,
+                    subProblems: []
+                };
+            }
+
+            if (resolutionResult.kind === "ambiguous") {
+                const packagesStr = resolutionResult.matchingPackages.join(", ");
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `Type '${resolutionResult.typeName}' is ambiguous. Found in packages: ${packagesStr}. Use a qualified type reference (e.g., 'package.${resolutionResult.typeName}').`,
+                    subProblems: []
+                };
+            }
+
+            const classTypeDef = resolutionResult.classType;
+
+            if (classTypeDef.isVirtual === true) {
+                const fullTypeName = `${classTypeDef.package}.${classTypeDef.name}`;
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `Type '${fullTypeName}' is a virtual type and cannot be used as a type annotation.`,
                     subProblems: []
                 };
             }
@@ -101,25 +265,49 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
 
     /**
      * Registers validation rule for class type declarations.
-     * Validates generic parameter count.
+     * Validates generic parameter count and type resolution.
      */
     private registerClassTypeValidationRule(): void {
         this.registerValidationRule(this.types.classTypeType, (node, accept) => {
-            const typeName = node.name;
             const providedTypeArgs = node.typeArgs;
+            const resolutionResult = this.resolveClassType(node);
 
-            const classTypeDef = this.typir.TypeDefinitions.getClassTypeIfExisting(typeName);
-            if (!classTypeDef) {
+            if (resolutionResult.kind === "not-found") {
                 accept({
                     $problem: this.validationProblem,
                     severity: "error",
                     languageNode: node,
-                    message: `Type '${typeName}' is not defined.`,
+                    message: `Type '${resolutionResult.typeName}' is not defined.`,
                     subProblems: []
                 });
                 return;
             }
 
+            if (resolutionResult.kind === "invalid-package") {
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node,
+                    message: `Package '${resolutionResult.packageName}' is not a valid package for type references.`,
+                    subProblems: []
+                });
+                return;
+            }
+
+            if (resolutionResult.kind === "ambiguous") {
+                const packagesStr = resolutionResult.matchingPackages.join(", ");
+                accept({
+                    $problem: this.validationProblem,
+                    severity: "error",
+                    languageNode: node,
+                    message: `Type '${resolutionResult.typeName}' is ambiguous. Found in packages: ${packagesStr}. Use a qualified type reference (e.g., 'package.${resolutionResult.typeName}').`,
+                    subProblems: []
+                });
+                return;
+            }
+
+            const classTypeDef = resolutionResult.classType;
+            const fullTypeName = `${classTypeDef.package}.${classTypeDef.name}`;
             const expectedGenericCount = classTypeDef.generics?.length ?? 0;
             const providedGenericCount = providedTypeArgs.length;
 
@@ -128,7 +316,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                     $problem: this.validationProblem,
                     severity: "error",
                     languageNode: node,
-                    message: `Type '${typeName}' expects ${expectedGenericCount} generic parameter(s), but ${providedGenericCount} were provided.`,
+                    message: `Type '${fullTypeName}' expects ${expectedGenericCount} generic parameter(s), but ${providedGenericCount} were provided.`,
                     subProblems: []
                 });
             }
@@ -138,7 +326,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
                     $problem: this.validationProblem,
                     severity: "warning",
                     languageNode: node,
-                    message: `Type '${typeName}' expects ${expectedGenericCount} generic parameter(s), but only ${providedGenericCount} were provided.`,
+                    message: `Type '${fullTypeName}' expects ${expectedGenericCount} generic parameter(s), but only ${providedGenericCount} were provided.`,
                     subProblems: []
                 });
             }

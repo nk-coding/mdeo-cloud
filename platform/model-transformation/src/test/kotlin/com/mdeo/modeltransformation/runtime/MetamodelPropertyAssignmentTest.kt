@@ -56,13 +56,13 @@ class MetamodelPropertyAssignmentTest {
     // Index 7: class.House
     private val types: List<ReturnType> = listOf<ReturnType>(
         VoidType(),                                                             // 0
-        ClassTypeRef(type = "builtin.string", isNullable = false),              // 1
-        ClassTypeRef(type = "builtin.double", isNullable = false),              // 2
-        ClassTypeRef(type = "builtin.boolean", isNullable = false),             // 3
-        ClassTypeRef(type = "Any", isNullable = true),                          // 4
-        ClassTypeRef(type = "builtin.List", isNullable = false),                // 5
-        ClassTypeRef(type = "builtin.int", isNullable = false),                 // 6
-        ClassTypeRef(type = "class.House", isNullable = false)                   // 7
+        ClassTypeRef(`package` = "builtin", type = "string", isNullable = false),              // 1
+        ClassTypeRef(`package` = "builtin", type = "double", isNullable = false),              // 2
+        ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false),             // 3
+        ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true),                          // 4
+        ClassTypeRef(`package` = "builtin", type = "List", isNullable = false),                // 5
+        ClassTypeRef(`package` = "builtin", type = "int", isNullable = false),                 // 6
+        ClassTypeRef(`package` = "class", type = "House", isNullable = false)                   // 7
     )
 
     private val metamodelData = MetamodelData(
@@ -132,12 +132,12 @@ class MetamodelPropertyAssignmentTest {
     private fun registerMetamodelTypes() {
         val typeRegistry = GremlinTypeRegistry.GLOBAL
 
-        val houseType = gremlinType("class.House")
+        val houseType = gremlinType("class", "House")
             .graphProperty("address")
             .build()
         typeRegistry.register(houseType)
 
-        val roomType = gremlinType("class.Room")
+        val roomType = gremlinType("class", "Room")
             .graphProperty("category")
             .graphProperty("value")
             .build()

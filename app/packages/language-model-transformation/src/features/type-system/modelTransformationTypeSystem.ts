@@ -1,23 +1,23 @@
 import {
     generateClassTypes,
+    generateEnumTypes,
     ExpressionTypeSystem,
     IterableType,
     extractMetamodelEntities,
     DefaultCollectionTypeFactory,
     TypePartialTypeSystem,
     type ClassType,
-    type Member,
     type ExpressionTypirServices,
     type PrimitiveTypes,
-    type MetamodelEnumInfo,
     typeRef,
     MetamodelPartialTypeSystem,
-    ENUM_CONTAINER_PACKAGE
+    getClassPackage,
+    getEnumPackage
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { LangiumDocument, LangiumDocuments, URI } from "langium";
 import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
-import { getExportedEntitiesFromMetamodelFile } from "@mdeo/language-metamodel";
+import { getExportedEntitiesByPath, getAllMetamodelAbsolutePaths } from "@mdeo/language-metamodel";
 import {
     expressionTypes,
     ModelTransformation,
@@ -40,27 +40,6 @@ import { modelTransformationLongType } from "../stdlib/primitives/long.js";
 import { modelTransformationStringType } from "../stdlib/primitives/string.js";
 
 const { AstUtils } = sharedImport("langium");
-
-/**
- * Captures both generated ClassTypes for a single enum.
- * The value type represents the type of individual enum values.
- * The container type is the virtual namespace-like type that exposes each enum
- * entry as a readonly property.
- */
-interface EnumTypeInfo {
-    /**
-     * The non-virtual type that models the underlying enum value (e.g. `enum.Status`).
-     */
-    valueType: ClassType;
-    /**
-     * The virtual type that exposes enum entries as readonly properties (e.g. `enum-container.Status`).
-     */
-    containerType: ClassType;
-    /**
-     * The original enum information from the metamodel extractor.
-     */
-    enumInfo: MetamodelEnumInfo;
-}
 
 /**
  * Type system for the Model Transformation language.
@@ -89,8 +68,8 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
                     ModelTransformationBagType,
                     ModelTransformationOrderedSetType
                 ],
-                lambdaSuperTypes: [{ type: ModelTransformationAnyType.name }],
-                createListType: (elementType) => typeRef("List").withTypeArgs({ T: elementType }).build()
+                lambdaSuperTypes: [{ package: "builtin", type: ModelTransformationAnyType.name }],
+                createListType: (elementType) => typeRef("builtin", "List").withTypeArgs({ T: elementType }).build()
             },
             expressionTypes,
             []
@@ -113,10 +92,45 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
      * @param typir The typir services to initialize with.
      */
     protected override onInitializeExtended(typir: ExpressionTypirServices<TypirLangiumSpecifics>): void {
+        const langiumDocuments = typir.langium.LangiumServices.workspace.LangiumDocuments;
+
+        const computePackageMap = (document: LangiumDocument): Map<string, string[]> => {
+            const map = new Map<string, string[]>();
+            map.set("builtin", ["builtin"]);
+
+            const root = document.parseResult?.value as ModelTransformationType | undefined;
+            const importFile = root?.import?.file;
+            if (importFile == undefined) {
+                return map;
+            }
+
+            const metamodelUri = resolveRelativePath(document, importFile);
+            const metamodelDoc = langiumDocuments.getDocument(metamodelUri);
+            if (metamodelDoc == undefined) {
+                return map;
+            }
+
+            const absolutePaths = getAllMetamodelAbsolutePaths(metamodelDoc, langiumDocuments);
+
+            const classPackages: string[] = [];
+            const enumPackages: string[] = [];
+
+            for (const absolutePath of absolutePaths) {
+                classPackages.push(getClassPackage(absolutePath));
+                enumPackages.push(getEnumPackage(absolutePath));
+            }
+
+            map.set("class", classPackages);
+            map.set("enum", enumPackages);
+
+            return map;
+        };
+
         const typePartialTypeSystem = new TypePartialTypeSystem<TypirLangiumSpecifics>(
             typir,
             typeTypes,
-            this.nullablePrimitiveTypes.Any
+            this.nullablePrimitiveTypes.Any,
+            computePackageMap
         );
         const modelTransformationPartialTypeSystem = new ModelTransformationPartialTypeSystem(
             typir,
@@ -152,22 +166,29 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
         if (metamodelDoc == undefined) {
             return;
         }
-        const { classes, enums } = getExportedEntitiesFromMetamodelFile(
-            metamodelDoc,
-            typir.langium.LangiumServices.workspace.LangiumDocuments
-        );
-        const { classes: classInfos, enums: enumInfos } = extractMetamodelEntities(
-            [...classes],
-            [...enums],
-            reflection,
-            DefaultCollectionTypeFactory
-        );
-        const classTypes = generateClassTypes(classInfos);
 
-        this.registerClassTypes(classTypes, typir);
+        const langiumDocuments = typir.langium.LangiumServices.workspace.LangiumDocuments;
 
-        const enumTypeInfos = this.generateEnumTypes(enumInfos);
-        this.registerEnumTypes(enumTypeInfos, typir);
+        const entitiesByPath = getExportedEntitiesByPath(metamodelDoc, langiumDocuments);
+
+        for (const docEntities of entitiesByPath) {
+            const absolutePath = docEntities.absolutePath;
+
+            const { classes: classInfos, enums: enumInfos } = extractMetamodelEntities(
+                docEntities.classes,
+                docEntities.enums,
+                reflection,
+                DefaultCollectionTypeFactory,
+                absolutePath
+            );
+
+            const classTypeResult = generateClassTypes(classInfos, absolutePath);
+            this.registerClassTypes(classTypeResult.types, typir);
+
+            const enumTypeResult = generateEnumTypes(enumInfos, absolutePath);
+            this.registerEnumTypes(enumTypeResult.types, typir);
+            this.registerEnumTypes(enumTypeResult.containerTypes, typir);
+        }
     }
 
     /**
@@ -227,76 +248,23 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
     private registerClassTypes(classTypes: ClassType[], typir: ExpressionTypirServices<TypirLangiumSpecifics>): void {
         const typeDefinitions = typir.TypeDefinitions;
         for (const classType of classTypes) {
-            const identifier = `${classType.package}.${classType.name}`;
-            if (typeDefinitions.getClassTypeIfExisting(identifier) == undefined) {
+            if (typeDefinitions.getClassTypeIfExisting(classType.name, classType.package) == undefined) {
                 typeDefinitions.addClassType(classType);
             }
         }
     }
 
     /**
-     * Generates value and container ClassTypes for each MetamodelEnumInfo.
+     * Registers class types in the Typir TypeDefinitions service.
      *
-     * For each enum:
-     * - A *value type* is created (`package = "enum"`) representing the type of individual enum values.
-     * - A *container type* is created (`package = "enum-container"`, `isVirtual: true`) with one readonly
-     *   property per enum entry typed as the value type. Allows member-access like `Status.ACTIVE` in the DSL.
-     *
-     * @param enumInfos The enum information extracted from the metamodel
-     * @returns Array of EnumTypeInfo containing both generated types plus the original enumInfo
-     */
-    private generateEnumTypes(enumInfos: MetamodelEnumInfo[]): EnumTypeInfo[] {
-        return enumInfos.map((enumInfo) => {
-            const valueType: ClassType = {
-                name: enumInfo.name,
-                package: "enum",
-                members: {}
-            };
-
-            const fqValueTypeName = `enum.${enumInfo.name}`;
-
-            const containerMembers: Record<string, Member> = {};
-            for (const entry of enumInfo.entries) {
-                containerMembers[entry] = {
-                    name: entry,
-                    isProperty: true,
-                    readonly: true,
-                    type: { type: fqValueTypeName, isNullable: false }
-                };
-            }
-
-            const containerType: ClassType = {
-                name: enumInfo.name,
-                package: ENUM_CONTAINER_PACKAGE,
-                members: containerMembers,
-                isVirtual: true
-            };
-
-            return { valueType, containerType, enumInfo };
-        });
-    }
-
-    /**
-     * Registers enum value types and container types in the Typir TypeDefinitions service.
-     * Each enum produces two types: a non-virtual value type and a virtual container type.
-     *
-     * @param enumTypeInfos The generated enum type information to register
+     * @param types The ClassType definitions to register
      * @param typir The Typir services
      */
-    private registerEnumTypes(
-        enumTypeInfos: EnumTypeInfo[],
-        typir: ExpressionTypirServices<TypirLangiumSpecifics>
-    ): void {
+    private registerEnumTypes(types: ClassType[], typir: ExpressionTypirServices<TypirLangiumSpecifics>): void {
         const typeDefinitions = typir.TypeDefinitions;
-        for (const { valueType, containerType } of enumTypeInfos) {
-            const valueId = `${valueType.package}.${valueType.name}`;
-            const containerId = `${containerType.package}.${containerType.name}`;
-
-            if (typeDefinitions.getClassTypeIfExisting(valueId) == undefined) {
-                typeDefinitions.addClassType(valueType);
-            }
-            if (typeDefinitions.getClassTypeIfExisting(containerId) == undefined) {
-                typeDefinitions.addClassType(containerType);
+        for (const classType of types) {
+            if (typeDefinitions.getClassTypeIfExisting(classType.name, classType.package) == undefined) {
+                typeDefinitions.addClassType(classType);
             }
         }
     }
