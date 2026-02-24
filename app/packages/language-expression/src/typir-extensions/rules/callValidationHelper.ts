@@ -109,7 +109,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      * Automatically validates the call during construction.
      *
      * @param languageNode The AST node representing the entire call expression
-     * @param functionReferenceNode The AST node representing the function/lambda being called
+     * @param functionType The type of the function (must be a function type or lambda type)
      * @param genericArgumentsNodes AST nodes for explicit generic type arguments
      * @param argumentNodes AST nodes for the call arguments
      * @param services Extended Typir services for type operations
@@ -117,34 +117,16 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      */
     constructor(
         private readonly languageNode: Specifics["LanguageType"],
-        private readonly functionReferenceNode: Specifics["LanguageType"],
+        functionType: CustomFunctionType | CustomLambdaType,
         private readonly genericArgumentsNodes: Specifics["LanguageType"][],
         private readonly argumentNodes: Specifics["LanguageType"][],
         readonly services: ExtendedTypirServices<Specifics>,
-        private readonly isInferenceMode: boolean
+        private readonly isInferenceMode: boolean,
     ) {
-        const functionReferenceType = services.Inference.inferType(functionReferenceNode);
-        if (isCustomFunctionType(functionReferenceType)) {
-            this.validateFunction(functionReferenceType);
-        } else if (isCustomLambdaType(functionReferenceType)) {
-            this.validateLambda(functionReferenceType);
-        } else if (Array.isArray(functionReferenceType)) {
-            if (isInferenceMode) {
-                this.errors.push(
-                    this.createError(
-                        this.functionReferenceNode,
-                        `Function reference type could not be determined.`,
-                        functionReferenceType
-                    )
-                );
-            }
+        if (isCustomFunctionType(functionType)) {
+            this.validateFunction(functionType);
         } else {
-            this.errors.push(
-                this.createError(
-                    this.functionReferenceNode,
-                    `Cannot call expression of type '${functionReferenceType.getName()}'.`
-                )
-            );
+            this.validateLambda(functionType);
         }
     }
 

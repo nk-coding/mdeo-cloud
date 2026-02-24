@@ -1,4 +1,4 @@
-import type { ClassType, Member } from "../../typir-extensions/config/type.js";
+import type { ClassType, Property } from "../../typir-extensions/config/type.js";
 import { getEnumContainerPackage, getEnumPackage } from "./metamodelClassExtractor.js";
 import type { MetamodelEnumInfo } from "./metamodelEnumInfo.js";
 
@@ -76,12 +76,13 @@ class EnumTypeGenerator {
         const valueType: ClassType = {
             name: enumInfo.name,
             package: enumInfo.package,
-            members: {}
+            properties: {},
+            methods: {}
         };
 
-        const containerMembers: Record<string, Member> = {};
+        const containerProperties: Record<string, Property> = {};
         for (const entry of enumInfo.entries) {
-            containerMembers[entry] = {
+            containerProperties[entry] = {
                 name: entry,
                 isProperty: true,
                 readonly: true,
@@ -92,7 +93,8 @@ class EnumTypeGenerator {
         const containerType: ClassType = {
             name: enumInfo.name,
             package: this.enumContainerPackage,
-            members: containerMembers,
+            properties: containerProperties,
+            methods: {},
             isVirtual: true
         };
 

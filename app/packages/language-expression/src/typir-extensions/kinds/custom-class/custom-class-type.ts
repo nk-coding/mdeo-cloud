@@ -1,7 +1,7 @@
 import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProblem } from "typir";
 import type { CustomClassDetails, CustomClassKind } from "./custom-class-kind.js";
 import { CustomValueTypeImplementation, type CustomValueType } from "../custom-value/custom-value-type.js";
-import type { ClassTypeRef, Member, ValueType } from "../../config/type.js";
+import type { ClassTypeRef, Property, Method, ValueType } from "../../config/type.js";
 import { sharedImport } from "@mdeo/language-shared";
 
 const {
@@ -143,11 +143,18 @@ export class CustomClassTypeImplementation
         }
     }
 
-    override getLocalMember(memberName: string): Member | undefined {
-        if (!Object.hasOwn(this.details.definition.members, memberName)) {
+    override getLocalProperty(memberName: string): Property | undefined {
+        if (!Object.hasOwn(this.details.definition.properties, memberName)) {
             return undefined;
         }
-        return this.details.definition.members[memberName];
+        return this.details.definition.properties[memberName];
+    }
+
+    override getLocalMethod(memberName: string): Method | undefined {
+        if (!Object.hasOwn(this.details.definition.methods, memberName)) {
+            return undefined;
+        }
+        return this.details.definition.methods[memberName];
     }
 }
 

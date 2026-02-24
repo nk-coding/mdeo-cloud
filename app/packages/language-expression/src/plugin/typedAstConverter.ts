@@ -7,6 +7,7 @@ import type {
     TypeCheckExpressionType,
     CallExpressionType,
     MemberAccessExpressionType,
+    MemberCallExpressionType,
     IdentifierExpressionType,
     StringLiteralExpressionType,
     IntLiteralExpressionType,
@@ -22,6 +23,7 @@ import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-v
 import { isCustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
 import { isCustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
 import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
+import type { CustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
 import { isCustomNullType } from "../typir-extensions/kinds/custom-null/custom-null-type.js";
 import { getCallOverload } from "../typir-extensions/rules/getCallOverload.js";
 import { DefaultTypeNames } from "../type-system/typeSystemConfig.js";
@@ -51,6 +53,7 @@ import {
     type TypedFunctionCallExpression,
     type TypedMemberCallExpression
 } from "./typedAst.js";
+import { inferMethodAccess, inferPropertyAccess } from "../typir-extensions/rules/inferMemberAccess.js";
 
 /**
  * Base converter for converting expression ASTs to TypedAST.
@@ -163,6 +166,8 @@ export abstract class TypedAstConverter {
             return this.convertTypeCastExpression(expr as TypeCastExpressionType);
         } else if (this.reflection.isInstance(expr, this.expressionTypes.typeCheckExpressionType)) {
             return this.convertTypeCheckExpression(expr as TypeCheckExpressionType);
+        } else if (this.reflection.isInstance(expr, this.expressionTypes.memberCallExpressionType)) {
+            return this.convertMemberCallExpression(expr as MemberCallExpressionType);
         } else if (this.reflection.isInstance(expr, this.expressionTypes.callExpressionType)) {
             return this.convertCallExpression(expr as CallExpressionType);
         } else if (this.reflection.isInstance(expr, this.expressionTypes.memberAccessExpressionType)) {
@@ -294,6 +299,57 @@ export abstract class TypedAstConverter {
     }
 
     /**
+     * Converts a member call expression (e.g. `obj.method(args)`) - the unified
+     * AST node produced by the memberCallPostfixFragment grammar rule.
+     *
+     * @param expr The member call expression AST node
+     * @returns The TypedMemberCallExpression representation
+     */
+    protected convertMemberCallExpression(expr: MemberCallExpressionType): TypedMemberCallExpression | TypedExpressionCallExpression {
+        const args = expr.arguments.map((arg) => this.convertExpression(arg));
+        const evalType = this.getTypeIndex(expr);
+        const methodType = inferMethodAccess(expr, expr.expression, expr.member, this.typir);
+        if (isCustomFunctionType(methodType)) {
+            const overload = getCallOverload(
+                expr,
+                methodType,
+                expr.genericArgs?.typeArguments ?? [],
+                expr.arguments,
+                this.typir
+            );
+            if (overload == undefined) {
+                throw new Error(`Could not determine overload for member call '${expr.member}'`);
+            }
+            return {
+                kind: "memberCall",
+                evalType,
+                expression: this.convertExpression(expr.expression),
+                member: expr.member,
+                isNullChaining: expr.isNullChaining ?? false,
+                arguments: args,
+                overload
+            };
+        }
+        const propertyType = inferPropertyAccess(expr, expr.expression, expr.member, this.typir);
+        if (Array.isArray(propertyType) || !isCustomLambdaType(propertyType)) {
+            throw new Error(`Could not determine callable type for member call '${expr.member}'`);
+        }
+        const memberAccess: TypedMemberAccessExpression = {
+            kind: "memberAccess",
+            evalType: this.getTypeIndexForType(propertyType),
+            expression: this.convertExpression(expr.expression),
+            member: expr.member,
+            isNullChaining: expr.isNullChaining ?? false
+        };
+        return {
+            kind: "call",
+            evalType,
+            expression: memberAccess,
+            arguments: args
+        };
+    }
+
+    /**
      * Converts a call expression.
      *
      * @param expr The call expression AST node
@@ -310,7 +366,7 @@ export abstract class TypedAstConverter {
         const args = expr.arguments.map((arg) => this.convertExpression(arg));
         const evalType = this.getTypeIndex(expr);
         if (isCustomFunctionType(expressionType)) {
-            return this.convertFunctionCallExpression(expr, args, evalType);
+            return this.convertFunctionCallExpression(expr, expressionType, args, evalType);
         } else {
             return {
                 kind: "call",
@@ -332,13 +388,14 @@ export abstract class TypedAstConverter {
      */
     protected convertFunctionCallExpression(
         expr: CallExpressionType,
+        functionType: CustomFunctionType,
         args: TypedExpression[],
         evalType: number
     ): TypedFunctionCallExpression | TypedMemberCallExpression {
         const expression = expr.expression;
         const overload = getCallOverload(
             expr,
-            expr.expression,
+            functionType,
             expr.genericArgs?.typeArguments ?? [],
             expr.arguments,
             this.typir
@@ -346,18 +403,7 @@ export abstract class TypedAstConverter {
         if (overload == undefined) {
             throw new Error("Could not determine overload for function call");
         }
-        if (this.reflection.isInstance(expression, this.expressionTypes.memberAccessExpressionType)) {
-            const memberAccess = expression as MemberAccessExpressionType;
-            return {
-                kind: "memberCall",
-                evalType,
-                expression: this.convertExpression(memberAccess.expression),
-                member: memberAccess.member,
-                isNullChaining: memberAccess.isNullChaining ?? false,
-                arguments: args,
-                overload
-            };
-        } else if (this.reflection.isInstance(expression, this.expressionTypes.identifierExpressionType)) {
+        if (this.reflection.isInstance(expression, this.expressionTypes.identifierExpressionType)) {
             return {
                 kind: "functionCall",
                 evalType,

@@ -2,10 +2,12 @@ import type { TypirLangiumSpecifics } from "typir-langium";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
+import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
+import { isCustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
 import { PartialTypeSystem, type PrimitiveTypes } from "./partialTypeSystem.js";
-import { inferMemberAccess } from "../typir-extensions/rules/inferMemberAccess.js";
+import { inferMethodAccess, inferPropertyAccess } from "../typir-extensions/rules/inferMemberAccess.js";
 import { inferCall } from "../typir-extensions/rules/inferCall.js";
-import { validateMemberAccess } from "../typir-extensions/rules/validateMemberAccess.js";
+import { validateMethodAccess, validatePropertyAccess } from "../typir-extensions/rules/validateMemberAccess.js";
 import { validateCall } from "../typir-extensions/rules/validateCall.js";
 import { findCommonParentType } from "../typir-extensions/rules/commonParentType.js";
 import { assertUnreachable } from "@mdeo/language-common";
@@ -37,6 +39,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         this.registerLiteralRules();
         this.registerIdentifierRules();
         this.registerMemberAccessRules();
+        this.registerMemberCallRules();
         this.registerCallRules();
         this.registerUnaryExpressionRules();
         this.registerBinaryExpressionRules();
@@ -121,16 +124,87 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
      */
     private registerMemberAccessRules(): void {
         this.registerInferenceRule(this.types.memberAccessExpressionType, (node) => {
-            const inferResult = inferMemberAccess(node, node.expression, node.member, this.typir);
+            const inferResult = inferPropertyAccess(node, node.expression, node.member, this.typir);
             if (node.isNullChaining && isCustomValueType(inferResult)) {
                 return inferResult.asNullable;
+            }
+            if (Array.isArray(inferResult)) {
+                return inferResult[0];
             }
             return inferResult;
         });
 
         this.registerValidationRule(this.types.memberAccessExpressionType, (node, accept) =>
-            validateMemberAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept)
+            validatePropertyAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept)
         );
+    }
+
+    /**
+     * Registers type inference and validation rules for member call expressions.
+     * Handles combined member access + call (e.g. `obj.method(args)`) as a single AST node.
+     */
+    private registerMemberCallRules(): void {
+        this.registerInferenceRule(this.types.memberCallExpressionType, (node) => {
+            const methodType = inferMethodAccess(node, node.expression, node.member, this.typir);
+            const callableType = isCustomFunctionType(methodType)
+                ? methodType
+                : (() => {
+                      const propertyType = inferPropertyAccess(node, node.expression, node.member, this.typir);
+                      return isCustomLambdaType(propertyType) ? propertyType : undefined;
+                  })();
+            if (callableType == undefined) {
+                return Array.isArray(methodType)
+                    ? methodType[0]!
+                    : {
+                          $problem: this.inferenceProblem,
+                          languageNode: node,
+                          location: `Member '${node.member}' is not callable.`,
+                          subProblems: []
+                      };
+            }
+            const inferResult = inferCall(
+                node,
+                callableType,
+                node.genericArgs?.typeArguments ?? [],
+                node.arguments,
+                this.typir
+            );
+            if (Array.isArray(inferResult)) {
+                return inferResult[0];
+            }
+            if (isCustomValueType(inferResult) && node.isNullChaining) {
+                return inferResult.asNullable;
+            }
+            return inferResult;
+        });
+
+        this.registerValidationRule(this.types.memberCallExpressionType, (node, accept) => {
+            const methodType = inferMethodAccess(node, node.expression, node.member, this.typir);
+            if (isCustomFunctionType(methodType)) {
+                validateMethodAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept);
+                validateCall(
+                    node,
+                    methodType,
+                    node.genericArgs?.typeArguments ?? [],
+                    node.arguments,
+                    this.typir
+                ).forEach(accept);
+            } else {
+                const propertyType = inferPropertyAccess(node, node.expression, node.member, this.typir);
+                if (isCustomLambdaType(propertyType)) {
+                    validatePropertyAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept);
+                    validateCall(
+                        node,
+                        propertyType,
+                        node.genericArgs?.typeArguments ?? [],
+                        node.arguments,
+                        this.typir
+                    ).forEach(accept);
+                } else {
+                    validateMethodAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept);
+                }
+            }
+        });
     }
 
     /**
@@ -139,33 +213,40 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
      */
     private registerCallRules(): void {
         this.registerInferenceRule(this.types.callExpressionType, (node) => {
-            const inferResult = inferCall(
+            const functionType = this.inference.inferType(node.expression);
+            if (!isCustomFunctionType(functionType) && !isCustomLambdaType(functionType)) {
+                if (Array.isArray(functionType)) {
+                    return functionType[0];
+                }
+                return {
+                    $problem: this.inferenceProblem,
+                    languageNode: node,
+                    location: `Cannot call expression of non-function type '${functionType.getName()}'.`,
+                    subProblems: []
+                };
+            }
+            return inferCall(
                 node,
-                node.expression,
+                functionType,
                 node.genericArgs?.typeArguments ?? [],
                 node.arguments,
                 this.typir
             );
-            if (isCustomValueType(inferResult)) {
-                const expression = node.expression;
-                if (this.astReflection.isInstance(expression, this.types.memberAccessExpressionType)) {
-                    if (expression.isNullChaining) {
-                        return inferResult.asNullable;
-                    }
-                }
-            }
-            return inferResult;
         });
 
-        this.registerValidationRule(this.types.callExpressionType, (node, accept) =>
+        this.registerValidationRule(this.types.callExpressionType, (node, accept) => {
+            const functionType = this.inference.inferType(node.expression);
+            if (!isCustomFunctionType(functionType) && !isCustomLambdaType(functionType)) {
+                return;
+            }
             validateCall(
                 node,
-                node.expression,
+                functionType,
                 node.genericArgs?.typeArguments ?? [],
                 node.arguments,
                 this.typir
-            ).forEach(accept)
-        );
+            ).forEach(accept);
+        });
     }
 
     /**

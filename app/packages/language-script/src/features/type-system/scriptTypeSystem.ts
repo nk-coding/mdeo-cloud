@@ -86,7 +86,7 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
                 ...stdlibGlobalFunctions,
                 ...[...plugins.functions.entries()].map(([name, func]) => ({
                     name,
-                    isProperty: false,
+                    isProperty: false as const,
                     type: func.function
                 }))
             ]

@@ -63,9 +63,29 @@ export class ExpressionConfig {
     readonly memberAccessExpressionTypeName: string;
 
     /**
-     * The name for the PostfixFragment rule.
+     * The name for the MemberCallExpression type.
      */
-    readonly postfixFragmentRuleName: string;
+    readonly memberCallExpressionTypeName: string;
+
+    /**
+     * The name for the AssertNonNullPostfixFragment rule.
+     */
+    readonly assertNonNullPostfixFragmentRuleName: string;
+
+    /**
+     * The name for the MemberAccessPostfixFragment rule.
+     */
+    readonly memberAccessPostfixFragmentRuleName: string;
+
+    /**
+     * The name for the CallPostfixFragment rule.
+     */
+    readonly callPostfixFragmentRuleName: string;
+
+    /**
+     * The name for the MemberCallPostfixFragment rule.
+     */
+    readonly memberCallPostfixFragmentRuleName: string;
 
     /**
      * The name for the PostfixExpression rule.
@@ -234,8 +254,12 @@ export class ExpressionConfig {
         this.callExpressionGenericArgsTypeName = prefix + "CallExpressionGenericArgs";
         this.callExpressionGenericArgsRuleName = prefix + "CallExpressionGenericArgsRule";
         this.memberAccessExpressionTypeName = prefix + "MemberAccessExpression";
+        this.memberCallExpressionTypeName = prefix + "MemberCallExpression";
         this.postfixExpressionRuleName = prefix + "PostfixExpressionRule";
-        this.postfixFragmentRuleName = prefix + "PostfixFragmentRule";
+        this.assertNonNullPostfixFragmentRuleName = prefix + "AssertNonNullPostfixFragmentRule";
+        this.memberAccessPostfixFragmentRuleName = prefix + "MemberAccessPostfixFragmentRule";
+        this.callPostfixFragmentRuleName = prefix + "CallPostfixFragmentRule";
+        this.memberCallPostfixFragmentRuleName = prefix + "MemberCallPostfixFragmentRule";
         this.identifierExpressionTypeName = prefix + "IdentifierExpression";
         this.identifierExpressionRuleName = prefix + "IdentifierExpressionRule";
         this.stringLiteralExpressionTypeName = prefix + "StringLiteralExpression";

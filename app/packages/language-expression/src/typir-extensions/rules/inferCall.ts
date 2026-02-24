@@ -1,4 +1,6 @@
 import type { InferenceProblem, TypirProblem, TypirSpecifics } from "typir";
+import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
+import type { CustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
 import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
 import type { CustomVoidType } from "../kinds/custom-void/custom-void-type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
@@ -14,7 +16,7 @@ const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
  *
  * @template Specifics Language-specific types extending TypirSpecifics
  * @param languageNode The AST node representing the entire call expression
- * @param functionReferenceNode The AST node representing the function/lambda being called
+ * @param functionType The type of the function (must be a function type or lambda type)
  * @param genericArgumentsNodes AST nodes for explicit generic type arguments
  * @param argumentNodes AST nodes for the call arguments
  * @param services Extended Typir services for type operations
@@ -22,14 +24,14 @@ const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
  */
 export function inferCall<Specifics extends TypirSpecifics>(
     languageNode: Specifics["LanguageType"],
-    functionReferenceNode: Specifics["LanguageType"],
+    functionType: CustomFunctionType | CustomLambdaType,
     genericArgumentsNodes: Specifics["LanguageType"][],
     argumentNodes: Specifics["LanguageType"][],
     services: ExtendedTypirServices<Specifics>
 ): InferenceProblem<Specifics> | CustomValueType | CustomVoidType {
     const validator = new InferenceCallValidator<Specifics>(
         languageNode,
-        functionReferenceNode,
+        functionType,
         genericArgumentsNodes,
         argumentNodes,
         services,

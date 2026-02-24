@@ -72,7 +72,7 @@ export class GlobalScope<Specifics extends TypirSpecifics> implements Scope<Spec
             definingScope: this,
             position: -1,
             inferType: () => type,
-            readonly: entry.readonly
+            readonly: entry.isProperty ? entry.readonly : undefined
         };
         this.entriesMap.set(entry.name, scopeEntry);
     }

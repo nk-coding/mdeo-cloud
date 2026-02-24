@@ -14,13 +14,9 @@ import type {
 import type { ScriptType, FunctionType, LambdaExpressionType, FunctionParametersType } from "@mdeo/language-script";
 import { LambdaExpression, statementTypes, expressionTypes } from "@mdeo/language-script";
 import type {
-    CallExpressionType,
     TypedExpression,
     TypedCallableBody,
     TypedReturnStatement,
-    TypedExpressionCallExpression,
-    TypedFunctionCallExpression,
-    TypedMemberCallExpression,
     TypedExtensionCallExpression,
     TypedExtensionCallArgument,
     TypedStringLiteralExpression,
@@ -28,7 +24,7 @@ import type {
     TypedBooleanLiteralExpression,
     TypedStatement
 } from "@mdeo/language-expression";
-import { StatementTypedAstConverter, getCallOverload, isCustomFunctionType } from "@mdeo/language-expression";
+import { StatementTypedAstConverter } from "@mdeo/language-expression";
 import { GrammarUtils, isAstNode, type AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
 import type { ReturnStatementType } from "@mdeo/language-script";
@@ -164,85 +160,6 @@ export class ScriptTypedAstConverter extends StatementTypedAstConverter {
             kind: "return",
             value: statement.value ? this.convertExpression(statement.value) : undefined
         };
-    }
-
-    /**
-     * Overrides call expression conversion to handle function call optimization.
-     *
-     * @param expr The call expression AST node
-     * @returns The TypedCallExpression representation
-     */
-    protected override convertCallExpression(
-        expr: CallExpressionType
-    ): TypedExpressionCallExpression | TypedFunctionCallExpression | TypedMemberCallExpression {
-        const expression = expr.expression;
-        const expressionType = this.typir.Inference.inferType(expression);
-        if (Array.isArray(expressionType)) {
-            throw new Error("Cannot infer type for call expression");
-        }
-        const args = expr.arguments.map((arg) => this.convertExpression(arg));
-        const evalType = this.getTypeIndex(expr);
-        if (isCustomFunctionType(expressionType)) {
-            return this.convertFunctionCallExpression(expr, args, evalType);
-        } else {
-            return {
-                kind: "call",
-                evalType,
-                expression: this.convertExpression(expr.expression),
-                arguments: args
-            };
-        }
-    }
-
-    /**
-     * Converts a function call expression.
-     * Only handles calls to named functions and member functions.
-     *
-     * @param expr The call expression AST node
-     * @param args The converted argument expressions
-     * @param evalType The evaluated type index of the call expression
-     * @returns The TypedFunctionCallExpression or TypedMemberCallExpression representation
-     */
-    protected override convertFunctionCallExpression(
-        expr: CallExpressionType,
-        args: TypedExpression[],
-        evalType: number
-    ): TypedFunctionCallExpression | TypedMemberCallExpression {
-        const expression = expr.expression;
-        const overload = getCallOverload(
-            expr,
-            expr.expression,
-            expr.genericArgs?.typeArguments ?? [],
-            expr.arguments,
-            this.typir
-        );
-        if (overload == undefined) {
-            throw new Error("Could not determine overload for function call");
-        }
-
-        if (this.reflection.isInstance(expression, this.expressionTypes.memberAccessExpressionType)) {
-            return {
-                kind: "memberCall",
-                evalType,
-                expression: this.convertExpression(expression.expression),
-                member: expression.member,
-                isNullChaining: expression.isNullChaining ?? false,
-                overload,
-                arguments: args
-            };
-        }
-
-        if (this.reflection.isInstance(expression, this.expressionTypes.identifierExpressionType)) {
-            return {
-                kind: "functionCall",
-                evalType,
-                name: expression.name,
-                overload,
-                arguments: args
-            };
-        }
-
-        throw new Error("Function call expression must be a member access or identifier");
     }
 
     /**

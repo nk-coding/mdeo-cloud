@@ -141,32 +141,57 @@ export function generateExpressionRules(
                 )
             ];
         });
+    const assertNonNullPostfixFragment = createFragmentRule(config.assertNonNullPostfixFragmentRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [treeRewriteAction(types.assertNonNullExpressionType, "expression", "=", () => ["!!"])]);
 
-    const postfixFragment = createFragmentRule(config.postfixFragmentRuleName)
+    const memberAccessPostfixFragment = createFragmentRule(config.memberAccessPostfixFragmentRuleName)
         .returns(types.baseExpressionType)
         .as(() => [
-            or(
-                treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
-                    or(flag("isNullChaining", "?."), "."),
-                    set("member", ID)
-                ]),
-                treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
-                    set("genericArgs", callExpressionGenericArgsRule),
-                    "(",
-                    ...manySep(
-                        add("arguments", () => expressionRule),
-                        ",",
-                        LeadingTrailing.TRAILING
-                    ),
-                    ")"
-                ]),
-                treeRewriteAction(types.assertNonNullExpressionType, "expression", "=", () => ["!!"])
-            )
+            treeRewriteAction(types.memberAccessExpressionType, "expression", "=", ({ set, flag }) => [
+                or(flag("isNullChaining", "?."), "."),
+                set("member", ID)
+            ])
+        ]);
+
+    const callPostfixFragment = createFragmentRule(config.callPostfixFragmentRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [
+            treeRewriteAction(types.callExpressionType, "expression", "=", ({ set, add }) => [
+                set("genericArgs", callExpressionGenericArgsRule),
+                "(",
+                ...manySep(
+                    add("arguments", () => expressionRule),
+                    ",",
+                    LeadingTrailing.TRAILING
+                ),
+                ")"
+            ])
+        ]);
+
+    const memberCallPostfixFragment = createFragmentRule(config.memberCallPostfixFragmentRuleName)
+        .returns(types.baseExpressionType)
+        .as(() => [
+            treeRewriteAction(types.memberCallExpressionType, "expression", "=", ({ set, add, flag }) => [
+                or(flag("isNullChaining", "?."), "."),
+                set("member", ID),
+                set("genericArgs", callExpressionGenericArgsRule),
+                "(",
+                ...manySep(
+                    add("arguments", () => expressionRule),
+                    ",",
+                    LeadingTrailing.TRAILING
+                ),
+                ")"
+            ])
         ]);
 
     const postfixExpressionRule = createRule(config.postfixExpressionRuleName)
         .returns(types.baseExpressionType)
-        .as(() => [primaryExpressionRule, many(postfixFragment)]);
+        .as(() => [
+            primaryExpressionRule,
+            many(or(memberAccessPostfixFragment, callPostfixFragment, memberCallPostfixFragment, assertNonNullPostfixFragment))
+        ]);
 
     const callExpressionGenericArgsRule = createRule(config.callExpressionGenericArgsRuleName)
         .returns(types.callExpressionGenericArgsType)
@@ -268,6 +293,10 @@ export function generateExpressionRules(
         listExpressionRule,
         primaryExpressionRule,
         postfixExpressionRule,
+        assertNonNullPostfixFragment,
+        memberAccessPostfixFragment,
+        callPostfixFragment,
+        memberCallPostfixFragment,
         callExpressionGenericArgsRule,
         unaryExpressionRule,
         typeCastExpressionRule,

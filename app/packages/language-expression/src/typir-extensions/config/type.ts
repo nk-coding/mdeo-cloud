@@ -127,29 +127,52 @@ export interface FunctionType {
 }
 
 /**
- * Represents a member (property or function) of a class type.
+ * A property member of a class type.
  */
-export interface Member {
+export interface Property {
     /**
-     * The name of the member
+     * The name of the property
      */
     name: string;
     /**
-     * Whether this is a property (true) or function/method (false)
+     * Marker: this is a property
      */
-    isProperty: boolean;
+    readonly isProperty: true;
     /**
-     * Whether this property is readonly (only applicable for properties)
+     * Whether this property is readonly
      */
     readonly?: boolean;
     /**
-     * The type of the member (ValueType for properties, FunctionType for functions)
+     * The type of the property
      */
-    type: ValueType | FunctionType;
+    type: ValueType;
 }
 
 /**
- * A type definition with its members (properties and methods) and type hierarchy.
+ * A method member of a class type.
+ */
+export interface Method {
+    /**
+     * The name of the method
+     */
+    name: string;
+    /**
+     * Marker: this is a method (not a property)
+     */
+    readonly isProperty: false;
+    /**
+     * The type of the method
+     */
+    type: FunctionType;
+}
+
+/**
+ * A member is either a property or a method.
+ */
+export type Member = Property | Method;
+
+/**
+ * A type definition with its properties, methods and type hierarchy.
  */
 export interface ClassType {
     /**
@@ -162,9 +185,13 @@ export interface ClassType {
      */
     package: string;
     /**
-     * A mapping of member names to their definitions (unified properties and methods)
+     * Properties (field/attribute members) of this class type
      */
-    members: Record<string, Member>;
+    properties: Record<string, Property>;
+    /**
+     * Methods (function/callable members) of this class type
+     */
+    methods: Record<string, Method>;
     /**
      * Optional list of generic type parameter names (e.g., ['T', 'U'])
      */

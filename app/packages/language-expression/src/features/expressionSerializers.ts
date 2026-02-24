@@ -12,6 +12,7 @@ import type {
     CallExpressionGenericArgsType,
     CallExpressionType,
     MemberAccessExpressionType,
+    MemberCallExpressionType,
     IdentifierExpressionType,
     StringLiteralExpressionType,
     IntLiteralExpressionType,
@@ -51,6 +52,9 @@ export function registerExpressionSerializers(
     AstSerializer.registerNodeSerializer(types.callExpressionType, (ctx) => printCallExpression(ctx, types));
     AstSerializer.registerNodeSerializer(types.memberAccessExpressionType, (ctx) =>
         printMemberAccessExpression(ctx, types)
+    );
+    AstSerializer.registerNodeSerializer(types.memberCallExpressionType, (ctx) =>
+        printMemberCallExpression(ctx, types)
     );
     AstSerializer.registerNodeSerializer(types.identifierExpressionType, (ctx) => printIdentifierExpression(ctx));
     AstSerializer.registerNodeSerializer(types.assertNonNullExpressionType, (ctx) =>
@@ -226,6 +230,31 @@ function printMemberAccessExpression(context: PrintContext<MemberAccessExpressio
     const operator = ctx.isNullChaining ? "?." : ".";
     const member = printPrimitive(getPrimitive(ctx, "member"), ID);
     return [expression, operator, member];
+}
+
+/**
+ * Prints a member call expression node (e.g. `obj.method(args)`).
+ *
+ * @param context The print context
+ * @param types The generated expression types
+ * @returns The formatted member call expression
+ */
+function printMemberCallExpression(context: PrintContext<MemberCallExpressionType>, types: ExpressionTypes): Doc {
+    const { ctx, printPrimitive, getPrimitive, path, print } = context;
+
+    const expression = path.call((p) => printWithPrec(p, Precedence.POSTFIX, print, types), "expression");
+    const operator = ctx.isNullChaining ? "?." : ".";
+    const member = printPrimitive(getPrimitive(ctx, "member"), ID);
+
+    const docs: Doc[] = [expression, operator, member];
+
+    if (ctx.genericArgs != undefined) {
+        docs.push(path.call(print, "genericArgs"));
+    }
+
+    docs.push(group(["(", indent([softline, join([",", line], path.map(print, "arguments"))]), softline, ")"]));
+
+    return group(docs);
 }
 
 /**

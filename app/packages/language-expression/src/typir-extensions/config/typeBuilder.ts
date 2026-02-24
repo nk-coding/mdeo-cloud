@@ -8,7 +8,8 @@ import {
     type GenericTypeRef,
     type LambdaType,
     type BaseClassTypeRef,
-    type Member,
+    type Property,
+    type Method,
     type VoidType,
     type ReturnType
 } from "./type.js";
@@ -323,7 +324,7 @@ type EnsureNotMember<T, K extends string> = K extends keyof T ? never : K;
  * Type representing the built ClassType with specific member names
  */
 type TypedClassType<T extends MemberNames> = ClassType & {
-    members: Record<string, Member> & { _memberNames?: T };
+    _memberNames?: T;
 };
 
 /**
@@ -346,7 +347,8 @@ type TypedClassType<T extends MemberNames> = ClassType & {
 export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
     private name: string;
     private package: string;
-    members: Record<string, Member> = {};
+    properties: Record<string, Property> = {};
+    methods: Record<string, Method> = {};
     private genericNames?: string[];
     private superTypes: BaseClassTypeRef[] = [];
     private _isVirtual: boolean = false;
@@ -368,7 +370,7 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         type: ValueType,
         readonly: boolean = false
     ): ClassTypeBuilder<T & Record<K, never>> {
-        this.members[name] = {
+        this.properties[name] = {
             name,
             isProperty: true,
             readonly,
@@ -388,7 +390,7 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         builder: (method: MethodBuilder) => MethodBuilder
     ): ClassTypeBuilder<T & Record<K, never>> {
         const methodBuilder = builder(new MethodBuilder());
-        this.members[name] = {
+        this.methods[name] = {
             name,
             isProperty: false,
             type: methodBuilder.build()
@@ -446,9 +448,14 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
      */
     keepMembers<K extends keyof T & string>(...memberNames: readonly K[]): ClassTypeBuilder<Pick<T, K>> {
         const keepSet = new Set<string>(memberNames as unknown as string[]);
-        for (const existingName of Object.keys(this.members)) {
+        for (const existingName of Object.keys(this.properties)) {
             if (!keepSet.has(existingName)) {
-                delete this.members[existingName];
+                delete this.properties[existingName];
+            }
+        }
+        for (const existingName of Object.keys(this.methods)) {
+            if (!keepSet.has(existingName)) {
+                delete this.methods[existingName];
             }
         }
         return this as ClassTypeBuilder<Pick<T, K>>;
@@ -461,9 +468,14 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
      */
     omitMembers<K extends keyof T & string>(...memberNames: readonly K[]): ClassTypeBuilder<Omit<T, K>> {
         const omitSet = new Set<string>(memberNames as unknown as string[]);
-        for (const existingName of Object.keys(this.members)) {
+        for (const existingName of Object.keys(this.properties)) {
             if (omitSet.has(existingName)) {
-                delete this.members[existingName];
+                delete this.properties[existingName];
+            }
+        }
+        for (const existingName of Object.keys(this.methods)) {
+            if (omitSet.has(existingName)) {
+                delete this.methods[existingName];
             }
         }
         return this as ClassTypeBuilder<Omit<T, K>>;
@@ -476,7 +488,8 @@ export class ClassTypeBuilder<T extends MemberNames = MemberNames> {
         const result: ClassType = {
             name: this.name,
             package: this.package,
-            members: this.members
+            properties: this.properties,
+            methods: this.methods
         };
 
         if (this.genericNames && this.genericNames.length > 0) {
@@ -522,8 +535,11 @@ export function classTypeFrom(
 ): ClassTypeBuilder<any> {
     const builder = new ClassTypeBuilder<any>(name, pkg);
 
-    for (const [memberName, member] of Object.entries(existingType.members)) {
-        builder.members[memberName] = member;
+    for (const [propName, prop] of Object.entries(existingType.properties)) {
+        builder.properties[propName] = prop;
+    }
+    for (const [methodName, meth] of Object.entries(existingType.methods)) {
+        builder.methods[methodName] = meth;
     }
 
     if (existingType.generics) {
@@ -589,9 +605,9 @@ export class GlobalFunctionBuilder {
     }
 
     /**
-     * Build the global function as a Member.
+     * Build the global function as a Method.
      */
-    build(): Member {
+    build(): Method {
         if (Object.keys(this.signatures).length === 0) {
             throw new Error("Global function must have at least one signature");
         }
@@ -625,7 +641,7 @@ export function globalFunction(name: string): GlobalFunctionBuilder {
  * globalProperty('PI', typeRef('builtin', 'double').build())
  * ```
  */
-export function globalProperty(name: string, type: ValueType, readonly: boolean = true): Member {
+export function globalProperty(name: string, type: ValueType, readonly: boolean = true): Property {
     return {
         name,
         isProperty: true,

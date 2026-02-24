@@ -126,7 +126,11 @@ export class CustomLambdaTypeImplementation
         }
     }
 
-    override getLocalMember(): undefined {
+    override getLocalProperty(_memberName: string) {
+        return undefined;
+    }
+
+    override getLocalMethod(_memberName: string) {
         return undefined;
     }
 

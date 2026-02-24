@@ -5,7 +5,7 @@ import {
     type CustomValueTypeDetail
 } from "../custom-value/custom-value-type.js";
 import type { CustomNullKind } from "./custom-null-kind.js";
-import type { ClassTypeRef, Member } from "../../config/type.js";
+import type { ClassTypeRef } from "../../config/type.js";
 import { sharedImport } from "@mdeo/language-shared";
 
 const { TypeEqualityProblem: TypeEqualityProblemConstant, createKindConflict } = sharedImport("typir");
@@ -101,7 +101,11 @@ export class CustomNullTypeImplementation
         }
     }
 
-    override getLocalMember(): Member | undefined {
+    override getLocalProperty(_memberName: string) {
+        return undefined;
+    }
+
+    override getLocalMethod(_memberName: string) {
         return undefined;
     }
 }

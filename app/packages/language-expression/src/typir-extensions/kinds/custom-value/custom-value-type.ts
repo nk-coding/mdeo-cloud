@@ -1,7 +1,7 @@
 import type { Type as TypirType, TypeDetails, TypirProblem, TypirSpecifics } from "typir";
 import type { CustomClassType } from "../custom-class/custom-class-type.js";
 import type { ExtendedTypirServices } from "../../service/extendedTypirServices.js";
-import type { BaseClassTypeRef, Member, ValueType } from "../../config/type.js";
+import type { BaseClassTypeRef, Property, Method, ValueType } from "../../config/type.js";
 import { sharedImport } from "@mdeo/language-shared";
 
 const { Type } = sharedImport("typir");
@@ -85,22 +85,38 @@ export interface CustomValueType<
     readonly isNullable: boolean;
 
     /**
-     * Get a member (property or method) by name, including inherited members.
-     * Uses caching to avoid repeated lookups.
+     * Get a property by name, including inherited properties.
      *
-     * @param memberName The name of the member to look up
-     * @returns The member wrapper object, or undefined if not found
+     * @param memberName The name of the property to look up
+     * @returns The property, or undefined if not found
      */
-    getMember(memberName: string): Member | undefined;
+    getProperty(memberName: string): Property | undefined;
 
     /**
-     * Get a member for a specific member name (without inheritance).
-     * Must be implemented by subclasses to provide local member lookup.
+     * Get a method by name, including inherited methods.
      *
-     * @param memberName The name of the member
-     * @returns The member wrapper object, or undefined if not found
+     * @param memberName The name of the method to look up
+     * @returns The method, or undefined if not found
      */
-    getLocalMember(memberName: string): Member | undefined;
+    getMethod(memberName: string): Method | undefined;
+
+    /**
+     * Get a property for a specific member name (without inheritance).
+     * Must be implemented by subclasses to provide local property lookup.
+     *
+     * @param memberName The name of the property
+     * @returns The property, or undefined if not found
+     */
+    getLocalProperty(memberName: string): Property | undefined;
+
+    /**
+     * Get a method for a specific member name (without inheritance).
+     * Must be implemented by subclasses to provide local method lookup.
+     *
+     * @param memberName The name of the method
+     * @returns The method, or undefined if not found
+     */
+    getLocalMethod(memberName: string): Method | undefined;
 
     /**
      * Register this type as a subtype of its super classes.
@@ -136,7 +152,8 @@ export class CustomValueTypeImplementation<
         return this._allSuperClasses;
     }
 
-    private readonly cachedMembers: Map<string, Member> = new Map();
+    private readonly cachedProperties: Map<string, Property> = new Map();
+    private readonly cachedMethods: Map<string, Method> = new Map();
 
     get asNullable(): CustomValueType {
         throw new Error("Method not implemented.");
@@ -183,7 +200,11 @@ export class CustomValueTypeImplementation<
         );
     }
 
-    getLocalMember(_memberName: string): Member | undefined {
+    getLocalProperty(_memberName: string): Property | undefined {
+        throw new Error("Method not implemented.");
+    }
+
+    getLocalMethod(_memberName: string): Method | undefined {
         throw new Error("Method not implemented.");
     }
 
@@ -200,23 +221,42 @@ export class CustomValueTypeImplementation<
         }
     }
 
-    getMember(memberName: string): Member | undefined {
-        if (this.cachedMembers.has(memberName)) {
-            return this.cachedMembers.get(memberName);
+    getProperty(memberName: string): Property | undefined {
+        if (this.cachedProperties.has(memberName)) {
+            return this.cachedProperties.get(memberName);
         }
-        const member = this.getLocalMember(memberName);
-        if (member == undefined) {
-            for (const superClass of this.superClasses) {
-                const superMember = superClass.getMember(memberName);
-                if (superMember != undefined) {
-                    this.cachedMembers.set(memberName, superMember);
-                    return superMember;
-                }
+        const local = this.getLocalProperty(memberName);
+        if (local !== undefined) {
+            this.cachedProperties.set(memberName, local);
+            return local;
+        }
+        for (const superClass of this.superClasses) {
+            const found = superClass.getProperty(memberName);
+            if (found !== undefined) {
+                this.cachedProperties.set(memberName, found);
+                return found;
             }
-            return undefined;
         }
-        this.cachedMembers.set(memberName, member);
-        return member;
+        return undefined;
+    }
+
+    getMethod(memberName: string): Method | undefined {
+        if (this.cachedMethods.has(memberName)) {
+            return this.cachedMethods.get(memberName);
+        }
+        const local = this.getLocalMethod(memberName);
+        if (local !== undefined) {
+            this.cachedMethods.set(memberName, local);
+            return local;
+        }
+        for (const superClass of this.superClasses) {
+            const found = superClass.getMethod(memberName);
+            if (found !== undefined) {
+                this.cachedMethods.set(memberName, found);
+                return found;
+            }
+        }
+        return undefined;
     }
 
     override getName(): string {

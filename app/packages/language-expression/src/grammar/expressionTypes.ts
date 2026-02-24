@@ -71,6 +71,16 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
             genericArgs: Optional(callExpressionGenericArgsType)
         });
 
+    const memberCallExpressionType = createInterface(config.memberCallExpressionTypeName)
+        .extends(baseExpressionType)
+        .attrs({
+            expression: baseExpressionType,
+            member: String,
+            isNullChaining: Boolean,
+            arguments: [baseExpressionType],
+            genericArgs: Optional(callExpressionGenericArgsType)
+        });
+
     const memberAccessExpressionType = createInterface(config.memberAccessExpressionTypeName)
         .extends(baseExpressionType)
         .attrs({
@@ -143,6 +153,7 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         ternaryExpressionType,
         callExpressionGenericArgsType,
         callExpressionType,
+        memberCallExpressionType,
         memberAccessExpressionType,
         identifierExpressionType,
         stringLiteralExpressionType,
@@ -197,6 +208,11 @@ export type CallExpressionGenericArgsType = ASTType<ExpressionTypes["callExpress
  * Type representing the call expression
  */
 export type CallExpressionType = ASTType<ExpressionTypes["callExpressionType"]>;
+
+/**
+ * Type representing the member call expression
+ */
+export type MemberCallExpressionType = ASTType<ExpressionTypes["memberCallExpressionType"]>;
 
 /**
  * Type representing the member access expression

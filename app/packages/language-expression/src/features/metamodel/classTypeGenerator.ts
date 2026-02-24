@@ -1,5 +1,5 @@
 import { FunctionSignature } from "../../typir-extensions/config/type.js";
-import type { ClassType, Member } from "../../typir-extensions/config/type.js";
+import type { ClassType, Property, Method } from "../../typir-extensions/config/type.js";
 import { getClassContainerPackage, getClassPackage } from "./metamodelClassExtractor.js";
 import type { MetamodelClassInfo, MetamodelPropertyInfo, MetamodelRelationInfo } from "./metamodelClassInfo.js";
 
@@ -75,20 +75,22 @@ class ClassTypeGenerator {
      * @returns Object containing the class type and container type
      */
     private generateClassType(info: MetamodelClassInfo): { classType: ClassType; containerType: ClassType } {
-        const members: Record<string, Member> = {};
+        const properties: Record<string, Property> = {};
+        const methods: Record<string, Method> = {};
 
         for (const prop of info.properties) {
-            members[prop.name] = this.createPropertyMember(prop);
+            properties[prop.name] = this.createPropertyMember(prop);
         }
 
         for (const rel of info.relations) {
-            members[rel.property] = this.createRelationMember(rel);
+            properties[rel.property] = this.createRelationMember(rel);
         }
 
         const classType: ClassType = {
             name: info.name,
             package: info.package,
-            members,
+            properties,
+            methods,
             superTypes: info.superClasses.map((superClass) => ({
                 package: superClass.package,
                 type: superClass.name
@@ -120,7 +122,7 @@ class ClassTypeGenerator {
             parameters: []
         };
 
-        const allMethod: Member = {
+        const allMethod: Method = {
             name: "all",
             isProperty: false,
             type: {
@@ -133,7 +135,8 @@ class ClassTypeGenerator {
         return {
             name: className,
             package: this.classContainerPackage,
-            members: { all: allMethod },
+            properties: {},
+            methods: { all: allMethod },
             isVirtual: true
         };
     }
@@ -144,7 +147,7 @@ class ClassTypeGenerator {
      * @param prop The property information
      * @returns The Member definition
      */
-    private createPropertyMember(prop: MetamodelPropertyInfo): Member {
+    private createPropertyMember(prop: MetamodelPropertyInfo): Property {
         return {
             name: prop.name,
             isProperty: true,
@@ -159,7 +162,7 @@ class ClassTypeGenerator {
      * @param rel The relation information
      * @returns The Member definition
      */
-    private createRelationMember(rel: MetamodelRelationInfo): Member {
+    private createRelationMember(rel: MetamodelRelationInfo): Property {
         return {
             name: rel.property,
             isProperty: true,

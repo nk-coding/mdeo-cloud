@@ -1,4 +1,4 @@
-import type { Member } from "@mdeo/language-expression";
+import type { Method } from "@mdeo/language-expression";
 import { globalFunction, typeRef, voidType, genericTypeRef } from "@mdeo/language-expression";
 
 /**
@@ -11,7 +11,7 @@ import { globalFunction, typeRef, voidType, genericTypeRef } from "@mdeo/languag
 /**
  * println(string) - prints a string followed by a newline.
  */
-export const printlnFunction: Member = globalFunction("println")
+export const printlnFunction: Method = globalFunction("println")
     .signature((sig) => sig.param("message", typeRef("builtin", "string").build()).returns(voidType()))
     .build();
 
@@ -21,7 +21,7 @@ export const printlnFunction: Member = globalFunction("println")
  * @example
  * val items = listOf(1, 2, 3)
  */
-export const listOfFunction: Member = globalFunction("listOf")
+export const listOfFunction: Method = globalFunction("listOf")
     .signature((sig) =>
         sig
             .generics("T")
@@ -41,7 +41,7 @@ export const listOfFunction: Member = globalFunction("listOf")
  * @example
  * val items = setOf("a", "b", "c")
  */
-export const setOfFunction: Member = globalFunction("setOf")
+export const setOfFunction: Method = globalFunction("setOf")
     .signature((sig) =>
         sig
             .generics("T")
@@ -61,7 +61,7 @@ export const setOfFunction: Member = globalFunction("setOf")
  * @example
  * val items = bagOf(1, 1, 2)
  */
-export const bagOfFunction: Member = globalFunction("bagOf")
+export const bagOfFunction: Method = globalFunction("bagOf")
     .signature((sig) =>
         sig
             .generics("T")
@@ -81,7 +81,7 @@ export const bagOfFunction: Member = globalFunction("bagOf")
  * @example
  * val items = orderedSetOf("z", "a", "m")
  */
-export const orderedSetOfFunction: Member = globalFunction("orderedSetOf")
+export const orderedSetOfFunction: Method = globalFunction("orderedSetOf")
     .signature((sig) =>
         sig
             .generics("T")
@@ -101,7 +101,7 @@ export const orderedSetOfFunction: Member = globalFunction("orderedSetOf")
  * @example
  * val items = emptyList<string>()
  */
-export const emptyListFunction: Member = globalFunction("emptyList")
+export const emptyListFunction: Method = globalFunction("emptyList")
     .signature((sig) =>
         sig.generics("T").returns(
             typeRef("builtin", "List")
@@ -117,7 +117,7 @@ export const emptyListFunction: Member = globalFunction("emptyList")
  * @example
  * val items = emptySet<int>()
  */
-export const emptySetFunction: Member = globalFunction("emptySet")
+export const emptySetFunction: Method = globalFunction("emptySet")
     .signature((sig) =>
         sig.generics("T").returns(
             typeRef("builtin", "Set")
@@ -133,7 +133,7 @@ export const emptySetFunction: Member = globalFunction("emptySet")
  * @example
  * val items = emptyBag<string>()
  */
-export const emptyBagFunction: Member = globalFunction("emptyBag")
+export const emptyBagFunction: Method = globalFunction("emptyBag")
     .signature((sig) =>
         sig.generics("T").returns(
             typeRef("builtin", "Bag")
@@ -149,7 +149,7 @@ export const emptyBagFunction: Member = globalFunction("emptyBag")
  * @example
  * val items = emptyOrderedSet<int>()
  */
-export const emptyOrderedSetFunction: Member = globalFunction("emptyOrderedSet")
+export const emptyOrderedSetFunction: Method = globalFunction("emptyOrderedSet")
     .signature((sig) =>
         sig.generics("T").returns(
             typeRef("builtin", "OrderedSet")
@@ -162,7 +162,7 @@ export const emptyOrderedSetFunction: Member = globalFunction("emptyOrderedSet")
 /**
  * All stdlib global functions combined.
  */
-export const stdlibGlobalFunctions: Member[] = [
+export const stdlibGlobalFunctions: Method[] = [
     printlnFunction,
     listOfFunction,
     setOfFunction,

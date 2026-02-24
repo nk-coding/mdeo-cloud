@@ -161,8 +161,8 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
             } else {
                 const expressionType = this.inference.inferType(node.left.expression);
                 if (isCustomValueType(expressionType)) {
-                    const member = expressionType.getMember(node.left.member);
-                    if (member != undefined && member.readonly === true) {
+                    const prop = expressionType.getProperty(node.left.member);
+                    if (prop != undefined && prop.readonly === true) {
                         isReadonly = true;
                     }
                 }

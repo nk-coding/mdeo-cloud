@@ -92,6 +92,7 @@ export function getExpressionPrecedence<T extends BaseExpressionType>(node: T, t
     if (
         nodeType === types.memberAccessExpressionType.name ||
         nodeType === types.callExpressionType.name ||
+        nodeType === types.memberCallExpressionType.name ||
         nodeType === types.assertNonNullExpressionType.name
     ) {
         return Precedence.POSTFIX;
