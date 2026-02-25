@@ -259,6 +259,56 @@ fun Route.executionStateRoutes(
             call.respondApiResult(result)
         }
     }
+
+    route("/api/executions/{executionId}/metadata") {
+        /**
+         * Updates metadata of an execution.
+         * Requires JWT authentication with execution:write scope.
+         *
+         * @param executionId Path parameter for execution UUID
+         * @param body UpdateExecutionMetadataRequest with metadata object
+         * @return Updated execution
+         */
+        patch {
+            val jwtPrincipal = call.getJwtPrincipal()
+
+            if (jwtPrincipal == null) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "JWT authentication required"))
+                return@patch
+            }
+
+            if (JwtService.SCOPE_EXECUTION_WRITE !in jwtPrincipal.scopes) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token missing execution:write scope"))
+                return@patch
+            }
+
+            val executionId = call.parameters["executionId"]?.let {
+                try {
+                    UUID.fromString(it)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            if (executionId == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid execution ID"))
+                return@patch
+            }
+
+            val tokenExecutionId = jwtPrincipal.payload.getClaim(JwtService.CLAIM_EXECUTION_ID)?.asString()
+            if (tokenExecutionId != executionId.toString()) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token not valid for this execution"))
+                return@patch
+            }
+
+            val request = call.receive<UpdateExecutionMetadataRequest>()
+            val result = executionService.updateExecutionMetadata(
+                executionId,
+                request.metadata
+            )
+
+            call.respondApiResult(result)
+        }
+    }
 }
 
 /**

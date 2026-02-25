@@ -27,7 +27,6 @@ const configLanguagePlugin: LanguagePlugin = {
     id: "config",
     name: "Config",
     extension: ".config",
-    newFileAction: true,
     icon,
     serverPlugin: {
         import: "language.js"
@@ -59,8 +58,10 @@ initializePluginContext();
 
 const { configPluginProvider } = await import("@mdeo/language-config");
 const { configDataHandler, CONFIG_DATA_KEY } = await import("./handler/configFileDataHandler.js");
+const { ConfigExecutionHandler } = await import("./handler/configExecutionHandler.js");
 
 const envConfig = parseServiceConfigFromEnv();
+const configExecutionHandler = new ConfigExecutionHandler();
 
 /**
  * Language configuration for the config language.
@@ -75,7 +76,8 @@ const configLanguageConfig: LanguageServiceConfig<ConfigAdditionalServices> = {
     },
     fileDataHandlers: {
         [CONFIG_DATA_KEY]: configDataHandler
-    }
+    },
+    executionHandlers: [configExecutionHandler]
 };
 
 const config: ServiceConfig<any> = {

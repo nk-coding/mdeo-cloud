@@ -1,6 +1,7 @@
 import type {
     ExecutionHandler,
     ExecutionContext,
+    ExecutionRequestContext,
     CanHandleResult,
     ExecuteResponse,
     FileEntry
@@ -158,7 +159,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
      * @param jwt JWT token for authentication
      * @returns Promise resolving to a markdown-formatted summary
      */
-    async getSummary(executionId: string, jwt: string): Promise<string> {
+    async getSummary(context: ExecutionRequestContext): Promise<string> {
+        const { executionId, jwt } = context;
         try {
             const response = await fetch(`${this.backendUrl}/api/executions/${executionId}/summary`, {
                 method: "GET",
@@ -196,7 +198,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
      *
      * @returns Promise resolving to an empty list
      */
-    async getFileTree(): Promise<FileEntry[]> {
+    async getFileTree(_context: ExecutionRequestContext): Promise<FileEntry[]> {
         return [];
     }
 
@@ -207,7 +209,7 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
      *
      * @returns Promise that rejects with an error
      */
-    async getFile(): Promise<Buffer> {
+    async getFile(_context: ExecutionRequestContext, _path: string): Promise<Buffer> {
         throw new Error(`File not found: Script executions do not produce files`);
     }
 
@@ -220,7 +222,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is cancelled
      */
-    async cancel(executionId: string, jwt: string): Promise<void> {
+    async cancel(context: ExecutionRequestContext): Promise<void> {
+        const { executionId, jwt } = context;
         try {
             const response = await fetch(`${this.backendUrl}/api/executions/${executionId}/cancel`, {
                 method: "POST",
@@ -257,7 +260,8 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is deleted
      */
-    async delete(executionId: string, jwt: string): Promise<void> {
+    async delete(context: ExecutionRequestContext): Promise<void> {
+        const { executionId, jwt } = context;
         try {
             const response = await fetch(`${this.backendUrl}/api/executions/${executionId}`, {
                 method: "DELETE",

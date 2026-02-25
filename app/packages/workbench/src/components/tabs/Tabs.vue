@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, ref, useTemplateRef, watch } from "vue";
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { TabsRoot, TabsList } from "reka-ui";
 import { Icon } from "lucide-vue-next";
 import FileTab from "./FileTab.vue";
@@ -51,19 +51,20 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import ScrollArea from "../ui/scroll-area/ScrollArea.vue";
 import { workbenchStateKey } from "../workbench/util";
 import { watchArray } from "@vueuse/core";
-import {
-    ActionDisplayLocation,
-    createActionProtocol,
-    type FileMenuActionData,
-    type FileAction
-} from "@mdeo/language-common";
-import * as vscodeJsonrpc from "vscode-jsonrpc";
+import { ActionDisplayLocation, type FileAction } from "@mdeo/language-common";
 import { getFileExtension } from "@/data/filesystem/util";
-
-const ActionProtocol = createActionProtocol(vscodeJsonrpc);
+import {
+    FileOperation,
+    type FileOperationEvent
+} from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
+import type { IDisposable } from "@codingame/monaco-vscode-api/vscode/vs/base/common/lifecycle";
+import {
+    fetchFileActions as fetchAvailableFileActions,
+    triggerFileAction
+} from "@/components/action/fileActions";
 
 const workbenchState = inject(workbenchStateKey)!;
-const { tabs, activeTab, languageClient, languagePluginByExtension, pendingAction } = workbenchState;
+const { tabs, activeTab, languageClient, languagePluginByExtension, pendingAction, monacoApi } = workbenchState;
 
 const tabsRef = useTemplateRef("tabsRef");
 
@@ -133,30 +134,18 @@ watch(
  * @param tab The file tab to fetch actions for
  */
 async function fetchFileActions(tab: EditorTab): Promise<void> {
-    if (!languageClient.value) {
-        fileActions.value = [];
-        return;
-    }
-
     const fileUri = tab.fileUri.toString();
     const fileName = tab.fileUri.path.split("/").pop() || "";
     const extension = getFileExtension(fileName);
-    const languagePlugin = languagePluginByExtension.value.get(extension);
 
-    if (!languagePlugin) {
-        fileActions.value = [];
-        return;
-    }
-
-    try {
-        const response = await languageClient.value.sendRequest(ActionProtocol.GetFileActionsRequest, {
-            languageId: languagePlugin.id,
-            fileUri
-        });
-        fileActions.value = response?.actions ?? [];
-    } catch {
-        fileActions.value = [];
-    }
+    fileActions.value = await fetchAvailableFileActions(
+        {
+            languageClient,
+            languagePluginByExtension
+        },
+        fileUri,
+        extension
+    );
 }
 
 /**
@@ -172,20 +161,42 @@ function handleActionClick(action: FileAction): void {
 
     const fileName = tab.fileUri.path.split("/").pop() ?? "";
     const extension = getFileExtension(fileName);
-    const languagePlugin = languagePluginByExtension.value.get(extension);
 
-    if (languagePlugin == undefined) {
-        return;
+    triggerFileAction(pendingAction, languagePluginByExtension, action, tab.fileUri.toString(), extension);
+}
+
+function shouldRefetchActions(event: FileOperationEvent): boolean {
+    const tab = activeTab.value;
+    if (tab == undefined) {
+        return false;
     }
 
-    pendingAction.value = {
-        type: action.key,
-        languageId: languagePlugin.id,
-        data: {
-            uri: tab.fileUri.toString()
-        } satisfies FileMenuActionData
-    };
+    if (event.operation !== FileOperation.WRITE) {
+        return false;
+    }
+
+    return event.resource.toString() === tab.fileUri.toString();
 }
+
+let fileOperationListener: IDisposable | undefined;
+
+onMounted(() => {
+    fileOperationListener = monacoApi.fileService.onDidRunOperation((event) => {
+        if (!shouldRefetchActions(event)) {
+            return;
+        }
+
+        const tab = activeTab.value;
+        if (tab != undefined) {
+            void fetchFileActions(tab);
+        }
+    });
+});
+
+onUnmounted(() => {
+    fileOperationListener?.dispose();
+    fileOperationListener = undefined;
+});
 
 /**
  * Closes a tab and selects a new active tab if needed

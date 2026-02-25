@@ -51,7 +51,7 @@ object ScriptClassBytecodeGenerator {
     private const val EXECUTION_CONTEXT_CLASS = "com/mdeo/script/runtime/ExecutionContext"
 
     /**
-     * Internal name of the ScriptModel interface.
+     * Internal name of the ScriptModel class.
      */
     private const val SCRIPT_MODEL_CLASS = "com/mdeo/script/runtime/model/ScriptModel"
 
@@ -175,11 +175,11 @@ object ScriptClassBytecodeGenerator {
         )
         allMv.visitLdcInsn(className)
         allMv.visitMethodInsn(
-            Opcodes.INVOKEINTERFACE,
+            Opcodes.INVOKEVIRTUAL,
             SCRIPT_MODEL_CLASS,
             "getAllInstances",
             "(Ljava/lang/String;)Ljava/util/List;",
-            true
+            false
         )
         allMv.visitInsn(Opcodes.ARETURN)
         allMv.visitMaxs(0, 0)

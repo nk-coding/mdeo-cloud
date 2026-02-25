@@ -42,6 +42,7 @@ import { generateScriptRule } from "./grammar/scriptRules.js";
 import type { AbstractAstReflection } from "langium";
 import { ScriptActionProvider } from "./features/scriptActionProvider.js";
 import { RunScriptActionHandler } from "./action-handlers/runScriptActionHandler.js";
+import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");
@@ -112,10 +113,11 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
                 action: {
                     ActionHandlerRegistry: (services) => {
                         const registry = new ActionHandlerRegistry();
+                        registry.register("new-file", new NewFileActionHandler(services.shared));
                         registry.register("run", new RunScriptActionHandler(services.shared));
                         return registry;
                     },
-                    ActionProvider: () => new ScriptActionProvider()
+                    ActionProvider: (services) => new ScriptActionProvider(services.shared)
                 }
             },
             postCreate(services) {

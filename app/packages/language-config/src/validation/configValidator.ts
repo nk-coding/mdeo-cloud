@@ -85,6 +85,7 @@ export class ConfigValidator {
     validateConfig(config: ConfigType, accept: ValidationAcceptor): void {
         this.validateSectionUniqueness(config, accept);
         this.validateSectionDependencies(config, accept);
+        this.validateSingleExecutableSection(config, accept);
     }
 
     /**
@@ -218,6 +219,43 @@ export class ConfigValidator {
                     }
                 );
             }
+        }
+    }
+
+    /**
+     * Checks that at most one executable section is present in the config document.
+     * Executable sections are those whose contribution plugin section definition
+     * has `executable: true`.
+     *
+     * @param config The Config root node
+     * @param accept The validation acceptor
+     */
+    private validateSingleExecutableSection(config: ConfigType, accept: ValidationAcceptor): void {
+        const executableSections: Array<{ section: BaseConfigSectionType; qualifiedName: string }> = [];
+
+        for (const section of config.sections ?? []) {
+            const namingInfo = this.sectionTypeToNamingInfo.get(section.$type);
+            if (namingInfo == undefined) {
+                continue;
+            }
+
+            const sectionDef = namingInfo.plugin.sections.find(
+                (pluginSection) => pluginSection.name === namingInfo.sectionName
+            );
+            if (sectionDef?.executable === true) {
+                executableSections.push({ section, qualifiedName: namingInfo.qualifiedName });
+            }
+        }
+
+        if (executableSections.length <= 1) {
+            return;
+        }
+
+        const presentExecutableNames = executableSections.map((s) => s.qualifiedName).join(", ");
+        for (const executable of executableSections) {
+            accept("error", `Only one executable section may be present, but found: ${presentExecutableNames}.`, {
+                node: executable.section
+            });
         }
     }
 

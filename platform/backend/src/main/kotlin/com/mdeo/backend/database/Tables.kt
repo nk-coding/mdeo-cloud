@@ -267,6 +267,7 @@ object ExecutionsTable : Table("executions") {
     val name = varchar("name", 255)
     val state = varchar("state", 32).default(ExecutionState.SUBMITTED)
     val progressText = text("progress_text").nullable()
+    val metadata = json<JsonObject>("metadata", Json).nullable()
     val filePath = varchar("file_path", 1024)
     val languageId = varchar("language_id", 255)
     val createdAt = timestamp("created_at")

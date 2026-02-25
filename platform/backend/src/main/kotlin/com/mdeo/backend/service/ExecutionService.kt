@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -186,6 +187,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 it[name] = "Execution $executionId"
                 it[state] = ExecutionState.SUBMITTED
                 it[progressText] = null
+                it[metadata] = null
                 it[ExecutionsTable.filePath] = normalizedPath
                 it[ExecutionsTable.languageId] = languagePlugin.id
                 it[createdAt] = now
@@ -248,6 +250,53 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         }
 
         return result
+    }
+
+    /**
+     * Updates the metadata of an execution (called by services via JWT).
+     * Metadata is only writable while execution is non-terminal.
+     *
+     * @param executionId The UUID of the execution
+     * @param metadata Small JSON metadata object
+     * @return ApiResult containing the updated execution or an error
+     */
+    suspend fun updateExecutionMetadata(
+        executionId: UUID,
+        metadata: JsonObject
+    ): ApiResult<Execution> {
+        return transaction {
+            val existing = ExecutionsTable.selectAll()
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
+                .firstOrNull()
+
+            if (existing == null) {
+                return@transaction executionFailure(
+                    ErrorCodes.EXECUTION_NOT_FOUND,
+                    "Execution not found: $executionId"
+                )
+            }
+
+            val currentState = existing[ExecutionsTable.state]
+            if (isTerminalState(currentState)) {
+                return@transaction executionFailure(
+                    ErrorCodes.EXECUTION_ALREADY_COMPLETED,
+                    "Execution is already in terminal state: $currentState"
+                )
+            }
+
+            val now = Instant.now()
+            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                it[ExecutionsTable.metadata] = metadata
+                it[updatedAt] = now
+            }
+
+            val row = ExecutionsTable
+                .selectAll()
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
+                .first()
+
+            success(rowToExecution(row))
+        }
     }
 
     /**
@@ -406,7 +455,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         val fileTree = try {
-            callPluginGetFileTree(pluginUrl, execution.languageId, executionId, projectId)
+            callPluginGetFileTree(pluginUrl, execution.languageId, executionId, projectId, execution.metadata)
         } catch (e: Exception) {
             logger.error("Failed to get file tree from plugin", e)
             return executionFailure(
@@ -443,7 +492,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            val summary = callPluginGetSummary(pluginUrl, execution.languageId, executionId, projectId)
+            val summary = callPluginGetSummary(pluginUrl, execution.languageId, executionId, projectId, execution.metadata)
             success(summary)
         } catch (e: Exception) {
             logger.error("Failed to get summary from plugin", e)
@@ -481,7 +530,14 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            val fileContent = callPluginGetFile(pluginUrl, execution.languageId, executionId, projectId, path)
+            val fileContent = callPluginGetFile(
+                pluginUrl,
+                execution.languageId,
+                executionId,
+                projectId,
+                path,
+                execution.metadata
+            )
             success(fileContent)
         } catch (e: Exception) {
             logger.error("Failed to get file from plugin", e)
@@ -524,7 +580,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            callPluginCancel(pluginUrl, execution.languageId, executionId, projectId)
+            callPluginCancel(pluginUrl, execution.languageId, executionId, projectId, execution.metadata)
 
             transaction {
                 val now = Instant.now()
@@ -570,7 +626,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
 
         return try {
-            callPluginDelete(pluginUrl, execution.languageId, executionId, projectId)
+            callPluginDelete(pluginUrl, execution.languageId, executionId, projectId, execution.metadata)
 
             transaction {
                 ExecutionsTable.deleteWhere { ExecutionsTable.id eq executionId.toKotlinUuid() }
@@ -661,6 +717,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             name = row[ExecutionsTable.name],
             state = row[ExecutionsTable.state],
             progressText = row[ExecutionsTable.progressText],
+            metadata = row[ExecutionsTable.metadata],
             createdAt = row[ExecutionsTable.createdAt].toString(),
             startedAt = row[ExecutionsTable.startedAt]?.toString(),
             finishedAt = row[ExecutionsTable.finishedAt]?.toString()
@@ -750,7 +807,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         pluginUrl: String,
         languageId: String,
         executionId: UUID,
-        projectId: UUID
+        projectId: UUID,
+        metadata: JsonObject?
     ): List<FileEntry> {
         return withContext(Dispatchers.IO) {
             val token = jwtService.generateExecutionToken(
@@ -765,6 +823,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 .header("Authorization", "Bearer $token")
                 .GET()
                 .timeout(Duration.ofMinutes(1))
+                .applyExecutionMetadataHeader(metadata)
                 .build()
 
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -790,7 +849,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         pluginUrl: String,
         languageId: String,
         executionId: UUID,
-        projectId: UUID
+        projectId: UUID,
+        metadata: JsonObject?
     ): String {
         return withContext(Dispatchers.IO) {
             val token = jwtService.generateExecutionToken(
@@ -805,6 +865,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 .header("Authorization", "Bearer $token")
                 .GET()
                 .timeout(Duration.ofMinutes(1))
+                .applyExecutionMetadataHeader(metadata)
                 .build()
 
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -832,7 +893,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         languageId: String,
         executionId: UUID,
         projectId: UUID,
-        path: String
+        path: String,
+        metadata: JsonObject?
     ): ByteArray {
         return withContext(Dispatchers.IO) {
             val token = jwtService.generateExecutionToken(
@@ -848,6 +910,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 .header("Authorization", "Bearer $token")
                 .GET()
                 .timeout(Duration.ofMinutes(1))
+                .applyExecutionMetadataHeader(metadata)
                 .build()
 
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray())
@@ -873,7 +936,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         pluginUrl: String,
         languageId: String,
         executionId: UUID,
-        projectId: UUID
+        projectId: UUID,
+        metadata: JsonObject?
     ) {
         withContext(Dispatchers.IO) {
             val token = jwtService.generateExecutionToken(
@@ -888,6 +952,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 .header("Authorization", "Bearer $token")
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .timeout(Duration.ofMinutes(1))
+                .applyExecutionMetadataHeader(metadata)
                 .build()
 
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -911,7 +976,8 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         pluginUrl: String,
         languageId: String,
         executionId: UUID,
-        projectId: UUID
+        projectId: UUID,
+        metadata: JsonObject?
     ) {
         withContext(Dispatchers.IO) {
             val token = jwtService.generateExecutionToken(
@@ -926,6 +992,7 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 .header("Authorization", "Bearer $token")
                 .DELETE()
                 .timeout(Duration.ofMinutes(1))
+                .applyExecutionMetadataHeader(metadata)
                 .build()
 
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -939,5 +1006,15 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
                 throw RuntimeException("Plugin returned status ${response.statusCode()}: ${response.body()}")
             }
         }
+    }
+
+    /**
+     * Adds execution metadata header to plugin requests when metadata is present.
+     */
+    private fun HttpRequest.Builder.applyExecutionMetadataHeader(metadata: JsonObject?): HttpRequest.Builder {
+        if (metadata != null) {
+            header("X-Execution-Metadata", metadata.toString())
+        }
+        return this
     }
 }

@@ -19,16 +19,20 @@ import {
     IdValueConverter,
     NewlineAwareTokenBuilder,
     SerializerFormatter,
-    registerDefaultTokenSerializers
+    registerDefaultTokenSerializers,
+    ActionHandlerRegistry,
+    type ActionHandlerRegistryAdditionalServices
 } from "@mdeo/language-shared";
 import { registerConfigSerializers } from "./features/configSerializers.js";
 import { ConfigExternalReferenceCollector } from "./features/configExternalReferenceCollector.js";
 import { registerConfigValidationChecks } from "./validation/configValidator.js";
+import { ConfigActionProvider } from "./features/configActionProvider.js";
+import { RunConfigActionHandler } from "./action-handlers/runConfigActionHandler.js";
 
 /**
  * Additional services for the Config language.
  */
-export type ConfigAdditionalServices = ExternalReferenceAdditionalServices;
+export type ConfigAdditionalServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
 /**
  * Provider for the Config language plugin.
@@ -70,7 +74,29 @@ export const configPluginProvider: LangiumLanguagePluginProvider<ConfigAdditiona
                     Formatter: (services) => new SerializerFormatter(services)
                 },
                 AstSerializer: (services) =>
-                    new ConfigAstSerializer(services, services.shared.ServiceRegistry, configPlugins)
+                    new ConfigAstSerializer(services, services.shared.ServiceRegistry, configPlugins),
+                action: {
+                    ActionHandlerRegistry: (services) => {
+                        const registry = new ActionHandlerRegistry();
+                        registry.register(
+                            "run",
+                            new RunConfigActionHandler(
+                                services.shared,
+                                services.shared.ServiceRegistry,
+                                resolvedPlugins,
+                                configPlugins
+                            )
+                        );
+                        return registry;
+                    },
+                    ActionProvider: (services) =>
+                        new ConfigActionProvider(
+                            services.shared,
+                            services.shared.ServiceRegistry,
+                            resolvedPlugins,
+                            configPlugins
+                        )
+                }
             },
             postCreate(services) {
                 registerDefaultTokenSerializers(services);

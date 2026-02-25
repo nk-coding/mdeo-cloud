@@ -1,3 +1,4 @@
+export * from "./action-handlers/newFileActionHandler.js";
 export * from "./action-handlers/runScriptActionHandler.js";
 export * from "./features/stdlib/globalFunctions.js";
 export * from "./features/type-system/lambdaScope.js";

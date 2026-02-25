@@ -16,7 +16,10 @@ import {
     SerializerFormatter,
     registerDefaultTokenSerializers,
     NewlineAwareTokenBuilder,
-    addExternalReferenceCollectionPhase
+    addExternalReferenceCollectionPhase,
+    ActionHandlerRegistry,
+    type ActionHandlerRegistryAdditionalServices,
+    DefaultActionProvider
 } from "@mdeo/language-shared";
 import { generateContributionPluginGrammar, ConfigTerminals } from "@mdeo/language-config";
 import { Class, Property } from "@mdeo/language-metamodel";
@@ -28,6 +31,7 @@ import { createMdeoContributionPlugin } from "./plugin/mdeoContributionPlugin.js
 import { registerMdeoValidationChecks } from "./validation/mdeoValidator.js";
 import { DefaultMdeoMetamodelResolver } from "./features/defaultMdeoMetamodelResolver.js";
 import type { MdeoMetamodelResolver } from "./features/mdeoMetamodelResolver.js";
+import { RunMdeoConfigActionHandler } from "./action-handlers/runMdeoConfigActionHandler.js";
 
 /**
  * Additional services required by the MDEO language plugin.
@@ -42,7 +46,9 @@ export interface MdeoAdditionalServices {
 /**
  * Combined services type for MDEO language.
  */
-export type MdeoServices = ExternalReferenceAdditionalServices & MdeoAdditionalServices;
+export type MdeoServices = ExternalReferenceAdditionalServices &
+    MdeoAdditionalServices &
+    ActionHandlerRegistryAdditionalServices;
 
 /**
  * Deserialization context for the MDEO grammar.
@@ -81,7 +87,15 @@ const configMdeoPlugin: LangiumLanguagePlugin<MdeoServices> = {
             Formatter: (services) => new SerializerFormatter(services)
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),
-        MdeoMetamodelResolver: () => new DefaultMdeoMetamodelResolver()
+        MdeoMetamodelResolver: () => new DefaultMdeoMetamodelResolver(),
+        action: {
+            ActionHandlerRegistry: () => {
+                const registry = new ActionHandlerRegistry();
+                registry.register("run", new RunMdeoConfigActionHandler());
+                return registry;
+            },
+            ActionProvider: () => new DefaultActionProvider()
+        }
     },
     postCreate(services) {
         registerDefaultTokenSerializers(services);

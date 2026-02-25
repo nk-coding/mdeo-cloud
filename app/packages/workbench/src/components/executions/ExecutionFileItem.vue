@@ -53,13 +53,12 @@ import { FileType } from "vscode";
 import { workbenchStateKey } from "@/components/workbench/util";
 import {
     ActionDisplayLocation,
-    createActionProtocol,
-    type FileMenuActionData,
     type FileAction
 } from "@mdeo/language-common";
-import * as vscodeJsonrpc from "vscode-jsonrpc";
-
-const ActionProtocol = createActionProtocol(vscodeJsonrpc);
+import {
+    fetchFileActions as fetchAvailableFileActions,
+    triggerFileAction
+} from "@/components/action/fileActions";
 
 const props = defineProps<{
     entry: FileSystemNode;
@@ -119,39 +118,30 @@ async function handleContextMenuOpen(open: boolean): Promise<void> {
 }
 
 async function fetchFileActions(): Promise<void> {
-    if (!languageClient.value) {
-        fileActions.value = [];
-        return;
-    }
-
     const languagePlugin = languagePluginByExtension.value.get(fileExtension.value);
     if (!languagePlugin) {
         fileActions.value = [];
         return;
     }
 
-    try {
-        const response = await languageClient.value.sendRequest(ActionProtocol.GetFileActionsRequest, {
-            languageId: languagePlugin.id,
-            fileUri: props.entry.uri.toString()
-        });
-        fileActions.value = response?.actions ?? [];
-    } catch {
-        fileActions.value = [];
-    }
+    fileActions.value = await fetchAvailableFileActions(
+        {
+            languageClient,
+            languagePluginByExtension
+        },
+        props.entry.uri.toString(),
+        fileExtension.value
+    );
 }
 
 function handleFileAction(action: FileAction): void {
-    const languagePlugin = languagePluginByExtension.value.get(fileExtension.value);
-    if (!languagePlugin) return;
-
-    pendingAction.value = {
-        type: action.key,
-        languageId: languagePlugin.id,
-        data: {
-            uri: props.entry.uri.toString()
-        } satisfies FileMenuActionData
-    };
+    triggerFileAction(
+        pendingAction,
+        languagePluginByExtension,
+        action,
+        props.entry.uri.toString(),
+        fileExtension.value
+    );
 }
 
 async function openTab(temporary: boolean, event?: MouseEvent | KeyboardEvent) {

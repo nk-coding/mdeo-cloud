@@ -1,6 +1,7 @@
 import type {
     ExecutionHandler,
     ExecutionContext,
+    ExecutionRequestContext,
     CanHandleResult,
     ExecuteResponse,
     FileEntry
@@ -128,7 +129,8 @@ export class ModelTransformationExecutionHandler implements ExecutionHandler<Exe
      * @param jwt JWT token for authentication
      * @returns Promise resolving to a markdown-formatted summary
      */
-    async getSummary(executionId: string, jwt: string): Promise<string> {
+    async getSummary(context: ExecutionRequestContext): Promise<string> {
+        const { executionId, jwt } = context;
         const response = await this.fetchWithErrorHandling(`${this.backendUrl}/api/executions/${executionId}/summary`, {
             method: "GET",
             headers: this.buildHeaders(jwt)
@@ -148,7 +150,8 @@ export class ModelTransformationExecutionHandler implements ExecutionHandler<Exe
      * @param jwt JWT token for authentication
      * @returns Promise resolving to the list of files and directories
      */
-    async getFileTree(executionId: string, jwt: string): Promise<FileEntry[]> {
+    async getFileTree(context: ExecutionRequestContext): Promise<FileEntry[]> {
+        const { executionId, jwt } = context;
         const response = await this.fetchWithErrorHandling(
             `${this.backendUrl}/api/executions/${executionId}/file-tree`,
             {
@@ -171,7 +174,8 @@ export class ModelTransformationExecutionHandler implements ExecutionHandler<Exe
      * @param jwt JWT token for authentication
      * @returns Promise resolving to the file contents as a Buffer
      */
-    async getFile(executionId: string, path: string, jwt: string): Promise<Buffer> {
+    async getFile(context: ExecutionRequestContext, path: string): Promise<Buffer> {
+        const { executionId, jwt } = context;
         const response = await this.fetchWithErrorHandling(
             `${this.backendUrl}/api/executions/${executionId}/files/${path}`,
             {
@@ -193,7 +197,8 @@ export class ModelTransformationExecutionHandler implements ExecutionHandler<Exe
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is cancelled
      */
-    async cancel(executionId: string, jwt: string): Promise<void> {
+    async cancel(context: ExecutionRequestContext): Promise<void> {
+        const { executionId, jwt } = context;
         await this.fetchWithErrorHandling(`${this.backendUrl}/api/executions/${executionId}/cancel`, {
             method: "POST",
             headers: this.buildHeaders(jwt)
@@ -209,7 +214,8 @@ export class ModelTransformationExecutionHandler implements ExecutionHandler<Exe
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is deleted
      */
-    async delete(executionId: string, jwt: string): Promise<void> {
+    async delete(context: ExecutionRequestContext): Promise<void> {
+        const { executionId, jwt } = context;
         await this.fetchWithErrorHandling(`${this.backendUrl}/api/executions/${executionId}`, {
             method: "DELETE",
             headers: {

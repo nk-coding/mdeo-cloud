@@ -9,9 +9,6 @@ import com.mdeo.script.compiler.ScriptCompiler
 import com.mdeo.script.runtime.ExecutionContext
 import com.mdeo.script.runtime.ExecutionEnvironment
 import com.mdeo.script.runtime.model.ModelDataScriptModel
-import com.mdeo.script.runtime.model.ModelInstance
-import com.mdeo.script.runtime.model.ModelInstanceBacking
-import com.mdeo.script.runtime.model.ModelInstanceFactory
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.scriptexecution.database.ExecutionsTable
 import kotlinx.coroutines.Dispatchers
@@ -338,16 +335,12 @@ class ExecutionService(
             val env = ExecutionEnvironment(compiledProgram, printStream)
             
             val result = if (metamodelData != null && modelData != null && metamodelPath != null) {
-                // Execute with model context — use env.classLoader so model instances and
-                // script classes share the same loader (avoids ClassCastException).
-                val factory = ReflectiveModelInstanceFactory(env.classLoader, metamodelPath)
-                val scriptModel = ModelDataScriptModel(modelData, metamodelData, factory)
+                val scriptModel = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
                 
                 ExecutionContext.withModel(scriptModel) {
                     env.invoke(filePath, methodName)
                 }
             } else {
-                // Execute without model
                 env.invoke(filePath, methodName)
             }
 
@@ -539,38 +532,5 @@ class ExecutionService(
                 "Execution is in state: $state"
             }
         }
-    }
-}
-
-/**
- * ModelInstanceFactory implementation that uses reflection to instantiate
- * generated model classes from a CompiledProgram.
- *
- * @param classLoader The ScriptClassLoader shared with the ExecutionEnvironment.
- * @param metamodelPath The metamodel path used for class naming.
- */
-private class ReflectiveModelInstanceFactory(
-    private val classLoader: com.mdeo.script.runtime.ScriptClassLoader,
-    private val metamodelPath: String
-) : ModelInstanceFactory {
-
-    override fun createInstance(className: String, backing: ModelInstanceBacking): ModelInstance {
-        val internalName = com.mdeo.script.compiler.model.ScriptClassBytecodeGenerator
-            .getInstanceClassName(className, metamodelPath)
-        val jvmClassName = internalName.replace("/", ".")
-        
-        val clazz = classLoader.loadClass(jvmClassName)
-        val constructor = clazz.getConstructor(ModelInstanceBacking::class.java)
-        return constructor.newInstance(backing) as ModelInstance
-    }
-
-    override fun createEnumValue(enumName: String, entryName: String): Any {
-        val internalName = com.mdeo.script.compiler.model.ScriptEnumBytecodeGenerator
-            .getEnumContainerClassName(enumName, metamodelPath)
-        val jvmClassName = internalName.replace("/", ".")
-        
-        val clazz = classLoader.loadClass(jvmClassName)
-        val field = clazz.getField(entryName)
-        return field.get(null) ?: error("Enum entry $enumName.$entryName not found")
     }
 }

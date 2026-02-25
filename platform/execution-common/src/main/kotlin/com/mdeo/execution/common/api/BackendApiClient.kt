@@ -9,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.modules.SerializersModule
 import org.slf4j.LoggerFactory
 
@@ -83,6 +84,35 @@ open class BackendApiClient(
     }
 
     /**
+     * Updates execution metadata on the backend.
+     *
+     * @param executionId UUID of the execution
+     * @param metadata JSON metadata object
+     * @param jwtToken JWT token to authenticate the request
+     * @return true if update was successful, false otherwise
+     */
+    suspend fun updateExecutionMetadata(
+        executionId: String,
+        metadata: JsonObject,
+        jwtToken: String
+    ): Boolean {
+        return try {
+            logger.debug("Updating backend metadata for execution $executionId")
+
+            val response = client.patch("$baseUrl/executions/$executionId/metadata") {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer $jwtToken")
+                setBody(UpdateExecutionMetadataRequest(metadata))
+            }
+
+            response.status == HttpStatusCode.OK || response.status == HttpStatusCode.NoContent
+        } catch (e: Exception) {
+            logger.error("Error updating execution metadata on backend", e)
+            false
+        }
+    }
+
+    /**
      * Makes an authenticated GET request to the backend.
      *
      * @param path The API path (relative to baseUrl)
@@ -122,4 +152,12 @@ open class BackendApiClient(
 internal data class UpdateExecutionStateRequest(
     val state: String,
     val progressText: String?
+)
+
+/**
+ * Request payload for updating execution metadata.
+ */
+@Serializable
+internal data class UpdateExecutionMetadataRequest(
+    val metadata: JsonObject
 )

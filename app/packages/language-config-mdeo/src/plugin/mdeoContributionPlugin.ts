@@ -87,7 +87,8 @@ export function createMdeoContributionPlugin(): ConfigContributionPlugin {
             {
                 name: "solver",
                 ruleName: SolverSectionContentRule.name,
-                interfaceName: SolverSection.name
+                interfaceName: SolverSection.name,
+                executable: true
             }
         ],
         dependencies: ["config-optimization"],

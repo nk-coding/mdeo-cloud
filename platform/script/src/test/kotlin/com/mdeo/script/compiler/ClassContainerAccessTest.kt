@@ -11,16 +11,10 @@ import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
 import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
 import com.mdeo.script.ast.TypedAst
-import com.mdeo.script.compiler.model.ScriptClassBytecodeGenerator
-import com.mdeo.script.compiler.model.ScriptEnumBytecodeGenerator
 import com.mdeo.script.compiler.model.ScriptMetamodelTypeRegistrar
 import com.mdeo.script.runtime.ExecutionContext
 import com.mdeo.script.runtime.ExecutionEnvironment
-import com.mdeo.script.runtime.ScriptClassLoader
 import com.mdeo.script.runtime.model.ModelDataScriptModel
-import com.mdeo.script.runtime.model.ModelInstance
-import com.mdeo.script.runtime.model.ModelInstanceBacking
-import com.mdeo.script.runtime.model.ModelInstanceFactory
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -109,8 +103,7 @@ class ClassContainerAccessTest {
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
         val env = ExecutionEnvironment(program, console = ps)
-        val factory = reflectiveFactory(env.classLoader, metamodelPath)
-        val model = ModelDataScriptModel(modelData, metamodelData, factory)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
 
         ExecutionContext.withModel(model) {
             env.invoke(testFileUri, "test")
@@ -305,8 +298,7 @@ class ClassContainerAccessTest {
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
         val env = ExecutionEnvironment(program, console = ps)
-        val factory = reflectiveFactory(env.classLoader, metamodelPath)
-        val model = ModelDataScriptModel(modelData, metamodelData, factory)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
 
         // Verify class container
         ExecutionContext.withModel(model) {
@@ -516,8 +508,7 @@ class ClassContainerAccessTest {
         )
 
         val env = ExecutionEnvironment(program)
-        val factory = reflectiveFactory(env.classLoader, metamodelPath)
-        val model = ModelDataScriptModel(modelData, metamodelData, factory)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
 
         val result = ExecutionContext.withModel(model) {
             env.invoke(testFileUri, "test")
@@ -541,29 +532,4 @@ class ClassContainerAccessTest {
         return baos.toString(Charsets.UTF_8)
     }
 
-    /**
-     * Creates a [ModelInstanceFactory] that uses reflection to load generated
-     * classes from a [ScriptClassLoader].
-     */
-    private fun reflectiveFactory(
-        classLoader: ScriptClassLoader,
-        metamodelPath: String
-    ): ModelInstanceFactory = object : ModelInstanceFactory {
-
-        override fun createInstance(className: String, backing: ModelInstanceBacking): ModelInstance {
-            val internalName = ScriptClassBytecodeGenerator.getInstanceClassName(className, metamodelPath)
-            val jvmClassName = internalName.replace("/", ".")
-            val clazz = classLoader.loadClass(jvmClassName)
-            val ctor = clazz.getConstructor(ModelInstanceBacking::class.java)
-            return ctor.newInstance(backing) as ModelInstance
-        }
-
-        override fun createEnumValue(enumName: String, entryName: String): Any {
-            val internalName = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumName, metamodelPath)
-            val jvmClassName = internalName.replace("/", ".")
-            val clazz = classLoader.loadClass(jvmClassName)
-            return clazz.getField(entryName).get(null)
-                ?: error("Enum entry $enumName.$entryName not found")
-        }
-    }
 }

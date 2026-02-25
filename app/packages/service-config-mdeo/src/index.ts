@@ -38,6 +38,22 @@ initializePluginContext();
 
 const { configMdeoPluginProvider, createMdeoContributionPlugin } = await import("@mdeo/language-config-mdeo");
 const { mdeoRequestHandler, MDEO_REQUEST_KEY } = await import("./handler/mdeoRequestHandler.js");
+const {
+    mdeoExecutionRequestHandler,
+    mdeoExecutionGetSummaryRequestHandler,
+    mdeoExecutionGetFileTreeRequestHandler,
+    mdeoExecutionGetFileRequestHandler,
+    mdeoExecutionCancelRequestHandler,
+    mdeoExecutionDeleteRequestHandler
+} = await import("./handler/mdeoExecutionRequestHandler.js");
+const {
+    CONFIG_EXECUTION_REQUEST_KEY,
+    CONFIG_EXECUTION_GET_SUMMARY_REQUEST_KEY,
+    CONFIG_EXECUTION_GET_FILE_TREE_REQUEST_KEY,
+    CONFIG_EXECUTION_GET_FILE_REQUEST_KEY,
+    CONFIG_EXECUTION_CANCEL_REQUEST_KEY,
+    CONFIG_EXECUTION_DELETE_REQUEST_KEY
+} = await import("@mdeo/language-config");
 
 /**
  * Plugin definition for the config-mdeo service.
@@ -87,7 +103,13 @@ const configMdeoLanguageConfig: LanguageServiceConfig<MdeoServices> = {
         [AST_HANDLER_KEY]: astHandler
     },
     requestHandlers: {
-        [MDEO_REQUEST_KEY]: mdeoRequestHandler
+        [MDEO_REQUEST_KEY]: mdeoRequestHandler,
+        [CONFIG_EXECUTION_REQUEST_KEY]: mdeoExecutionRequestHandler,
+        [CONFIG_EXECUTION_GET_SUMMARY_REQUEST_KEY]: mdeoExecutionGetSummaryRequestHandler,
+        [CONFIG_EXECUTION_GET_FILE_TREE_REQUEST_KEY]: mdeoExecutionGetFileTreeRequestHandler,
+        [CONFIG_EXECUTION_GET_FILE_REQUEST_KEY]: mdeoExecutionGetFileRequestHandler,
+        [CONFIG_EXECUTION_CANCEL_REQUEST_KEY]: mdeoExecutionCancelRequestHandler,
+        [CONFIG_EXECUTION_DELETE_REQUEST_KEY]: mdeoExecutionDeleteRequestHandler
     }
 };
 

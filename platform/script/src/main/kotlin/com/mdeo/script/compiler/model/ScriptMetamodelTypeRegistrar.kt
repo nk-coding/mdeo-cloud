@@ -53,7 +53,7 @@ object ScriptMetamodelTypeRegistrar {
     /** Internal name of ExecutionContext class (formerly ModelContext). */
     private const val MODEL_CONTEXT_CLASS = "com/mdeo/script/runtime/ExecutionContext"
 
-    /** Internal name of ScriptModel interface. */
+    /** Internal name of ScriptModel class. */
     private const val SCRIPT_MODEL_CLASS = "com/mdeo/script/runtime/model/ScriptModel"
 
     /**
@@ -440,7 +440,7 @@ private class EnumEntryPropertyDefinition(
 /**
  * Method definition for model.allInstances(className).
  *
- * Emits a call to ModelContext.requireModel().getAllInstances(className).
+ * Emits a call to ExecutionContext.requireModel().getAllInstances(className).
  */
 private class AllInstancesMethodDefinition(
     override val overloadKey: String,
@@ -452,7 +452,7 @@ private class AllInstancesMethodDefinition(
     override val descriptor: String = "()Ljava/util/List;"
     override val isStatic: Boolean = false
     override val ownerClass: String = "com/mdeo/script/runtime/model/ScriptModel"
-    override val isInterface: Boolean = true
+    override val isInterface: Boolean = false
     override val jvmMethodName: String = "getAllInstances"
     override val isVarArgs: Boolean = false
     override val parameterTypes: List<ValueType> = emptyList()
@@ -462,11 +462,11 @@ private class AllInstancesMethodDefinition(
     override fun emitInvocation(mv: MethodVisitor) {
         mv.visitLdcInsn(targetClassName)
         mv.visitMethodInsn(
-            Opcodes.INVOKEINTERFACE,
+            Opcodes.INVOKEVIRTUAL,
             ownerClass,
             jvmMethodName,
             "(Ljava/lang/String;)Ljava/util/List;",
-            true
+            false
         )
     }
 }
@@ -506,11 +506,11 @@ private class ClassContainerAllMethodDefinition(
         )
         mv.visitLdcInsn(className)
         mv.visitMethodInsn(
-            Opcodes.INVOKEINTERFACE,
+            Opcodes.INVOKEVIRTUAL,
             "com/mdeo/script/runtime/model/ScriptModel",
             "getAllInstances",
             "(Ljava/lang/String;)Ljava/util/List;",
-            true
+            false
         )
     }
 }

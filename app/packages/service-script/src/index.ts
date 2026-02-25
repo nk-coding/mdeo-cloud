@@ -25,6 +25,7 @@ const scriptLanguagePlugin: LanguagePlugin = {
     id: "script",
     name: "Script",
     extension: ".fn",
+    newFileAction: true,
     icon: convertIcon(FileCode),
     serverPlugin: {
         import: "language.js"

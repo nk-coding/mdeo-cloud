@@ -23,26 +23,18 @@ export interface ConfigSection {
      * This interface name must exist in the plugin's serialized grammar.
      */
     interfaceName: string;
+
+    /**
+     * Marks this section as executable.
+     * If true, the config language can expose the regular "run" file action
+     * when this section is present in a config file.
+     */
+    executable?: boolean;
 }
 
 /**
  * Plugin for contributing sections to the config language.
  * Each plugin can contribute multiple sections with their associated grammars.
- *
- * @example
- * ```typescript
- * const optimizationPlugin: ConfigContributionPlugin = {
- *     id: "config-optimization",
- *     type: ConfigContributionPlugin.TYPE,
- *     shortName: "optimization",
- *     languageKey: "config-optimization",
- *     grammar: serializedGrammar,
- *     sections: [
- *         { name: "problem", ruleName: "Problem", interfaceName: "ConfigProblemSection" },
- *         { name: "goal", ruleName: "Goal", interfaceName: "ConfigGoalSection" }
- *     ]
- * };
- * ```
  */
 export interface ConfigContributionPlugin extends ServerContributionPlugin {
     /**

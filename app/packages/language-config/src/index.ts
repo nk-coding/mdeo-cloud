@@ -1,4 +1,5 @@
 export * from "./features/configAstSerializer.js";
+export * from "./features/configActionProvider.js";
 export * from "./features/configDelegatingScopeProvider.js";
 export * from "./features/configExternalReferenceCollector.js";
 export * from "./features/configSerializers.js";
@@ -8,5 +9,6 @@ export * from "./grammar/configTypes.js";
 export * from "./plugin/configContributionPlugin.js";
 export * from "./plugin/configRequestBody.js";
 export * from "./plugin/resolvePlugins.js";
+export * from "./action-handlers/runConfigActionHandler.js";
 export * from "./validation/configValidator.js";
 export * from "./plugin.js";

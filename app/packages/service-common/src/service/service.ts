@@ -8,7 +8,7 @@ import type { ServerContributionPlugin } from "@mdeo/plugin";
 import { URI } from "vscode-uri";
 import { buildManifest } from "./util.js";
 import type { FileInfo } from "../handler/types.js";
-import type { ExecutionContext } from "../execution/types.js";
+import type { ExecutionContext, ExecutionMetadata, ExecutionRequestContext } from "../execution/types.js";
 import { JwtAuthMiddleware } from "../auth/jwtAuth.js";
 
 /**
@@ -33,6 +33,28 @@ function extractJwtFromRequest(request: FastifyRequest): string {
         throw new Error("Missing or invalid Authorization header");
     }
     return authHeader.substring(7);
+}
+
+/**
+ * Extracts optional execution metadata from backend-forwarded header.
+ */
+function extractExecutionMetadataFromRequest(request: FastifyRequest): ExecutionMetadata | undefined {
+    const headerValue = request.headers["x-execution-metadata"];
+    const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+    if (typeof raw !== "string" || raw.trim().length === 0) {
+        return undefined;
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+            return parsed as ExecutionMetadata;
+        }
+    } catch {
+        // Ignore malformed metadata header and proceed without metadata.
+    }
+
+    return undefined;
 }
 
 /**
@@ -272,7 +294,9 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                     fileVersion,
                     data: data ?? {},
                     jwt,
-                    contributionPlugins: contributionPlugins ?? []
+                    contributionPlugins: contributionPlugins ?? [],
+                    instance,
+                    serverApi: instance.services.shared.ServerApi
                 };
 
                 try {
@@ -330,6 +354,14 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const jwt = extractJwtFromRequest(request);
+                const claims = JwtAuthMiddleware.getClaims(request);
+                const project = claims?.projectId;
+
+                if (!project) {
+                    return reply.status(401).send({ error: "JWT does not contain projectId claim" });
+                }
+
+                const metadata = extractExecutionMetadataFromRequest(request);
 
                 if (
                     !languageHandler.config.executionHandlers ||
@@ -339,15 +371,27 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const handler = languageHandler.config.executionHandlers[0];
+                const instance = await languageHandler.pool.acquire([], jwt, project);
+
+                const context: ExecutionRequestContext = {
+                    executionId,
+                    project,
+                    jwt,
+                    metadata,
+                    instance,
+                    serverApi: instance.services.shared.ServerApi
+                };
 
                 try {
-                    const summary = await handler.getSummary(executionId, jwt);
+                    const summary = await handler.getSummary(context);
                     return reply.send({ summary });
                 } catch (error) {
                     fastify.log.error(error);
                     return reply.status(500).send({
                         error: error instanceof Error ? error.message : "Failed to get summary"
                     });
+                } finally {
+                    languageHandler.pool.release(instance);
                 }
             }
         );
@@ -378,6 +422,14 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const jwt = extractJwtFromRequest(request);
+                const claims = JwtAuthMiddleware.getClaims(request);
+                const project = claims?.projectId;
+
+                if (!project) {
+                    return reply.status(401).send({ error: "JWT does not contain projectId claim" });
+                }
+
+                const metadata = extractExecutionMetadataFromRequest(request);
 
                 if (
                     !languageHandler.config.executionHandlers ||
@@ -387,15 +439,27 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const handler = languageHandler.config.executionHandlers[0];
+                const instance = await languageHandler.pool.acquire([], jwt, project);
+
+                const context: ExecutionRequestContext = {
+                    executionId,
+                    project,
+                    jwt,
+                    metadata,
+                    instance,
+                    serverApi: instance.services.shared.ServerApi
+                };
 
                 try {
-                    const files = await handler.getFileTree(executionId, jwt);
+                    const files = await handler.getFileTree(context);
                     return reply.send({ files });
                 } catch (error) {
                     fastify.log.error(error);
                     return reply.status(500).send({
                         error: error instanceof Error ? error.message : "Failed to get file tree"
                     });
+                } finally {
+                    languageHandler.pool.release(instance);
                 }
             }
         );
@@ -427,6 +491,14 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const jwt = extractJwtFromRequest(request);
+                const claims = JwtAuthMiddleware.getClaims(request);
+                const project = claims?.projectId;
+
+                if (!project) {
+                    return reply.status(401).send({ error: "JWT does not contain projectId claim" });
+                }
+
+                const metadata = extractExecutionMetadataFromRequest(request);
 
                 if (
                     !languageHandler.config.executionHandlers ||
@@ -436,15 +508,27 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const handler = languageHandler.config.executionHandlers[0];
+                const instance = await languageHandler.pool.acquire([], jwt, project);
+
+                const context: ExecutionRequestContext = {
+                    executionId,
+                    project,
+                    jwt,
+                    metadata,
+                    instance,
+                    serverApi: instance.services.shared.ServerApi
+                };
 
                 try {
-                    const fileContent = await handler.getFile(executionId, path, jwt);
+                    const fileContent = await handler.getFile(context, path);
                     return reply.type("application/octet-stream").send(fileContent);
                 } catch (error) {
                     fastify.log.error(error);
                     return reply.status(500).send({
                         error: error instanceof Error ? error.message : "Failed to get file"
                     });
+                } finally {
+                    languageHandler.pool.release(instance);
                 }
             }
         );
@@ -475,6 +559,14 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const jwt = extractJwtFromRequest(request);
+                const claims = JwtAuthMiddleware.getClaims(request);
+                const project = claims?.projectId;
+
+                if (!project) {
+                    return reply.status(401).send({ error: "JWT does not contain projectId claim" });
+                }
+
+                const metadata = extractExecutionMetadataFromRequest(request);
 
                 if (
                     !languageHandler.config.executionHandlers ||
@@ -484,15 +576,27 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const handler = languageHandler.config.executionHandlers[0];
+                const instance = await languageHandler.pool.acquire([], jwt, project);
+
+                const context: ExecutionRequestContext = {
+                    executionId,
+                    project,
+                    jwt,
+                    metadata,
+                    instance,
+                    serverApi: instance.services.shared.ServerApi
+                };
 
                 try {
-                    await handler.cancel(executionId, jwt);
+                    await handler.cancel(context);
                     return reply.status(204).send();
                 } catch (error) {
                     fastify.log.error(error);
                     return reply.status(500).send({
                         error: error instanceof Error ? error.message : "Failed to cancel execution"
                     });
+                } finally {
+                    languageHandler.pool.release(instance);
                 }
             }
         );
@@ -523,6 +627,14 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const jwt = extractJwtFromRequest(request);
+                const claims = JwtAuthMiddleware.getClaims(request);
+                const project = claims?.projectId;
+
+                if (!project) {
+                    return reply.status(401).send({ error: "JWT does not contain projectId claim" });
+                }
+
+                const metadata = extractExecutionMetadataFromRequest(request);
 
                 if (
                     !languageHandler.config.executionHandlers ||
@@ -532,15 +644,27 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 }
 
                 const handler = languageHandler.config.executionHandlers[0];
+                const instance = await languageHandler.pool.acquire([], jwt, project);
+
+                const context: ExecutionRequestContext = {
+                    executionId,
+                    project,
+                    jwt,
+                    metadata,
+                    instance,
+                    serverApi: instance.services.shared.ServerApi
+                };
 
                 try {
-                    await handler.delete(executionId, jwt);
+                    await handler.delete(context);
                     return reply.status(204).send();
                 } catch (error) {
                     fastify.log.error(error);
                     return reply.status(500).send({
                         error: error instanceof Error ? error.message : "Failed to delete execution"
                     });
+                } finally {
+                    languageHandler.pool.release(instance);
                 }
             }
         );

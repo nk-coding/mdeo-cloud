@@ -2,6 +2,7 @@ package com.mdeo.common.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Represents an execution in the system.
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.JsonElement
  * @property name Display name of the execution
  * @property state Current state of the execution
  * @property progressText Optional progress indication text
+ * @property metadata Optional execution-scoped JSON metadata
  * @property createdAt ISO 8601 timestamp when the execution was created/submitted
  * @property startedAt ISO 8601 timestamp when the execution started running, or null if not yet started
  * @property finishedAt ISO 8601 timestamp when the execution finished, or null if not yet finished
@@ -26,6 +28,7 @@ data class Execution(
     val name: String,
     val state: String,
     val progressText: String?,
+    val metadata: JsonObject? = null,
     val createdAt: String,
     val startedAt: String? = null,
     val finishedAt: String? = null
@@ -75,6 +78,16 @@ data class CreateExecutionResponse(
 data class UpdateExecutionStateRequest(
     val state: String,
     val progressText: String? = null
+)
+
+/**
+ * Request payload for updating execution metadata (used by services via JWT).
+ *
+ * @property metadata Small JSON object to store with the execution
+ */
+@Serializable
+data class UpdateExecutionMetadataRequest(
+    val metadata: JsonObject
 )
 
 /**

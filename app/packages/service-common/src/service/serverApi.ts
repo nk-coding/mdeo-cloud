@@ -72,6 +72,14 @@ export interface ServerApi {
      * @returns The response data from the plugin request handler
      */
     sendPluginRequest(languageId: string, key: string, body: unknown): Promise<unknown>;
+
+    /**
+     * Updates execution metadata in the backend.
+     *
+     * @param executionId The execution ID
+     * @param metadata Small JSON metadata object
+     */
+    updateExecutionMetadata(executionId: string, metadata: Record<string, unknown>): Promise<void>;
 }
 
 /**
@@ -159,13 +167,6 @@ export class HttpServerApi implements ServerApi {
         };
     }
 
-    /**
-     * Reads a file from the backend.
-     *
-     * @param path The path of the file to read
-     * @returns Promise resolving to the file content and version
-     * @throws Error if the file cannot be read or JWT is not set
-     */
     async readFile(path: string): Promise<{ content: string; version: number }> {
         const encodedPath = encodeURIComponent(path);
         const response = await fetch(`${this.projectBackendUrl}/files/${encodedPath}`, {
@@ -191,15 +192,6 @@ export class HttpServerApi implements ServerApi {
         return fileData;
     }
 
-    /**
-     * Gets computed file data from the backend.
-     * Uses caching to avoid redundant requests.
-     *
-     * @param path The path of the file
-     * @param key The data key (e.g., "ast", "diagram")
-     * @returns Promise resolving to the computed file data and version
-     * @throws Error if the data cannot be retrieved or JWT is not set
-     */
     async getFileData(path: string, key: string): Promise<FileData> {
         if (!this.fileDataCache.has(key)) {
             this.fileDataCache.set(key, new Map());
@@ -235,13 +227,6 @@ export class HttpServerApi implements ServerApi {
         return fileData;
     }
 
-    /**
-     * Lists files in a directory.
-     *
-     * @param path The directory path to list
-     * @returns Promise resolving to array of directory entries
-     * @throws Error if the directory cannot be listed or JWT is not set
-     */
     async listDirectory(path: string): Promise<DirectoryEntry[]> {
         const encodedPath = encodeURIComponent(path);
         const response = await fetch(`${this.projectBackendUrl}/files/dirs/${encodedPath}`, {
@@ -272,16 +257,6 @@ export class HttpServerApi implements ServerApi {
         return this.fileDataCache.get(key) ?? new Map();
     }
 
-    /**
-     * Sends a request to a plugin's request handler via the backend proxy.
-     * The backend forwards the request to the appropriate plugin service.
-     * Contribution plugins are automatically determined server-side.
-     *
-     * @param languageId The language ID of the target plugin
-     * @param key The request handler key
-     * @param body The request body to forward
-     * @returns The response data from the plugin request handler
-     */
     async sendPluginRequest(languageId: string, key: string, body: any): Promise<unknown> {
         const encodedLanguageId = encodeURIComponent(languageId);
         const encodedKey = encodeURIComponent(key);
@@ -299,5 +274,20 @@ export class HttpServerApi implements ServerApi {
 
         const result = await response.json();
         return result.data;
+    }
+
+    async updateExecutionMetadata(executionId: string, metadata: Record<string, unknown>): Promise<void> {
+        const encodedExecutionId = encodeURIComponent(executionId);
+        const response = await fetch(`${this.backendUrl}/executions/${encodedExecutionId}/metadata`, {
+            method: "PATCH",
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({ metadata })
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                `Failed to update execution metadata ${executionId}: ${response.status} ${response.statusText}`
+            );
+        }
     }
 }

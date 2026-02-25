@@ -1,3 +1,6 @@
+import type { LangiumInstance } from "../langium/langiumInstance.js";
+import type { ServerApi } from "../service/serverApi.js";
+
 /**
  * Execution lifecycle states
  */
@@ -72,6 +75,51 @@ export interface ExecutionContext {
      * Contribution plugins for the language
      */
     contributionPlugins: object[];
+
+    /**
+     * The configured Langium instance for this execution request.
+     */
+    instance: LangiumInstance<any>;
+
+    /**
+     * Server API configured with the current request context.
+     */
+    serverApi: ServerApi;
+}
+
+/**
+ * Small JSON metadata object stored on execution records.
+ */
+export type ExecutionMetadata = Record<string, unknown>;
+
+/**
+ * Context for execution follow-up operations (summary/files/cancel/delete).
+ */
+export interface ExecutionRequestContext {
+    /**
+     * Unique identifier for the execution.
+     */
+    executionId: string;
+    /**
+     * Project identifier from the authenticated JWT context.
+     */
+    project: string;
+    /**
+     * JWT token for authentication.
+     */
+    jwt: string;
+    /**
+     * Optional execution metadata attached by backend.
+     */
+    metadata?: ExecutionMetadata;
+    /**
+     * The configured Langium instance for this request.
+     */
+    instance: LangiumInstance<any>;
+    /**
+     * Server API configured with the current request context.
+     */
+    serverApi: ServerApi;
 }
 
 /**
@@ -157,7 +205,7 @@ export interface ExecutionHandler<T = unknown> {
      * @param jwt JWT token for authentication
      * @returns Promise resolving to a markdown-formatted summary
      */
-    getSummary(executionId: string, jwt: string): Promise<string>;
+    getSummary(context: ExecutionRequestContext): Promise<string>;
 
     /**
      * Gets the file tree of execution results.
@@ -166,7 +214,7 @@ export interface ExecutionHandler<T = unknown> {
      * @param jwt JWT token for authentication
      * @returns Promise resolving to the list of files and directories
      */
-    getFileTree(executionId: string, jwt: string): Promise<FileEntry[]>;
+    getFileTree(context: ExecutionRequestContext): Promise<FileEntry[]>;
     /**
      * Reads a specific file from the execution results.
      *
@@ -175,7 +223,7 @@ export interface ExecutionHandler<T = unknown> {
      * @param jwt JWT token for authentication
      * @returns Promise resolving to the file contents
      */
-    getFile(executionId: string, path: string, jwt: string): Promise<Buffer>;
+    getFile(context: ExecutionRequestContext, path: string): Promise<Buffer>;
     /**
      * Cancels a running execution.
      *
@@ -183,7 +231,7 @@ export interface ExecutionHandler<T = unknown> {
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is cancelled
      */
-    cancel(executionId: string, jwt: string): Promise<void>;
+    cancel(context: ExecutionRequestContext): Promise<void>;
 
     /**
      * Deletes an execution and its results.
@@ -192,7 +240,7 @@ export interface ExecutionHandler<T = unknown> {
      * @param jwt JWT token for authentication
      * @returns Promise that resolves when the execution is deleted
      */
-    delete(executionId: string, jwt: string): Promise<void>;
+    delete(context: ExecutionRequestContext): Promise<void>;
 }
 
 /**
