@@ -1,6 +1,7 @@
 package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.getUserSession
+import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.backend.service.SubscribeMessage
 import com.mdeo.backend.service.UnsubscribeMessage
@@ -36,6 +37,7 @@ fun Route.webSocketRoutes(
         val handler = WebSocketMessageHandler(
             connectionId = connectionId,
             userId = session.userId,
+            isGlobalAdmin = session.isAdmin,
             webSocketService = webSocketService,
             projectService = projectService,
             session = this
@@ -51,6 +53,7 @@ fun Route.webSocketRoutes(
  *
  * @property connectionId Unique identifier for this connection
  * @property userId The authenticated user's ID
+ * @property isGlobalAdmin Whether the user has global admin permission
  * @property webSocketService Service for managing subscriptions
  * @property projectService Service for validating project access
  * @property session The WebSocket session
@@ -58,6 +61,7 @@ fun Route.webSocketRoutes(
 private class WebSocketMessageHandler(
     private val connectionId: String,
     private val userId: String,
+    private val isGlobalAdmin: Boolean,
     private val webSocketService: WebSocketNotificationService,
     private val projectService: ProjectService,
     private val session: DefaultWebSocketServerSession
@@ -172,12 +176,11 @@ private class WebSocketMessageHandler(
      * @return True if the user has access, false otherwise
      */
     private fun validateProjectAccess(projectId: UUID): Boolean {
-        val project = projectService.getProject(projectId) ?: return false
         val userUuid = try {
             UUID.fromString(userId)
         } catch (e: Exception) {
             return false
         }
-        return projectService.isOwnerOrAdmin(projectId, userUuid, false)
+        return projectService.hasProjectPermission(projectId, userUuid, isGlobalAdmin, ProjectPermission.READ)
     }
 }

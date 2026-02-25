@@ -3,6 +3,7 @@ package com.mdeo.backend.routes
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.JwtService
 import com.mdeo.backend.service.LanguagePluginRequestService
+import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -35,7 +36,7 @@ fun Route.languagePluginRequestRoutes(
                     return@post
                 }
                 
-                if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@post
                 }

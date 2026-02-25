@@ -19,7 +19,7 @@
 import { ref, inject, onActivated, watch } from "vue";
 import { workbenchStateKey } from "@/components/workbench/util";
 import type { Project } from "@/data/project/project";
-import type { UserInfo } from "@/data/api/backendApi";
+import type { ProjectUserInfo } from "@/data/api/backendApi";
 import ProjectsList from "./ProjectsList.vue";
 import ProjectDetails from "./ProjectDetails.vue";
 import { showApiError } from "@/lib/notifications";
@@ -29,7 +29,7 @@ const { backendApi, project, activeSidebar } = inject(workbenchStateKey)!;
 const projects = ref<Project[]>([]);
 const showProjectsList = ref(false);
 
-const projectUsers = ref<UserInfo[]>([]);
+const projectUsers = ref<ProjectUserInfo[]>([]);
 
 async function loadProjects() {
     const result = await backendApi.projects.getAll();
@@ -45,7 +45,7 @@ async function loadProjectDetails() {
         return;
     }
 
-    const usersResult = await backendApi.projects.getOwners(project.value.id);
+    const usersResult = await backendApi.projects.getUsers(project.value.id);
 
     if (usersResult.success) {
         projectUsers.value = usersResult.value.sort((a, b) => {

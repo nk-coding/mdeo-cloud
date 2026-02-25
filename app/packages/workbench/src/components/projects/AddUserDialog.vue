@@ -38,7 +38,7 @@ import ScrollArea from "@/components/ui/scroll-area/ScrollArea.vue";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Tree from "@/components/tree/Tree.vue";
 import TreeItem from "@/components/tree/TreeItem.vue";
-import type { User, UserInfo } from "@/data/api/backendApi";
+import type { User, ProjectUserInfo } from "@/data/api/backendApi";
 import { User as UserIcon } from "lucide-vue-next";
 import { workbenchStateKey } from "@/components/workbench/util";
 import { showApiError } from "@/lib/notifications";
@@ -58,7 +58,7 @@ const { backendApi } = inject(workbenchStateKey)!;
 const searchText = ref("");
 const expandedItems = ref<Set<any>>(new Set());
 const allUsers = ref<User[]>([]);
-const projectUsers = ref<UserInfo[]>([]);
+const projectUsers = ref<ProjectUserInfo[]>([]);
 
 const availableUsers = computed(() => {
     const projectUserIds = new Set(projectUsers.value.map((u) => u.id));
@@ -76,7 +76,7 @@ const filteredUsers = computed(() => {
 async function loadUsers() {
     const [allUsersResult, projectUsersResult] = await Promise.all([
         backendApi.users.getAll(),
-        backendApi.projects.getOwners(props.projectId)
+        backendApi.projects.getUsers(props.projectId)
     ]);
 
     if (allUsersResult.success) {
@@ -92,7 +92,7 @@ async function loadUsers() {
 }
 
 async function handleSelectUser(user: User) {
-    const result = await backendApi.projects.addOwner(props.projectId, user.id);
+    const result = await backendApi.projects.addUser(props.projectId, user.id);
     if (result.success) {
         await loadUsers();
         emit("usersUpdated");

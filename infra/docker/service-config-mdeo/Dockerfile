@@ -15,6 +15,8 @@ FROM node:23-alpine
 # Install curl for healthchecks
 RUN apk add --no-cache curl
 
+ARG SERVICE_VERSION=""
+
 WORKDIR /workspace
 
 # Copy the entire packages structure with built artifacts and dependencies
@@ -29,6 +31,7 @@ WORKDIR /workspace/packages/service-config-mdeo
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
+ENV SERVICE_VERSION=${SERVICE_VERSION}
 
 EXPOSE 3000
 

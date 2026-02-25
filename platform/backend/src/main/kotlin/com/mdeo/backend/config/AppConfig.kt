@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
  * @property session Session management configuration
  * @property cors Cross-Origin Resource Sharing configuration
  * @property defaultAdmin Default administrator account configuration
+ * @property defaultNewUserCanCreateProject Whether newly registered users can create projects by default
  * @property plugin Plugin system configuration
  */
 data class AppConfig(
@@ -18,6 +19,7 @@ data class AppConfig(
     val session: SessionConfig,
     val cors: CorsConfig,
     val defaultAdmin: DefaultAdminConfig,
+    val defaultNewUserCanCreateProject: Boolean,
     val plugin: PluginConfig,
     val jwt: JwtConfig,
     val fileData: FileDataConfig
@@ -73,6 +75,8 @@ data class AppConfig(
                     username = System.getenv("ADMIN_USERNAME") ?: "admin",
                     password = System.getenv("ADMIN_PASSWORD") ?: "admin"
                 ),
+                defaultNewUserCanCreateProject =
+                    System.getenv("DEFAULT_NEW_USER_CREATE_PROJECT")?.toBoolean() ?: false,
                 plugin = PluginConfig(
                     baseUrl = System.getenv("PLUGIN_BASE_URL"),
                     internalBaseUrl = System.getenv("INTERNAL_PLUGIN_BASE_URL") 

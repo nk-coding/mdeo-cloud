@@ -27,7 +27,7 @@ const scriptLanguagePlugin: LanguagePlugin = {
     extension: ".fn",
     icon: convertIcon(FileCode),
     serverPlugin: {
-        import: "static/language.js"
+        import: "language.js"
     },
     graphicalEditorPlugin: undefined,
     textualEditorPlugin: {

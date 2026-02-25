@@ -26,7 +26,7 @@ import { cva } from "class-variance-authority";
 export interface TreeButtonProps extends PrimitiveProps {
     class?: HTMLAttributes["class"];
     data: TreeItem;
-    mode?: "default" | "edit";
+    mode?: "default" | "edit" | "non-selectable";
 }
 
 defineOptions({
@@ -75,8 +75,17 @@ const buttonModes = cva(
                     "hover:bg-accent/75",
                     "group-focus-within/tree:data-[active=true]:bg-sidebar-primary group-focus-within/tree:data-[active=true]:text-sidebar-primary-foreground",
                     "focus-within:data-[active=false]:[&:not(:active)]:bg-sidebar-primary/70 focus-within:data-[active=false]:[&:not(:active)]:text-sidebar-primary-foreground",
-                    "data-[state=open]:data-[slot=context-menu-trigger]:bg-sidebar-primary/70 data-[state=open]:data-[slot=context-menu-trigger]:text-sidebar-primary-foreground",
                     "data-[active=true]:bg-accent",
+                    "data-[active=true]:text-accent-foreground",
+                    "data-[state=open]:data-[slot=context-menu-trigger]:bg-sidebar-primary/70 data-[state=open]:data-[slot=context-menu-trigger]:text-sidebar-primary-foreground",
+                    "[&_*]:pointer-events-none"
+                ],
+                "non-selectable": [
+                    "hover:bg-accent/75",
+                    "group-focus-within/tree:data-[active=true]:bg-transparent group-focus-within/tree:data-[active=true]:text-foreground",
+                    "focus-within:data-[active=false]:[&:not(:active)]:bg-transparent focus-within:data-[active=false]:[&:not(:active)]:text-foreground",
+                    "data-[active=true]:bg-transparent data-[active=true]:text-foreground",
+                    "data-[state=open]:data-[slot=context-menu-trigger]:bg-sidebar-primary/70 data-[state=open]:data-[slot=context-menu-trigger]:text-sidebar-primary-foreground",
                     "[&_*]:pointer-events-none"
                 ],
                 edit: [

@@ -5,7 +5,7 @@
                 <SidebarInput v-model="searchText" placeholder="Search users..." class="bg-transparent" />
 
                 <div class="mt-4 flex-1 min-h-0 overflow-hidden">
-                    <ScrollArea class="h-full pr-1 **:data-[slot=scroll-area-viewport]:rounded-none">
+                    <ScrollArea class="h-full **:data-[slot=scroll-area-viewport]:rounded-none">
                         <SidebarMenu class="pb-2">
                             <SidebarMenuItem v-for="user in filteredUsers" :key="user.id">
                                 <SidebarMenuButtonChild
@@ -16,9 +16,9 @@
                                     <User class="size-4 shrink-0" />
                                     <span class="text-sm font-medium truncate">{{ user.username }}</span>
                                     <span
-                                        v-if="user.isAdmin"
+                                        v-if="user.isAdmin || user.canCreateProject"
                                         class="ml-auto text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
-                                        >Admin</span
+                                        >{{ user.isAdmin ? "Admin" : "Projects" }}</span
                                     >
                                 </SidebarMenuButtonChild>
                             </SidebarMenuItem>
@@ -42,9 +42,11 @@
                     <div class="p-6">
                         <section v-if="selectedUser" class="space-y-6">
                             <UserDetails
+                                :key="selectedUser.id"
                                 :user="selectedUser"
                                 :backend-api="backendApi"
-                                @admin-updated="handleAdminUpdated"
+                                :disable-admin-toggle="isLastGlobalAdmin(selectedUser.id)"
+                                @permissions-updated="handlePermissionsUpdated"
                             />
                         </section>
 
@@ -147,10 +149,16 @@ async function loadUsers(preferredSelection?: string) {
     }
 }
 
-function handleAdminUpdated(userId: string, isAdmin: boolean) {
+function isLastGlobalAdmin(userId: string): boolean {
+    const adminUsers = users.value.filter((u) => u.isAdmin);
+    return adminUsers.length === 1 && adminUsers[0]?.id === userId;
+}
+
+function handlePermissionsUpdated(userId: string, isAdmin: boolean, canCreateProject: boolean) {
     const user = users.value.find((u) => u.id === userId);
     if (user) {
         user.isAdmin = isAdmin;
+        user.canCreateProject = canCreateProject;
     }
 }
 

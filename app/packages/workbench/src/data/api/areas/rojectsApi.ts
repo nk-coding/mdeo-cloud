@@ -3,17 +3,31 @@ import type { Project } from "../../project/project";
 import type { BackendApiCore } from "../backendApi";
 
 /**
- * User info for project owner listings
+ * User info for project user listings
  */
-export interface UserInfo {
+export interface ProjectUserInfo {
     id: string;
     username: string;
+    isAdmin: boolean;
+    canExecute: boolean;
+    canWrite: boolean;
+}
+
+/**
+ * Project membership info for a specific user
+ */
+export interface UserProjectMembership {
+    projectId: string;
+    projectName: string;
+    isAdmin: boolean;
+    canExecute: boolean;
+    canWrite: boolean;
 }
 
 /**
  * API for project management operations.
  * Provides methods for creating, updating, deleting projects,
- * and managing project ownership.
+ * and managing project users.
  */
 export class ProjectsApi {
     /**
@@ -74,40 +88,85 @@ export class ProjectsApi {
     }
 
     /**
-     * Gets all owners of a project
+     * Gets all users of a project
      *
      * @param projectId The ID of the project
-     * @returns A promise resolving to an array of user info for each owner
+     * @returns A promise resolving to an array of user info for each project user
      */
-    async getOwners(projectId: string): Promise<ApiResult<UserInfo[], ProjectError>> {
-        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/owners`);
+    async getUsers(projectId: string): Promise<ApiResult<ProjectUserInfo[], ProjectError>> {
+        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/users`);
     }
 
     /**
-     * Adds a user as an owner of a project
+     * Adds a user to a project with permissions
      *
      * @param projectId The ID of the project
-     * @param userId The ID of the user to add as owner
+     * @param userId The ID of the user to add
+     * @param isAdmin Whether the user should be a project admin
+     * @param canExecute Whether the user should have execute permission
+     * @param canWrite Whether the user should have write permission
      * @returns A promise resolving to success or an error
      */
-    async addOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
-        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/owners`, {
+    async addUser(
+        projectId: string,
+        userId: string,
+        isAdmin = false,
+        canExecute = false,
+        canWrite = false
+    ): Promise<ApiResult<void, ProjectError>> {
+        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/users`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId })
+            body: JSON.stringify({ userId, isAdmin, canExecute, canWrite })
         });
     }
 
     /**
-     * Removes a user as an owner from a project
+     * Updates project permissions for a user
      *
      * @param projectId The ID of the project
-     * @param userId The ID of the user to remove as owner
+     * @param userId The ID of the user to update
+     * @param isAdmin Whether the user should be a project admin
+     * @param canExecute Whether the user should have execute permission
+     * @param canWrite Whether the user should have write permission
      * @returns A promise resolving to success or an error
      */
-    async removeOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
-        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/owners/${userId}`, {
+    async updateUserPermissions(
+        projectId: string,
+        userId: string,
+        isAdmin: boolean,
+        canExecute: boolean,
+        canWrite: boolean
+    ): Promise<ApiResult<void, ProjectError>> {
+        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/users/${userId}/permissions`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isAdmin, canExecute, canWrite })
+        });
+    }
+
+    /**
+     * Removes a user from a project
+     *
+     * @param projectId The ID of the project
+     * @param userId The ID of the user to remove
+     * @returns A promise resolving to success or an error
+     */
+    async removeUser(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
+        return this.core.fetchApiResult(`${this.core.baseUrl}/projects/${projectId}/users/${userId}`, {
             method: "DELETE"
         });
+    }
+
+    async getOwners(projectId: string): Promise<ApiResult<ProjectUserInfo[], ProjectError>> {
+        return this.getUsers(projectId);
+    }
+
+    async addOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
+        return this.addUser(projectId, userId, true, true, true);
+    }
+
+    async removeOwner(projectId: string, userId: string): Promise<ApiResult<void, ProjectError>> {
+        return this.removeUser(projectId, userId);
     }
 }

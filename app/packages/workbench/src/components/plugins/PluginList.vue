@@ -5,7 +5,7 @@
         <SidebarInput v-model="searchText" placeholder="Search plugins..." class="mt-4 bg-transparent" />
 
         <div class="mt-4 flex-1 min-h-0 overflow-hidden">
-            <ScrollArea class="h-full pr-1 **:data-[slot=scroll-area-viewport]:rounded-none">
+            <ScrollArea class="h-full **:data-[slot=scroll-area-viewport]:rounded-none">
                 <SidebarMenu class="pb-2">
                     <SidebarMenuItem v-for="plugin in filteredPlugins" :key="plugin.id">
                         <SidebarMenuButtonChild

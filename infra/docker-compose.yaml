@@ -106,6 +106,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-metamodel/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -123,6 +125,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-model/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -140,6 +144,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-script/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -158,6 +164,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-model-transformation/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -224,6 +232,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-config/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -241,6 +251,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-config-optimization/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
@@ -258,6 +270,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/service-config-mdeo/Dockerfile
+      args:
+        SERVICE_VERSION: ${SERVICE_VERSION:-}
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"

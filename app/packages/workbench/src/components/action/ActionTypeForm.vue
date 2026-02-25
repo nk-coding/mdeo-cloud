@@ -2,7 +2,7 @@
     <Field class="w-full">
         <FieldLabel v-if="label">{{ label }}</FieldLabel>
         <FieldContent>
-            <Switch v-if="isBoolean" v-model:checked="booleanModel" />
+            <Switch v-if="isBoolean" v-model="booleanModel" />
             <InputGroup v-else-if="isNumber">
                 <NumberField
                     v-model="numberModel"

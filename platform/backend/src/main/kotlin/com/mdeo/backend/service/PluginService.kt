@@ -272,6 +272,26 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     }
 
     /**
+     * Refreshes all plugins by re-fetching each manifest and updating stored language plugins.
+     *
+     * @return ApiResult indicating success or containing an error from the first failed refresh
+     */
+    suspend fun refreshAllPluginsData(): ApiResult<Unit> {
+        val pluginIds = transaction {
+            PluginsTable.selectAll().map { it[PluginsTable.id].toJavaUuid() }
+        }
+
+        for (pluginId in pluginIds) {
+            when (val refreshResult = refreshPluginData(pluginId)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Failure -> return refreshResult
+            }
+        }
+
+        return success(Unit)
+    }
+
+    /**
      * Fetches the plugin manifest from the plugin's GET / endpoint.
      * Uses the internal base URL for backend-to-plugin communication.
      */

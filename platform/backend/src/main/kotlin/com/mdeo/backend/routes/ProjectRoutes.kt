@@ -1,13 +1,27 @@
 package com.mdeo.backend.routes
 
-import com.mdeo.backend.plugins.*
-import com.mdeo.backend.service.*
-import com.mdeo.common.model.*
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
-import java.util.*
+import com.mdeo.backend.plugins.canCreateProject
+import com.mdeo.backend.plugins.getUserSession
+import com.mdeo.backend.service.AddProjectUserResult
+import com.mdeo.backend.service.ProjectPermission
+import com.mdeo.backend.service.ProjectService
+import com.mdeo.backend.service.RemoveProjectUserResult
+import com.mdeo.backend.service.UpdateProjectUserPermissionsResult
+import com.mdeo.common.model.AddOwnerRequest
+import com.mdeo.common.model.AddProjectUserRequest
+import com.mdeo.common.model.CreateProjectRequest
+import com.mdeo.common.model.UpdateProjectRequest
+import com.mdeo.common.model.UpdateProjectUserPermissionsRequest
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+import io.ktor.server.routing.route
+import java.util.UUID
 
 /**
  * Configures project management routes.
@@ -16,125 +30,100 @@ import java.util.*
  */
 fun Route.projectRoutes(projectService: ProjectService) {
     route("/api/projects") {
-        /**
-         * Gets all projects accessible by the current user.
-         *
-         * @return ApiResult.Success with list of projects, 401 if not authenticated
-         */
         get {
             val session = call.getUserSession()
             if (session == null) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@get
             }
-            
-            val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+            val userId = parseUserId(session.userId) ?: run {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                 return@get
             }
-            
+
             val projects = projectService.getProjectsForUser(userId, session.isAdmin)
             call.respond(projects)
         }
-        
-        /**
-         * Creates a new project.
-         *
-         * @param body CreateProjectRequest with project name
-         * @return ApiResult.Success with project ID on success (201 Created), 401 if not authenticated
-         */
+
         post {
             val session = call.getUserSession()
             if (session == null) {
                 call.respond(HttpStatusCode.Unauthorized)
                 return@post
             }
-            
-            val request = call.receive<CreateProjectRequest>()
-            val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+            if (!call.canCreateProject()) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Create project permission required"))
+                return@post
+            }
+
+            val userId = parseUserId(session.userId) ?: run {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                 return@post
             }
+
+            val request = call.receive<CreateProjectRequest>()
             val project = projectService.createProject(request.name, userId)
             call.respond(HttpStatusCode.Created, project)
         }
-        
+
         route("/{projectId}") {
-            /**
-             * Gets a single project by ID.
-             *
-             * @param projectId Path parameter for project UUID
-             * @return ApiResult.Success with project details, 401/403/404 on errors
-             */
             get {
                 val session = call.getUserSession()
                 if (session == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                     return@get
                 }
-                
-                val projectId = call.parameters["projectId"]?.let { 
-                    try { UUID.fromString(it) } catch (e: Exception) { null }
-                }
-                if (projectId == null) {
+
+                val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                     return@get
                 }
-                
-                val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+                val userId = parseUserId(session.userId) ?: run {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                     return@get
                 }
-                
-                if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+
+                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@get
                 }
-                
+
                 val project = projectService.getProject(projectId)
                 if (project == null) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@get
                 }
-                
+
                 call.respond(project)
             }
-            
-            /**
-             * Updates a project's details.
-             *
-             * @param projectId Path parameter for project UUID
-             * @param body UpdateProjectRequest with updated project data
-             * @return ApiResult.Success on success, 401/403/404 on errors
-             */
+
             put {
                 val session = call.getUserSession()
                 if (session == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                     return@put
                 }
-                
-                val projectId = call.parameters["projectId"]?.let { 
-                    try { UUID.fromString(it) } catch (e: Exception) { null }
-                }
-                if (projectId == null) {
+
+                val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                     return@put
                 }
-                
-                val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+                val userId = parseUserId(session.userId) ?: run {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                     return@put
                 }
-                
-                if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+
+                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                     return@put
                 }
-                
+
                 val request = call.receive<UpdateProjectRequest>()
                 val updated = projectService.updateProject(projectId, request)
-
                 if (!updated) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@put
@@ -148,184 +137,333 @@ fun Route.projectRoutes(projectService: ProjectService) {
 
                 call.respond(updatedProject)
             }
-            
-            /**
-             * Deletes a project.
-             *
-             * @param projectId Path parameter for project UUID
-             * @return ApiResult.Success on success, 401/403/404 on errors
-             */
+
             delete {
                 val session = call.getUserSession()
                 if (session == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                     return@delete
                 }
-                
-                val projectId = call.parameters["projectId"]?.let { 
-                    try { UUID.fromString(it) } catch (e: Exception) { null }
-                }
-                if (projectId == null) {
+
+                val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                     return@delete
                 }
-                
-                val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+                val userId = parseUserId(session.userId) ?: run {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                     return@delete
                 }
-                
-                if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
-                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+
+                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                     return@delete
                 }
-                
+
                 val deleted = projectService.deleteProject(projectId)
-                
                 if (!deleted) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
                     return@delete
                 }
-                
+
                 call.respond(Unit)
             }
-            
-            route("/owners") {
-                /**
-                 * Gets all owners of a project.
-                 *
-                 * @param projectId Path parameter for project UUID
-                 * @return ApiResult.Success with list of owners, 401/403 on errors
-                 */
+
+            route("/users") {
                 get {
                     val session = call.getUserSession()
                     if (session == null) {
                         call.respond(HttpStatusCode.Unauthorized)
                         return@get
                     }
-                    
-                    val projectId = call.parameters["projectId"]?.let { 
-                        try { UUID.fromString(it) } catch (e: Exception) { null }
-                    }
-                    if (projectId == null) {
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                         return@get
                     }
-                    
-                    val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+                    val userId = parseUserId(session.userId) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                         return@get
                     }
-                    
-                    if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+
+                    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                         return@get
                     }
-                    
-                    val owners = projectService.getProjectOwners(projectId)
-                    call.respond(owners)
+
+                    val users = projectService.getProjectUsers(projectId)
+                    call.respond(users)
                 }
-                
-                /**
-                 * Adds an owner to a project.
-                 *
-                 * @param projectId Path parameter for project UUID
-                 * @param body AddOwnerRequest with userId to add
-                 * @return ApiResult.Success on success, 401/403/404 on errors
-                 */
+
                 post {
                     val session = call.getUserSession()
                     if (session == null) {
                         call.respond(HttpStatusCode.Unauthorized)
                         return@post
                     }
-                    
-                    val projectId = call.parameters["projectId"]?.let { 
-                        try { UUID.fromString(it) } catch (e: Exception) { null }
-                    }
-                    if (projectId == null) {
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                         return@post
                     }
-                    
-                    val currentUserId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+                    val currentUserId = parseUserId(session.userId) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                         return@post
                     }
-                    
-                    if (!projectService.isOwnerOrAdmin(projectId, currentUserId, session.isAdmin)) {
-                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                         return@post
                     }
-                    
-                    val request = call.receive<AddOwnerRequest>()
-                    val userId = try { UUID.fromString(request.userId) } catch (e: Exception) {
+
+                    val request = call.receive<AddProjectUserRequest>()
+                    val userId = parseUserId(request.userId) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                         return@post
                     }
-                    
-                    when (projectService.addOwner(projectId, userId)) {
-                        AddOwnerResult.SUCCESS -> call.respond(Unit)
-                        AddOwnerResult.PROJECT_NOT_FOUND -> 
+
+                    when (
+                        projectService.addProjectUser(
+                            projectId = projectId,
+                            userId = userId,
+                            isAdmin = request.isAdmin,
+                            canExecute = request.canExecute,
+                            canWrite = request.canWrite
+                        )
+                    ) {
+                        AddProjectUserResult.SUCCESS -> call.respond(Unit)
+                        AddProjectUserResult.PROJECT_NOT_FOUND ->
                             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
-                        AddOwnerResult.USER_NOT_FOUND -> 
+                        AddProjectUserResult.USER_NOT_FOUND ->
                             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
-                        AddOwnerResult.ALREADY_OWNER -> 
-                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is already an owner"))
+                        AddProjectUserResult.ALREADY_MEMBER ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is already in the project"))
                     }
                 }
-                
-                /**
-                 * Removes an owner from a project.
-                 *
-                 * @param projectId Path parameter for project UUID
-                 * @param userId Path parameter for user UUID to remove
-                 * @return ApiResult.Success on success, 401/403/404 on errors
-                 */
+
+                put("/{userId}/permissions") {
+                    val session = call.getUserSession()
+                    if (session == null) {
+                        call.respond(HttpStatusCode.Unauthorized)
+                        return@put
+                    }
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
+                        return@put
+                    }
+
+                    val currentUserId = parseUserId(session.userId) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@put
+                    }
+
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
+                        return@put
+                    }
+
+                    val userId = parseUserId(call.parameters["userId"]) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@put
+                    }
+
+                    val request = call.receive<UpdateProjectUserPermissionsRequest>()
+                    when (
+                        projectService.updateProjectUserPermissions(
+                            projectId = projectId,
+                            userId = userId,
+                            isAdmin = request.isAdmin,
+                            canExecute = request.canExecute,
+                            canWrite = request.canWrite
+                        )
+                    ) {
+                        UpdateProjectUserPermissionsResult.SUCCESS -> call.respond(Unit)
+                        UpdateProjectUserPermissionsResult.PROJECT_NOT_FOUND ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
+                        UpdateProjectUserPermissionsResult.USER_NOT_FOUND ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
+                        UpdateProjectUserPermissionsResult.NOT_MEMBER ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is not part of this project"))
+                        UpdateProjectUserPermissionsResult.LAST_PROJECT_ADMIN ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cannot remove the last project admin"))
+                    }
+                }
+
                 delete("/{userId}") {
                     val session = call.getUserSession()
                     if (session == null) {
                         call.respond(HttpStatusCode.Unauthorized)
                         return@delete
                     }
-                    
-                    val projectId = call.parameters["projectId"]?.let { 
-                        try { UUID.fromString(it) } catch (e: Exception) { null }
-                    }
-                    if (projectId == null) {
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                         return@delete
                     }
-                    
-                    val currentUserId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+
+                    val currentUserId = parseUserId(session.userId) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                         return@delete
                     }
-                    
-                    val userId = call.parameters["userId"]?.let { 
-                        try { UUID.fromString(it) } catch (e: Exception) { null }
+
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
+                        return@delete
                     }
-                    if (userId == null) {
+
+                    val userId = parseUserId(call.parameters["userId"]) ?: run {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                         return@delete
                     }
-                    
-                    if (!projectService.isOwnerOrAdmin(projectId, currentUserId, session.isAdmin)) {
-                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
-                        return@delete
-                    }
-                    
-                    when (projectService.removeOwner(projectId, userId)) {
-                        RemoveOwnerResult.SUCCESS -> call.respond(Unit)
-                        RemoveOwnerResult.PROJECT_NOT_FOUND -> 
+
+                    when (projectService.removeProjectUser(projectId, userId)) {
+                        RemoveProjectUserResult.SUCCESS -> call.respond(Unit)
+                        RemoveProjectUserResult.PROJECT_NOT_FOUND ->
                             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
-                        RemoveOwnerResult.NOT_OWNER -> 
-                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is not an owner"))
-                        RemoveOwnerResult.LAST_OWNER -> 
-                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cannot remove the last owner"))
+                        RemoveProjectUserResult.NOT_MEMBER ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is not part of this project"))
+                        RemoveProjectUserResult.LAST_PROJECT_ADMIN ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cannot remove the last project admin"))
+                    }
+                }
+            }
+
+            route("/owners") {
+                get {
+                    val session = call.getUserSession()
+                    if (session == null) {
+                        call.respond(HttpStatusCode.Unauthorized)
+                        return@get
+                    }
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
+                        return@get
+                    }
+
+                    val userId = parseUserId(session.userId) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@get
+                    }
+
+                    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+                        return@get
+                    }
+
+                    call.respond(projectService.getProjectUsers(projectId))
+                }
+
+                post {
+                    val session = call.getUserSession()
+                    if (session == null) {
+                        call.respond(HttpStatusCode.Unauthorized)
+                        return@post
+                    }
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
+                        return@post
+                    }
+
+                    val currentUserId = parseUserId(session.userId) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@post
+                    }
+
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
+                        return@post
+                    }
+
+                    val request = call.receive<AddOwnerRequest>()
+                    val userId = parseUserId(request.userId) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@post
+                    }
+
+                    when (
+                        projectService.addProjectUser(
+                            projectId = projectId,
+                            userId = userId,
+                            isAdmin = true,
+                            canExecute = true,
+                            canWrite = true
+                        )
+                    ) {
+                        AddProjectUserResult.SUCCESS -> call.respond(Unit)
+                        AddProjectUserResult.PROJECT_NOT_FOUND ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
+                        AddProjectUserResult.USER_NOT_FOUND ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
+                        AddProjectUserResult.ALREADY_MEMBER ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is already in the project"))
+                    }
+                }
+
+                delete("/{userId}") {
+                    val session = call.getUserSession()
+                    if (session == null) {
+                        call.respond(HttpStatusCode.Unauthorized)
+                        return@delete
+                    }
+
+                    val projectId = parseProjectId(call.parameters["projectId"]) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
+                        return@delete
+                    }
+
+                    val currentUserId = parseUserId(session.userId) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@delete
+                    }
+
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                        call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
+                        return@delete
+                    }
+
+                    val userId = parseUserId(call.parameters["userId"]) ?: run {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                        return@delete
+                    }
+
+                    when (projectService.removeProjectUser(projectId, userId)) {
+                        RemoveProjectUserResult.SUCCESS -> call.respond(Unit)
+                        RemoveProjectUserResult.PROJECT_NOT_FOUND ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Project not found"))
+                        RemoveProjectUserResult.NOT_MEMBER ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User is not part of this project"))
+                        RemoveProjectUserResult.LAST_PROJECT_ADMIN ->
+                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Cannot remove the last project admin"))
                     }
                 }
             }
         }
+    }
+}
+
+private fun parseProjectId(rawProjectId: String?): UUID? {
+    if (rawProjectId.isNullOrBlank()) {
+        return null
+    }
+    return try {
+        UUID.fromString(rawProjectId)
+    } catch (exception: Exception) {
+        null
+    }
+}
+
+private fun parseUserId(rawUserId: String?): UUID? {
+    if (rawUserId.isNullOrBlank()) {
+        return null
+    }
+    return try {
+        UUID.fromString(rawUserId)
+    } catch (exception: Exception) {
+        null
     }
 }

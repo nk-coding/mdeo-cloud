@@ -19,16 +19,15 @@ import kotlin.uuid.toKotlinUuid
 class ProjectService(services: InjectedServices) : BaseService(), InjectedServices by services {
     
     /**
-     * Retrieves all projects accessible by a user.
-     * Admins can see all projects, while regular users see only projects they own.
+     * Retrieves all projects readable by a user.
      *
      * @param userId The UUID of the user
-     * @param isAdmin Whether the user has admin privileges
-     * @return List of projects accessible by the user
+     * @param isGlobalAdmin Whether the user has global admin privileges
+     * @return List of readable projects
      */
-    fun getProjectsForUser(userId: UUID, isAdmin: Boolean): List<Project> {
+    fun getProjectsForUser(userId: UUID, isGlobalAdmin: Boolean): List<Project> {
         return transaction {
-            if (isAdmin) {
+            if (isGlobalAdmin) {
                 ProjectsTable.selectAll()
                     .map { it.toProject() }
             } else {
@@ -39,22 +38,30 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
             }
         }
     }
-    
+
     /**
-     * Retrieves all projects owned by a specific user.
+     * Retrieves all project memberships for a specific user.
      *
      * @param userId The UUID of the user
-     * @return List of projects owned by the user
+     * @return List of project memberships for the user
      */
-    fun getProjectsByUserId(userId: UUID): List<Project> {
+    fun getProjectMembershipsByUserId(userId: UUID): List<UserProjectMembership> {
         return transaction {
             (ProjectsTable innerJoin ProjectOwnersTable)
                 .selectAll()
                 .where { ProjectOwnersTable.userId eq userId.toKotlinUuid() }
-                .map { it.toProject() }
+                .map {
+                    UserProjectMembership(
+                        projectId = it[ProjectsTable.id].toJavaUuid().toString(),
+                        projectName = it[ProjectsTable.name],
+                        isAdmin = it[ProjectOwnersTable.isAdmin],
+                        canExecute = it[ProjectOwnersTable.isAdmin] || it[ProjectOwnersTable.canExecute],
+                        canWrite = it[ProjectOwnersTable.isAdmin] || it[ProjectOwnersTable.canWrite]
+                    )
+                }
         }
     }
-    
+
     /**
      * Retrieves a specific project by its ID.
      *
@@ -71,26 +78,49 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     }
     
     /**
-     * Checks if a user is an owner of a project or has admin privileges.
+     * Checks whether a user has the specified permission for a project.
      *
      * @param projectId The UUID of the project
      * @param userId The UUID of the user
-     * @param isAdmin Whether the user has admin privileges
-     * @return true if the user is an owner or admin, false otherwise
+     * @param isGlobalAdmin Whether the user has global admin permission
+     * @param permission The project permission to validate
+     * @return true if the user has the permission, false otherwise
      */
-    fun isOwnerOrAdmin(projectId: UUID, userId: UUID, isAdmin: Boolean): Boolean {
-        if (isAdmin) return true
-        
+    fun hasProjectPermission(
+        projectId: UUID,
+        userId: UUID,
+        isGlobalAdmin: Boolean,
+        permission: ProjectPermission
+    ): Boolean {
+        if (isGlobalAdmin) {
+            return true
+        }
+
         return transaction {
-            ProjectOwnersTable.selectAll()
+            val membership = ProjectOwnersTable.selectAll()
                 .where { 
                     (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
                     (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
                 }
-                .count() > 0
+                .firstOrNull() ?: return@transaction false
+
+            if (permission == ProjectPermission.READ) {
+                return@transaction true
+            }
+
+            if (membership[ProjectOwnersTable.isAdmin]) {
+                return@transaction true
+            }
+
+            when (permission) {
+                ProjectPermission.ADMIN -> false
+                ProjectPermission.EXECUTE -> membership[ProjectOwnersTable.canExecute]
+                ProjectPermission.WRITE -> membership[ProjectOwnersTable.canWrite]
+                ProjectPermission.READ -> true
+            }
         }
     }
-    
+
     /**
      * Creates a new project with the creator as the initial owner.
      * Automatically adds default plugins to the new project.
@@ -113,7 +143,10 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
 
             ProjectOwnersTable.insert {
                 it[ProjectOwnersTable.projectId] = projectId.toKotlinUuid()
-                it[userId] = creatorUserId.toKotlinUuid()
+                it[ProjectOwnersTable.userId] = creatorUserId.toKotlinUuid()
+                it[ProjectOwnersTable.isAdmin] = true
+                it[ProjectOwnersTable.canExecute] = true
+                it[ProjectOwnersTable.canWrite] = true
             }
 
             val defaultPlugins = pluginService.getDefaultPlugins()
@@ -165,40 +198,52 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     }
     
     /**
-     * Retrieves all owners of a project.
+     * Retrieves all users of a project with their project permissions.
      *
      * @param projectId The UUID of the project
-     * @return List of user information for all project owners
+     * @return List of user information for all project users
      */
-    fun getProjectOwners(projectId: UUID): List<UserInfo> {
+    fun getProjectUsers(projectId: UUID): List<ProjectUserInfo> {
         return transaction {
             (ProjectOwnersTable innerJoin UsersTable)
                 .selectAll()
                 .where { ProjectOwnersTable.projectId eq projectId.toKotlinUuid() }
-                .map { 
-                    UserInfo(
+                .map {
+                    ProjectUserInfo(
                         id = it[UsersTable.id].toJavaUuid().toString(),
-                        username = it[UsersTable.username]
+                        username = it[UsersTable.username],
+                        isAdmin = it[ProjectOwnersTable.isAdmin],
+                        canExecute = it[ProjectOwnersTable.isAdmin] || it[ProjectOwnersTable.canExecute],
+                        canWrite = it[ProjectOwnersTable.isAdmin] || it[ProjectOwnersTable.canWrite]
                     )
                 }
         }
     }
-    
+
     /**
-     * Adds a user as an owner of a project.
+     * Adds a user to a project with explicit permissions.
      *
      * @param projectId The UUID of the project
-     * @param userId The UUID of the user to add as owner
+     * @param userId The UUID of the user to add
+     * @param isAdmin Whether the user should be a project admin
+     * @param canExecute Whether the user should have execute permission
+     * @param canWrite Whether the user should have write permission
      * @return The result of the operation
      */
-    fun addOwner(projectId: UUID, userId: UUID): AddOwnerResult {
+    fun addProjectUser(
+        projectId: UUID,
+        userId: UUID,
+        isAdmin: Boolean,
+        canExecute: Boolean,
+        canWrite: Boolean
+    ): AddProjectUserResult {
         return transaction {
             val projectExists = ProjectsTable.selectAll()
                 .where { ProjectsTable.id eq projectId.toKotlinUuid() }
                 .count() > 0
             
             if (!projectExists) {
-                return@transaction AddOwnerResult.PROJECT_NOT_FOUND
+                return@transaction AddProjectUserResult.PROJECT_NOT_FOUND
             }
             
             val userExists = UsersTable.selectAll()
@@ -206,64 +251,121 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
                 .count() > 0
             
             if (!userExists) {
-                return@transaction AddOwnerResult.USER_NOT_FOUND
+                return@transaction AddProjectUserResult.USER_NOT_FOUND
             }
             
-            val alreadyOwner = ProjectOwnersTable.selectAll()
+            val alreadyMember = ProjectOwnersTable.selectAll()
                 .where { 
                     (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
                     (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
                 }
                 .count() > 0
             
-            if (alreadyOwner) {
-                return@transaction AddOwnerResult.ALREADY_OWNER
+            if (alreadyMember) {
+                return@transaction AddProjectUserResult.ALREADY_MEMBER
             }
             
             ProjectOwnersTable.insert {
                 it[ProjectOwnersTable.projectId] = projectId.toKotlinUuid()
                 it[ProjectOwnersTable.userId] = userId.toKotlinUuid()
+                it[ProjectOwnersTable.isAdmin] = isAdmin
+                it[ProjectOwnersTable.canExecute] = isAdmin || canExecute
+                it[ProjectOwnersTable.canWrite] = isAdmin || canWrite
             }
             
-            AddOwnerResult.SUCCESS
+            AddProjectUserResult.SUCCESS
         }
     }
-    
+
     /**
-     * Removes a user as an owner of a project.
-     * Cannot remove the last owner of a project.
+     * Updates project permissions of an existing user.
      *
      * @param projectId The UUID of the project
-     * @param userId The UUID of the user to remove as owner
+     * @param userId The UUID of the user
+     * @param isAdmin Whether the user should be a project admin
+     * @param canExecute Whether the user should have execute permission
+     * @param canWrite Whether the user should have write permission
      * @return The result of the operation
      */
-    fun removeOwner(projectId: UUID, userId: UUID): RemoveOwnerResult {
+    fun updateProjectUserPermissions(
+        projectId: UUID,
+        userId: UUID,
+        isAdmin: Boolean,
+        canExecute: Boolean,
+        canWrite: Boolean
+    ): UpdateProjectUserPermissionsResult {
+        return transaction {
+            val projectExists = ProjectsTable.selectAll()
+                .where { ProjectsTable.id eq projectId.toKotlinUuid() }
+                .count() > 0
+            if (!projectExists) {
+                return@transaction UpdateProjectUserPermissionsResult.PROJECT_NOT_FOUND
+            }
+
+            val userExists = UsersTable.selectAll()
+                .where { UsersTable.id eq userId.toKotlinUuid() }
+                .count() > 0
+            if (!userExists) {
+                return@transaction UpdateProjectUserPermissionsResult.USER_NOT_FOUND
+            }
+
+            val membership = ProjectOwnersTable.selectAll()
+                .where {
+                    (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and
+                    (ProjectOwnersTable.userId eq userId.toKotlinUuid())
+                }
+                .firstOrNull() ?: return@transaction UpdateProjectUserPermissionsResult.NOT_MEMBER
+
+            val currentlyAdmin = membership[ProjectOwnersTable.isAdmin]
+            if (currentlyAdmin && !isAdmin && countProjectAdmins(projectId) <= 1) {
+                return@transaction UpdateProjectUserPermissionsResult.LAST_PROJECT_ADMIN
+            }
+
+            ProjectOwnersTable.update({
+                (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and
+                    (ProjectOwnersTable.userId eq userId.toKotlinUuid())
+            }) {
+                it[ProjectOwnersTable.isAdmin] = isAdmin
+                it[ProjectOwnersTable.canExecute] = isAdmin || canExecute
+                it[ProjectOwnersTable.canWrite] = isAdmin || canWrite
+            }
+
+            UpdateProjectUserPermissionsResult.SUCCESS
+        }
+    }
+
+    /**
+     * Removes a user from a project.
+     * Cannot remove the last project admin.
+     *
+     * @param projectId The UUID of the project
+     * @param userId The UUID of the user to remove
+     * @return The result of the operation
+     */
+    fun removeProjectUser(projectId: UUID, userId: UUID): RemoveProjectUserResult {
         return transaction {
             val projectExists = ProjectsTable.selectAll()
                 .where { ProjectsTable.id eq projectId.toKotlinUuid() }
                 .count() > 0
             
             if (!projectExists) {
-                return@transaction RemoveOwnerResult.PROJECT_NOT_FOUND
+                return@transaction RemoveProjectUserResult.PROJECT_NOT_FOUND
             }
             
-            val isOwner = ProjectOwnersTable.selectAll()
+            val membership = ProjectOwnersTable.selectAll()
                 .where { 
                     (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and 
                     (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
                 }
-                .count() > 0
+                .firstOrNull()
             
-            if (!isOwner) {
-                return@transaction RemoveOwnerResult.NOT_OWNER
+            if (membership == null) {
+                return@transaction RemoveProjectUserResult.NOT_MEMBER
             }
-            
-            val ownerCount = ProjectOwnersTable.selectAll()
-                .where { ProjectOwnersTable.projectId eq projectId.toKotlinUuid() }
-                .count()
-            
-            if (ownerCount <= 1) {
-                return@transaction RemoveOwnerResult.LAST_OWNER
+
+            val isAdmin = membership[ProjectOwnersTable.isAdmin]
+            if (isAdmin && countProjectAdmins(projectId) <= 1) {
+                return@transaction RemoveProjectUserResult.LAST_PROJECT_ADMIN
             }
             
             ProjectOwnersTable.deleteWhere { 
@@ -271,8 +373,17 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
                 (ProjectOwnersTable.userId eq userId.toKotlinUuid()) 
             }
             
-            RemoveOwnerResult.SUCCESS
+            RemoveProjectUserResult.SUCCESS
         }
+    }
+
+    private fun countProjectAdmins(projectId: UUID): Long {
+        return ProjectOwnersTable.selectAll()
+            .where {
+                (ProjectOwnersTable.projectId eq projectId.toKotlinUuid()) and
+                    (ProjectOwnersTable.isAdmin eq true)
+            }
+            .count()
     }
     
     private fun ResultRow.toProject(): Project {
@@ -283,10 +394,31 @@ class ProjectService(services: InjectedServices) : BaseService(), InjectedServic
     }
 }
 
-enum class AddOwnerResult {
-    SUCCESS, PROJECT_NOT_FOUND, USER_NOT_FOUND, ALREADY_OWNER
+enum class AddProjectUserResult {
+    SUCCESS,
+    PROJECT_NOT_FOUND,
+    USER_NOT_FOUND,
+    ALREADY_MEMBER
 }
 
-enum class RemoveOwnerResult {
-    SUCCESS, PROJECT_NOT_FOUND, NOT_OWNER, LAST_OWNER
+enum class UpdateProjectUserPermissionsResult {
+    SUCCESS,
+    PROJECT_NOT_FOUND,
+    USER_NOT_FOUND,
+    NOT_MEMBER,
+    LAST_PROJECT_ADMIN
+}
+
+enum class RemoveProjectUserResult {
+    SUCCESS,
+    PROJECT_NOT_FOUND,
+    NOT_MEMBER,
+    LAST_PROJECT_ADMIN
+}
+
+enum class ProjectPermission {
+    ADMIN,
+    EXECUTE,
+    READ,
+    WRITE
 }

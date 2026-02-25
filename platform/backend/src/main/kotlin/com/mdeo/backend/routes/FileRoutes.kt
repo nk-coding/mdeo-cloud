@@ -3,6 +3,7 @@ package com.mdeo.backend.routes
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.FileService
 import com.mdeo.backend.service.JwtService
+import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
 import io.ktor.http.*
@@ -57,7 +58,8 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
          * @return ApiResult indicating success or failure
          */
         post("{path...}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.WRITE) ?: return@post
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -81,7 +83,8 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
          * @return ApiResult indicating success or failure
          */
         put("{path...}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@put
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.WRITE) ?: return@put
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -103,7 +106,8 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
          * @return ApiResult indicating success or failure
          */
         delete("{path...}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@delete
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.WRITE) ?: return@delete
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -124,7 +128,8 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
          * @return ApiResult indicating success or failure
          */
         post("{path...}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.WRITE) ?: return@post
             
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
@@ -200,7 +205,8 @@ fun Route.fileRoutes(fileService: FileService, projectService: ProjectService) {
          * @return ApiResult indicating success or failure
          */
         post {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.WRITE) ?: return@post
             
             val from = call.request.queryParameters["from"]
             val to = call.request.queryParameters["to"]
@@ -242,7 +248,7 @@ private suspend fun ApplicationCall.validateProjectAccessWithJwt(projectService:
             return null
         }
         
-        if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+        if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
             respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
             return null
         }
@@ -271,7 +277,10 @@ private suspend fun ApplicationCall.validateProjectAccessWithJwt(projectService:
  * @param projectService Service for project access validation
  * @return Project UUID if validation succeeds, null otherwise
  */
-private suspend fun ApplicationCall.validateProjectAccessSessionOnly(projectService: ProjectService): UUID? {
+private suspend fun ApplicationCall.validateProjectAccessSessionOnly(
+    projectService: ProjectService,
+    requiredPermission: ProjectPermission
+): UUID? {
     val session = getUserSession()
     if (session == null) {
         respond(HttpStatusCode.Unauthorized)
@@ -291,7 +300,7 @@ private suspend fun ApplicationCall.validateProjectAccessSessionOnly(projectServ
         return null
     }
     
-    if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, requiredPermission)) {
         respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
         return null
     }

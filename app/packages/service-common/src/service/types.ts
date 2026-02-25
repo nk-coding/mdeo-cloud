@@ -110,6 +110,12 @@ export interface ServiceConfig<T = object> {
      * Path to static files to serve (default: dist directory)
      */
     staticPath?: string;
+
+    /**
+     * Optional static asset version used for cache busting.
+     * When set, static assets are served under /static/{version}/.
+     */
+    version?: string;
 }
 
 /**

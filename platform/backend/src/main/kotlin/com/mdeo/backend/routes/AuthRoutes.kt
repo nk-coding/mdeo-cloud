@@ -36,13 +36,17 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
             call.sessions.set(UserSession(
                 userId = user.id,
                 username = user.username,
-                isAdmin = user.roles.contains("admin")
+                isAdmin = user.roles.contains(UserRoles.ADMIN),
+                canCreateProject =
+                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
             ))
             
             call.respond(LoginResponse(UserInfo(
                 id = user.id,
                 username = user.username,
-                isAdmin = user.roles.contains("admin")
+                isAdmin = user.roles.contains(UserRoles.ADMIN),
+                canCreateProject =
+                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
             )))
         }
 
@@ -66,13 +70,17 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
             call.sessions.set(UserSession(
                 userId = user.id,
                 username = user.username,
-                isAdmin = user.roles.contains("admin")
+                isAdmin = user.roles.contains(UserRoles.ADMIN),
+                canCreateProject =
+                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
             ))
 
             call.respond(LoginResponse(UserInfo(
                 id = user.id,
                 username = user.username,
-                isAdmin = user.roles.contains("admin")
+                isAdmin = user.roles.contains(UserRoles.ADMIN),
+                canCreateProject =
+                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
             )))
         }
         
@@ -99,7 +107,8 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
                 call.respond(UserInfo(
                     id = session.userId,
                     username = session.username,
-                    isAdmin = session.isAdmin
+                    isAdmin = session.isAdmin,
+                    canCreateProject = session.isAdmin || session.canCreateProject
                 ))
             }
         }

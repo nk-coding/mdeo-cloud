@@ -36,11 +36,14 @@ object ProjectsTable : Table("projects") {
 }
 
 /**
- * Project owners table schema for managing project ownership relationships.
+ * Project user membership table schema for managing project-level permissions.
  */
 object ProjectOwnersTable : Table("project_owners") {
     val projectId = uuid("project_id").references(ProjectsTable.id, onDelete = ReferenceOption.CASCADE)
     val userId = uuid("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE)
+    val isAdmin = bool("is_admin").default(false)
+    val canExecute = bool("can_execute").default(false)
+    val canWrite = bool("can_write").default(false)
 
     override val primaryKey = PrimaryKey(projectId, userId)
 }

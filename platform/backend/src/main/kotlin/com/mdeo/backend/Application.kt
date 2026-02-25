@@ -112,7 +112,7 @@ fun Application.module(appConfig: AppConfig) {
         authenticate(AUTH_SESSION) {
             webSocketRoutes(services.webSocketNotificationService, services.projectService)
             projectRoutes(services.projectService)
-            metadataRoutes(services.metadataService)
+            metadataRoutes(services.metadataService, services.projectService)
             pluginRoutes(services.pluginService, services.projectService)
             adminRoutes(services.userService)
             userRoutes(services.userService, services.projectService)

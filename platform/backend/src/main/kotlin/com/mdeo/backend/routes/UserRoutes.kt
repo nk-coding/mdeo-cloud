@@ -2,6 +2,7 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.ProjectService
+import com.mdeo.backend.service.UpdateUserPermissionsResult
 import com.mdeo.backend.service.UserService
 import com.mdeo.common.model.*
 import io.ktor.http.*
@@ -12,7 +13,7 @@ import kotlinx.serialization.Serializable
 import java.util.*
 
 /**
- * Request body for updating user admin status.
+ * Backward-compatible request body for admin-only updates.
  */
 @Serializable
 data class UpdateUserAdminRequest(
@@ -50,7 +51,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
         
         route("/{userId}") {
             /**
-             * Gets all projects owned by a specific user (admin only).
+             * Gets all project memberships for a specific user (admin only).
              *
              * @param userId Path parameter for user UUID
              * @return ApiResult.Success with list of projects, 401/403/400 on errors
@@ -75,18 +76,18 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                     return@get
                 }
                 
-                val projects = projectService.getProjectsByUserId(userId)
+                val projects = projectService.getProjectMembershipsByUserId(userId)
                 call.respond(projects)
             }
             
             /**
-             * Updates a user's admin status (admin only).
+             * Updates a user's global permissions (admin only).
              *
              * @param userId Path parameter for user UUID
-             * @param body UpdateUserAdminRequest with isAdmin flag
+             * @param body UpdateUserPermissionsRequest with permission values
              * @return ApiResult.Success on success, 401/403/400/404 on errors
              */
-            put("/admin") {
+            put("/permissions") {
                 val session = call.getUserSession()
                 if (session == null) {
                     call.respond(HttpStatusCode.Unauthorized)
@@ -106,15 +107,68 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                     return@put
                 }
                 
-                val request = call.receive<UpdateUserAdminRequest>()
-                
-                val updated = userService.updateUserAdmin(userId, request.isAdmin)
-                if (!updated) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
+                val request = call.receive<UpdateUserPermissionsRequest>()
+
+                when (
+                    userService.updateUserGlobalPermissions(
+                        userId = userId,
+                        isAdmin = request.isAdmin,
+                        canCreateProject = request.canCreateProject
+                    )
+                ) {
+                    UpdateUserPermissionsResult.SUCCESS -> call.respond(Unit)
+                    UpdateUserPermissionsResult.USER_NOT_FOUND ->
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
+                    UpdateUserPermissionsResult.LAST_GLOBAL_ADMIN ->
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Cannot remove the last global admin")
+                        )
+                }
+            }
+
+            /**
+             * Backward-compatible endpoint for updating admin status only.
+             */
+            put("/admin") {
+                val session = call.getUserSession()
+                if (session == null) {
+                    call.respond(HttpStatusCode.Unauthorized)
                     return@put
                 }
-                
-                call.respond(Unit)
+
+                if (!session.isAdmin) {
+                    call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
+                    return@put
+                }
+
+                val userId = call.parameters["userId"]?.let {
+                    try { UUID.fromString(it) } catch (e: Exception) { null }
+                }
+                if (userId == null) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                    return@put
+                }
+
+                val request = call.receive<UpdateUserAdminRequest>()
+                val canCreateProject = request.isAdmin
+
+                when (
+                    userService.updateUserGlobalPermissions(
+                        userId = userId,
+                        isAdmin = request.isAdmin,
+                        canCreateProject = canCreateProject
+                    )
+                ) {
+                    UpdateUserPermissionsResult.SUCCESS -> call.respond(Unit)
+                    UpdateUserPermissionsResult.USER_NOT_FOUND ->
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
+                    UpdateUserPermissionsResult.LAST_GLOBAL_ADMIN ->
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Cannot remove the last global admin")
+                        )
+                }
             }
         }
     }

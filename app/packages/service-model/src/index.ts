@@ -43,11 +43,11 @@ const modelLanguagePlugin: LanguagePlugin = {
     newFileAction: true,
     icon,
     serverPlugin: {
-        import: "static/language.js"
+        import: "language.js"
     },
     graphicalEditorPlugin: {
-        import: "static/editor.js",
-        stylesUrl: "static/styles.css",
+        import: "editor.js",
+        stylesUrl: "styles.css",
         stylesCls: "editor-model"
     },
     textualEditorPlugin: {
@@ -70,11 +70,11 @@ const generatedModelLanguagePlugin: LanguagePlugin = {
     newFileAction: false,
     icon,
     serverPlugin: {
-        import: "static/generatedLanguage.js"
+        import: "generatedLanguage.js"
     },
     graphicalEditorPlugin: {
-        import: "static/editor.js",
-        stylesUrl: "static/styles.css",
+        import: "editor.js",
+        stylesUrl: "styles.css",
         stylesCls: "editor-model"
     },
     textualEditorPlugin: undefined,

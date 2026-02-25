@@ -65,19 +65,30 @@
                             :active-element="null"
                             :expanded-items="new Set()"
                         >
-                            <TreeItem
-                                v-for="plugin in sortedPlugins"
-                                :key="plugin.id"
-                                :data="plugin"
-                                :is-folder="false"
-                                :has-children="false"
-                                @click="handlePluginClick(plugin as WorkbenchPlugin)"
-                            >
-                                <template #content>
-                                    <Icon :iconNode="plugin.icon" name="PluginIcon" class="size-4 mr-2" />
-                                    <span class="truncate">{{ plugin.name }}</span>
-                                </template>
-                            </TreeItem>
+                            <ContextMenu v-for="plugin in sortedPlugins" :key="plugin.id">
+                                <ContextMenuTrigger as-child>
+                                    <TreeItem
+                                        :data="plugin"
+                                        :is-folder="false"
+                                        :has-children="false"
+                                        :mode="'non-selectable'"
+                                        @click="handlePluginClick(plugin as WorkbenchPlugin)"
+                                    >
+                                        <template #content>
+                                            <Icon :iconNode="plugin.icon" name="PluginIcon" class="size-4 mr-2" />
+                                            <span class="truncate">{{ plugin.name }}</span>
+                                        </template>
+                                    </TreeItem>
+                                </ContextMenuTrigger>
+                                <ContextMenuContent>
+                                    <ContextMenuItem
+                                        :disabled="isPluginRemovalInProgress(plugin.id)"
+                                        @click="handleRemovePlugin(plugin as WorkbenchPlugin)"
+                                    >
+                                        Remove from Project
+                                    </ContextMenuItem>
+                                </ContextMenuContent>
+                            </ContextMenu>
                         </Tree>
                         <div v-else class="text-sm text-muted-foreground p-2">No plugins added</div>
                     </ScrollArea>
@@ -89,29 +100,54 @@
                         <template #actions>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" class="h-8 w-8" @click="openAddUserDialog">
-                                        <Plus class="size-4" />
+                                    <Button variant="ghost" size="icon" class="h-8 w-8" @click="openManageUsersDialog">
+                                        <Settings2 class="size-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="right">Add User</TooltipContent>
+                                <TooltipContent side="right">Manage Users</TooltipContent>
                             </Tooltip>
                         </template>
                     </SidebarPanelHeader>
                     <ScrollArea class="flex-1 min-h-0 px-2">
                         <Tree v-if="users.length > 0" class="w-full" :active-element="null" :expanded-items="new Set()">
                             <ContextMenu v-for="user in users" :key="user.id">
-                                <ContextMenuTrigger>
-                                    <TreeItem :data="user" :is-folder="false" :has-children="false">
+                                <ContextMenuTrigger as-child>
+                                    <TreeItem
+                                        :data="user"
+                                        :is-folder="false"
+                                        :has-children="false"
+                                        :mode="'non-selectable'"
+                                        @click="handleUserClick(user)"
+                                    >
                                         <template #content>
                                             <UserIcon class="size-4 mr-2" />
                                             <span class="truncate">{{ user.username }}</span>
+                                            <div class="ml-auto flex items-center gap-1 shrink-0">
+                                                <span
+                                                    v-if="user.isAdmin"
+                                                    class="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                                                    >Admin</span
+                                                >
+                                                <span
+                                                    v-if="!user.isAdmin && user.canExecute"
+                                                    class="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                                                    >Execute</span
+                                                >
+                                                <span
+                                                    v-if="!user.isAdmin && user.canWrite"
+                                                    class="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                                                    >Write</span
+                                                >
+                                            </div>
                                         </template>
                                     </TreeItem>
                                 </ContextMenuTrigger>
                                 <ContextMenuContent>
-                                    <ContextMenuItem @click="handleRemoveUser(user)" :disabled="users.length <= 1">
-                                        <Trash2 class="size-4 mr-2" />
-                                        Remove
+                                    <ContextMenuItem
+                                        :disabled="isUserRemovalInProgress(user.id) || isLastProjectAdmin(user.id)"
+                                        @click="handleRemoveUser(user)"
+                                    >
+                                        Remove from Project
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             </ContextMenu>
@@ -139,9 +175,10 @@
             :selected-plugin-id-prop="selectedPluginIdForDialog"
         />
 
-        <AddUserDialog
-            v-model:open="isAddUserDialogOpen"
+        <ManageUsersDialog
+            v-model:open="isManageUsersDialogOpen"
             :project-id="project!.id"
+            :selected-user-id-prop="selectedUserIdForDialog"
             @users-updated="handleUsersUpdated"
         />
 
@@ -164,7 +201,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, useTemplateRef, nextTick, computed } from "vue";
+import { ref, inject, useTemplateRef, nextTick, computed, reactive } from "vue";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -173,7 +210,6 @@ import { Separator } from "@/components/ui/separator";
 import SidebarPanelHeader from "@/components/sidebar/SidebarPanelHeader.vue";
 import Tree from "@/components/tree/Tree.vue";
 import TreeItem from "@/components/tree/TreeItem.vue";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -184,16 +220,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import ManagePluginsDialog from "./ManagePluginsDialog.vue";
-import AddUserDialog from "./AddUserDialog.vue";
-import type { UserInfo } from "@/data/api/backendApi";
-import { Pencil, Plus, Trash2, FolderOpen, User as UserIcon, Settings2, Icon } from "lucide-vue-next";
+import ManageUsersDialog from "./ManageUsersDialog.vue";
+import type { ProjectUserInfo } from "@/data/api/backendApi";
+import { Pencil, Trash2, FolderOpen, User as UserIcon, Settings2, Icon } from "lucide-vue-next";
 import { workbenchStateKey } from "@/components/workbench/util";
 import type { WorkbenchPlugin } from "@/data/plugin/plugin";
 import { showApiError } from "@/lib/notifications";
 
 const props = defineProps<{
-    users: UserInfo[];
+    users: ProjectUserInfo[];
 }>();
 
 const emit = defineEmits<{
@@ -208,10 +245,13 @@ const { backendApi, project, plugins } = inject(workbenchStateKey)!;
 const isEditingName = ref(false);
 const editedName = ref("");
 const isManagePluginsDialogOpen = ref(false);
-const isAddUserDialogOpen = ref(false);
+const isManageUsersDialogOpen = ref(false);
 const isDeleteDialogOpen = ref(false);
 const projectNameInput = useTemplateRef("projectNameInput");
 const selectedPluginIdForDialog = ref<string | undefined>(undefined);
+const selectedUserIdForDialog = ref<string | undefined>(undefined);
+const removingPluginIds = reactive(new Set<string>());
+const removingUserIds = reactive(new Set<string>());
 
 const sortedPlugins = computed(() => {
     return Array.from(plugins.value.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -237,8 +277,9 @@ function openManagePluginsDialog() {
     isManagePluginsDialogOpen.value = true;
 }
 
-function openAddUserDialog() {
-    isAddUserDialogOpen.value = true;
+function openManageUsersDialog() {
+    selectedUserIdForDialog.value = undefined;
+    isManageUsersDialogOpen.value = true;
 }
 
 function openDeleteDialog() {
@@ -247,17 +288,6 @@ function openDeleteDialog() {
 
 function handleUsersUpdated() {
     emit("usersUpdated");
-}
-
-async function handleRemoveUser(user: UserInfo) {
-    if (props.users.length <= 1) return;
-
-    const result = await backendApi.projects.removeOwner(project.value!.id, user.id);
-    if (result.success) {
-        emit("usersUpdated");
-    } else {
-        showApiError("remove user from project", result.error.message);
-    }
 }
 
 function handleDeleteProject() {
@@ -271,5 +301,63 @@ function handleOpenProjects() {
 function handlePluginClick(plugin: WorkbenchPlugin) {
     selectedPluginIdForDialog.value = plugin.id;
     isManagePluginsDialogOpen.value = true;
+}
+
+function handleUserClick(user: ProjectUserInfo) {
+    selectedUserIdForDialog.value = user.id;
+    isManageUsersDialogOpen.value = true;
+}
+
+function isPluginRemovalInProgress(pluginId: string): boolean {
+    return removingPluginIds.has(pluginId);
+}
+
+function isUserRemovalInProgress(userId: string): boolean {
+    return removingUserIds.has(userId);
+}
+
+function isLastProjectAdmin(userId: string): boolean {
+    const adminUsers = props.users.filter((user) => user.isAdmin);
+    return adminUsers.length === 1 && adminUsers[0]?.id === userId;
+}
+
+async function handleRemovePlugin(plugin: WorkbenchPlugin) {
+    if (removingPluginIds.has(plugin.id)) {
+        return;
+    }
+
+    removingPluginIds.add(plugin.id);
+    try {
+        const result = await backendApi.plugins.removeFromProject(project.value!.id, plugin.id);
+        if (result.success) {
+            plugins.value.delete(plugin.id);
+        } else {
+            showApiError("remove plugin from project", result.error.message);
+        }
+    } finally {
+        removingPluginIds.delete(plugin.id);
+    }
+}
+
+async function handleRemoveUser(user: ProjectUserInfo) {
+    if (removingUserIds.has(user.id)) {
+        return;
+    }
+
+    if (isLastProjectAdmin(user.id)) {
+        return;
+    }
+
+    removingUserIds.add(user.id);
+    try {
+        const result = await backendApi.projects.removeUser(project.value!.id, user.id);
+        if (result.success) {
+            emit("usersUpdated");
+        } else {
+            showApiError("remove user from project", result.error.message);
+        }
+    } finally {
+        removingUserIds.delete(user.id);
+    }
 }
 </script>

@@ -3,6 +3,7 @@ package com.mdeo.backend.routes
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.FileDataService
 import com.mdeo.backend.service.JwtService
+import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
 import io.ktor.http.*
@@ -51,7 +52,7 @@ fun Route.fileDataRoutes(
                     return@get
                 }
                 
-                if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@get
                 }

@@ -9,18 +9,33 @@
                 @select="selectPlugin"
             >
                 <template #header>
-                    <SidebarMenu>
-                        <SidebarMenuItem>
-                            <SidebarMenuButtonChild
-                                class="gap-2 justify-start"
-                                :is-active="selectedEntry === 'add'"
-                                @click="selectAddEntry"
-                            >
-                                <PlusCircle class="size-4" />
-                                <span class="text-sm font-medium">Add plugin</span>
-                            </SidebarMenuButtonChild>
-                        </SidebarMenuItem>
-                    </SidebarMenu>
+                    <div class="flex items-center gap-2">
+                        <SidebarMenu class="flex-1 min-w-0">
+                            <SidebarMenuItem>
+                                <SidebarMenuButtonChild
+                                    class="gap-2 justify-start"
+                                    :is-active="selectedEntry === 'add'"
+                                    @click="selectAddEntry"
+                                >
+                                    <PlusCircle class="size-4" />
+                                    <span class="text-sm font-medium">Add plugin</span>
+                                </SidebarMenuButtonChild>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="icon-sm"
+                                    :disabled="plugins.length === 0 || refreshingAllPlugins"
+                                    @click="handleRefreshAllPlugins"
+                                >
+                                    <RefreshCw class="size-4" :class="{ 'animate-spin': refreshingAllPlugins }" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Refresh all plugins</TooltipContent>
+                        </Tooltip>
+                    </div>
                 </template>
                 <template #plugin-indicator="{ plugin }">
                     <Pin v-if="plugin.default" class="size-4 ml-auto fill-current" />
@@ -163,6 +178,7 @@ const addError = ref("");
 const selectedEntry = ref<"add" | string>("add");
 const deletingPluginId = ref<string>();
 const refreshingPluginId = ref<string>();
+const refreshingAllPlugins = ref(false);
 const updatingDefaultPluginId = ref<string>();
 const hasLoaded = ref(false);
 
@@ -270,6 +286,21 @@ async function handleRefreshPlugin() {
         }
     } finally {
         refreshingPluginId.value = undefined;
+    }
+}
+
+async function handleRefreshAllPlugins() {
+    refreshingAllPlugins.value = true;
+    try {
+        const result = await props.backendApi.plugins.refreshAll();
+        if (result.success) {
+            const selectedPluginId = selectedEntry.value === "add" ? undefined : selectedEntry.value;
+            await loadPlugins(selectedPluginId);
+        } else {
+            showApiError("refresh all plugins", result.error.message);
+        }
+    } finally {
+        refreshingAllPlugins.value = false;
     }
 }
 

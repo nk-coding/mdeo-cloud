@@ -2,6 +2,7 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.PluginService
+import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
 import io.ktor.http.*
@@ -97,6 +98,21 @@ fun Route.pluginRoutes(
             
             call.respondApiResult(result)
         }
+
+        /**
+         * Refreshes all plugins by re-fetching each plugin manifest (admin only).
+         *
+         * @return ApiResult indicating success or failure, 403 if not admin
+         */
+        post("/refresh") {
+            if (!call.isAdmin()) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
+                return@post
+            }
+
+            val result = pluginService.refreshAllPluginsData()
+            call.respondApiResult(result)
+        }
         
         /**
          * Gets a specific plugin by ID.
@@ -171,7 +187,7 @@ fun Route.pluginRoutes(
                 return@get
             }
             
-            if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@get
             }
@@ -207,7 +223,7 @@ fun Route.pluginRoutes(
                 return@post
             }
             
-            if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.ADMIN)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@post
             }
@@ -258,7 +274,7 @@ fun Route.pluginRoutes(
                 return@delete
             }
             
-            if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.ADMIN)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@delete
             }

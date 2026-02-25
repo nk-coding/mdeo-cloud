@@ -27,11 +27,11 @@ const metamodelLanguagePlugin: LanguagePlugin = {
     extension: ".mm",
     icon: convertIcon(Network),
     serverPlugin: {
-        import: "static/language.js"
+        import: "language.js"
     },
     graphicalEditorPlugin: {
-        import: "static/editor.js",
-        stylesUrl: "static/styles.css",
+        import: "editor.js",
+        stylesUrl: "styles.css",
         stylesCls: "editor-metamodel"
     },
     textualEditorPlugin: {

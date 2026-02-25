@@ -30,7 +30,7 @@ const configLanguagePlugin: LanguagePlugin = {
     newFileAction: true,
     icon,
     serverPlugin: {
-        import: "static/language.js"
+        import: "language.js"
     },
     graphicalEditorPlugin: undefined,
     textualEditorPlugin: {

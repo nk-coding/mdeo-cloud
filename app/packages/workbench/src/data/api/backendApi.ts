@@ -9,7 +9,7 @@ import { FileDataApi } from "./areas/fileDataApi";
 import { WebSocketApi } from "./areas/webSocketApi";
 
 export type { User } from "./areas/authApi";
-export type { UserInfo } from "./areas/rojectsApi";
+export type { ProjectUserInfo, UserProjectMembership } from "./areas/rojectsApi";
 export type { FileReadResult } from "./areas/filesApi";
 
 /**

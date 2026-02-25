@@ -43,7 +43,7 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
                     it[id] = UUID.randomUUID().toKotlinUuid()
                     it[UsersTable.username] = username
                     it[UsersTable.passwordHash] = passwordHash
-                    it[roles] = "${UserRoles.USER},${UserRoles.ADMIN}"
+                    it[roles] = setOf(UserRoles.USER, UserRoles.ADMIN).joinToString(",")
                     it[createdAt] = now
                     it[updatedAt] = now
                 }
@@ -120,12 +120,16 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
             val now = Instant.now()
             val userId = UUID.randomUUID()
             val passwordHash = hashPassword(password)
+            val roles = mutableSetOf(UserRoles.USER)
+            if (config.defaultNewUserCanCreateProject) {
+                roles.add(UserRoles.CREATE_PROJECT)
+            }
 
             UsersTable.insert {
                 it[id] = userId.toKotlinUuid()
                 it[UsersTable.username] = username
                 it[UsersTable.passwordHash] = passwordHash
-                it[roles] = UserRoles.USER
+                it[UsersTable.roles] = roles.joinToString(",")
                 it[createdAt] = now
                 it[updatedAt] = now
             }
@@ -227,55 +231,95 @@ class UserService(services: InjectedServices) : BaseService(), InjectedServices 
     fun getAllUsers(): List<UserInfo> {
         return transaction {
             UsersTable.selectAll()
-                .map { 
+                .map {
+                    val roles = parseRoles(it[UsersTable.roles])
                     UserInfo(
                         id = it[UsersTable.id].toJavaUuid().toString(),
                         username = it[UsersTable.username],
-                        isAdmin = it[UsersTable.roles].contains(UserRoles.ADMIN)
+                        isAdmin = roles.contains(UserRoles.ADMIN),
+                        canCreateProject = roles.contains(UserRoles.ADMIN) || roles.contains(UserRoles.CREATE_PROJECT)
                     )
                 }
         }
     }
-    
+
     /**
-     * Updates a user's admin status by adding or removing the admin role.
+     * Updates a user's global permissions.
      *
      * @param userId The UUID of the user to update
-     * @param isAdmin Whether the user should have admin privileges
-     * @return true if the user was updated, false if user not found
+     * @param isAdmin Whether the user should have global administrator privileges
+     * @param canCreateProject Whether the user should have create-project permission
+     * @return Result indicating success or the validation failure reason
      */
-    fun updateUserAdmin(userId: UUID, isAdmin: Boolean): Boolean {
+    fun updateUserGlobalPermissions(
+        userId: UUID,
+        isAdmin: Boolean,
+        canCreateProject: Boolean
+    ): UpdateUserPermissionsResult {
         return transaction {
             val row = UsersTable.selectAll()
                 .where { UsersTable.id eq userId.toKotlinUuid() }
-                .firstOrNull() ?: return@transaction false
-            
-            val currentRoles = row[UsersTable.roles].split(",").filter { it.isNotBlank() }.toMutableSet()
-            
+                .firstOrNull() ?: return@transaction UpdateUserPermissionsResult.USER_NOT_FOUND
+
+            val currentRoles = parseRoles(row[UsersTable.roles]).toMutableSet()
+            val currentlyAdmin = currentRoles.contains(UserRoles.ADMIN)
+
+            if (currentlyAdmin && !isAdmin && countGlobalAdmins() <= 1) {
+                return@transaction UpdateUserPermissionsResult.LAST_GLOBAL_ADMIN
+            }
+
+            currentRoles.add(UserRoles.USER)
             if (isAdmin) {
                 currentRoles.add(UserRoles.ADMIN)
+                currentRoles.add(UserRoles.CREATE_PROJECT)
             } else {
                 currentRoles.remove(UserRoles.ADMIN)
+                if (canCreateProject) {
+                    currentRoles.add(UserRoles.CREATE_PROJECT)
+                } else {
+                    currentRoles.remove(UserRoles.CREATE_PROJECT)
+                }
             }
-            
+
             UsersTable.update({ UsersTable.id eq userId.toKotlinUuid() }) {
                 it[roles] = currentRoles.joinToString(",")
                 it[updatedAt] = Instant.now()
             }
-            
-            true
+
+            UpdateUserPermissionsResult.SUCCESS
         }
     }
-    
+
     private fun hashPassword(password: String): String {
         return BCrypt.withDefaults().hashToString(12, password.toCharArray())
     }
-    
+
+    private fun countGlobalAdmins(): Int {
+        return UsersTable.selectAll()
+            .count {
+                parseRoles(it[UsersTable.roles]).contains(UserRoles.ADMIN)
+            }
+    }
+
+    private fun parseRoles(rawRoles: String): Set<String> {
+        return rawRoles
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toSet()
+    }
+
     private fun ResultRow.toUser(): User {
         return User(
             id = this[UsersTable.id].toJavaUuid().toString(),
             username = this[UsersTable.username],
-            roles = this[UsersTable.roles].split(",").filter { it.isNotBlank() }
+            roles = parseRoles(this[UsersTable.roles]).toList()
         )
     }
+}
+
+enum class UpdateUserPermissionsResult {
+    SUCCESS,
+    USER_NOT_FOUND,
+    LAST_GLOBAL_ADMIN
 }

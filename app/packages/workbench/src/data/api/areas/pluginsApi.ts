@@ -63,6 +63,17 @@ export class PluginsApi {
     }
 
     /**
+     * Refreshes all plugins by re-fetching all plugin manifests
+     *
+     * @returns A promise resolving to success or an error
+     */
+    async refreshAll(): Promise<ApiResult<void, PluginError>> {
+        return this.core.fetchApiResult(`${this.core.baseUrl}/plugins/refresh`, {
+            method: "POST"
+        });
+    }
+
+    /**
      * Updates the default status of a plugin
      *
      * @param pluginId The ID of the plugin to update

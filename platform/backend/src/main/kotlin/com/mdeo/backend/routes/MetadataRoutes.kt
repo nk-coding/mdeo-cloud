@@ -2,6 +2,8 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.MetadataService
+import com.mdeo.backend.service.ProjectPermission
+import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -14,8 +16,9 @@ import java.util.*
  * Configures metadata management routes for project files.
  *
  * @param metadataService Service for metadata operations
+ * @param projectService Service for project access validation
  */
-fun Route.metadataRoutes(metadataService: MetadataService) {
+fun Route.metadataRoutes(metadataService: MetadataService, projectService: ProjectService) {
     route("/api/projects/{projectId}/metadata") {
         /**
          * Reads metadata for a file.
@@ -39,6 +42,16 @@ fun Route.metadataRoutes(metadataService: MetadataService) {
                 return@get
             }
             
+            val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                return@get
+            }
+
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+                return@get
+            }
+
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
             
@@ -69,6 +82,16 @@ fun Route.metadataRoutes(metadataService: MetadataService) {
                 return@put
             }
             
+            val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                return@put
+            }
+
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.WRITE)) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+                return@put
+            }
+
             val pathParts = call.parameters.getAll("path") ?: emptyList()
             val path = pathParts.joinToString("/")
             
@@ -102,7 +125,17 @@ fun Route.metadataRoutes(metadataService: MetadataService) {
                 return@get
             }
             
-            val executionId = call.parameters["executionId"]?.let { 
+            val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                return@get
+            }
+
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+                return@get
+            }
+
+            val executionId = call.parameters["executionId"]?.let {
                 try { UUID.fromString(it) } catch (e: Exception) { null }
             }
             if (executionId == null) {
@@ -141,7 +174,17 @@ fun Route.metadataRoutes(metadataService: MetadataService) {
                 return@put
             }
             
-            val executionId = call.parameters["executionId"]?.let { 
+            val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                return@put
+            }
+
+            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.WRITE)) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
+                return@put
+            }
+
+            val executionId = call.parameters["executionId"]?.let {
                 try { UUID.fromString(it) } catch (e: Exception) { null }
             }
             if (executionId == null) {

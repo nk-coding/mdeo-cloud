@@ -12,14 +12,14 @@
                             Administrators have full access to all projects and system settings.
                         </p>
                     </div>
-                    <Button
-                        :variant="user.isAdmin ? 'default' : 'outline'"
-                        size="sm"
-                        :disabled="updatingAdmin"
-                        @click="handleAdminToggle(!user.isAdmin)"
-                    >
-                        {{ user.isAdmin ? "Admin" : "User" }}
-                    </Button>
+                    <Switch v-model="isAdmin" :disabled="isUpdating || disableAdminToggle" />
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                        <label class="text-sm font-medium">Create Projects</label>
+                        <p class="text-xs text-muted-foreground">Allows creating new projects globally.</p>
+                    </div>
+                    <Switch v-model="canCreateProject" :disabled="isUpdating || isAdmin" />
                 </div>
             </div>
         </div>
@@ -27,76 +27,66 @@
         <Separator />
 
         <div class="space-y-3">
-            <h3 class="text-lg font-medium text-foreground">Owned Projects</h3>
+            <h3 class="text-lg font-medium text-foreground">Projects</h3>
             <div v-if="loadingProjects" class="text-sm text-muted-foreground">Loading projects...</div>
             <div v-else-if="projects.length === 0" class="text-sm text-muted-foreground">
-                This user doesn't own any projects.
+                This user is not a member of any projects.
             </div>
             <div v-else class="space-y-2">
                 <div
                     v-for="project in projects"
-                    :key="project.id"
+                    :key="project.projectId"
                     class="flex items-center gap-2 p-2 rounded-md border text-sm"
                 >
                     <Folder class="size-4 text-muted-foreground" />
-                    <span>{{ project.name }}</span>
+                    <span class="truncate">{{ project.projectName }}</span>
+                    <span
+                        v-if="project.isAdmin"
+                        class="ml-auto text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                        >Admin</span
+                    >
+                    <span
+                        v-if="!project.isAdmin && project.canExecute"
+                        class="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                        >Execute</span
+                    >
+                    <span
+                        v-if="!project.isAdmin && project.canWrite"
+                        class="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium"
+                        >Write</span
+                    >
                 </div>
             </div>
         </div>
     </div>
-
-    <AlertDialog v-model:open="showAdminDialog">
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>{{ user.isAdmin ? "Remove" : "Grant" }} Administrator Access</AlertDialogTitle>
-                <AlertDialogDescription>
-                    {{
-                        user.isAdmin
-                            ? `Are you sure you want to remove administrator access for "${user.username}"? They will lose access to system settings and all projects.`
-                            : `Are you sure you want to grant administrator access to "${user.username}"? They will have full access to all projects and system settings.`
-                    }}
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction :disabled="updatingAdmin" @click="confirmAdminChange">Confirm</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { Folder } from "lucide-vue-next";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle
-} from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import type { User, BackendApi } from "@/data/api/backendApi";
-import type { Project } from "@/data/project/project";
+import type { UserProjectMembership } from "@/data/api/backendApi";
+import { showApiError } from "@/lib/notifications";
 
 const props = defineProps<{
     user: User;
     backendApi: BackendApi;
+    disableAdminToggle: boolean;
 }>();
 
 const emit = defineEmits<{
-    adminUpdated: [userId: string, isAdmin: boolean];
+    permissionsUpdated: [userId: string, isAdmin: boolean, canCreateProject: boolean];
 }>();
 
-const projects = ref<Project[]>([]);
+const projects = ref<UserProjectMembership[]>([]);
 const loadingProjects = ref(false);
-const updatingAdmin = ref(false);
-const showAdminDialog = ref(false);
-const pendingAdminValue = ref(false);
+const isUpdating = ref(false);
+const isAdmin = ref(false);
+const canCreateProject = ref(false);
+const isSyncingFromProps = ref(false);
+const isApplyingPermissionChange = ref(false);
 
 async function loadProjects() {
     loadingProjects.value = true;
@@ -110,29 +100,96 @@ async function loadProjects() {
     }
 }
 
-function handleAdminToggle(newValue: boolean) {
-    pendingAdminValue.value = newValue;
-    showAdminDialog.value = true;
-}
-
-async function confirmAdminChange() {
-    updatingAdmin.value = true;
+async function savePermissions() {
+    isUpdating.value = true;
     try {
-        const result = await props.backendApi.users.updateAdmin(props.user.id, pendingAdminValue.value);
+        const result = await props.backendApi.users.updatePermissions(
+            props.user.id,
+            isAdmin.value,
+            canCreateProject.value
+        );
         if (result.success) {
-            emit("adminUpdated", props.user.id, pendingAdminValue.value);
+            emit("permissionsUpdated", props.user.id, isAdmin.value, canCreateProject.value);
+        } else {
+            showApiError("update user permissions", result.error.message);
+            isAdmin.value = props.user.isAdmin;
+            canCreateProject.value = props.user.canCreateProject;
         }
     } finally {
-        updatingAdmin.value = false;
-        showAdminDialog.value = false;
+        isUpdating.value = false;
     }
+}
+
+async function handleAdminChange(value: boolean) {
+    isApplyingPermissionChange.value = true;
+    try {
+        isAdmin.value = value;
+        if (value) {
+            canCreateProject.value = true;
+        }
+        await savePermissions();
+    } finally {
+        isApplyingPermissionChange.value = false;
+    }
+}
+
+async function handleCreateProjectChange(value: boolean) {
+    isApplyingPermissionChange.value = true;
+    try {
+        canCreateProject.value = value;
+        await savePermissions();
+    } finally {
+        isApplyingPermissionChange.value = false;
+    }
+}
+
+function syncLocalPermissionsFromProps() {
+    isSyncingFromProps.value = true;
+    isAdmin.value = props.user.isAdmin;
+    canCreateProject.value = props.user.canCreateProject;
+    isSyncingFromProps.value = false;
 }
 
 watch(
     () => props.user.id,
     () => {
+        syncLocalPermissionsFromProps();
         loadProjects();
     },
     { immediate: true }
 );
+
+watch(
+    () => [props.user.isAdmin, props.user.canCreateProject],
+    ([nextIsAdmin, nextCanCreateProject]) => {
+        if (!isUpdating.value && !isSyncingFromProps.value) {
+            isAdmin.value = nextIsAdmin ?? false;
+            canCreateProject.value = nextCanCreateProject ?? false;
+        }
+    }
+);
+
+watch(isAdmin, async (nextValue, previousValue) => {
+    if (
+        isSyncingFromProps.value ||
+        isUpdating.value ||
+        isApplyingPermissionChange.value ||
+        nextValue === previousValue
+    ) {
+        return;
+    }
+    await handleAdminChange(nextValue);
+});
+
+watch(canCreateProject, async (nextValue, previousValue) => {
+    if (
+        isSyncingFromProps.value ||
+        isUpdating.value ||
+        isApplyingPermissionChange.value ||
+        nextValue === previousValue
+    ) {
+        return;
+    }
+    await handleCreateProjectChange(nextValue);
+});
 </script>

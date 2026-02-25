@@ -93,7 +93,7 @@ const modelTransformationLanguagePlugin: LanguagePlugin = {
     newFileAction: true,
     icon,
     serverPlugin: {
-        import: "static/language.js"
+        import: "language.js"
     },
     textualEditorPlugin: {
         languageConfiguration: defaultLanguageConfiguration,
@@ -123,8 +123,8 @@ const modelTransformationLanguagePlugin: LanguagePlugin = {
         })
     },
     graphicalEditorPlugin: {
-        import: "static/editor.js",
-        stylesUrl: "static/styles.css",
+        import: "editor.js",
+        stylesUrl: "styles.css",
         stylesCls: "editor-model-transformation"
     },
     isGenerated: false

@@ -57,9 +57,11 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
 
     if (config.serveStatic !== false) {
         const staticPath = config.staticPath ?? resolve(process.cwd(), "static");
+        const version = config.version?.trim();
+        const staticPrefix = version && version.length > 0 ? `/static/${version}/` : "/static/";
         await fastify.register(fastifyStatic, {
             root: staticPath,
-            prefix: "/static",
+            prefix: staticPrefix,
             decorateReply: false
         });
     }
@@ -80,7 +82,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
 
     const jwtAuth = new JwtAuthMiddleware(config.backendApiUrl, config.jwtIssuer);
 
-    const manifest = buildManifest(config.plugin);
+    const manifest = buildManifest(config.plugin, config.version);
 
     fastify.get("/", async (request: FastifyRequest, reply: FastifyReply) => {
         return reply.send(manifest);

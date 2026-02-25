@@ -27,7 +27,8 @@ data class User(
 data class UserInfo(
     val id: String,
     val username: String,
-    val isAdmin: Boolean = false
+    val isAdmin: Boolean = false,
+    val canCreateProject: Boolean = false
 )
 
 /**
@@ -36,4 +37,17 @@ data class UserInfo(
 object UserRoles {
     const val USER = "user"
     const val ADMIN = "admin"
+    const val CREATE_PROJECT = "create_project"
 }
+
+/**
+ * Request payload for updating a user's global permissions.
+ *
+ * @property isAdmin Whether the user should have global administrator rights
+ * @property canCreateProject Whether the user should be able to create projects
+ */
+@Serializable
+data class UpdateUserPermissionsRequest(
+    val isAdmin: Boolean,
+    val canCreateProject: Boolean
+)

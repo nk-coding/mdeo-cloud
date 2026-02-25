@@ -84,3 +84,13 @@ fun ApplicationCall.getJwtPrincipal(): JwtPrincipal? {
 fun ApplicationCall.isAdmin(): Boolean {
     return getUserSession()?.isAdmin == true
 }
+
+/**
+ * Extension function to check if the current user can create projects globally.
+ *
+ * @return true if the user is authenticated and has create-project permission
+ */
+fun ApplicationCall.canCreateProject(): Boolean {
+    val session = getUserSession() ?: return false
+    return session.isAdmin || session.canCreateProject
+}

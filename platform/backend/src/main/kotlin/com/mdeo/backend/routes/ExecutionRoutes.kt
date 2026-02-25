@@ -3,6 +3,7 @@ package com.mdeo.backend.routes
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.ExecutionService
 import com.mdeo.backend.service.JwtService
+import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.common.model.*
 import io.ktor.http.*
@@ -30,7 +31,8 @@ fun Route.executionRoutes(
          * @return List of executions
          */
         get {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@get
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.READ) ?: return@get
             
             val executions = executionService.listExecutions(projectId)
             call.respond(executions)
@@ -44,7 +46,8 @@ fun Route.executionRoutes(
          * @return Created execution
          */
         post {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.EXECUTE) ?: return@post
             
             val request = call.receive<CreateExecutionRequest>()
             val result = executionService.createExecution(projectId, request.filePath, request.data)
@@ -59,7 +62,8 @@ fun Route.executionRoutes(
          * @return Success or failure
          */
         delete {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@delete
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.EXECUTE) ?: return@delete
             
             val result = executionService.deleteAllExecutions(projectId)
             call.respondApiResult(result)
@@ -73,7 +77,8 @@ fun Route.executionRoutes(
          * @return Execution with file tree
          */
         get("{executionId}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@get
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.READ) ?: return@get
             
             val executionId = call.parameters["executionId"]?.let { 
                 try { UUID.fromString(it) } catch (e: Exception) { null }
@@ -95,7 +100,8 @@ fun Route.executionRoutes(
          * @return Summary content
          */
         get("{executionId}/summary") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@get
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.READ) ?: return@get
             
             val executionId = call.parameters["executionId"]?.let { 
                 try { UUID.fromString(it) } catch (e: Exception) { null }
@@ -124,7 +130,8 @@ fun Route.executionRoutes(
          * @return File contents
          */
         get("{executionId}/files/{path...}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@get
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.READ) ?: return@get
             
             val executionId = call.parameters["executionId"]?.let { 
                 try { UUID.fromString(it) } catch (e: Exception) { null }
@@ -155,7 +162,8 @@ fun Route.executionRoutes(
          * @return Success or failure
          */
         post("{executionId}/cancel") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@post
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.EXECUTE) ?: return@post
             
             val executionId = call.parameters["executionId"]?.let { 
                 try { UUID.fromString(it) } catch (e: Exception) { null }
@@ -177,7 +185,8 @@ fun Route.executionRoutes(
          * @return Success or failure
          */
         delete("{executionId}") {
-            val projectId = call.validateProjectAccessSessionOnly(projectService) ?: return@delete
+            val projectId =
+                call.validateProjectAccessSessionOnly(projectService, ProjectPermission.EXECUTE) ?: return@delete
             
             val executionId = call.parameters["executionId"]?.let { 
                 try { UUID.fromString(it) } catch (e: Exception) { null }
@@ -259,7 +268,10 @@ fun Route.executionStateRoutes(
  * @param projectService Service for project access validation
  * @return Project UUID if validation succeeds, null otherwise
  */
-private suspend fun ApplicationCall.validateProjectAccessSessionOnly(projectService: ProjectService): UUID? {
+private suspend fun ApplicationCall.validateProjectAccessSessionOnly(
+    projectService: ProjectService,
+    requiredPermission: ProjectPermission
+): UUID? {
     val session = getUserSession()
     if (session == null) {
         respond(HttpStatusCode.Unauthorized)
@@ -279,7 +291,7 @@ private suspend fun ApplicationCall.validateProjectAccessSessionOnly(projectServ
         return null
     }
     
-    if (!projectService.isOwnerOrAdmin(projectId, userId, session.isAdmin)) {
+    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, requiredPermission)) {
         respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
         return null
     }

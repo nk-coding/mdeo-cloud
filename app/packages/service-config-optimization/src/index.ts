@@ -26,7 +26,7 @@ const configOptimizationLanguagePlugin: LanguagePlugin = {
     newFileAction: false,
     icon,
     serverPlugin: {
-        import: "static/language.js"
+        import: "language.js"
     },
     graphicalEditorPlugin: undefined,
     textualEditorPlugin: undefined,
