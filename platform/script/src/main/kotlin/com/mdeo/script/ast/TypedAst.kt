@@ -16,12 +16,15 @@ import kotlinx.serialization.Serializable
  *
  * @param types Array of all types used in the program. Generics are replaced by Any? due to
  *              type erasure. Types are indexed by typeIndex in expressions.
+ * @param metamodelPath Optional absolute path of the imported metamodel file.
+ *        When present, the script has access to metamodel types and the `model` global.
  * @param imports All imports in the program.
  * @param functions All top-level functions in the program.
  */
 @Serializable
 data class TypedAst(
     val types: List<@Serializable(with = ReturnTypeSerializer::class) ReturnType>,
+    val metamodelPath: String? = null,
     val imports: List<TypedImport>,
     val functions: List<TypedFunction>
 )

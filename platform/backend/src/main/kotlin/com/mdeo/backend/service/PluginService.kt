@@ -7,6 +7,7 @@ import com.mdeo.backend.database.ProjectPluginsTable
 import com.mdeo.common.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.core.*
@@ -26,7 +27,7 @@ import kotlin.uuid.toKotlinUuid
 /**
  * Plugin manifest returned from plugin's GET / endpoint.
  */
-@kotlinx.serialization.Serializable
+@Serializable
 data class PluginManifest(
     val id: String,
     val url: String? = null,
@@ -37,7 +38,7 @@ data class PluginManifest(
     val contributionPlugins: List<JsonObject> = emptyList()
 )
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class ManifestLanguagePlugin(
     val id: String,
     val name: String,
@@ -50,19 +51,19 @@ data class ManifestLanguagePlugin(
     val isGenerated: Boolean = false
 )
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class ManifestServerPlugin(
     val import: String
 )
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class ManifestGraphicalEditorPlugin(
     val import: String,
     val stylesUrl: String,
     val stylesCls: String
 )
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class ManifestTextualEditorPlugin(
     val languageConfiguration: JsonObject,
     val monarchTokensProvider: JsonObject

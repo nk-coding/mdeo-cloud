@@ -1,6 +1,8 @@
 import type { AstReflection } from "@mdeo/language-common";
 import {
     Association,
+    Enum,
+    EnumTypeReference,
     PrimitiveType,
     type AssociationEndType,
     type AssociationType,
@@ -345,7 +347,7 @@ class MetamodelClassExtractor {
 
     /**
      * Resolves the base type of a property without considering multiplicity.
-     * Handles primitive types and defaults to string for enum types.
+     * Handles primitive types and enum type references.
      *
      * @param property The property to resolve the base type for
      * @returns The base ValueType
@@ -354,6 +356,14 @@ class MetamodelClassExtractor {
         const typeValue = property.type;
         if (this.reflection.isInstance(typeValue, PrimitiveType)) {
             return this.resolvePrimitiveType(typeValue.name);
+        }
+        if (this.reflection.isInstance(typeValue, EnumTypeReference)) {
+            const enumNode = typeValue.enum?.ref;
+            if (this.reflection.isInstance(enumNode, Enum)) {
+                const doc = AstUtils.getDocument(enumNode);
+                const enumPath = doc.uri.path;
+                return { package: getEnumPackage(enumPath), type: enumNode.name, isNullable: false };
+            }
         }
         return { package: "builtin", type: DefaultTypeNames.String, isNullable: false };
     }

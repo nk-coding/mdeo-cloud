@@ -1,6 +1,7 @@
 package com.mdeo.script.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.CoercionUtil
@@ -270,7 +271,7 @@ object ArithmeticOperationHelper {
      * @param targetTypeName The numeric type name to convert to
      */
     private fun compileOperandWithConversion(
-        operand: com.mdeo.expression.ast.expressions.TypedExpression,
+        operand: TypedExpression,
         context: CompilationContext,
         mv: MethodVisitor,
         operandType: ReturnType,

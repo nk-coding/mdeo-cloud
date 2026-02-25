@@ -1,6 +1,7 @@
 package com.mdeo.script.compiler.registry.type
 
 import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.script.stdlib.registrar.types.StdlibRegistrar
 
 /**
  * Registry for type definitions used during compilation.
@@ -34,7 +35,7 @@ class TypeRegistry(private val parent: TypeRegistry? = null) {
          */
         private fun createStdlibRegistry(): TypeRegistry {
             val registry = TypeRegistry()
-            com.mdeo.script.stdlib.registrar.types.StdlibRegistrar.registerAll(registry)
+            StdlibRegistrar.registerAll(registry)
             return registry
         }
     }

@@ -26,6 +26,11 @@ class ScriptClassLoader(
      * Cache of loaded interface classes by interface name.
      */
     private val loadedInterfaces = mutableMapOf<String, Class<*>>()
+
+    /**
+     * Cache of loaded model classes by class name.
+     */
+    private val loadedModelClasses = mutableMapOf<String, Class<*>>()
     
     /**
      * Loads the class for a given file URI.
@@ -51,13 +56,23 @@ class ScriptClassLoader(
     override fun findClass(name: String): Class<*> {
         val internalName = name.replace(".", "/")
         
+        // Check generated interfaces (lambdas)
         val interfaceBytecode = program.generatedInterfaces[internalName]
         if (interfaceBytecode != null) {
             return loadedInterfaces.getOrPut(internalName) {
                 defineClass(name, interfaceBytecode, 0, interfaceBytecode.size)
             }
         }
+
+        // Check generated model classes (ModelInstance subclasses, enums)
+        val modelClassBytecode = program.generatedModelClasses[internalName]
+        if (modelClassBytecode != null) {
+            return loadedModelClasses.getOrPut(internalName) {
+                defineClass(name, modelClassBytecode, 0, modelClassBytecode.size)
+            }
+        }
         
+        // Check compiled script classes
         val compiledClass = program.classes.values.find { it.className == internalName }
             ?: throw ClassNotFoundException(name)
         

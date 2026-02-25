@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.LambdaType
 import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LambdaInterfaceRegistry
 import com.mdeo.script.compiler.util.CoercionUtil
@@ -144,7 +145,7 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
      */
     private fun buildErasedMethodDescriptor(lambdaType: LambdaType): String {
         val params = lambdaType.parameters.joinToString("") { "Ljava/lang/Object;" }
-        val returnDesc = if (lambdaType.returnType is com.mdeo.expression.ast.types.VoidType) {
+        val returnDesc = if (lambdaType.returnType is VoidType) {
             "V"
         } else {
             "Ljava/lang/Object;"

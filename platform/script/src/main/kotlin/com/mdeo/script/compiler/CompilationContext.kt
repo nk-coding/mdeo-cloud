@@ -73,6 +73,7 @@ class CompilationContext(
     private val lambdaInterfaceRegistry: LambdaInterfaceRegistry = LambdaInterfaceRegistry(),
     val globalFunctionRegistry: GlobalFunctionRegistry = GlobalFunctionRegistry.GLOBAL,
     val globalPropertyRegistry: GlobalPropertyRegistry = GlobalPropertyRegistry.GLOBAL,
+    val fileScopePropertyRegistry: GlobalPropertyRegistry = GlobalPropertyRegistry(),
     val functionRegistry: FunctionRegistry = globalFunctionRegistry,
     val typeRegistry: TypeRegistry = TypeRegistry.GLOBAL
 ) {
@@ -274,6 +275,7 @@ class CompilationContext(
             lambdaInterfaceRegistry = lambdaInterfaceRegistry,
             globalFunctionRegistry = globalFunctionRegistry,
             globalPropertyRegistry = globalPropertyRegistry,
+            fileScopePropertyRegistry = fileScopePropertyRegistry,
             functionRegistry = functionRegistry,
             typeRegistry = typeRegistry
         )

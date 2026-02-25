@@ -4,7 +4,7 @@ import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -13,7 +13,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedIdentifierExpression] nodes.
  *
- * Compiles identifier expressions into [GremlinCompilationResult] containing GraphTraversals
+ * Compiles identifier expressions into [CompilationResult] containing GraphTraversals
  * that reference variables bound in the match context or from variable scopes.
  *
  * ## Scope Resolution
@@ -64,14 +64,14 @@ class IdentifierCompiler : ExpressionCompiler {
      * @param expression The identifier expression to compile
      * @param context The compilation context containing variable scope information
      * @param initialTraversal Optional initial traversal to build upon
-     * @return A [GremlinCompilationResult] containing the compiled identifier traversal
+     * @return A [CompilationResult] containing the compiled identifier traversal
      * @throws CompilationException if the variable cannot be resolved in the scope
      */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val identifierExpression = expression as TypedIdentifierExpression
         val binding = resolveVariable(identifierExpression, context)
         return compileBinding(binding, identifierExpression.name, context, initialTraversal)
@@ -120,7 +120,7 @@ class IdentifierCompiler : ExpressionCompiler {
      * @param name The name of the variable (used for step labels)
      * @param context The compilation context
      * @param initialTraversal Optional initial traversal to build upon
-     * @return A [GremlinCompilationResult] representing the variable reference
+     * @return A [CompilationResult] representing the variable reference
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileBinding(
@@ -128,10 +128,10 @@ class IdentifierCompiler : ExpressionCompiler {
         name: String,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         return when (binding) {
             is VariableBinding.ValueBinding -> {
-                GremlinCompilationResult.constant(binding.value, initialTraversal)
+                CompilationResult.constant(binding.value, initialTraversal)
             }
             is VariableBinding.InstanceBinding -> {
                 compileInstanceBinding(binding, name, context, initialTraversal)
@@ -164,7 +164,7 @@ class IdentifierCompiler : ExpressionCompiler {
      * @param name The variable name used to derive the step label
      * @param context The compilation context
      * @param initialTraversal Optional initial traversal to build upon
-     * @return A [GremlinCompilationResult] with select() traversal for the instance
+     * @return A [CompilationResult] with select() traversal for the instance
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileInstanceBinding(
@@ -172,14 +172,14 @@ class IdentifierCompiler : ExpressionCompiler {
         name: String,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val stepLabel = VariableBinding.stepLabel(name)
         val traversal =  if (initialTraversal != null) {
             initialTraversal.select<Any>(stepLabel) as GraphTraversal<Any, Any>
         } else {
             AnonymousTraversal.select<Any, Any>(stepLabel)
         }
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
     
     /**
@@ -191,19 +191,19 @@ class IdentifierCompiler : ExpressionCompiler {
      * @param binding The LabelBinding containing the step label
      * @param context The compilation context
      * @param initialTraversal Optional initial traversal to append to
-     * @return A [GremlinCompilationResult] containing the select() traversal
+     * @return A [CompilationResult] containing the select() traversal
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileLabelBinding(
         binding: VariableBinding.LabelBinding,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val traversal = if (initialTraversal != null) {
             initialTraversal.select<Any>(binding.label) as GraphTraversal<Any, Any>
         } else {
             AnonymousTraversal.select<Any, Any>(binding.label)
         }
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 }

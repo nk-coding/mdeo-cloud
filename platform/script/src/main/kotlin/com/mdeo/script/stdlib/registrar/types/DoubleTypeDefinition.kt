@@ -11,7 +11,7 @@ private const val DOUBLE_HELPER = "com/mdeo/script/stdlib/impl/primitives/Double
  */
 fun createDoubleType(): TypeDefinition {
     return typeDefinition("builtin", "double") {
-        extends("builtin", "any")
+        extends("builtin", "Any")
         primitiveDesc("D")
         wrapperClass("java/lang/Double")
 

@@ -15,6 +15,12 @@ export interface TypedAst {
     types: ReturnType[];
 
     /**
+     * Optional absolute path of the metamodel file referenced by this script.
+     * Undefined if the script has no metamodel import.
+     */
+    metamodelPath?: string;
+
+    /**
      * All imports in the program.
      */
     imports: TypedImport[];

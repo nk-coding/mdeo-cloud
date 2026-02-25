@@ -3,14 +3,14 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedStringLiteralExpression] nodes.
  *
- * Compiles string literal expressions into a [GremlinCompilationResult] containing
+ * Compiles string literal expressions into a [CompilationResult] containing
  * a GraphTraversal that produces the constant string value using `__.constant()`.
  *
  * ## Example
@@ -40,15 +40,15 @@ class StringLiteralCompiler : ExpressionCompiler {
      * @param expression The string literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [GremlinCompilationResult] producing the string value
+     * @return A [CompilationResult] producing the string value
      */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val stringExpression = expression as TypedStringLiteralExpression
         val stringValue = stringExpression.value
-        return GremlinCompilationResult.constant(stringValue, initialTraversal)
+        return CompilationResult.constant(stringValue, initialTraversal)
     }
 }

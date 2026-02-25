@@ -17,7 +17,7 @@ fun main() {
         val voidTypeIndex = voidType()
         
         // Create consumer lambda type: (any?) -> void
-        val consumerLambdaType = addType(consumer(ClassTypeRef("builtin", "any", true)))
+        val consumerLambdaType = addType(consumer(ClassTypeRef("builtin", "Any", true)))
         
         function(
             name = "testFunction",

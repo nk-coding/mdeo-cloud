@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":execution-common"))
     implementation(project(":expression"))
     implementation(project(":script"))
+    implementation(project(":model-transformation"))
     
     // Ktor Server
     implementation(libs.ktor.server.core)

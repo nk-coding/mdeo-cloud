@@ -1,7 +1,7 @@
 package com.mdeo.modeltransformation.compiler.registry
 
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.VertexProperty
 
@@ -73,9 +73,9 @@ class SimpleGremlinTypeDefinition(
  * Example usage:
  * ```kotlin
  * val stringType = GremlinTypeDefinitionBuilder("builtin", "string")
- *     .extends("builtin", "any")
+ *     .extends("builtin", "Any")
  *     .property("length") { receiver ->
- *         GremlinCompilationResult.ValueResult((receiver as? String)?.length ?: 0)
+ *         CompilationResult.ValueResult((receiver as? String)?.length ?: 0)
  *     }
  *     .build()
  * ```
@@ -107,7 +107,7 @@ class GremlinTypeDefinitionBuilder(
      * Adds a parent type that this type extends using package and name.
      *
      * @param pkg The package part of the parent type (e.g., "builtin").
-     * @param name The simple name of the parent type (e.g., "any").
+     * @param name The simple name of the parent type (e.g., "Any").
      * @param isNullable Whether the parent type reference is nullable.
      * @return This builder, for method chaining.
      */
@@ -136,7 +136,7 @@ class GremlinTypeDefinitionBuilder(
      */
     fun property(
         name: String,
-        compiler: (GraphTraversal<*, *>) -> GremlinCompilationResult
+        compiler: (GraphTraversal<*, *>) -> CompilationResult
     ): GremlinTypeDefinitionBuilder {
         properties[name] = SimpleGremlinPropertyDefinition(name, compiler)
         return this
@@ -168,7 +168,7 @@ class GremlinTypeDefinitionBuilder(
     fun graphProperty(name: String): GremlinTypeDefinitionBuilder {
         properties[name] = SimpleGremlinPropertyDefinition(name) { receiver ->
             val traversal = (receiver as GraphTraversal<Any, Any>).values<Any>(name)
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         return this
     }
@@ -235,7 +235,7 @@ class GremlinTypeDefinitionBuilder(
         name: String,
         overloadKey: String = "",
         parameterCount: Int = 0,
-        compiler: (GraphTraversal<*, *>, List<GremlinCompilationResult>) -> GremlinCompilationResult
+        compiler: (GraphTraversal<*, *>, List<CompilationResult>) -> CompilationResult
     ): GremlinTypeDefinitionBuilder {
         val methodDef = SimpleGremlinMethodDefinition(name, overloadKey, parameterCount, compiler)
         methods.getOrPut(name) { mutableListOf() }.add(methodDef)
@@ -280,7 +280,7 @@ class GremlinTypeDefinitionBuilder(
  */
 class SimpleGremlinPropertyDefinition(
     override val name: String,
-    private val compiler: (GraphTraversal<*, *>) -> GremlinCompilationResult
+    private val compiler: (GraphTraversal<*, *>) -> CompilationResult
 ) : GremlinPropertyDefinition {
 
     /**
@@ -291,7 +291,7 @@ class SimpleGremlinPropertyDefinition(
      * @param receiver The receiver traversal (the object the property is accessed on)
      * @return The compilation result containing the property value as a traversal
      */
-    override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
+    override fun compile(receiver: GraphTraversal<*, *>): CompilationResult {
         return compiler(receiver)
     }
 }
@@ -326,7 +326,7 @@ class AssociationGremlinPropertyDefinition(
      * @return The compilation result containing the edge traversal
      */
     @Suppress("UNCHECKED_CAST")
-    override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
+    override fun compile(receiver: GraphTraversal<*, *>): CompilationResult {
         val typed = receiver as GraphTraversal<Any, Any>
         
         val traversal: GraphTraversal<Any, out Any> = if (isOutgoing) {
@@ -335,7 +335,7 @@ class AssociationGremlinPropertyDefinition(
             typed.`in`(edgeLabel)
         }
         
-        return GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        return CompilationResult.of(traversal as GraphTraversal<Any, Any>)
     }
 }
 
@@ -362,8 +362,8 @@ class EnumEntryPropertyDefinition(
      * @param receiver The receiver traversal (ignored for enum entries)
      * @return The compilation result containing the constant enum value string
      */
-    override fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult {
-        return GremlinCompilationResult.constant<Any, String>(value, null)
+    override fun compile(receiver: GraphTraversal<*, *>): CompilationResult {
+        return CompilationResult.constant<Any, String>(value, null)
     }
 }
 
@@ -379,7 +379,7 @@ class SimpleGremlinMethodDefinition(
     override val name: String,
     override val overloadKey: String,
     override val parameterCount: Int,
-    private val compiler: (GraphTraversal<*, *>, List<GremlinCompilationResult>) -> GremlinCompilationResult
+    private val compiler: (GraphTraversal<*, *>, List<CompilationResult>) -> CompilationResult
 ) : GremlinMethodDefinition {
 
     /**
@@ -393,8 +393,8 @@ class SimpleGremlinMethodDefinition(
      */
     override fun compile(
         receiver: GraphTraversal<*, *>,
-        arguments: List<GremlinCompilationResult>
-    ): GremlinCompilationResult {
+        arguments: List<CompilationResult>
+    ): CompilationResult {
         return compiler(receiver, arguments)
     }
 }

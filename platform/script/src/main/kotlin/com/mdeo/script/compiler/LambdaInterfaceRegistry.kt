@@ -40,7 +40,7 @@ class LambdaInterfaceRegistry {
      */
     private fun initializePredefinedInterfaces() {
         val basePackage = "com/mdeo/script/runtime"
-        val nullableAny = ClassTypeRef("builtin", "any", isNullable = true)
+        val nullableAny = ClassTypeRef("builtin", "Any", isNullable = true)
         val voidType = VoidType()
         
         registerPredefined(
@@ -115,7 +115,7 @@ class LambdaInterfaceRegistry {
      * @return A normalized lambda type suitable for use as a map key.
      */
     fun createKey(lambdaType: LambdaType): LambdaType {
-        val nullableAny = ClassTypeRef("builtin", "any", isNullable = true)
+        val nullableAny = ClassTypeRef("builtin", "Any", isNullable = true)
         
         return LambdaType(
             returnType = normalizeType(lambdaType.returnType, nullableAny),

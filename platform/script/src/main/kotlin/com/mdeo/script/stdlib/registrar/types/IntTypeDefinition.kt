@@ -11,7 +11,7 @@ private const val INT_HELPER = "com/mdeo/script/stdlib/impl/primitives/IntHelper
  */
 fun createIntType(): TypeDefinition {
     return typeDefinition("builtin", "int") {
-        extends("builtin", "any")
+        extends("builtin", "Any")
         primitiveDesc("I")
         wrapperClass("java/lang/Integer")
 

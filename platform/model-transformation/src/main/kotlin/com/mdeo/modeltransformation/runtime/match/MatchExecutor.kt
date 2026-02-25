@@ -10,7 +10,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternPropertyAssignment
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.compiler.expressions.EqualityCompilerUtil
@@ -356,7 +356,7 @@ class MatchExecutor {
 
         for (property in simpleProperties) {
             val compilationResult = compilePropertyExpression(property.value, context, engine, matchedInstanceNames)!!
-            if (compilationResult is GremlinCompilationResult.ValueResult) {
+            if (compilationResult is CompilationResult.ValueResult) {
                 val value = compilationResult.value
                 if (value != null) {
                     result = result.property(property.propertyName, value) 
@@ -527,7 +527,7 @@ class MatchExecutor {
      * @param traversal The main traversal to extend
      * @param instanceName The name of the instance to set the property on
      * @param propertyName The name of the property to set
-     * @param listResult The GremlinCompilationResult that emits list element values
+     * @param listResult The CompilationResult that emits list element values
      * @param engine The transformation engine with the traversal source
      * @param compilationContext The compilation context for unique ID generation
      * @return The extended traversal with sideEffect steps for list property management
@@ -537,7 +537,7 @@ class MatchExecutor {
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         instanceName: String,
         propertyName: String,
-        listResult: GremlinCompilationResult,
+        listResult: CompilationResult,
         engine: TransformationEngine,
         compilationContext: CompilationContext
     ): GraphTraversal<Vertex, Map<String, Any>> {
@@ -736,7 +736,7 @@ class MatchExecutor {
             clauses.add(buildEdgeMatchClause(link))
         }
         
-        val compiledVariablesMap = mutableMapOf<String, GremlinCompilationResult>()
+        val compiledVariablesMap = mutableMapOf<String, CompilationResult>()
         for (variableElement in variables) {
             val variableName = variableElement.variable.name
             val variableLabel = VariableBinding.variableLabel(variableName)
@@ -773,7 +773,7 @@ class MatchExecutor {
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         compilationContext: CompilationContext
-    ): Pair<GraphTraversal<Any, Any>, GremlinCompilationResult> {
+    ): Pair<GraphTraversal<Any, Any>, CompilationResult> {
         val anchorTraversal = AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
         
         val compilationResult = engine.expressionCompilerRegistry.compile(
@@ -835,7 +835,7 @@ class MatchExecutor {
                     throw IllegalStateException("Failed to compile property expression for ${property.propertyName}")
                 }
                 
-                if (compilationResult is GremlinCompilationResult.ValueResult) {
+                if (compilationResult is CompilationResult.ValueResult) {
                     clause = clause.has(property.propertyName, compilationResult.value) as GraphTraversal<Any, Any>
                 }
             }
@@ -1074,12 +1074,12 @@ class MatchExecutor {
                 if (property.operator == "==") {
                     val compilationResult = compilePropertyExpression(property.value, context, engine, emptyList())
                     
-                    if (className == null && compilationResult is GremlinCompilationResult.ValueResult) {
+                    if (className == null && compilationResult is CompilationResult.ValueResult) {
                         result = result.where(
                             AnonymousTraversal.select<Any, Any>(instanceLabel)
                                 .has(property.propertyName, compilationResult.value)
                         ) as GraphTraversal<Vertex, Map<String, Any>>
-                    } else if (compilationResult != null && compilationResult !is GremlinCompilationResult.ValueResult) {
+                    } else if (compilationResult != null && compilationResult !is CompilationResult.ValueResult) {
                         val propertyTraversal = AnonymousTraversal.select<Any, Any>(instanceLabel)
                             .values<Any>(property.propertyName) as GraphTraversal<Any, Any>
                         
@@ -1399,7 +1399,7 @@ class MatchExecutor {
         val result = compilePropertyExpression(expression, context, engine, matchedInstanceNames)
         if (result == null) return null
         
-        if (result is GremlinCompilationResult.ValueResult) {
+        if (result is CompilationResult.ValueResult) {
             return result.value
         }
         
@@ -1415,7 +1415,7 @@ class MatchExecutor {
     /**
      * Compiles a property value expression and returns the full compilation result.
      * 
-     * This variant returns the GremlinCompilationResult, allowing the caller to
+     * This variant returns the CompilationResult, allowing the caller to
      * distinguish between constant and non-constant (traversal) results.
      * 
      * @param expression The expression to compile
@@ -1429,7 +1429,7 @@ class MatchExecutor {
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         matchedInstanceNames: List<String>
-    ): GremlinCompilationResult? {
+    ): CompilationResult? {
         if (!engine.expressionCompilerRegistry.canCompile(expression)) {
             throw IllegalStateException(
                 "Expression compiler not found for expression of type '${expression::class.simpleName}'. " +

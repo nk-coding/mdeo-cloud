@@ -122,7 +122,7 @@ class MemberAccessCompiler : ExpressionCompiler() {
         mv: MethodVisitor
     ) {
         val lookupTypeRef = if (targetType is LambdaType) {
-            ClassTypeRef("builtin", "any", false)
+            ClassTypeRef("builtin", "Any", false)
         } else if (targetType is ClassTypeRef) {
             targetType
         } else {

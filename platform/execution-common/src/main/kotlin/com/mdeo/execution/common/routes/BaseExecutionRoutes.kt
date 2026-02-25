@@ -14,6 +14,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.*
 
@@ -64,7 +65,7 @@ fun Route.executionRoutesWithFileTree(
 }
 
 private fun Route.cancelExecutionRoute(
-    logger: org.slf4j.Logger,
+    logger: Logger,
     executionService: ExecutionService
 ) {
     post("{id}/cancel") {
@@ -98,7 +99,7 @@ private fun Route.cancelExecutionRoute(
 }
 
 private fun Route.deleteExecutionRoute(
-    logger: org.slf4j.Logger,
+    logger: Logger,
     executionService: ExecutionService
 ) {
     delete("{id}") {
@@ -132,7 +133,7 @@ private fun Route.deleteExecutionRoute(
 }
 
 private fun Route.getSummaryRoute(
-    logger: org.slf4j.Logger,
+    logger: Logger,
     executionService: ExecutionService
 ) {
     get("{id}/summary") {
@@ -170,7 +171,7 @@ private fun Route.getSummaryRoute(
 }
 
 private fun Route.getFileTreeRoute(
-    logger: org.slf4j.Logger,
+    logger: Logger,
     executionService: ExecutionServiceWithFileTree
 ) {
     get("{id}/file-tree") {
@@ -210,7 +211,7 @@ private fun Route.getFileTreeRoute(
 }
 
 private fun Route.getFileContentsRoute(
-    logger: org.slf4j.Logger,
+    logger: Logger,
     executionService: ExecutionServiceWithFileTree
 ) {
     get("{id}/files/{path...}") {

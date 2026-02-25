@@ -1,5 +1,7 @@
 package com.mdeo.script.compiler.registry.function
 
+import com.mdeo.script.stdlib.registrar.global.GlobalFunctionRegistrar
+
 /**
  * Registry for global scope functions.
  *
@@ -32,7 +34,7 @@ class GlobalFunctionRegistry : FunctionRegistry {
          */
         private fun createStdlibRegistry(): GlobalFunctionRegistry {
             val registry = GlobalFunctionRegistry()
-            com.mdeo.script.stdlib.registrar.global.GlobalFunctionRegistrar.registerAll(registry)
+            GlobalFunctionRegistrar.registerAll(registry)
             return registry
         }
     }

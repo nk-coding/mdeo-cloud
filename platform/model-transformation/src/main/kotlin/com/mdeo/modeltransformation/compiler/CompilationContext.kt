@@ -2,7 +2,7 @@ package com.mdeo.modeltransformation.compiler
 
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.expression.ast.types.ReturnType
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
@@ -37,7 +37,7 @@ class CompilationContext(
     val types: List<ReturnType>,
     val currentScope: VariableScope,
     val traversalSource: GraphTraversalSource?,
-    val typeRegistry: GremlinTypeRegistry
+    val typeRegistry: TypeRegistry
 ) {
     /**
      * Counter for generating unique variable names

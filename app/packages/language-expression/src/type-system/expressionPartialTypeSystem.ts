@@ -181,7 +181,9 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
         this.registerValidationRule(this.types.memberCallExpressionType, (node, accept) => {
             const methodType = inferMethodAccess(node, node.expression, node.member, this.typir);
             if (isCustomFunctionType(methodType)) {
-                validateMethodAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept);
+                validateMethodAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(
+                    accept
+                );
                 validateCall(
                     node,
                     methodType,
@@ -192,7 +194,9 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
             } else {
                 const propertyType = inferPropertyAccess(node, node.expression, node.member, this.typir);
                 if (isCustomLambdaType(propertyType)) {
-                    validatePropertyAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept);
+                    validatePropertyAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(
+                        accept
+                    );
                     validateCall(
                         node,
                         propertyType,
@@ -201,7 +205,9 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                         this.typir
                     ).forEach(accept);
                 } else {
-                    validateMethodAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(accept);
+                    validateMethodAccess(node, node.expression, node.member, node.isNullChaining, this.typir).forEach(
+                        accept
+                    );
                 }
             }
         });
@@ -225,13 +231,7 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
                     subProblems: []
                 };
             }
-            return inferCall(
-                node,
-                functionType,
-                node.genericArgs?.typeArguments ?? [],
-                node.arguments,
-                this.typir
-            );
+            return inferCall(node, functionType, node.genericArgs?.typeArguments ?? [], node.arguments, this.typir);
         });
 
         this.registerValidationRule(this.types.callExpressionType, (node, accept) => {
@@ -239,13 +239,9 @@ export class ExpressionPartialTypeSystem<Specifics extends TypirLangiumSpecifics
             if (!isCustomFunctionType(functionType) && !isCustomLambdaType(functionType)) {
                 return;
             }
-            validateCall(
-                node,
-                functionType,
-                node.genericArgs?.typeArguments ?? [],
-                node.arguments,
-                this.typir
-            ).forEach(accept);
+            validateCall(node, functionType, node.genericArgs?.typeArguments ?? [], node.arguments, this.typir).forEach(
+                accept
+            );
         });
     }
 

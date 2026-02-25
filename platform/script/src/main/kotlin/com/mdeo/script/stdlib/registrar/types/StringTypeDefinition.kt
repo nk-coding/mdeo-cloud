@@ -11,7 +11,7 @@ private const val STRING_HELPER = "com/mdeo/script/stdlib/impl/primitives/String
  */
 fun createStringType(): TypeDefinition {
     return typeDefinition("builtin", "string") {
-        extends("builtin", "any")
+        extends("builtin", "Any")
         jvmClass("java/lang/String")
 
         staticMethod("characterAt") {

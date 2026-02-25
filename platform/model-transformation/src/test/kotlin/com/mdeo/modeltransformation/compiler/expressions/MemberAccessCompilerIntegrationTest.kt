@@ -7,7 +7,7 @@ import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.T
@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Tests for MemberAccessCompiler with GremlinTypeRegistry integration.
+ * Tests for MemberAccessCompiler with TypeRegistry integration.
  *
  * Tests the compilation of member access expressions using the type registry
  * to resolve properties and associations:
@@ -65,9 +65,9 @@ class MemberAccessCompilerIntegrationTest {
     /**
      * Creates a type registry with test metamodel types.
      */
-    private fun createTestTypeRegistry(): GremlinTypeRegistry {
-        val parent = GremlinTypeRegistry.GLOBAL
-        val registry = GremlinTypeRegistry(parent)
+    private fun createTestTypeRegistry(): TypeRegistry {
+        val parent = TypeRegistry.GLOBAL
+        val registry = TypeRegistry(parent)
         
         // Define Person type with properties and associations
         val personType = gremlinType("class", "Person")

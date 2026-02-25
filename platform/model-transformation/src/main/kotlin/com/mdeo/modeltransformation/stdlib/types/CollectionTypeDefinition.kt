@@ -1,6 +1,6 @@
 package com.mdeo.modeltransformation.stdlib.types
 
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
@@ -47,31 +47,31 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
 @Suppress("UNCHECKED_CAST")
 fun createCollectionType(): GremlinTypeDefinition {
     return gremlinType("builtin", "Collection")
-        .extends("builtin", "any")
+        .extends("builtin", "Any")
         .cardinality(VertexProperty.Cardinality.list)
         .method("size", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().count()
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("isEmpty", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().count().`is`(0L)
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("notEmpty", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().count().`is`(P.gt(0L))
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("sum", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().sum<Number>()
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("first", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().limit(1)
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("last", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).unfold<Any>().tail(1)
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("filter") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -86,7 +86,7 @@ fun createCollectionType(): GremlinTypeDefinition {
             }
             val predResult = registry.compile(lambda.body, lambdaContext, null)
             val filtered = unfoldedWithLabel.filter((predResult.traversal as GraphTraversal<Any, Any>).`is`(true))
-            GremlinCompilationResult.of(filtered as GraphTraversal<Any, Any>)
+            CompilationResult.of(filtered as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("map") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -101,7 +101,7 @@ fun createCollectionType(): GremlinTypeDefinition {
             }
             val mapResult = registry.compile(lambda.body, lambdaContext, null)
             val mapped = unfoldedWithLabel.map(mapResult.traversal)
-            GremlinCompilationResult.of(mapped as GraphTraversal<Any, Any>)
+            CompilationResult.of(mapped as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("exists") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -121,7 +121,7 @@ fun createCollectionType(): GremlinTypeDefinition {
                 AnonymousTraversal.constant<Any>(true),
                 AnonymousTraversal.constant<Any>(false)
             )
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("all") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -141,7 +141,7 @@ fun createCollectionType(): GremlinTypeDefinition {
                 AnonymousTraversal.constant<Any>(true),
                 AnonymousTraversal.constant<Any>(false)
             )
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("none") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -161,7 +161,7 @@ fun createCollectionType(): GremlinTypeDefinition {
                 AnonymousTraversal.constant<Any>(true),
                 AnonymousTraversal.constant<Any>(false)
             )
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("one") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -181,7 +181,7 @@ fun createCollectionType(): GremlinTypeDefinition {
                 AnonymousTraversal.constant<Any>(true),
                 AnonymousTraversal.constant<Any>(false)
             )
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("find") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -196,7 +196,7 @@ fun createCollectionType(): GremlinTypeDefinition {
             }
             val predResult = registry.compile(lambda.body, lambdaContext, null)
             val filtered = unfoldedWithLabel.filter((predResult.traversal as GraphTraversal<Any, Any>).`is`(true))
-            GremlinCompilationResult.of(filtered.limit(1) as GraphTraversal<Any, Any>)
+            CompilationResult.of(filtered.limit(1) as GraphTraversal<Any, Any>)
         }
         .lambdaMethod("reject") { receiver, lambda, context, registry ->
             val unfolded = (receiver as GraphTraversal<Any, Any>).unfold<Any>()
@@ -211,7 +211,7 @@ fun createCollectionType(): GremlinTypeDefinition {
             }
             val predResult = registry.compile(lambda.body, lambdaContext, null)
             val rejected = unfoldedWithLabel.not((predResult.traversal as GraphTraversal<Any, Any>).`is`(true))
-            GremlinCompilationResult.of(rejected as GraphTraversal<Any, Any>)
+            CompilationResult.of(rejected as GraphTraversal<Any, Any>)
         }
         .build()
 }

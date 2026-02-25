@@ -14,6 +14,10 @@ interface ScriptExecutionData {
      * Name of the method to execute
      */
     methodName: string;
+    /**
+     * Optional absolute path of the model file to run against
+     */
+    modelPath?: string;
 }
 
 /**
@@ -101,7 +105,10 @@ export class ScriptExecutionHandler implements ExecutionHandler<ExecuteResponse>
             executionId,
             project,
             filePath,
-            data: typedData.methodName
+            data: {
+                methodName: typedData.methodName,
+                ...(typedData.modelPath ? { modelPath: typedData.modelPath } : {})
+            }
         };
 
         try {

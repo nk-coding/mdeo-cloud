@@ -516,7 +516,7 @@ class AdditionalStdlibMethodsIntegrationTest {
         fun `any asBoolean converts true string to boolean`() {
             val ast = buildTypedAst {
                 val stringType = stringType()
-                val anyType = addType(ClassTypeRef("builtin", "any", false))
+                val anyType = addType(ClassTypeRef("builtin", "Any", false))
                 val boolType = booleanType()
                 function(
                     name = "testFunction",

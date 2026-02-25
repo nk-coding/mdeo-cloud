@@ -15,7 +15,7 @@ import com.mdeo.expression.ast.types.VoidType
  * Example usage:
  * ```kotlin
  * typeDefinition("builtin", "int") {
- *     extends("builtin", "any")
+ *     extends("builtin", "Any")
  *
  *     // Non-overloaded method: use empty string as overload key
  *     staticMethod("abs") {
@@ -63,7 +63,7 @@ class TypeDefinitionBuilder(private val typePackage: String, private val typeNam
      * Specifies that this type extends another type using package and name.
      *
      * @param pkg The package part of the parent type (e.g., "builtin", "class/path/to/file").
-     * @param name The simple name of the parent type (e.g., "any", "House").
+     * @param name The simple name of the parent type (e.g., "Any", "House").
      * @param isNullable Whether the parent type reference is nullable.
      */
     fun extends(pkg: String, name: String, isNullable: Boolean = false) {

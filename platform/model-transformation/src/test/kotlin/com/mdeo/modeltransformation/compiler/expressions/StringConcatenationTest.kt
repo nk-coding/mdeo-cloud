@@ -5,8 +5,8 @@ import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.VariableScope
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.T
@@ -49,7 +49,7 @@ class StringConcatenationTest {
             types = types,
             currentScope = VariableScope.empty(),
             traversalSource = g,
-            typeRegistry = GremlinTypeRegistry.GLOBAL
+            typeRegistry = TypeRegistry.GLOBAL
         )
     }
 
@@ -63,7 +63,7 @@ class StringConcatenationTest {
      * This is needed for anonymous traversals.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun <T> executeTraversal(result: GremlinCompilationResult): T? {
+    private fun <T> executeTraversal(result: CompilationResult): T? {
         val traversal = result.traversal as GraphTraversal<Any, T>
         return g.inject(null as Any?).flatMap(traversal).next()
     }

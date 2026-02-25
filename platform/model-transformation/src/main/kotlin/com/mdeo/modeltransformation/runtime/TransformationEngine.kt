@@ -8,7 +8,7 @@ import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
@@ -56,7 +56,7 @@ class TransformationEngine(
      * - "enum/path/to/metamodel.EnumName" for enum value types
      * - "enum-container/path/to/metamodel.EnumName" for enum container types
      */
-    val typeRegistry: GremlinTypeRegistry
+    val typeRegistry: TypeRegistry
 
     /**
      * The class package prefix derived from the metamodel path.
@@ -190,8 +190,8 @@ class TransformationEngine(
      *
      * @param metamodelData The metamodel data containing class, enum, and association definitions.
      */
-    private fun createTypeRegistry(metamodelData: MetamodelData): GremlinTypeRegistry {
-        val dynamicRegistry = GremlinTypeRegistry(parent = GremlinTypeRegistry.GLOBAL)
+    private fun createTypeRegistry(metamodelData: MetamodelData): TypeRegistry {
+        val dynamicRegistry = TypeRegistry(parent = TypeRegistry.GLOBAL)
 
         registerEnumTypes(dynamicRegistry, metamodelData)
 
@@ -245,7 +245,7 @@ class TransformationEngine(
      * @param registry The registry to add enum types to.
      * @param metamodelData The metamodel data containing enum definitions.
      */
-    private fun registerEnumTypes(registry: GremlinTypeRegistry, metamodelData: MetamodelData) {
+    private fun registerEnumTypes(registry: TypeRegistry, metamodelData: MetamodelData) {
         for (enumData in metamodelData.enums) {
             val enumName = enumData.name
 

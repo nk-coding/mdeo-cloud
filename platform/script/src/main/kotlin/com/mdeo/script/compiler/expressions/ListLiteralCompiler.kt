@@ -3,6 +3,7 @@ package com.mdeo.script.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedListLiteralExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import org.objectweb.asm.MethodVisitor
@@ -74,7 +75,7 @@ class ListLiteralCompiler : ExpressionCompiler() {
      * @param context The compilation context.
      * @return The element type or Any? if not determinable.
      */
-    private fun getElementType(listExpr: TypedListLiteralExpression, context: CompilationContext): com.mdeo.expression.ast.types.ReturnType {
+    private fun getElementType(listExpr: TypedListLiteralExpression, context: CompilationContext): ReturnType {
         val listType = context.getType(listExpr.evalType)
         if (listType is ClassTypeRef && listType.typeArgs?.isNotEmpty() == true) {
             return listType.typeArgs?.values?.first() ?: ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true)

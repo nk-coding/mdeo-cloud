@@ -84,7 +84,7 @@ export const typedAstHandler: FileDataHandler<TypedAst | TypedRootAst | null, Sc
     }
 
     const converter = new ScriptTypedAstConverter(instance.services.typir, reflection);
-    const typedRoot = converter.convertScript(script);
+    const typedRoot = converter.convertScript(script, document);
 
     return {
         data: typedRoot,

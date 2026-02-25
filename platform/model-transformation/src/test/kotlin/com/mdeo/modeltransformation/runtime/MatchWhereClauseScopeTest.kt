@@ -13,7 +13,7 @@ import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
@@ -83,7 +83,7 @@ class MatchWhereClauseScopeTest {
         g = graph.traversal()
 
         // Register metamodel types in the global type registry
-        val typeRegistry = GremlinTypeRegistry.GLOBAL
+        val typeRegistry = TypeRegistry.GLOBAL
 
         val houseType = gremlinType("class", "House")
             .graphProperty("address")

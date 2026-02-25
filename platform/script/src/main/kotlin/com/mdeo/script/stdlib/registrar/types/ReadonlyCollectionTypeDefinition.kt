@@ -14,7 +14,7 @@ private const val READONLY_COLLECTION = "com/mdeo/script/stdlib/impl/collections
  */
 fun createReadonlyCollectionType(): TypeDefinition {
     return typeDefinition("builtin", "ReadonlyCollection") {
-        extends("builtin", "any")
+        extends("builtin", "Any")
 
         instanceMethod("size") {
             overload("", "()I", READONLY_COLLECTION, isInterface = true,

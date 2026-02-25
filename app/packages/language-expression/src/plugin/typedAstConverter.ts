@@ -303,9 +303,11 @@ export abstract class TypedAstConverter {
      * AST node produced by the memberCallPostfixFragment grammar rule.
      *
      * @param expr The member call expression AST node
-     * @returns The TypedMemberCallExpression representation
+     * @returns The TypedMemberCallExpression/TypedExpressionCallExpression representation
      */
-    protected convertMemberCallExpression(expr: MemberCallExpressionType): TypedMemberCallExpression | TypedExpressionCallExpression {
+    protected convertMemberCallExpression(
+        expr: MemberCallExpressionType
+    ): TypedMemberCallExpression | TypedExpressionCallExpression {
         const args = expr.arguments.map((arg) => this.convertExpression(arg));
         const evalType = this.getTypeIndex(expr);
         const methodType = inferMethodAccess(expr, expr.expression, expr.member, this.typir);

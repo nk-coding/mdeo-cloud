@@ -1,6 +1,7 @@
 package com.mdeo.backend.service
 
 import com.auth0.jwt.JWT
+import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
 import com.mdeo.backend.config.JwtConfig
@@ -127,7 +128,7 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
      *
      * @return A configured JWT verifier
      */
-    fun getVerifier(): com.auth0.jwt.JWTVerifier {
+    fun getVerifier(): JWTVerifier {
         return JWT.require(algorithm)
             .withIssuer(jwtConfig.issuer)
             .build()

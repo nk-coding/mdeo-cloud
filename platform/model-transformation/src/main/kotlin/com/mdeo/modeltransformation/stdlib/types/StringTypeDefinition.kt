@@ -17,6 +17,6 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  */
 fun createStringType(): GremlinTypeDefinition {
     return gremlinType("builtin", "string")
-        .extends("builtin", "any")
+        .extends("builtin", "Any")
         .build()
 }

@@ -1,17 +1,30 @@
 package com.mdeo.scriptexecution.service
 
 import com.mdeo.execution.common.service.ExecutionService as CommonExecutionService
+import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.compiler.CompilationInput
 import com.mdeo.script.compiler.ScriptCompiler
+import com.mdeo.script.runtime.ExecutionContext
 import com.mdeo.script.runtime.ExecutionEnvironment
+import com.mdeo.script.runtime.model.ModelDataScriptModel
+import com.mdeo.script.runtime.model.ModelInstance
+import com.mdeo.script.runtime.model.ModelInstanceBacking
+import com.mdeo.script.runtime.model.ModelInstanceFactory
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.scriptexecution.database.ExecutionsTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.eq
@@ -24,6 +37,17 @@ import java.util.*
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
+
+/**
+ * Parsed execution request data.
+ *
+ * @param methodName The method name to execute.
+ * @param modelPath Optional path to the model file.
+ */
+private data class ExecutionRequestData(
+    val methodName: String,
+    val modelPath: String?
+)
 
 /**
  * Merged service for managing and executing scripts.
@@ -51,7 +75,9 @@ class ExecutionService(
      * @param executionId UUID of the execution
      * @param projectId UUID of the project
      * @param filePath Path to the file
-     * @param data JSON data containing execution parameters
+     * @param data JSON data containing execution parameters. Can be:
+     *             - A bare string: method name only (backwards compatible)
+     *             - A JSON object: { "methodName": "...", "modelPath": "..." (optional) }
      * @param jwtToken JWT token to pass through to backend
      * @return Display name for the execution
      */
@@ -62,8 +88,8 @@ class ExecutionService(
         data: JsonElement,
         jwtToken: String
     ): String = withContext(Dispatchers.IO) {
-        val methodName = data.toString().removeSurrounding("\"")
-        validateInputs(filePath, methodName)
+        val requestData = parseExecutionData(data)
+        validateInputs(filePath, requestData.methodName)
 
         val now = Instant.now()
         transaction {
@@ -85,7 +111,7 @@ class ExecutionService(
         withContext(Dispatchers.Default) {
             try {
                 withTimeout(timeoutMs) {
-                    executeScript(executionId, projectId, filePath, methodName, jwtToken)
+                    executeScript(executionId, projectId, filePath, requestData, jwtToken)
                 }
             } catch (e: TimeoutCancellationException) {
                 logger.error("Execution timeout after ${timeoutMs}ms", e)
@@ -114,7 +140,39 @@ class ExecutionService(
             }
         }
 
-        "$filePath:$methodName"
+        "$filePath:${requestData.methodName}"
+    }
+
+    /**
+     * Parses execution request data from JSON.
+     *
+     * Supports two formats:
+     * - Bare string: "methodName" (backwards compatible)
+     * - JSON object: { "methodName": "...", "modelPath": "..." (optional) }
+     *
+     * @param data The JSON element to parse.
+     * @return ExecutionRequestData containing method name and optional model path.
+     */
+    private fun parseExecutionData(data: JsonElement): ExecutionRequestData {
+        return when (data) {
+            is JsonPrimitive -> {
+                // Backwards compatible: bare string is the method name
+                ExecutionRequestData(
+                    methodName = data.content,
+                    modelPath = null
+                )
+            }
+            is JsonObject -> {
+                val methodName = data["methodName"]?.jsonPrimitive?.content
+                    ?: throw IllegalArgumentException("Missing 'methodName' in execution data")
+                val modelPath = data["modelPath"]?.jsonPrimitive?.content
+                ExecutionRequestData(
+                    methodName = methodName,
+                    modelPath = modelPath
+                )
+            }
+            else -> throw IllegalArgumentException("Invalid execution data format: expected string or object")
+        }
     }
 
     /**
@@ -145,16 +203,18 @@ class ExecutionService(
      * @param executionId UUID of the execution
      * @param projectId UUID of the project
      * @param filePath Path to the file
-     * @param methodName Name of the method to execute
+     * @param requestData Execution request containing method name and optional model path
      * @param jwtToken JWT token to pass through to backend
      */
     private suspend fun executeScript(
         executionId: UUID,
         projectId: UUID,
         filePath: String,
-        methodName: String,
+        requestData: ExecutionRequestData,
         jwtToken: String
     ) {
+        val methodName = requestData.methodName
+        
         updateExecutionState(executionId, ExecutionState.INITIALIZING, "Fetching AST and dependencies...", jwtToken)
 
         val typedAsts = dependencyResolver.resolveWithDependencies(
@@ -205,6 +265,40 @@ class ExecutionService(
             return
         }
 
+        // Determine if model support is needed
+        val metamodelPath = mainTypedAst.metamodelPath
+        val modelPath = requestData.modelPath
+        
+        // Fetch metamodel and model data if needed
+        var metamodelData: MetamodelData? = null
+        var modelData: ModelData? = null
+        
+        if (metamodelPath != null && modelPath != null) {
+            updateExecutionState(executionId, ExecutionState.INITIALIZING, "Fetching metamodel and model data...", jwtToken)
+            
+            metamodelData = backendApiService.getMetamodelData(projectId.toString(), metamodelPath, jwtToken)
+            if (metamodelData == null) {
+                updateExecutionState(
+                    executionId,
+                    ExecutionState.FAILED,
+                    "Failed to fetch metamodel data from '$metamodelPath'",
+                    jwtToken
+                )
+                return
+            }
+            
+            modelData = backendApiService.getModelData(projectId.toString(), modelPath, jwtToken)
+            if (modelData == null) {
+                updateExecutionState(
+                    executionId,
+                    ExecutionState.FAILED,
+                    "Failed to fetch model data from '$modelPath'",
+                    jwtToken
+                )
+                return
+            }
+        }
+
         updateExecutionState(
             executionId,
             ExecutionState.INITIALIZING,
@@ -214,7 +308,7 @@ class ExecutionService(
 
         val compiledProgram = try {
             val input = CompilationInput(typedAsts)
-            compiler.compile(input)
+            compiler.compile(input, metamodelData, metamodelPath)
         } catch (e: Exception) {
             logger.error("Compilation failed", e)
             
@@ -242,7 +336,20 @@ class ExecutionService(
 
         try {
             val env = ExecutionEnvironment(compiledProgram, printStream)
-            val result = env.invoke(filePath, methodName)
+            
+            val result = if (metamodelData != null && modelData != null && metamodelPath != null) {
+                // Execute with model context — use env.classLoader so model instances and
+                // script classes share the same loader (avoids ClassCastException).
+                val factory = ReflectiveModelInstanceFactory(env.classLoader, metamodelPath)
+                val scriptModel = ModelDataScriptModel(modelData, metamodelData, factory)
+                
+                ExecutionContext.withModel(scriptModel) {
+                    env.invoke(filePath, methodName)
+                }
+            } else {
+                // Execute without model
+                env.invoke(filePath, methodName)
+            }
 
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
             val resultString = result?.toString() ?: "null"
@@ -432,5 +539,38 @@ class ExecutionService(
                 "Execution is in state: $state"
             }
         }
+    }
+}
+
+/**
+ * ModelInstanceFactory implementation that uses reflection to instantiate
+ * generated model classes from a CompiledProgram.
+ *
+ * @param classLoader The ScriptClassLoader shared with the ExecutionEnvironment.
+ * @param metamodelPath The metamodel path used for class naming.
+ */
+private class ReflectiveModelInstanceFactory(
+    private val classLoader: com.mdeo.script.runtime.ScriptClassLoader,
+    private val metamodelPath: String
+) : ModelInstanceFactory {
+
+    override fun createInstance(className: String, backing: ModelInstanceBacking): ModelInstance {
+        val internalName = com.mdeo.script.compiler.model.ScriptClassBytecodeGenerator
+            .getInstanceClassName(className, metamodelPath)
+        val jvmClassName = internalName.replace("/", ".")
+        
+        val clazz = classLoader.loadClass(jvmClassName)
+        val constructor = clazz.getConstructor(ModelInstanceBacking::class.java)
+        return constructor.newInstance(backing) as ModelInstance
+    }
+
+    override fun createEnumValue(enumName: String, entryName: String): Any {
+        val internalName = com.mdeo.script.compiler.model.ScriptEnumBytecodeGenerator
+            .getEnumContainerClassName(enumName, metamodelPath)
+        val jvmClassName = internalName.replace("/", ".")
+        
+        val clazz = classLoader.loadClass(jvmClassName)
+        val field = clazz.getField(entryName)
+        return field.get(null) ?: error("Enum entry $enumName.$entryName not found")
     }
 }

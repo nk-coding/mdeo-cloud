@@ -441,7 +441,7 @@ class BagAndOrderedSetIntegrationTest {
             val ast = buildTypedAst {
                 val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "Any", true))
 
                 function(
                     name = "testFunction",
@@ -483,7 +483,7 @@ class BagAndOrderedSetIntegrationTest {
             val ast = buildTypedAst {
                 val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "Any", true))
 
                 function(
                     name = "testFunction",
@@ -523,7 +523,7 @@ class BagAndOrderedSetIntegrationTest {
             val ast = buildTypedAst {
                 val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "Any", true))
 
                 function(
                     name = "testFunction",
@@ -609,7 +609,7 @@ class BagAndOrderedSetIntegrationTest {
             val ast = buildTypedAst {
                 val orderedSetType = addType(ClassTypeRef("builtin", "OrderedSet", false))
                 val intTypeIndex = intType()
-                val anyTypeIndex = addType(ClassTypeRef("builtin", "any", true))
+                val anyTypeIndex = addType(ClassTypeRef("builtin", "Any", true))
 
                 function(
                     name = "testFunction",

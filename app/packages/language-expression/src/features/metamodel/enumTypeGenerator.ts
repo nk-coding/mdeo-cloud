@@ -77,7 +77,8 @@ class EnumTypeGenerator {
             name: enumInfo.name,
             package: enumInfo.package,
             properties: {},
-            methods: {}
+            methods: {},
+            superTypes: [{ package: "builtin", type: "Any" }]
         };
 
         const containerProperties: Record<string, Property> = {};

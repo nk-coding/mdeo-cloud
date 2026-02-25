@@ -86,7 +86,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
         mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
         val effectiveTargetType = if (targetType is ClassTypeRef && targetType.isNullable && CoercionUtil.isPrimitiveType(targetType)) {
-            ClassTypeRef("builtin", "any", false)
+            ClassTypeRef("builtin", "Any", false)
         } else {
             targetType
         }
@@ -135,7 +135,7 @@ class MemberCallCompiler : AbstractCallCompiler() {
         resultType: ReturnType
     ) {
         val lookupTypeRef = if (targetType is LambdaType) {
-            ClassTypeRef("builtin", "any", false)
+            ClassTypeRef("builtin", "Any", false)
         } else if (targetType is ClassTypeRef) {
             targetType
         } else {

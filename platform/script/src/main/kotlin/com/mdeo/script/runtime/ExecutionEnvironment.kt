@@ -20,8 +20,10 @@ class ExecutionEnvironment(
 ) {
     /**
      * The class loader for loading compiled classes.
+     * Exposed so callers can reuse the same loader (e.g. for creating model instances
+     * that will be cast to generated types inside the executing script).
      */
-    private val classLoader = ScriptClassLoader(program)
+    val classLoader = ScriptClassLoader(program)
     
     /**
      * Invokes a function from a specific file.

@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.ASMUtil
+import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LoopLabels
 import com.mdeo.script.compiler.Scope
@@ -111,7 +112,7 @@ class ForStatementCompiler : StatementCompiler {
         
         emitHasNextCheck(mv, iteratorSlot, loopEnd)
         
-        emitNextAndStore(mv, iteratorSlot, variableType, loopVariable.slotIndex)
+        emitNextAndStore(mv, iteratorSlot, variableType, loopVariable.slotIndex, context)
         
         compileLoopBody(forStmt, context, mv, forBodyScope)
         
@@ -186,7 +187,8 @@ class ForStatementCompiler : StatementCompiler {
         mv: MethodVisitor,
         iteratorSlot: Int,
         variableType: ReturnType,
-        variableSlot: Int
+        variableSlot: Int,
+        context: CompilationContext
     ) {
         mv.visitVarInsn(Opcodes.ALOAD, iteratorSlot)
         mv.visitMethodInsn(
@@ -196,9 +198,10 @@ class ForStatementCompiler : StatementCompiler {
             "()Ljava/lang/Object;",
             true
         )
-        
-        ASMUtil.emitUnboxOrCast(variableType, mv)
-        
+
+        val anyType = ClassTypeRef("builtin", "Any", false)
+        CoercionUtil.emitCoercion(anyType, variableType, mv, context)
+
         val storeOpcode = ASMUtil.getStoreOpcode(variableType)
         mv.visitVarInsn(storeOpcode, variableSlot)
     }

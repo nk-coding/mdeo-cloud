@@ -86,7 +86,7 @@ class EnumCreateBlockTest {
         ClassTypeRef(`package` = "builtin", type = "string",            isNullable = false),      // 1
         ClassTypeRef(`package` = "builtin", type = "double",            isNullable = false),      // 2
         ClassTypeRef(`package` = "builtin", type = "boolean",           isNullable = false),      // 3
-        ClassTypeRef(`package` = "builtin", type = "any",               isNullable = true),       // 4
+        ClassTypeRef(`package` = "builtin", type = "Any",               isNullable = true),       // 4
         ClassTypeRef(`package` = "enum", type = "TestEnum",             isNullable = false),      // 5
         ClassTypeRef(`package` = "enum-container", type = "TestEnum",   isNullable = false)       // 6
     )

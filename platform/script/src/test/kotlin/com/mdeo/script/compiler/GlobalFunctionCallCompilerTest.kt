@@ -1,5 +1,7 @@
 package com.mdeo.script.compiler
 
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.script.ast.TypedParameter
 import com.mdeo.script.stdlib.impl.collections.Bag
 import com.mdeo.script.stdlib.impl.collections.OrderedSet
 import com.mdeo.script.stdlib.impl.collections.ScriptList
@@ -29,7 +31,7 @@ class GlobalFunctionCallCompilerTest {
         fun `listOf creates list from varargs`() {
             val ast = buildTypedAst {
                 val listType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "List", false)
+                    ClassTypeRef("builtin", "List", false)
                 )
 
                 function(
@@ -62,7 +64,7 @@ class GlobalFunctionCallCompilerTest {
         fun `setOf creates set from varargs`() {
             val ast = buildTypedAst {
                 val setType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "Set", false)
+                    ClassTypeRef("builtin", "Set", false)
                 )
 
                 function(
@@ -95,7 +97,7 @@ class GlobalFunctionCallCompilerTest {
         fun `bagOf creates bag from varargs`() {
             val ast = buildTypedAst {
                 val bagType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "Bag", false)
+                    ClassTypeRef("builtin", "Bag", false)
                 )
 
                 function(
@@ -128,7 +130,7 @@ class GlobalFunctionCallCompilerTest {
         fun `orderedSetOf creates ordered set from varargs`() {
             val ast = buildTypedAst {
                 val orderedSetType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "OrderedSet", false)
+                    ClassTypeRef("builtin", "OrderedSet", false)
                 )
 
                 function(
@@ -161,7 +163,7 @@ class GlobalFunctionCallCompilerTest {
         fun `listOf with no arguments creates empty list`() {
             val ast = buildTypedAst {
                 val listType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "List", false)
+                    ClassTypeRef("builtin", "List", false)
                 )
 
                 function(
@@ -194,7 +196,7 @@ class GlobalFunctionCallCompilerTest {
         fun `emptyList creates empty list`() {
             val ast = buildTypedAst {
                 val listType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "List", false)
+                    ClassTypeRef("builtin", "List", false)
                 )
 
                 function(
@@ -223,7 +225,7 @@ class GlobalFunctionCallCompilerTest {
         fun `emptySet creates empty set`() {
             val ast = buildTypedAst {
                 val setType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "Set", false)
+                    ClassTypeRef("builtin", "Set", false)
                 )
 
                 function(
@@ -252,7 +254,7 @@ class GlobalFunctionCallCompilerTest {
         fun `emptyBag creates empty bag`() {
             val ast = buildTypedAst {
                 val bagType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "Bag", false)
+                    ClassTypeRef("builtin", "Bag", false)
                 )
 
                 function(
@@ -281,7 +283,7 @@ class GlobalFunctionCallCompilerTest {
         fun `emptyOrderedSet creates empty ordered set`() {
             val ast = buildTypedAst {
                 val orderedSetType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "OrderedSet", false)
+                    ClassTypeRef("builtin", "OrderedSet", false)
                 )
 
                 function(
@@ -314,7 +316,7 @@ class GlobalFunctionCallCompilerTest {
         fun `listOf with mixed types`() {
             val ast = buildTypedAst {
                 val listType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "List", false)
+                    ClassTypeRef("builtin", "List", false)
                 )
 
                 function(
@@ -347,7 +349,7 @@ class GlobalFunctionCallCompilerTest {
         fun `listOf with null values`() {
             val ast = buildTypedAst {
                 val listType = addType(
-                    com.mdeo.expression.ast.types.ClassTypeRef("builtin", "List", false)
+                    ClassTypeRef("builtin", "List", false)
                 )
                 val nullableInt = intNullableType()
 
@@ -421,8 +423,8 @@ class GlobalFunctionCallCompilerTest {
                     name = "add",
                     returnType = intType,
                     parameters = listOf(
-                        com.mdeo.script.ast.TypedParameter("a", intType),
-                        com.mdeo.script.ast.TypedParameter("b", intType)
+                        TypedParameter("a", intType),
+                        TypedParameter("b", intType)
                     ),
                     body = listOf(
                         returnStmt(

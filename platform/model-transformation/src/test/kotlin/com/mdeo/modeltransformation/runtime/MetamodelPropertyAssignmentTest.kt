@@ -14,7 +14,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.match.MatchResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
@@ -130,7 +130,7 @@ class MetamodelPropertyAssignmentTest {
      * simulating what should happen during engine.execute().
      */
     private fun registerMetamodelTypes() {
-        val typeRegistry = GremlinTypeRegistry.GLOBAL
+        val typeRegistry = TypeRegistry.GLOBAL
 
         val houseType = gremlinType("class", "House")
             .graphProperty("address")

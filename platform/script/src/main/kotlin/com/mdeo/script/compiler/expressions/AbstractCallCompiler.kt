@@ -49,7 +49,7 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
         }
 
         val isReturnNullable = actualReturnType.isNullable
-        val isReturnAny = actualReturnType.`package` == "builtin" && actualReturnType.type == "any"
+        val isReturnAny = actualReturnType.`package` == "builtin" && actualReturnType.type == "Any"
 
         if ((isReturnAny || isReturnNullable) &&
             !expectedType.isNullable && CoercionUtil.isPrimitiveType(expectedType)) {

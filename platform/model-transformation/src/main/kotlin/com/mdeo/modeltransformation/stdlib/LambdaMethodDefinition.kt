@@ -2,7 +2,7 @@ package com.mdeo.modeltransformation.stdlib
 
 import com.mdeo.modeltransformation.ast.expressions.TypedLambdaExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
@@ -34,7 +34,7 @@ interface LambdaMethodDefinition : GremlinMethodDefinition {
         lambda: TypedLambdaExpression,
         context: CompilationContext,
         compilerRegistry: ExpressionCompilerRegistry
-    ): GremlinCompilationResult
+    ): CompilationResult
 }
 
 /**
@@ -55,7 +55,7 @@ fun GremlinTypeDefinitionBuilder.lambdaMethod(
         lambda: TypedLambdaExpression,
         context: CompilationContext,
         compilerRegistry: ExpressionCompilerRegistry
-    ) -> GremlinCompilationResult
+    ) -> CompilationResult
 ): GremlinTypeDefinitionBuilder {
     return method(object : LambdaMethodDefinition {
         override val name = name
@@ -67,12 +67,12 @@ fun GremlinTypeDefinitionBuilder.lambdaMethod(
             lambda: TypedLambdaExpression,
             context: CompilationContext,
             compilerRegistry: ExpressionCompilerRegistry
-        ): GremlinCompilationResult = compiler(receiver, lambda, context, compilerRegistry)
+        ): CompilationResult = compiler(receiver, lambda, context, compilerRegistry)
 
         override fun compile(
             receiver: GraphTraversal<*, *>,
-            arguments: List<GremlinCompilationResult>
-        ): GremlinCompilationResult {
+            arguments: List<CompilationResult>
+        ): CompilationResult {
             throw UnsupportedOperationException("Lambda method '$name' must be compiled via compileWithLambda()")
         }
     })

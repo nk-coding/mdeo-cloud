@@ -3,14 +3,14 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedFloatLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedFloatLiteralExpression] nodes.
  *
- * Compiles float literal expressions into a [GremlinCompilationResult] containing
+ * Compiles float literal expressions into a [CompilationResult] containing
  * a GraphTraversal that produces the constant float value using `__.constant()`.
  *
  * ## Example
@@ -40,15 +40,15 @@ class FloatLiteralCompiler : ExpressionCompiler {
      * @param expression The float literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [GremlinCompilationResult] producing the float value
+     * @return A [CompilationResult] producing the float value
      */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val floatExpression = expression as TypedFloatLiteralExpression
         val floatValue = floatExpression.value.toFloat()
-        return GremlinCompilationResult.constant(floatValue, initialTraversal)
+        return CompilationResult.constant(floatValue, initialTraversal)
     }
 }

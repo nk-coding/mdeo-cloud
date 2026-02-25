@@ -8,7 +8,7 @@ import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.expressions.TypedLambdaExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 
@@ -64,7 +64,7 @@ class LambdaMethodDefinitionsTest {
             types = types,
             currentScope = VariableScope.empty(),
             traversalSource = graph.traversal(),
-            typeRegistry = GremlinTypeRegistry.GLOBAL
+            typeRegistry = TypeRegistry.GLOBAL
         )
     }
 

@@ -241,7 +241,7 @@ class TypeCastCompiler : ExpressionCompiler() {
         val targetName = targetRef.type
         val sourceRef = sourceType as ClassTypeRef
 
-        if (sourceRef.`package` == "builtin" && sourceRef.type == "any") {
+        if (sourceRef.`package` == "builtin" && sourceRef.type == "Any") {
             val wrapperClass = context.typeRegistry.getWrapperClassName(targetRef) ?: "java/lang/Object"
             mv.visitTypeInsn(Opcodes.CHECKCAST, wrapperClass)
             CoercionUtil.emitUnboxing(targetRef, mv)
@@ -279,7 +279,7 @@ class TypeCastCompiler : ExpressionCompiler() {
         mv: MethodVisitor
     ) {
         val targetRef = targetType as ClassTypeRef
-        if (targetRef.`package` == "builtin" && targetRef.type == "any") {
+        if (targetRef.`package` == "builtin" && targetRef.type == "Any") {
             return
         }
 
@@ -300,8 +300,8 @@ class TypeCastCompiler : ExpressionCompiler() {
             return true
         }
 
-        if (sourceType.`package` == "builtin" && sourceType.type == "any"
-            && targetType.`package` == "builtin" && targetType.type == "any") {
+        if (sourceType.`package` == "builtin" && sourceType.type == "Any"
+            && targetType.`package` == "builtin" && targetType.type == "Any") {
             return true
         }
 

@@ -4,7 +4,7 @@ import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.P
@@ -14,7 +14,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedBinaryExpression] nodes.
  *
- * Compiles binary expressions into [GremlinCompilationResult] containing GraphTraversals
+ * Compiles binary expressions into [CompilationResult] containing GraphTraversals
  * that implement arithmetic, comparison, equality, and logical operators using pure Gremlin.
  *
  * ## Supported Operators
@@ -192,7 +192,7 @@ class BinaryOperatorCompiler(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val binaryExpr = expression as TypedBinaryExpression
         val operator = binaryExpr.operator
 
@@ -229,7 +229,7 @@ class BinaryOperatorCompiler(
         expr: TypedBinaryExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         if (expr.operator == OPERATOR_ADD && isStringConcatenation(expr, context)) {
             val leftResult = registry.compile(expr.left, context, initialTraversal)
             val rightResult = registry.compile(expr.right, context, null)
@@ -250,7 +250,7 @@ class BinaryOperatorCompiler(
             .`as`(rightLabel)
             .math("$leftLabel $mathSymbol $rightLabel")
 
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**
@@ -314,10 +314,10 @@ class BinaryOperatorCompiler(
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileRuntimeStringConcatenation(
-        leftResult: GremlinCompilationResult,
-        rightResult: GremlinCompilationResult,
+        leftResult: CompilationResult,
+        rightResult: CompilationResult,
         context: CompilationContext
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val leftLabel = context.getUniqueId()
         val rightLabel = context.getUniqueId()
         val traversal = (leftResult.traversal as GraphTraversal<Any, Any>)
@@ -335,7 +335,7 @@ class BinaryOperatorCompiler(
                 leftVal + rightVal
             }
         
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**
@@ -355,7 +355,7 @@ class BinaryOperatorCompiler(
         expr: TypedBinaryExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
@@ -366,7 +366,7 @@ class BinaryOperatorCompiler(
             context
         )
 
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**
@@ -388,7 +388,7 @@ class BinaryOperatorCompiler(
         expr: TypedBinaryExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
@@ -410,7 +410,7 @@ class BinaryOperatorCompiler(
             rightLabel
         )
 
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**
@@ -430,7 +430,7 @@ class BinaryOperatorCompiler(
         expr: TypedBinaryExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val leftResult = registry.compile(expr.left, context, initialTraversal)
         val rightResult = registry.compile(expr.right, context, null)
 
@@ -440,7 +440,7 @@ class BinaryOperatorCompiler(
             rightResult.traversal as GraphTraversal<Any, Any>
         )
 
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**

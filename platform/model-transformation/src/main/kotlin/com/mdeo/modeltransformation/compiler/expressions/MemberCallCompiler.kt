@@ -7,7 +7,7 @@ import com.mdeo.expression.ast.types.GenericTypeRef
 import com.mdeo.expression.ast.types.LambdaType
 import com.mdeo.modeltransformation.ast.expressions.TypedLambdaExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import com.mdeo.modeltransformation.stdlib.LambdaMethodDefinition
@@ -46,7 +46,7 @@ class MemberCallCompiler(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val memberCall = expression as TypedMemberCallExpression
         
         val receiverResult = registry.compile(memberCall.expression, context, initialTraversal)
@@ -96,10 +96,10 @@ class MemberCallCompiler(
         val type = context.resolveTypeOrNull(expression.evalType)
         return when (type) {
             is ClassTypeRef -> type
-            is GenericTypeRef -> ClassTypeRef("builtin", "any", false)
-            is LambdaType -> ClassTypeRef("builtin", "any", false)
-            null -> ClassTypeRef("builtin", "any", false)
-            else -> ClassTypeRef("builtin", "any", false)
+            is GenericTypeRef -> ClassTypeRef("builtin", "Any", false)
+            is LambdaType -> ClassTypeRef("builtin", "Any", false)
+            null -> ClassTypeRef("builtin", "Any", false)
+            else -> ClassTypeRef("builtin", "Any", false)
         }
     }
 

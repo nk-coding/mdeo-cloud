@@ -10,6 +10,7 @@ import {
     FileCategory
 } from "@mdeo/language-common";
 import { sharedImport, type ActionHandler, resolveRelativePath, calculateRelativePath } from "@mdeo/language-shared";
+import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { ModelTransformationType } from "../grammar/modelTransformationTypes.js";
 import type { ModelType } from "@mdeo/language-model";
@@ -176,15 +177,25 @@ export class RunModelTransformationActionHandler implements ActionHandler {
      * @returns Array of relative paths to compatible model files
      */
     private async findCompatibleModels(transformationUri: string, metamodelUri: string): Promise<string[]> {
-        const documents = this.sharedServices.workspace.LangiumDocuments.all.toArray();
+        const langiumDocuments = this.sharedServices.workspace.LangiumDocuments;
+        const documents = langiumDocuments.all.toArray();
         const modelDocuments = documents.filter((doc) => doc.textDocument.languageId === "model");
-
         const compatibleModels: string[] = [];
         const transformationPath = URI.parse(transformationUri).path;
 
+        const metamodelDoc = langiumDocuments.getDocument(URI.parse(metamodelUri));
+        if (!metamodelDoc) {
+            return compatibleModels;
+        }
+
         for (const doc of modelDocuments) {
             const modelMetamodelUri = this.getModelMetamodelUri(doc.uri.toString());
-            if (modelMetamodelUri === metamodelUri) {
+            if (!modelMetamodelUri) continue;
+
+            const modelMetamodelDoc = langiumDocuments.getDocument(URI.parse(modelMetamodelUri));
+            if (!modelMetamodelDoc) continue;
+
+            if (isMetamodelCompatible(modelMetamodelDoc, metamodelDoc, langiumDocuments)) {
                 const relativePath = calculateRelativePath(transformationPath, doc.uri.path);
                 compatibleModels.push(relativePath);
             }

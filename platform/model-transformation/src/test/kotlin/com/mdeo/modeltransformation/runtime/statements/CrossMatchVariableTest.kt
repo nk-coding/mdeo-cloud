@@ -7,7 +7,7 @@ import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
@@ -51,7 +51,7 @@ class CrossMatchVariableTest {
         graph = TinkerGraph.open()
         
         // Set up type registry with House and Room types
-        val typeRegistry = GremlinTypeRegistry.GLOBAL
+        val typeRegistry = TypeRegistry.GLOBAL
         
         val graphNodeType = gremlinType("builtin", "__GraphNode")
             .graphProperty("address")

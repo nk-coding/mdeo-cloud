@@ -5,7 +5,7 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.match.MatchResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
@@ -35,7 +35,7 @@ class CreateBlockPropertyAccessTest {
         g = graph.traversal()
         
         // Set up a type registry with __GraphNode, House and Room types
-        val typeRegistry = GremlinTypeRegistry.GLOBAL
+        val typeRegistry = TypeRegistry.GLOBAL
         
         // Register __GraphNode with the properties that will be accessed in tests
         val graphNodeType = gremlinType("builtin", "__GraphNode")

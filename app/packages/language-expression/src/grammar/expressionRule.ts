@@ -190,7 +190,14 @@ export function generateExpressionRules(
         .returns(types.baseExpressionType)
         .as(() => [
             primaryExpressionRule,
-            many(or(memberAccessPostfixFragment, callPostfixFragment, memberCallPostfixFragment, assertNonNullPostfixFragment))
+            many(
+                or(
+                    memberAccessPostfixFragment,
+                    callPostfixFragment,
+                    memberCallPostfixFragment,
+                    assertNonNullPostfixFragment
+                )
+            )
         ]);
 
     const callExpressionGenericArgsRule = createRule(config.callExpressionGenericArgsRuleName)

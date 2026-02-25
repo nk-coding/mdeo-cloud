@@ -20,7 +20,7 @@ class LocalVariableIndexAssignerTest {
                 "double" -> ClassTypeRef("builtin", "double", false)
                 "boolean" -> ClassTypeRef("builtin", "boolean", false)
                 "string" -> ClassTypeRef("builtin", "string", false)
-                else -> ClassTypeRef("builtin", "any", true)
+                else -> ClassTypeRef("builtin", "Any", true)
             }
         }
         val ast = TypedAst(types = typeList, imports = emptyList(), functions = emptyList())
@@ -34,7 +34,7 @@ class LocalVariableIndexAssignerTest {
         "double" -> ClassTypeRef("builtin", "double", false)
         "boolean" -> ClassTypeRef("builtin", "boolean", false)
         "string" -> ClassTypeRef("builtin", "string", false)
-        else -> ClassTypeRef("builtin", "any", true)
+        else -> ClassTypeRef("builtin", "Any", true)
     }
 
     

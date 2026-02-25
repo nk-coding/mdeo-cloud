@@ -266,7 +266,7 @@ class TypeRegistryTest {
 
         @Test
         fun `global registry contains any type`() {
-            val anyType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "any", false))
+            val anyType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "Any", false))
             assertNotNull(anyType)
         }
 
@@ -286,7 +286,7 @@ class TypeRegistryTest {
         fun `int type extends any type`() {
             val intType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
-            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test

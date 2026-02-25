@@ -2,6 +2,7 @@ package com.mdeo.script.compiler.statements
 
 import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.expression.ast.statements.TypedWhileStatement
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LoopLabels
 import com.mdeo.script.compiler.Scope
@@ -100,7 +101,7 @@ class WhileStatementCompiler : StatementCompiler {
      * @return Unit.
      */
     private fun emitBooleanJump(
-        conditionType: com.mdeo.expression.ast.types.ReturnType,
+        conditionType: ReturnType,
         falseLabel: Label,
         mv: MethodVisitor
     ) {

@@ -3,7 +3,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedTernaryExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.P
@@ -13,7 +13,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedTernaryExpression] nodes.
  *
- * Compiles ternary expressions (condition ? then : else) into [GremlinCompilationResult]
+ * Compiles ternary expressions (condition ? then : else) into [CompilationResult]
  * containing GraphTraversals that use Gremlin's `choose()` step for conditional branching.
  *
  * ## Gremlin Implementation
@@ -63,13 +63,13 @@ class TernaryExpressionCompiler(
      * @param expression The ternary expression to compile
      * @param context The compilation context containing variable bindings and scope information
      * @param initialTraversal Optional initial traversal to build upon; passed only to the condition
-     * @return A [GremlinCompilationResult] containing the compiled choose() traversal
+     * @return A [CompilationResult] containing the compiled choose() traversal
      */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val ternaryExpr = expression as TypedTernaryExpression
         return compileTernary(ternaryExpr, context, initialTraversal)
     }
@@ -85,14 +85,14 @@ class TernaryExpressionCompiler(
      * @param expr The ternary expression containing condition, true, and false branches
      * @param context The compilation context for resolving variables and scopes
      * @param initialTraversal Optional initial traversal passed only to the condition expression
-     * @return A [GremlinCompilationResult] with the complete choose() traversal
+     * @return A [CompilationResult] with the complete choose() traversal
      */
     @Suppress("UNCHECKED_CAST")
     private fun compileTernary(
         expr: TypedTernaryExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val conditionResult = registry.compile(expr.condition, context, initialTraversal)
 
         val trueResult = registry.compile(expr.trueExpression, context, null)
@@ -104,7 +104,7 @@ class TernaryExpressionCompiler(
             falseResult.traversal as GraphTraversal<Any, Any>
         )
 
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**

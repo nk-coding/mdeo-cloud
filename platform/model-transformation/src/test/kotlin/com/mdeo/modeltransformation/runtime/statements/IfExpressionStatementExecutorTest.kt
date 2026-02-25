@@ -16,7 +16,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedIfExpressionStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
@@ -50,7 +50,7 @@ class IfExpressionStatementExecutorTest {
         g = graph.traversal()
         
         // Set up type registry with __GraphNode, House and Room types
-        val typeRegistry = GremlinTypeRegistry.GLOBAL
+        val typeRegistry = TypeRegistry.GLOBAL
         val graphNodeType = gremlinType("builtin", "__GraphNode")
             .graphProperty("address")
             .graphProperty("size")

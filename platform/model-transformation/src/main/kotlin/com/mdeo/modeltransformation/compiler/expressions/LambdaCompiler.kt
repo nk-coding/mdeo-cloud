@@ -3,7 +3,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.modeltransformation.ast.expressions.TypedLambdaExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
@@ -53,7 +53,7 @@ class LambdaCompiler : ExpressionCompiler {
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         throw NotImplementedError(
             "Lambda traversal compilation is not yet implemented. " +
             "Lambda expressions require additional infrastructure for parameter " +

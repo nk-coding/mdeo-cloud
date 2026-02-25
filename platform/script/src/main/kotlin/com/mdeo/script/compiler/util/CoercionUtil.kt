@@ -261,7 +261,7 @@ object CoercionUtil {
         }
         
         if (sourceType is ClassTypeRef && targetType is ClassTypeRef) {
-            return emitClassTypeCoercion(sourceType, targetType, mv)
+            return emitClassTypeCoercion(sourceType, targetType, mv, context)
         }
         
         return false
@@ -273,7 +273,8 @@ object CoercionUtil {
     private fun emitClassTypeCoercion(
         sourceType: ClassTypeRef,
         targetType: ClassTypeRef,
-        mv: MethodVisitor
+        mv: MethodVisitor,
+        context: CompilationContext? = null
     ): Boolean {
         val sourceTypeName = sourceType.type
         val targetTypeName = targetType.type
@@ -283,7 +284,7 @@ object CoercionUtil {
         
         val sourceIsPrimitive = isPrimitiveType(sourceType)
         val targetIsPrimitive = isPrimitiveType(targetType)
-        val sourceIsAny = sourceType.`package` == "builtin" && sourceType.type == "any"
+        val sourceIsAny = sourceType.`package` == "builtin" && sourceType.type == "Any"
         
         if (sourceIsPrimitive && !sourceIsNullable && targetIsPrimitive && targetIsNullable) {
             return emitPrimitiveToBoxedConversion(sourceTypeName, targetTypeName, mv)
@@ -319,7 +320,7 @@ object CoercionUtil {
 
         if (!sourceIsPrimitive && !targetIsPrimitive && 
             (sourceType.`package` != targetType.`package` || sourceType.type != targetType.type)) {
-            return emitReferenceTypeConversion(sourceType, targetType, mv)
+            return emitReferenceTypeConversion(sourceType, targetType, mv, context)
         }
         
         return false
@@ -450,9 +451,10 @@ object CoercionUtil {
     private fun emitReferenceTypeConversion(
         sourceType: ClassTypeRef,
         targetType: ClassTypeRef,
-        mv: MethodVisitor
+        mv: MethodVisitor,
+        context: CompilationContext? = null
     ): Boolean {
-        if (targetType.`package` == "builtin" && targetType.type == "any") {
+        if (targetType.`package` == "builtin" && targetType.type == "Any") {
             return false
         }
         
@@ -460,7 +462,16 @@ object CoercionUtil {
             && sourceType.isNullable == targetType.isNullable) {
             return false
         }
-        
+
+        if (targetType.`package` != "builtin") {
+            val jvmClass = context?.typeRegistry?.getJvmClassName(targetType)
+            if (jvmClass != null) {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, jvmClass)
+                return true
+            }
+            return false
+        }
+
         val targetDescriptor = ASMUtil.getTypeDescriptor(targetType)
         if (targetDescriptor.startsWith("L") && targetDescriptor.endsWith(";")) {
             val internalName = targetDescriptor.substring(1, targetDescriptor.length - 1)

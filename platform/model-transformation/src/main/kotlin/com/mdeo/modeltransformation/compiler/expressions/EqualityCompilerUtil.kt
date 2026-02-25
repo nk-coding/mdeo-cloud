@@ -2,7 +2,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import org.apache.tinkerpop.gremlin.process.traversal.P
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -71,7 +71,7 @@ object EqualityCompilerUtil {
         rightTraversal: GraphTraversal<Any, Any>,
         leftType: ValueType,
         rightType: ValueType,
-        registry: GremlinTypeRegistry,
+        registry: TypeRegistry,
         leftLabel: String,
         rightLabel: String
     ): GraphTraversal<Any, Boolean> {
@@ -148,7 +148,7 @@ object EqualityCompilerUtil {
      */
     private fun isCollectionType(
         type: ValueType?,
-        registry: GremlinTypeRegistry
+        registry: TypeRegistry
     ): Boolean {
         if (type == null) return false
         

@@ -11,7 +11,7 @@ private const val BOOLEAN_HELPER = "com/mdeo/script/stdlib/impl/primitives/Boole
  */
 fun createBooleanType(): TypeDefinition {
     return typeDefinition("builtin", "boolean") {
-        extends("builtin", "any")
+        extends("builtin", "Any")
         primitiveDesc("Z")
         wrapperClass("java/lang/Boolean")
 

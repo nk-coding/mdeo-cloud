@@ -18,7 +18,7 @@ import com.mdeo.modeltransformation.stdlib.StdlibRegistrar
  * @param parent Optional parent registry for fallback lookups. When set, [getType]
  *               will search the parent if a type is not found locally.
  */
-class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
+class TypeRegistry(private val parent: TypeRegistry? = null) {
 
     // Double map: package -> name -> GremlinTypeDefinition
     private val types: MutableMap<String, MutableMap<String, GremlinTypeDefinition>> = mutableMapOf()
@@ -28,13 +28,13 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
          * The global static registry containing all stdlib type definitions.
          * This is initialized lazily and shared across all compilation contexts.
          */
-        val GLOBAL: GremlinTypeRegistry by lazy { createStdlibRegistry() }
+        val GLOBAL: TypeRegistry by lazy { createStdlibRegistry() }
 
         /**
          * Creates the global stdlib registry with all built-in types.
          */
-        private fun createStdlibRegistry(): GremlinTypeRegistry {
-            val registry = GremlinTypeRegistry()
+        private fun createStdlibRegistry(): TypeRegistry {
+            val registry = TypeRegistry()
             StdlibRegistrar.registerAll(registry)
             return registry
         }
@@ -45,8 +45,8 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
          * @param types The types to register.
          * @return A new registry with the types registered.
          */
-        fun of(vararg types: GremlinTypeDefinition): GremlinTypeRegistry {
-            return GremlinTypeRegistry().registerAll(*types)
+        fun of(vararg types: GremlinTypeDefinition): TypeRegistry {
+            return TypeRegistry().registerAll(*types)
         }
     }
 
@@ -56,7 +56,7 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * @param type The type definition to register.
      * @return This registry, for method chaining.
      */
-    fun register(type: GremlinTypeDefinition): GremlinTypeRegistry {
+    fun register(type: GremlinTypeDefinition): TypeRegistry {
         types.getOrPut(type.typePackage) { mutableMapOf() }[type.typeName] = type
         return this
     }
@@ -67,7 +67,7 @@ class GremlinTypeRegistry(private val parent: GremlinTypeRegistry? = null) {
      * @param typesToRegister The type definitions to register.
      * @return This registry, for method chaining.
      */
-    fun registerAll(vararg typesToRegister: GremlinTypeDefinition): GremlinTypeRegistry {
+    fun registerAll(vararg typesToRegister: GremlinTypeDefinition): TypeRegistry {
         typesToRegister.forEach { types.getOrPut(it.typePackage) { mutableMapOf() }[it.typeName] = it }
         return this
     }

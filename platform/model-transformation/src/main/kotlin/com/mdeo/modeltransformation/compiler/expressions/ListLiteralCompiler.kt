@@ -4,7 +4,7 @@ import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedListLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationException
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -13,7 +13,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
 /**
  * Traversal-based compiler for [TypedListLiteralExpression] nodes.
  *
- * Compiles list literal expressions into a [GremlinCompilationResult] containing
+ * Compiles list literal expressions into a [CompilationResult] containing
  * a GraphTraversal that produces a list of constant values.
  *
  * ## Compilation Strategy
@@ -65,14 +65,14 @@ class ListLiteralCompiler(
      * @param expression The list literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [GremlinCompilationResult] that emits each list element sequentially
+     * @return A [CompilationResult] that emits each list element sequentially
      */
     @Suppress("UNCHECKED_CAST")
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val listExpression = expression as TypedListLiteralExpression
         val elementResults = compileElements(listExpression.elements, context)
 
@@ -101,7 +101,7 @@ class ListLiteralCompiler(
             }
         }
 
-        return GremlinCompilationResult.of(traversal)
+        return CompilationResult.of(traversal)
     }
 
     /**
@@ -113,12 +113,12 @@ class ListLiteralCompiler(
      *
      * @param elements The list of element expressions to compile
      * @param context The compilation context
-     * @return A list of [GremlinCompilationResult] for each element
+     * @return A list of [CompilationResult] for each element
      */
     private fun compileElements(
         elements: List<TypedExpression>,
         context: CompilationContext
-    ): List<GremlinCompilationResult> {
+    ): List<CompilationResult> {
         return elements.map { element ->
             registry.compile(element, context, null)
         }

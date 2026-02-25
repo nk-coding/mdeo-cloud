@@ -1,6 +1,6 @@
 package com.mdeo.modeltransformation.runtime.match
 
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
@@ -22,7 +22,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * @property results Map from variable label to its compilation result
  */
 internal data class CompiledVariables(
-    val results: Map<String, GremlinCompilationResult>
+    val results: Map<String, CompilationResult>
 ) {
     /**
      * Gets the compilation result for a variable by its label.
@@ -30,7 +30,7 @@ internal data class CompiledVariables(
      * @param variableLabel The label of the variable (from VariableBinding.variableLabel)
      * @return The compilation result, or null if the variable was not compiled
      */
-    fun get(variableLabel: String): GremlinCompilationResult? {
+    fun get(variableLabel: String): CompilationResult? {
         return results[variableLabel]
     }
     

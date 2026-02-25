@@ -14,6 +14,6 @@ import com.mdeo.modeltransformation.compiler.registry.gremlinType
  */
 fun createBooleanType(): GremlinTypeDefinition {
     return gremlinType("builtin", "boolean")
-        .extends("builtin", "any")
+        .extends("builtin", "Any")
         .build()
 }

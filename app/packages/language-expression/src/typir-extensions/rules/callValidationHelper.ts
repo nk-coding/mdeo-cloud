@@ -121,7 +121,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
         private readonly genericArgumentsNodes: Specifics["LanguageType"][],
         private readonly argumentNodes: Specifics["LanguageType"][],
         readonly services: ExtendedTypirServices<Specifics>,
-        private readonly isInferenceMode: boolean,
+        private readonly isInferenceMode: boolean
     ) {
         if (isCustomFunctionType(functionType)) {
             this.validateFunction(functionType);

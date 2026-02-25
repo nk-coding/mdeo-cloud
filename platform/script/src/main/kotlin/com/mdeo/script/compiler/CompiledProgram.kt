@@ -8,10 +8,13 @@ package com.mdeo.script.compiler
  *                Each file is compiled into a separate JVM class.
  * @param generatedInterfaces Map of interface name to bytecode for generated functional interfaces.
  *                            These are custom interfaces generated for lambdas (e.g., Lambda$Int$Int).
+ * @param generatedModelClasses Map of class name to bytecode for generated model classes.
+ *                              Includes ModelInstance subclasses, enum value classes, and enum containers.
  */
 data class CompiledProgram(
     val classes: Map<String, CompiledClass>,
-    val generatedInterfaces: Map<String, ByteArray> = emptyMap()
+    val generatedInterfaces: Map<String, ByteArray> = emptyMap(),
+    val generatedModelClasses: Map<String, ByteArray> = emptyMap()
 )
 
 /**

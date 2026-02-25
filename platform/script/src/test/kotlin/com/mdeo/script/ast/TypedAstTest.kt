@@ -8,6 +8,8 @@ import com.mdeo.expression.ast.TypedCallableBody
 import com.mdeo.expression.ast.statements.TypedReturnStatement
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
+import com.mdeo.expression.ast.types.VoidType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
@@ -176,7 +178,7 @@ class TypedAstTest {
         val result = json.decodeFromString(TypedAst.serializer(), jsonString)
         
         assertEquals(1, result.types.size)
-        assertIs<com.mdeo.expression.ast.types.VoidType>(result.types[0])
+        assertIs<VoidType>(result.types[0])
     }
     
     @Test
@@ -197,6 +199,6 @@ class TypedAstTest {
         val result = json.decodeFromString(TypedAst.serializer(), jsonString)
         
         assertEquals(1, result.types.size)
-        assertIs<com.mdeo.expression.ast.types.LambdaType>(result.types[0])
+        assertIs<LambdaType>(result.types[0])
     }
 }

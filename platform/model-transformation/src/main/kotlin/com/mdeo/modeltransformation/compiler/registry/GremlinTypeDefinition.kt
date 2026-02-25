@@ -1,7 +1,7 @@
 package com.mdeo.modeltransformation.compiler.registry
 
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.VertexProperty
 
@@ -17,7 +17,7 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
  *
  * @see GremlinPropertyDefinition
  * @see GremlinMethodDefinition
- * @see GremlinTypeRegistry
+ * @see TypeRegistry
  */
 interface GremlinTypeDefinition {
 
@@ -35,7 +35,7 @@ interface GremlinTypeDefinition {
      * The types this type extends, expressed as [ClassTypeRef].
      *
      * Members from parent types are inherited and can be looked up.
-     * For example, all types typically extend the "any" type in the "builtin" package.
+     * For example, all types typically extend the "Any" type in the "builtin" package.
      */
     val extends: List<ClassTypeRef>
     
@@ -54,7 +54,7 @@ interface GremlinTypeDefinition {
     /**
      * Gets a property definition by name.
      *
-     * Does NOT include inherited properties. Use [GremlinTypeRegistry.lookupProperty]
+     * Does NOT include inherited properties. Use [TypeRegistry.lookupProperty]
      * to include inherited properties.
      *
      * @param name The property name.
@@ -65,7 +65,7 @@ interface GremlinTypeDefinition {
     /**
      * Gets a method definition by name and overload key.
      *
-     * Does NOT include inherited methods. Use [GremlinTypeRegistry.lookupMethod]
+     * Does NOT include inherited methods. Use [TypeRegistry.lookupMethod]
      * to include inherited methods.
      *
      * @param name The method name.
@@ -129,7 +129,7 @@ interface GremlinPropertyDefinition {
      * @param receiver The receiver traversal (the object the property is accessed on).
      * @return The compilation result containing the property value as a traversal.
      */
-    fun compile(receiver: GraphTraversal<*, *>): GremlinCompilationResult
+    fun compile(receiver: GraphTraversal<*, *>): CompilationResult
 }
 
 /**
@@ -176,6 +176,6 @@ interface GremlinMethodDefinition {
      */
     fun compile(
         receiver: GraphTraversal<*, *>,
-        arguments: List<GremlinCompilationResult>
-    ): GremlinCompilationResult
+        arguments: List<CompilationResult>
+    ): CompilationResult
 }

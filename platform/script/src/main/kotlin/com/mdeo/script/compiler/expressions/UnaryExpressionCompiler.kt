@@ -2,6 +2,7 @@ package com.mdeo.script.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedUnaryExpression
+import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import com.mdeo.script.compiler.util.TypeConversionUtil
@@ -68,7 +69,7 @@ class UnaryExpressionCompiler : ExpressionCompiler() {
         expr: TypedUnaryExpression,
         context: CompilationContext,
         mv: MethodVisitor,
-        operandType: com.mdeo.expression.ast.types.ReturnType
+        operandType: ReturnType
     ) {
         val typeName = TypeConversionUtil.getNumericTypeName(operandType)
             ?: throw IllegalArgumentException("Operand must be numeric for negation")

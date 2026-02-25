@@ -231,7 +231,6 @@ function collectEntitiesByPathRecursively(
         return;
     }
 
-    // Extract entities local to this document
     const classes: ClassType[] = [];
     const enums: EnumType[] = [];
     const associations: AssociationType[] = [];
@@ -253,7 +252,6 @@ function collectEntitiesByPathRecursively(
         associations
     });
 
-    // Process imports
     for (const importStatement of metamodel.imports ?? []) {
         const importedDoc = resolveImportedDocument(document, importStatement, documents);
         if (importedDoc != undefined) {
@@ -454,7 +452,6 @@ function collectPathsRecursively(
     }
     visited.add(uriString);
 
-    // Add this document's absolute path
     paths.push(document.uri.path);
 
     const metamodel = document.parseResult?.value as MetaModelType | undefined;

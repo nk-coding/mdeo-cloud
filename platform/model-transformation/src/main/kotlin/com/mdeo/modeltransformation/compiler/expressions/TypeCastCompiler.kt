@@ -3,7 +3,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedTypeCastExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -12,7 +12,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Traversal-based compiler for [TypedTypeCastExpression] nodes.
  *
  * Compiles type cast expressions (expr as Type, expr as? Type) into
- * [GremlinCompilationResult] containing GraphTraversals.
+ * [CompilationResult] containing GraphTraversals.
  *
  * ## Gremlin Implementation
  * Since Gremlin is dynamically typed, type casts are essentially no-ops at runtime.
@@ -43,7 +43,7 @@ class TypeCastCompiler(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val castExpr = expression as TypedTypeCastExpression
         return compileTypeCast(castExpr, context, initialTraversal)
     }
@@ -65,7 +65,7 @@ class TypeCastCompiler(
         expr: TypedTypeCastExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         return registry.compile(expr.expression, context, initialTraversal)
     }
 }

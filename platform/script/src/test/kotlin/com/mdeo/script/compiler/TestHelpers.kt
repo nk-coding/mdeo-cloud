@@ -134,7 +134,7 @@ class TypedAstBuilder {
     /**
      * Adds a nullable Any type and returns its index.
      */
-    fun anyNullableType(): Int = addType(ClassTypeRef("builtin", "any", true))
+    fun anyNullableType(): Int = addType(ClassTypeRef("builtin", "Any", true))
     
     /**
      * Adds a non-nullable list type and returns its index.

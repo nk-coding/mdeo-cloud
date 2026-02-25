@@ -1,6 +1,7 @@
 package com.mdeo.script.ast.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedExpressionSerializer as BaseTypedExpressionSerializer
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -16,7 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * expression type to deserialize to. It first checks for script-specific
  * kinds, then delegates to the base serializer for common expression types.
  */
-object TypedExpressionSerializer : com.mdeo.expression.ast.expressions.TypedExpressionSerializer() {
+object TypedExpressionSerializer : BaseTypedExpressionSerializer() {
     
     /**
      * Selects the appropriate deserializer based on the "kind" field in the JSON element.

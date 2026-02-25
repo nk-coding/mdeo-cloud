@@ -15,7 +15,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  *
  * All result types provide a [traversal] property containing the compiled GraphTraversal.
  */
-sealed interface GremlinCompilationResult {
+sealed interface CompilationResult {
     
     /**
      * The compiled GraphTraversal representing this expression.
@@ -32,7 +32,7 @@ sealed interface GremlinCompilationResult {
      */
     data class TraversalResult(
         override val traversal: GraphTraversal<*, *>
-    ) : GremlinCompilationResult
+    ) : CompilationResult
     
     /**
      * Result type for expressions that produce a known constant primitive value.
@@ -58,7 +58,7 @@ sealed interface GremlinCompilationResult {
     data class ValueResult(
         override val traversal: GraphTraversal<*, *>,
         val value: Any?
-    ) : GremlinCompilationResult {
+    ) : CompilationResult {
         init {
             if (value != null) {
                 val isAllowedType = value is String ||
@@ -83,10 +83,10 @@ sealed interface GremlinCompilationResult {
          *
          * @param value The constant value
          * @param initialTraversal Optional initial traversal to prepend
-         * @return A [GremlinCompilationResult.ValueResult] that produces the constant value
+         * @return A [CompilationResult.ValueResult] that produces the constant value
          */
         @Suppress("UNCHECKED_CAST")
-        fun <S, E> constant(value: E, initialTraversal: GraphTraversal<S, *>? = null): GremlinCompilationResult {
+        fun <S, E> constant(value: E, initialTraversal: GraphTraversal<S, *>? = null): CompilationResult {
             val traversal = (initialTraversal ?: 
                 org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__`.identity<Any>())
                 .constant(value) as GraphTraversal<Any, Any>
@@ -101,9 +101,9 @@ sealed interface GremlinCompilationResult {
          * Creates a result from an existing traversal.
          *
          * @param traversal The traversal to wrap
-         * @return A [GremlinCompilationResult.TraversalResult] wrapping the traversal
+         * @return A [CompilationResult.TraversalResult] wrapping the traversal
          */
-        fun <S, E> of(traversal: GraphTraversal<S, E>): GremlinCompilationResult {
+        fun <S, E> of(traversal: GraphTraversal<S, E>): CompilationResult {
             return TraversalResult(traversal = traversal)
         }
 
@@ -111,10 +111,10 @@ sealed interface GremlinCompilationResult {
          * Creates an identity result that passes through the input unchanged.
          *
          * @param initialTraversal Optional initial traversal to use instead
-         * @return A [GremlinCompilationResult] that passes through input
+         * @return A [CompilationResult] that passes through input
          */
         @Suppress("UNCHECKED_CAST")
-        fun <S> identity(initialTraversal: GraphTraversal<S, *>? = null): GremlinCompilationResult {
+        fun <S> identity(initialTraversal: GraphTraversal<S, *>? = null): CompilationResult {
             val traversal = initialTraversal ?: 
                 org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__`.identity<Any>()
             

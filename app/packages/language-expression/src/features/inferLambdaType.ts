@@ -1,6 +1,6 @@
 import type { InferenceProblem } from "typir";
 import type { TypirLangiumSpecifics } from "typir-langium";
-import type { CallExpressionType, ExpressionTypes } from "../grammar/expressionTypes.js";
+import type { CallExpressionType, ExpressionTypes, MemberCallExpressionType } from "../grammar/expressionTypes.js";
 import type {
     AssignmentStatementType,
     StatementTypes,
@@ -21,6 +21,7 @@ import {
 } from "../typir-extensions/config/type.js";
 import type { ExpressionTypirServices } from "../type-system/services.js";
 import { sharedImport } from "@mdeo/language-shared";
+import { inferMethodAccess, inferPropertyAccess } from "../typir-extensions/rules/inferMemberAccess.js";
 
 const { InferenceProblem: InferenceProblemConstant } = sharedImport("typir");
 
@@ -95,6 +96,10 @@ export function inferLambdaTypeFromContext<Specifics extends TypirLangiumSpecifi
 
     if (astReflection.isInstance(container, expressionTypes.callExpressionType)) {
         return inferFromCallExpression(lambdaNode, container, services);
+    }
+
+    if (astReflection.isInstance(container, expressionTypes.memberCallExpressionType)) {
+        return inferFromMemberCallExpression(lambdaNode, container, services);
     }
 
     return createInferenceProblem(
@@ -211,6 +216,57 @@ function inferFromCallExpression<Specifics extends TypirLangiumSpecifics>(
         services,
         lambdaNode,
         `Call target is neither a function nor a lambda type, but '${targetType.getName()}'.`
+    );
+}
+
+/**
+ * Infers lambda type from a member call expression context (as an argument).
+ *
+ * @param lambdaNode The lambda expression node
+ * @param memberCallExpressionNode The member call expression node
+ * @param services Extended Typir services
+ * @return The inferred lambda type or an inference problem
+ */
+function inferFromMemberCallExpression<Specifics extends TypirLangiumSpecifics>(
+    lambdaNode: Specifics["LanguageType"],
+    memberCallExpressionNode: MemberCallExpressionType,
+    services: ExpressionTypirServices<Specifics>
+): LambdaTypeInferenceResult<Specifics> {
+    const argumentIndex = lambdaNode.$containerIndex;
+    if (argumentIndex == undefined) {
+        return createInferenceProblem(services, lambdaNode, "Cannot determine argument position.");
+    }
+
+    const targetType = inferMethodAccess(
+        memberCallExpressionNode,
+        memberCallExpressionNode.expression,
+        memberCallExpressionNode.member,
+        services
+    );
+
+    if (isCustomFunctionType(targetType)) {
+        return inferFromFunctionTarget(lambdaNode, argumentIndex, targetType, services);
+    }
+
+    const propertyTargetType = inferPropertyAccess(
+        memberCallExpressionNode,
+        memberCallExpressionNode.expression,
+        memberCallExpressionNode.member,
+        services
+    );
+
+    if (isCustomLambdaType(propertyTargetType)) {
+        return inferFromLambdaTarget(lambdaNode, argumentIndex, propertyTargetType, services);
+    }
+
+    if (Array.isArray(propertyTargetType)) {
+        return createInferenceProblem(services, lambdaNode, "Cannot infer type of call target");
+    }
+
+    return createInferenceProblem(
+        services,
+        lambdaNode,
+        `Member call target is neither a function nor a lambda type, but '${propertyTargetType.getName()}'.`
     );
 }
 

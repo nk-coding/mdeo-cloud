@@ -7,7 +7,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Interface for expression compilers that produce traversal-based results.
  *
  * This is the new expression compiler interface that always produces a
- * [GremlinCompilationResult]. All expressions are compiled to GraphTraversals,
+ * [CompilationResult]. All expressions are compiled to GraphTraversals,
  * ensuring uniformity and composability across the compiler infrastructure.
  *
  * ## Initial Traversal Handling
@@ -32,9 +32,9 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  *         expression: TypedExpression,
  *         context: CompilationContext,
  *         initialTraversal: GraphTraversal<*, *>?
- *     ): GremlinCompilationResult {
+ *     ): CompilationResult {
  *         val intExpr = expression as TypedIntLiteralExpression
- *         return GremlinCompilationResult.constant(
+ *         return CompilationResult.constant(
  *             intExpr.value.toInt(),
  *             initialTraversal
  *         )
@@ -42,7 +42,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * }
  * ```
  *
- * @see GremlinCompilationResult
+ * @see CompilationResult
  * @see CompilationContext
  * @see ExpressionCompilerRegistry
  */
@@ -64,7 +64,7 @@ interface ExpressionCompiler {
      * Compiles the given expression into a traversal compilation result.
      *
      * This method transforms a typed expression into a GraphTraversal.
-     * The result is always a [GremlinCompilationResult] containing the
+     * The result is always a [CompilationResult] containing the
      * traversal that represents the expression.
      *
      * ## Initial Traversal Usage
@@ -87,5 +87,5 @@ interface ExpressionCompiler {
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>? = null
-    ): GremlinCompilationResult
+    ): CompilationResult
 }

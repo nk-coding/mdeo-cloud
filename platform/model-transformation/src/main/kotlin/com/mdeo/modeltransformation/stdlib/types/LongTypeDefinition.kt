@@ -1,6 +1,6 @@
 package com.mdeo.modeltransformation.stdlib.types
 
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -29,177 +29,177 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 @Suppress("UNCHECKED_CAST")
 fun createLongType(): GremlinTypeDefinition {
     return gremlinType("builtin", "long")
-        .extends("builtin", "any")
+        .extends("builtin", "Any")
         .method("abs", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).math("abs(_)")
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("floor", "", 0) { receiver, _ ->
-            GremlinCompilationResult.of(receiver as GraphTraversal<Any, Any>)
+            CompilationResult.of(receiver as GraphTraversal<Any, Any>)
         }
         .method("ceiling", "", 0) { receiver, _ ->
-            GremlinCompilationResult.of(receiver as GraphTraversal<Any, Any>)
+            CompilationResult.of(receiver as GraphTraversal<Any, Any>)
         }
         .method("round", "", 0) { receiver, _ ->
-            GremlinCompilationResult.of(receiver as GraphTraversal<Any, Any>)
+            CompilationResult.of(receiver as GraphTraversal<Any, Any>)
         }
         .method("log", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).math("log(_)")
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("log10", "", 0) { receiver, _ ->
             val traversal = (receiver as GraphTraversal<Any, Any>).math("log10(_)")
-            GremlinCompilationResult.of(traversal as GraphTraversal<Any, Any>)
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         .method("pow", "", 1) { receiver, args ->
-            val expValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && expValue != null) {
+            val expValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && expValue != null) {
                 "_ ^ $expValue"
             } else {
                 "_ ^ exp"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("mod", "", 1) { receiver, args ->
-            val divisorValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && divisorValue != null) {
+            val divisorValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && divisorValue != null) {
                 "_ % $divisorValue"
             } else {
                 "_ % divisor"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("max", "builtin.int", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "max(_, $otherValue)"
             } else {
                 "max(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("max", "builtin.long", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "max(_, $otherValue)"
             } else {
                 "max(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("max", "builtin.float", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "max(_, $otherValue)"
             } else {
                 "max(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("max", "builtin.double", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "max(_, $otherValue)"
             } else {
                 "max(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("min", "builtin.int", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "min(_, $otherValue)"
             } else {
                 "min(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("min", "builtin.long", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "min(_, $otherValue)"
             } else {
                 "min(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("min", "builtin.float", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "min(_, $otherValue)"
             } else {
                 "min(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .method("min", "builtin.double", 1) { receiver, args ->
-            val otherValue = (args.firstOrNull() as? GremlinCompilationResult.ValueResult)?.value
-            val expr = if (args.firstOrNull() is GremlinCompilationResult.ValueResult == true && otherValue != null) {
+            val otherValue = (args.firstOrNull() as? CompilationResult.ValueResult)?.value
+            val expr = if (args.firstOrNull() is CompilationResult.ValueResult == true && otherValue != null) {
                 "min(_, $otherValue)"
             } else {
                 "min(_, other)"
             }
             val traversal = (receiver as GraphTraversal<Any, Any>).math(expr)
-            val result = if (args.firstOrNull() is GremlinCompilationResult.ValueResult != true && args.isNotEmpty()) {
+            val result = if (args.firstOrNull() is CompilationResult.ValueResult != true && args.isNotEmpty()) {
                 traversal.by(args.first().traversal)
             } else {
                 traversal
             }
-            GremlinCompilationResult.of(result as GraphTraversal<Any, Any>)
+            CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
         .build()
 }

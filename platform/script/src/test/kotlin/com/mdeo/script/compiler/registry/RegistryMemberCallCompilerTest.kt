@@ -264,7 +264,7 @@ class RegistryMemberCallCompilerTest {
         @Test
         fun `inherited method from any has correct owner`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
-                ClassTypeRef("builtin", "any", false),
+                ClassTypeRef("builtin", "Any", false),
                 "toString",
                 ""
             )
@@ -280,42 +280,42 @@ class RegistryMemberCallCompilerTest {
         fun `int extends any`() {
             val intType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
-            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
         fun `long extends any`() {
             val longType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "long", false))
             assertNotNull(longType)
-            assertTrue(longType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(longType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
         fun `double extends any`() {
             val doubleType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "double", false))
             assertNotNull(doubleType)
-            assertTrue(doubleType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(doubleType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
         fun `float extends any`() {
             val floatType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "float", false))
             assertNotNull(floatType)
-            assertTrue(floatType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(floatType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
         fun `string extends any`() {
             val stringType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "string", false))
             assertNotNull(stringType)
-            assertTrue(stringType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(stringType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
         fun `boolean extends any`() {
             val booleanType = TypeRegistry.GLOBAL.getType(ClassTypeRef("builtin", "boolean", false))
             assertNotNull(booleanType)
-            assertTrue(booleanType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(booleanType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
     }
 }

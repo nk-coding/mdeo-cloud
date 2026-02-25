@@ -3,7 +3,7 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedAssertNonNullExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -11,7 +11,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 /**
  * Traversal-based compiler for [TypedAssertNonNullExpression] nodes.
  *
- * Compiles assert non-null expressions (expr!!) into [GremlinCompilationResult]
+ * Compiles assert non-null expressions (expr!!) into [CompilationResult]
  * containing GraphTraversals.
  *
  * ## Gremlin Implementation
@@ -56,13 +56,13 @@ class AssertNonNullCompiler(
      * @param expression The assert non-null expression to compile
      * @param context The compilation context
      * @param initialTraversal Optional initial traversal to build upon
-     * @return A [GremlinCompilationResult] containing the inner expression's traversal
+     * @return A [CompilationResult] containing the inner expression's traversal
      */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val assertExpr = expression as TypedAssertNonNullExpression
         return compileAssertNonNull(assertExpr, context, initialTraversal)
     }
@@ -77,13 +77,13 @@ class AssertNonNullCompiler(
      * @param expr The assert non-null expression containing the inner expression
      * @param context The compilation context
      * @param initialTraversal Optional initial traversal to build upon
-     * @return A [GremlinCompilationResult] with the compiled inner expression
+     * @return A [CompilationResult] with the compiled inner expression
      */
     private fun compileAssertNonNull(
         expr: TypedAssertNonNullExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         return registry.compile(expr.expression, context, initialTraversal)
     }
 }

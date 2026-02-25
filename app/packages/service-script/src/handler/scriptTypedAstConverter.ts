@@ -25,9 +25,10 @@ import type {
     TypedStatement
 } from "@mdeo/language-expression";
 import { StatementTypedAstConverter } from "@mdeo/language-expression";
-import { GrammarUtils, isAstNode, type AstNode } from "langium";
+import { GrammarUtils, isAstNode, type AstNode, type LangiumDocument } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
 import type { ReturnStatementType } from "@mdeo/language-script";
+import { resolveRelativePath } from "@mdeo/language-shared";
 
 /**
  * Script-specific extension of StatementTypedAstConverter.
@@ -69,9 +70,10 @@ export class ScriptTypedAstConverter extends StatementTypedAstConverter {
      * Converts a Script AST node to a TypedAst.
      *
      * @param script The Script AST node
+     * @param document The LangiumDocument for resolving relative paths
      * @returns The TypedAst representation
      */
-    convertScript(script: ScriptType): TypedAst {
+    convertScript(script: ScriptType, document: LangiumDocument): TypedAst {
         const imports: TypedImport[] = script.imports.map((imp: any) => ({
             name: imp.name,
             ref: imp.ref?.$refText ?? "",
@@ -80,8 +82,14 @@ export class ScriptTypedAstConverter extends StatementTypedAstConverter {
 
         const functions: TypedFunction[] = script.functions.map((func: FunctionType) => this.convertFunction(func));
 
+        const metamodelPath =
+            script.metamodelImport?.file != null
+                ? resolveRelativePath(document, script.metamodelImport.file).fsPath
+                : undefined;
+
         return {
             types: this.types,
+            metamodelPath,
             imports,
             functions
         };

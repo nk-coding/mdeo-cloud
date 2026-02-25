@@ -12,7 +12,7 @@ private const val ANY_HELPER = "com/mdeo/script/stdlib/impl/primitives/AnyHelper
  * The Any type is the root of the type hierarchy.
  */
 fun createAnyType(): TypeDefinition {
-    return typeDefinition("builtin", "any") {
+    return typeDefinition("builtin", "Any") {
         jvmClass("java/lang/Object")
         staticMethod("asBoolean") {
             overload(

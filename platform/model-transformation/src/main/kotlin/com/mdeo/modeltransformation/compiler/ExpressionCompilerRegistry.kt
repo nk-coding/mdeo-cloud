@@ -25,7 +25,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
  * Registry for traversal-based expression compilers.
  *
  * This registry manages [ExpressionCompiler] instances and provides
- * centralized compilation dispatch. All expressions compile to [GremlinCompilationResult],
+ * centralized compilation dispatch. All expressions compile to [CompilationResult],
  * ensuring uniform handling across the compilation infrastructure.
  *
  * ## Compiler Registration
@@ -107,7 +107,7 @@ class ExpressionCompilerRegistry {
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>? = null
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val compiler = findCompiler(expression)
             ?: throw CompilationException(
                 "No compiler registered for expression type: ${expression.kind}",

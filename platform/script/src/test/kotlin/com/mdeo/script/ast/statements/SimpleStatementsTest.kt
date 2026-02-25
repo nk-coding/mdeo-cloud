@@ -1,5 +1,6 @@
 package com.mdeo.script.ast.statements
 
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.script.ast.expressions.TypedExpressionSerializer
 
@@ -132,7 +133,7 @@ class SimpleStatementsTest {
         assertIs<TypedReturnStatement>(result)
         
         val value = result.value
-        assertIs<com.mdeo.expression.ast.expressions.TypedBinaryExpression>(value)
+        assertIs<TypedBinaryExpression>(value)
         assertEquals("*", value.operator)
     }
 }

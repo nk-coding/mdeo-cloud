@@ -137,7 +137,7 @@ class TypeCheckCompiler : ExpressionCompiler() {
         val sourceIsNullable = sourceType.isNullable
         val checkIsNullable = checkType.isNullable
 
-        if (sourceType.`package` == "builtin" && sourceType.type == "any") {
+        if (sourceType.`package` == "builtin" && sourceType.type == "Any") {
             return null
         }
 
@@ -149,7 +149,7 @@ class TypeCheckCompiler : ExpressionCompiler() {
             return false
         }
 
-        if (sourceIsPrimitive && !sourceIsNullable && checkType.`package` == "builtin" && checkType.type == "any") {
+        if (sourceIsPrimitive && !sourceIsNullable && checkType.`package` == "builtin" && checkType.type == "Any") {
             return true
         }
 
@@ -188,7 +188,7 @@ class TypeCheckCompiler : ExpressionCompiler() {
         checkType: ClassTypeRef,
         context: CompilationContext
     ): Boolean? {
-        if (checkType.`package` == "builtin" && checkType.type == "any" && checkType.isNullable) {
+        if (checkType.`package` == "builtin" && checkType.type == "Any" && checkType.isNullable) {
             return true
         }
 

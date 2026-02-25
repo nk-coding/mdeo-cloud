@@ -1,7 +1,7 @@
 package com.mdeo.modeltransformation.stdlib
 
 import com.mdeo.modeltransformation.compiler.registry.GremlinTypeDefinition
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.stdlib.types.createAnyType
 import com.mdeo.modeltransformation.stdlib.types.createBagType
 import com.mdeo.modeltransformation.stdlib.types.createBooleanType
@@ -26,7 +26,7 @@ import com.mdeo.modeltransformation.stdlib.types.createStringType
  * Lambda-accepting methods (filter, map, exists, etc.) are compiled to pure
  * traversals by compiling the lambda body with parameter binding.
  *
- * @see GremlinTypeRegistry
+ * @see TypeRegistry
  */
 object StdlibRegistrar {
 
@@ -35,7 +35,7 @@ object StdlibRegistrar {
      *
      * @param registry The registry to register types with.
      */
-    fun registerAll(registry: GremlinTypeRegistry) {
+    fun registerAll(registry: TypeRegistry) {
         registerPrimitiveTypes(registry)
         registerCollectionTypes(registry)
     }
@@ -43,10 +43,10 @@ object StdlibRegistrar {
     /**
      * Creates a registry with all standard library types pre-registered.
      *
-     * @return A new [GremlinTypeRegistry] with all stdlib types.
+     * @return A new [TypeRegistry] with all stdlib types.
      */
-    fun createRegistry(): GremlinTypeRegistry {
-        val registry = GremlinTypeRegistry()
+    fun createRegistry(): TypeRegistry {
+        val registry = TypeRegistry()
         registerAll(registry)
         return registry
     }
@@ -81,7 +81,7 @@ object StdlibRegistrar {
      *
      * @param registry The registry to register primitive types with
      */
-    private fun registerPrimitiveTypes(registry: GremlinTypeRegistry) {
+    private fun registerPrimitiveTypes(registry: TypeRegistry) {
         registry.register(createAnyType())
         registry.register(createBooleanType())
         registry.register(createIntType())
@@ -98,7 +98,7 @@ object StdlibRegistrar {
      *
      * @param registry The registry to register collection types with
      */
-    private fun registerCollectionTypes(registry: GremlinTypeRegistry) {
+    private fun registerCollectionTypes(registry: TypeRegistry) {
         registry.register(createCollectionType())
         registry.register(createOrderedCollectionType())
         registry.register(createListType())

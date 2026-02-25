@@ -4,7 +4,7 @@ import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.VariableScope
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -28,7 +28,7 @@ class BooleanLiteralCompilerTest {
             types = emptyList(),
             currentScope = VariableScope.empty(),
             traversalSource = graph.traversal(),
-            typeRegistry = GremlinTypeRegistry.GLOBAL
+            typeRegistry = TypeRegistry.GLOBAL
         )
     }
 

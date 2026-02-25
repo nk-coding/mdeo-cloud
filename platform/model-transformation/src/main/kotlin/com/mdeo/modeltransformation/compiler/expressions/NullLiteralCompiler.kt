@@ -3,14 +3,14 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedNullLiteralExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedNullLiteralExpression] nodes.
  *
- * Compiles null literal expressions into a [GremlinCompilationResult] containing
+ * Compiles null literal expressions into a [CompilationResult] containing
  * a GraphTraversal that produces `null` using `__.constant(null)`.
  *
  * ## Example
@@ -45,15 +45,15 @@ class NullLiteralCompiler : ExpressionCompiler {
      * @param expression The null literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [GremlinCompilationResult] producing null
+     * @return A [CompilationResult] producing null
      */
     @Suppress("UNCHECKED_CAST")
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val typedInitial = initialTraversal as? GraphTraversal<Any, *>
-        return GremlinCompilationResult.constant<Any, Any?>(null, typedInitial)
+        return CompilationResult.constant<Any, Any?>(null, typedInitial)
     }
 }

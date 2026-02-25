@@ -16,8 +16,8 @@ import com.mdeo.expression.ast.expressions.TypedTernaryExpression
 import com.mdeo.expression.ast.expressions.TypedUnaryExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
@@ -84,7 +84,7 @@ class TraversalCompilerTest {
         ClassTypeRef(`package` = "builtin", type = "float", isNullable = false),    // 3
         ClassTypeRef(`package` = "builtin", type = "string", isNullable = false),   // 4
         ClassTypeRef(`package` = "builtin", type = "boolean", isNullable = false),  // 5
-        ClassTypeRef(`package` = "builtin", type = "any", isNullable = true),       // 6
+        ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true),       // 6
         ClassTypeRef(`package` = "builtin", type = "List", isNullable = false)              // 7
     )
 
@@ -97,7 +97,7 @@ class TraversalCompilerTest {
             types = types,
             currentScope = VariableScope.empty(),
             traversalSource = g,
-            typeRegistry = GremlinTypeRegistry.GLOBAL
+            typeRegistry = TypeRegistry.GLOBAL
         )
     }
 
@@ -157,7 +157,7 @@ class TraversalCompilerTest {
      * Anonymous traversals like __.constant(x) need an input to produce output.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun <T> executeConstantTraversal(result: GremlinCompilationResult): T? {
+    private fun <T> executeConstantTraversal(result: CompilationResult): T? {
         // Execute the traversal with a null input
         val traversal = g.inject(null as Any?).flatMap(result.traversal as GraphTraversal<Any, T>)
         return if (traversal.hasNext()) traversal.next() else null
@@ -168,7 +168,7 @@ class TraversalCompilerTest {
      * This is needed for anonymous traversals like __.constant(x).
      */
     @Suppress("UNCHECKED_CAST")
-    private fun <T> executeWithVertex(result: GremlinCompilationResult): T? {
+    private fun <T> executeWithVertex(result: CompilationResult): T? {
         // Add a dummy vertex as starting point for the traversal
         val vertex = graph.addVertex(T.label, "dummy")
         val traversal = g.V(vertex).flatMap(result.traversal as GraphTraversal<Any, T>)
@@ -179,7 +179,7 @@ class TraversalCompilerTest {
      * Helper to execute a traversal and get all results.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun <T> executeTraversalList(result: GremlinCompilationResult): List<T> {
+    private fun <T> executeTraversalList(result: CompilationResult): List<T> {
         val traversal = result.traversal as GraphTraversal<Any, T>
         return traversal.toList()
     }

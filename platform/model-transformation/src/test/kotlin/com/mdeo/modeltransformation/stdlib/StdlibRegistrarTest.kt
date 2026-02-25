@@ -1,6 +1,6 @@
 package com.mdeo.modeltransformation.stdlib
 
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -21,7 +21,7 @@ import com.mdeo.expression.ast.types.ClassTypeRef
  */
 class StdlibRegistrarTest {
 
-    private lateinit var registry: GremlinTypeRegistry
+    private lateinit var registry: TypeRegistry
 
     @BeforeEach
     fun setUp() {
@@ -33,7 +33,7 @@ class StdlibRegistrarTest {
 
         @Test
         fun `registers all primitive types`() {
-            assertTrue(registry.hasType(ClassTypeRef("builtin", "any", false)))
+            assertTrue(registry.hasType(ClassTypeRef("builtin", "Any", false)))
             assertTrue(registry.hasType(ClassTypeRef("builtin", "int", false)))
             assertTrue(registry.hasType(ClassTypeRef("builtin", "long", false)))
             assertTrue(registry.hasType(ClassTypeRef("builtin", "float", false)))
@@ -255,7 +255,7 @@ class StdlibRegistrarTest {
         fun `Collection extends any`() {
             val collectionType = registry.getType(ClassTypeRef("builtin", "Collection", false))
             assertNotNull(collectionType)
-            assertTrue(collectionType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(collectionType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
@@ -269,14 +269,14 @@ class StdlibRegistrarTest {
         fun `int extends any`() {
             val intType = registry.getType(ClassTypeRef("builtin", "int", false))
             assertNotNull(intType)
-            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(intType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test
         fun `string extends any`() {
             val stringType = registry.getType(ClassTypeRef("builtin", "string", false))
             assertNotNull(stringType)
-            assertTrue(stringType.extends.contains(ClassTypeRef("builtin", "any", false)))
+            assertTrue(stringType.extends.contains(ClassTypeRef("builtin", "Any", false)))
         }
 
         @Test

@@ -7,6 +7,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import org.slf4j.LoggerFactory
@@ -117,7 +118,7 @@ open class BackendApiClient(
 /**
  * Request payload for updating execution state.
  */
-@kotlinx.serialization.Serializable
+@Serializable
 internal data class UpdateExecutionStateRequest(
     val state: String,
     val progressText: String?

@@ -8,7 +8,7 @@ import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
 import com.mdeo.modeltransformation.ast.model.ModelDataLink
 import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
-import com.mdeo.modeltransformation.compiler.registry.GremlinTypeRegistry
+import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Edge
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory
 class GraphToModelDataConverter(
     private val metamodelData: MetamodelData,
     private val types: List<ReturnType>,
-    private val typeRegistry: GremlinTypeRegistry
+    private val typeRegistry: TypeRegistry
 ) {
     private val logger = LoggerFactory.getLogger(GraphToModelDataConverter::class.java)
     

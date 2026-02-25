@@ -48,9 +48,6 @@ class IdentifierCompiler : ExpressionCompiler() {
         return expression is TypedIdentifierExpression
     }
 
-    /**
-     * Not used - this compiler overrides [compile] directly.
-     */
     override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
         val identifier = expression as TypedIdentifierExpression
 
@@ -58,6 +55,13 @@ class IdentifierCompiler : ExpressionCompiler() {
             val globalProperty = context.globalPropertyRegistry.getProperty(identifier.name)
                 ?: throw CompilationException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
             globalProperty.emitAccess(mv)
+            return
+        }
+
+        if (identifier.scope == 1) {
+            val fileScopeProperty = context.fileScopePropertyRegistry.getProperty(identifier.name)
+                ?: throw CompilationException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
+            fileScopeProperty.emitAccess(mv)
             return
         }
 
@@ -101,7 +105,7 @@ class IdentifierCompiler : ExpressionCompiler() {
      */
     private fun compileRefWrappedVariableLoad(
         slotIndex: Int,
-        type: com.mdeo.expression.ast.types.ReturnType,
+        type: ReturnType,
         mv: MethodVisitor
     ) {
         mv.visitVarInsn(Opcodes.ALOAD, slotIndex)

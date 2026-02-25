@@ -3,14 +3,14 @@ package com.mdeo.modeltransformation.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedDoubleLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.modeltransformation.compiler.CompilationContext
-import com.mdeo.modeltransformation.compiler.GremlinCompilationResult
+import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.ExpressionCompiler
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 
 /**
  * Traversal-based compiler for [TypedDoubleLiteralExpression] nodes.
  *
- * Compiles double literal expressions into a [GremlinCompilationResult] containing
+ * Compiles double literal expressions into a [CompilationResult] containing
  * a GraphTraversal that produces the constant double value using `__.constant()`.
  *
  * ## Example
@@ -40,15 +40,15 @@ class DoubleLiteralCompiler : ExpressionCompiler {
      * @param expression The double literal expression to compile
      * @param context The traversal compilation context
      * @param initialTraversal Optional traversal to build upon
-     * @return A [GremlinCompilationResult] producing the double value
+     * @return A [CompilationResult] producing the double value
      */
     override fun compile(
         expression: TypedExpression,
         context: CompilationContext,
         initialTraversal: GraphTraversal<*, *>?
-    ): GremlinCompilationResult {
+    ): CompilationResult {
         val doubleExpression = expression as TypedDoubleLiteralExpression
         val doubleValue = doubleExpression.value.toDouble()
-        return GremlinCompilationResult.constant(doubleValue, initialTraversal)
+        return CompilationResult.constant(doubleValue, initialTraversal)
     }
 }

@@ -86,15 +86,20 @@ class ClassTypeGenerator {
             properties[rel.property] = this.createRelationMember(rel);
         }
 
+        const superTypes = info.superClasses.map((superClass) => ({
+            package: superClass.package,
+            type: superClass.name
+        }));
+        if (superTypes.length === 0) {
+            superTypes.push({ package: "builtin", type: "Any" });
+        }
+
         const classType: ClassType = {
             name: info.name,
             package: info.package,
             properties,
             methods,
-            superTypes: info.superClasses.map((superClass) => ({
-                package: superClass.package,
-                type: superClass.name
-            }))
+            superTypes
         };
 
         const containerType = this.createContainerType(info.name);

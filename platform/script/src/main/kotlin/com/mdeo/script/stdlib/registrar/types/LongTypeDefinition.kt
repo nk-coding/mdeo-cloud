@@ -11,7 +11,7 @@ private const val LONG_HELPER = "com/mdeo/script/stdlib/impl/primitives/LongHelp
  */
 fun createLongType(): TypeDefinition {
     return typeDefinition("builtin", "long") {
-        extends("builtin", "any")
+        extends("builtin", "Any")
         primitiveDesc("J")
         wrapperClass("java/lang/Long")
 
