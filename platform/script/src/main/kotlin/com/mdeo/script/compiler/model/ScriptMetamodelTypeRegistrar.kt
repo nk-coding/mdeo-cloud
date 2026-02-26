@@ -110,7 +110,7 @@ object ScriptMetamodelTypeRegistrar {
         val registry = GlobalPropertyRegistry()
 
         for (classData in metamodelData.classes) {
-            val containerClass = ScriptClassBytecodeGenerator.getClassContainerClassName(classData.name, metamodelPath)
+            val containerClass = ScriptClassBytecodeGenerator.getClassContainerClassName(classData.name)
             registry.registerProperty(
                 StaticGlobalPropertyDefinition(
                     name = classData.name,
@@ -122,7 +122,7 @@ object ScriptMetamodelTypeRegistrar {
         }
 
         for (enumData in metamodelData.enums) {
-            val containerClass = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name, metamodelPath)
+            val containerClass = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name)
             registry.registerProperty(
                 StaticGlobalPropertyDefinition(
                     name = enumData.name,
@@ -147,8 +147,8 @@ object ScriptMetamodelTypeRegistrar {
         metamodelPath: String
     ) {
         val typePackage = "$CLASS_CONTAINER_PACKAGE$metamodelPath"
-        val containerClassName = ScriptClassBytecodeGenerator.getClassContainerClassName(classData.name, metamodelPath)
-        val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name, metamodelPath)
+        val containerClassName = ScriptClassBytecodeGenerator.getClassContainerClassName(classData.name)
+        val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name)
 
         val typeDef = TypeDefinitionImpl(
             typePackage = typePackage,
@@ -181,11 +181,11 @@ object ScriptMetamodelTypeRegistrar {
         val typeDef = TypeDefinitionImpl(
             typePackage = typePackage,
             typeName = enumData.name,
-            jvmClassName = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name, metamodelPath)
+            jvmClassName = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name)
         )
 
-        val containerClass = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name, metamodelPath)
-        val valueClass = ScriptEnumBytecodeGenerator.getEnumValueClassName(enumData.name, metamodelPath)
+        val containerClass = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name)
+        val valueClass = ScriptEnumBytecodeGenerator.getEnumValueClassName(enumData.name)
 
         for (entry in enumData.entries) {
             typeDef.addProperty(EnumEntryPropertyDefinition(
@@ -209,7 +209,7 @@ object ScriptMetamodelTypeRegistrar {
         metamodelPath: String
     ) {
         val typePackage = "$ENUM_PACKAGE$metamodelPath"
-        val valueClassName = ScriptEnumBytecodeGenerator.getEnumValueClassName(enumData.name, metamodelPath)
+        val valueClassName = ScriptEnumBytecodeGenerator.getEnumValueClassName(enumData.name)
         val typeDef = TypeDefinitionImpl(
             typePackage = typePackage,
             typeName = enumData.name,
@@ -231,7 +231,7 @@ object ScriptMetamodelTypeRegistrar {
         metamodelData: MetamodelData
     ) {
         val typePackage = "$CLASS_PACKAGE$metamodelPath"
-        val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name, metamodelPath)
+        val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name)
 
         val extendsRefs = classData.extends.map { superName ->
             ClassTypeRef(`package` = typePackage, type = superName, isNullable = false)
@@ -295,7 +295,7 @@ object ScriptMetamodelTypeRegistrar {
         metamodelPath: String,
         isMultiple: Boolean
     ): PropertyDefinition {
-        val targetInstanceClass = ScriptClassBytecodeGenerator.getInstanceClassName(targetClassName, metamodelPath)
+        val targetInstanceClass = ScriptClassBytecodeGenerator.getInstanceClassName(targetClassName)
         val descriptor = if (isMultiple) {
             "Ljava/util/List;"
         } else {
@@ -335,10 +335,7 @@ object ScriptMetamodelTypeRegistrar {
                 else -> "Ljava/lang/Object;"
             }
             property.enumType != null -> {
-                val enumValueClass = ScriptEnumBytecodeGenerator.getEnumValueClassName(
-                    property.enumType!!,
-                    metamodelPath
-                )
+                val enumValueClass = ScriptEnumBytecodeGenerator.getEnumValueClassName(property.enumType!!)
                 "L$enumValueClass;"
             }
             else -> "Ljava/lang/Object;"
@@ -393,7 +390,7 @@ object ScriptMetamodelTypeRegistrar {
         )
 
         for (classData in metamodelData.classes) {
-            val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name, metamodelPath)
+            val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name)
             typeDef.addMethod(AllInstancesMethodDefinition(
                 overloadKey = classData.name,
                 targetClassName = classData.name,

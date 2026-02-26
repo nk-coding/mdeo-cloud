@@ -1,54 +1,45 @@
 package com.mdeo.script.runtime
 
 import com.mdeo.script.compiler.CompiledProgram
-import java.io.PrintStream
 import java.lang.reflect.Method
 import java.lang.reflect.InvocationTargetException
 
 /**
  * Environment for executing compiled script programs.
  *
- * Provides methods to invoke functions from compiled scripts
- * and manages the console output stream.
+ * Provides methods to invoke functions from compiled scripts.
  *
  * @param program The compiled program to execute.
- * @param console The PrintStream for console output.
  */
 class ExecutionEnvironment(
-    private val program: CompiledProgram,
-    val console: PrintStream = System.out
+    val program: CompiledProgram
 ) {
     /**
      * The class loader for loading compiled classes.
      * Exposed so callers can reuse the same loader (e.g. for creating model instances
      * that will be cast to generated types inside the executing script).
      */
-    val classLoader = ScriptClassLoader(program)
+    val classLoader = ScriptClassLoader(program, ExecutionEnvironment::class.java.classLoader)
     
     /**
      * Invokes a function from a specific file.
-     * 
-     * Sets up the execution context with the console stream before invoking,
-     * so that println and other output functions write to the correct stream.
-     * 
-     * @param fileUri The file URI containing the function.
+     *
+     * @param filePath The file path containing the function.
      * @param functionName The name of the function to invoke.
      * @param args The arguments to pass to the function.
      * @return The result of the function invocation, or null if the function returns void.
      * @throws IllegalArgumentException if the file or function is not found.
      */
-    fun invoke(fileUri: String, functionName: String, vararg args: Any?): Any? {
-        return ExecutionContext.withConsole(console) {
-            val clazz = classLoader.loadClassForFile(fileUri)
-            
-            val method = findMethod(clazz, functionName, args)
-                ?: throw IllegalArgumentException("Function not found: $functionName in $fileUri")
-            
-            try {
-                method.invoke(null, *args)
-            } catch (e: InvocationTargetException) {
-                throw e.cause ?: e
-            }
+    fun invoke(filePath: String, functionName: String, vararg args: Any?): Any? {
+        val clazz = classLoader.loadClassForFile(filePath)
+
+        val method = findMethod(clazz, functionName, args)
+            ?: throw IllegalArgumentException("Function not found: $functionName in $filePath")
+
+        try {
+            return method.invoke(null, *args)
+        } catch (e: InvocationTargetException) {
+            throw e.cause ?: e
         }
     }
     
@@ -67,12 +58,12 @@ class ExecutionEnvironment(
     }
     
     /**
-     * Gets a loaded class by file URI.
+     * Gets a loaded class by file path.
      * 
-     * @param fileUri The file URI.
+     * @param filePath The file path.
      * @return The loaded Class.
      */
-    fun getClass(fileUri: String): Class<*> {
-        return classLoader.loadClassForFile(fileUri)
+    fun getClass(filePath: String): Class<*> {
+        return classLoader.loadClassForFile(filePath)
     }
 }

@@ -5,24 +5,30 @@ import com.mdeo.expression.ast.types.PropertyData
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
 import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
+import com.mdeo.script.compiler.CompiledProgram
+import com.mdeo.script.runtime.ScriptClassLoader
 
 /**
- * Implementation of ScriptModel backed by ModelData.
+ * Implementation of [ScriptModel] backed by [ModelData].
  *
- * This is a simple implementation that converts the entire model eagerly
- * on construction, creating all ModelInstance objects upfront.
+ * This is a simple implementation that converts the entire model eagerly on construction,
+ * creating all [ModelInstance] objects upfront.
  *
- * @param modelData The model data containing instances and links.
+ * Class loading is delegated to [ScriptModel]: the [classLoader] and [program] are forwarded
+ * to the base class, which resolves the generated JVM classes for model instances and enum
+ * containers automatically.
+ *
+ * @param modelData     The model data containing instances and links.
  * @param metamodelData The metamodel for type information and inheritance.
- * @param classLoader The class loader containing generated script classes.
- * @param metamodelPath The metamodel path used for generated type naming.
+ * @param classLoader   The class loader containing generated script classes.
+ * @param program       The compiled program that maps metamodel names to JVM binary class names.
  */
 class ModelDataScriptModel(
     private val modelData: ModelData,
     private val metamodelData: MetamodelData,
-    classLoader: com.mdeo.script.runtime.ScriptClassLoader,
-    metamodelPath: String
-) : ScriptModel(classLoader, metamodelPath) {
+    classLoader: ScriptClassLoader,
+    program: CompiledProgram
+) : ScriptModel(classLoader, program) {
 
     /**
      * Pre-computed map of class name to list of instances (including subclasses).

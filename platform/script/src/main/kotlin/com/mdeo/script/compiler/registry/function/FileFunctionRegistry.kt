@@ -7,11 +7,11 @@ import com.mdeo.script.ast.TypedImport
 /**
  * Reference to a function imported from another file.
  *
- * @param uri The URI of the source file containing the function.
- * @param ref The actual function name in the source file.
+ * @param path The path of the source file containing the function.
+ * @param ref  The actual function name in the source file.
  */
 data class ImportedFunctionRef(
-    val uri: String,
+    val path: String,
     val ref: String
 )
 
@@ -24,7 +24,7 @@ data class ImportedFunctionRef(
  * 3. Parent registry (typically the global registry)
  *
  * @param parent The parent registry (typically GlobalFunctionRegistry).
- * @param importedFileRegistries Map of file URIs to their registries for resolving imports.
+ * @param importedFileRegistries Map of file paths to their registries for resolving imports.
  */
 class FileFunctionRegistry(
     private val parent: FunctionRegistry,
@@ -71,7 +71,7 @@ class FileFunctionRegistry(
      */
     fun registerImport(import: TypedImport) {
         importedFunctions[import.name] = ImportedFunctionRef(
-            uri = import.uri,
+            path = import.uri,
             ref = import.ref
         )
     }
@@ -91,7 +91,7 @@ class FileFunctionRegistry(
         localFunctions[name]?.let { return it }
 
         importedFunctions[name]?.let { importRef ->
-            val importedRegistry = importedFileRegistries[importRef.uri]
+            val importedRegistry = importedFileRegistries[importRef.path]
             return importedRegistry?.lookupFunction(importRef.ref)
         }
 
@@ -127,10 +127,10 @@ class FileFunctionRegistry(
          * 1. Create registries for all files with empty import maps
          * 2. Link them together for cross-file import resolution
          *
-         * @param files Map of file URIs to their TypedAst.
+         * @param files Map of file paths to their TypedAst.
          * @param globalRegistry The global function registry to use as parent.
-         * @param classNameResolver Function to convert a file URI to a JVM class name.
-         * @return Map of file URIs to their FileFunctionRegistry instances.
+         * @param classNameResolver Function to convert a file path to a JVM class name.
+         * @return Map of file paths to their FileFunctionRegistry instances.
          */
         fun createForCompilation(
             files: Map<String, TypedAst>,
@@ -139,8 +139,8 @@ class FileFunctionRegistry(
         ): Map<String, FileFunctionRegistry> {
             val registries = mutableMapOf<String, FileFunctionRegistry>()
 
-            for ((uri, ast) in files) {
-                val className = classNameResolver(uri)
+            for ((path, ast) in files) {
+                val className = classNameResolver(path)
                 val registry = FileFunctionRegistry(globalRegistry, emptyMap())
 
                 for (func in ast.functions) {
@@ -151,13 +151,13 @@ class FileFunctionRegistry(
                     registry.registerImport(import)
                 }
 
-                registries[uri] = registry
+                registries[path] = registry
             }
 
             val linkedRegistries = mutableMapOf<String, FileFunctionRegistry>()
             
-            for ((uri, ast) in files) {
-                val className = classNameResolver(uri)
+            for ((path, ast) in files) {
+                val className = classNameResolver(path)
                 val linkedRegistry = FileFunctionRegistry(globalRegistry, linkedRegistries)
 
                 for (func in ast.functions) {
@@ -168,7 +168,7 @@ class FileFunctionRegistry(
                     linkedRegistry.registerImport(import)
                 }
 
-                linkedRegistries[uri] = linkedRegistry
+                linkedRegistries[path] = linkedRegistry
             }
 
             return linkedRegistries

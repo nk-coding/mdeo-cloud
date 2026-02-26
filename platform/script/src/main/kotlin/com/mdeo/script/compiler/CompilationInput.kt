@@ -8,8 +8,8 @@ import com.mdeo.script.ast.TypedAst
  */
 data class CompilationInput(
     /**
-     * Map of file URI to the TypedAST for that file.
-     * The file URI is used to generate unique class names.
+     * Map of file path to the TypedAST for that file.
+     * The file path is used to generate unique class names.
      */
     val files: Map<String, TypedAst>
 )

@@ -58,10 +58,12 @@ class PrintlnOutputCaptureTest {
             // Create a custom output stream to capture println output
             val outputStream = ByteArrayOutputStream()
             val customConsole = PrintStream(outputStream, true, Charsets.UTF_8)
-            val env = ExecutionEnvironment(program, customConsole)
+            val env = ExecutionEnvironment(program)
 
             // Execute the function
-            env.invoke("test://test.script", "testPrintln")
+            ExecutionContext.withContext(customConsole, null) {
+                env.invoke("test://test.script", "testPrintln")
+            }
 
             // Verify output was captured
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
@@ -95,9 +97,11 @@ class PrintlnOutputCaptureTest {
 
             val outputStream = ByteArrayOutputStream()
             val customConsole = PrintStream(outputStream, true, Charsets.UTF_8)
-            val env = ExecutionEnvironment(program, customConsole)
+            val env = ExecutionEnvironment(program)
 
-            env.invoke("test://test.script", "testEmptyPrintln")
+            ExecutionContext.withContext(customConsole, null) {
+                env.invoke("test://test.script", "testEmptyPrintln")
+            }
 
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
             assertEquals("\n", capturedOutput)
@@ -150,9 +154,11 @@ class PrintlnOutputCaptureTest {
 
             val outputStream = ByteArrayOutputStream()
             val customConsole = PrintStream(outputStream, true, Charsets.UTF_8)
-            val env = ExecutionEnvironment(program, customConsole)
+            val env = ExecutionEnvironment(program)
 
-            env.invoke("test://test.script", "testMultiplePrintln")
+            ExecutionContext.withContext(customConsole, null) {
+                env.invoke("test://test.script", "testMultiplePrintln")
+            }
 
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
             assertEquals("Line 1\nLine 2\nLine 3\n", capturedOutput)
@@ -191,9 +197,11 @@ class PrintlnOutputCaptureTest {
 
             val outputStream = ByteArrayOutputStream()
             val customConsole = PrintStream(outputStream, true, Charsets.UTF_8)
-            val env = ExecutionEnvironment(program, customConsole)
+            val env = ExecutionEnvironment(program)
 
-            val result = env.invoke("test://test.script", "testPrintlnWithReturn")
+            val result = ExecutionContext.withContext(customConsole, null) {
+                env.invoke("test://test.script", "testPrintlnWithReturn")
+            }
 
             // Both output and return value should work
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
@@ -206,7 +214,7 @@ class PrintlnOutputCaptureTest {
     inner class DefaultConsoleStream {
 
         @Test
-        fun `default console uses System_out when no custom stream provided`() {
+        fun `default console uses System_out when no context is set`() {
             val ast = buildTypedAst {
                 val intType = intType()
                 function(
@@ -217,13 +225,11 @@ class PrintlnOutputCaptureTest {
             }
 
             val input = CompilationInput(mapOf("test://test.script" to ast))
-            val program = compiler.compile(input)
+            compiler.compile(input)
 
-            // Create environment without custom console
-            val env = ExecutionEnvironment(program)
-
-            // Should use System.out (though we can't easily verify the output)
-            assertEquals(System.out, env.console)
+            // When no context is set, getConsole() should fall back to System.out
+            ExecutionContext.clearConsole()
+            assertEquals(System.out, ExecutionContext.getConsole())
         }
     }
 
@@ -258,14 +264,17 @@ class PrintlnOutputCaptureTest {
             // First execution
             val outputStream1 = ByteArrayOutputStream()
             val console1 = PrintStream(outputStream1, true, Charsets.UTF_8)
-            val env1 = ExecutionEnvironment(program, console1)
-            env1.invoke("test://test.script", "testPrintln")
+            val env = ExecutionEnvironment(program)
+            ExecutionContext.withContext(console1, null) {
+                env.invoke("test://test.script", "testPrintln")
+            }
 
             // Second execution
             val outputStream2 = ByteArrayOutputStream()
             val console2 = PrintStream(outputStream2, true, Charsets.UTF_8)
-            val env2 = ExecutionEnvironment(program, console2)
-            env2.invoke("test://test.script", "testPrintln")
+            ExecutionContext.withContext(console2, null) {
+                env.invoke("test://test.script", "testPrintln")
+            }
 
             // Both should have captured their own output independently
             val output1 = outputStream1.toString(Charsets.UTF_8)
@@ -280,14 +289,14 @@ class PrintlnOutputCaptureTest {
     inner class ExecutionContextBehavior {
 
         @Test
-        fun `ExecutionContext_withConsole properly restores previous context`() {
+        fun `ExecutionContext_withContext properly restores previous context`() {
             val stream1 = PrintStream(ByteArrayOutputStream())
             val stream2 = PrintStream(ByteArrayOutputStream())
 
             ExecutionContext.setConsole(stream1)
             assertEquals(stream1, ExecutionContext.getConsole())
 
-            ExecutionContext.withConsole(stream2) {
+            ExecutionContext.withContext(stream2, null) {
                 assertEquals(stream2, ExecutionContext.getConsole())
             }
 
@@ -335,9 +344,11 @@ class PrintlnOutputCaptureTest {
 
             val outputStream = ByteArrayOutputStream()
             val customConsole = PrintStream(outputStream, true, Charsets.UTF_8)
-            val env = ExecutionEnvironment(program, customConsole)
+            val env = ExecutionEnvironment(program)
 
-            env.invoke("test://test.script", "testSpecialChars")
+            ExecutionContext.withContext(customConsole, null) {
+                env.invoke("test://test.script", "testSpecialChars")
+            }
 
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
             assertTrue(capturedOutput.contains("Tab:\there"))

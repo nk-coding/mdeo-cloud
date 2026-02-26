@@ -20,8 +20,8 @@ class ScriptCompilerTest {
         
         val program = compiler.compile(input)
         
-        assertEquals(1, program.classes.size)
-        assertNotNull(program.classes["test://empty.script"])
+        assertEquals(1, program.scriptFileToClass.size)
+        assertNotNull(program.scriptFileToClass["test://empty.script"])
     }
     
     @Test
@@ -42,9 +42,9 @@ class ScriptCompilerTest {
         
         val program = compiler.compile(input)
         
-        assertEquals(2, program.classes.size)
-        assertNotNull(program.classes["test://file1.script"])
-        assertNotNull(program.classes["test://file2.script"])
+        assertEquals(2, program.scriptFileToClass.size)
+        assertNotNull(program.scriptFileToClass["test://file1.script"])
+        assertNotNull(program.scriptFileToClass["test://file2.script"])
     }
     
     @Test
@@ -57,12 +57,12 @@ class ScriptCompilerTest {
         
         val program = compiler.compile(input)
         
-        val class1 = program.classes["test://file1.script"]!!
-        val class2 = program.classes["test://file2.script"]!!
+        val class1 = program.scriptFileToClass["test://file1.script"]!!
+        val class2 = program.scriptFileToClass["test://file2.script"]!!
         
-        assertNotNull(class1.className)
-        assertNotNull(class2.className)
-        assert(class1.className != class2.className)
+        assertNotNull(class1)
+        assertNotNull(class2)
+        assert(class1 != class2)
     }
     
     @Test

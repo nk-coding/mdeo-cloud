@@ -123,7 +123,7 @@ class ExecutionEnvironmentTest {
     }
     
     @Test
-    fun `custom console stream can be used`() {
+    fun `custom console stream is active during withContext block`() {
         val ast = buildTypedAst {
             val intType = intType()
             function("getValue", intType, body = listOf(returnStmt(intLiteral(42, intType))))
@@ -134,9 +134,11 @@ class ExecutionEnvironmentTest {
         
         val outputStream = ByteArrayOutputStream()
         val customConsole = PrintStream(outputStream)
-        val env = ExecutionEnvironment(program, customConsole)
+        val env = ExecutionEnvironment(program)
         
-        assertNotNull(env.console)
-        assertEquals(customConsole, env.console)
+        ExecutionContext.withContext(customConsole, null) {
+            assertEquals(customConsole, ExecutionContext.getConsole())
+            env.invoke("test://test.script", "getValue")
+        }
     }
 }

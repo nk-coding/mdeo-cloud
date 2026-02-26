@@ -1,16 +1,14 @@
 package com.mdeo.script.runtime
 
-import com.mdeo.script.compiler.CompiledClass
 import com.mdeo.script.compiler.CompiledProgram
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 /**
- * Tests for edge cases and potential bugs in ScriptClassLoader.
+ * Tests for edge cases and regression coverage in ScriptClassLoader.
  */
 class ScriptClassLoaderBugTest {
 
@@ -32,61 +30,54 @@ class ScriptClassLoaderBugTest {
     }
 
     /**
-     * BUG: findClass does not check the cache before calling defineClass.
-     * 
-     * If loadClassForFile is called first, and then findClass is called 
-     * (which can happen through loadClass delegation), it will attempt to 
-     * define the same class twice, causing a LinkageError.
-     * 
-     * This test exposes the bug by calling loadClassForFile first and then
-     * trying to use findClass (via loadClass).
+     * Regression: loadClassForFile followed by loadClass (which routes through findClass)
+     * must return the same cached class instance without attempting to redefine it.
      */
     @Test
     fun `findClass after loadClassForFile should return cached class not redefine`() {
-        val className = "com/test/DuplicateTestClass"
-        val bytecode = createSimpleBytecode(className)
-        val compiledClass = CompiledClass("test://test.script", className, bytecode)
-        val program = CompiledProgram(mapOf("test://test.script" to compiledClass))
+        val internalName = "com/test/DuplicateTestClass"
+        val binaryName = "com.test.DuplicateTestClass"
+        val bytecode = createSimpleBytecode(internalName)
+        val program = CompiledProgram(
+            allBytecodes = mapOf(binaryName to bytecode),
+            scriptFileToClass = mapOf("test://test.script" to binaryName)
+        )
 
-        val classLoader = ScriptClassLoader(program)
+        val classLoader = ScriptClassLoader(program, ScriptClassLoaderBugTest::class.java.classLoader)
         
         // First load via loadClassForFile - this defines the class and caches it
         val clazz1 = classLoader.loadClassForFile("test://test.script")
         assertNotNull(clazz1)
         
-        // Now try to load via loadClass which calls findClass
-        // This should return the cached class, not try to redefine it
-        // BUG: findClass doesn't check the cache, so it tries to redefine the class
-        val clazz2 = classLoader.loadClass("com.test.DuplicateTestClass")
+        // loadClass routes through findClass; the unified cache ensures no double-define
+        val clazz2 = classLoader.loadClass(binaryName)
         
         assertNotNull(clazz2)
         assertSame(clazz1, clazz2, "findClass should return the same cached class instance")
     }
     
     /**
-     * BUG: Multiple calls to findClass (without loadClassForFile) will also 
-     * try to define the class multiple times.
-     * 
-     * The findClass method doesn't cache its results, so calling loadClass
-     * multiple times could potentially cause issues if the class isn't found
-     * in parent classloader cache.
+     * Regression: multiple loadClass calls for the same name must return the same instance
+     * and never attempt to define the class twice.
      */
     @Test
     fun `multiple findClass calls should not attempt duplicate class definition`() {
-        val className = "com/test/MultipleLoadClass"
-        val bytecode = createSimpleBytecode(className)
-        val compiledClass = CompiledClass("test://test.script", className, bytecode)
-        val program = CompiledProgram(mapOf("test://test.script" to compiledClass))
+        val internalName = "com/test/MultipleLoadClass"
+        val binaryName = "com.test.MultipleLoadClass"
+        val bytecode = createSimpleBytecode(internalName)
+        val program = CompiledProgram(
+            allBytecodes = mapOf(binaryName to bytecode),
+            scriptFileToClass = mapOf("test://test.script" to binaryName)
+        )
 
-        val classLoader = ScriptClassLoader(program)
+        val classLoader = ScriptClassLoader(program, ScriptClassLoaderBugTest::class.java.classLoader)
         
-        // First call to loadClass - will call findClass which defines the class
-        val clazz1 = classLoader.loadClass("com.test.MultipleLoadClass")
+        // First call to loadClass - defines and caches the class
+        val clazz1 = classLoader.loadClass(binaryName)
         assertNotNull(clazz1)
         
-        // Second call to loadClass - should return cached class from parent's findLoadedClass
-        // but if findClass is called again, it would try to redefine
-        val clazz2 = classLoader.loadClass("com.test.MultipleLoadClass")
+        // Second call must return the cached instance, not try to redefine
+        val clazz2 = classLoader.loadClass(binaryName)
         assertNotNull(clazz2)
         
         assertSame(clazz1, clazz2, "Multiple loadClass calls should return the same instance")

@@ -25,11 +25,10 @@
         "@mdeo/editor-shared": "^0.1.0"
     },
     "devDependencies": {
-        "@eclipse-glsp/client": "^2.6.0",
         "@eclipse-glsp/sprotty": "^2.6.0",
-        "@tailwindcss/cli": "^4.2.0",
+        "@tailwindcss/cli": "^4.2.1",
         "inversify": "^6.2.2",
         "snabbdom": "~3.5.1",
-        "tailwindcss": "^4.2.0"
+        "tailwindcss": "^4.2.1"
     }
 }

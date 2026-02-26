@@ -1,4 +1,4 @@
-import type { SModelRootImpl as GModelRoot } from "sprotty";
+import type { GModelRoot } from "@eclipse-glsp/sprotty";
 import { GEdge } from "../../model/edge.js";
 import type { EdgeEditTool } from "./edgeEditTool.js";
 import { sharedImport } from "../../sharedImport.js";

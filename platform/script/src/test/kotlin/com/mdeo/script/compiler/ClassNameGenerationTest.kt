@@ -23,10 +23,7 @@ class ClassNameGenerationTest {
         val input = CompilationInput(mapOf("file:///path/to/script.mdeo" to ast))
         val program = compiler.compile(input)
         
-        assertNotNull(program.classes["file:///path/to/script.mdeo"])
-        
-        // The class name should not contain characters that are invalid in JVM class names
-        val className = program.classes["file:///path/to/script.mdeo"]!!.className
+        val className = program.scriptFileToClass["file:///path/to/script.mdeo"]
         assertNotNull(className)
         assert(!className.contains(":")) { "Class name should not contain colons: $className" }
         assert(!className.contains(" ")) { "Class name should not contain spaces: $className" }
@@ -42,9 +39,8 @@ class ClassNameGenerationTest {
         val input = CompilationInput(mapOf("file:///path/to/my script.mdeo" to ast))
         val program = compiler.compile(input)
         
-        assertNotNull(program.classes["file:///path/to/my script.mdeo"])
-        
-        val className = program.classes["file:///path/to/my script.mdeo"]!!.className
+        val className = program.scriptFileToClass["file:///path/to/my script.mdeo"]
+        assertNotNull(className)
         assert(!className.contains(" ")) { "Class name should not contain spaces: $className" }
     }
     
@@ -61,8 +57,8 @@ class ClassNameGenerationTest {
         ))
         val program = compiler.compile(input)
         
-        val class1 = program.classes["file:///path/to/script1.mdeo"]!!.className
-        val class2 = program.classes["file:///path/to/script2.mdeo"]!!.className
+        val class1 = program.scriptFileToClass["file:///path/to/script1.mdeo"]!!
+        val class2 = program.scriptFileToClass["file:///path/to/script2.mdeo"]!!
         
         assert(class1 != class2) { "Different files should produce different class names" }
     }
@@ -87,8 +83,8 @@ class ClassNameGenerationTest {
         ))
         val program = compiler.compile(input)
         
-        val class1 = program.classes["test://file.name"]!!.className
-        val class2 = program.classes["test://file_name"]!!.className
+        val class1 = program.scriptFileToClass["test://file.name"]!!
+        val class2 = program.scriptFileToClass["test://file_name"]!!
         
         // BUG: Both will be sanitized to have underscores, producing the same class name
         // This assertion should fail if the bug exists

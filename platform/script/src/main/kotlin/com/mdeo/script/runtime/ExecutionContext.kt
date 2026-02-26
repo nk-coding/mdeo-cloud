@@ -18,10 +18,6 @@ object ExecutionContext {
     @PublishedApi
     internal val modelHolder = ThreadLocal<ScriptModel?>()
 
-    // -------------------------------------------------------------------------
-    // Console management
-    // -------------------------------------------------------------------------
-
     /**
      * Gets the current console PrintStream for this thread.
      * Falls back to System.out if no context is set.
@@ -48,31 +44,6 @@ object ExecutionContext {
     fun clearConsole() {
         consoleStream.remove()
     }
-
-    /**
-     * Executes a block with a specific console stream, then restores the previous context.
-     *
-     * @param stream The PrintStream to use during execution.
-     * @param block The code block to execute.
-     * @return The result of the block.
-     */
-    inline fun <T> withConsole(stream: PrintStream, block: () -> T): T {
-        val previous = consoleStream.get()
-        try {
-            setConsole(stream)
-            return block()
-        } finally {
-            if (previous != null) {
-                consoleStream.set(previous)
-            } else {
-                clearConsole()
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Model management
-    // -------------------------------------------------------------------------
 
     /**
      * Gets the current ScriptModel for this thread, or null if none is set.
@@ -113,31 +84,6 @@ object ExecutionContext {
     fun clearModel() {
         modelHolder.remove()
     }
-
-    /**
-     * Executes a block with a specific script model, then restores the previous context.
-     *
-     * @param model The ScriptModel to use during execution.
-     * @param block The code block to execute.
-     * @return The result of the block.
-     */
-    inline fun <T> withModel(model: ScriptModel, block: () -> T): T {
-        val previous = modelHolder.get()
-        try {
-            setModel(model)
-            return block()
-        } finally {
-            if (previous != null) {
-                modelHolder.set(previous)
-            } else {
-                clearModel()
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Combined context management
-    // -------------------------------------------------------------------------
 
     /**
      * Clears all thread-local state (console stream and model).

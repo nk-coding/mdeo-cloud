@@ -612,7 +612,7 @@ class CompilerTestHelper {
     private val compiler = ScriptCompiler()
     
     companion object {
-        private const val TEST_FILE_URI = "test://test.script"
+        private const val TEST_FILE_PATH = "test://test.script"
         private const val TEST_FUNCTION_NAME = "testFunction"
     }
     
@@ -629,10 +629,10 @@ class CompilerTestHelper {
         functionName: String = TEST_FUNCTION_NAME,
         vararg args: Any?
     ): Any? {
-        val input = CompilationInput(mapOf(TEST_FILE_URI to ast))
+        val input = CompilationInput(mapOf(TEST_FILE_PATH to ast))
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        return env.invoke(TEST_FILE_URI, functionName, *args)
+        return env.invoke(TEST_FILE_PATH, functionName, *args)
     }
     
     /**

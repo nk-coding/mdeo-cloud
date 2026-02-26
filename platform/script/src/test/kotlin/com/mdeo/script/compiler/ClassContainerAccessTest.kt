@@ -43,7 +43,7 @@ class ClassContainerAccessTest {
     private val enumPackage = "${ScriptMetamodelTypeRegistrar.ENUM_PACKAGE}$metamodelPath"
 
     private val compiler = ScriptCompiler()
-    private val testFileUri = "test://class-container-test.script"
+    private val testFilePath = "test://class-container-test.script"
 
     // -------------------------------------------------------------------------
     // Class container – House.all()
@@ -64,6 +64,7 @@ class ClassContainerAccessTest {
     @Test
     fun `House dot all() iterates over all instances in the model`() {
         val metamodelData = MetamodelData(
+            path = metamodelPath,
             classes = listOf(
                 ClassData(
                     name = "House",
@@ -80,8 +81,8 @@ class ClassContainerAccessTest {
         )
 
         val ast = buildHouseAllAst()
-        val input = CompilationInput(mapOf(testFileUri to ast))
-        val program = compiler.compile(input, metamodelData, metamodelPath)
+        val input = CompilationInput(mapOf(testFilePath to ast))
+        val program = compiler.compile(input, metamodelData)
 
         val modelData = ModelData(
             metamodelUri = metamodelPath,
@@ -102,11 +103,11 @@ class ClassContainerAccessTest {
 
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
-        val env = ExecutionEnvironment(program, console = ps)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
+        val env = ExecutionEnvironment(program)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
 
-        ExecutionContext.withModel(model) {
-            env.invoke(testFileUri, "test")
+        ExecutionContext.withContext(ps, model) {
+            env.invoke(testFilePath, "test")
         }
         val output = baos.toString(Charsets.UTF_8)
 
@@ -189,16 +190,17 @@ class ClassContainerAccessTest {
     @Test
     fun `Enum container entry access returns correct entry name`() {
         val metamodelData = MetamodelData(
+            path = metamodelPath,
             enums = listOf(
                 EnumData(name = "Status", entries = listOf("ACTIVE", "INACTIVE"))
             )
         )
 
         val ast = buildEnumEntryAst()
-        val input = CompilationInput(mapOf(testFileUri to ast))
-        val program = compiler.compile(input, metamodelData, metamodelPath)
+        val input = CompilationInput(mapOf(testFilePath to ast))
+        val program = compiler.compile(input, metamodelData)
 
-        val result = ExecutionEnvironment(program).invoke(testFileUri, "getActiveEntry")
+        val result = ExecutionEnvironment(program).invoke(testFilePath, "getActiveEntry")
 
         assertEquals("ACTIVE", result,
             "Expected Status.ACTIVE.getEntry() to return \"ACTIVE\", but got: $result")
@@ -258,6 +260,7 @@ class ClassContainerAccessTest {
     @Test
     fun `Both class container and enum container are accessible in the same script`() {
         val metamodelData = MetamodelData(
+            path = metamodelPath,
             classes = listOf(
                 ClassData(
                     name = "Tag",
@@ -278,8 +281,8 @@ class ClassContainerAccessTest {
 
         // Script: two functions share the same file scope
         val ast = buildMixedAst()
-        val input = CompilationInput(mapOf(testFileUri to ast))
-        val program = compiler.compile(input, metamodelData, metamodelPath)
+        val input = CompilationInput(mapOf(testFilePath to ast))
+        val program = compiler.compile(input, metamodelData)
 
         val modelData = ModelData(
             metamodelUri = metamodelPath,
@@ -297,18 +300,18 @@ class ClassContainerAccessTest {
         // script classes share the same ScriptClassLoader (avoids classloader identity crisis).
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
-        val env = ExecutionEnvironment(program, console = ps)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
+        val env = ExecutionEnvironment(program)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
 
         // Verify class container
-        ExecutionContext.withModel(model) {
-            env.invoke(testFileUri, "printTagLabels")
+        ExecutionContext.withContext(ps, model) {
+            env.invoke(testFilePath, "printTagLabels")
         }
         val tagLabels = baos.toString(Charsets.UTF_8).lines().filter { it.isNotBlank() }
         assertEquals(listOf("urgent"), tagLabels)
 
         // Verify enum container
-        val priorityEntry = env.invoke(testFileUri, "getHighEntry")
+        val priorityEntry = env.invoke(testFilePath, "getHighEntry")
         assertEquals("HIGH", priorityEntry)
     }
 
@@ -396,6 +399,7 @@ class ClassContainerAccessTest {
     @Test
     fun `toString on enum value returns entry name`() {
         val metamodelData = MetamodelData(
+            path = metamodelPath,
             enums = listOf(EnumData(name = "Status", entries = listOf("ACTIVE", "INACTIVE")))
         )
 
@@ -425,10 +429,10 @@ class ClassContainerAccessTest {
             )
         }
 
-        val input = CompilationInput(mapOf(testFileUri to ast))
-        val program = compiler.compile(input, metamodelData, metamodelPath)
+        val input = CompilationInput(mapOf(testFilePath to ast))
+        val program = compiler.compile(input, metamodelData)
 
-        val result = ExecutionEnvironment(program).invoke(testFileUri, "test")
+        val result = ExecutionEnvironment(program).invoke(testFilePath, "test")
 
         assertEquals("ACTIVE", result,
             "Expected Status.ACTIVE.toString() to return \"ACTIVE\", but got: $result")
@@ -452,6 +456,7 @@ class ClassContainerAccessTest {
     @Test
     fun `toString on class instance returns class name and instance name`() {
         val metamodelData = MetamodelData(
+            path = metamodelPath,
             classes = listOf(ClassData(name = "House", isAbstract = false, properties = emptyList()))
         )
 
@@ -492,8 +497,8 @@ class ClassContainerAccessTest {
             )
         }
 
-        val input = CompilationInput(mapOf(testFileUri to ast))
-        val program = compiler.compile(input, metamodelData, metamodelPath)
+        val input = CompilationInput(mapOf(testFilePath to ast))
+        val program = compiler.compile(input, metamodelData)
 
         val modelData = ModelData(
             metamodelUri = metamodelPath,
@@ -508,10 +513,10 @@ class ClassContainerAccessTest {
         )
 
         val env = ExecutionEnvironment(program)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
 
-        val result = ExecutionContext.withModel(model) {
-            env.invoke(testFileUri, "test")
+        val result = ExecutionContext.withContext(System.out, model) {
+            env.invoke(testFilePath, "test")
         }
 
         assertEquals("House:house1", result,
@@ -528,7 +533,7 @@ class ClassContainerAccessTest {
     private fun captureOutput(block: () -> Unit): String {
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
-        ExecutionContext.withConsole(ps) { block() }
+        ExecutionContext.withContext(ps, null) { block() }
         return baos.toString(Charsets.UTF_8)
     }
 

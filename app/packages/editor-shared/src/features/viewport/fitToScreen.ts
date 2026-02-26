@@ -1,6 +1,6 @@
 import type { Action } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../../sharedImport.js";
-import type { SModelRootImpl } from "sprotty";
+import type { GModelRoot } from "@eclipse-glsp/sprotty";
 
 const { FitToScreenAction } = sharedImport("@eclipse-glsp/protocol");
 const { FitToScreenCommand: SprottyFitToScreenCommand } = sharedImport("@eclipse-glsp/sprotty");
@@ -20,7 +20,7 @@ export function createFitToScreenAction(animate: boolean | undefined = undefined
  */
 @injectable()
 export class FitToScreenCommand extends SprottyFitToScreenCommand {
-    protected override initialize(model: SModelRootImpl): void {
+    protected override initialize(model: GModelRoot): void {
         super.initialize(model);
         if (this.newViewport == undefined) {
             this.newViewport = {

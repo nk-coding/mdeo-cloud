@@ -110,6 +110,10 @@ export interface AssociationData {
  */
 export interface MetamodelAstData {
     /**
+     * The absolute file-system path of this metamodel file.
+     */
+    path: string;
+    /**
      * All class definitions in the metamodel (enums are excluded).
      */
     classes: ClassData[];
@@ -244,7 +248,7 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
     }
 
     return {
-        data: { classes, enums, associations, importedMetamodelPaths },
+        data: { path: fileInfo.uri.fsPath, classes, enums, associations, importedMetamodelPaths },
         ...serverApi.getTrackedRequests()
     };
 };

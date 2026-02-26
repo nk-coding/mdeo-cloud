@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory
  * When a typed-ast has imports from other files, this resolver:
  * 1. Identifies the imported file URIs from the imports field
  * 2. Recursively fetches typed-asts for all dependencies
- * 3. Builds a complete map of fileUri -> TypedAst for compilation
+ * 3. Builds a complete map of filePath -> TypedAst for compilation
  * 
  * The typed-ast structure includes an `imports` array where each import has:
  * - `name`: The imported symbol name (local name in the importing file)

@@ -143,7 +143,11 @@ data class AssociationData(
 @Serializable
 data class MetamodelData(
     /**
-     * All class definitions in the metamodel (enums are excluded).
+     * The absolute file-system path of this metamodel file.
+     */
+    val path: String = "",
+    /**
+     * All class definitions in the metamodel.
      */
     val classes: List<ClassData> = emptyList(),
     /**

@@ -15,6 +15,7 @@
     },
     "devDependencies": {
         "langium": "^4.2.1",
+        "prettier": "^3.8.1",
         "typir": "^0.3.3",
         "typir-langium": "^0.3.3"
     }

@@ -1,6 +1,5 @@
 package com.mdeo.script.runtime
 
-import com.mdeo.script.compiler.CompiledClass
 import com.mdeo.script.compiler.CompiledProgram
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -17,10 +16,12 @@ class ScriptClassLoaderTest {
     @Test
     fun `loadClassForFile loads class for valid file URI`() {
         val bytecode = createSimpleBytecode("com/test/TestClass")
-        val compiledClass = CompiledClass("test://test.script", "com/test/TestClass", bytecode)
-        val program = CompiledProgram(mapOf("test://test.script" to compiledClass))
+        val program = CompiledProgram(
+            allBytecodes = mapOf("com.test.TestClass" to bytecode),
+            scriptFileToClass = mapOf("test://test.script" to "com.test.TestClass")
+        )
         
-        val classLoader = ScriptClassLoader(program)
+        val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
         val clazz = classLoader.loadClassForFile("test://test.script")
         
         assertNotNull(clazz)
@@ -30,7 +31,7 @@ class ScriptClassLoaderTest {
     @Test
     fun `loadClassForFile throws for unknown file URI`() {
         val program = CompiledProgram(emptyMap())
-        val classLoader = ScriptClassLoader(program)
+        val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
         
         assertThrows<ClassNotFoundException> {
             classLoader.loadClassForFile("test://unknown.script")
@@ -40,10 +41,12 @@ class ScriptClassLoaderTest {
     @Test
     fun `loadClassForFile caches loaded classes`() {
         val bytecode = createSimpleBytecode("com/test/CachedClass")
-        val compiledClass = CompiledClass("test://test.script", "com/test/CachedClass", bytecode)
-        val program = CompiledProgram(mapOf("test://test.script" to compiledClass))
+        val program = CompiledProgram(
+            allBytecodes = mapOf("com.test.CachedClass" to bytecode),
+            scriptFileToClass = mapOf("test://test.script" to "com.test.CachedClass")
+        )
         
-        val classLoader = ScriptClassLoader(program)
+        val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
         val clazz1 = classLoader.loadClassForFile("test://test.script")
         val clazz2 = classLoader.loadClassForFile("test://test.script")
         
@@ -53,10 +56,12 @@ class ScriptClassLoaderTest {
     @Test
     fun `findClass loads class by name`() {
         val bytecode = createSimpleBytecode("com/test/FindableClass")
-        val compiledClass = CompiledClass("test://test.script", "com/test/FindableClass", bytecode)
-        val program = CompiledProgram(mapOf("test://test.script" to compiledClass))
+        val program = CompiledProgram(
+            allBytecodes = mapOf("com.test.FindableClass" to bytecode),
+            scriptFileToClass = mapOf("test://test.script" to "com.test.FindableClass")
+        )
         
-        val classLoader = ScriptClassLoader(program)
+        val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
         val clazz = classLoader.loadClass("com.test.FindableClass")
         
         assertNotNull(clazz)

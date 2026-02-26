@@ -1,5 +1,5 @@
 import type { Point } from "@eclipse-glsp/protocol";
-import type { SModelElementImpl } from "sprotty";
+import type { GModelElement } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 import { GNode } from "../../model/node.js";
 
@@ -8,7 +8,7 @@ const { GridSnapper: GLSPGridSnapper } = sharedImport("@eclipse-glsp/client");
 
 @injectable()
 export class GridSnapper extends GLSPGridSnapper {
-    override snap(position: Point, element: SModelElementImpl): Point {
+    override snap(position: Point, element: GModelElement): Point {
         if (element instanceof GNode) {
             let dx = 0;
             let dy = 0;

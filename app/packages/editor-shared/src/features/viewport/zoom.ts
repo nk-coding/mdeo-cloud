@@ -1,4 +1,4 @@
-import type { IActionDispatcher, SModelElementImpl, SModelRootImpl } from "sprotty";
+import type { IActionDispatcher, GModelElement, GModelRoot } from "@eclipse-glsp/sprotty";
 import type { Action, Point, Viewport } from "@eclipse-glsp/protocol";
 import UnitBezier from "@mapbox/unitbezier";
 import type { SetViewportAction } from "./viewport.js";
@@ -107,7 +107,7 @@ export class ZoomMouseListener extends SprottyZoomMouseListener {
      */
     targetZoom?: number;
 
-    override wheel(target: SModelElementImpl, event: WheelEvent): Action[] {
+    override wheel(target: GModelElement, event: WheelEvent): Action[] {
         const viewport = findParentByFeature(target, isViewport);
         if (viewport == undefined) {
             return [];
@@ -138,7 +138,7 @@ export class ZoomMouseListener extends SprottyZoomMouseListener {
      * @param viewport the viewport
      * @param viewportOffset the cursor position which should remain stable
      */
-    private detectWheelType(value: number, viewport: SModelRootImpl & Viewport, viewportOffset: Point) {
+    private detectWheelType(value: number, viewport: GModelRoot & Viewport, viewportOffset: Point) {
         const now = Date.now();
         const timeDelta = now - this.lastWheelEventTime;
         if (this.rollingValues.length > 4) {
@@ -189,7 +189,7 @@ export class ZoomMouseListener extends SprottyZoomMouseListener {
      * @param viewportOffset the cursor position which should remain stable
      * @returns the actions to dispatch
      */
-    private updateViewport(viewport: SModelRootImpl & Viewport, viewportOffset: Point): Action[] {
+    private updateViewport(viewport: GModelRoot & Viewport, viewportOffset: Point): Action[] {
         const isWheel = this.type === "wheel";
         if (
             isWheel &&
@@ -222,7 +222,7 @@ export class ZoomMouseListener extends SprottyZoomMouseListener {
      */
     private generateUpdateViewportAction(
         limitedZoom: number,
-        viewport: SModelRootImpl & Viewport,
+        viewport: GModelRoot & Viewport,
         viewportOffset: Point,
         isWheel: boolean
     ): SetViewportAction {

@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.types.MetamodelData
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.compiler.CompilationInput
+import com.mdeo.script.compiler.CompiledProgram
 import com.mdeo.script.compiler.ScriptCompiler
 import com.mdeo.script.runtime.ExecutionContext
 import com.mdeo.script.runtime.ExecutionEnvironment
@@ -44,6 +45,26 @@ import kotlin.uuid.toKotlinUuid
 private data class ExecutionRequestData(
     val methodName: String,
     val modelPath: String?
+)
+
+/**
+ * Resolved typed ASTs and the metamodel path extracted from the main file.
+ *
+ * @param typedAsts All dependency-resolved typed ASTs keyed by file path.
+ * @param metamodelPath Absolute metamodel path from the main file's typed AST, or null.
+ */
+private data class ResolvedAsts(
+    val typedAsts: Map<String, TypedAst>,
+    val metamodelPath: String?
+)
+
+/**
+ * Fetched metamodel and model data for a single execution.
+ * The metamodel's absolute path is embedded in [metamodelData.path][MetamodelData.path].
+ */
+private data class ModelContext(
+    val metamodelData: MetamodelData,
+    val modelData: ModelData
 )
 
 /**
@@ -143,22 +164,11 @@ class ExecutionService(
     /**
      * Parses execution request data from JSON.
      *
-     * Supports two formats:
-     * - Bare string: "methodName" (backwards compatible)
-     * - JSON object: { "methodName": "...", "modelPath": "..." (optional) }
-     *
      * @param data The JSON element to parse.
      * @return ExecutionRequestData containing method name and optional model path.
      */
     private fun parseExecutionData(data: JsonElement): ExecutionRequestData {
         return when (data) {
-            is JsonPrimitive -> {
-                // Backwards compatible: bare string is the method name
-                ExecutionRequestData(
-                    methodName = data.content,
-                    modelPath = null
-                )
-            }
             is JsonObject -> {
                 val methodName = data["methodName"]?.jsonPrimitive?.content
                     ?: throw IllegalArgumentException("Missing 'methodName' in execution data")
@@ -195,7 +205,7 @@ class ExecutionService(
     }
 
     /**
-     * Executes a script method.
+     * Executes a script method. Delegates to focused sub-steps for clarity.
      *
      * @param executionId UUID of the execution
      * @param projectId UUID of the project
@@ -210,137 +220,194 @@ class ExecutionService(
         requestData: ExecutionRequestData,
         jwtToken: String
     ) {
-        val methodName = requestData.methodName
-        
+        val resolvedAsts = resolveAndValidateAsts(
+            executionId, projectId, filePath, requestData.methodName, jwtToken
+        ) ?: return
+
+        val modelContext = if (resolvedAsts.metamodelPath != null && requestData.modelPath != null) {
+            fetchModelContext(
+                executionId, projectId,
+                resolvedAsts.metamodelPath, requestData.modelPath,
+                jwtToken
+            ) ?: return
+        } else {
+            null
+        }
+
+        val compiledProgram = compileScriptFiles(
+            executionId, resolvedAsts.typedAsts, modelContext?.metamodelData, jwtToken
+        ) ?: return
+
+        runCompiledScript(
+            executionId, compiledProgram, modelContext, filePath, requestData.methodName, jwtToken
+        )
+    }
+
+    /**
+     * Resolves all typed ASTs for [filePath] and its dependencies, then checks that the
+     * target [methodName] exists and has no parameters.
+     *
+     * Updates execution state to [ExecutionState.FAILED] and returns `null` on any error.
+     *
+     * @return [ResolvedAsts] on success, `null` on failure.
+     */
+    private suspend fun resolveAndValidateAsts(
+        executionId: UUID,
+        projectId: UUID,
+        filePath: String,
+        methodName: String,
+        jwtToken: String
+    ): ResolvedAsts? {
         updateExecutionState(executionId, ExecutionState.INITIALIZING, "Fetching AST and dependencies...", jwtToken)
 
         val typedAsts = dependencyResolver.resolveWithDependencies(
-            projectId.toString(),
-            filePath,
-            jwtToken
+            projectId.toString(), filePath, jwtToken
         )
-
         if (typedAsts == null) {
             updateExecutionState(
-                executionId,
-                ExecutionState.FAILED,
-                "Failed to fetch typed AST or its dependencies from backend",
-                jwtToken
+                executionId, ExecutionState.FAILED,
+                "Failed to fetch typed AST or its dependencies from backend", jwtToken
             )
-            return
+            return null
         }
 
         val mainTypedAst = typedAsts[filePath]
         if (mainTypedAst == null) {
             updateExecutionState(
-                executionId,
-                ExecutionState.FAILED,
-                "Main file typed AST not found in resolved dependencies",
-                jwtToken
+                executionId, ExecutionState.FAILED,
+                "Main file typed AST not found in resolved dependencies", jwtToken
             )
-            return
+            return null
         }
 
         val targetFunction = mainTypedAst.functions.find { it.name == methodName }
         if (targetFunction == null) {
             updateExecutionState(
-                executionId,
-                ExecutionState.FAILED,
-                "Method '$methodName' not found in file",
-                jwtToken
+                executionId, ExecutionState.FAILED,
+                "Method '$methodName' not found in file", jwtToken
             )
-            return
+            return null
         }
 
         if (targetFunction.parameters.isNotEmpty()) {
             updateExecutionState(
-                executionId,
-                ExecutionState.FAILED,
+                executionId, ExecutionState.FAILED,
                 "Method '$methodName' has parameters. Only methods with no parameters are supported.",
                 jwtToken
             )
-            return
+            return null
         }
 
-        // Determine if model support is needed
-        val metamodelPath = mainTypedAst.metamodelPath
-        val modelPath = requestData.modelPath
-        
-        // Fetch metamodel and model data if needed
-        var metamodelData: MetamodelData? = null
-        var modelData: ModelData? = null
-        
-        if (metamodelPath != null && modelPath != null) {
-            updateExecutionState(executionId, ExecutionState.INITIALIZING, "Fetching metamodel and model data...", jwtToken)
-            
-            metamodelData = backendApiService.getMetamodelData(projectId.toString(), metamodelPath, jwtToken)
-            if (metamodelData == null) {
-                updateExecutionState(
-                    executionId,
-                    ExecutionState.FAILED,
-                    "Failed to fetch metamodel data from '$metamodelPath'",
-                    jwtToken
-                )
-                return
-            }
-            
-            modelData = backendApiService.getModelData(projectId.toString(), modelPath, jwtToken)
-            if (modelData == null) {
-                updateExecutionState(
-                    executionId,
-                    ExecutionState.FAILED,
-                    "Failed to fetch model data from '$modelPath'",
-                    jwtToken
-                )
-                return
-            }
-        }
+        return ResolvedAsts(typedAsts, mainTypedAst.metamodelPath)
+    }
 
+    /**
+     * Fetches the metamodel and model data needed for execution.
+     * The returned [ModelContext.metamodelData] carries its absolute path in
+     * [MetamodelData.path].
+     *
+     * Updates execution state to [ExecutionState.FAILED] and returns `null` on any error.
+     *
+     * @return [ModelContext] on success, `null` on failure.
+     */
+    private suspend fun fetchModelContext(
+        executionId: UUID,
+        projectId: UUID,
+        metamodelPath: String,
+        modelPath: String,
+        jwtToken: String
+    ): ModelContext? {
         updateExecutionState(
-            executionId,
-            ExecutionState.INITIALIZING,
-            "Compiling ${typedAsts.size} file(s)...",
-            jwtToken
+            executionId, ExecutionState.INITIALIZING, "Fetching metamodel and model data...", jwtToken
         )
 
-        val compiledProgram = try {
-            val input = CompilationInput(typedAsts)
-            compiler.compile(input, metamodelData, metamodelPath)
+        val metamodelData = backendApiService.getMetamodelData(projectId.toString(), metamodelPath, jwtToken)
+        if (metamodelData == null) {
+            updateExecutionState(
+                executionId, ExecutionState.FAILED,
+                "Failed to fetch metamodel data from '$metamodelPath'", jwtToken
+            )
+            return null
+        }
+
+        val modelData = backendApiService.getModelData(projectId.toString(), modelPath, jwtToken)
+        if (modelData == null) {
+            updateExecutionState(
+                executionId, ExecutionState.FAILED,
+                "Failed to fetch model data from '$modelPath'", jwtToken
+            )
+            return null
+        }
+
+        return ModelContext(metamodelData, modelData)
+    }
+
+    /**
+     * Compiles all [typedAsts] into a [CompiledProgram], treating [metamodelData] as optional.
+     * When provided, the metamodel path is read from [MetamodelData.path].
+     *
+     * Updates execution state to [ExecutionState.FAILED] and returns `null` on compilation error.
+     *
+     * @return [CompiledProgram] on success, `null` on failure.
+     */
+    private suspend fun compileScriptFiles(
+        executionId: UUID,
+        typedAsts: Map<String, TypedAst>,
+        metamodelData: MetamodelData?,
+        jwtToken: String
+    ): CompiledProgram? {
+        updateExecutionState(
+            executionId, ExecutionState.INITIALIZING,
+            "Compiling ${typedAsts.size} file(s)...", jwtToken
+        )
+
+        return try {
+            compiler.compile(CompilationInput(typedAsts), metamodelData)
         } catch (e: Exception) {
             logger.error("Compilation failed", e)
-            
             val errorMessage = "Compilation error: ${e.message}"
-            
             transaction {
                 ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                     it[ExecutionsTable.error] = errorMessage
                 }
             }
-            
-            updateExecutionState(
-                executionId,
-                ExecutionState.FAILED,
-                errorMessage,
-                jwtToken
-            )
-            return
+            updateExecutionState(executionId, ExecutionState.FAILED, errorMessage, jwtToken)
+            null
         }
+    }
 
+    /**
+     * Runs the compiled program and persists the result and output to the database.
+     *
+     * @param modelContext Optional model/metamodel context; when present a
+     *   [ModelDataScriptModel] is injected into the execution environment.
+     */
+    private suspend fun runCompiledScript(
+        executionId: UUID,
+        compiledProgram: CompiledProgram,
+        modelContext: ModelContext?,
+        filePath: String,
+        methodName: String,
+        jwtToken: String
+    ) {
         updateExecutionState(executionId, ExecutionState.RUNNING, "Executing...", jwtToken)
 
         val outputStream = ByteArrayOutputStream()
         val printStream = PrintStream(outputStream, true, Charsets.UTF_8)
 
         try {
-            val env = ExecutionEnvironment(compiledProgram, printStream)
-            
-            val result = if (metamodelData != null && modelData != null && metamodelPath != null) {
-                val scriptModel = ModelDataScriptModel(modelData, metamodelData, env.classLoader, metamodelPath)
-                
-                ExecutionContext.withModel(scriptModel) {
-                    env.invoke(filePath, methodName)
-                }
+            val env = ExecutionEnvironment(compiledProgram)
+
+            val scriptModel = if (modelContext != null) {
+                ModelDataScriptModel(
+                    modelContext.modelData, modelContext.metamodelData,
+                    env.classLoader, env.program
+                )
             } else {
+                null
+            }
+
+            val result = ExecutionContext.withContext(printStream, scriptModel) {
                 env.invoke(filePath, methodName)
             }
 
@@ -354,13 +421,7 @@ class ExecutionService(
                 }
             }
 
-            updateExecutionState(
-                executionId,
-                ExecutionState.COMPLETED,
-                "Completed successfully",
-                jwtToken
-            )
-
+            updateExecutionState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
             logger.info("Execution $executionId completed successfully")
         } catch (e: Exception) {
             logger.error("Runtime error during execution", e)
@@ -375,12 +436,7 @@ class ExecutionService(
                 }
             }
 
-            updateExecutionState(
-                executionId,
-                ExecutionState.FAILED,
-                "Runtime error: ${e.message}",
-                jwtToken
-            )
+            updateExecutionState(executionId, ExecutionState.FAILED, "Runtime error: ${e.message}", jwtToken)
         } finally {
             printStream.close()
         }
