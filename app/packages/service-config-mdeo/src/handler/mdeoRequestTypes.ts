@@ -1,60 +1,31 @@
 /**
- * Data for a "using" path in the search section.
- */
-export interface UsingPathData {
-    /**
-     * The path to the model transformation file.
-     */
-    path: string;
-}
-
-/**
  * Data for a class mutation (create/delete/mutate).
+ * Informational only; not forwarded to the optimizer backend.
  */
 export interface ClassMutationData {
-    /**
-     * The mutation operator type.
-     */
     operator: "create" | "delete" | "mutate";
-    /**
-     * The name of the class being mutated.
-     */
     className: string;
 }
 
 /**
  * Data for an edge mutation (add/remove/mutate).
+ * Informational only; not forwarded to the optimizer backend.
  */
 export interface EdgeMutationData {
-    /**
-     * The mutation operator type.
-     */
     operator: "add" | "remove" | "mutate";
-    /**
-     * The name of the class owning the edge.
-     */
     className: string;
-    /**
-     * The name of the edge property.
-     */
     edgeName: string;
 }
 
 /**
  * Data for the mutations block.
+ * `usingPaths` is a flat list of absolute file-system paths, matching
+ * Kotlin MutationsConfig.usingPaths (List<String>).
  */
 export interface MutationsBlockData {
-    /**
-     * The model transformation file paths.
-     */
-    usingPaths: UsingPathData[];
-    /**
-     * The class mutations.
-     */
+    /** Absolute paths to the model transformation files. */
+    usingPaths: string[];
     classMutations: ClassMutationData[];
-    /**
-     * The edge mutations.
-     */
     edgeMutations: EdgeMutationData[];
 }
 
@@ -62,68 +33,45 @@ export interface MutationsBlockData {
  * Data extracted from the search section.
  */
 export interface SearchSectionData {
-    /**
-     * The mutations block data.
-     */
     mutations?: MutationsBlockData;
 }
 
-/** Bare integer step size. Example: step = 3 */
-export interface MutationStepNumericData {
-    kind: "numeric";
-    value: number;
-}
+/**
+ * Mutation step configuration.
+ * `type` discriminator matches Kotlin @SerialName values ("Fixed" / "Interval").
+ */
+export type MutationStepConfig =
+    | { type: "Fixed"; n: number }
+    | { type: "Interval"; lower: number; upper: number };
 
-/** Fixed step size with no argument (runtime default = 1). Example: step = fixed */
-export interface MutationStepFixedData {
-    kind: "fixed";
-}
-
-/** Fixed step size with an explicit integer argument. Example: step = fixed(3) */
-export interface MutationStepFixedNData {
-    kind: "fixedN";
-    n: number;
-}
-
-/** Interval step size drawn from [lower, upper). Example: step = interval(1, 5) */
-export interface MutationStepIntervalData {
-    kind: "interval";
-    lower: number;
-    upper: number;
-}
-
-/** Discriminated union of all mutation step value forms. */
-export type MutationStepValueData =
-    | MutationStepNumericData
-    | MutationStepFixedData
-    | MutationStepFixedNData
-    | MutationStepIntervalData;
-
-/** Data for the mutation { } nested block. */
+/**
+ * Mutation parameters block.
+ * Maps to Kotlin MutationParameters.
+ * `strategy` matches Kotlin MutationStrategy enum names (uppercase).
+ */
 export interface MutationBlockData {
-    step?: MutationStepValueData;
-    strategy?: "random" | "repetitive";
-    selection?: "random";
-    application?: "random";
-    credit?: "random";
-    repair?: "default";
+    step?: MutationStepConfig;
+    strategy?: "RANDOM" | "REPETITIVE";
 }
 
-/** Data for the archive { } nested block. */
-export interface ArchiveBlockData {
-    size?: number;
-}
-
-/** Data for the parameters { } block. */
+/**
+ * Algorithm parameters block.
+ * Maps to Kotlin AlgorithmParameters.
+ * `variation` matches Kotlin VariationType enum names (uppercase).
+ * `archiveSize` matches Kotlin AlgorithmParameters.archiveSize directly.
+ */
 export interface AlgorithmParametersData {
     population?: number;
-    variation?: "mutation" | "genetic" | "probabilistic";
+    variation?: "MUTATION" | "GENETIC" | "PROBABILISTIC";
     mutation?: MutationBlockData;
     bisections?: number;
-    archive?: ArchiveBlockData;
+    archiveSize?: number;
 }
 
-/** Data for the termination { } block. */
+/**
+ * Termination block.
+ * Maps to Kotlin TerminationConfig.
+ */
 export interface TerminationBlockData {
     evolutions?: number;
     time?: number;
@@ -131,9 +79,12 @@ export interface TerminationBlockData {
     iterations?: number;
 }
 
-/** Data extracted from the solver section. */
+/**
+ * Solver section data.
+ * Maps to Kotlin SolverConfig.
+ * `provider` and `algorithm` match Kotlin enum names (uppercase).
+ */
 export interface SolverSectionData {
-    provider?: "moea" | "ecj";
     algorithm?: "NSGAII" | "IBEA" | "SPEA2" | "SMSMOEA" | "VEGA" | "PESA2" | "PAES" | "RANDOM";
     parameters?: AlgorithmParametersData;
     termination?: TerminationBlockData;
@@ -142,14 +93,10 @@ export interface SolverSectionData {
 
 /**
  * Combined response from the MDEO request handler.
+ * Keys match Kotlin SearchConfig / SolverConfig directly so no conversion
+ * is needed in the execution handler.
  */
 export interface MdeoRequestResponse {
-    /**
-     * The search section data.
-     */
     search?: SearchSectionData;
-    /**
-     * The solver section data.
-     */
     solver?: SolverSectionData;
 }

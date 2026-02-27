@@ -524,6 +524,95 @@ class ClassContainerAccessTest {
     }
 
     // -------------------------------------------------------------------------
+    // Bug regression: Room.all().size() on empty model
+    // -------------------------------------------------------------------------
+
+    /**
+     * Regression test for: `Room.all().size()` must return 0 when the model
+     * contains no Room instances.
+     *
+     * The script:
+     * ```
+     * fun countRooms(): int {
+     *     return Room.all().size()
+     * }
+     * ```
+     * executed against an empty model must return 0.
+     *
+     * Bug: [ModelDataScriptModel.getAllInstances] returns `kotlin.collections.EmptyList`
+     * (via Kotlin's `emptyList()`) when there are no instances for a class.
+     * The generated script bytecode calls
+     * `INVOKEINTERFACE com/mdeo/script/stdlib/impl/collections/ReadonlyCollection size ()I`
+     * on this object, but `EmptyList` does not implement `ReadonlyCollection`,
+     * causing `IncompatibleClassChangeError` at runtime.
+     */
+    @Test
+    fun `Room dot all dot size() returns 0 for empty model`() {
+        val metamodelData = MetamodelData(
+            path = metamodelPath,
+            classes = listOf(
+                ClassData(
+                    name = "Room",
+                    isAbstract = false,
+                    properties = emptyList()
+                )
+            )
+        )
+
+        // Script: fun countRooms(): int { return Room.all().size() }
+        val ast = buildTypedAst {
+            val intIdx           = addType(ClassTypeRef("builtin", "int", false))
+            val roomContainerIdx = addType(ClassTypeRef(classContainerPackage, "Room", false))
+            val collectionIdx    = addType(ClassTypeRef("builtin", "Collection", false))
+
+            function(
+                name = "countRooms",
+                returnType = intIdx,
+                body = listOf(
+                    returnStmt(
+                        // Room.all().size()
+                        memberCall(
+                            expression = memberCall(
+                                expression = identifier("Room", roomContainerIdx, scope = 1),
+                                member = "all",
+                                overload = "",
+                                arguments = emptyList(),
+                                resultTypeIndex = collectionIdx
+                            ),
+                            member = "size",
+                            overload = "",
+                            arguments = emptyList(),
+                            resultTypeIndex = intIdx
+                        )
+                    )
+                )
+            )
+        }
+
+        val input = CompilationInput(mapOf(testFilePath to ast))
+        val program = compiler.compile(input, metamodelData)
+
+        // Empty model – no Room instances, so getAllInstances("Room") returns emptyList()
+        val modelData = ModelData(
+            metamodelUri = metamodelPath,
+            instances = emptyList(),
+            links = emptyList()
+        )
+
+        val env = ExecutionEnvironment(program)
+        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
+
+        // This should return 0 but currently throws IncompatibleClassChangeError
+        // because getAllInstances() returns kotlin.collections.EmptyList instead
+        // of a ReadonlyCollection implementation.
+        val result = ExecutionContext.withContext(System.out, model) {
+            env.invoke(testFilePath, "countRooms")
+        }
+
+        assertEquals(0, result, "Room.all().size() should return 0 for an empty model")
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 

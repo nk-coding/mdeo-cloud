@@ -28,13 +28,18 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * @param metamodelData The metamodel data containing class and association definitions.
  * @param expressionCompilerRegistry Registry for compiling expressions to GraphTraversal.
  * @param statementExecutorRegistry Registry for executing transformation statements.
+ * @param deterministic When true (default), single-match statements use `limit(1)` which always
+ *   selects the first candidate in traversal order. When false, `sample(1)` is used instead,
+ *   picking a uniformly random candidate from all matches and thus introducing non-determinism.
+ *   Set to false for search-based optimisation runs where variety across iterations is desired.
  */
 class TransformationEngine(
     val traversalSource: GraphTraversalSource,
     val ast: TypedAst,
     val metamodelData: MetamodelData = MetamodelData.empty(),
     val expressionCompilerRegistry: ExpressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
-    val statementExecutorRegistry: StatementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
+    val statementExecutorRegistry: StatementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry(),
+    val deterministic: Boolean = true
 ) {
 
     val instanceNameRegistry: InstanceNameRegistry = InstanceNameRegistry()
@@ -286,19 +291,23 @@ class TransformationEngine(
          * @param traversalSource The Gremlin GraphTraversalSource.
          * @param ast The TypedAst to execute.
          * @param metamodelData The metamodel data containing class and association definitions.
+         * @param deterministic When true (default) single-match steps use `limit(1)`; when false
+         *   they use `sample(1)` for non-deterministic match selection.
          * @return A new TransformationEngine with default configuration.
          */
         fun create(
             traversalSource: GraphTraversalSource, 
             ast: TypedAst,
-            metamodelData: MetamodelData = MetamodelData.empty()
+            metamodelData: MetamodelData = MetamodelData.empty(),
+            deterministic: Boolean = true
         ): TransformationEngine {
             return TransformationEngine(
                 traversalSource = traversalSource,
                 ast = ast,
                 metamodelData = metamodelData,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
-                statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
+                statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry(),
+                deterministic = deterministic
             )
         }
     }

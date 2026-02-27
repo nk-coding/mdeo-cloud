@@ -12,7 +12,6 @@ import type {
     EdgeMutationType,
     MutationStepValueType,
     MutationBlockType,
-    ArchiveBlockType,
     AlgorithmParametersType,
     TerminationBlockType
 } from "@mdeo/language-config-mdeo";
@@ -24,12 +23,10 @@ import type {
     SolverSectionData,
     MdeoRequestResponse,
     MutationsBlockData,
-    UsingPathData,
     ClassMutationData,
     EdgeMutationData,
-    MutationStepValueData,
+    MutationStepConfig,
     MutationBlockData,
-    ArchiveBlockData,
     AlgorithmParametersData,
     TerminationBlockData
 } from "./mdeoRequestTypes.js";
@@ -43,17 +40,11 @@ import type { ServiceMdeoMetamodelResolver } from "../serviceMdeoMetamodelResolv
 export const MDEO_REQUEST_KEY = "config";
 
 /**
- * Extracts using path data.
- *
- * @param usingPath The using path node
- * @param document The config Langium document
- * @returns The extracted data
+ * Extracts the absolute path for a using-path node.
  */
-function extractUsingPath(usingPath: UsingPathType, document: LangiumDocument): UsingPathData {
+function extractUsingPath(usingPath: UsingPathType, document: LangiumDocument): string {
     const relativePath = usingPath.path ?? "";
-    return {
-        path: resolveRelativePath(document, relativePath).fsPath
-    };
+    return resolveRelativePath(document, relativePath).fsPath;
 }
 
 /**
@@ -85,10 +76,6 @@ function extractEdgeMutation(mutation: EdgeMutationType): EdgeMutationData {
 
 /**
  * Extracts mutations block data.
- *
- * @param mutations The mutations block node
- * @param document The config Langium document
- * @returns The extracted data
  */
 function extractMutationsBlock(mutations: MutationsBlockType, document: LangiumDocument): MutationsBlockData {
     return {
@@ -113,21 +100,22 @@ function extractSearchData(section: SearchSectionType, document: LangiumDocument
 }
 
 /**
- * Extracts mutation step value data from the AST union node.
+ * Converts an AST mutation step node to a MutationStepConfig matching
+ * the Kotlin sealed class @SerialName discriminators ("Fixed" / "Interval").
  */
-function extractMutationStepValue(step: MutationStepValueType): MutationStepValueData {
+function extractMutationStepValue(step: MutationStepValueType): MutationStepConfig {
     const typed = step as unknown as { $type: string; value?: number; n?: number; lower?: number; upper?: number };
     switch (typed.$type) {
         case "ConfigMdeoMutationStepNumeric":
-            return { kind: "numeric", value: typed.value ?? 0 };
+            return { type: "Fixed", n: typed.value ?? 0 };
         case "ConfigMdeoMutationStepFixed":
-            return { kind: "fixed" };
+            return { type: "Fixed", n: 1 };
         case "ConfigMdeoMutationStepFixedN":
-            return { kind: "fixedN", n: typed.n ?? 0 };
+            return { type: "Fixed", n: typed.n ?? 0 };
         case "ConfigMdeoMutationStepInterval":
-            return { kind: "interval", lower: typed.lower ?? 0, upper: typed.upper ?? 0 };
+            return { type: "Interval", lower: typed.lower ?? 0, upper: typed.upper ?? 0 };
         default:
-            return { kind: "fixed" };
+            return { type: "Fixed", n: 1 };
     }
 }
 
@@ -136,21 +124,11 @@ function extractMutationStepValue(step: MutationStepValueType): MutationStepValu
  */
 function extractMutationBlock(mutation: MutationBlockType): MutationBlockData {
     const step = mutation.step[0];
+    const strategy = mutation.strategy[0];
     return {
         step: step ? extractMutationStepValue(step as MutationStepValueType) : undefined,
-        strategy: mutation.strategy[0] as MutationBlockData["strategy"],
-        selection: mutation.selection[0] as MutationBlockData["selection"],
-        application: mutation.application[0] as MutationBlockData["application"],
-        credit: mutation.credit[0] as MutationBlockData["credit"],
-        repair: mutation.repair[0] as MutationBlockData["repair"]
+        strategy: strategy != null ? (strategy.toUpperCase() as MutationBlockData["strategy"]) : undefined
     };
-}
-
-/**
- * Extracts archive block data.
- */
-function extractArchiveBlock(archive: ArchiveBlockType): ArchiveBlockData {
-    return { size: archive.size[0] };
 }
 
 /**
@@ -158,13 +136,14 @@ function extractArchiveBlock(archive: ArchiveBlockType): ArchiveBlockData {
  */
 function extractAlgorithmParameters(params: AlgorithmParametersType): AlgorithmParametersData {
     const mutation = params.mutation[0];
-    const archive = params.archive[0];
+    const archive = params.archive[0] as unknown as { size?: number[] } | undefined;
+    const variation = params.variation[0];
     return {
         population: params.population[0],
-        variation: params.variation[0] as AlgorithmParametersData["variation"],
+        variation: variation != null ? (variation.toUpperCase() as AlgorithmParametersData["variation"]) : undefined,
         mutation: mutation ? extractMutationBlock(mutation as MutationBlockType) : undefined,
         bisections: params.bisections[0],
-        archive: archive ? extractArchiveBlock(archive as ArchiveBlockType) : undefined
+        archiveSize: archive?.size?.[0]
     };
 }
 
@@ -182,15 +161,11 @@ function extractTerminationBlock(termination: TerminationBlockType): Termination
 
 /**
  * Extracts solver section data.
- *
- * @param section The solver section node
- * @returns The extracted data
  */
 function extractSolverData(section: SolverSectionType): SolverSectionData {
     const parameters = section.parameters[0];
     const termination = section.termination[0];
     return {
-        provider: section.provider[0] as SolverSectionData["provider"],
         algorithm: section.algorithm[0] as SolverSectionData["algorithm"],
         parameters: parameters ? extractAlgorithmParameters(parameters as AlgorithmParametersType) : undefined,
         termination: termination ? extractTerminationBlock(termination as TerminationBlockType) : undefined,
@@ -217,10 +192,10 @@ export const mdeoRequestHandler: RequestHandler<MdeoRequestResponse, MdeoService
 
     const resolver = context.services.MdeoMetamodelResolver as ServiceMdeoMetamodelResolver;
     const problemData = (requestBody.dependencyData?.["optimization"]?.["problem"] ?? {}) as {
-        metamodel?: string;
+        metamodelPath?: string;
     };
-    if (problemData.metamodel) {
-        resolver.setMetamodelData(URI.file(problemData.metamodel));
+    if (problemData.metamodelPath) {
+        resolver.setMetamodelData(URI.file(problemData.metamodelPath));
     }
 
     const textDocument = TextDocument.create(requestBody.configFileUri, CONFIG_MDEO_LANGUAGE_KEY, 0, text);

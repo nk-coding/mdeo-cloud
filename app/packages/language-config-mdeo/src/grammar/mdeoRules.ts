@@ -247,7 +247,6 @@ export const TerminationBlockRule = createRule("ConfigMdeoTerminationBlockRule")
  * The keyword will be added by the wrapper rule in language-config composition.
  * Syntax:
  *   {
- *       provider = moea
  *       algorithm = NSGAII
  *       parameters {
  *           population = 40
@@ -267,7 +266,6 @@ export const SolverSectionContentRule = createRule("SolverSectionContentRule")
         many(NEWLINE),
         many(
             or(
-                group("provider", "=", add("provider", "moea", "ecj")),
                 group(
                     "algorithm",
                     "=",

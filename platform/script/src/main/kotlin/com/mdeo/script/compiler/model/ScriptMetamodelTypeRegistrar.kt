@@ -509,6 +509,19 @@ private class ClassContainerAllMethodDefinition(
             "(Ljava/lang/String;)Ljava/util/List;",
             false
         )
+        // Wrap the returned List in a BagImpl so the result implements
+        // ReadonlyCollection (required for .size(), .isEmpty(), etc. calls
+        // that the script compiler emits as INVOKEINTERFACE on ReadonlyCollection).
+        mv.visitTypeInsn(Opcodes.NEW, "com/mdeo/script/stdlib/impl/collections/BagImpl")
+        mv.visitInsn(Opcodes.DUP_X1)
+        mv.visitInsn(Opcodes.SWAP)
+        mv.visitMethodInsn(
+            Opcodes.INVOKESPECIAL,
+            "com/mdeo/script/stdlib/impl/collections/BagImpl",
+            "<init>",
+            "(Ljava/util/Collection;)V",
+            false
+        )
     }
 }
 

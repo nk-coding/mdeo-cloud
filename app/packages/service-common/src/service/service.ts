@@ -215,6 +215,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                 try {
                     const result = await handler({
                         body,
+                        jwt,
                         instance,
                         services: instance.services,
                         serverApi: instance.services.shared.ServerApi,

@@ -16,7 +16,6 @@ import type {
     ProblemSectionData,
     GoalSectionData,
     OptimizationRequestResponse,
-    MultiplicityData,
     ConstraintData,
     ObjectiveData,
     RefinementData
@@ -33,12 +32,12 @@ function extractProblemData(section: ProblemSectionType, document: LangiumDocume
     const metamodel = section.metamodel[0];
     const model = section.model[0];
     return {
-        metamodel: metamodel ? resolveRelativePath(document, metamodel).fsPath : "",
-        model: model ? resolveRelativePath(document, model).fsPath : ""
+        metamodelPath: metamodel ? resolveRelativePath(document, metamodel).fsPath : "",
+        modelPath: model ? resolveRelativePath(document, model).fsPath : ""
     };
 }
 
-function extractMultiplicity(mult: any): MultiplicityData {
+function extractMultiplicityBounds(mult: any): { lower: number; upper: number } {
     if (mult == undefined) {
         return { lower: 1, upper: 1 };
     }
@@ -94,17 +93,21 @@ function extractGoalData(section: GoalSectionType, document: LangiumDocument): G
         const refText: string = o.objective?.$refText ?? "";
         const resolved = functionLookup.get(refText);
         return {
-            type: (o.type === "maximize" ? "maximize" : "minimize") as "maximize" | "minimize",
+            type: (o.type === "maximize" ? "MAXIMIZE" : "MINIMIZE") as "MAXIMIZE" | "MINIMIZE",
             path: resolved?.path ?? "",
             functionName: resolved?.functionName ?? refText
         };
     });
 
-    const refinements: RefinementData[] = (section.refinements ?? []).map((r: any) => ({
-        className: r.class?.$refText ?? "",
-        fieldName: r.field?.$refText ?? "",
-        multiplicity: extractMultiplicity(r.multiplicity)
-    }));
+    const refinements: RefinementData[] = (section.refinements ?? []).map((r: any) => {
+        const bounds = extractMultiplicityBounds(r.multiplicity);
+        return {
+            className: r.class?.$refText ?? "",
+            fieldName: r.field?.$refText ?? "",
+            lower: bounds.lower,
+            upper: bounds.upper
+        };
+    });
 
     return { constraints, objectives, refinements };
 }

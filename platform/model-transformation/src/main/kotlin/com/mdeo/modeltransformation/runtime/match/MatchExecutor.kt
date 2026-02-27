@@ -225,7 +225,7 @@ class MatchExecutor {
             traversal
         }
         
-        traversal = applyLimit(traversal, limit)
+        traversal = applyLimit(traversal, limit, engine.deterministic)
         
         val matchedInstanceNames = elements.matchableInstances.map { it.objectInstance.name }
         traversal = addCreateVertexSteps(traversal, elements.createInstances, context, engine, matchedInstanceNames, compilationContext)
@@ -263,21 +263,32 @@ class MatchExecutor {
     }
     
     /**
-     * Applies limit to the traversal (unless unlimited).
-     * 
-     * @param traversal The traversal to apply the limit to
-     * @param limit Maximum number of results to return (values <= 0 mean no limit)
-     * @return The traversal with limit applied if limit > 0, otherwise unchanged
+     * Applies limit (or random sampling) to the traversal.
+     *
+     * When [deterministic] is true and [limit] > 0 the standard `limit()` step is used,
+     * which always picks the first candidate in traversal order.
+     *
+     * When [deterministic] is false and [limit] == 1 the `sample(1)` step is used instead,
+     * which selects a uniformly random element from all candidates, producing non-deterministic
+     * results across repeated calls on the same graph — desirable for search-based optimisation.
+     * For limits other than 1 in non-deterministic mode, `limit()` is still used because
+     * `sample()` semantics are only meaningful for single-pick operations.
+     *
+     * @param traversal The traversal to apply the limit to.
+     * @param limit Maximum number of results to return (values <= 0 mean no limit).
+     * @param deterministic When false and limit == 1, uses sample(1) instead of limit(1).
+     * @return The traversal with the appropriate step applied.
      */
     @Suppress("UNCHECKED_CAST")
     private fun applyLimit(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
-        limit: Long
+        limit: Long,
+        deterministic: Boolean = true
     ): GraphTraversal<Vertex, Map<String, Any>> {
-        return if (limit > 0) {
-            traversal.limit(limit) as GraphTraversal<Vertex, Map<String, Any>>
-        } else {
-            traversal
+        return when {
+            limit <= 0 -> traversal
+            !deterministic && limit == 1L -> traversal.sample(1) as GraphTraversal<Vertex, Map<String, Any>>
+            else -> traversal.limit(limit) as GraphTraversal<Vertex, Map<String, Any>>
         }
     }
     

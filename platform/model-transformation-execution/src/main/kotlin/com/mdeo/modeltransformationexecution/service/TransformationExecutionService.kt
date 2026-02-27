@@ -282,7 +282,7 @@ class TransformationExecutionService(
         
         return try {
             val g = graph.traversal()
-            val engine = TransformationEngine.create(g, typedAst, metamodelData)
+            val engine = TransformationEngine.create(g, typedAst, metamodelData, deterministic = false)
             
             graphLoader.load(g, modelData, engine.instanceNameRegistry, metamodelData)
             

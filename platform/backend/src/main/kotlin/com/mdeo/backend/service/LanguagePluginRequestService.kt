@@ -33,21 +33,28 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
     /**
      * Execute a request against the language plugin for the given language.
      *
-     * This method locates the appropriate plugin for the language, prepares a project JWT,
-     * and forwards the provided JSON body to the plugin endpoint. Contribution plugin metadata
-     * is included in the request payload.
+     * This method locates the appropriate plugin for the language, prepares a JWT,
+     * and forwards the provided JSON body to the plugin endpoint. When a
+     * [callerJwt] is supplied (service-to-service calls) it is forwarded directly
+     * so that its full scope set (e.g. execution:write) reaches the plugin.
+     * For browser-session calls where no [callerJwt] is available a fresh
+     * project token is generated instead.
+     *
+     * Contribution plugin metadata is included in the request payload.
      *
      * @param projectId the UUID of the project making the request.
      * @param languageId the identifier of the language whose plugin should handle the request.
      * @param key the plugin route key to call.
      * @param body the JSON payload to forward to the plugin.
+     * @param callerJwt optional JWT from the caller to forward directly (preserves scopes).
      * @return an [ApiResult] containing the plugin response data on success or an error on failure.
      */
     suspend fun executeRequest(
         projectId: UUID,
         languageId: String,
         key: String,
-        body: JsonElement
+        body: JsonElement,
+        callerJwt: String? = null
     ): ApiResult<LanguagePluginResponse> {
         val pluginInfo = pluginService.findPluginByLanguage(projectId, languageId)
             ?: return languagePluginRequestFailure(
@@ -65,7 +72,7 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
         val contributionPlugins = pluginService.getContributionPluginsForLanguage(projectId, languageId)
 
         return try {
-            val token = jwtService.generateProjectToken(projectId)
+            val token = callerJwt ?: jwtService.generateProjectToken(projectId)
 
             val responseData = callPlugin(
                 pluginUrl,

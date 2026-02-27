@@ -91,9 +91,6 @@ function printSolverSection(context: PrintContext<SolverSectionType>): Doc {
     docs.push("{");
 
     const contentDocs: Doc[] = [];
-    if (ctx.provider.length > 0) {
-        contentDocs.push(["provider = ", ctx.provider[0]]);
-    }
     if (ctx.algorithm.length > 0) {
         contentDocs.push(["algorithm = ", ctx.algorithm[0]]);
     }

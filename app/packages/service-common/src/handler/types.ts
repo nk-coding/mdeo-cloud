@@ -79,6 +79,12 @@ export interface RequestContext<T = object> {
     body: unknown;
 
     /**
+     * The JWT token extracted from the Authorization header.
+     * Use this to forward authorization when calling downstream services.
+     */
+    jwt: string;
+
+    /**
      * The Langium instance to use for processing
      */
     instance: LangiumInstance<T>;

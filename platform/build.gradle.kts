@@ -26,5 +26,13 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+
+        // MOEA Framework's Instrumenter uses deep reflection; open JDK internal modules
+        jvmArgs(
+            "--add-opens", "java.xml/org.xml.sax.helpers=ALL-UNNAMED",
+            "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+            "--add-opens", "java.base/java.util=ALL-UNNAMED",
+            "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED"
+        )
     }
 }

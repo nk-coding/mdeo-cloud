@@ -57,13 +57,14 @@ export class ConfigExecutionHandler implements ExecutionHandler<ExecuteResponse>
         const plugins = (context.contributionPlugins as ServerContributionPlugin[]).filter(ConfigContributionPlugin.is);
         const executableSection = await this.resolveSingleExecutableSection(context, plugins);
 
-        const requestBody: ConfigExecutionPluginRequestBody = {
+        const requestBody: ConfigExecutionPluginRequestBody & { jwt?: string } = {
             executionId: context.executionId,
             project: context.project,
             filePath: context.filePath,
             fileContent: context.fileContent,
             fileVersion: context.fileVersion,
-            data: context.data
+            data: context.data,
+            jwt: context.jwt
         };
 
         const routingMetadata: ConfigExecutionRoutingMetadata = {

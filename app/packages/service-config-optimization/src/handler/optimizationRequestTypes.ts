@@ -1,27 +1,12 @@
 /**
  * Data extracted from the optimization problem section.
+ * Field names match Kotlin ProblemConfig.
  */
 export interface ProblemSectionData {
-    /**
-     * Absolute path to the .metamodel file.
-     */
-    metamodel: string;
-    /**
-     * Absolute path to the .model file.
-     */
-    model: string;
-}
-
-/**
- * A multiplicity with explicit lower and upper bounds.
- * Use -1 for upper to indicate an unbounded (∞) upper limit.
- */
-export interface MultiplicityData {
-    lower: number;
-    /**
-     * -1 means unbounded (∞).
-     */
-    upper: number;
+    /** Absolute path to the .metamodel file. */
+    metamodelPath: string;
+    /** Absolute path to the .model file. */
+    modelPath: string;
 }
 
 /**
@@ -40,38 +25,28 @@ export interface ConstraintData {
 
 /**
  * An objective in the goal section (e.g., `maximize myFn`).
+ * `type` matches Kotlin ObjectiveTendency enum serialization (uppercase).
  */
 export interface ObjectiveData {
-    /**
-     * Whether the objective is maximized or minimized.
-     */
-    type: "maximize" | "minimize";
-    /**
-     * Absolute path to the script file that contains the objective function.
-     */
+    /** Whether the objective is maximized or minimized. */
+    type: "MAXIMIZE" | "MINIMIZE";
+    /** Absolute path to the script file that contains the objective function. */
     path: string;
-    /**
-     * The name of the objective function as declared in the script file.
-     */
+    /** The name of the objective function as declared in the script file. */
     functionName: string;
 }
 
 /**
  * A refinement specification in the goal section (e.g., `refine Class.field[0..*]`).
+ * `lower`/`upper` match Kotlin RefinementConfig fields directly (-1 means unbounded).
  */
 export interface RefinementData {
-    /**
-     * The name of the refined class.
-     */
     className: string;
-    /**
-     * The name of the refined field.
-     */
     fieldName: string;
-    /**
-     * The multiplicity constraint.
-     */
-    multiplicity: MultiplicityData;
+    /** Lower bound of the multiplicity. */
+    lower: number;
+    /** Upper bound of the multiplicity (-1 means unbounded). */
+    upper: number;
 }
 
 /**

@@ -21,21 +21,23 @@ fun Route.languagePluginRequestRoutes(
         post {
             val session = call.getUserSession()
             val jwtPrincipal = call.getJwtPrincipal()
-            
-            val projectId = call.parameters["projectId"]?.let { 
+
+            val projectId = call.parameters["projectId"]?.let {
                 try { UUID.fromString(it) } catch (e: Exception) { null }
             }
             if (projectId == null) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid project ID"))
                 return@post
             }
-            
+
+            var callerJwt: String? = null
+
             if (session != null) {
                 val userId = try { UUID.fromString(session.userId) } catch (e: Exception) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
                     return@post
                 }
-                
+
                 if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@post
@@ -49,37 +51,42 @@ fun Route.languagePluginRequestRoutes(
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Token missing required scope"))
                     return@post
                 }
+                val authHeader = call.request.headers[HttpHeaders.Authorization]
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    callerJwt = authHeader.substring(7)
+                }
             } else {
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
                 return@post
             }
-            
+
             val languageId = call.parameters["languageId"]
             if (languageId.isNullOrBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing language ID"))
                 return@post
             }
-            
+
             val key = call.parameters["key"]
             if (key.isNullOrBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing request key"))
                 return@post
             }
-            
+
             val body = try {
                 call.receive<JsonElement>()
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid JSON body"))
                 return@post
             }
-            
+
             val result = languagePluginRequestService.executeRequest(
                 projectId,
                 languageId,
                 key,
-                body
+                body,
+                callerJwt
             )
-            
+
             call.respondApiResult(result)
         }
     }

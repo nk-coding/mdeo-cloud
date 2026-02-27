@@ -1,0 +1,91 @@
+package com.mdeo.optimizer
+
+import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.modeltransformation.ast.TypedAst
+import com.mdeo.optimizer.config.OptimizationConfig
+import com.mdeo.optimizer.guidance.GuidanceFunction
+import com.mdeo.optimizer.moea.AlgorithmConfiguration
+import com.mdeo.optimizer.moea.MoeaOptimization
+import com.mdeo.optimizer.moea.SearchResult
+import com.mdeo.optimizer.moea.SolutionGenerator
+import com.mdeo.optimizer.operators.MutationStrategyFactory
+import com.mdeo.optimizer.solution.Solution
+import org.slf4j.LoggerFactory
+
+/**
+ * Main orchestrator for optimization runs.
+ *
+ * Ported from OptimisationInterpreter.java. Wires together the solver configuration,
+ * mutation strategy, guidance functions, and the initial solution provider, then runs
+ * the evolutionary search using the MOEA Framework.
+ *
+ * @param config Full optimization configuration (problem, goal, search, solver).
+ * @param objectives Objective guidance functions (fitness evaluators).
+ * @param constraints Constraint guidance functions.
+ * @param transformations Pre-fetched and validated transformation typed ASTs, keyed by file path.
+ * @param metamodelData The metamodel data used for transformation execution.
+ * @param initialSolutionProvider Factory for creating an initial candidate solution
+ *   (model loaded into a [GraphBackend]).
+ */
+class OptimizationOrchestrator(
+    private val config: OptimizationConfig,
+    private val objectives: List<GuidanceFunction>,
+    private val constraints: List<GuidanceFunction>,
+    private val transformations: Map<String, TypedAst>,
+    private val metamodelData: MetamodelData,
+    private val initialSolutionProvider: () -> Solution
+) {
+    private val logger = LoggerFactory.getLogger(OptimizationOrchestrator::class.java)
+
+    /**
+     * Runs the optimization and returns the search result.
+     *
+     * Creates the mutation strategy from configuration, builds the MOEA algorithm
+     * configuration, and executes the specified number of batches. Currently returns
+     * the result of the last batch.
+     *
+     * @return The [SearchResult] containing the final approximation set and metrics.
+     */
+    fun run(): SearchResult {
+        logger.info(
+            "Starting optimization: algorithm=${config.solver.algorithm}, " +
+                "objectives=${objectives.size}, constraints=${constraints.size}, " +
+                "transformations=${transformations.size}, batches=${config.solver.batches}"
+        )
+
+        val mutationStrategy = MutationStrategyFactory.create(
+            config.solver.parameters.mutation,
+            transformations,
+            metamodelData
+        )
+
+        val solutionGenerator = SolutionGenerator(
+            initialSolutionProvider = initialSolutionProvider,
+            mutationStrategy = mutationStrategy
+        )
+
+        val algorithmConfig = AlgorithmConfiguration(
+            solverConfig = config.solver,
+            solutionGenerator = solutionGenerator,
+            objectives = objectives,
+            constraints = constraints
+        )
+
+        val batches = config.solver.batches.coerceAtLeast(1)
+        var bestResult: SearchResult? = null
+
+        for (batch in 1..batches) {
+            logger.info("Running optimization batch $batch/$batches with algorithm ${config.solver.algorithm}")
+            val optimization = MoeaOptimization()
+            val result = optimization.execute(algorithmConfig)
+
+            if (bestResult == null) {
+                bestResult = result
+            }
+            // TODO: Compare results across batches and keep the best approximation set
+        }
+
+        logger.info("Optimization completed after $batches batch(es)")
+        return bestResult!!
+    }
+}

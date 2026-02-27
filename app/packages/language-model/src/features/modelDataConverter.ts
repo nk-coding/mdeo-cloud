@@ -1,6 +1,5 @@
 import type { AstReflection } from "@mdeo/language-common";
 import {
-    Class,
     Property,
     resolveClassChain,
     isOptionalMultiplicity,
@@ -82,8 +81,7 @@ export class ModelDataConverter {
      * @returns The ModelDataInstance representation
      */
     private convertInstance(obj: ObjectInstanceType): ModelDataInstance {
-        const classRef = obj.class?.ref;
-        const classType = classRef ? this.resolveToClass(classRef) : undefined;
+        const classType = obj.class?.ref;
         const className = classType?.name ?? "";
 
         const properties = this.buildPropertyList(obj, classType);
@@ -267,54 +265,69 @@ export class ModelDataConverter {
     /**
      * Converts a single Link AST node to ModelDataLink format.
      *
+     * Always outputs the link in the metamodel's canonical direction (metamodel-source
+     * as `sourceName`, metamodel-target as `targetName`). When the user writes the
+     * link in the opposite direction, source and target are swapped so the backend
+     * always receives consistently-directed links.
+     *
      * @param link The Link AST node
-     * @returns The ModelDataLink representation
+     * @returns The ModelDataLink representation, normalised to metamodel direction
      */
     private convertLink(link: LinkType): ModelDataLink {
-        const sourceObj = link.source?.object?.ref;
-        const targetObj = link.target?.object?.ref;
-        const sourceName = sourceObj?.name ?? "";
-        const targetName = targetObj?.name ?? "";
+        const sourceObj = link.source.object.ref;
+        const targetObj = link.target.object.ref;
+        const sourceInstanceName = sourceObj?.name ?? "";
+        const targetInstanceName = targetObj?.name ?? "";
+
+        if (sourceObj == undefined || targetObj == undefined) {
+            throw new Error(
+                `Link with undefined source or target object: ${sourceInstanceName} -> ${targetInstanceName}`
+            );
+        }
 
         const propertyNames = this.resolvePropertyNames(link, sourceObj, targetObj);
 
+        if (!propertyNames.matchesDirection) {
+            return {
+                sourceName: targetInstanceName,
+                sourceProperty: propertyNames.targetProperty,
+                targetName: sourceInstanceName,
+                targetProperty: propertyNames.sourceProperty
+            };
+        }
+
         return {
-            sourceName,
+            sourceName: sourceInstanceName,
             sourceProperty: propertyNames.sourceProperty,
-            targetName,
+            targetName: targetInstanceName,
             targetProperty: propertyNames.targetProperty
         };
     }
 
     /**
-     * Resolves property names for both ends of a link.
+     * Resolves property names for both ends of a link, together with the metamodel
+     * direction flag.
+     *
+     * Unlike the previous implementation this method no longer short-circuits when
+     * both property names are explicitly provided: direction normalisation requires
+     * consulting the metamodel even in that case.
      *
      * @param link The Link AST node
      * @param sourceObj The source ObjectInstance
      * @param targetObj The target ObjectInstance
-     * @returns Object containing source and target property names
+     * @returns Object containing source/target property names and whether the written
+     *          direction matches the metamodel association direction
      */
     private resolvePropertyNames(
         link: LinkType,
-        sourceObj: ObjectInstanceType | undefined,
-        targetObj: ObjectInstanceType | undefined
-    ): { sourceProperty: string | null; targetProperty: string | null } {
+        sourceObj: ObjectInstanceType,
+        targetObj: ObjectInstanceType
+    ): { sourceProperty: string | null; targetProperty: string | null; matchesDirection: boolean } {
         const explicitSourceProp = this.resolveExplicitProperty(link.source?.property?.ref);
         const explicitTargetProp = this.resolveExplicitProperty(link.target?.property?.ref);
 
-        if (explicitSourceProp && explicitTargetProp) {
-            return { sourceProperty: explicitSourceProp, targetProperty: explicitTargetProp };
-        }
-
         const sourceClass = this.resolveObjectClass(sourceObj);
         const targetClass = this.resolveObjectClass(targetObj);
-
-        if (!sourceClass || !targetClass) {
-            return {
-                sourceProperty: explicitSourceProp,
-                targetProperty: explicitTargetProp
-            };
-        }
 
         return this.resolveFromAssociation(
             sourceClass,
@@ -345,16 +358,23 @@ export class ModelDataConverter {
      * @param obj The ObjectInstance AST node
      * @returns The ClassType or undefined
      */
-    private resolveObjectClass(obj: ObjectInstanceType | undefined): ClassType | undefined {
-        if (!obj) {
-            return undefined;
+    private resolveObjectClass(obj: ObjectInstanceType): ClassType {
+        const classRef = obj.class.ref;
+        if (classRef == undefined) {
+            throw new Error(`ObjectInstance ${obj.name} has no class reference`);
         }
-        const classRef = obj.class?.ref;
-        return classRef ? this.resolveToClass(classRef) : undefined;
+        return classRef;
     }
 
     /**
-     * Resolves property names from the association between classes.
+     * Resolves property names from the association between classes, and exposes
+     * the `matchesDirection` flag from the resolver so callers can normalise the
+     * link direction.
+     *
+     * When `matchesDirection` is false the property names are still relative to the
+     * *written* direction (sourcePropertyName belongs to the written-source vertex,
+     * targetPropertyName belongs to the written-target vertex), so the caller must
+     * swap both instance names *and* property names to obtain the metamodel direction.
      *
      * @param sourceClass The source class
      * @param targetClass The target class
@@ -362,7 +382,7 @@ export class ModelDataConverter {
      * @param targetPropRef Target property reference from AST
      * @param explicitSourceProp Explicit source property name
      * @param explicitTargetProp Explicit target property name
-     * @returns Object containing resolved source and target property names
+     * @returns Object containing resolved source/target property names and direction flag
      */
     private resolveFromAssociation(
         sourceClass: ClassType,
@@ -371,7 +391,7 @@ export class ModelDataConverter {
         targetPropRef: AstNode | undefined,
         explicitSourceProp: string | null,
         explicitTargetProp: string | null
-    ): { sourceProperty: string | null; targetProperty: string | null } {
+    ): { sourceProperty: string | null; targetProperty: string | null; matchesDirection: boolean } {
         const sourceProp =
             sourcePropRef && this.reflection.isInstance(sourcePropRef, Property)
                 ? (sourcePropRef as PropertyType)
@@ -384,28 +404,14 @@ export class ModelDataConverter {
         const resolved = this.associationResolver.resolveAssociation(sourceClass, targetClass, sourceProp, targetProp);
 
         if (!resolved) {
-            return { sourceProperty: explicitSourceProp, targetProperty: explicitTargetProp };
+            // No matching association found; keep written direction as a safe fallback.
+            return { sourceProperty: explicitSourceProp, targetProperty: explicitTargetProp, matchesDirection: true };
         }
 
         return {
             sourceProperty: resolved.sourcePropertyName ?? null,
-            targetProperty: resolved.targetPropertyName ?? null
+            targetProperty: resolved.targetPropertyName ?? null,
+            matchesDirection: resolved.matchesDirection
         };
-    }
-
-    /**
-     * Resolves an AstNode to its actual Class type.
-     *
-     * @param classNode The class reference node
-     * @returns The ClassType or undefined
-     */
-    private resolveToClass(classNode: AstNode | undefined): ClassType | undefined {
-        if (!classNode) {
-            return undefined;
-        }
-        if (this.reflection.isInstance(classNode, Class)) {
-            return classNode as ClassType;
-        }
-        return undefined;
     }
 }

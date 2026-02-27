@@ -16,6 +16,8 @@ commons-collections = "4.5.0"
 asm = "9.9.1"
 jacoco = "0.8.14"
 shadow = "9.3.1"
+moeaframework = "5.1"
+tinkerpop = "3.8.0"
 
 [libraries]
 # Ktor Server
@@ -70,6 +72,9 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 # Other
 commons-collections = { module = "org.apache.commons:commons-collections4", version.ref = "commons-collections" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+moeaframework = { module = "org.moeaframework:moeaframework", version.ref = "moeaframework" }
+tinkergraph-gremlin = { module = "org.apache.tinkerpop:tinkergraph-gremlin", version.ref = "tinkerpop" }
+gremlin-core = { module = "org.apache.tinkerpop:gremlin-core", version.ref = "tinkerpop" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

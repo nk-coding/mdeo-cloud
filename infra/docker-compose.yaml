@@ -44,6 +44,21 @@ services:
       retries: 5
     restart: unless-stopped
 
+  postgres-optimizer:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${OPTIMIZER_DB_USER:-${DATABASE_USER}}
+      POSTGRES_PASSWORD: ${OPTIMIZER_DB_PASSWORD:-${DATABASE_PASSWORD}}
+      POSTGRES_DB: mdeo
+    volumes:
+      - postgres-optimizer-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${OPTIMIZER_DB_USER:-${DATABASE_USER}} -d mdeo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ..
@@ -99,6 +114,8 @@ services:
       service-config-optimization:
         condition: service_healthy
       service-config-mdeo:
+        condition: service_healthy
+      optimizer-execution:
         condition: service_healthy
     restart: unless-stopped
 
@@ -276,9 +293,34 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
+      OPTIMIZER_EXECUTION_SERVICE_URL: ${OPTIMIZER_EXECUTION_SERVICE_URL:-http://optimizer-execution:8083}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  optimizer-execution:
+    build:
+      context: ..
+      dockerfile: infra/docker/optimizer-execution/Dockerfile
+    environment:
+      SERVER_PORT: "8083"
+      DATABASE_URL: ${OPTIMIZER_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-optimizer:5432/mdeo}
+      DATABASE_USER: ${OPTIMIZER_DB_USER:-${DATABASE_USER}}
+      DATABASE_PASSWORD: ${OPTIMIZER_DB_PASSWORD:-${DATABASE_PASSWORD}}
+      BACKEND_API_URL: ${OPTIMIZER_EXECUTION_BACKEND_URL:-http://backend:8080}
+      EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-600000}
+    depends_on:
+      postgres-optimizer:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -289,3 +331,4 @@ volumes:
   postgres-backend-data:
   postgres-script-data:
   postgres-model-transformation-data:
+  postgres-optimizer-data:

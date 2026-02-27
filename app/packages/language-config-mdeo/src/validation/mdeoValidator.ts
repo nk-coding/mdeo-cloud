@@ -244,32 +244,13 @@ export class MdeoValidator {
      * @param accept The validation acceptor for reporting diagnostics
      */
     validateSolverSection(solver: SolverSectionType, accept: ValidationAcceptor): void {
-        this.checkNoDuplicateKeys(solver, "provider", accept);
         this.checkNoDuplicateKeys(solver, "algorithm", accept);
         this.checkNoDuplicateNodes(solver.parameters, "parameters", accept);
         this.checkNoDuplicateNodes(solver.termination, "termination", accept);
         this.checkNoDuplicateKeys(solver, "batches", accept);
-        this.validateProvider(solver, accept);
         this.validateAlgorithm(solver, accept);
         this.validateParameters(solver, accept);
         this.validateTermination(solver, accept);
-    }
-
-    /**
-     * Validates the provider value.
-     *
-     * @param solver The solver section
-     * @param accept The validation acceptor
-     */
-    private validateProvider(solver: SolverSectionType, accept: ValidationAcceptor): void {
-        const provider = solver.provider[0];
-        if (provider != undefined && !VALID_PROVIDERS.has(provider)) {
-            accept(
-                "error",
-                `Invalid provider '${provider}'. Must be one of: ${Array.from(VALID_PROVIDERS).join(", ")}.`,
-                { node: solver, property: "provider", index: 0 }
-            );
-        }
     }
 
     /**
