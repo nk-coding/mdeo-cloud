@@ -1,5 +1,6 @@
 package com.mdeo.optimizer.config
 
+import com.mdeo.optimizer.rulegen.MutationRuleSpec
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -62,6 +63,20 @@ data class ConstraintConfig(
     val functionName: String
 )
 
+/**
+ * Multiplicity refinement that tightens the lower or upper bound of a metamodel reference
+ * for the purpose of rule generation.
+ *
+ * **Note:** Refinements affect rule generation only when the generator explicitly applies
+ * them. The current Kotlin port of [com.mdeo.optimizer.rulegen.MutationRuleGenerator]
+ * performs a single pass over base metamodel multiplicities and does **not** apply these
+ * refinements — this is a placeholder for future support.
+ *
+ * @param className The metamodel class that owns the reference.
+ * @param fieldName The reference (field) name to refine.
+ * @param lower     The tightened lower bound (>= original lower).
+ * @param upper     The tightened upper bound (<= original upper, or -1 for unbounded).
+ */
 @Serializable
 data class RefinementConfig(
     val className: String,
@@ -80,14 +95,28 @@ data class SearchConfig(
 
 @Serializable
 data class MutationsConfig(
-    val usingPaths: List<String>
+    val usingPaths: List<String> = emptyList(),
+    /**
+     * Auto-generation specs: when non-empty, [MutationRuleGenerator] is invoked at run-time
+     * to synthesise additional mutation operators directly from the metamodel structure.
+     * Generated operators are merged with any hand-written transformations from [usingPaths].
+     */
+    val generate: List<MutationRuleSpec> = emptyList()
 )
+
+/**
+ * The underlying solver framework to use.
+ * Currently only MOEA Framework is supported.
+ */
+@Serializable
+enum class SolverProvider { MOEA }
 
 /**
  * Solver section: algorithm configuration + termination.
  */
 @Serializable
 data class SolverConfig(
+    val provider: SolverProvider = SolverProvider.MOEA,
     val algorithm: AlgorithmType = AlgorithmType.NSGAII,
     val parameters: AlgorithmParameters = AlgorithmParameters(),
     val termination: TerminationConfig = TerminationConfig(),

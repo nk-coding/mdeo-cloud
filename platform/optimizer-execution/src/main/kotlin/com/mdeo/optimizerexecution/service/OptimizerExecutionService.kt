@@ -13,6 +13,7 @@ import com.mdeo.modeltransformationexecution.service.GraphToModelDataConverter
 import com.mdeo.modeltransformationexecution.service.ModelDataGraphLoader
 import com.mdeo.optimizer.OptimizationOrchestrator
 import com.mdeo.optimizer.config.*
+import com.mdeo.optimizer.rulegen.MutationRuleGenerator
 import com.mdeo.optimizer.graph.TinkerGraphBackend
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
@@ -194,9 +195,34 @@ class OptimizerExecutionService(
             executionId, ExecutionState.INITIALIZING,
             "Fetching ${config.search.mutations.usingPaths.size} transformation(s)...", jwtToken
         )
-        val transformations = fetchAllTransformations(
+        val fetchedTransformations = fetchAllTransformations(
             executionId, projectId, config.search.mutations.usingPaths, jwtToken
         ) ?: return
+
+        // --- Phase 3b: Auto-generate mutation operators from metamodel specs ---
+        val transformations: Map<String, TransformationTypedAst> =
+            if (config.search.mutations.generate.isNotEmpty()) {
+                val generated = MutationRuleGenerator.generate(
+                    metamodelData = metamodelData,
+                    specs = config.search.mutations.generate,
+                    metamodelPath = config.problem.metamodelPath
+                )
+                logger.info(
+                    "Auto-generated {} mutation rule(s) from {} spec(s)",
+                    generated.size, config.search.mutations.generate.size
+                )
+                updateState(
+                    executionId, ExecutionState.INITIALIZING,
+                    "Auto-generated ${generated.size} mutation rule(s)...", jwtToken
+                )
+                // Merge: hand-written transformations take precedence over generated ones
+                val merged = LinkedHashMap<String, TransformationTypedAst>()
+                generated.forEach { m -> merged[m.name] = m.typedAst }
+                merged.putAll(fetchedTransformations)
+                merged
+            } else {
+                fetchedTransformations
+            }
 
         // --- Phase 4: Fetch all script typed ASTs for objectives/constraints ---
         val scriptPaths = collectScriptPaths(config.goal)
@@ -499,7 +525,9 @@ class OptimizerExecutionService(
         require(config.problem.metamodelPath.isNotBlank()) { "metamodelPath cannot be empty" }
         require(config.problem.modelPath.isNotBlank()) { "modelPath cannot be empty" }
         require(config.goal.objectives.isNotEmpty()) { "At least one objective is required" }
-        require(config.search.mutations.usingPaths.isNotEmpty()) { "At least one using path is required" }
+        require(config.search.mutations.usingPaths.isNotEmpty() || config.search.mutations.generate.isNotEmpty()) {
+            "At least one mutation source is required: specify usingPaths or generate in search.mutations"
+        }
         require(!config.problem.metamodelPath.contains("..")) { "Path traversal not allowed" }
         require(!config.problem.modelPath.contains("..")) { "Path traversal not allowed" }
     }
