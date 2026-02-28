@@ -6,7 +6,7 @@ import {
     type ClassType,
     type PropertyType
 } from "@mdeo/language-metamodel";
-import { AssociationResolver } from "./associationResolver.js";
+import { AssociationResolver, type ResolvedAssociation } from "./associationResolver.js";
 import type { ModelData, ModelDataInstance, ModelDataLink, ModelDataPropertyValue } from "./modelData.js";
 import {
     Model,
@@ -22,7 +22,6 @@ import {
     type ListValueType,
     type SingleValueType
 } from "../grammar/modelTypes.js";
-import type { AstNode } from "langium";
 
 /**
  * Converter for transforming Model AST nodes to the ModelData format.
@@ -285,71 +284,52 @@ export class ModelDataConverter {
             );
         }
 
-        const propertyNames = this.resolvePropertyNames(link, sourceObj, targetObj);
+        const { matchesDirection, association } = this.resolveAssociation(link, sourceObj, targetObj);
 
-        if (!propertyNames.matchesDirection) {
+        if (!matchesDirection) {
             return {
                 sourceName: targetInstanceName,
-                sourceProperty: propertyNames.targetProperty,
+                sourceProperty: association.source?.name ?? null,
                 targetName: sourceInstanceName,
-                targetProperty: propertyNames.sourceProperty
+                targetProperty: association.target?.name ?? null
             };
         }
 
         return {
             sourceName: sourceInstanceName,
-            sourceProperty: propertyNames.sourceProperty,
+            sourceProperty: association.source?.name ?? null,
             targetName: targetInstanceName,
-            targetProperty: propertyNames.targetProperty
+            targetProperty: association.target?.name ?? null
         };
     }
 
     /**
-     * Resolves property names for both ends of a link, together with the metamodel
-     * direction flag.
-     *
-     * Unlike the previous implementation this method no longer short-circuits when
-     * both property names are explicitly provided: direction normalisation requires
-     * consulting the metamodel even in that case.
+     * Resolves association and direction for a link based on its source and target objects.
      *
      * @param link The Link AST node
      * @param sourceObj The source ObjectInstance
      * @param targetObj The target ObjectInstance
-     * @returns Object containing source/target property names and whether the written
-     *          direction matches the metamodel association direction
+     * @returns Object containing the resolved association and whether the link direction matches the association direction
      */
-    private resolvePropertyNames(
+    private resolveAssociation(
         link: LinkType,
         sourceObj: ObjectInstanceType,
         targetObj: ObjectInstanceType
-    ): { sourceProperty: string | null; targetProperty: string | null; matchesDirection: boolean } {
-        const explicitSourceProp = this.resolveExplicitProperty(link.source?.property?.ref);
-        const explicitTargetProp = this.resolveExplicitProperty(link.target?.property?.ref);
-
+    ): ResolvedAssociation {
         const sourceClass = this.resolveObjectClass(sourceObj);
         const targetClass = this.resolveObjectClass(targetObj);
+        const sourceEnd = link.source.property?.ref;
+        const targetEnd = link.target.property?.ref;
 
-        return this.resolveFromAssociation(
-            sourceClass,
-            targetClass,
-            link.source?.property?.ref,
-            link.target?.property?.ref,
-            explicitSourceProp,
-            explicitTargetProp
-        );
-    }
+        const resolved = this.associationResolver.resolveAssociation(sourceClass, targetClass, sourceEnd, targetEnd);
 
-    /**
-     * Resolves property name from explicit property reference.
-     *
-     * @param propRef The property reference
-     * @returns The property name or null
-     */
-    private resolveExplicitProperty(propRef: AstNode | undefined): string | null {
-        if (!propRef || !this.reflection.isInstance(propRef, Property)) {
-            return null;
+        if (resolved == undefined) {
+            throw new Error(
+                `No association found between ${sourceClass.name} and ${targetClass.name} for link with source property '${sourceEnd?.name}' and target property '${targetEnd?.name}'`
+            );
         }
-        return (propRef as PropertyType).name ?? null;
+
+        return resolved;
     }
 
     /**
@@ -364,54 +344,5 @@ export class ModelDataConverter {
             throw new Error(`ObjectInstance ${obj.name} has no class reference`);
         }
         return classRef;
-    }
-
-    /**
-     * Resolves property names from the association between classes, and exposes
-     * the `matchesDirection` flag from the resolver so callers can normalise the
-     * link direction.
-     *
-     * When `matchesDirection` is false the property names are still relative to the
-     * *written* direction (sourcePropertyName belongs to the written-source vertex,
-     * targetPropertyName belongs to the written-target vertex), so the caller must
-     * swap both instance names *and* property names to obtain the metamodel direction.
-     *
-     * @param sourceClass The source class
-     * @param targetClass The target class
-     * @param sourcePropRef Source property reference from AST
-     * @param targetPropRef Target property reference from AST
-     * @param explicitSourceProp Explicit source property name
-     * @param explicitTargetProp Explicit target property name
-     * @returns Object containing resolved source/target property names and direction flag
-     */
-    private resolveFromAssociation(
-        sourceClass: ClassType,
-        targetClass: ClassType,
-        sourcePropRef: AstNode | undefined,
-        targetPropRef: AstNode | undefined,
-        explicitSourceProp: string | null,
-        explicitTargetProp: string | null
-    ): { sourceProperty: string | null; targetProperty: string | null; matchesDirection: boolean } {
-        const sourceProp =
-            sourcePropRef && this.reflection.isInstance(sourcePropRef, Property)
-                ? (sourcePropRef as PropertyType)
-                : undefined;
-        const targetProp =
-            targetPropRef && this.reflection.isInstance(targetPropRef, Property)
-                ? (targetPropRef as PropertyType)
-                : undefined;
-
-        const resolved = this.associationResolver.resolveAssociation(sourceClass, targetClass, sourceProp, targetProp);
-
-        if (!resolved) {
-            // No matching association found; keep written direction as a safe fallback.
-            return { sourceProperty: explicitSourceProp, targetProperty: explicitTargetProp, matchesDirection: true };
-        }
-
-        return {
-            sourceProperty: resolved.sourcePropertyName ?? null,
-            targetProperty: resolved.targetPropertyName ?? null,
-            matchesDirection: resolved.matchesDirection
-        };
     }
 }

@@ -1,5 +1,5 @@
 import { createInterface, createType, Optional, Ref, type ASTType, type BaseType } from "@mdeo/language-common";
-import { Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
+import { AssociationEnd, Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
 /**
@@ -102,7 +102,7 @@ export type ObjectInstanceType = ASTType<typeof ObjectInstance>;
  */
 export const LinkEnd = createInterface("LinkEnd").attrs({
     object: Ref(() => ObjectInstance),
-    property: Optional(Ref(() => Property))
+    property: Optional(Ref(() => AssociationEnd))
 });
 
 /**

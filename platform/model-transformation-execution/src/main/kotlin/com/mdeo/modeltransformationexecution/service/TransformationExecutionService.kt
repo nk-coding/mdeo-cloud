@@ -6,6 +6,7 @@ import com.mdeo.execution.common.service.ExecutionServiceWithFileTree
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
+import com.mdeo.modeltransformation.service.GraphToModelDataConverter
 import com.mdeo.modeltransformationexecution.database.TransformationExecutionsTable
 import com.mdeo.modeltransformationexecution.database.TransformationResultFilesTable
 import kotlinx.coroutines.Dispatchers

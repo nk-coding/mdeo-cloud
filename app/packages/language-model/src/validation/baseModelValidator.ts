@@ -147,6 +147,15 @@ export abstract class BaseModelValidator {
 
         if (sourceAssociation !== targetAssociation) {
             accept("error", `Source and target properties must be from the same association.`, { node: link });
+            return;
+        }
+
+        if (sourceProperty === targetProperty) {
+            accept(
+                "error",
+                `Source and target properties must reference opposite association ends, not the same end '${sourceProperty.name}'.`,
+                { node: link }
+            );
         }
     }
 

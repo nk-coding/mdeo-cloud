@@ -23,7 +23,7 @@ export class GeneratedModelMetadataManager extends ModelMetadataManager {
         }
 
         this.extractJsonInstanceMetadata(modelData.instances, nodes);
-        this.extractJsonLinkMetadata(modelData.links, edges);
+        this.extractJsonLinkMetadata(modelData.links, edges, nodes);
 
         return { nodes, edges };
     }
@@ -71,8 +71,13 @@ export class GeneratedModelMetadataManager extends ModelMetadataManager {
      *
      * @param links List of links in the model data
      * @param edges Record to populate with edge metadata
+     * @param nodes Record to populate with node metadata
      */
-    private extractJsonLinkMetadata(links: ModelDataLink[], edges: Record<string, EdgeMetadata>): void {
+    private extractJsonLinkMetadata(
+        links: ModelDataLink[],
+        edges: Record<string, EdgeMetadata>,
+        nodes: Record<string, NodeMetadata>
+    ): void {
         for (let i = 0; i < links.length; i++) {
             const link = links[i];
             const sourcePart = link.sourceProperty ? `${link.sourceName}_${link.sourceProperty}` : link.sourceName;
@@ -91,6 +96,20 @@ export class GeneratedModelMetadataManager extends ModelMetadataManager {
                     targetProperty: link.targetProperty
                 }
             };
+
+            if (link.sourceProperty != null) {
+                nodes[`${edgeId}#target-node`] = {
+                    type: ModelElementType.NODE_LINK_END,
+                    attrs: {}
+                };
+            }
+
+            if (link.targetProperty != null) {
+                nodes[`${edgeId}#source-node`] = {
+                    type: ModelElementType.NODE_LINK_END,
+                    attrs: {}
+                };
+            }
         }
     }
 }

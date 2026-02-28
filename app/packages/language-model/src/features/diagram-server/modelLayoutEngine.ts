@@ -2,6 +2,7 @@ import type { GModelRoot } from "@eclipse-glsp/server";
 import type { LayoutOperation } from "@mdeo/editor-protocol";
 import { BaseLayoutEngine, GEdge, GNode, sharedImport } from "@mdeo/language-shared";
 import type { ElkExtendedEdge, ElkNode } from "elkjs";
+import { GLinkEndNode } from "./model/linkEndNode.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -34,7 +35,17 @@ export class ModelLayoutEngine extends BaseLayoutEngine {
                 edges.push({
                     id: child.id,
                     sources: [child.sourceId],
-                    targets: [child.targetId]
+                    targets: [child.targetId],
+                    labels: child.children
+                        .filter((label) => label instanceof GLinkEndNode)
+                        .map((label) => ({
+                            text: "_",
+                            width: bounds[label.id]?.width,
+                            height: bounds[label.id]?.height,
+                            layoutOptions: {
+                                "elk.edgeLabels.placement": label.end === "source" ? "HEAD" : "TAIL"
+                            }
+                        }))
                 });
             }
         }

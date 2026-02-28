@@ -24,11 +24,6 @@ import type { Range } from "vscode-languageserver-types";
 const { AstUtils, CstUtils, isLeafCstNode, GrammarUtils } = sharedImport("langium");
 
 /**
- * Valid provider values for the solver section.
- */
-const VALID_PROVIDERS = new Set(["moea", "ecj"]);
-
-/**
  * Valid algorithm names for the solver section.
  */
 const VALID_ALGORITHMS = new Set(["NSGAII", "IBEA", "SPEA2", "SMSMOEA", "VEGA", "PESA2", "PAES", "RANDOM"]);

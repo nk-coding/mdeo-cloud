@@ -1,20 +1,13 @@
 import type { RenderingContext } from "@eclipse-glsp/sprotty";
-import {
-    sharedImport,
-    GEdgeView,
-    type EdgeMarkerData,
-    type EdgeAttachment,
-    EdgeAttachmentPosition
-} from "@mdeo/editor-shared";
+import { sharedImport, GEdgeView, type EdgeAttachment, EdgeAttachmentPosition } from "@mdeo/editor-shared";
 import type { GLinkEdge } from "../model/linkEdge.js";
 import { GLinkEndNode } from "../model/linkEndNode.js";
 
 const { injectable } = sharedImport("inversify");
-const { svg } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering link edges between objects.
- * Renders edges as polylines with an arrow marker at the target end and labels at source/target ends.
+ * Renders edges as polylines with labels at source/target ends.
  */
 @injectable()
 export class GLinkEdgeView extends GEdgeView {
@@ -34,24 +27,5 @@ export class GLinkEdgeView extends GEdgeView {
         }
 
         return attachments;
-    }
-
-    protected override renderTargetMarker(): EdgeMarkerData | undefined {
-        const arrow = svg("polygon", {
-            class: {
-                "fill-foreground": true,
-                "stroke-foreground": true,
-                "stroke-[1px]": true
-            },
-            attrs: {
-                points: "0,0 -12,-6 -12,6"
-            }
-        });
-
-        return {
-            marker: arrow,
-            strokeOffset: 12,
-            elementOffset: 6
-        };
     }
 }

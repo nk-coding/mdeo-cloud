@@ -9,7 +9,7 @@ import com.mdeo.modeltransformation.ast.TypedAst as TransformationTypedAst
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
-import com.mdeo.modeltransformationexecution.service.GraphToModelDataConverter
+import com.mdeo.modeltransformation.service.GraphToModelDataConverter
 import com.mdeo.modeltransformationexecution.service.ModelDataGraphLoader
 import com.mdeo.optimizer.OptimizationOrchestrator
 import com.mdeo.optimizer.config.*

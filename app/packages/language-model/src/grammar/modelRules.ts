@@ -15,7 +15,7 @@ import {
     optional,
     group
 } from "@mdeo/language-common";
-import { Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
+import { AssociationEnd, Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
 import {
     SimpleValue,
     EnumValue,
@@ -115,7 +115,7 @@ export const LinkEndRule = createRule("LinkEndRule")
     .returns(LinkEnd)
     .as(({ set }) => [
         set("object", ref(ObjectInstance, ID)),
-        optional(group(".", set("property", ref(Property, ID))))
+        optional(group(".", set("property", ref(AssociationEnd, ID))))
     ]);
 
 /**

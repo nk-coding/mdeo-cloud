@@ -1,12 +1,11 @@
 import type { AstReflection } from "@mdeo/language-common";
 import {
     Association,
-    Class,
     MetaModel,
     resolveClassChain,
     type AssociationType,
     type ClassType,
-    type PropertyType
+    type AssociationEndType
 } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
@@ -18,16 +17,6 @@ export interface ResolvedAssociation {
      * The association that connects the two classes.
      */
     association: AssociationType;
-
-    /**
-     * The property name on the source side of the link.
-     */
-    sourcePropertyName?: string;
-
-    /**
-     * The property name on the target side of the link.
-     */
-    targetPropertyName?: string;
 
     /**
      * Whether the link direction matches the association direction.
@@ -42,7 +31,7 @@ export interface ResolvedAssociation {
  * This class provides methods to:
  * - Find all associations between two classes
  * - Find a unique association between two classes
- * - Resolve property names for both ends of a link
+ * - Resolve associationend names for both ends of a link
  */
 export class AssociationResolver {
     /**
@@ -75,8 +64,8 @@ export class AssociationResolver {
                 }
 
                 const assoc = element;
-                const sourceClass = this.resolveToClass(assoc.source?.class?.ref);
-                const targetClass = this.resolveToClass(assoc.target?.class?.ref);
+                const sourceClass = assoc.source?.class?.ref;
+                const targetClass = assoc.target?.class?.ref;
 
                 if (!sourceClass || !targetClass) {
                     continue;
@@ -112,13 +101,13 @@ export class AssociationResolver {
     }
 
     /**
-     * Finds an association by a property name on one end.
+     * Finds an association by a associationend name on one end.
      *
-     * @param property The property that is an association end
+     * @param associationend The associationend that is an association end
      * @returns The containing association, or undefined if not found
      */
-    findAssociationForProperty(property: PropertyType): AssociationType | undefined {
-        const container = property.$container;
+    findAssociationForAssociationEnd(associationend: AssociationEndType): AssociationType | undefined {
+        const container = associationend.$container;
         if (container && this.reflection.isInstance(container, Association)) {
             return container;
         }
@@ -126,35 +115,35 @@ export class AssociationResolver {
     }
 
     /**
-     * Resolves an association and returns both end property names.
+     * Resolves an association and returns both end associationend names.
      *
      * This method handles three cases:
-     * 1. Both property names are given: validates they belong to the same association
-     * 2. One property name is given: finds the association and returns both names
-     * 3. No property names are given: finds the unique association and returns both names
+     * 1. Both associationend names are given: validates they belong to the same association
+     * 2. One associationend name is given: finds the association and returns both names
+     * 3. No associationend names are given: finds the unique association and returns both names
      *
      * @param sourceClass The source class of the link
      * @param targetClass The target class of the link
-     * @param sourceProperty The property on the source end, if specified
-     * @param targetProperty The property on the target end, if specified
-     * @returns The resolved association with both property names, or undefined
+     * @param sourceAssociationEnd The associationend on the source end, if specified
+     * @param targetAssociationEnd The associationend on the target end, if specified
+     * @returns The resolved association with both associationend names, or undefined
      */
     resolveAssociation(
         sourceClass: ClassType,
         targetClass: ClassType,
-        sourceProperty?: PropertyType,
-        targetProperty?: PropertyType
+        sourceAssociationEnd?: AssociationEndType,
+        targetAssociationEnd?: AssociationEndType
     ): ResolvedAssociation | undefined {
-        if (sourceProperty != undefined && targetProperty != undefined) {
-            return this.resolveWithBothProperties(sourceProperty, targetProperty, sourceClass);
+        if (sourceAssociationEnd != undefined && targetAssociationEnd != undefined) {
+            return this.resolveWithBothProperties(sourceAssociationEnd, targetAssociationEnd, sourceClass);
         }
 
-        if (sourceProperty != undefined || targetProperty != undefined) {
-            return this.resolveWithOneProperty(
+        if (sourceAssociationEnd != undefined || targetAssociationEnd != undefined) {
+            return this.resolveWithOneAssociationEnd(
                 sourceClass,
                 targetClass,
-                sourceProperty ?? targetProperty!,
-                sourceProperty != undefined
+                sourceAssociationEnd ?? targetAssociationEnd!,
+                sourceAssociationEnd != undefined
             );
         }
 
@@ -165,64 +154,56 @@ export class AssociationResolver {
      * Resolves when both properties are specified.
      */
     private resolveWithBothProperties(
-        sourceProperty: PropertyType,
-        targetProperty: PropertyType,
+        sourceAssociationEnd: AssociationEndType,
+        targetAssociationEnd: AssociationEndType,
         sourceClass: ClassType
     ): ResolvedAssociation | undefined {
-        const sourceAssoc = this.findAssociationForProperty(sourceProperty);
-        const targetAssoc = this.findAssociationForProperty(targetProperty);
+        const sourceAssoc = this.findAssociationForAssociationEnd(sourceAssociationEnd);
+        const targetAssoc = this.findAssociationForAssociationEnd(targetAssociationEnd);
 
         if (!sourceAssoc || !targetAssoc || sourceAssoc !== targetAssoc) {
             return undefined;
         }
-
-        const matchesDirection = this.propertyMatchesAssociationSource(sourceProperty, sourceAssoc, sourceClass);
+        const matchesDirection = this.associationendMatchesAssociationSource(
+            sourceAssociationEnd,
+            sourceAssoc,
+            sourceClass
+        );
 
         return {
             association: sourceAssoc,
-            sourcePropertyName: sourceProperty.name,
-            targetPropertyName: targetProperty.name,
             matchesDirection
         };
     }
 
     /**
-     * Resolves when only one property is specified.
+     * Resolves when only one associationend is specified.
      */
-    private resolveWithOneProperty(
+    private resolveWithOneAssociationEnd(
         sourceClass: ClassType,
         targetClass: ClassType,
-        property: PropertyType,
-        isSourceProperty: boolean
+        associationend: AssociationEndType,
+        isSourceAssociationEnd: boolean
     ): ResolvedAssociation | undefined {
-        const association = this.findAssociationForProperty(property);
+        const association = this.findAssociationForAssociationEnd(associationend);
         if (!association) {
             return undefined;
         }
 
-        const sourceEnd = association.source;
-        const targetEnd = association.target;
-
-        const matchesDirection = this.propertyMatchesAssociationSource(
-            property,
+        const matchesDirection = this.associationendMatchesAssociationSource(
+            associationend,
             association,
-            isSourceProperty ? sourceClass : targetClass
+            isSourceAssociationEnd ? sourceClass : targetClass
         );
 
-        if (isSourceProperty) {
-            const oppositeEnd = matchesDirection ? targetEnd : sourceEnd;
+        if (isSourceAssociationEnd) {
             return {
                 association,
-                sourcePropertyName: property.name,
-                targetPropertyName: oppositeEnd?.name,
                 matchesDirection
             };
         } else {
-            const oppositeEnd = matchesDirection ? sourceEnd : targetEnd;
             return {
                 association,
-                sourcePropertyName: oppositeEnd?.name,
-                targetPropertyName: property.name,
                 matchesDirection
             };
         }
@@ -237,38 +218,34 @@ export class AssociationResolver {
             return undefined;
         }
 
-        const assocSourceClass = this.resolveToClass(association.source?.class?.ref);
+        const assocSourceClass = association.source?.class?.ref;
         const sourceChain = new Set(resolveClassChain(sourceClass, this.reflection));
         const matchesDirection = assocSourceClass != undefined && sourceChain.has(assocSourceClass);
 
         if (matchesDirection) {
             return {
                 association,
-                sourcePropertyName: association.source?.name,
-                targetPropertyName: association.target?.name,
                 matchesDirection: true
             };
         } else {
             return {
                 association,
-                sourcePropertyName: association.target?.name,
-                targetPropertyName: association.source?.name,
                 matchesDirection: false
             };
         }
     }
 
     /**
-     * Checks if a property is on the source side of an association relative to a class.
+     * Checks if a associationend is on the source side of an association relative to a class.
      */
-    private propertyMatchesAssociationSource(
-        property: PropertyType,
+    private associationendMatchesAssociationSource(
+        associationend: AssociationEndType,
         association: AssociationType,
         classType: ClassType
     ): boolean {
         const sourceEnd = association.source;
-        if (sourceEnd?.name === property.name) {
-            const sourceClass = this.resolveToClass(sourceEnd.class?.ref);
+        if (sourceEnd?.name === associationend.name) {
+            const sourceClass = sourceEnd.class?.ref;
             if (sourceClass) {
                 const classChain = new Set(resolveClassChain(classType, this.reflection));
                 return classChain.has(sourceClass);
@@ -318,19 +295,6 @@ export class AssociationResolver {
                 return current as { elements?: AstNode[] };
             }
             current = current.$container;
-        }
-        return undefined;
-    }
-
-    /**
-     * Resolves an AstNode to its actual Class.
-     */
-    private resolveToClass(classNode: AstNode | undefined): ClassType | undefined {
-        if (classNode == undefined) {
-            return undefined;
-        }
-        if (this.reflection.isInstance(classNode, Class)) {
-            return classNode;
         }
         return undefined;
     }

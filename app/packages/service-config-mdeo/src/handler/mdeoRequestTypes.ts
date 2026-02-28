@@ -40,9 +40,7 @@ export interface SearchSectionData {
  * Mutation step configuration.
  * `type` discriminator matches Kotlin @SerialName values ("Fixed" / "Interval").
  */
-export type MutationStepConfig =
-    | { type: "Fixed"; n: number }
-    | { type: "Interval"; lower: number; upper: number };
+export type MutationStepConfig = { type: "Fixed"; n: number } | { type: "Interval"; lower: number; upper: number };
 
 /**
  * Mutation parameters block.

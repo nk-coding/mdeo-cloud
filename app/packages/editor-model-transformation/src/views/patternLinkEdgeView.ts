@@ -1,12 +1,5 @@
 import type { Point, RenderingContext } from "@eclipse-glsp/sprotty";
-import {
-    sharedImport,
-    GEdgeView,
-    type EdgeMarkerData,
-    type EdgeAttachment,
-    EdgeAttachmentPosition,
-    type GEdge
-} from "@mdeo/editor-shared";
+import { sharedImport, GEdgeView, type EdgeAttachment, EdgeAttachmentPosition, type GEdge } from "@mdeo/editor-shared";
 import type { GPatternLinkEdge } from "../model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "../model/patternLinkEndNode.js";
 import { GPatternLinkModifierLabel } from "../model/patternLinkModifierLabel.js";
@@ -36,27 +29,8 @@ function getStrokeClassForModifier(modifier: PatternModifierKind): string {
 }
 
 /**
- * Gets CSS classes for fill based on the modifier kind.
- *
- * @param modifier The pattern modifier kind
- * @returns CSS class string for the fill color
- */
-function getFillClassForModifier(modifier: PatternModifierKind): string {
-    switch (modifier) {
-        case PatternModifierKind.CREATE:
-            return "fill-create";
-        case PatternModifierKind.DELETE:
-            return "fill-delete";
-        case PatternModifierKind.FORBID:
-            return "fill-forbid";
-        default:
-            return "fill-foreground";
-    }
-}
-
-/**
  * View for rendering pattern link edges between instances.
- * Renders edges as polylines with an arrow marker at the target end and labels at source/target ends.
+ * Renders edges as polylines with labels at source/target ends.
  * The edge color changes based on the modifier (create/delete/forbid).
  */
 @injectable()
@@ -84,32 +58,6 @@ export class GPatternLinkEdgeView extends GEdgeView {
         }
 
         return attachments;
-    }
-
-    protected override renderTargetMarker(
-        model: Readonly<GEdge>,
-        _context: RenderingContext
-    ): EdgeMarkerData | undefined {
-        const patternModel = model as GPatternLinkEdge;
-        const fillClass = getFillClassForModifier(patternModel.modifier);
-        const strokeClass = getStrokeClassForModifier(patternModel.modifier);
-
-        const arrow = svg("polygon", {
-            class: {
-                [fillClass]: true,
-                [strokeClass]: true,
-                "stroke-[1px]": true
-            },
-            attrs: {
-                points: "0,0 -12,-6 -12,6"
-            }
-        });
-
-        return {
-            marker: arrow,
-            strokeOffset: 12,
-            elementOffset: 6
-        };
     }
 
     protected override renderVisiblePath(route: Point[], model: Readonly<GEdge>): VNode {

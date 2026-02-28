@@ -1,6 +1,6 @@
 import type { AstReflection } from "@mdeo/language-common";
 import { TypedAstConverter, type TypedExpression } from "@mdeo/language-expression";
-import { AssociationResolver } from "@mdeo/language-model";
+import { AssociationResolver, type ResolvedAssociation } from "@mdeo/language-model";
 import { resolveRelativePath } from "@mdeo/language-shared";
 import type { LangiumDocument } from "langium";
 import {
@@ -61,7 +61,7 @@ import {
     type PatternObjectInstanceReferenceType,
     PatternObjectInstanceReference
 } from "@mdeo/language-model-transformation";
-import { Class, type ClassType as MetamodelClassType, type PropertyType } from "@mdeo/language-metamodel";
+import { AssociationEnd, type AssociationEndType } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
 
 /**
@@ -403,53 +403,80 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
 
     /**
      * Converts a pattern link.
-     * Uses AssociationResolver to resolve both property names and determine link direction.
+     *
+     * Always outputs the link in the metamodel's canonical direction (metamodel-source
+     * as source, metamodel-target as target). When the user writes the link in the
+     * opposite direction, source and target are swapped.
      *
      * @param link The PatternLink AST node
-     * @returns The TypedPatternLink representation
+     * @returns The TypedPatternLink representation, normalised to metamodel direction
      */
     private convertPatternLink(link: PatternLinkType): TypedPatternLink {
-        const { sourcePropertyName, targetPropertyName, isOutgoing } = this.resolvePatternLinkProperties(link);
+        const sourceObj = link.source.object?.ref;
+        const targetObj = link.target.object?.ref;
+        const sourceInstanceName = link.source.object?.$refText ?? "";
+        const targetInstanceName = link.target.object?.$refText ?? "";
 
-        const start = {
-            objectName: link.source.object?.$refText ?? "",
-            propertyName: sourcePropertyName
-        };
-        const end = {
-            objectName: link.target.object?.$refText ?? "",
-            propertyName: targetPropertyName
-        };
+        if (sourceObj == undefined || targetObj == undefined) {
+            throw new Error(
+                `Pattern link with undefined source or target object: ${sourceInstanceName} -> ${targetInstanceName}`
+            );
+        }
+
+        const { matchesDirection, association } = this.resolveAssociation(link, sourceObj, targetObj);
+
+        if (!matchesDirection) {
+            return {
+                modifier: link.modifier?.modifier,
+                source: {
+                    objectName: targetInstanceName,
+                    propertyName: association.source?.name
+                },
+                target: {
+                    objectName: sourceInstanceName,
+                    propertyName: association.target?.name
+                }
+            };
+        }
 
         return {
             modifier: link.modifier?.modifier,
-            source: isOutgoing ? start : end,
-            target: isOutgoing ? end : start
+            source: {
+                objectName: sourceInstanceName,
+                propertyName: association.source?.name
+            },
+            target: {
+                objectName: targetInstanceName,
+                propertyName: association.target?.name
+            }
         };
     }
 
     /**
-     * Resolves both property names and direction for a pattern link.
-     * Uses AssociationResolver to find the association and determine property names.
+     * Resolves association and direction for a pattern link based on its source and target objects.
      *
      * @param link The PatternLink AST node
-     * @returns Object containing source/target property names and isOutgoing flag
+     * @param sourceObj The source PatternObjectInstance
+     * @param targetObj The target PatternObjectInstance
+     * @returns Object containing the resolved association and whether direction matches association direction
      */
-    private resolvePatternLinkProperties(link: PatternLinkType): {
-        sourcePropertyName?: string;
-        targetPropertyName?: string;
-        isOutgoing: boolean;
-    } {
-        const sourceClass = this.getPatternLinkEndClass(link.source);
-        const targetClass = this.getPatternLinkEndClass(link.target);
-
-        if (!sourceClass || !targetClass) {
-            throw new Error(
-                `Unable to resolve classes for pattern link between '${link.source.object?.$refText}' and '${link.target.object?.$refText}'`
-            );
-        }
-
-        const sourceProperty = link.source.property?.ref as PropertyType | undefined;
-        const targetProperty = link.target.property?.ref as PropertyType | undefined;
+    private resolveAssociation(
+        link: PatternLinkType,
+        sourceObj: PatternObjectInstanceType,
+        targetObj: PatternObjectInstanceType
+    ): ResolvedAssociation {
+        const sourceClass = this.resolveObjectClass(sourceObj);
+        const targetClass = this.resolveObjectClass(targetObj);
+        const sourcePropertyRef = link.source.property?.ref;
+        const targetPropertyRef = link.target.property?.ref;
+        const sourceProperty: AssociationEndType | undefined =
+            sourcePropertyRef && this.reflection.isInstance(sourcePropertyRef, AssociationEnd)
+                ? sourcePropertyRef
+                : undefined;
+        const targetProperty: AssociationEndType | undefined =
+            targetPropertyRef && this.reflection.isInstance(targetPropertyRef, AssociationEnd)
+                ? targetPropertyRef
+                : undefined;
 
         const resolved = this.associationResolver.resolveAssociation(
             sourceClass,
@@ -464,30 +491,21 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
             );
         }
 
-        return {
-            sourcePropertyName: resolved.sourcePropertyName,
-            targetPropertyName: resolved.targetPropertyName,
-            isOutgoing: resolved.matchesDirection
-        };
+        return resolved;
     }
 
     /**
-     * Gets the class type for a pattern link end by resolving the object instance reference.
+     * Resolves the class type for a pattern object instance.
      *
-     * @param linkEnd The pattern link end
-     * @returns The class type or undefined if not resolvable
+     * @param obj The PatternObjectInstance AST node
+     * @returns The ClassType
      */
-    private getPatternLinkEndClass(linkEnd: { object?: { ref?: unknown } }): MetamodelClassType | undefined {
-        const objectInstance = linkEnd.object?.ref;
-        if (!objectInstance || typeof objectInstance !== "object") {
-            return undefined;
+    private resolveObjectClass(obj: PatternObjectInstanceType) {
+        const classRef = obj.class?.ref;
+        if (classRef == undefined) {
+            throw new Error(`PatternObjectInstance ${obj.name} has no class reference`);
         }
-
-        const classRef = (objectInstance as { class?: { ref?: unknown } }).class?.ref;
-        if (classRef && this.reflection.isInstance(classRef, Class)) {
-            return classRef;
-        }
-        return undefined;
+        return classRef;
     }
 
     /**

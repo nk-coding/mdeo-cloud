@@ -27,7 +27,7 @@ const MDEO_PLUGIN_NAME = "mdeo";
 function buildHeaders(jwt: string): Record<string, string> {
     return {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${jwt}`
+        Authorization: `Bearer ${jwt}`
     };
 }
 
