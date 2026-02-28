@@ -89,12 +89,12 @@ guidance functions penalise multiplicity violations (as the original `mde_optimi
 
 ---
 
-### 4. Multiplicity guard conditions (LB/UB checks) not added to rules
+### 4. Multiplicity guard conditions — resolved
 
 | | |
 |---|---|
 | **Present in original?** | ✅ Yes — every rule type except SWAP |
-| **Classification** | New limitation introduced by the port |
+| **Classification** | Resolved (was: new limitation introduced by the port) |
 
 #### Original behaviour
 
@@ -110,23 +110,36 @@ calls `applyRuleNacConditions()`, which invokes:
 These are `NestedCondition` objects (wrapped in `Not` for NAC) chained with `AND` onto the rule's
 LHS `Formula`.  Only `SwapEdgeRuleCommand` skips this step entirely.
 
-#### Why it was not implemented
+#### Port behaviour
 
-The custom DSL has a `forbid` modifier for NACs but has no PAC modifier (positive application
-condition) and no way to express "at least N of these edges must exist" as a quantified pattern
-condition.  A `forbid` can express "this edge must not exist" (upper bound = 0 case) but not
-"fewer than N of these edges exist" as a general guard.  The LB/UB generators in the original
-compute the exact offset value $k = (b - \text{preserved} + \text{balance})$ and then build a
-nested pattern asserting the existence of exactly $k$ additional edges via `NestedCondition` chains
-— a construct the DSL does not support.
+`MutationAstBuilder` generates `where` clauses via `MultiplicityGuardBuilder` with `.size()`
+checks for all rule types:
+
+| Rule type | Guard | Condition |
+|-----------|-------|-----------|
+| ADD       | Upper-bound on source | `source.ref.size() < upper` when `upper > 0` |
+| REMOVE    | Lower-bound on source | `source.ref.size() > lower` when `lower > 0` |
+| CHANGE    | Upper-bound on opposite | `newTarget.oppRef.size() < upper` when bidirectional and `upper > 0` |
+| CHANGE    | Lower-bound on opposite | `oldTarget.oppRef.size() > lower` when bidirectional and `lower > 0` |
+| CREATE    | Upper-bound on container | `container.ref.size() < upper` when containment and `upper > 0` |
+| DELETE    | Lower-bound on each guarded neighbour | `neighbor_r.oppRef.size() > lower` per ref with `opposite.lower > 0` |
+| SWAP      | None (correct — cardinality preserved) | — |
+
+The mechanism differs from the original: where the original builds `NestedCondition` chains
+counting exactly $k$ additional edges ($k = b - \text{preserved} + \text{balance}$), the port
+uses direct `.size()` comparisons against the metamodel bounds.  For single-edge mutations these
+are functionally equivalent.
+
+For DELETE rules, one representative neighbour is matched per guarded reference.  The guard checks
+that the matched neighbour has strictly more than the minimum number of back-edges, so losing one
+edge (when D is deleted) still satisfies the lower bound.  If D has multiple targets via the same
+reference and only some would violate the bound, the rule can still fire through a safe match while
+leaving unsafe neighbours unprotected — this residual gap is handled by constraint scoring.
 
 #### Practical effect
 
-Generated operators can fire in states that would violate multiplicity bounds.  The ADD rule has a
-`forbid` NAC that prevents adding a duplicate edge (the simplest upper-bound case), but it does
-not prevent exceeding an upper bound $> 1$.  Operators that delete edges may fire even when the
-lower bound would be breached.  As with limitation 3, this is handled indirectly through the
-objective/constraint scoring rather than at the operator level.
+All rule types now respect multiplicity bounds at the operator level, matching the original's
+behaviour in the common cases.
 
 ---
 

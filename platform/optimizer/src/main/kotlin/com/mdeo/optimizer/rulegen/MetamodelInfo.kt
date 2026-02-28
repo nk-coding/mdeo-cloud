@@ -3,12 +3,15 @@ package com.mdeo.optimizer.rulegen
 import com.mdeo.expression.ast.types.MetamodelData
 
 /**
- * Multiplicity information for the "opposite" end of a bidirectional association.
+ * Multiplicity and naming information for the "opposite" end of a bidirectional association.
  *
- * @param lower Lower bound of the opposite reference (0 = optional).
- * @param upper Upper bound of the opposite reference (-1 = unbounded).
+ * @param refName Name of the opposite reference, or null when the opposite end is unnamed
+ *                (not navigable).
+ * @param lower   Lower bound of the opposite reference (0 = optional).
+ * @param upper   Upper bound of the opposite reference (-1 = unbounded).
  */
 data class OppositeInfo(
+    val refName: String?,
     val lower: Int,
     val upper: Int
 )
@@ -148,6 +151,7 @@ class MetamodelInfo(
                     upper = override?.upper ?: assoc.source.multiplicity.upper,
                     isContainment = assoc.operator == CONTAINMENT_OPERATOR,
                     opposite = if (assoc.target.name != null) OppositeInfo(
+                        refName = assoc.target.name,
                         lower = assoc.target.multiplicity.lower,
                         upper = assoc.target.multiplicity.upper
                     ) else null,
@@ -170,6 +174,7 @@ class MetamodelInfo(
                     upper = assoc.target.multiplicity.upper,
                     isContainment = false,
                     opposite = OppositeInfo(
+                        refName = assoc.source.name,
                         lower = assoc.source.multiplicity.lower,
                         upper = assoc.source.multiplicity.upper
                     ),

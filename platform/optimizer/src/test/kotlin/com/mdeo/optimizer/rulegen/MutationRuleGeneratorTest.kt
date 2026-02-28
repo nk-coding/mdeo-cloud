@@ -9,6 +9,14 @@ import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
 import com.mdeo.optimizer.config.RefinementConfig
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.VoidType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -639,6 +647,711 @@ class MutationRuleGeneratorTest {
                 refinedInfo.referencesForNode("House"),
                 "House refs must be unchanged when only Room.windows is overridden"
             )
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Multiplicity guard integration tests
+    // -------------------------------------------------------------------------
+
+    /**
+     * Tests that [MutationAstBuilder] adds (or omits) multiplicity-guard `where` clauses
+     * on generated rules based on reference upper/lower bounds, containment context,
+     * bidirectionality, and spec type.
+     */
+    @Nested
+    inner class MultiplicityGuardTests {
+
+        private val mmPath = "/project/home.mm"
+        private val info = MetamodelInfo(metamodelData)
+
+        @Test
+        fun `ADD rule with bounded upper multiplicity contains upper-bound where clause`() {
+            val garageClass = ClassData(name = "Garage", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "House",
+                    name = "garages",
+                    multiplicity = MultiplicityData(lower = 0, upper = 3)
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Garage",
+                    name = null,
+                    multiplicity = MultiplicityData(lower = 0, upper = 1)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/garage.mm",
+                classes = listOf(houseClass, garageClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("House", "garages", RepairSpecType.ADD)
+            val ast = MutationAstBuilder.build("ADD_House_garages", spec, "/project/garage.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertEquals(1, whereClauses.size, "Expected exactly one where clause for bounded upper")
+
+            val expr = whereClauses[0].whereClause.expression as TypedBinaryExpression
+            assertEquals("<", expr.operator)
+            val sizeCall = expr.left as TypedMemberCallExpression
+            assertEquals("size", sizeCall.member)
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            assertEquals("garages", memberAccess.member)
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+            assertEquals("source", identifier.name)
+            val bound = expr.right as TypedIntLiteralExpression
+            assertEquals("3", bound.value)
+        }
+
+        @Test
+        fun `ADD rule with unbounded upper multiplicity has no where clause`() {
+            val spec = RepairSpec("Room", "windows", RepairSpecType.ADD)
+            val ast = MutationAstBuilder.build("ADD_Room_windows", spec, mmPath, info)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertTrue(whereClauses.isEmpty(), "Expected no where clause for unbounded upper (-1)")
+        }
+
+        @Test
+        fun `REMOVE rule with positive lower bound contains lower-bound where clause`() {
+            val partClass = ClassData(name = "Part", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "House",
+                    name = "parts",
+                    multiplicity = MultiplicityData(lower = 2, upper = -1)
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Part",
+                    name = null,
+                    multiplicity = MultiplicityData(lower = 0, upper = 1)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/parts.mm",
+                classes = listOf(houseClass, partClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("House", "parts", RepairSpecType.REMOVE)
+            val ast = MutationAstBuilder.build("REMOVE_House_parts", spec, "/project/parts.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertEquals(1, whereClauses.size, "Expected exactly one where clause for lower=2")
+
+            val expr = whereClauses[0].whereClause.expression as TypedBinaryExpression
+            assertEquals(">", expr.operator)
+            val sizeCall = expr.left as TypedMemberCallExpression
+            assertEquals("size", sizeCall.member)
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            assertEquals("parts", memberAccess.member)
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+            assertEquals("source", identifier.name)
+            val bound = expr.right as TypedIntLiteralExpression
+            assertEquals("2", bound.value)
+        }
+
+        @Test
+        fun `REMOVE rule with lower=0 has no where clause`() {
+            val spec = RepairSpec("Room", "windows", RepairSpecType.REMOVE)
+            val ast = MutationAstBuilder.build("REMOVE_Room_windows", spec, mmPath, info)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertTrue(whereClauses.isEmpty(), "Expected no where clause when lower=0")
+        }
+
+        @Test
+        fun `CHANGE rule with bounded opposite produces guards on opposite reference`() {
+            val nodeClass = ClassData(name = "Node", isAbstract = false)
+            val edgeClass = ClassData(name = "Edge", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Node",
+                    name = "edges",
+                    multiplicity = MultiplicityData(lower = 0, upper = -1)
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Edge",
+                    name = "owner",
+                    multiplicity = MultiplicityData(lower = 1, upper = 2)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/graph.mm",
+                classes = listOf(nodeClass, edgeClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Node", "edges", RepairSpecType.CHANGE)
+            val ast = MutationAstBuilder.build("CHANGE_Node_edges", spec, "/project/graph.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertEquals(2, whereClauses.size, "Expected two where clauses: upper-bound on newTarget, lower-bound on oldTarget")
+
+            val upperGuard = whereClauses[0].whereClause.expression as TypedBinaryExpression
+            assertEquals("<", upperGuard.operator)
+            val upperSizeCall = upperGuard.left as TypedMemberCallExpression
+            assertEquals("size", upperSizeCall.member)
+            val upperAccess = upperSizeCall.expression as TypedMemberAccessExpression
+            assertEquals("owner", upperAccess.member)
+            val upperIdent = upperAccess.expression as TypedIdentifierExpression
+            assertEquals("newTarget", upperIdent.name)
+            val upperBound = upperGuard.right as TypedIntLiteralExpression
+            assertEquals("2", upperBound.value)
+
+            val lowerGuard = whereClauses[1].whereClause.expression as TypedBinaryExpression
+            assertEquals(">", lowerGuard.operator)
+            val lowerSizeCall = lowerGuard.left as TypedMemberCallExpression
+            assertEquals("size", lowerSizeCall.member)
+            val lowerAccess = lowerSizeCall.expression as TypedMemberAccessExpression
+            assertEquals("owner", lowerAccess.member)
+            val lowerIdent = lowerAccess.expression as TypedIdentifierExpression
+            assertEquals("oldTarget", lowerIdent.name)
+            val lowerBound = lowerGuard.right as TypedIntLiteralExpression
+            assertEquals("1", lowerBound.value)
+        }
+
+        @Test
+        fun `SWAP rule has no multiplicity guards even with bounded multiplicities`() {
+            val nodeClass = ClassData(name = "Node", isAbstract = false)
+            val edgeClass = ClassData(name = "Edge", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Node",
+                    name = "edges",
+                    multiplicity = MultiplicityData(lower = 1, upper = 3)
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Edge",
+                    name = "owner",
+                    multiplicity = MultiplicityData(lower = 1, upper = 2)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/graph.mm",
+                classes = listOf(nodeClass, edgeClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Node", "edges", RepairSpecType.SWAP)
+            val ast = MutationAstBuilder.build("SWAP_Node_edges", spec, "/project/graph.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertTrue(whereClauses.isEmpty(), "SWAP must not add where clauses (cardinality preserved)")
+        }
+
+        @Test
+        fun `CREATE rule with containment upper bound has where clause on container`() {
+            val boxClass = ClassData(name = "Box", isAbstract = false)
+            val itemClass = ClassData(name = "Item", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Box",
+                    name = "items",
+                    multiplicity = MultiplicityData(lower = 0, upper = 5)
+                ),
+                operator = "<>->",
+                target = AssociationEndData(
+                    className = "Item",
+                    name = "box",
+                    multiplicity = MultiplicityData(lower = 1, upper = 1)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/box.mm",
+                classes = listOf(boxClass, itemClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Item", null, RepairSpecType.CREATE)
+            val ast = MutationAstBuilder.build(
+                "CREATE_Item_in_Box_via_items", spec, "/project/box.mm", localInfo,
+                createContext = "Box" to "items"
+            )
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertEquals(1, whereClauses.size, "Expected where clause for containment upper=5")
+
+            val expr = whereClauses[0].whereClause.expression as TypedBinaryExpression
+            assertEquals("<", expr.operator)
+            val sizeCall = expr.left as TypedMemberCallExpression
+            assertEquals("size", sizeCall.member)
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            assertEquals("items", memberAccess.member)
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+            assertEquals("container", identifier.name)
+            val bound = expr.right as TypedIntLiteralExpression
+            assertEquals("5", bound.value)
+        }
+
+        @Test
+        fun `CREATE standalone has no multiplicity guards`() {
+            val spec = RepairSpec("House", null, RepairSpecType.CREATE)
+            val ast = MutationAstBuilder.build("CREATE_House", spec, mmPath, info, createContext = null)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertTrue(whereClauses.isEmpty(), "Standalone CREATE must have no where clauses")
+        }
+
+        @Test
+        fun `types array is populated with builtin types and metamodel class types`() {
+            val garageClass = ClassData(name = "Garage", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "House",
+                    name = "garages",
+                    multiplicity = MultiplicityData(lower = 0, upper = 3)
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Garage",
+                    name = null,
+                    multiplicity = MultiplicityData(lower = 0, upper = 1)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/garage.mm",
+                classes = listOf(houseClass, garageClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("House", "garages", RepairSpecType.ADD)
+            val ast = MutationAstBuilder.build("ADD_House_garages", spec, "/project/garage.mm", localInfo)
+
+            assertNotNull(ast)
+            assertTrue(ast.types.size >= 6, "Expected at least 6 builtin types")
+            assertTrue(ast.types[0] is VoidType, "Index 0 must be VoidType")
+            assertTrue(ast.types[1] is ClassTypeRef, "Index 1 must be ClassTypeRef")
+            assertEquals("string", (ast.types[1] as ClassTypeRef).type)
+            assertEquals("int", (ast.types[5] as ClassTypeRef).type)
+
+            val classRefs = ast.types.filterIsInstance<ClassTypeRef>()
+            assertTrue(
+                classRefs.any { it.type == "House" && it.`package`.contains("/project/garage.mm") },
+                "Expected House class type in types array"
+            )
+            assertTrue(
+                classRefs.any { it.type == "Garage" && it.`package`.contains("/project/garage.mm") },
+                "Expected Garage class type in types array"
+            )
+            assertTrue(
+                classRefs.any { it.type == "List" && it.typeArgs?.containsKey("T") == true },
+                "Expected List<Garage> type in types array"
+            )
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // MultiplicityGuardBuilder unit tests
+    // -------------------------------------------------------------------------
+
+    /**
+     * Unit tests for [MultiplicityGuardBuilder] verifying expression tree structure,
+     * type index management, and guard semantics.
+     */
+    @Nested
+    inner class MultiplicityGuardBuilderTests {
+
+        @Test
+        fun `buildUpperBoundGuard produces correct expression tree`() {
+            val builder = MultiplicityGuardBuilder("/test/meta.mm")
+            val guard = builder.buildUpperBoundGuard(
+                varName = "source",
+                varClassName = "Node",
+                refName = "edges",
+                targetClassName = "Edge",
+                upperBound = 5
+            )
+
+            val expr = guard.whereClause.expression as TypedBinaryExpression
+            assertEquals("<", expr.operator)
+            assertEquals(MultiplicityGuardBuilder.BOOLEAN_INDEX, expr.evalType)
+
+            val sizeCall = expr.left as TypedMemberCallExpression
+            assertEquals("size", sizeCall.member)
+            assertEquals(MultiplicityGuardBuilder.INT_INDEX, sizeCall.evalType)
+            assertTrue(sizeCall.arguments.isEmpty())
+
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            assertEquals("edges", memberAccess.member)
+            assertFalse(memberAccess.isNullChaining)
+
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+            assertEquals("source", identifier.name)
+            assertEquals(1, identifier.scope)
+
+            val bound = expr.right as TypedIntLiteralExpression
+            assertEquals("5", bound.value)
+            assertEquals(MultiplicityGuardBuilder.INT_INDEX, bound.evalType)
+        }
+
+        @Test
+        fun `buildLowerBoundGuard produces correct expression tree`() {
+            val builder = MultiplicityGuardBuilder("/test/meta.mm")
+            val guard = builder.buildLowerBoundGuard(
+                varName = "container",
+                varClassName = "Box",
+                refName = "items",
+                targetClassName = "Item",
+                lowerBound = 3
+            )
+
+            val expr = guard.whereClause.expression as TypedBinaryExpression
+            assertEquals(">", expr.operator)
+            assertEquals(MultiplicityGuardBuilder.BOOLEAN_INDEX, expr.evalType)
+
+            val sizeCall = expr.left as TypedMemberCallExpression
+            assertEquals("size", sizeCall.member)
+
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            assertEquals("items", memberAccess.member)
+
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+            assertEquals("container", identifier.name)
+
+            val bound = expr.right as TypedIntLiteralExpression
+            assertEquals("3", bound.value)
+        }
+
+        @Test
+        fun `getOrAddClassType registers metamodel class with correct package`() {
+            val builder = MultiplicityGuardBuilder("/project/test.mm")
+            val idx = builder.getOrAddClassType("Widget")
+
+            assertTrue(idx >= 6, "Class type index must be beyond builtin slots")
+            val types = builder.getTypes()
+            val classType = types[idx] as ClassTypeRef
+            assertEquals("Widget", classType.type)
+            assertEquals("class/project/test.mm", classType.`package`)
+            assertFalse(classType.isNullable)
+        }
+
+        @Test
+        fun `getOrAddClassType returns same index for duplicate registration`() {
+            val builder = MultiplicityGuardBuilder("/project/test.mm")
+            val first = builder.getOrAddClassType("Widget")
+            val second = builder.getOrAddClassType("Widget")
+            assertEquals(first, second, "Duplicate class type must reuse the same index")
+            assertEquals(7, builder.getTypes().size, "No duplicate entry should be added")
+        }
+
+        @Test
+        fun `getOrAddListType registers List type with correct typeArgs`() {
+            val builder = MultiplicityGuardBuilder("/project/test.mm")
+            val listIdx = builder.getOrAddListType("Edge")
+
+            assertTrue(listIdx >= 7, "List type index must be after class type")
+            val types = builder.getTypes()
+            val listType = types[listIdx] as ClassTypeRef
+            assertEquals("List", listType.type)
+            assertEquals("builtin", listType.`package`)
+            assertFalse(listType.isNullable)
+
+            val typeArg = listType.typeArgs!!["T"] as ClassTypeRef
+            assertEquals("Edge", typeArg.type)
+            assertEquals("class/project/test.mm", typeArg.`package`)
+        }
+
+        @Test
+        fun `getTypes returns snapshot with all builtin entries`() {
+            val builder = MultiplicityGuardBuilder("/test.mm")
+            val types = builder.getTypes()
+
+            assertEquals(6, types.size, "Fresh builder must have exactly 6 builtin types")
+            assertTrue(types[0] is VoidType)
+            assertEquals("string", (types[1] as ClassTypeRef).type)
+            assertEquals("double", (types[2] as ClassTypeRef).type)
+            assertEquals("boolean", (types[3] as ClassTypeRef).type)
+            assertEquals("Any", (types[4] as ClassTypeRef).type)
+            assertTrue((types[4] as ClassTypeRef).isNullable)
+            assertEquals("int", (types[5] as ClassTypeRef).type)
+        }
+
+        @Test
+        fun `upper bound guard type indices reference correct entries`() {
+            val builder = MultiplicityGuardBuilder("/test/meta.mm")
+            val guard = builder.buildUpperBoundGuard(
+                varName = "src",
+                varClassName = "Alpha",
+                refName = "betas",
+                targetClassName = "Beta",
+                upperBound = 10
+            )
+
+            val types = builder.getTypes()
+            val expr = guard.whereClause.expression as TypedBinaryExpression
+            val sizeCall = expr.left as TypedMemberCallExpression
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+
+            val alphaType = types[identifier.evalType] as ClassTypeRef
+            assertEquals("Alpha", alphaType.type)
+
+            val listType = types[memberAccess.evalType] as ClassTypeRef
+            assertEquals("List", listType.type)
+            val listElementType = listType.typeArgs!!["T"] as ClassTypeRef
+            assertEquals("Beta", listElementType.type)
+
+            assertEquals(MultiplicityGuardBuilder.INT_INDEX, sizeCall.evalType)
+            assertEquals(MultiplicityGuardBuilder.BOOLEAN_INDEX, expr.evalType)
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DeleteGuardTests
+    // -------------------------------------------------------------------------
+
+    /**
+     * Tests for the multiplicity guards added to DELETE rules.
+     *
+     * When a node is deleted all edges connected to it are removed. Guards are
+     * added for every reference whose opposite end has a positive lower bound, to
+     * prevent deletion when a neighbour would drop below its required minimum.
+     */
+    @Nested
+    inner class DeleteGuardTests {
+
+        @Test
+        fun `DELETE rule with opposite lower=1 adds neighbor where-clause guard`() {
+            val assignmentClass = ClassData(name = "Assignment", isAbstract = false)
+            val taskClass       = ClassData(name = "Task",       isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Assignment",
+                    name = "task",
+                    multiplicity = MultiplicityData.optional()
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Task",
+                    name = "assignments",
+                    multiplicity = MultiplicityData.oneOrMore()
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/assign.mm",
+                classes = listOf(assignmentClass, taskClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Assignment", null, RepairSpecType.DELETE)
+            val ast = MutationAstBuilder.build("DELETE_Assignment", spec, "/project/assign.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertEquals(1, whereClauses.size, "Expected exactly one where clause for opposite lower=1")
+
+            val expr = whereClauses[0].whereClause.expression as TypedBinaryExpression
+            assertEquals(">", expr.operator)
+            val sizeCall = expr.left as TypedMemberCallExpression
+            assertEquals("size", sizeCall.member)
+            val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+            assertEquals("assignments", memberAccess.member)
+            val identifier = memberAccess.expression as TypedIdentifierExpression
+            assertEquals("neighbor_task", identifier.name)
+            val bound = expr.right as TypedIntLiteralExpression
+            assertEquals("1", bound.value)
+
+            val links = stmt.pattern.elements.filterIsInstance<TypedPatternLinkElement>()
+            val guardLink = links.find { it.link.source.objectName == "node" && it.link.source.propertyName == "task" }
+            assertNotNull(guardLink, "Expected a link element for node.task -- neighbor_task")
+            assertEquals(null, guardLink.link.modifier, "Guard link must be a match (modifier=null)")
+            assertEquals("neighbor_task", guardLink.link.target.objectName)
+
+            val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
+            val neighborObj = objects.find { it.objectInstance.name == "neighbor_task" }
+            assertNotNull(neighborObj, "Expected a match object element for neighbor_task")
+            assertEquals("Task", neighborObj.objectInstance.className)
+        }
+
+        @Test
+        fun `DELETE rule with no opposite references has no guards`() {
+            val info = MetamodelInfo(metamodelData)
+            val spec = RepairSpec("Room", null, RepairSpecType.DELETE)
+            val ast = MutationAstBuilder.build("DELETE_Room", spec, "/project/home.mm", info)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertTrue(whereClauses.isEmpty(), "Expected no where clauses when all refs are unidirectional or opposite lower=0")
+
+            val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
+            val nodeObj = objects.find { it.objectInstance.name == "node" && it.objectInstance.className == "Room" }
+            assertNotNull(nodeObj, "Expected a match element for node: Room")
+            val deleteMarker = objects.find { it.objectInstance.name == "node" && it.objectInstance.modifier == "delete" }
+            assertNotNull(deleteMarker, "Expected a delete marker for node")
+        }
+
+        @Test
+        fun `DELETE rule with opposite lower=0 has no guard for that ref`() {
+            val roomClass2  = ClassData(name = "Room2",  isAbstract = false)
+            val houseClass2 = ClassData(name = "House2", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "House2",
+                    name = "rooms",
+                    multiplicity = MultiplicityData.many()
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Room2",
+                    name = "house",
+                    multiplicity = MultiplicityData.many()
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/house2.mm",
+                classes = listOf(houseClass2, roomClass2),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Room2", null, RepairSpecType.DELETE)
+            val ast = MutationAstBuilder.build("DELETE_Room2", spec, "/project/house2.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertTrue(whereClauses.isEmpty(), "Expected no where clause when opposite.lower=0")
+        }
+
+        @Test
+        fun `DELETE rule neighbor object and link are MATCH elements (modifier=null)`() {
+            val assignmentClass = ClassData(name = "Assignment", isAbstract = false)
+            val taskClass       = ClassData(name = "Task",       isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Assignment",
+                    name = "task",
+                    multiplicity = MultiplicityData.optional()
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Task",
+                    name = "assignments",
+                    multiplicity = MultiplicityData.oneOrMore()
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/assign.mm",
+                classes = listOf(assignmentClass, taskClass),
+                associations = listOf(assoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Assignment", null, RepairSpecType.DELETE)
+            val ast = MutationAstBuilder.build("DELETE_Assignment", spec, "/project/assign.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+
+            val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
+            val neighborObj = objects.find { it.objectInstance.name == "neighbor_task" }
+            assertNotNull(neighborObj, "Expected neighbor_task object element")
+            assertEquals(null, neighborObj.objectInstance.modifier, "Neighbor must be a match (modifier=null)")
+
+            val links = stmt.pattern.elements.filterIsInstance<TypedPatternLinkElement>()
+            val guardLink = links.find { it.link.source.propertyName == "task" }
+            assertNotNull(guardLink, "Expected a link element for task ref")
+            assertEquals(null, guardLink.link.modifier, "Guard link must be a match (modifier=null)")
+        }
+
+        @Test
+        fun `DELETE rule with multiple guarded references adds a guard per reference`() {
+            val orderClass    = ClassData(name = "Order",    isAbstract = false)
+            val customerClass = ClassData(name = "Customer", isAbstract = false)
+            val productClass  = ClassData(name = "Product",  isAbstract = false)
+            val customerAssoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Order",
+                    name = "customer",
+                    multiplicity = MultiplicityData.optional()
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Customer",
+                    name = "orders",
+                    multiplicity = MultiplicityData.oneOrMore()
+                )
+            )
+            val productAssoc = AssociationData(
+                source = AssociationEndData(
+                    className = "Order",
+                    name = "product",
+                    multiplicity = MultiplicityData.optional()
+                ),
+                operator = "-->",
+                target = AssociationEndData(
+                    className = "Product",
+                    name = "purchases",
+                    multiplicity = MultiplicityData(lower = 2, upper = -1)
+                )
+            )
+            val localMeta = MetamodelData(
+                path = "/project/order.mm",
+                classes = listOf(orderClass, customerClass, productClass),
+                associations = listOf(customerAssoc, productAssoc)
+            )
+            val localInfo = MetamodelInfo(localMeta)
+            val spec = RepairSpec("Order", null, RepairSpecType.DELETE)
+            val ast = MutationAstBuilder.build("DELETE_Order", spec, "/project/order.mm", localInfo)
+
+            assertNotNull(ast)
+            val stmt = ast.statements[0] as TypedMatchStatement
+
+            val whereClauses = stmt.pattern.elements.filterIsInstance<TypedPatternWhereClauseElement>()
+            assertEquals(2, whereClauses.size, "Expected two where clauses for two guarded refs")
+
+            val guardExprs = whereClauses.map { it.whereClause.expression as TypedBinaryExpression }
+
+            val customerGuard = guardExprs.find { expr ->
+                val sizeCall = expr.left as TypedMemberCallExpression
+                val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+                memberAccess.member == "orders"
+            }
+            assertNotNull(customerGuard, "Expected a guard for Customer.orders")
+            val customerIdent = ((customerGuard.left as TypedMemberCallExpression).expression as TypedMemberAccessExpression).expression as TypedIdentifierExpression
+            assertEquals("neighbor_customer", customerIdent.name)
+            assertEquals("1", (customerGuard.right as TypedIntLiteralExpression).value)
+
+            val productGuard = guardExprs.find { expr ->
+                val sizeCall = expr.left as TypedMemberCallExpression
+                val memberAccess = sizeCall.expression as TypedMemberAccessExpression
+                memberAccess.member == "purchases"
+            }
+            assertNotNull(productGuard, "Expected a guard for Product.purchases")
+            val productIdent = ((productGuard.left as TypedMemberCallExpression).expression as TypedMemberAccessExpression).expression as TypedIdentifierExpression
+            assertEquals("neighbor_product", productIdent.name)
+            assertEquals("2", (productGuard.right as TypedIntLiteralExpression).value)
+
+            val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
+            val neighborObjects = objects.filter { it.objectInstance.modifier == null && it.objectInstance.name.startsWith("neighbor_") }
+            assertEquals(2, neighborObjects.size, "Expected two neighbor match object instances")
+
+            val links = stmt.pattern.elements.filterIsInstance<TypedPatternLinkElement>()
+            val guardLinks = links.filter { it.link.modifier == null }
+            assertEquals(2, guardLinks.size, "Expected two guard link match elements")
         }
     }
 }
