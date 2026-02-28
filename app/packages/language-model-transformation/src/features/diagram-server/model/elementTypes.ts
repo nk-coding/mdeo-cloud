@@ -84,7 +84,7 @@ export enum ModelTransformationElementType {
     LABEL_VARIABLE = "label:variable",
 
     /**
-     * Modifier label shown in the middle of a pattern link edge (create/delete/forbid)
+     * Modifier label shown in the middle of a pattern link edge (create/delete/forbid/require)
      */
     LABEL_PATTERN_LINK_MODIFIER = "label:pattern-link-modifier",
 
@@ -105,14 +105,14 @@ export enum ModelTransformationElementType {
     MATCH_NODE_COMPARTMENTS = "comp:match-node-compartments",
 
     /**
-     * Modifier title compartment (renders «create», «delete», «forbid» + name label)
+     * Modifier title compartment (renders «create», «delete», «forbid», «require» + name label)
      */
     COMPARTMENT_MODIFIER_TITLE = "comp:modifier-title"
 }
 
 /**
  * Enum for pattern modifier kinds.
- * Represents the create/delete/forbid modifier on pattern elements.
+ * Represents the create/delete/forbid/require modifier on pattern elements.
  */
 export enum PatternModifierKind {
     /**
@@ -130,7 +130,11 @@ export enum PatternModifierKind {
     /**
      * Forbid the element (negative application condition)
      */
-    FORBID = "forbid"
+    FORBID = "forbid",
+    /**
+     * Require the element (positive application condition)
+     */
+    REQUIRE = "require"
 }
 
 /**

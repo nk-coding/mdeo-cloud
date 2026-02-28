@@ -15,7 +15,8 @@ const { injectable } = sharedImport("inversify");
  * Modifier-specific border colours:
  *  - CREATE  → green border
  *  - DELETE  → red border
- *  - FORBID  → amber border
+ *  - FORBID  → blue border
+ *  - REQUIRE → orange border
  *  - NONE    → foreground (default) border
  *
  * Referenced instances (from previous matches) are rendered with reduced opacity.
@@ -37,6 +38,7 @@ export class GPatternInstanceNodeView extends GRectangularNodeView {
             "border-create": modifier === PatternModifierKind.CREATE,
             "border-delete": modifier === PatternModifierKind.DELETE,
             "border-forbid": modifier === PatternModifierKind.FORBID,
+            "border-require": modifier === PatternModifierKind.REQUIRE,
             "bg-background": true,
             "box-border": true,
             flex: true,

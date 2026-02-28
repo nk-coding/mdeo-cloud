@@ -10,8 +10,8 @@ const { svg, html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 /**
  * View for the pattern link modifier label.
  * Renders a SVG foreignObject containing an HTML span with french-quote–wrapped
- * modifier text (e.g. «create», «delete», «forbid»), coloured to match the
- * instance/edge colour scheme (`text-create`, `text-delete`, `text-forbid`).
+ * modifier text (e.g. «create», «delete», «forbid», «require»), coloured to match the
+ * instance/edge colour scheme (`text-create`, `text-delete`, `text-forbid`, `text-require`).
  *
  * No selection, resize, or move handles are rendered because the model element
  * carries no node features.
@@ -45,7 +45,8 @@ export class GPatternLinkModifierLabelView implements IView {
                     class: {
                         "text-create": modifier === PatternModifierKind.CREATE,
                         "text-delete": modifier === PatternModifierKind.DELETE,
-                        "text-forbid": modifier === PatternModifierKind.FORBID
+                        "text-forbid": modifier === PatternModifierKind.FORBID,
+                        "text-require": modifier === PatternModifierKind.REQUIRE
                     },
                     attrs: {
                         [ATTR_BBOX_ELEMENT]: true

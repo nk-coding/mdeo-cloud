@@ -7,7 +7,7 @@ const { GChildElement, boundsFeature, Bounds: BoundsUtil } = sharedImport("@ecli
 /**
  * Client-side model for a pattern link modifier label.
  * Displayed in the middle of a pattern link edge when a modifier
- * (create/delete/forbid) is present on the link.
+ * (create/delete/forbid/require) is present on the link.
  */
 export class GPatternLinkModifierLabel extends GChildElement implements BoundsAware {
     static readonly DEFAULT_FEATURES = [boundsFeature];

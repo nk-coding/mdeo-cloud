@@ -113,6 +113,7 @@ const modelTransformationLanguagePlugin: LanguagePlugin = {
                 "create",
                 "delete",
                 "forbid",
+                "require",
                 "where",
                 "kill",
                 "stop",

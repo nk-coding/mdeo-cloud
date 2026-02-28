@@ -3,6 +3,7 @@ import {
     type ExpressionTypirServices,
     type PrimitiveTypes,
     type CustomValueType,
+    type IdentifierExpressionType,
     isCustomValueType,
     isCustomVoidType,
     isCustomLambdaType,
@@ -19,6 +20,7 @@ import {
     WhileExpressionStatement,
     PatternObjectInstance,
     WhereClause,
+    expressionTypes,
     type LambdaExpressionType,
     type PatternPropertyAssignmentType
 } from "../../grammar/modelTransformationTypes.js";
@@ -85,6 +87,7 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
         this.registerLambdaValidationRule();
         this.registerPatternVariableInferenceRule();
         this.registerPatternVariableValidationRule();
+        this.registerIdentifierExpressionValidationRule();
         this.registerPatternPropertyAssignmentValidationRule();
         this.registerControlFlowValidationRules();
         this.registerWhereClauseValidationRule();
@@ -319,6 +322,47 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
                 });
             }
         });
+    }
+
+    /**
+     * Registers the validation rule for identifier expressions.
+     * Prevents references to pattern object instances annotated with forbid/require.
+     */
+    private registerIdentifierExpressionValidationRule(): void {
+        this.registerValidationRule(expressionTypes.identifierExpressionType, (node, accept) => {
+            this.validateIdentifierExpressionTarget(node, accept);
+        });
+    }
+
+    /**
+     * Validates that identifier expressions do not target forbid/require pattern object instances.
+     *
+     * @param node The identifier expression node.
+     * @param accept The validation problem acceptor.
+     */
+    private validateIdentifierExpressionTarget(
+        node: IdentifierExpressionType,
+        accept: ValidationProblemAcceptor<TypirLangiumSpecifics>
+    ): void {
+        const scope = this.typir.ScopeProvider.getScope(node);
+        const entry = scope.getEntry(node.name);
+        if (entry?.languageNode == undefined) {
+            return;
+        }
+
+        if (!this.astReflection.isInstance(entry.languageNode, PatternObjectInstance)) {
+            return;
+        }
+
+        const instance = entry.languageNode;
+        const modifier = instance.modifier?.modifier;
+        if (modifier === "forbid" || modifier === "require") {
+            accept({
+                languageNode: node,
+                message: `Identifier '${node.name}' cannot reference a '${modifier}' instance in expressions.`,
+                severity: "error"
+            });
+        }
     }
 
     /**

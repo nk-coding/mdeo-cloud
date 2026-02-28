@@ -36,7 +36,7 @@ export class GPatternInstanceNode extends GRectangularNode {
     typeName?: string;
 
     /**
-     * The modifier kind (none, create, delete, forbid)
+     * The modifier kind (none, create, delete, forbid, require)
      */
     modifier!: PatternModifierKind;
 }

@@ -23,6 +23,8 @@ function getStrokeClassForModifier(modifier: PatternModifierKind): string {
             return "stroke-delete";
         case PatternModifierKind.FORBID:
             return "stroke-forbid";
+        case PatternModifierKind.REQUIRE:
+            return "stroke-require";
         default:
             return "stroke-foreground";
     }
@@ -31,7 +33,7 @@ function getStrokeClassForModifier(modifier: PatternModifierKind): string {
 /**
  * View for rendering pattern link edges between instances.
  * Renders edges as polylines with labels at source/target ends.
- * The edge color changes based on the modifier (create/delete/forbid).
+ * The edge color changes based on the modifier (create/delete/forbid/require).
  */
 @injectable()
 export class GPatternLinkEdgeView extends GEdgeView {

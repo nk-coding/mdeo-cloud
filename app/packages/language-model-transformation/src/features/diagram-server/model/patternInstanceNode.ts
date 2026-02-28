@@ -18,7 +18,7 @@ export class GPatternInstanceNode extends GNode {
     typeName?: string;
 
     /**
-     * The modifier kind (none, create, delete, forbid)
+     * The modifier kind (none, create, delete, forbid, require)
      */
     modifier!: PatternModifierKind;
 

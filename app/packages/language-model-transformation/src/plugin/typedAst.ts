@@ -79,7 +79,7 @@ export interface TypedPatternPropertyAssignment {
  */
 export interface TypedPatternObjectInstance {
     /**
-     * Optional modifier (create, delete, or forbid).
+     * Optional modifier (create, delete, forbid, or require).
      */
     modifier?: string;
 
@@ -123,7 +123,7 @@ export interface TypedPatternLinkEnd {
  */
 export interface TypedPatternLink {
     /**
-     * Optional modifier (create, delete, or forbid).
+     * Optional modifier (create, delete, forbid, or require).
      */
     modifier?: string;
 

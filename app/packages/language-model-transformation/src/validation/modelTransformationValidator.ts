@@ -10,6 +10,8 @@ import {
     ForMatchStatement,
     IfExpressionStatement,
     WhileExpressionStatement,
+    Pattern,
+    PatternLink,
     PatternObjectInstance,
     PatternVariable,
     type ModelTransformationType,
@@ -267,6 +269,8 @@ export class ModelTransformationValidator extends BaseModelValidator {
                 });
             }
         }
+
+        this.validateConditionalInstanceLinkAttachments(obj, accept);
     }
 
     /**
@@ -396,5 +400,145 @@ export class ModelTransformationValidator extends BaseModelValidator {
         const targetObj = target.object.ref as PatternObjectInstanceType;
 
         this.validateLinkBase(link, sourceObj, targetObj, accept);
+        this.validateConditionalLinkEndpoints(link, sourceObj, targetObj, accept);
+    }
+
+    /**
+     * Validates that conditional links connect only to compatible instance modifiers.
+     *
+     * @param link The pattern link being validated
+     * @param sourceObj The resolved source object instance
+     * @param targetObj The resolved target object instance
+     * @param accept The validation acceptor
+     */
+    private validateConditionalLinkEndpoints(
+        link: PatternLinkType,
+        sourceObj: PatternObjectInstanceType,
+        targetObj: PatternObjectInstanceType,
+        accept: ValidationAcceptor
+    ): void {
+        const linkModifier = link.modifier?.modifier;
+
+        if (linkModifier === "forbid") {
+            this.validateLinkEndpointModifierCompatibility(link, sourceObj, "source", "forbid", "require", accept);
+            this.validateLinkEndpointModifierCompatibility(link, targetObj, "target", "forbid", "require", accept);
+        }
+
+        if (linkModifier === "require") {
+            this.validateLinkEndpointModifierCompatibility(link, sourceObj, "source", "require", "forbid", accept);
+            this.validateLinkEndpointModifierCompatibility(link, targetObj, "target", "require", "forbid", accept);
+        }
+    }
+
+    /**
+     * Validates that a link endpoint object does not use an incompatible conditional modifier.
+     *
+     * @param link The pattern link being validated
+     * @param endpointObject The endpoint object instance
+     * @param endpointProperty The endpoint property name used for diagnostics
+     * @param linkModifier The modifier of the current link
+     * @param incompatibleModifier The modifier disallowed on the endpoint object
+     * @param accept The validation acceptor
+     */
+    private validateLinkEndpointModifierCompatibility(
+        link: PatternLinkType,
+        endpointObject: PatternObjectInstanceType,
+        endpointProperty: "source" | "target",
+        linkModifier: "forbid" | "require",
+        incompatibleModifier: "forbid" | "require",
+        accept: ValidationAcceptor
+    ): void {
+        const endpointModifier = endpointObject.modifier?.modifier;
+        if (endpointModifier !== incompatibleModifier) {
+            return;
+        }
+
+        accept(
+            "error",
+            `A '${linkModifier}' link cannot be attached to a '${incompatibleModifier}' instance '${endpointObject.name}'.`,
+            {
+                node: link,
+                property: endpointProperty
+            }
+        );
+    }
+
+    /**
+     * Validates that conditional instances are connected only by links with matching modifier.
+     *
+     * @param obj The pattern object instance being validated
+     * @param accept The validation acceptor
+     */
+    private validateConditionalInstanceLinkAttachments(
+        obj: PatternObjectInstanceType,
+        accept: ValidationAcceptor
+    ): void {
+        const instanceModifier = obj.modifier?.modifier;
+        if (instanceModifier !== "forbid" && instanceModifier !== "require") {
+            return;
+        }
+
+        const pattern = this.findContainingPattern(obj);
+        if (pattern == undefined) {
+            return;
+        }
+
+        const connectedLinks = this.collectConnectedLinks(pattern, obj);
+        for (const link of connectedLinks) {
+            if (link.modifier?.modifier === instanceModifier) {
+                continue;
+            }
+
+            accept("error", `A '${instanceModifier}' instance can only be attached to '${instanceModifier}' links.`, {
+                node: obj,
+                property: "modifier"
+            });
+            return;
+        }
+    }
+
+    /**
+     * Finds the nearest parent pattern for a node.
+     *
+     * @param node The node to inspect
+     * @returns The containing pattern, if any
+     */
+    private findContainingPattern(node: { $container?: AstNode }): PatternType | undefined {
+        let current = node.$container;
+
+        while (current != undefined) {
+            if (this.reflection.isInstance(current, Pattern)) {
+                return current as PatternType;
+            }
+            current = current.$container;
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Collects links from a pattern that are connected to the given object instance.
+     *
+     * @param pattern The containing pattern
+     * @param objectInstance The object instance whose links should be collected
+     * @returns The connected links
+     */
+    private collectConnectedLinks(pattern: PatternType, objectInstance: PatternObjectInstanceType): PatternLinkType[] {
+        const links: PatternLinkType[] = [];
+
+        for (const element of pattern.elements ?? []) {
+            if (!this.reflection.isInstance(element, PatternLink)) {
+                continue;
+            }
+
+            const link = element as PatternLinkType;
+            const sourceRef = link.source?.object?.ref;
+            const targetRef = link.target?.object?.ref;
+            if (sourceRef === objectInstance || targetRef === objectInstance) {
+                links.push(link);
+            }
+        }
+
+        return links;
     }
 }

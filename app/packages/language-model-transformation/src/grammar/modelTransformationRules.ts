@@ -101,11 +101,18 @@ export function generateModelTransformationRules(): {
 
     /**
      * Pattern modifier rule.
-     * Matches create, delete, or forbid keywords.
+     * Matches create, delete, forbid, or require keywords.
      */
     const PatternModifierRule = createRule("PatternModifierRule")
         .returns(PatternModifier)
-        .as(({ set }) => [or(set("modifier", "create"), set("modifier", "delete"), set("modifier", "forbid"))]);
+        .as(({ set }) => [
+            or(
+                set("modifier", "create"),
+                set("modifier", "delete"),
+                set("modifier", "forbid"),
+                set("modifier", "require")
+            )
+        ]);
 
     /**
      * Pattern variable rule.

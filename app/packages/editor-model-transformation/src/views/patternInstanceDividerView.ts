@@ -11,6 +11,7 @@ const { findParentByFeature } = sharedImport("@eclipse-glsp/sprotty");
  * Colours the divider line using the same colour as the enclosing
  * GPatternInstanceNode border so the separator visually matches the
  * modifier colour (green for create, red for delete, blue for forbid,
+ * orange for require,
  * foreground for none).
  */
 @injectable()
@@ -24,6 +25,7 @@ export class GPatternInstanceDividerView extends GHorizontalDividerView {
             "border-create": parentInstance != null && parentInstance.modifier === PatternModifierKind.CREATE,
             "border-delete": parentInstance != null && parentInstance.modifier === PatternModifierKind.DELETE,
             "border-forbid": parentInstance != null && parentInstance.modifier === PatternModifierKind.FORBID,
+            "border-require": parentInstance != null && parentInstance.modifier === PatternModifierKind.REQUIRE,
             "border-foreground": parentInstance != null && parentInstance.modifier === PatternModifierKind.NONE,
             "border-current": parentInstance == null
         };

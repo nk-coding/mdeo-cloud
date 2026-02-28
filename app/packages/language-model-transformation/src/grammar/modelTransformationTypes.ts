@@ -29,7 +29,7 @@ export const expressionTypes = generateExpressionTypes(expressionConfig, typeTyp
 export const BaseExpression = expressionTypes.baseExpressionType;
 
 /**
- * Modifier for pattern elements (create, delete, forbid).
+ * Modifier for pattern elements (create, delete, forbid, require).
  */
 export const PatternModifier = createInterface("PatternModifier").attrs({
     modifier: String
@@ -82,7 +82,7 @@ export type PatternPropertyAssignmentType = ASTType<typeof PatternPropertyAssign
 
 /**
  * Pattern object instance definition.
- * Optionally prefixed with create, delete, or forbid.
+ * Optionally prefixed with create, delete, forbid, or require.
  */
 export const PatternObjectInstance = createInterface("PatternObjectInstance").attrs({
     modifier: Optional(PatternModifier),
@@ -140,7 +140,7 @@ export type PatternLinkEndType = ASTType<typeof PatternLinkEnd>;
 
 /**
  * Link definition in a pattern.
- * Optionally prefixed with create, delete, or forbid.
+ * Optionally prefixed with create, delete, forbid, or require.
  */
 export const PatternLink = createInterface("PatternLink").attrs({
     modifier: Optional(PatternModifier),

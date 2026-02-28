@@ -1512,6 +1512,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 return PatternModifierKind.DELETE;
             case "forbid":
                 return PatternModifierKind.FORBID;
+            case "require":
+                return PatternModifierKind.REQUIRE;
             default:
                 return PatternModifierKind.NONE;
         }

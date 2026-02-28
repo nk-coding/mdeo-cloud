@@ -10,7 +10,7 @@ const { html, findParentByFeature } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for the pattern modifier title compartment.
- * Renders a UML stereotype label (e.g. «create», «delete», «forbid») above the instance
+ * Renders a UML stereotype label (e.g. «create», «delete», «forbid», «require») above the instance
  * name label. The modifier kind is resolved by traversing up to the closest ancestor
  * GPatternInstanceNode rather than storing it in the compartment model itself.
  * The stereotype text is coloured using the same colour used for the node's border.
@@ -34,6 +34,7 @@ export class GPatternModifierTitleCompartmentView extends GCompartmentView {
                         "text-create": modifier === PatternModifierKind.CREATE,
                         "text-delete": modifier === PatternModifierKind.DELETE,
                         "text-forbid": modifier === PatternModifierKind.FORBID,
+                        "text-require": modifier === PatternModifierKind.REQUIRE,
                         "text-foreground": modifier === PatternModifierKind.NONE
                     }
                 },
