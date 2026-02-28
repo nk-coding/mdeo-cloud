@@ -8,6 +8,7 @@ import com.mdeo.expression.ast.types.MultiplicityData
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
+import com.mdeo.optimizer.config.RefinementConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -136,19 +137,39 @@ class MutationRuleGeneratorTest {
             assertEquals("Room", r.targetClass)
             assertTrue(r.isContainment)
             assertNotNull(r.opposite)
-            assertEquals(1, r.opposite!!.lower)
-            assertEquals(1, r.opposite!!.upper)
+            assertEquals(1, r.opposite.lower)
+            assertEquals(1, r.opposite.upper)
         }
 
         @Test
-        fun `referencesForNode Room returns windows`() {
+        fun `referencesForNode Room returns windows and reverse house`() {
             val refs = info.referencesForNode("Room")
-            assertEquals(1, refs.size)
-            val r = refs[0]
-            assertEquals("windows", r.refName)
-            assertEquals("Window", r.targetClass)
-            assertFalse(r.isContainment)
-            assertEquals(null, r.opposite)
+            assertEquals(2, refs.size)
+
+            val windows = refs.find { it.refName == "windows" }
+            assertNotNull(windows)
+            assertEquals("Window", windows.targetClass)
+            assertFalse(windows.isContainment)
+            assertEquals(null, windows.opposite)
+            assertFalse(windows.isReverse)
+
+            val house = refs.find { it.refName == "house" }
+            assertNotNull(house)
+            assertEquals("House", house.targetClass)
+            assertFalse(house.isContainment, "Reverse-end of containment must not be marked as containment")
+            assertNotNull(house.opposite)
+            assertEquals(1, house.lower)
+            assertEquals(1, house.upper)
+            assertTrue(house.isReverse)
+        }
+
+        @Test
+        fun `referencesForNode Room reverse house has correct opposite multiplicity`() {
+            val house = info.referencesForNode("Room").find { it.refName == "house" }
+            assertNotNull(house)
+            val opp = house.opposite!!
+            assertEquals(0, opp.lower, "Opposite lower should match House.rooms lower (0)")
+            assertEquals(-1, opp.upper, "Opposite upper should match House.rooms upper (0..*  = -1)")
         }
 
         @Test
@@ -480,6 +501,144 @@ class MutationRuleGeneratorTest {
                 assertTrue(m.typedAst.statements.isNotEmpty(), "Rule '${m.name}' has no statements")
                 assertTrue(m.typedAst.statements.all { it is TypedMatchStatement })
             }
+        }
+
+        @Test
+        fun `generate ADD for Room produces operators for reverse house reference`() {
+            val specs = listOf(MutationRuleSpec("Room", action = MutationAction.ADD))
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs)
+            val names = mutations.map { it.name }.toSet()
+            assertTrue(
+                names.any { it.contains("house") },
+                "Expected at least one operator referencing the reverse-end 'house' reference; got: $names"
+            )
+        }
+
+        @Test
+        fun `generate ADD for Room house reverse reference builds valid TypedAst`() {
+            val specs = listOf(MutationRuleSpec("Room", edge = "house", action = MutationAction.ADD))
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs)
+            assertTrue(mutations.isNotEmpty(), "Expected at least one mutation for Room.house")
+            for (m in mutations) {
+                assertNotNull(m.typedAst)
+                assertTrue(m.typedAst.statements.isNotEmpty(), "Rule '${m.name}' has no statements")
+                val stmt = m.typedAst.statements[0] as TypedMatchStatement
+                val links = stmt.pattern.elements.filterIsInstance<TypedPatternLinkElement>()
+                val linkRef = links.first().link.source.propertyName
+                assertEquals("house", linkRef, "Link should use the 'house' reference name")
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // S-type (refinement) rule generation
+    // -------------------------------------------------------------------------
+
+    @Nested
+    inner class STypeRuleGenerationTests {
+
+        @Test
+        fun `generate without refinements produces no S_ prefixed rules`() {
+            val specs = listOf(MutationRuleSpec("Room", action = MutationAction.ALL))
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs)
+            val sTypeNames = mutations.map { it.name }.filter { it.startsWith("S_") }
+            assertTrue(
+                sTypeNames.isEmpty(),
+                "Expected no S_-prefixed rules without refinements; got: $sTypeNames"
+            )
+        }
+
+        @Test
+        fun `generate with refinements produces S_ prefixed rules`() {
+            val specs = listOf(MutationRuleSpec("Room", edge = "windows", action = MutationAction.ADD))
+            val refinements = listOf(
+                RefinementConfig(className = "Room", fieldName = "windows", lower = 0, upper = 3)
+            )
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs, refinements = refinements)
+            val sTypeNames = mutations.map { it.name }.filter { it.startsWith("S_") }
+            assertTrue(
+                sTypeNames.isNotEmpty(),
+                "Expected S_-prefixed rules when refinements provided; got: ${mutations.map { it.name }}"
+            )
+        }
+
+        @Test
+        fun `S_type rules reflect tightened multiplicity bounds`() {
+            // Room.windows base: lower=0, upper=-1 (0..*), no opposite → ADD rule.
+            // Refinement tightens to lower=1, upper=1 (1..1); lower==upper and no opposite → SWAP.
+            val specs = listOf(MutationRuleSpec("Room", edge = "windows", action = MutationAction.ADD))
+            val refinements = listOf(
+                RefinementConfig(className = "Room", fieldName = "windows", lower = 1, upper = 1)
+            )
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs, refinements = refinements)
+            val names = mutations.map { it.name }.toSet()
+
+            assertTrue(
+                names.contains("S_SWAP_Room_windows"),
+                "Expected S_SWAP_Room_windows with 1..1 refinement; got: $names"
+            )
+            assertFalse(
+                names.contains("S_ADD_Room_windows"),
+                "Expected no S_ADD_Room_windows when lower==upper; got: $names"
+            )
+        }
+
+        @Test
+        fun `S_type rules are merged alongside base rules`() {
+            val specs = listOf(MutationRuleSpec("Room", edge = "windows", action = MutationAction.ADD))
+            val refinements = listOf(
+                RefinementConfig(className = "Room", fieldName = "windows", lower = 0, upper = 3)
+            )
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs, refinements = refinements)
+            val names = mutations.map { it.name }.toSet()
+
+            assertTrue(names.any { !it.startsWith("S_") }, "Expected base rules in merged result")
+            assertTrue(names.any { it.startsWith("S_") }, "Expected S_ rules in merged result")
+        }
+
+        @Test
+        fun `duplicate specs with refinements yield no duplicate S_ rule names`() {
+            val specs = listOf(
+                MutationRuleSpec("Room", edge = "windows", action = MutationAction.ADD),
+                MutationRuleSpec("Room", edge = "windows", action = MutationAction.ADD)
+            )
+            val refinements = listOf(
+                RefinementConfig(className = "Room", fieldName = "windows", lower = 0, upper = 3)
+            )
+            val mutations = MutationRuleGenerator.generate(metamodelData, specs, refinements = refinements)
+            val names = mutations.map { it.name }
+            assertEquals(
+                names.distinct().size,
+                names.size,
+                "Expected no duplicate rule names; got: $names"
+            )
+        }
+
+        @Test
+        fun `MetamodelInfo withOverrides applies lower bound override`() {
+            val overrides = listOf(
+                MultiplicityOverride(className = "Room", refName = "windows", lower = 2, upper = -1)
+            )
+            val refinedInfo = MetamodelInfo.withOverrides(metamodelData, overrides)
+            val refs = refinedInfo.referencesForNode("Room")
+            val windows = refs.first { it.refName == "windows" }
+            assertEquals(2, windows.lower, "Expected overridden lower bound of 2")
+            assertEquals(-1, windows.upper, "Expected upper bound unchanged at -1")
+        }
+
+        @Test
+        fun `MetamodelInfo withOverrides leaves unrefined references unchanged`() {
+            val overrides = listOf(
+                MultiplicityOverride(className = "Room", refName = "windows", lower = 2, upper = 5)
+            )
+            val refinedInfo = MetamodelInfo.withOverrides(metamodelData, overrides)
+            val baseInfo = MetamodelInfo(metamodelData)
+
+            assertEquals(
+                baseInfo.referencesForNode("House"),
+                refinedInfo.referencesForNode("House"),
+                "House refs must be unchanged when only Room.windows is overridden"
+            )
         }
     }
 }

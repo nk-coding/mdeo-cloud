@@ -3,28 +3,22 @@ package com.mdeo.modeltransformation.compiler
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
-import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
 /**
  * Context for traversal-based expression compilation.
  *
  * This context provides all necessary information for compiling typed expressions
- * into GraphTraversals. It extends the compilation infrastructure with match-specific
- * settings to support the unified traversal compilation model.
- *
- * ## Variable Counter
- * The [variableCounter] is used to generate unique variable names for intermediate
- * values in where clauses. This ensures no naming conflicts when multiple
- * expressions use temporary bindings.
+ * into GraphTraversals.
  *
  * ## Scope Chain
  * The [currentScope] represents the current variable scope with access to parent scopes
  * through the scope chain. Variable resolution walks up the chain to find bindings.
  *
  * ## Unique ID Generation
- * The context maintains an internal counter for generating unique labels in Gremlin
- * traversals via [getUniqueId]. This ensures no naming conflicts across operations.
+ * Unique label generation is delegated to the provided [idGenerator]. Sharing the same
+ * [LabelIdGenerator] instance across all compilation contexts and the enclosing match
+ * executor ensures that no two step labels collide within a single traversal build.
  *
  * @param types The list of types referenced by expressions via evalType index.
  *              Indices must be preserved from the TypedAst. Entries may be VoidType or
@@ -32,26 +26,17 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  * @param currentScope The current variable scope with access to parent scopes
  * @param traversalSource The GraphTraversalSource for building traversals
  * @param typeRegistry The type registry for property and method lookup
+ * @param idGenerator The shared label ID generator; defaults to a fresh sequential generator
+ *                    but should be supplied by the caller to share the counter across
+ *                    all contexts participating in the same traversal build.
  */
 class CompilationContext(
     val types: List<ReturnType>,
     val currentScope: VariableScope,
     val traversalSource: GraphTraversalSource?,
-    val typeRegistry: TypeRegistry
-) {
-    /**
-     * Counter for generating unique variable names
-     */
-    private var idCounter = 0
-    
-    /**
-     * Generates a unique ID for use in Gremlin traversal labels.
-     * 
-     * @return A unique string identifier in the format "id_N" where N is an incrementing counter
-     */
-    fun getUniqueId(): String {
-        return "id_${idCounter++}"
-    }
+    val typeRegistry: TypeRegistry,
+    val idGenerator: LabelIdGenerator = SequentialLabelIdGenerator()
+) : LabelIdGenerator by idGenerator {
     /**
      * Resolves a type from the types array using the given index.
      *
@@ -104,7 +89,8 @@ class CompilationContext(
             types = types,
             currentScope = childScope,
             traversalSource = traversalSource,
-            typeRegistry = typeRegistry
+            typeRegistry = typeRegistry,
+            idGenerator = idGenerator
         )
     }
 }

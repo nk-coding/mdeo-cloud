@@ -67,10 +67,11 @@ data class ConstraintConfig(
  * Multiplicity refinement that tightens the lower or upper bound of a metamodel reference
  * for the purpose of rule generation.
  *
- * **Note:** Refinements affect rule generation only when the generator explicitly applies
- * them. The current Kotlin port of [com.mdeo.optimizer.rulegen.MutationRuleGenerator]
- * performs a single pass over base metamodel multiplicities and does **not** apply these
- * refinements — this is a placeholder for future support.
+ * When a non-empty list of refinements is passed to
+ * [com.mdeo.optimizer.rulegen.MutationRuleGenerator.generate], a second generation pass is
+ * performed using a modified [com.mdeo.optimizer.rulegen.MetamodelInfo] where the specified
+ * reference multiplicities are replaced by the values declared here.  Rules produced in the
+ * second pass are prefixed with `"S_"` to distinguish them from the base rules.
  *
  * @param className The metamodel class that owns the reference.
  * @param fieldName The reference (field) name to refine.

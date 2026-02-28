@@ -10,7 +10,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
  * Categorizes pattern elements by their role in pattern matching and modifications.
  *
  * This data class separates pattern elements into distinct categories based on their
- * modifiers (create, delete, forbid) and types (instances, links, variables, where clauses).
+ * modifiers (create, delete, forbid, require) and types (instances, links, variables, where clauses).
  * This categorization enables the unified executor to process different element types
  * efficiently in the appropriate phases of the execution pipeline.
  *
@@ -20,13 +20,15 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
  * - **matchableInstances**: Object instances without modifiers that must be found in the graph
  * - **createInstances**: Object instances with "create" modifier to be inserted
  * - **deleteInstances**: Object instances with "delete" modifier to be removed
- * - **forbidInstances**: Object instances with "forbid" modifier that must not exist
+ * - **forbidInstances**: Object instances with "forbid" modifier that must not exist (NAC)
+ * - **requireInstances**: Object instances with "require" modifier that must exist (PAC)
  *
  * ### Links
  * - **matchableLinks**: Links without modifiers that must exist in the graph
  * - **createLinks**: Links with "create" modifier to be inserted
  * - **deleteLinks**: Links with "delete" modifier to be removed
- * - **forbidLinks**: Links with "forbid" modifier that must not exist
+ * - **forbidLinks**: Links with "forbid" modifier that must not exist (NAC)
+ * - **requireLinks**: Links with "require" modifier that must exist (PAC)
  *
  * ### Other Elements
  * - **variables**: Variable definitions that compute and bind values
@@ -38,8 +40,10 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
  * @property deleteInstances Object instances to delete during modifications
  * @property createLinks Links to create during modifications
  * @property deleteLinks Links to delete during modifications
- * @property forbidInstances Object instances that must not exist (negative constraint)
- * @property forbidLinks Links that must not exist (negative constraint)
+ * @property forbidInstances Object instances that must not exist (negative application condition)
+ * @property forbidLinks Links that must not exist (negative application condition)
+ * @property requireInstances Object instances that must exist (positive application condition)
+ * @property requireLinks Links that must exist (positive application condition)
  * @property variables Variable definitions for computed values
  * @property whereClauses Boolean expressions constraining the match
  */
@@ -52,6 +56,8 @@ internal data class PatternCategories(
     val deleteLinks: List<TypedPatternLinkElement>,
     val forbidInstances: List<TypedPatternObjectInstanceElement>,
     val forbidLinks: List<TypedPatternLinkElement>,
+    val requireInstances: List<TypedPatternObjectInstanceElement>,
+    val requireLinks: List<TypedPatternLinkElement>,
     val variables: List<TypedPatternVariableElement>,
     val whereClauses: List<TypedPatternWhereClauseElement>
 ) {
@@ -89,16 +95,20 @@ internal data class PatternCategories(
             val deleteLinks = mutableListOf<TypedPatternLinkElement>()
             val forbidInstances = mutableListOf<TypedPatternObjectInstanceElement>()
             val forbidLinks = mutableListOf<TypedPatternLinkElement>()
+            val requireInstances = mutableListOf<TypedPatternObjectInstanceElement>()
+            val requireLinks = mutableListOf<TypedPatternLinkElement>()
             val variables = mutableListOf<TypedPatternVariableElement>()
             val whereClauses = mutableListOf<TypedPatternWhereClauseElement>()
             
             for (element in pattern.elements) {
                 when (element) {
                     is TypedPatternObjectInstanceElement -> categorizeInstance(
-                        element, matchableInstances, createInstances, deleteInstances, forbidInstances
+                        element, matchableInstances, createInstances, deleteInstances,
+                        forbidInstances, requireInstances
                     )
                     is TypedPatternLinkElement -> categorizeLink(
-                        element, matchableLinks, createLinks, deleteLinks, forbidLinks
+                        element, matchableLinks, createLinks, deleteLinks,
+                        forbidLinks, requireLinks
                     )
                     is TypedPatternVariableElement -> variables.add(element)
                     is TypedPatternWhereClauseElement -> whereClauses.add(element)
@@ -107,7 +117,8 @@ internal data class PatternCategories(
             
             return PatternCategories(
                 matchableInstances, matchableLinks, createInstances, deleteInstances,
-                createLinks, deleteLinks, forbidInstances, forbidLinks, variables, whereClauses
+                createLinks, deleteLinks, forbidInstances, forbidLinks,
+                requireInstances, requireLinks, variables, whereClauses
             )
         }
         
@@ -118,6 +129,7 @@ internal data class PatternCategories(
          * - "create" → create list
          * - "delete" → delete list
          * - "forbid" → forbid list
+         * - "require" → require list
          * - no modifier → matchable list
          *
          * @param element The instance element to categorize
@@ -125,18 +137,21 @@ internal data class PatternCategories(
          * @param create Target list for create instances
          * @param delete Target list for delete instances
          * @param forbid Target list for forbid instances
+         * @param require Target list for require instances
          */
         private fun categorizeInstance(
             element: TypedPatternObjectInstanceElement,
             matchable: MutableList<TypedPatternObjectInstanceElement>,
             create: MutableList<TypedPatternObjectInstanceElement>,
             delete: MutableList<TypedPatternObjectInstanceElement>,
-            forbid: MutableList<TypedPatternObjectInstanceElement>
+            forbid: MutableList<TypedPatternObjectInstanceElement>,
+            require: MutableList<TypedPatternObjectInstanceElement>
         ) {
             when (element.objectInstance.modifier) {
                 "create" -> create.add(element)
                 "delete" -> delete.add(element)
                 "forbid" -> forbid.add(element)
+                "require" -> require.add(element)
                 else -> matchable.add(element)
             }
         }
@@ -148,6 +163,7 @@ internal data class PatternCategories(
          * - "create" → create list
          * - "delete" → delete list
          * - "forbid" → forbid list
+         * - "require" → require list
          * - no modifier → matchable list
          *
          * @param element The link element to categorize
@@ -155,18 +171,21 @@ internal data class PatternCategories(
          * @param create Target list for create links
          * @param delete Target list for delete links
          * @param forbid Target list for forbid links
+         * @param require Target list for require links
          */
         private fun categorizeLink(
             element: TypedPatternLinkElement,
             matchable: MutableList<TypedPatternLinkElement>,
             create: MutableList<TypedPatternLinkElement>,
             delete: MutableList<TypedPatternLinkElement>,
-            forbid: MutableList<TypedPatternLinkElement>
+            forbid: MutableList<TypedPatternLinkElement>,
+            require: MutableList<TypedPatternLinkElement>
         ) {
             when (element.link.modifier) {
                 "create" -> create.add(element)
                 "delete" -> delete.add(element)
                 "forbid" -> forbid.add(element)
+                "require" -> require.add(element)
                 else -> matchable.add(element)
             }
         }

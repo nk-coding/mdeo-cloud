@@ -50,59 +50,6 @@ convergence speed and plateau escaping behaviour.
 
 ---
 
-### 2. Multiplicity-refined ("S-type") rules not generated
-
-| | |
-|---|---|
-| **Present in original?** | ✅ Yes — the second generation pass |
-| **Classification** | New limitation introduced by the port |
-
-#### Original behaviour
-
-`RulesGenerator.generateRules()` runs the full generation pipeline **twice**:
-
-```java
-// RulesGenerator.java
-if (this.refinedMultiplicities.size() > 0) {
-    var solutionMetamodelWrapper =
-        new MetamodelWrapper(this.metamodel, this.refinedMultiplicities);  // ruleType = "S"
-    ruleSpecs.forEach(ruleSpec -> {
-        var repairSpecs = specsGenerator.getRepairsForRuleSpec(ruleSpec, solutionMetamodelWrapper);
-        generatedRulesListSolution.addAll(
-            generateSpecRules(ruleSpec, repairSpecs, solutionMetamodelWrapper));
-    });
-    this.refinedMultiplicities.forEach(m -> solutionMetamodelWrapper.revertEdgeMultiplicities(m));
-}
-```
-
-The first pass uses base metamodel multiplicities and names rules with a `P_` prefix (Problem
-rules).  The second pass temporarily mutates the `EPackage` in-place with user-specified tightened
-lower/upper bounds and names rules with an `S_` prefix (Solution rules).  Both sets are merged
-after semantic deduplication.  The purpose is to generate operators that are valid specifically
-inside the tighter solution space, avoiding moves that would immediately violate refinement
-constraints.
-
-The `GoalConfig.refinements` list (carrying `className`, `fieldName`, `lower`, `upper`) maps
-directly to the `List<Multiplicity>` the original feeds to this second pass.
-
-#### Why it was not implemented
-
-The platform's `MetamodelData` does not provide mutable access to multiplicity bounds.  The
-original exploits EMF's mutable `EPackage` singleton — it literally calls setters on `EReference`
-objects and then reverts them.  `MetamodelData` is an immutable serialised snapshot; replicating
-the mutation-and-revert trick would require building a modified copy of the `MetamodelData` struct
-for the second pass.  This is implementable as a follow-up.
-
-#### Practical effect
-
-Refinements declared under `goal.refinements` in the optimisation config are currently parsed and
-stored on `RefinementConfig` but never consumed by the rule generator.  The search space is not
-restricted to the tighter solution bounds at the operator level.  Generated operators will
-occasionally produce moves that violate refinement constraints; the guidance functions and
-constraint scores must then steer the search away from those regions instead.
-
----
-
 ### 3. Lower-bound repair (`LB_REPAIR`) is a simplified stub
 
 | | |
@@ -209,54 +156,14 @@ Building one would require a significant new module.
 Name-based deduplication (the current approach) eliminates all cases where the same
 `(node, edge, RepairSpecType)` triple is produced twice — which covers all structural duplicates
 within a single generation pass.  It does _not_ detect two semantically identical rules that arise
-from different triples, which the original would merge.  This occurs primarily when the S-type
-second pass (limitation 2) generates rules already covered by the P-type first pass.  Since the
-second pass is not implemented, this case does not arise in practice.
+from different triples, which the original would merge.  In practice, any S-type rule whose name
+already exists in the result map (because tightened bounds produce an identical rule shape to a
+base rule) is silently skipped — the `seen` map in `MutationRuleGenerator` handles this
+naturally since S-type rules carry an `S_` prefix and therefore never share a name with base rules.
 
 ---
 
-### 6. Bidirectional reverse-end references not enumerated for the target class
-
-| | |
-|---|---|
-| **Present in original?** | ⚠️ Partially — the behaviour in the original also only generates from the owning class |
-| **Classification** | Shared limitation (both original and port); documented for clarity |
-
-#### Original behaviour
-
-`SpecsGenerator` calls `node.getEReferences()` on the `EClass` to enumerate references for
-generation.  In EMF, `EClass.getEReferences()` returns only references **structurally owned** by
-that class — the ones declared on it directly.
-
-For the bidirectional association `House.rooms ←→ Room.house`, where `rooms` is declared on
-`House` and `house` is declared on `Room`:
-- When processing `House`, `getEReferences()` returns `rooms` (and `house` is available via
-  `rooms.getEOpposite()`).
-- When processing `Room`, `getEReferences()` returns `house` (and `rooms` is available via
-  `house.getEOpposite()`).
-
-Both directions **are** generated, but each from the perspective of the class that owns that
-reference.
-
-#### Port behaviour
-
-`MetamodelInfo.referencesForNode(className)` filters `MetamodelData.associations` for entries
-where `assoc.source.className == className && assoc.source.name != null`.  If `MetamodelData`
-stores a bidirectional association as a single record with `source = House` and `target = Room`,
-then `referencesForNode("Room")` returns nothing for the `house` link.
-
-#### Practical effect
-
-If the backend populates `MetamodelData` with one `AssociationData` record per logical association
-(regardless of bidirectionality), the port produces **half the operators** the original would for
-the reverse end.  This is a meaningful gap for bidirectional containment associations in
-particular.  Whether this applies depends on how `MetamodelData.associations` is populated by the
-metamodel service — if it emits both `House→Room` and `Room→House` as separate records, there is
-no gap.  The KDoc in `MetamodelInfo.referencesForNode` documents this dependency explicitly.
-
----
-
-### 7. Inherited references not enumerated
+### 6. Inherited references not enumerated
 
 | | |
 |---|---|
@@ -355,8 +262,8 @@ synthetic names, and treated identically to hand-authored transformation scripts
 
 | | Original | Port |
 |---|---|---|
-| **Refinements consumed by** | `RulesGenerator` (generation) + OCL constraints (evaluation) | `RefinementConfig` parsed and stored; not yet consumed by generator |
-| **Effect on operators** | Generates S-type rules valid within tighter bounds | No effect on generated operators |
+| **Refinements consumed by** | `RulesGenerator` (generation) + OCL constraints (evaluation) | `MutationRuleGenerator.generate()` (via `refinements` parameter) + constraint guidance functions |
+| **Effect on operators** | Generates S-type rules valid within tighter bounds | Generates `S_`-prefixed rules via `MetamodelInfo.withOverrides()` using tightened bounds |
 | **Effect on evaluation** | OCL constraint evaluator rejects solutions outside bounds | Constraint guidance functions score bound violations |
 
 ---
