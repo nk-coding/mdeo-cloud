@@ -4,6 +4,7 @@ import { CustomValueTypeImplementation } from "../custom-value/custom-value-type
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
 import type { CustomLambdaDetails, CustomLambdaKind } from "./custom-lambda-kind.js";
 import type { LambdaType } from "../../config/type.js";
+import { addDependsOnTypeEdge } from "../../service/customTypeGraph.js";
 
 const {
     checkValueForConflict,
@@ -59,6 +60,7 @@ export class CustomLambdaTypeImplementation
         );
         this.kind = kind;
         this.registerSubtypesAndConversion();
+        this.registerTypeDependencies();
         this.defineTheInitializationProcessOfThisType({});
     }
 
@@ -221,6 +223,32 @@ export class CustomLambdaTypeImplementation
                 subProblems: [createKindConflict(otherType, this)]
             }
         ];
+    }
+
+    /**
+     * Registers dependency edges for return type, parameter types, and type arguments.
+     */
+    private registerTypeDependencies(): void {
+        if (this.details.returnType instanceof CustomValueTypeImplementation) {
+            this.registerTypeDependency(this.details.returnType);
+        }
+
+        for (const parameterType of this.details.parameterTypes) {
+            this.registerTypeDependency(parameterType);
+        }
+
+        for (const typeArg of this.details.typeArgs.values()) {
+            this.registerTypeDependency(typeArg);
+        }
+    }
+
+    /**
+     * Registers a single dependency edge.
+     *
+     * @param dependencyType The dependency type
+     */
+    private registerTypeDependency(dependencyType: CustomValueType): void {
+        addDependsOnTypeEdge(this.services.infrastructure.Graph, this, dependencyType);
     }
 }
 

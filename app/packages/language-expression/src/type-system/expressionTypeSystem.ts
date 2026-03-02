@@ -2,7 +2,7 @@ import type { TypirLangiumServices, TypirLangiumSpecifics } from "typir-langium"
 import type { TypeSystemConfig } from "./typeSystemConfig.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
 import type { ClassType, Member } from "../typir-extensions/config/type.js";
-import type { TypeDefinitionService } from "../typir-extensions/service/type-definition-service.js";
+import type { TypeDefinitionService } from "../typir-extensions/service/typeDefinitionService.js";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { ExpressionTypirServices } from "./services.js";
 import { ExpressionPartialTypeSystem } from "./expressionPartialTypeSystem.js";

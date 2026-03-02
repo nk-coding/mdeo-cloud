@@ -5,7 +5,7 @@ import type { CustomFunctionFactoryService } from "../kinds/custom-function/cust
 import type { CustomValueFactoryService } from "../kinds/custom-value/custom-value-kind.js";
 import type { CustomVoidFactoryService } from "../kinds/custom-void/custom-void-kind.js";
 import type { CustomNullFactoryService } from "../kinds/custom-null/custom-null-kind.js";
-import type { TypeDefinitionService } from "./type-definition-service.js";
+import type { TypeDefinitionService } from "./typeDefinitionService.js";
 import type { ScopeProviderCaching } from "../scope/scopeProviderCache.js";
 import type { ScopeProvider } from "../scope/scopeProvider.js";
 import type { TypirLangiumAddedServices, TypirLangiumSpecifics } from "typir-langium";

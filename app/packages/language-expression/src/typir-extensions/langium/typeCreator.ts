@@ -1,8 +1,10 @@
 import { sharedImport } from "@mdeo/language-shared";
 import type { LangiumTypeCreator, TypirLangiumServices, TypirLangiumSpecifics } from "typir-langium";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
-import type { ClassType } from "../config/type.js";
-import type { TypeDefinitionListener, TypeDefinitionService } from "../service/type-definition-service.js";
+import type { ClassType, ClassTypeRef } from "../config/type.js";
+import type { TypeDefinitionListener, TypeDefinitionService } from "../service/typeDefinitionService.js";
+import type { Type } from "typir";
+import { isCustomClassType, type CustomClassType } from "../kinds/custom-class/custom-class-type.js";
 
 const { DefaultLangiumTypeCreator } = sharedImport("typir-langium");
 
@@ -19,6 +21,14 @@ export function generateTypeCreator<Specifics extends TypirLangiumSpecifics>(): 
         private readonly documentTypeDefinitionMap: Map<string, ClassType[]> = new Map();
         private readonly typeDefinition: TypeDefinitionService;
 
+        /**
+         * Map of ClassTypes to its instances (CustomClassType)
+         *
+         * Outer map key: package name
+         * Inner map key: class name
+         */
+        private readonly typeMap = new Map<string, Map<string, CustomClassType[]>>();
+
         constructor(services: ExtendedTypirServices<Specifics> & TypirLangiumServices<Specifics>) {
             super(services);
             this.typeDefinition = services.TypeDefinitions;
@@ -30,6 +40,26 @@ export function generateTypeCreator<Specifics extends TypirLangiumSpecifics>(): 
             (this.documentTypeDefinitionMap.get(documentKey) ?? []).forEach((classTypeToRemove) =>
                 this.typeDefinition.removeClassType(classTypeToRemove)
             );
+            this.documentTypeDefinitionMap.delete(documentKey);
+        }
+
+        override onAddedType(newType: Type): void {
+            super.onAddedType(newType);
+
+            if (isCustomClassType(newType)) {
+                const definition = newType.definition as ClassTypeRef;
+                const nameMap = this.typeMap.get(definition.type);
+                if (nameMap == undefined) {
+                    this.typeMap.set(definition.type, new Map([[definition.package, [newType]]]));
+                } else {
+                    const packageList = nameMap.get(definition.package);
+                    if (packageList == undefined) {
+                        nameMap.set(definition.package, [newType]);
+                    } else {
+                        packageList.push(newType);
+                    }
+                }
+            }
         }
 
         onAddedClassType(classType: ClassType): void {
@@ -43,7 +73,24 @@ export function generateTypeCreator<Specifics extends TypirLangiumSpecifics>(): 
             }
         }
 
-        onRemovedClassType(): void {}
+        onRemovedClassType(classType: ClassType): void {
+            const nameMap = this.typeMap.get(classType.name);
+            if (nameMap == undefined) {
+                return;
+            }
+            const instanceList = nameMap.get(classType.package);
+            if (instanceList == undefined) {
+                return;
+            }
+            for (const instance of instanceList) {
+                this.typeGraph.removeNode(instance);
+            }
+            nameMap.delete(classType.package);
+
+            if (nameMap.size === 0) {
+                this.typeMap.delete(classType.name);
+            }
+        }
     }
 
     return {

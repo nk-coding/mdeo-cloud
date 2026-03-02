@@ -2,7 +2,9 @@ import type { TypirSpecifics, TypirProblem, Type as TypirType, TypeEqualityProbl
 import type { CustomClassDetails, CustomClassKind } from "./custom-class-kind.js";
 import { CustomValueTypeImplementation, type CustomValueType } from "../custom-value/custom-value-type.js";
 import type { ClassTypeRef, Property, Method, ValueType } from "../../config/type.js";
+import type { CustomFunctionType } from "../custom-function/custom-function-type.js";
 import { sharedImport } from "@mdeo/language-shared";
+import { addDependsOnTypeEdge } from "../../service/customTypeGraph.js";
 
 const {
     checkValueForConflict,
@@ -66,6 +68,7 @@ export class CustomClassTypeImplementation
         );
         this.kind = kind;
         this.registerSubtypesAndConversion();
+        this.registerTypeDependencies();
         this.defineTheInitializationProcessOfThisType({});
     }
 
@@ -155,6 +158,28 @@ export class CustomClassTypeImplementation
             return undefined;
         }
         return this.details.definition.methods[memberName];
+    }
+
+    /**
+     * Registers dependency edges for all dependent custom types.
+     */
+    private registerTypeDependencies(): void {
+        for (const typeArg of this.details.typeArgs.values()) {
+            this.registerTypeDependency(typeArg);
+        }
+
+        for (const superClass of this.superClasses) {
+            this.registerTypeDependency(superClass);
+        }
+    }
+
+    /**
+     * Registers a single dependency edge.
+     *
+     * @param dependencyType The dependency type
+     */
+    private registerTypeDependency(dependencyType: CustomValueType | CustomFunctionType): void {
+        addDependsOnTypeEdge(this.services.infrastructure.Graph, this, dependencyType);
     }
 }
 

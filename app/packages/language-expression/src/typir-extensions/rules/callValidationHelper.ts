@@ -12,7 +12,7 @@ import { isCustomNullType } from "../kinds/custom-null/custom-null-type.js";
 import { isCustomClassType } from "../kinds/custom-class/custom-class-type.js";
 import type { FunctionSignature, ValueType, FunctionType, ReturnType } from "../config/type.js";
 import { ClassTypeRef, GenericTypeRef, LambdaType, VoidType } from "../config/type.js";
-import type { TypeDefinitionService } from "../service/type-definition-service.js";
+import type { TypeDefinitionService } from "../service/typeDefinitionService.js";
 import { findCommonParentType, findSuperTypeWithTypeArgs } from "./commonParentType.js";
 import { getClassTypeIdentifier } from "./util.js";
 import { assertUnreachable } from "@mdeo/language-common";

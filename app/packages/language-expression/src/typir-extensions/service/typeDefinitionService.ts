@@ -222,7 +222,6 @@ export class DefaultTypeDefinitionService<Specifics extends TypirSpecifics> impl
         if (existingClassType != undefined) {
             nameMap.delete(classType.package);
 
-            // Clean up empty name map
             if (nameMap.size === 0) {
                 this.typeMap.delete(classType.name);
             }
