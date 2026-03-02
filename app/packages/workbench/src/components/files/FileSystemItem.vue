@@ -128,16 +128,10 @@ import { treeContextKey } from "../tree/util";
 import { FileType } from "@codingame/monaco-vscode-files-service-override";
 import { Uri } from "vscode";
 import FileTypeIcon from "../FileTypeIcon.vue";
-import {
-    ActionDisplayLocation,
-    type FileAction
-} from "@mdeo/language-common";
+import { ActionDisplayLocation, type FileAction } from "@mdeo/language-common";
 import { getFileExtension } from "@/data/filesystem/util";
 import plugin from "vue-sonner";
-import {
-    fetchFileActions as fetchAvailableFileActions,
-    triggerFileAction
-} from "@/components/action/fileActions";
+import { fetchFileActions as fetchAvailableFileActions, triggerFileAction } from "@/components/action/fileActions";
 
 const props = defineProps<{
     entry: FileSystemNode;

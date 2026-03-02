@@ -166,10 +166,9 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
             return;
         }
 
-        const script = languageNode as ScriptType;
-        const document = AstUtils.getDocument(script);
+        const document = AstUtils.getDocument(languageNode);
 
-        const metamodelDoc = this.loadMetamodelSync(document, script, typir);
+        const metamodelDoc = this.loadMetamodelSync(document, languageNode, typir);
         if (metamodelDoc == undefined) {
             return;
         }

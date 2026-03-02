@@ -58,10 +58,7 @@ import {
     type FileOperationEvent
 } from "@codingame/monaco-vscode-api/vscode/vs/platform/files/common/files";
 import type { IDisposable } from "@codingame/monaco-vscode-api/vscode/vs/base/common/lifecycle";
-import {
-    fetchFileActions as fetchAvailableFileActions,
-    triggerFileAction
-} from "@/components/action/fileActions";
+import { fetchFileActions as fetchAvailableFileActions, triggerFileAction } from "@/components/action/fileActions";
 
 const workbenchState = inject(workbenchStateKey)!;
 const { tabs, activeTab, languageClient, languagePluginByExtension, pendingAction, monacoApi } = workbenchState;

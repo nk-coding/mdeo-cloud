@@ -97,7 +97,7 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
      * @returns Array of grouped toolbox items with ghost elements
      */
     async getToolboxItems(): Promise<GroupedToolboxItem[]> {
-        const classes = await this.getAvailableNonAbstractClasses();
+        const classes = this.getAvailableNonAbstractClasses();
         const items: GroupedToolboxItem[] = [];
 
         for (const classInfo of classes) {
@@ -127,7 +127,7 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
      *
      * @returns Array of objects with class names and ClassType for object creation
      */
-    private async getAvailableNonAbstractClasses(): Promise<Array<{ name: string; classType: ClassType }>> {
+    private getAvailableNonAbstractClasses(): Array<{ name: string; classType: ClassType }> {
         const sourceModel = this.modelState.sourceModel as PartialModel;
         const sourceModelDoc = sourceModel?.$document;
         const importedFile = sourceModel?.import?.file;
@@ -138,7 +138,11 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
 
         const metamodelUri = resolveRelativePath(sourceModelDoc, importedFile);
         const documents = this.modelState.languageServices.shared.workspace.LangiumDocuments;
-        const doc = await documents.getOrCreateDocument(metamodelUri);
+        const doc = documents.getDocument(metamodelUri);
+
+        if (doc == undefined) {
+            return [];
+        }
 
         const exports = getExportedEntitiesFromMetamodelFile(doc, documents);
 

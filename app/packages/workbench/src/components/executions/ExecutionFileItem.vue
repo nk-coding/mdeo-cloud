@@ -51,14 +51,8 @@ import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } 
 import type { FileSystemNode, File, Folder } from "@/data/filesystem/file";
 import { FileType } from "vscode";
 import { workbenchStateKey } from "@/components/workbench/util";
-import {
-    ActionDisplayLocation,
-    type FileAction
-} from "@mdeo/language-common";
-import {
-    fetchFileActions as fetchAvailableFileActions,
-    triggerFileAction
-} from "@/components/action/fileActions";
+import { ActionDisplayLocation, type FileAction } from "@mdeo/language-common";
+import { fetchFileActions as fetchAvailableFileActions, triggerFileAction } from "@/components/action/fileActions";
 
 const props = defineProps<{
     entry: FileSystemNode;

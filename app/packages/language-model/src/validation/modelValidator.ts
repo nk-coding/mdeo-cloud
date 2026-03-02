@@ -25,9 +25,9 @@ import {
     type ListValueType
 } from "../grammar/modelTypes.js";
 import { BaseModelValidator } from "./baseModelValidator.js";
-import { sharedImport } from "@mdeo/language-shared";
+import { resolveRelativeDocument, sharedImport } from "@mdeo/language-shared";
 
-const { MultiMap } = sharedImport("langium");
+const { MultiMap, AstUtils } = sharedImport("langium");
 
 /**
  * Interface mapping for model AST types used in validation checks.
@@ -70,6 +70,8 @@ export class ModelValidator extends BaseModelValidator {
      * Validates the entire model for object name uniqueness.
      */
     validateModel(model: ModelType, accept: ValidationAcceptor): void {
+        this.validateMetamodelImport(model, accept);
+
         const nameToObjects = new MultiMap<string, ObjectInstanceType>();
 
         for (const obj of model.objects ?? []) {
@@ -87,6 +89,27 @@ export class ModelValidator extends BaseModelValidator {
                     });
                 }
             }
+        }
+    }
+
+    /**
+     * Checks that the metamodel path in a `using` declaration resolves to an existing document.
+     */
+    private validateMetamodelImport(model: ModelType, accept: ValidationAcceptor): void {
+        const metamodelImport = model.import;
+        const file = metamodelImport?.file;
+        if (file == undefined || file.trim() === "") {
+            return;
+        }
+
+        const document = AstUtils.getDocument(model);
+        const targetDoc = resolveRelativeDocument(document, file, this.services.shared.workspace.LangiumDocuments);
+
+        if (targetDoc == undefined) {
+            accept("error", `Cannot resolve metamodel path '${file}'. The file does not exist or is not loaded.`, {
+                node: metamodelImport,
+                property: "file"
+            });
         }
     }
 

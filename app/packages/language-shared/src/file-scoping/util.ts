@@ -1,4 +1,4 @@
-import type { LangiumDocument, URI } from "langium";
+import type { LangiumDocument, LangiumDocuments, URI } from "langium";
 import { sharedImport } from "../sharedImport.js";
 
 const { UriUtils } = sharedImport("langium");
@@ -14,4 +14,25 @@ export function resolveRelativePath(document: LangiumDocument, file: string): UR
     const currentUri = document.uri;
     const dirname = UriUtils.dirname(currentUri);
     return UriUtils.joinPath(dirname, file);
+}
+
+/**
+ * Resolves and loads a document from a relative path.
+ *
+ * @param fromDocument The source document from which the relative path is resolved
+ * @param relativePath The relative file path to resolve
+ * @param documents The Langium document registry
+ * @returns The resolved Langium document, or undefined if not found
+ */
+export function resolveRelativeDocument(
+    fromDocument: LangiumDocument,
+    relativePath: string | undefined,
+    documents: LangiumDocuments
+): LangiumDocument | undefined {
+    if (relativePath == undefined || relativePath.trim() === "") {
+        return undefined;
+    }
+
+    const uri = resolveRelativePath(fromDocument, relativePath);
+    return documents.getDocument(uri);
 }

@@ -31,7 +31,7 @@ import type {
     ResolvedContributedExpression,
     ResolvedScriptContributionPlugins
 } from "../../plugin/scriptContributionPlugin.js";
-import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
+import { sharedImport, resolveRelativeDocument } from "@mdeo/language-shared";
 import type { InferenceProblem, Type, ValidationProblemAcceptor } from "typir";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import type { LangiumDocument, LangiumDocuments } from "langium";
@@ -180,8 +180,17 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
         documents: LangiumDocuments,
         accept: ValidationProblemAcceptor<ScriptTypirSpecifics>
     ): void {
+        if (fileImport.file == undefined) {
+            return;
+        }
         const targetDoc = this.resolveDocument(document, fileImport.file, documents);
         if (targetDoc == undefined) {
+            accept({
+                languageNode: fileImport,
+                languageProperty: "file",
+                message: `Cannot resolve import path '${fileImport.file}'. The file does not exist or is not loaded.`,
+                severity: "error"
+            });
             return;
         }
 
@@ -237,8 +246,7 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
         relativePath: string,
         documents: LangiumDocuments
     ): LangiumDocument | undefined {
-        const uri = resolveRelativePath(fromDocument, relativePath);
-        return documents.getDocument(uri);
+        return resolveRelativeDocument(fromDocument, relativePath, documents);
     }
 
     /**

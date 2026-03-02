@@ -7,7 +7,7 @@ import type {
     Properties
 } from "langium";
 import type { ExtendedLangiumServices } from "@mdeo/language-common";
-import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
+import { resolveRelativeDocument, sharedImport } from "@mdeo/language-shared";
 import { MetaModel, isMetamodelCompatible } from "@mdeo/language-metamodel";
 import { Model } from "@mdeo/language-model";
 import {
@@ -459,8 +459,7 @@ export class OptimizationValidator {
      * @returns The resolved LangiumDocument or undefined
      */
     private resolveDocument(fromDocument: LangiumDocument, relativePath: string): LangiumDocument | undefined {
-        const uri = resolveRelativePath(fromDocument, relativePath);
-        return this.documents.getDocument(uri);
+        return resolveRelativeDocument(fromDocument, relativePath, this.documents);
     }
 
     /**
@@ -519,6 +518,14 @@ export class OptimizationValidator {
         const scriptDoc = this.resolveDocument(document, fileImport.file);
 
         if (scriptDoc == undefined) {
+            accept(
+                "error",
+                `Cannot resolve import path '${fileImport.file}'. The file does not exist or is not loaded.`,
+                {
+                    node: fileImport,
+                    property: "file"
+                }
+            );
             return;
         }
 

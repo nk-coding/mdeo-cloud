@@ -24,9 +24,9 @@ import {
     type ElseIfBranchType,
     type IfMatchStatementType
 } from "../grammar/modelTransformationTypes.js";
-import { sharedImport } from "@mdeo/language-shared";
+import { resolveRelativeDocument, sharedImport } from "@mdeo/language-shared";
 
-const { MultiMap } = sharedImport("langium");
+const { MultiMap, AstUtils } = sharedImport("langium");
 
 /**
  * Interface for named elements (objects and variables).
@@ -80,9 +80,32 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * @param accept The validation acceptor
      */
     validateTransformation(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
+        this.validateMetamodelImport(transformation, accept);
+
         const allNames = new MultiMap<string, NamedElement>();
         this.collectAllNames(transformation, allNames);
         this.reportDuplicateNames(allNames, accept);
+    }
+
+    /**
+     * Checks that the metamodel path in a `using` declaration resolves to an existing document.
+     */
+    private validateMetamodelImport(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
+        const metamodelImport = transformation.import;
+        const file = metamodelImport?.file;
+        if (file == undefined || file.trim() === "") {
+            return;
+        }
+
+        const document = AstUtils.getDocument(transformation);
+        const targetDoc = resolveRelativeDocument(document, file, this.services.shared.workspace.LangiumDocuments);
+
+        if (targetDoc == undefined) {
+            accept("error", `Cannot resolve metamodel path '${file}'. The file does not exist or is not loaded.`, {
+                node: metamodelImport,
+                property: "file"
+            });
+        }
     }
 
     /**
