@@ -255,7 +255,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-${{ matrix.service.name }}-*
+          pattern: digests-${{ matrix.service.name }}-linux-*
           merge-multiple: true
 
       - name: Log in to GitHub Container Registry
