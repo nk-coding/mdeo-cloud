@@ -1,5 +1,5 @@
 # Build stage
-FROM node:23-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /build
 COPY app/ ./
@@ -10,7 +10,7 @@ RUN npm run build:css
 RUN npm run -w @mdeo/service-metamodel build:static
 
 # Production stage
-FROM node:23-alpine
+FROM node:24-alpine
 
 # Install curl for healthchecks
 RUN apk add --no-cache curl
