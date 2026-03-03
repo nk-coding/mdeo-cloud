@@ -1,13 +1,3 @@
-resource "helm_release" "cnpg_operator" {
-  name             = "cnpg"
-  repository       = "https://cloudnative-pg.github.io/charts"
-  chart            = "cloudnative-pg"
-  namespace        = "cnpg-system"
-  create_namespace = true
-  wait             = true
-  wait_for_jobs    = true
-}
-
 locals {
   databases = {
     "postgres-backend" = {
@@ -56,10 +46,10 @@ resource "kubernetes_secret_v1" "db_credentials" {
   }
 }
 
+# The CNPG operator and its CRDs are installed by ../cluster_setup before this
+# configuration is applied, so kubernetes_manifest can be used directly here.
 resource "kubernetes_manifest" "db_cluster" {
   for_each = local.databases
-
-  depends_on = [helm_release.cnpg_operator]
 
   manifest = {
     apiVersion = "postgresql.cnpg.io/v1"

@@ -50,6 +50,24 @@ resource "kubernetes_deployment_v1" "backend" {
       }
 
       spec {
+        # Wait for all plugin services to be reachable via the workbench nginx
+        # before the backend starts, so that plugin registration succeeds in
+        # one pass (mirrors docker-compose depends_on: service_healthy).
+        init_container {
+          name  = "wait-for-plugins"
+          image = "busybox:1.36"
+          command = [
+            "sh", "-c",
+            <<-EOT
+              for path in /plugin/metamodel/ /plugin/model/ /plugin/script/ /plugin/model-transformation/ /plugin/config/ /plugin/config-optimization/ /plugin/config-mdeo/; do
+                echo "Waiting for workbench$path ...";
+                until wget -q -O /dev/null "http://workbench:80$path"; do sleep 3; done;
+                echo "Ready: $path";
+              done
+            EOT
+          ]
+        }
+
         container {
           name              = "backend"
           image             = "${var.image_registry}/${var.image_owner}/mdeo-backend:${var.app_version}"
@@ -104,7 +122,7 @@ resource "kubernetes_deployment_v1" "backend" {
           }
           env {
             name  = "CORS_ALLOWED_HOSTS"
-            value = var.app_endpoint
+            value = replace(replace(var.app_endpoint, "https://", ""), "http://", "")
           }
 
           # Admin credentials
@@ -118,9 +136,12 @@ resource "kubernetes_deployment_v1" "backend" {
           }
 
           # Plugin URLs
+          # PLUGIN_BASE_URL is intentionally empty: DEFAULT_PLUGIN_URLS are
+          # relative paths (/plugin/...) that the browser resolves against the
+          # current host, and the backend prefixes them with INTERNAL_PLUGIN_BASE_URL.
           env {
             name  = "PLUGIN_BASE_URL"
-            value = var.app_endpoint
+            value = ""
           }
           env {
             name  = "INTERNAL_PLUGIN_BASE_URL"
@@ -133,7 +154,7 @@ resource "kubernetes_deployment_v1" "backend" {
 
           liveness_probe {
             http_get {
-              path = "/actuator/health"
+              path = "/health"
               port = 8080
             }
             initial_delay_seconds = 120
@@ -144,7 +165,7 @@ resource "kubernetes_deployment_v1" "backend" {
 
           readiness_probe {
             http_get {
-              path = "/actuator/health"
+              path = "/health"
               port = 8080
             }
             initial_delay_seconds = 60

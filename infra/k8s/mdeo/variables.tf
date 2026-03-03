@@ -82,3 +82,9 @@ variable "max_langium_instances" {
   description = "Maximum number of Langium worker instances per JS service"
   default     = 5
 }
+
+variable "gateway_class_name" {
+  type        = string
+  description = "GatewayClass name to use for the mdeo Gateway (e.g. 'nginx', 'cilium', 'traefik')"
+  default     = "nginx"
+}

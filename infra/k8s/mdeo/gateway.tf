@@ -1,37 +1,4 @@
-resource "helm_release" "nginx_gateway_fabric" {
-  name             = "nginx-gateway-fabric"
-  repository       = "https://helm.nginx.com/stable"
-  chart            = "nginx-gateway-fabric"
-  namespace        = "nginx-gateway"
-  create_namespace = true
-  wait             = true
-
-  set {
-    name  = "nginxGateway.image.pullPolicy"
-    value = "Always"
-  }
-}
-
-resource "kubernetes_manifest" "gateway_class" {
-  depends_on = [helm_release.nginx_gateway_fabric]
-
-  manifest = {
-    apiVersion = "gateway.networking.k8s.io/v1"
-    kind       = "GatewayClass"
-    metadata = {
-      name = "nginx"
-      labels = {
-        "app.kubernetes.io/part-of" = "mdeo"
-      }
-    }
-    spec = {
-      controllerName = "gateway.nginx.org/nginx-gateway-controller"
-    }
-  }
-}
-
 resource "kubernetes_manifest" "gateway" {
-  depends_on = [kubernetes_manifest.gateway_class]
 
   manifest = {
     apiVersion = "gateway.networking.k8s.io/v1"
@@ -45,7 +12,7 @@ resource "kubernetes_manifest" "gateway" {
       }
     }
     spec = {
-      gatewayClassName = "nginx"
+      gatewayClassName = var.gateway_class_name
       listeners = concat(
         [
           {
