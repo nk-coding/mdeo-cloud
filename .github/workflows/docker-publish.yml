@@ -1,0 +1,90 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: backend
+            dockerfile: infra/docker/backend/Dockerfile
+          - name: workbench
+            dockerfile: infra/docker/workbench/Dockerfile
+          - name: service-metamodel
+            dockerfile: infra/docker/service-metamodel/Dockerfile
+          - name: service-model
+            dockerfile: infra/docker/service-model/Dockerfile
+          - name: service-script
+            dockerfile: infra/docker/service-script/Dockerfile
+          - name: service-model-transformation
+            dockerfile: infra/docker/service-model-transformation/Dockerfile
+          - name: service-config
+            dockerfile: infra/docker/service-config/Dockerfile
+          - name: service-config-optimization
+            dockerfile: infra/docker/service-config-optimization/Dockerfile
+          - name: service-config-mdeo
+            dockerfile: infra/docker/service-config-mdeo/Dockerfile
+          - name: script-execution
+            dockerfile: infra/docker/script-execution/Dockerfile
+          - name: model-transformation-execution
+            dockerfile: infra/docker/model-transformation-execution/Dockerfile
+          - name: optimizer-execution
+            dockerfile: infra/docker/optimizer-execution/Dockerfile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/mdeo-${{ matrix.service.name }}
+          tags: |
+            # Publish a semver tag (e.g. 1.2.3) for version tags matching v*
+            type=semver,pattern={{version}}
+            # Publish an "edge" tag for every push to main
+            type=edge,branch=main
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}

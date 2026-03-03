@@ -1,0 +1,151 @@
+locals {
+  execution_services = {
+    "script-execution" = {
+      port         = 8081
+      db_key       = "postgres-script"
+      cluster_name = "postgres-script"
+    }
+
+    "model-transformation-execution" = {
+      port         = 8082
+      db_key       = "postgres-model-transformation"
+      cluster_name = "postgres-model-transformation"
+    }
+
+    "optimizer-execution" = {
+      port         = 8083
+      db_key       = "postgres-optimizer"
+      cluster_name = "postgres-optimizer"
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "execution" {
+  for_each = local.execution_services
+
+  metadata {
+    name      = each.key
+    namespace = local.ns
+    labels = {
+      "app.kubernetes.io/name"    = each.key
+      "app.kubernetes.io/part-of" = "mdeo"
+    }
+  }
+
+  spec {
+    selector = {
+      "app.kubernetes.io/name" = each.key
+    }
+
+    port {
+      name        = "http"
+      port        = each.value.port
+      target_port = each.value.port
+      protocol    = "TCP"
+    }
+  }
+}
+
+resource "kubernetes_deployment_v1" "execution" {
+  for_each = local.execution_services
+
+  metadata {
+    name      = each.key
+    namespace = local.ns
+    labels = {
+      "app.kubernetes.io/name"    = each.key
+      "app.kubernetes.io/part-of" = "mdeo"
+    }
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        "app.kubernetes.io/name" = each.key
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          "app.kubernetes.io/name"    = each.key
+          "app.kubernetes.io/part-of" = "mdeo"
+        }
+      }
+
+      spec {
+        container {
+          name              = each.key
+          image             = "${var.image_registry}/${var.image_owner}/mdeo-${each.key}:${var.app_version}"
+          image_pull_policy = "Always"
+
+          port {
+            container_port = each.value.port
+            protocol       = "TCP"
+          }
+
+          env {
+            name  = "SERVER_PORT"
+            value = tostring(each.value.port)
+          }
+
+          env {
+            name  = "DATABASE_URL"
+            value = "jdbc:postgresql://${each.value.cluster_name}-rw:5432/mdeo"
+          }
+
+          env {
+            name  = "DATABASE_USER"
+            value = var.database_user
+          }
+
+          env {
+            name = "DATABASE_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.db_credentials[each.value.db_key].metadata[0].name
+                key  = "password"
+              }
+            }
+          }
+
+          env {
+            name  = "BACKEND_API_URL"
+            value = "http://backend:8080"
+          }
+
+          env {
+            name  = "EXECUTION_TIMEOUT_MS"
+            value = tostring(var.execution_timeout_ms)
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/health"
+              port = each.value.port
+            }
+            initial_delay_seconds = 90
+            period_seconds        = 10
+            failure_threshold     = 20
+            timeout_seconds       = 10
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/health"
+              port = each.value.port
+            }
+            initial_delay_seconds = 60
+            period_seconds        = 10
+            failure_threshold     = 10
+            timeout_seconds       = 10
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [kubernetes_manifest.db_cluster]
+}
