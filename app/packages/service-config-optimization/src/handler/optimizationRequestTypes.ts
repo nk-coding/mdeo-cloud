@@ -3,9 +3,13 @@
  * Field names match Kotlin ProblemConfig.
  */
 export interface ProblemSectionData {
-    /** Absolute path to the .metamodel file. */
+    /**
+     * Absolute path to the .metamodel file.
+     */
     metamodelPath: string;
-    /** Absolute path to the .model file. */
+    /**
+     * Absolute path to the .model file.
+     */
     modelPath: string;
 }
 
@@ -28,11 +32,17 @@ export interface ConstraintData {
  * `type` matches Kotlin ObjectiveTendency enum serialization (uppercase).
  */
 export interface ObjectiveData {
-    /** Whether the objective is maximized or minimized. */
+    /**
+     * Whether the objective is maximized or minimized.
+     */
     type: "MAXIMIZE" | "MINIMIZE";
-    /** Absolute path to the script file that contains the objective function. */
+    /**
+     * Absolute path to the script file that contains the objective function.
+     */
     path: string;
-    /** The name of the objective function as declared in the script file. */
+    /**
+     * The name of the objective function as declared in the script file.
+     */
     functionName: string;
 }
 
@@ -43,9 +53,13 @@ export interface ObjectiveData {
 export interface RefinementData {
     className: string;
     fieldName: string;
-    /** Lower bound of the multiplicity. */
+    /**
+     * Lower bound of the multiplicity.
+     */
     lower: number;
-    /** Upper bound of the multiplicity (-1 means unbounded). */
+    /**
+     * Upper bound of the multiplicity (-1 means unbounded).
+     */
     upper: number;
 }
 

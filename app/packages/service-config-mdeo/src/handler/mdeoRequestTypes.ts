@@ -23,7 +23,9 @@ export interface EdgeMutationData {
  * Kotlin MutationsConfig.usingPaths (List<String>).
  */
 export interface MutationsBlockData {
-    /** Absolute paths to the model transformation files. */
+    /**
+     * Absolute paths to the model transformation files.
+     */
     usingPaths: string[];
     classMutations: ClassMutationData[];
     edgeMutations: EdgeMutationData[];

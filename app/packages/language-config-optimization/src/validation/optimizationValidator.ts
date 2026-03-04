@@ -560,6 +560,14 @@ export class OptimizationValidator {
 
         const scriptMetamodelDoc = this.resolveDocument(scriptDoc, scriptMetamodelPath);
         if (scriptMetamodelDoc == undefined) {
+            accept(
+                "error",
+                `Cannot resolve script file's metamodel path '${scriptMetamodelPath}'. The file does not exist or is not loaded.`,
+                {
+                    node: fileImport,
+                    property: "file"
+                }
+            );
             return;
         }
 

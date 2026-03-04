@@ -222,7 +222,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         contributionPlugins: serverContributionPlugins
                     });
 
-                    return reply.send({ data: result });
+                    return reply.send({ data: result ?? null });
                 } finally {
                     languageHandler.pool.release(instance);
                 }

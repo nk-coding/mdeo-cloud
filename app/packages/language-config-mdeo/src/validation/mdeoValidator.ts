@@ -185,20 +185,48 @@ export class MdeoValidator {
         const transformationMetamodelPath = transformation.import?.file;
 
         if (transformationMetamodelPath == undefined) {
+            accept(
+                "error",
+                `The model transformation at '${usingPath.path}' does not specify an import for its metamodel, so compatibility cannot be determined.`,
+                {
+                    node: usingPath,
+                    property: "path"
+                }
+            );
             return;
         }
 
         const configMetamodelUri = this.metamodelResolver.getMetamodelUri(document);
         if (configMetamodelUri == undefined) {
+            accept(
+                "error",
+                `The problem section does not specify a metamodel, so compatibility cannot be determined.`,
+                {
+                    node: usingPath,
+                    property: "path"
+                }
+            );
             return;
         }
         const configMetamodelDoc = documents.getDocument(configMetamodelUri);
         if (configMetamodelDoc == undefined) {
+            accept("error", `The problem section's metamodel at '${configMetamodelUri}' could not be resolved.`, {
+                node: usingPath,
+                property: "path"
+            });
             return;
         }
 
         const transformationMetamodelDoc = this.resolveDocument(targetDoc, transformationMetamodelPath, documents);
         if (transformationMetamodelDoc == undefined) {
+            accept(
+                "error",
+                `The model transformation's metamodel at '${transformationMetamodelPath}' could not be resolved.`,
+                {
+                    node: usingPath,
+                    property: "path"
+                }
+            );
             return;
         }
 

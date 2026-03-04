@@ -19,7 +19,9 @@ import org.junit.jupiter.params.provider.EnumSource
  */
 class MoeaOptimizationTest {
 
-    /** Simple objective that counts vertices in the graph. */
+    /**
+     * Simple objective that counts vertices in the graph. 
+     */
     private class VertexCountObjective : GuidanceFunction {
         override val name = "VertexCount"
         override fun computeFitness(solution: Solution): Double {
@@ -27,18 +29,24 @@ class MoeaOptimizationTest {
         }
     }
 
-    /** Objective that always returns a constant — for testing search mechanics. */
+    /**
+     * Objective that always returns a constant — for testing search mechanics. 
+     */
     private class ConstantObjective(private val value: Double) : GuidanceFunction {
         override val name = "Constant"
         override fun computeFitness(solution: Solution): Double = value
     }
 
-    /** Identity mutation strategy — returns deep copy without modification. */
+    /**
+     * Identity mutation strategy — returns deep copy without modification. 
+     */
     private class IdentityMutationStrategy : MutationStrategy {
         override fun mutate(solution: Solution): Solution = solution.deepCopy()
     }
 
-    /** Mutation strategy that adds a random vertex to the graph. */
+    /**
+     * Mutation strategy that adds a random vertex to the graph. 
+     */
     private class AddVertexMutationStrategy : MutationStrategy {
         override fun mutate(solution: Solution): Solution {
             val copy = solution.deepCopy()

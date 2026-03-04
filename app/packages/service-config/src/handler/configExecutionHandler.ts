@@ -4,16 +4,15 @@ import {
     CONFIG_EXECUTION_GET_FILE_TREE_REQUEST_KEY,
     CONFIG_EXECUTION_GET_FILE_REQUEST_KEY,
     CONFIG_EXECUTION_CANCEL_REQUEST_KEY,
-    CONFIG_EXECUTION_DELETE_REQUEST_KEY,
-    ConfigContributionPlugin,
-    getWrapperInterfaceName
-} from "@mdeo/language-config";
+    CONFIG_EXECUTION_DELETE_REQUEST_KEY
+} from "@mdeo/service-config-common";
 import type {
     ConfigExecutionPluginRequestBody,
     ConfigExecutionRoutingMetadata,
     ConfigExecutionFollowUpRequestBody,
     ConfigExecutionFileRequestBody
-} from "@mdeo/language-config";
+} from "@mdeo/service-config-common";
+import { ConfigContributionPlugin, getWrapperInterfaceName } from "@mdeo/language-config";
 import type { ConfigType } from "@mdeo/language-config";
 import type {
     ExecutionHandler,

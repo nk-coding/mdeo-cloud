@@ -174,8 +174,12 @@ data class TerminationConfig(
  */
 @Serializable
 enum class ModelConversionStrategy {
-    /** Convert all model data to ScriptModel instances eagerly at binding time. */
+    /**
+     * Convert all model data to ScriptModel instances eagerly at binding time. 
+     */
     EAGER,
-    /** Convert model data lazily on first access. */
+    /**
+     * Convert model data lazily on first access. 
+     */
     LAZY
 }

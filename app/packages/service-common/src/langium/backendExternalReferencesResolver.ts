@@ -45,9 +45,14 @@ export class BackendExternalReferencesResolver implements ExternalReferenceResol
     async loadExternalDocuments(externalReferences: ExternalReferences): Promise<void> {
         await Promise.all(
             externalReferences.local.map(async (uri) => {
-                const source = await this.serverApi.readFile(uri.path);
-                this.langiumDocuments.createDocument(uri, source.content);
-                this.cancelationTokenSource?.cancel();
+                try {
+                    const source = await this.serverApi.readFile(uri.path);
+                    this.langiumDocuments.createDocument(uri, source.content);
+                } catch {
+                    // ignore, file does not exist
+                } finally {
+                    this.cancelationTokenSource?.cancel();
+                }
             })
         );
 
@@ -74,9 +79,18 @@ export class BackendExternalReferencesResolver implements ExternalReferenceResol
      * @returns The loaded AST datas
      */
     private async loadExternalAsts(paths: Set<string>): Promise<AstData[]> {
-        return await Promise.all(
-            [...paths].map(async (path) => (await this.serverApi.getFileData(path, AST_HANDLER_KEY)).data as AstData)
+        const result: AstData[] = [];
+        await Promise.all(
+            [...paths].map(async (path) => {
+                try {
+                    const data = (await this.serverApi.getFileData(path, AST_HANDLER_KEY)).data as AstData;
+                    result.push(data);
+                } catch {
+                    // ignore, file does not exist or cannot be loaded
+                }
+            })
         );
+        return result;
     }
 
     /**

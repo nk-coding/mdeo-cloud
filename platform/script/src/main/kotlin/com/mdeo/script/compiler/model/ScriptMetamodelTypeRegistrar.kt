@@ -32,28 +32,44 @@ import org.objectweb.asm.Opcodes
  */
 object ScriptMetamodelTypeRegistrar {
 
-    /** Package prefix for enum container types. */
+    /**
+     * Package prefix for enum container types. 
+     */
     const val ENUM_CONTAINER_PACKAGE = "enum-container"
 
-    /** Package prefix for enum value types. */
+    /**
+     * Package prefix for enum value types. 
+     */
     const val ENUM_PACKAGE = "enum"
 
-    /** Package prefix for class types. */
+    /**
+     * Package prefix for class types. 
+     */
     const val CLASS_PACKAGE = "class"
 
-    /** Package prefix for class container types. */
+    /**
+     * Package prefix for class container types. 
+     */
     const val CLASS_CONTAINER_PACKAGE = "class-container"
 
-    /** Package for the model global. */
+    /**
+     * Package for the model global. 
+     */
     const val MODEL_PACKAGE = "model"
 
-    /** Type name for the model global. */
+    /**
+     * Type name for the model global. 
+     */
     const val MODEL_TYPE_NAME = "Model"
 
-    /** Internal name of ExecutionContext class (formerly ModelContext). */
+    /**
+     * Internal name of ExecutionContext class (formerly ModelContext). 
+     */
     private const val MODEL_CONTEXT_CLASS = "com/mdeo/script/runtime/ExecutionContext"
 
-    /** Internal name of ScriptModel class. */
+    /**
+     * Internal name of ScriptModel class. 
+     */
     private const val SCRIPT_MODEL_CLASS = "com/mdeo/script/runtime/model/ScriptModel"
 
     /**

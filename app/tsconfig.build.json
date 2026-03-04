@@ -60,6 +60,9 @@
             "path": "packages/service-config"
         },
         {
+            "path": "packages/service-config-common"
+        },
+        {
             "path": "packages/service-config-optimization"
         },
         {

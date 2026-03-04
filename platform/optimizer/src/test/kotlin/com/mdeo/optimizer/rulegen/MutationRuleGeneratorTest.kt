@@ -45,7 +45,9 @@ class MutationRuleGeneratorTest {
     private val roomClass  = ClassData(name = "Room",  isAbstract = false)
     private val windowClass = ClassData(name = "Window", isAbstract = false)
 
-    /** House <>-> Room (containment, bidirectional) */
+    /**
+     * House <>-> Room (containment, bidirectional) 
+     */
     private val houseRoomsAssoc = AssociationData(
         source = AssociationEndData(
             className = "House",
@@ -60,7 +62,9 @@ class MutationRuleGeneratorTest {
         )
     )
 
-    /** Room --> Window (non-containment, unidirectional 0..*) */
+    /**
+     * Room --> Window (non-containment, unidirectional 0..*) 
+     */
     private val roomWindowsAssoc = AssociationData(
         source = AssociationEndData(
             className = "Room",

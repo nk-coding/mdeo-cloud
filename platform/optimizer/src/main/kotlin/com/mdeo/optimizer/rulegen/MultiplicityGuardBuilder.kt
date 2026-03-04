@@ -42,22 +42,34 @@ import com.mdeo.modeltransformation.ast.patterns.TypedWhereClause
 class MultiplicityGuardBuilder(private val metamodelPath: String) {
 
     companion object {
-        /** Type-array index for `void`. */
+        /**
+         * Type-array index for `void`. 
+         */
         const val VOID_INDEX = 0
 
-        /** Type-array index for `builtin.string`. */
+        /**
+         * Type-array index for `builtin.string`. 
+         */
         const val STRING_INDEX = 1
 
-        /** Type-array index for `builtin.double`. */
+        /**
+         * Type-array index for `builtin.double`. 
+         */
         const val DOUBLE_INDEX = 2
 
-        /** Type-array index for `builtin.boolean`. */
+        /**
+         * Type-array index for `builtin.boolean`. 
+         */
         const val BOOLEAN_INDEX = 3
 
-        /** Type-array index for `builtin.Any?`. */
+        /**
+         * Type-array index for `builtin.Any?`. 
+         */
         const val ANY_INDEX = 4
 
-        /** Type-array index for `builtin.int`. */
+        /**
+         * Type-array index for `builtin.int`. 
+         */
         const val INT_INDEX = 5
     }
 

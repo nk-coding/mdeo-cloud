@@ -1,11 +1,11 @@
 import { ConfigContributionPlugin, getWrapperInterfaceName } from "@mdeo/language-config";
+import type { ConfigAdditionalServices, ConfigType } from "@mdeo/language-config";
 import type {
-    ConfigAdditionalServices,
     ConfigPluginDependencyData,
     ConfigPluginRequestBody,
-    ConfigType
-} from "@mdeo/language-config";
-import { hasParserErrors, type FileDataHandler } from "@mdeo/service-common";
+    ConfigPluginRequestResponse
+} from "@mdeo/service-config-common";
+import { hasParserErrors, type FileDataHandler, type FileDependency, type DataDependency } from "@mdeo/service-common";
 import type { AstNode } from "langium";
 
 /**
@@ -14,7 +14,7 @@ import type { AstNode } from "langium";
  */
 export const CONFIG_DATA_KEY = "config";
 
-export type { ConfigPluginDependencyData, ConfigPluginRequestBody } from "@mdeo/language-config";
+export type { ConfigPluginDependencyData, ConfigPluginRequestBody } from "@mdeo/service-config-common";
 
 /**
  * The overall data returned by the config file-data handler.
@@ -208,6 +208,8 @@ export const configDataHandler: FileDataHandler<ConfigFileData | null, ConfigAdd
     const sectionLookup = new Map(config.sections.map((section) => [section.$type, section]));
 
     const result: ConfigFileData = {};
+    const accumulatedFileDeps: FileDependency[] = [];
+    const accumulatedDataDeps: DataDependency[] = [];
 
     for (const plugin of sortedPlugins) {
         const partialLines: string[] = [];
@@ -242,23 +244,28 @@ export const configDataHandler: FileDataHandler<ConfigFileData | null, ConfigAdd
             configFileUri: fileInfo.uri.toString()
         };
 
-        const pluginResult = (await serverApi.sendPluginRequest(
-            plugin.languageKey,
-            CONFIG_DATA_KEY,
-            requestBody
-        )) as Record<string, unknown> | null;
+        const rawPluginResult = await serverApi.sendPluginRequest(plugin.languageKey, CONFIG_DATA_KEY, requestBody);
+        const pluginResponse = rawPluginResult as ConfigPluginRequestResponse<Record<string, unknown>>;
 
-        if (pluginResult == null) {
-            return { data: null, fileDependencies: [], dataDependencies: [] };
+        accumulatedFileDeps.push(...(pluginResponse?.fileDependencies ?? []));
+        accumulatedDataDeps.push(...(pluginResponse?.dataDependencies ?? []));
+
+        if (pluginResponse?.data == null) {
+            const trackedRequests = serverApi.getTrackedRequests();
+            return {
+                data: null,
+                fileDependencies: [...trackedRequests.fileDependencies, ...accumulatedFileDeps],
+                dataDependencies: [...trackedRequests.dataDependencies, ...accumulatedDataDeps]
+            };
         }
 
-        result[plugin.shortName] = pluginResult;
+        result[plugin.shortName] = pluginResponse.data;
     }
 
     const trackedRequests = serverApi.getTrackedRequests();
     return {
         data: result,
-        fileDependencies: trackedRequests.fileDependencies,
-        dataDependencies: trackedRequests.dataDependencies
+        fileDependencies: [...trackedRequests.fileDependencies, ...accumulatedFileDeps],
+        dataDependencies: [...trackedRequests.dataDependencies, ...accumulatedDataDeps]
     };
 };

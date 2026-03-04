@@ -1,8 +1,8 @@
 import type { RequestHandler } from "@mdeo/service-common";
-import { hasErrors } from "@mdeo/service-common";
 import type { ExternalReferenceAdditionalServices } from "@mdeo/language-common";
+import { buildConfigPluginDocument, type ConfigPluginRequestResponse } from "@mdeo/service-config-common";
 import { getWrapperInterfaceName } from "@mdeo/language-config";
-import type { ConfigPluginRequestBody } from "@mdeo/language-config";
+
 import { CONFIG_OPTIMIZATION_LANGUAGE_KEY, OPTIMIZATION_PLUGIN_NAME } from "@mdeo/language-config-optimization";
 import type {
     ProblemSectionType,
@@ -10,7 +10,6 @@ import type {
     SingleMultiplicityType,
     RangeMultiplicityType
 } from "@mdeo/language-config-optimization";
-import { TextDocument } from "langium";
 import type { LangiumDocument } from "langium";
 import type {
     ProblemSectionData,
@@ -21,12 +20,6 @@ import type {
     RefinementData
 } from "./optimizationRequestTypes.js";
 import { resolveRelativePath } from "@mdeo/language-shared";
-
-/**
- * Key used for the optimization plugin request handler.
- * Must match the key used by the config file-data handler to call this plugin.
- */
-export const OPTIMIZATION_REQUEST_KEY = "config";
 
 function extractProblemData(section: ProblemSectionType, document: LangiumDocument): ProblemSectionData {
     const metamodel = section.metamodel[0];
@@ -118,44 +111,35 @@ function extractGoalData(section: GoalSectionType, document: LangiumDocument): G
  * dependency data from plugins this plugin depends on, parses the text using the
  * optimization language services, and extracts structured data for each section.
  *
- * Returns `null` when the text contains lexer or parser errors, mirroring the
- * null-return behaviour of the file-data handlers.
+ * Always returns a {@link ConfigPluginRequestResponse} so that tracked dependencies
+ * are included even when processing fails. The {@link ConfigPluginRequestResponse.data}
+ * field is `null` when the text contains lexer or parser errors.
  *
  * The handler is invoked by the config service's file-data handler via the backend
  * plugin request proxy.
  *
- * Response format: `{ problem?: ProblemSectionData, goal?: GoalSectionData }` or `null`
+ * Response format: `ConfigPluginRequestResponse<{ problem?: ProblemSectionData, goal?: GoalSectionData }>`
  */
 export const optimizationRequestHandler: RequestHandler<
-    OptimizationRequestResponse,
+    ConfigPluginRequestResponse<OptimizationRequestResponse>,
     ExternalReferenceAdditionalServices
-> = async (context): Promise<OptimizationRequestResponse | null> => {
-    const requestBody = context.body as ConfigPluginRequestBody;
-    const text = requestBody?.text ?? "";
+> = async (context): Promise<ConfigPluginRequestResponse<OptimizationRequestResponse>> => {
+    const result = await buildConfigPluginDocument(context, CONFIG_OPTIMIZATION_LANGUAGE_KEY);
 
-    if (!text.trim()) {
-        return {};
+    if (result.type === "empty") {
+        return { data: {}, ...context.serverApi.getTrackedRequests() };
+    }
+    if (result.type === "error") {
+        return { data: null, ...context.serverApi.getTrackedRequests() };
     }
 
-    const textDocument = TextDocument.create(requestBody.configFileUri, CONFIG_OPTIMIZATION_LANGUAGE_KEY, 0, text);
-    context.services.shared.workspace.TextDocuments.set(textDocument);
-    const document = context.services.shared.workspace.LangiumDocumentFactory.fromTextDocument(textDocument);
-    await context.services.shared.workspace.DocumentBuilder.build([document], { validation: true });
-    if (hasErrors(document)) {
-        return null;
-    }
-
-    const root = document.parseResult?.value as { sections?: any[] } | undefined;
-    if (root == undefined || !Array.isArray(root.sections)) {
-        return {};
-    }
-
+    const { document, sections } = result;
     const response: OptimizationRequestResponse = {};
 
     const problemWrapperType = getWrapperInterfaceName("problem", OPTIMIZATION_PLUGIN_NAME);
     const goalWrapperType = getWrapperInterfaceName("goal", OPTIMIZATION_PLUGIN_NAME);
 
-    for (const section of root.sections) {
+    for (const section of sections) {
         if (section.$type === problemWrapperType) {
             response.problem = extractProblemData(section.content as ProblemSectionType, document);
         } else if (section.$type === goalWrapperType) {
@@ -163,5 +147,5 @@ export const optimizationRequestHandler: RequestHandler<
         }
     }
 
-    return response;
+    return { data: response, ...context.serverApi.getTrackedRequests() };
 };

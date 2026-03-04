@@ -103,7 +103,7 @@ function serializeDocument(
         if (fileDep != undefined) {
             result.fileDependencies.push(fileDep);
         } else {
-            throw new Error(`Missing tracked request for local reference: ${ref.path}`);
+            result.fileDependencies.push({ path: ref.path });
         }
     }
 
@@ -112,7 +112,7 @@ function serializeDocument(
         if (dataDep != undefined) {
             result.dataDependencies.push(dataDep);
         } else {
-            throw new Error(`Missing tracked request for external reference: ${ref.path}`);
+            result.dataDependencies.push({ path: ref.path, key: AST_HANDLER_KEY });
         }
     }
 

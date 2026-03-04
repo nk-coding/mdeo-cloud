@@ -18,9 +18,6 @@
             "path": "../language-config-mdeo"
         },
         {
-            "path": "../language-config-optimization"
-        },
-        {
             "path": "../language-metamodel"
         },
         {
@@ -28,6 +25,9 @@
         },
         {
             "path": "../service-common"
+        },
+        {
+            "path": "../service-config-common"
         }
     ],
     "include": ["src/**/*.ts"],

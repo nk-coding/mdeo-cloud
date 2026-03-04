@@ -19,6 +19,9 @@
         },
         {
             "path": "../service-common"
+        },
+        {
+            "path": "../service-config-common"
         }
     ],
     "include": ["src/**/*.ts"],

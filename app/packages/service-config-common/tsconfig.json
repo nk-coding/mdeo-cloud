@@ -12,21 +12,6 @@
             "path": "../language-common"
         },
         {
-            "path": "../language-config-optimization"
-        },
-        {
-            "path": "../service-config-common"
-        },
-        {
-            "path": "../language-config"
-        },
-        {
-            "path": "../language-metamodel"
-        },
-        {
-            "path": "../language-shared"
-        },
-        {
             "path": "../service-common"
         }
     ],

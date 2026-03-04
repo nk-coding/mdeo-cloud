@@ -421,7 +421,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
                 it[FileDataTable.updatedAt] = now
             }
 
-            for (fileDep in response.fileDependencies) {
+            for (fileDep in response.fileDependencies.toSet()) {
                 FileDependenciesTable.insert {
                     it[FileDependenciesTable.projectId] = projectId.toKotlinUuid()
                     it[FileDependenciesTable.path] = path
@@ -431,7 +431,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
                 }
             }
 
-            for (dataDep in response.dataDependencies) {
+            for (dataDep in response.dataDependencies.toSet()) {
                 DataDependenciesTable.insert {
                     it[DataDependenciesTable.projectId] = projectId.toKotlinUuid()
                     it[DataDependenciesTable.path] = path

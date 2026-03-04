@@ -20,10 +20,14 @@ data class MutationRuleSpec(
     val edge: String? = null,
     val action: MutationAction = MutationAction.ALL
 ) {
-    /** True when this spec targets a specific edge (reference) rather than the whole node. */
+    /**
+     * True when this spec targets a specific edge (reference) rather than the whole node. 
+     */
     fun isEdge(): Boolean = edge != null
 
-    /** True when this spec targets the whole node (no specific edge). */
+    /**
+     * True when this spec targets the whole node (no specific edge). 
+     */
     fun isNode(): Boolean = edge == null
 }
 

@@ -3,7 +3,7 @@ import type {
     ConfigExecutionPluginRequestBody,
     ConfigExecutionFollowUpRequestBody,
     ConfigExecutionFileRequestBody
-} from "@mdeo/language-config";
+} from "@mdeo/service-config-common";
 import type { MdeoServices } from "@mdeo/language-config-mdeo";
 
 /**

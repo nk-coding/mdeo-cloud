@@ -26,9 +26,13 @@ type ClassTypeResolutionResult =
  * Cached per-document package map state, computed once per document lifecycle.
  */
 type DocumentPackageCache = {
-    /** Map from user-visible package names to lists of internal packages. */
+    /**
+     * Map from user-visible package names to lists of internal packages.
+     */
     packageMap: Map<string, string[]>;
-    /** Set of all internal packages from all values of packageMap. */
+    /**
+     * Set of all internal packages from all values of packageMap.
+     */
     allInternalPackages: Set<string>;
 };
 

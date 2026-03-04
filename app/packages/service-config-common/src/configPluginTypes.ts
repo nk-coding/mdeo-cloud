@@ -1,9 +1,29 @@
+import type { FileDependency, DataDependency } from "@mdeo/service-common";
+
 /**
  * Dependency data passed to each plugin request handler.
  * Keys are plugin short names; values are section-name → data maps from
  * plugins that this plugin declared as sectionDependencies.
  */
 export type ConfigPluginDependencyData = Record<string, Record<string, unknown>>;
+
+/**
+ * Request body sent to each contribution plugin's request handler.
+ */
+export interface ConfigPluginRequestBody {
+    /**
+     * Computed data from dependency plugins, keyed by plugin short name then section name.
+     */
+    dependencyData: ConfigPluginDependencyData;
+    /**
+     * Partial config text containing only sections from this plugin, using simple keywords.
+     */
+    text: string;
+    /**
+     * The URI string of the originating config file. Used to construct a stable synthetic document URI.
+     */
+    configFileUri: string;
+}
 
 /**
  * Response returned by a config contribution plugin's request handler.
@@ -24,29 +44,11 @@ export interface ConfigPluginRequestResponse<T = Record<string, unknown>> {
     /**
      * File paths (and their versions) that were read during processing.
      */
-    fileDependencies: { path: string; version?: number }[];
+    fileDependencies: FileDependency[];
     /**
      * Other file-data computations that were consulted during processing.
      */
-    dataDependencies: { path: string; key: string; version?: number }[];
-}
-
-/**
- * Request body sent to each contribution plugin's request handler.
- */
-export interface ConfigPluginRequestBody {
-    /**
-     * Computed data from dependency plugins, keyed by plugin short name then section name.
-     */
-    dependencyData: ConfigPluginDependencyData;
-    /**
-     * Partial config text containing only sections from this plugin, using simple keywords.
-     */
-    text: string;
-    /**
-     * The URI string of the originating config file. Used to construct a stable synthetic document URI.
-     */
-    configFileUri: string;
+    dataDependencies: DataDependency[];
 }
 
 /**
@@ -111,6 +113,12 @@ export interface ConfigExecutionFollowUpRequestBody {
 export interface ConfigExecutionFileRequestBody extends ConfigExecutionFollowUpRequestBody {
     path: string;
 }
+
+/**
+ * Request-handler key used by config contribution plugin services
+ * to register and handle partial-config data requests from service-config.
+ */
+export const CONFIG_PLUGIN_REQUEST_KEY = "config";
 
 /**
  * Request-handler key for forwarding config execution to a contribution plugin language.

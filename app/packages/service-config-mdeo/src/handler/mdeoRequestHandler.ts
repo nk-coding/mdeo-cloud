@@ -1,7 +1,6 @@
 import type { RequestHandler } from "@mdeo/service-common";
-import { hasErrors } from "@mdeo/service-common";
+import { buildConfigPluginDocument, type ConfigPluginRequestResponse } from "@mdeo/service-config-common";
 import { getWrapperInterfaceName } from "@mdeo/language-config";
-import type { ConfigPluginRequestBody } from "@mdeo/language-config";
 import { CONFIG_MDEO_LANGUAGE_KEY, MDEO_PLUGIN_NAME } from "@mdeo/language-config-mdeo";
 import type {
     SearchSectionType,
@@ -15,7 +14,7 @@ import type {
     AlgorithmParametersType,
     TerminationBlockType
 } from "@mdeo/language-config-mdeo";
-import { TextDocument, URI } from "langium";
+import { URI } from "langium";
 import type { LangiumDocument } from "langium";
 import { resolveRelativePath } from "@mdeo/language-shared";
 import type {
@@ -32,12 +31,6 @@ import type {
 } from "./mdeoRequestTypes.js";
 import type { MdeoServices } from "@mdeo/language-config-mdeo";
 import type { ServiceMdeoMetamodelResolver } from "../serviceMdeoMetamodelResolver.js";
-
-/**
- * Key used for the MDEO plugin request handler.
- * Must match the key used by the config file-data handler to call this plugin.
- */
-export const MDEO_REQUEST_KEY = "config";
 
 /**
  * Extracts the absolute path for a using-path node.
@@ -178,49 +171,44 @@ function extractSolverData(section: SolverSectionType): SolverSectionData {
  * Receives a partial config text (containing only MDEO sections) and
  * parses the text using the MDEO language services, extracting structured data.
  *
- * Returns `null` when the text contains lexer or parser errors.
+ * Always returns a {@link ConfigPluginRequestResponse} so that tracked dependencies
+ * are included even when processing fails. The {@link ConfigPluginRequestResponse.data}
+ * field is `null` when the text contains lexer or parser errors.
  */
-export const mdeoRequestHandler: RequestHandler<MdeoRequestResponse, MdeoServices> = async (
-    context
-): Promise<MdeoRequestResponse | null> => {
-    const requestBody = context.body as ConfigPluginRequestBody;
-    const text = requestBody?.text ?? "";
-
-    if (!text.trim()) {
-        return {};
-    }
-
+export const mdeoRequestHandler: RequestHandler<
+    ConfigPluginRequestResponse<MdeoRequestResponse>,
+    MdeoServices
+> = async (context): Promise<ConfigPluginRequestResponse<MdeoRequestResponse>> => {
     const resolver = context.services.MdeoMetamodelResolver as ServiceMdeoMetamodelResolver;
-    const problemData = (requestBody.dependencyData?.["optimization"]?.["problem"] ?? {}) as {
-        metamodelPath?: string;
-    };
-    if (problemData.metamodelPath) {
-        resolver.setMetamodelData(URI.file(problemData.metamodelPath));
+
+    const result = await buildConfigPluginDocument(
+        context,
+        CONFIG_MDEO_LANGUAGE_KEY,
+        (requestBody) => {
+            const problemData = (requestBody.dependencyData?.["optimization"]?.["problem"] ?? {}) as {
+                metamodelPath?: string;
+            };
+            if (problemData.metamodelPath) {
+                resolver.setMetamodelData(URI.file(problemData.metamodelPath));
+            }
+        },
+        () => resolver.clearMetamodelData()
+    );
+
+    if (result.type === "empty") {
+        return { data: {}, ...context.serverApi.getTrackedRequests() };
+    }
+    if (result.type === "error") {
+        return { data: null, ...context.serverApi.getTrackedRequests() };
     }
 
-    const textDocument = TextDocument.create(requestBody.configFileUri, CONFIG_MDEO_LANGUAGE_KEY, 0, text);
-    context.services.shared.workspace.TextDocuments.set(textDocument);
-    const document = context.services.shared.workspace.LangiumDocumentFactory.fromTextDocument(textDocument);
-    try {
-        await context.services.shared.workspace.DocumentBuilder.build([document], { validation: true });
-        if (hasErrors(document)) {
-            return null;
-        }
-    } finally {
-        resolver.clearMetamodelData();
-    }
-
-    const root = document.parseResult?.value as { sections?: any[] } | undefined;
-    if (root == undefined || !Array.isArray(root.sections)) {
-        return {};
-    }
-
+    const { document, sections } = result;
     const response: MdeoRequestResponse = {};
 
     const searchWrapperType = getWrapperInterfaceName("search", MDEO_PLUGIN_NAME);
     const solverWrapperType = getWrapperInterfaceName("solver", MDEO_PLUGIN_NAME);
 
-    for (const section of root.sections) {
+    for (const section of sections) {
         if (section.$type === searchWrapperType) {
             response.search = extractSearchData(section.content as SearchSectionType, document);
         } else if (section.$type === solverWrapperType) {
@@ -228,5 +216,5 @@ export const mdeoRequestHandler: RequestHandler<MdeoRequestResponse, MdeoService
         }
     }
 
-    return response;
+    return { data: response, ...context.serverApi.getTrackedRequests() };
 };

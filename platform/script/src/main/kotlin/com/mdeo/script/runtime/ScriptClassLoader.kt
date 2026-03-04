@@ -21,7 +21,9 @@ class ScriptClassLoader(
     parent: ClassLoader
 ) : ClassLoader(parent) {
 
-    /** Single unified cache of all classes that have been defined by this loader. */
+    /**
+     * Single unified cache of all classes that have been defined by this loader. 
+     */
     private val loadedClasses = mutableMapOf<String, Class<*>>()
 
     /**

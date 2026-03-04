@@ -1,0 +1,95 @@
+import { TextDocument } from "langium";
+import type { LangiumDocument } from "langium";
+import { hasErrors } from "@mdeo/service-common";
+import type { RequestContext } from "@mdeo/service-common";
+import type { ConfigPluginRequestBody } from "./configPluginTypes.js";
+
+/**
+ * Discriminated union returned by {@link buildConfigPluginDocument}.
+ *
+ * - `"empty"` – the request had no text content or the parsed document had no
+ *   sections; callers should return an empty (but valid) response.
+ * - `"error"` – Langium validation produced errors; callers should return
+ *   `data: null` while still including tracked dependencies.
+ * - `"success"` – the document was built and validated successfully; callers
+ *   can walk {@link ConfigPluginDocumentSuccess.sections}.
+ */
+export type ConfigPluginDocumentResult =
+    | { type: "empty" }
+    | { type: "error" }
+    | {
+          type: "success";
+          /**
+           * The built Langium document.
+           */
+          document: LangiumDocument;
+          /**
+           * Top-level section nodes from the parsed AST.
+           */
+          sections: any[];
+          /**
+           * The decoded request body supplied by the config service.
+           */
+          requestBody: ConfigPluginRequestBody;
+      };
+
+/**
+ * Builds and validates a partial config document for a contribution plugin.
+ *
+ * This helper encapsulates the common boilerplate shared by all config
+ * contribution plugin request handlers:
+ * 1. Decodes the {@link ConfigPluginRequestBody} from the request context.
+ * 2. Short-circuits to `"empty"` when no text is present.
+ * 3. Creates a synthetic `TextDocument`, registers it with the Langium
+ *    workspace, and creates a `LangiumDocument` via the document factory.
+ * 4. Optionally runs caller-provided **setup** logic (e.g. injecting a
+ *    metamodel resolver) inside the `try/finally` block so that cleanup
+ *    is always executed.
+ * 5. Builds and validates the document via `DocumentBuilder`.
+ * 6. Returns `"error"` when validation errors are present.
+ * 7. Returns `"success"` with the document and its top-level sections.
+ *
+ * @param context  The request context injected by the service framework.
+ * @param languageKey  The language ID of the target contribution plugin language.
+ * @param setup  Optional callback invoked after document creation and before
+ *   `DocumentBuilder.build`. Runs inside the `try/finally` block so
+ *   {@link cleanup} is guaranteed to execute even if `setup` throws.
+ * @param cleanup  Optional callback invoked in the `finally` block after
+ *   `DocumentBuilder.build`, regardless of success or failure. Useful for
+ *   releasing resources such as metamodel resolver state.
+ * @returns A discriminated {@link ConfigPluginDocumentResult}.
+ */
+export async function buildConfigPluginDocument<S extends object>(
+    context: RequestContext<S>,
+    languageKey: string,
+    setup?: (requestBody: ConfigPluginRequestBody) => void,
+    cleanup?: () => void
+): Promise<ConfigPluginDocumentResult> {
+    const requestBody = context.body as ConfigPluginRequestBody;
+    const text = requestBody?.text ?? "";
+
+    if (!text.trim()) {
+        return { type: "empty" };
+    }
+
+    const textDocument = TextDocument.create(requestBody.configFileUri, languageKey, 0, text);
+    context.services.shared.workspace.TextDocuments.set(textDocument);
+    const document = context.services.shared.workspace.LangiumDocumentFactory.fromTextDocument(textDocument);
+
+    try {
+        setup?.(requestBody);
+        await context.services.shared.workspace.DocumentBuilder.build([document], { validation: true });
+        if (hasErrors(document)) {
+            return { type: "error" };
+        }
+    } finally {
+        cleanup?.();
+    }
+
+    const root = document.parseResult?.value as { sections?: any[] } | undefined;
+    if (root == undefined || !Array.isArray(root.sections)) {
+        return { type: "empty" };
+    }
+
+    return { type: "success", document, sections: root.sections, requestBody };
+}
