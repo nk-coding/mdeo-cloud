@@ -5,6 +5,32 @@ import type { ModelState } from "./modelState.js";
 import type { EdgeLayoutMetadata, LayoutOperation, NodePositionMetadata } from "@mdeo/editor-protocol";
 import type { MetadataEdits } from "./handler/operationHandlerCommand.js";
 
+/**
+ * The grid size used for rounding positions and routing points during layout.
+ */
+const GRID_SIZE = 10;
+
+/**
+ * Rounds a value to the nearest grid position.
+ */
+function roundToGrid(value: number): number {
+    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
+/**
+ * Alignment options for a node, determining which point of the node is snapped to the grid.
+ */
+export interface NodeAlignment {
+    /**
+     * Vertical alignment: "top" snaps the top edge, "center" snaps the middle, "bottom" snaps the bottom edge.
+     */
+    vAlign: "top" | "center" | "bottom";
+    /**
+     * Horizontal alignment: "left" snaps the left edge, "center" snaps the middle, "right" snaps the right edge.
+     */
+    hAlign: "left" | "center" | "right";
+}
+
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey, ActionDispatcher: ActionDispatcherKey } = sharedImport("@eclipse-glsp/server");
 const { Point } = sharedImport("@eclipse-glsp/protocol");
@@ -95,7 +121,20 @@ export abstract class BaseLayoutEngine {
     }
 
     /**
-     * Extracts position metadata from the given ELK node
+     * Returns the grid alignment for the given node.
+     * The alignment determines which point of the node is snapped to the grid.
+     * Defaults to top-left alignment.
+     *
+     * @param _nodeId the id of the node
+     * @returns the alignment for the node
+     */
+    protected getNodeAlignment(_nodeId: string): NodeAlignment {
+        return { vAlign: "top", hAlign: "left" };
+    }
+
+    /**
+     * Extracts position metadata from the given ELK node, rounding the position to the grid.
+     * The point that is rounded is determined by the node's alignment (see {@link getNodeAlignment}).
      *
      * @param node the ELK node to extract metadata from
      * @returns the extracted position metadata, or undefined if no metadata is available
@@ -104,13 +143,46 @@ export abstract class BaseLayoutEngine {
         if (node.x == undefined || node.y == undefined) {
             return undefined;
         }
-        return {
-            position: { x: node.x, y: node.y }
-        };
+        const { vAlign, hAlign } = this.getNodeAlignment(node.id);
+        const width = node.width ?? 0;
+        const height = node.height ?? 0;
+
+        let anchorX = node.x;
+        if (hAlign === "center") {
+            anchorX += width / 2;
+        } else if (hAlign === "right") {
+            anchorX += width;
+        }
+
+        let anchorY = node.y;
+        if (vAlign === "center") {
+            anchorY += height / 2;
+        } else if (vAlign === "bottom") {
+            anchorY += height;
+        }
+
+        const roundedAnchorX = roundToGrid(anchorX);
+        const roundedAnchorY = roundToGrid(anchorY);
+
+        let x = roundedAnchorX;
+        if (hAlign === "center") {
+            x -= width / 2;
+        } else if (hAlign === "right") {
+            x -= width;
+        }
+
+        let y = roundedAnchorY;
+        if (vAlign === "center") {
+            y -= height / 2;
+        } else if (vAlign === "bottom") {
+            y -= height;
+        }
+
+        return { position: { x, y } };
     }
 
     /**
-     * Extracts layout metadata from the given ELK edge
+     * Extracts layout metadata from the given ELK edge, rounding all routing points to the grid.
      *
      * @param edge the ELK edge to extract metadata from
      * @returns the extracted edge layout metadata
@@ -119,15 +191,22 @@ export abstract class BaseLayoutEngine {
         const section = edge.sections?.[0];
         if (section?.bendPoints == undefined) {
             return {
-                routingPoints: []
+                routingPoints: [],
+                sourceAnchor: undefined,
+                targetAnchor: undefined
             };
         }
         const points =
             section.bendPoints.length > 0
-                ? section.bendPoints.map((pt) => ({ x: pt.x, y: pt.y }))
-                : [Point.linear(section.startPoint, section.endPoint, 0.5)];
+                ? section.bendPoints.map((pt) => ({ x: roundToGrid(pt.x), y: roundToGrid(pt.y) }))
+                : [Point.linear(section.startPoint, section.endPoint, 0.5)].map((pt) => ({
+                      x: roundToGrid(pt.x),
+                      y: roundToGrid(pt.y)
+                  }));
         return {
-            routingPoints: points
+            routingPoints: points,
+            sourceAnchor: undefined,
+            targetAnchor: undefined
         };
     }
 }

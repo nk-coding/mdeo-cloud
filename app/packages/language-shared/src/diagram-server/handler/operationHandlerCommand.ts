@@ -66,14 +66,22 @@ export class OperationHandlerCommand implements Command {
                 delete result[key];
             } else {
                 const currentEntry = current[key] ?? {};
-                let meta: object | undefined;
+                let meta: Record<string, any> | undefined;
                 if (currentEntry.meta != undefined) {
                     meta = {
-                        ...currentEntry.meta,
-                        ...value?.meta
+                        ...currentEntry.meta
                     };
-                } else {
-                    meta = value?.meta;
+                }
+                if (value.meta != undefined) {
+                    if (meta == undefined) {
+                        meta = {
+                            ...value.meta
+                        };
+                    } else {
+                        for (const [metaKey, metaValue] of Object.entries(value.meta)) {
+                            meta[metaKey] = metaValue;
+                        }
+                    }
                 }
                 result[key] = {
                     ...currentEntry,

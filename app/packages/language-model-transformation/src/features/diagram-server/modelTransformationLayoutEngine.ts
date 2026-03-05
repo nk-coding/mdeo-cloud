@@ -1,6 +1,7 @@
 import type { GModelRoot } from "@eclipse-glsp/server";
 import type { LayoutOperation } from "@mdeo/editor-protocol";
 import { BaseLayoutEngine, GEdge, GNode, sharedImport } from "@mdeo/language-shared";
+import type { NodeAlignment } from "@mdeo/language-shared";
 import type { ElkExtendedEdge, ElkNode } from "elkjs";
 import { GMatchNode } from "./model/matchNode.js";
 import { GMatchNodeCompartments } from "./model/matchNodeCompartments.js";
@@ -9,6 +10,10 @@ import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
 import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
+import { GStartNode } from "./model/startNode.js";
+import { GEndNode } from "./model/endNode.js";
+import { GSplitNode } from "./model/splitNode.js";
+import { GMergeNode } from "./model/mergeNode.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -22,6 +27,24 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
+    /**
+     * Returns center/center alignment for split, merge, start, and end nodes so that
+     * the center point of these circular/diamond-shaped nodes is snapped to the grid.
+     * All other nodes use the default top-left alignment.
+     */
+    protected override getNodeAlignment(nodeId: string): NodeAlignment {
+        const element = this.modelState.index.find(nodeId);
+        if (
+            element instanceof GStartNode ||
+            element instanceof GEndNode ||
+            element instanceof GSplitNode ||
+            element instanceof GMergeNode
+        ) {
+            return { vAlign: "center", hAlign: "center" };
+        }
+        return super.getNodeAlignment(nodeId);
+    }
+
     /**
      * Transforms the GModel to an ELK graph for layout computation.
      * Creates a hierarchical graph with match nodes containing pattern instances.

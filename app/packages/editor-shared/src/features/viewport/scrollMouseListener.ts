@@ -18,7 +18,9 @@ const { findParentByFeature, isViewport } = sharedImport("@eclipse-glsp/sprotty"
  */
 @injectable()
 export class EditorScrollMouseListener extends GLSPScrollMouseListener {
-    /** When true, pans the viewport on drag regardless of what element was hit. */
+    /**
+     * When true, pans the viewport on drag regardless of what element was hit.
+     */
     scrollAlways = false;
 
     override handle(action: Action): void | Action | ICommand {
