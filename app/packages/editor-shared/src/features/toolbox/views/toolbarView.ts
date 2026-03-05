@@ -51,11 +51,12 @@ export function generateToolbarView(context: Toolbox): VNode {
  * @returns The tool button VNode
  */
 function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
-    const isActive = context.toolState.toolType === tool.id;
+    const isActive = context.toolType === tool.id;
     const hasItems = context.hasToolboxItems();
 
     const isDisabled =
-        (tool.id === ToolType.BOTTOM_PANEL_TOGGLE && !hasItems) ||
+        (tool.id === ToolType.BOTTOM_PANEL_TOGGLE &&
+            (!hasItems || context.toolType === ToolType.HAND || context.toolType === ToolType.MARQUEE)) ||
         (tool.id === ToolType.CREATE_EDGE && context.isLayoutable);
     const isInteractable = context.isOpen && !isDisabled;
 

@@ -2,7 +2,6 @@ import type { VNode } from "snabbdom";
 import type { Action, IActionDispatcher, GModelRoot, PaletteItem } from "@eclipse-glsp/sprotty";
 import type MiniSearch from "minisearch";
 import { sharedImport } from "../../sharedImport.js";
-import { ToolState } from "./toolState.js";
 import { ToolType, type ToolDefinition, type ToolboxEditEntry, type ToolboxErrorState } from "./toolboxTypes.js";
 import { generateToolboxView } from "./views/toolboxView.js";
 import { enableTool } from "./tools.js";
@@ -12,7 +11,10 @@ import { LayoutAction } from "./layoutAction.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES } = sharedImport("@eclipse-glsp/sprotty");
-const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction } = sharedImport("@eclipse-glsp/client");
+import { HandTool } from "../hand-tool/handTool.js";
+
+const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction, MarqueeMouseTool } =
+    sharedImport("@eclipse-glsp/client");
 const { init, classModule, propsModule, styleModule, eventListenersModule, attributesModule } =
     sharedImport("snabbdom");
 const MiniSearchLib = sharedImport("minisearch");
@@ -30,9 +32,6 @@ export class Toolbox extends ToolPalette {
     @inject(TYPES.IActionDispatcher)
     declare protected actionDispatcher: IActionDispatcher;
 
-    @inject(ToolState)
-    public toolState!: ToolState;
-
     @inject(PreviewRenderer)
     public previewRenderer!: PreviewRenderer;
 
@@ -45,6 +44,7 @@ export class Toolbox extends ToolPalette {
 
     public isOpen: boolean = true;
     public isBottomPanelOpen: boolean = true;
+    public toolType: ToolType = ToolType.POINTER;
     public showPreviewFor?: string;
     public searchString: string = "";
     public errorState?: ToolboxErrorState = undefined;
@@ -170,6 +170,16 @@ export class Toolbox extends ToolPalette {
     }
 
     /**
+     * Changes the active tool back to pointer if it is not already, and updates the UI.
+     */
+    override changeActiveButton(): void {
+        if (this.toolType !== ToolType.POINTER) {
+            this.toolType = ToolType.POINTER;
+            this.update();
+        }
+    }
+
+    /**
      * Builds toolbox entries from palette items.
      */
     protected buildToolboxEntries(): void {
@@ -281,11 +291,11 @@ export class Toolbox extends ToolPalette {
      * @param tool The tool type to set
      */
     updateTool(tool: ToolType): void {
-        if (this.toolState.toolType === tool) {
+        if (this.toolType === tool) {
             return;
         }
 
-        this.toolState.toolType = tool;
+        this.toolType = tool;
 
         const action = this.getToolAction(tool);
         if (action) {
@@ -306,11 +316,9 @@ export class Toolbox extends ToolPalette {
             case ToolType.POINTER:
                 return EnableDefaultToolsAction.create();
             case ToolType.HAND:
-                return EnableToolsAction.create([]);
-            case ToolType.DELETE:
-                return EnableToolsAction.create(["glsp.delete-mouse-tool"]);
+                return EnableToolsAction.create([HandTool.ID]);
             case ToolType.MARQUEE:
-                return EnableToolsAction.create(["glsp.marquee-selection-tool"]);
+                return EnableToolsAction.create([MarqueeMouseTool.ID]);
             default:
                 return undefined;
         }

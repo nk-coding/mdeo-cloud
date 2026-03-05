@@ -1,6 +1,7 @@
 import type { VNode } from "snabbdom";
 import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
+import { ToolType } from "../toolboxTypes.js";
 
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -70,6 +71,8 @@ function generateToolboxInternal(context: Toolbox): VNode {
             }
         },
         generateToolbarView(context),
-        hasItems ? generateDetailsPanelView(context) : undefined
+        hasItems && context.toolType !== ToolType.HAND && context.toolType !== ToolType.MARQUEE
+            ? generateDetailsPanelView(context)
+            : undefined
     );
 }

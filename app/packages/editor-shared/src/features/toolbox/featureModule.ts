@@ -1,6 +1,5 @@
 import { sharedImport } from "../../sharedImport.js";
 import { Toolbox } from "./toolbox.js";
-import { ToolState } from "./toolState.js";
 import { DefaultPreviewRenderer, PreviewRenderer } from "./previewRenderer.js";
 import { LayoutCommand } from "./layoutAction.js";
 
@@ -14,8 +13,6 @@ const { EnableDefaultToolsAction, ToolPalette } = sharedImport("@eclipse-glsp/cl
  */
 export const toolboxModule = new FeatureModule(
     (bind, _unbind, isBound, rebind) => {
-        bind(ToolState).toSelf().inSingletonScope();
-
         bind(Toolbox).toSelf().inSingletonScope();
         rebind(ToolPalette).toService(Toolbox);
 

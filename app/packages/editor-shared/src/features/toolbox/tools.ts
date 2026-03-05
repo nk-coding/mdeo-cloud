@@ -49,7 +49,7 @@ export const toolboxTools: ToolDefinition[] = [
  * @param tool The tool type to enable
  */
 export function enableTool(context: Toolbox, tool: ToolType): void {
-    if (context.toolState.toolType !== tool) {
+    if (context.toolType !== tool) {
         context.updateTool(tool);
     }
 }

@@ -2,10 +2,11 @@ import { sharedImport } from "../../sharedImport.js";
 import { SetViewportCommand } from "./viewport.js";
 import { ZoomMouseListener } from "./zoom.js";
 import { InitializeViewportLayoutCommand } from "./initializeViewportLayout.js";
+import { EditorScrollMouseListener } from "./scrollMouseListener.js";
 import type { Action, ICommand } from "@eclipse-glsp/sprotty";
 import { FitToScreenCommand } from "./fitToScreen.js";
 
-const { FeatureModule } = sharedImport("@eclipse-glsp/client");
+const { FeatureModule, GLSPScrollMouseListener } = sharedImport("@eclipse-glsp/client");
 const {
     ZoomMouseListener: SprottyZoomMouseListener,
     SetViewportCommand: SprottySetViewportCommand,
@@ -27,6 +28,8 @@ export const viewportModule = new FeatureModule(
         rebind(SprottySetViewportCommand).toService(SetViewportCommand);
         bind(FitToScreenCommand).toSelf();
         rebind(SprottyFitToScreenCommand).toService(FitToScreenCommand);
+        bind(EditorScrollMouseListener).toSelf().inSingletonScope();
+        rebind(GLSPScrollMouseListener).toService(EditorScrollMouseListener);
 
         const context = { bind, isBound };
         bind(InitializeViewportLayoutCommand).toSelf();

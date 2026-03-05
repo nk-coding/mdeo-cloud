@@ -7,7 +7,6 @@ import type { IconNode } from "lucide";
 export enum ToolType {
     POINTER = "pointer",
     HAND = "hand",
-    DELETE = "delete",
     MARQUEE = "marquee",
     CREATE_EDGE = "create-edge",
     LAYOUT = "layout",

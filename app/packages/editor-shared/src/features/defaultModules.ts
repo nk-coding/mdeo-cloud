@@ -11,6 +11,9 @@ import { reconnectEdgeModule } from "./reconnect-edge/featureModule.js";
 import { viewportModule } from "./viewport/featureModule.js";
 import { toolboxModule } from "./toolbox/featureModule.js";
 import { gridModule } from "./grid/featureModule.js";
+import { marqueeSelectionToolModule } from "./marquee-selection-tool/featureModule.js";
+import { handToolModule } from "./hand-tool/featureModule.js";
+import { selectModule } from "./select/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
@@ -28,6 +31,7 @@ import { gridModule } from "./grid/featureModule.js";
  * - viewportModule: Viewport management and fit-to-screen functionality
  * - toolboxModule: Toolbox UI for tool selection and element palette
  * - gridModule: Grid snapping functionality for element alignment
+ * marqueeSelectionToolModule: Marquee selection tool for selecting multiple elements
  */
 export const DEFAULT_MODULES = [
     boundsModule,
@@ -42,5 +46,8 @@ export const DEFAULT_MODULES = [
     reconnectEdgeModule,
     viewportModule,
     toolboxModule,
-    gridModule
+    gridModule,
+    marqueeSelectionToolModule,
+    handToolModule,
+    selectModule
 ];

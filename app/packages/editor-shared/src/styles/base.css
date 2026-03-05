@@ -33,6 +33,124 @@
     field-sizing: content;
 }
 
+.sprotty .grab-mode,
+.sprotty .grab-mode * {
+    cursor: grab;
+}
+
+/* GLSP cursor mode overrides: apply to the element AND all children to ensure
+   the cursor is not reset by nested SVG elements. */
+
+.sprotty .default-mode,
+.sprotty .default-mode * {
+    cursor: default;
+}
+
+.sprotty .node-creation-mode,
+.sprotty .node-creation-mode * {
+    cursor: copy;
+}
+
+.sprotty .overlap-forbidden-mode,
+.sprotty .overlap-forbidden-mode * {
+    cursor: not-allowed;
+}
+
+.sprotty .edge-creation-select-source-mode,
+.sprotty .edge-creation-select-source-mode * {
+    cursor: pointer;
+}
+
+.sprotty .edge-creation-select-target-mode,
+.sprotty .edge-reconnect-select-target-mode,
+.sprotty .edge-creation-select-target-mode *,
+.sprotty .edge-reconnect-select-target-mode * {
+    cursor: crosshair;
+}
+
+.sprotty .edge-check-pending-mode,
+.sprotty .edge-check-pending-mode * {
+    cursor: wait;
+}
+
+.sprotty .edge-modification-not-allowed-mode,
+.sprotty .edge-modification-not-allowed-mode * {
+    cursor: no-drop;
+}
+
+.sprotty .element-deletion-mode,
+.sprotty .element-deletion-mode * {
+    cursor: pointer;
+}
+
+.sprotty .move-mode,
+.sprotty .move-mode * {
+    cursor: move;
+}
+
+.sprotty .marquee-mode,
+.sprotty .marquee-mode * {
+    cursor: crosshair;
+}
+
+.sprotty .sprotty-node.marquee {
+    fill: rgb(from var(--editor-primary) r g b / 0.1);
+    opacity: 1;
+    stroke: var(--editor-primary);
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+}
+
+.sprotty .resize-nesw-mode,
+.sprotty .resize-nesw-mode * {
+    cursor: nesw-resize;
+}
+
+.sprotty .resize-nwse-mode,
+.sprotty .resize-nwse-mode * {
+    cursor: nwse-resize;
+}
+
+.sprotty .resize-nw-mode,
+.sprotty .resize-nw-mode * {
+    cursor: nw-resize;
+}
+
+.sprotty .resize-n-mode,
+.sprotty .resize-n-mode * {
+    cursor: n-resize;
+}
+
+.sprotty .resize-ne-mode,
+.sprotty .resize-ne-mode * {
+    cursor: ne-resize;
+}
+
+.sprotty .resize-e-mode,
+.sprotty .resize-e-mode * {
+    cursor: e-resize;
+}
+
+.sprotty .resize-se-mode,
+.sprotty .resize-se-mode * {
+    cursor: se-resize;
+}
+
+.sprotty .resize-s-mode,
+.sprotty .resize-s-mode * {
+    cursor: s-resize;
+}
+
+.sprotty .resize-sw-mode,
+.sprotty .resize-sw-mode * {
+    cursor: sw-resize;
+}
+
+.sprotty .resize-w-mode,
+.sprotty .resize-w-mode * {
+    cursor: w-resize;
+}
+
 @utility no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none; /* IE 10+ */
