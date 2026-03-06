@@ -3,6 +3,7 @@ import { sharedImport } from "../sharedImport.js";
 import type { GNode } from "../model/node.js";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 import type { VNode } from "snabbdom";
+import { renderCreateEdgeEndpoint } from "./edgeView.js";
 
 const { injectable } = sharedImport("inversify");
 const { svg, ShapeView } = sharedImport("@eclipse-glsp/sprotty");
@@ -51,17 +52,16 @@ export abstract class GNodeViewBase extends ShapeView {
     ];
 
     /**
-     * Renders all control elements (selection rectangle and resize handles) for the node.
-     * Checks if the element is selected.
+     * Renders all control elements (selection rectangle and resize handles) for the node that should be rendered behind the node.
      *
      * @param model The model of the element
      * @returns The control elements
      */
-    protected renderControlElements(model: Readonly<GNode>): VNode[] {
+    protected renderBackgroundControlElements(model: Readonly<GNode>): VNode[] {
         const result: VNode[] = [];
 
-        if (model.isReconnectTarget) {
-            result.push(...this.renderReconnectTargetBorder(model));
+        if (model.edgeEditHighlight != undefined) {
+            result.push(...this.renderEdgeEditHighlightBorder(model));
         }
 
         if (!model.selected) {
@@ -70,6 +70,22 @@ export abstract class GNodeViewBase extends ShapeView {
 
         const zoom = findViewportZoom(model);
         return [...result, ...this.renderSelectedRect(model, zoom), ...this.renderResizeHandles(model, zoom)];
+    }
+
+    /**
+     * Renders all control elements (selection rectangle and resize handles) for the node that should be rendered in front of the node.
+     *
+     * @param model The model of the element
+     * @returns The control elements
+     */
+    protected renderForegroundControlElements(model: Readonly<GNode>): VNode[] {
+        const result: VNode[] = [];
+
+        if (model.edgeEditHighlight?.anchorPosition != undefined) {
+            result.push(this.renderEdgeEditHighlightAnchor(model, model.edgeEditHighlight.anchorPosition));
+        }
+
+        return result;
     }
 
     /**
@@ -217,12 +233,13 @@ export abstract class GNodeViewBase extends ShapeView {
     }
 
     /**
-     * Renders a semitransparent border when the node is a reconnect target.
+     * Renders a semitransparent border when the node has an edge-edit highlight
+     * (e.g. when it is a reconnect or create-edge target).
      *
      * @param model The model of the element
      * @returns The border elements
      */
-    private renderReconnectTargetBorder(model: Readonly<GNode>): VNode[] {
+    private renderEdgeEditHighlightBorder(model: Readonly<GNode>): VNode[] {
         const { width, height } = model.bounds;
 
         return [
@@ -240,5 +257,40 @@ export abstract class GNodeViewBase extends ShapeView {
                 }
             })
         ];
+    }
+
+    /**
+     * Renders an anchor cue point for edge-edit highlighting.
+     *
+     * @param model The node model
+     * @param anchor The projected anchor on the node bounds
+     * @returns The rendered anchor cue VNode
+     */
+    private renderEdgeEditHighlightAnchor(model: Readonly<GNode>, anchor: { side: string; value: number }): VNode {
+        const point = this.anchorToPoint(model, anchor);
+        return renderCreateEdgeEndpoint(point, findViewportZoom(model));
+    }
+
+    /**
+     * Converts an anchor descriptor to a local point on the node outline.
+     *
+     * @param model The node model
+     * @param anchor The anchor descriptor
+     * @returns The local point on the node outline
+     */
+    private anchorToPoint(model: Readonly<GNode>, anchor: { side: string; value: number }): Point {
+        const value = Math.max(0, Math.min(1, anchor.value));
+
+        switch (anchor.side) {
+            case "top":
+                return { x: model.bounds.width * value, y: 0 };
+            case "bottom":
+                return { x: model.bounds.width * value, y: model.bounds.height };
+            case "left":
+                return { x: 0, y: model.bounds.height * value };
+            case "right":
+            default:
+                return { x: model.bounds.width, y: model.bounds.height * value };
+        }
     }
 }

@@ -14,6 +14,7 @@ import { gridModule } from "./grid/featureModule.js";
 import { marqueeSelectionToolModule } from "./marquee-selection-tool/featureModule.js";
 import { handToolModule } from "./hand-tool/featureModule.js";
 import { selectModule } from "./select/featureModule.js";
+import { createEdgeToolModule } from "./create-edge-tool/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
@@ -49,5 +50,6 @@ export const DEFAULT_MODULES = [
     gridModule,
     marqueeSelectionToolModule,
     handToolModule,
-    selectModule
+    selectModule,
+    createEdgeToolModule
 ];

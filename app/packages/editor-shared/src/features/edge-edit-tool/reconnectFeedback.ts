@@ -154,7 +154,7 @@ export class UpdateEdgeReconnectFeedbackCommand extends FeedbackCommand {
             if (edge.reconnectData.targetId) {
                 const prevTarget = context.root.index.getById(edge.reconnectData.targetId);
                 if (prevTarget instanceof GNode) {
-                    prevTarget.isReconnectTarget = false;
+                    prevTarget.edgeEditHighlight = undefined;
                 }
             }
             edge.reconnectData = {
@@ -167,7 +167,7 @@ export class UpdateEdgeReconnectFeedbackCommand extends FeedbackCommand {
             if (this.action.targetId) {
                 const newTarget = context.root.index.getById(this.action.targetId);
                 if (newTarget instanceof GNode) {
-                    newTarget.isReconnectTarget = true;
+                    newTarget.edgeEditHighlight = { type: "reconnect" };
                 }
             }
         }
@@ -192,7 +192,7 @@ export class StopEdgeReconnectFeedbackCommand extends FeedbackCommand {
             if (edge.reconnectData.targetId) {
                 const target = context.root.index.getById(edge.reconnectData.targetId);
                 if (target instanceof GNode) {
-                    target.isReconnectTarget = false;
+                    target.edgeEditHighlight = undefined;
                 }
             }
             delete edge.reconnectData;

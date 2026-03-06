@@ -2,12 +2,11 @@ import type { VNode } from "snabbdom";
 import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
 import { ToolType } from "../toolboxTypes.js";
-
-const { html } = sharedImport("@eclipse-glsp/sprotty");
-
 import { generateToolbarView } from "./toolbarView.js";
 import { generateDetailsPanelView } from "./detailsPanelView.js";
 import { generateErrorView } from "./errorView.js";
+
+const { html, matchesKeystroke } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * Generates the complete toolbox view.
@@ -63,10 +62,9 @@ function generateToolboxInternal(context: Toolbox): VNode {
             },
             on: {
                 keydown: (event: KeyboardEvent) => {
-                    context.handleKeyDown(event);
-                },
-                keyup: (event: KeyboardEvent) => {
-                    context.handleKeyUp(event);
+                    if (matchesKeystroke(event, "Escape") && context.toolType !== ToolType.HAND) {
+                        context.updateTool(ToolType.POINTER);
+                    }
                 }
             }
         },

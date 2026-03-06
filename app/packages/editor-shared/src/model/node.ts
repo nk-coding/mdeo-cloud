@@ -1,10 +1,27 @@
 import type { Fadeable, FluentIterable, Hoverable, Point, Selectable } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
-import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata, EdgeAnchor } from "@mdeo/editor-protocol";
 import { GEdge } from "./edge.js";
 import type { Connectable } from "../features/edge-routing/connectable.js";
 
 const { GShapeElement } = sharedImport("@eclipse-glsp/sprotty");
+
+/**
+ * Describes the current edge-edit highlight state on a node.
+ * Used by both reconnect and create-edge flows to render visual feedback
+ * such as a highlight border and optional anchor point cue.
+ */
+export interface EdgeEditHighlight {
+    /**
+     * The type of edge-edit operation causing this highlight.
+     */
+    type: "reconnect" | "create";
+    /**
+     * Optional anchor position to render as a point cue on the node.
+     * Used in create-edge phase 1 to show the projected start point.
+     */
+    anchorPosition?: EdgeAnchor;
+}
 
 /**
  * Base client-side model for node elements.
@@ -31,9 +48,11 @@ export class GNode extends GShapeElement implements Selectable, Fadeable, Hovera
     hoverFeedback: boolean = false;
 
     /**
-     * Indicates whether the node is currently a reconnect target.
+     * Edge-edit highlight state for this node.
+     * Set when the node is a potential reconnect or create-edge target.
+     * Undefined when the node is not highlighted.
      */
-    isReconnectTarget: boolean = false;
+    edgeEditHighlight?: EdgeEditHighlight;
 
     /**
      * Vertical alignment of the node. Defaults to "top".

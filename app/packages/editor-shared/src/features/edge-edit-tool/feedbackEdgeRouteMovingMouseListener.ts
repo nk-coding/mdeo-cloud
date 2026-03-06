@@ -13,15 +13,10 @@ import type {
 } from "@mdeo/editor-protocol";
 import type { Bounds as BoundsType } from "@eclipse-glsp/protocol";
 
-const { DragAwareMouseListener, getAbsolutePosition, cursorFeedbackAction, isSelected } =
+const { DragAwareMouseListener, getAbsolutePosition, cursorFeedbackAction, isSelected, CursorCSS } =
     sharedImport("@eclipse-glsp/client");
 const { findParentByFeature, isViewport, translatePoint } = sharedImport("@eclipse-glsp/sprotty");
 const { Point: PointUtil } = sharedImport("@eclipse-glsp/protocol");
-
-/**
- * CSS class for edge segment move cursor.
- */
-const CSS_EDGE_SEGMENT_MOVE = "edge-segment-move-mode";
 
 /**
  * Mouse listener that handles edge route segment dragging.
@@ -111,7 +106,14 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
             } else {
                 this.offset = PointUtil.ORIGIN;
             }
-            this.cursorFeedback.add(cursorFeedbackAction(CSS_EDGE_SEGMENT_MOVE), cursorFeedbackAction()).submit();
+            const sourceOrientation = Orientation.fromSide(this.startMeta.sourceAnchor.side);
+            const orientation = segmentIndex % 2 === 0 ? sourceOrientation : Orientation.invert(sourceOrientation);
+            this.cursorFeedback
+                .add(
+                    cursorFeedbackAction(orientation === "horizontal" ? CursorCSS.RESIZE_N : CursorCSS.RESIZE_W),
+                    cursorFeedbackAction()
+                )
+                .submit();
         }
 
         return result;

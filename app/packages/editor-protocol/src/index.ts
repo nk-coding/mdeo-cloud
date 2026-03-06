@@ -1,4 +1,7 @@
 export * from "./actions/resetCanvasBoundsAction.js";
+export * from "./actions/createEdgeSchemaActions.js";
+export * from "./createEdgeSchema.js";
+export * from "./operations/createEdgeOperation.js";
 export * from "./operations/layoutOperation.js";
 export * from "./operations/partialChangeBoundsOperation.js";
 export * from "./operations/reconnectEdgeOperation.js";

@@ -11,7 +11,7 @@ import type { GLabel } from "../model/label.js";
 import { UpdateLabelEditAction } from "../features/edit-label/updateLabelEditAction.js";
 
 const { injectable, inject } = sharedImport("inversify");
-const { html, TYPES, ApplyLabelEditOperation } = sharedImport("@eclipse-glsp/sprotty");
+const { html, TYPES, ApplyLabelEditOperation, matchesKeystroke } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering GLabel elements with inline editing support.
@@ -202,10 +202,10 @@ export class GLabelView implements IView {
      * @param model The label model being edited
      */
     protected handleKeyDown(event: KeyboardEvent, model: Readonly<GLabel>): void {
-        if (event.key === "Enter" && !event.shiftKey) {
+        if (matchesKeystroke(event, "Enter") && !event.shiftKey) {
             event.preventDefault();
             this.applyLabelEdit(model);
-        } else if (event.key === "Escape") {
+        } else if (matchesKeystroke(event, "Escape")) {
             event.preventDefault();
             this.cancelEdit(model);
         }

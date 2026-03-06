@@ -55,10 +55,11 @@ export class GMatchNodeView extends GNodeViewBase {
         return svg(
             "g",
             { class: { "cursor-pointer": true } },
-            ...this.renderControlElements(model),
+            ...this.renderBackgroundControlElements(model),
             ...outlines,
             innerGroup,
-            ...bottomVNodes
+            ...bottomVNodes,
+            ...this.renderForegroundControlElements(model)
         );
     }
 

@@ -18,6 +18,9 @@ import { ModelDeleteElementOperationHandler } from "./handler/modelDeleteElement
 import { ModelLabelEditValidator } from "./modelLabelEditValidator.js";
 import { ModelToolPaletteItemProvider } from "./modelToolPaletteItemProvider.js";
 import { ModelLayoutEngine } from "./modelLayoutEngine.js";
+import { ModelCreateEdgeSchemaResolver } from "./modelCreateEdgeSchemaResolver.js";
+import { CreateLinkOperationHandler } from "./handler/createLinkOperationHandler.js";
+import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
 const { injectable } = sharedImport("inversify");
 
@@ -27,78 +30,43 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class ModelDiagramModule extends BaseDiagramModule {
-    /**
-     * Binds the diagram configuration for model diagrams.
-     *
-     * @returns The ModelDiagramConfiguration class
-     */
     protected override bindDiagramConfiguration(): BindingTarget<DiagramConfiguration> {
         return ModelDiagramConfiguration;
     }
 
-    /**
-     * Binds the GModel factory for creating graph models from AST.
-     *
-     * @returns The ModelGModelFactory class
-     */
     protected override bindGModelFactory(): BindingTarget<GModelFactory> {
         return ModelGModelFactory;
     }
 
-    /**
-     * Binds the model ID provider for generating element IDs.
-     *
-     * @returns The ModelModelIdProvider class
-     */
     protected override bindModelIdProvider(): BindingTarget<ModelIdProvider> {
         return ModelModelIdProvider;
     }
 
-    /**
-     * Binds the metadata manager for handling layout metadata.
-     *
-     * @returns The ModelMetadataManager class
-     */
     protected override bindMetadataManager(): BindingTarget<MetadataManager> {
         return ModelMetadataManager;
     }
 
-    /**
-     * Configures operation handlers for model diagram operations.
-     *
-     * @param binding The binding to add operation handlers to
-     */
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         super.configureOperationHandlers(binding);
         binding.add(ModelApplyLabelEditOperationHandler);
         binding.add(ModelReconnectEdgeOperationHandler);
+        binding.add(CreateLinkOperationHandler);
         binding.add(CreateObjectOperationHandler);
         binding.add(ModelDeleteElementOperationHandler);
     }
 
-    /**
-     * Binds the label edit validator for validating label edits.
-     *
-     * @returns The ModelLabelEditValidator class
-     */
+    protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {
+        return ModelCreateEdgeSchemaResolver;
+    }
+
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {
         return ModelLabelEditValidator;
     }
 
-    /**
-     * Binds the tool palette item provider for the diagram toolbox.
-     *
-     * @returns The ModelToolPaletteItemProvider class
-     */
     protected override bindToolPaletteItemProvider(): BindingTarget<ToolPaletteItemProvider> {
         return ModelToolPaletteItemProvider;
     }
 
-    /**
-     * Binds the layout engine for automatic layout computation.
-     *
-     * @returns The ModelLayoutEngine class
-     */
     protected override bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine> {
         return ModelLayoutEngine;
     }

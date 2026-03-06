@@ -85,12 +85,12 @@ export abstract class GEdgeView implements IView {
     /**
      * Size of the reconnect handle (in pixels at zoom 1.0)
      */
-    protected static readonly RECONNECT_HANDLE_SIZE = 20;
+    static readonly RECONNECT_HANDLE_SIZE = 20;
 
     /**
      * Size of the inner reconnect handle (in pixels at zoom 1.0)
      */
-    protected static readonly RECONNECT_HANDLE_INNER_SIZE = 10;
+    static readonly RECONNECT_HANDLE_INNER_SIZE = 10;
 
     /**
      * Renders the edge element with optional markers, visible path, invisible selection path, and additional content.
@@ -143,12 +143,17 @@ export abstract class GEdgeView implements IView {
             children.push(...this.renderReconnectHandles(model, route));
         }
 
+        if (model.edgeCreateData && route.length >= 2) {
+            children.push(...this.renderCreateEdgeEndpoints(model, route));
+        }
+
         const rootClasses: Record<string, boolean> = {};
         if (!isSelected(model)) {
             rootClasses["cursor-pointer"] = true;
         }
-        if (model.reconnectData) {
+        if (model.reconnectData != undefined || model.edgeCreateData != undefined) {
             rootClasses["pointer-events-none"] = true;
+            rootClasses["[&_*]:pointer-events-none!"] = true;
         }
 
         return svg("g", { class: rootClasses }, ...children);
@@ -697,7 +702,7 @@ export abstract class GEdgeView implements IView {
      * @returns An array of VNodes for the reconnect handles
      */
     protected renderReconnectHandles(model: Readonly<GEdge>, route: Point[]): VNode[] {
-        const reconnectData = (model as any).reconnectData as EdgeReconnectData | undefined;
+        const reconnectData = model.reconnectData as EdgeReconnectData | undefined;
         const zoom = findViewportZoom(model);
         const handles: VNode[] = [];
 
@@ -711,6 +716,21 @@ export abstract class GEdgeView implements IView {
         handles.push(this.renderReconnectHandle(targetPoint, "target", zoom, targetActive ?? false));
 
         return handles;
+    }
+
+    /**
+     * Renders non-interactive endpoint indicators for create-edge feedback.
+     * Both source and target endpoints stay visible during phase 2.
+     *
+     * @param route The computed route
+     * @returns Endpoint indicator VNodes
+     */
+    protected renderCreateEdgeEndpoints(model: Readonly<GEdge>, route: Point[]): VNode[] {
+        const zoom = findViewportZoom(model);
+        const sourcePoint = route[0];
+        const targetPoint = route[route.length - 1];
+
+        return [renderCreateEdgeEndpoint(sourcePoint, zoom), renderCreateEdgeEndpoint(targetPoint, zoom)];
     }
 
     /**
@@ -761,4 +781,47 @@ export abstract class GEdgeView implements IView {
             })
         );
     }
+}
+
+/**
+ * Renders a single non-interactive endpoint indicator.
+ *
+ * @param position Endpoint position
+ * @param zoom Current zoom level
+ * @returns The endpoint indicator VNode
+ */
+export function renderCreateEdgeEndpoint(position: Point, zoom: number): VNode {
+    const outerRadius = GEdgeView.RECONNECT_HANDLE_SIZE / 2 / zoom;
+    const innerRadius = GEdgeView.RECONNECT_HANDLE_INNER_SIZE / 2 / zoom;
+
+    return svg(
+        "g",
+        {},
+        svg("circle", {
+            attrs: {
+                cx: position.x,
+                cy: position.y,
+                r: outerRadius
+            },
+            class: {
+                "fill-primary/25": true,
+                "non-scaling-stroke": true,
+                "pointer-events-none": true
+            }
+        }),
+        svg("circle", {
+            attrs: {
+                cx: position.x,
+                cy: position.y,
+                r: innerRadius
+            },
+            class: {
+                "fill-background": true,
+                "stroke-primary": true,
+                "stroke-[1.5px]": true,
+                "non-scaling-stroke": true,
+                "pointer-events-none": true
+            }
+        })
+    );
 }

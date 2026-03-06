@@ -19,6 +19,8 @@ import { MetamodelDeleteNodeOperationHandler } from "./handler/metamodelDeleteEl
 import { MetamodelLabelEditValidator } from "./metamodelLabelEditValidator.js";
 import { MetamodelToolPaletteItemProvider } from "./metamodelToolPaletteItemProvider.js";
 import { MetamodelLayoutEngine } from "./metamodelLayoutEngine.js";
+import { MetamodelCreateEdgeSchemaResolver } from "./metamodelCreateEdgeSchemaResolver.js";
+import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
 const { injectable } = sharedImport("inversify");
 
@@ -63,5 +65,9 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
 
     protected override bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine> {
         return MetamodelLayoutEngine;
+    }
+
+    protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {
+        return MetamodelCreateEdgeSchemaResolver;
     }
 }

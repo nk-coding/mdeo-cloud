@@ -7,6 +7,8 @@ import { GeneratedModelModelIdProvider } from "./generatedModelModelIdProvider.j
 import { GeneratedModelMetadataManager } from "./generatedModelMetadataManager.js";
 import { GeneratedModelToolPaletteItemProvider } from "./generatedModelToolPaletteItemProvider.js";
 import { ModelLayoutEngine } from "../modelLayoutEngine.js";
+import { GeneratedModelCreateEdgeSchemaResolver } from "./generatedModelCreateEdgeSchemaResolver.js";
+import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
 const { injectable } = sharedImport("inversify");
 
@@ -57,5 +59,9 @@ export class GeneratedModelDiagramModule extends BaseDiagramModule {
      */
     protected override bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine> {
         return ModelLayoutEngine;
+    }
+
+    protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {
+        return GeneratedModelCreateEdgeSchemaResolver;
     }
 }

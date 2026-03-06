@@ -3,7 +3,7 @@ import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
 import { inputClasses } from "./styles.js";
 
-const { html } = sharedImport("@eclipse-glsp/sprotty");
+const { html, matchesKeystroke } = sharedImport("@eclipse-glsp/sprotty");
 const { Search } = sharedImport("lucide");
 
 import { generateIcon } from "./iconView.js";
@@ -69,7 +69,7 @@ export function generateSearchInputView(context: Toolbox): VNode {
                     debouncedSearchUpdate(context, target.value);
                 },
                 keydown: (event: KeyboardEvent) => {
-                    if (event.key === "Escape") {
+                    if (matchesKeystroke(event, "Escape")) {
                         context.searchString = "";
                         context.selectedItemIndex = 0;
                         context.update();

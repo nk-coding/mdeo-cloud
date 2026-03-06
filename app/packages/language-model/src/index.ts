@@ -27,6 +27,7 @@ export * from "./features/diagram-server/modelModelIdProvider.js";
 export * from "./features/diagram-server/modelToolPaletteItemProvider.js";
 export * from "./features/associationEndCache.js";
 export * from "./features/associationResolver.js";
+export * from "./features/baseMetamodelHelper.js";
 export * from "./features/modelData.js";
 export * from "./features/modelDataConverter.js";
 export * from "./features/modelExternalReferenceCollector.js";

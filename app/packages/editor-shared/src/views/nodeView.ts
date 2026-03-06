@@ -35,7 +35,13 @@ export abstract class GNodeView extends GNodeViewBase {
             },
             this.renderForeignElement(model, context)
         );
-        return svg("g", null, ...this.renderControlElements(model), foreignObjectVNode);
+        return svg(
+            "g",
+            null,
+            ...this.renderBackgroundControlElements(model),
+            foreignObjectVNode,
+            ...this.renderForegroundControlElements(model)
+        );
     }
 
     /**

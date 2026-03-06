@@ -1,13 +1,12 @@
 import type { AstReflection } from "@mdeo/language-common";
 import {
     Association,
-    MetaModel,
     resolveClassChain,
     type AssociationType,
     type ClassType,
     type AssociationEndType
 } from "@mdeo/language-metamodel";
-import type { AstNode } from "langium";
+import { BaseMetamodelHelper } from "./baseMetamodelHelper.js";
 
 /**
  * Result of resolving an association between two classes.
@@ -28,63 +27,20 @@ export interface ResolvedAssociation {
 /**
  * Helper class for resolving associations between classes in metamodels.
  *
- * This class provides methods to:
- * - Find all associations between two classes
+ * Extends {@link BaseMetamodelHelper} for shared metamodel traversal utilities
+ * and adds methods to:
  * - Find a unique association between two classes
- * - Resolve associationend names for both ends of a link
+ * - Look up an association by one of its end properties
+ * - Resolve the oriented association for a link, determining directionality
  */
-export class AssociationResolver {
+export class AssociationResolver extends BaseMetamodelHelper {
     /**
      * Creates a new AssociationResolver.
      *
      * @param reflection The AST reflection for type checking
      */
-    constructor(private readonly reflection: AstReflection) {}
-
-    /**
-     * Finds all associations between two classes, considering inheritance.
-     *
-     * @param class1 The first class
-     * @param class2 The second class
-     * @returns Array of associations that connect the two classes
-     */
-    findAssociationsBetweenClasses(class1: ClassType, class2: ClassType): AssociationType[] {
-        const result: AssociationType[] = [];
-        const class1Chain = resolveClassChain(class1, this.reflection);
-        const class2Chain = resolveClassChain(class2, this.reflection);
-
-        const metamodels = this.collectMetamodels([...class1Chain, ...class2Chain]);
-        const class1ChainSet = new Set(class1Chain);
-        const class2ChainSet = new Set(class2Chain);
-
-        for (const metaModel of metamodels) {
-            for (const element of metaModel.elements ?? []) {
-                if (!this.reflection.isInstance(element, Association)) {
-                    continue;
-                }
-
-                const assoc = element;
-                const sourceClass = assoc.source?.class?.ref;
-                const targetClass = assoc.target?.class?.ref;
-
-                if (!sourceClass || !targetClass) {
-                    continue;
-                }
-
-                const connects = this.associationConnectsClasses(
-                    sourceClass,
-                    targetClass,
-                    class1ChainSet,
-                    class2ChainSet
-                );
-
-                if (connects) {
-                    result.push(assoc);
-                }
-            }
-        }
-
-        return result;
+    constructor(reflection: AstReflection) {
+        super(reflection);
     }
 
     /**
@@ -101,9 +57,9 @@ export class AssociationResolver {
     }
 
     /**
-     * Finds an association by a associationend name on one end.
+     * Finds the association that owns the given association end.
      *
-     * @param associationend The associationend that is an association end
+     * @param associationend The association end whose containing association to find
      * @returns The containing association, or undefined if not found
      */
     findAssociationForAssociationEnd(associationend: AssociationEndType): AssociationType | undefined {
@@ -115,18 +71,18 @@ export class AssociationResolver {
     }
 
     /**
-     * Resolves an association and returns both end associationend names.
+     * Resolves an association and determines its directionality for a link.
      *
-     * This method handles three cases:
-     * 1. Both associationend names are given: validates they belong to the same association
-     * 2. One associationend name is given: finds the association and returns both names
-     * 3. No associationend names are given: finds the unique association and returns both names
+     * Handles three cases:
+     * 1. Both association ends are given: validates they belong to the same association.
+     * 2. One association end is given: resolves the association and determines direction.
+     * 3. No association ends are given: finds the unique association and determines direction.
      *
      * @param sourceClass The source class of the link
      * @param targetClass The target class of the link
-     * @param sourceAssociationEnd The associationend on the source end, if specified
-     * @param targetAssociationEnd The associationend on the target end, if specified
-     * @returns The resolved association with both associationend names, or undefined
+     * @param sourceAssociationEnd The association end on the source side, if specified
+     * @param targetAssociationEnd The association end on the target side, if specified
+     * @returns The resolved association with directionality, or undefined
      */
     resolveAssociation(
         sourceClass: ClassType,
@@ -151,7 +107,12 @@ export class AssociationResolver {
     }
 
     /**
-     * Resolves when both properties are specified.
+     * Resolves the association when both end properties are specified.
+     *
+     * @param sourceAssociationEnd The source-side association end
+     * @param targetAssociationEnd The target-side association end
+     * @param sourceClass The source class, used to verify directionality
+     * @returns The resolved association with directionality, or undefined if the ends differ
      */
     private resolveWithBothProperties(
         sourceAssociationEnd: AssociationEndType,
@@ -170,14 +131,17 @@ export class AssociationResolver {
             sourceClass
         );
 
-        return {
-            association: sourceAssoc,
-            matchesDirection
-        };
+        return { association: sourceAssoc, matchesDirection };
     }
 
     /**
-     * Resolves when only one associationend is specified.
+     * Resolves the association when only one end property is specified.
+     *
+     * @param sourceClass The source class of the link
+     * @param targetClass The target class of the link
+     * @param associationend The single specified association end
+     * @param isSourceAssociationEnd Whether the specified end is on the source side
+     * @returns The resolved association with directionality, or undefined if not found
      */
     private resolveWithOneAssociationEnd(
         sourceClass: ClassType,
@@ -196,21 +160,15 @@ export class AssociationResolver {
             isSourceAssociationEnd ? sourceClass : targetClass
         );
 
-        if (isSourceAssociationEnd) {
-            return {
-                association,
-                matchesDirection
-            };
-        } else {
-            return {
-                association,
-                matchesDirection
-            };
-        }
+        return { association, matchesDirection };
     }
 
     /**
-     * Resolves when no properties are specified.
+     * Resolves the association when no end properties are specified.
+     *
+     * @param sourceClass The source class of the link
+     * @param targetClass The target class of the link
+     * @returns The unique resolved association with directionality, or undefined
      */
     private resolveWithNoProperties(sourceClass: ClassType, targetClass: ClassType): ResolvedAssociation | undefined {
         const association = this.findUniqueAssociation(sourceClass, targetClass);
@@ -222,21 +180,17 @@ export class AssociationResolver {
         const sourceChain = new Set(resolveClassChain(sourceClass, this.reflection));
         const matchesDirection = assocSourceClass != undefined && sourceChain.has(assocSourceClass);
 
-        if (matchesDirection) {
-            return {
-                association,
-                matchesDirection: true
-            };
-        } else {
-            return {
-                association,
-                matchesDirection: false
-            };
-        }
+        return { association, matchesDirection };
     }
 
     /**
-     * Checks if a associationend is on the source side of an association relative to a class.
+     * Determines whether an association end is on the source side of an association
+     * relative to a given class.
+     *
+     * @param associationend The association end to check
+     * @param association The containing association
+     * @param classType The class whose side membership is being checked
+     * @returns True when the end is the source end and the class is in the source chain
      */
     private associationendMatchesAssociationSource(
         associationend: AssociationEndType,
@@ -252,50 +206,5 @@ export class AssociationResolver {
             }
         }
         return false;
-    }
-
-    /**
-     * Collects metamodels from a list of classes.
-     */
-    private collectMetamodels(classes: ClassType[]): Set<{ elements?: AstNode[] }> {
-        const metamodels = new Set<{ elements?: AstNode[] }>();
-        for (const cls of classes) {
-            const metaModel = this.getMetaModel(cls);
-            if (metaModel) {
-                metamodels.add(metaModel);
-            }
-        }
-        return metamodels;
-    }
-
-    /**
-     * Checks if an association connects two class chains.
-     */
-    private associationConnectsClasses(
-        assocSourceClass: ClassType,
-        assocTargetClass: ClassType,
-        class1ChainSet: Set<ClassType>,
-        class2ChainSet: Set<ClassType>
-    ): boolean {
-        const sourceInClass1 = class1ChainSet.has(assocSourceClass);
-        const sourceInClass2 = class2ChainSet.has(assocSourceClass);
-        const targetInClass1 = class1ChainSet.has(assocTargetClass);
-        const targetInClass2 = class2ChainSet.has(assocTargetClass);
-
-        return (sourceInClass1 && targetInClass2) || (sourceInClass2 && targetInClass1);
-    }
-
-    /**
-     * Gets the MetaModel containing a class.
-     */
-    private getMetaModel(classType: ClassType): { elements?: AstNode[] } | undefined {
-        let current: AstNode | undefined = classType;
-        while (current != undefined) {
-            if (this.reflection.isInstance(current, MetaModel)) {
-                return current as { elements?: AstNode[] };
-            }
-            current = current.$container;
-        }
-        return undefined;
     }
 }

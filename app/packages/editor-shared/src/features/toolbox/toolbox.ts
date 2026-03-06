@@ -8,6 +8,7 @@ import { enableTool } from "./tools.js";
 import { ScrollViewState } from "./views/scrollView.js";
 import { PreviewRenderer } from "./previewRenderer.js";
 import { LayoutAction } from "./layoutAction.js";
+import { CreateEdgeTool } from "../create-edge-tool/createEdgeTool.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES } = sharedImport("@eclipse-glsp/sprotty");
@@ -319,6 +320,8 @@ export class Toolbox extends ToolPalette {
                 return EnableToolsAction.create([HandTool.ID]);
             case ToolType.MARQUEE:
                 return EnableToolsAction.create([MarqueeMouseTool.ID]);
+            case ToolType.CREATE_EDGE:
+                return EnableToolsAction.create([CreateEdgeTool.ID]);
             default:
                 return undefined;
         }
@@ -350,26 +353,5 @@ export class Toolbox extends ToolPalette {
         }
 
         this.actionDispatcher.dispatchAll(item.paletteItem.actions);
-    }
-
-    /**
-     * Handles keydown events in the toolbox.
-     *
-     * @param event The keyboard event
-     */
-    handleKeyDown(event: KeyboardEvent): void {
-        if (event.key === "Escape") {
-            this.searchString = "";
-            this.update();
-        }
-    }
-
-    /**
-     * Handles keyup events in the toolbox.
-     *
-     * @param _event The keyboard event
-     */
-    handleKeyUp(_event: KeyboardEvent): void {
-        // Placeholder for key state tracking
     }
 }

@@ -1,7 +1,7 @@
 import type { Point } from "@eclipse-glsp/protocol";
 import type { Bounds as BoundsType } from "@eclipse-glsp/protocol";
 import type { EdgeLayoutMetadata, AnchorSide, EdgeAnchor } from "@mdeo/editor-protocol";
-import type { GEdge, EdgeReconnectData } from "../../model/edge.js";
+import type { GEdge, EdgeReconnectData, EdgeCreateData } from "../../model/edge.js";
 import type { BoundsAware, ISnapper } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 
@@ -55,6 +55,11 @@ export class EdgeRouter {
         const reconnectData = edge.reconnectData as EdgeReconnectData | undefined;
         if (reconnectData) {
             return this.computeReconnectRoute(edge, reconnectData);
+        }
+
+        const createData = edge.edgeCreateData as EdgeCreateData | undefined;
+        if (createData) {
+            return this.computeCreateEdgeRoute(edge, createData);
         }
 
         const sourceBounds = (edge.index.getById(edge.sourceId) as BoundsAware | undefined)?.bounds;
@@ -240,6 +245,62 @@ export class EdgeRouter {
             meta: edge.meta,
             sourceAnchor: isReconnectingSource ? movingAnchor : fixedAnchor,
             targetAnchor: isReconnectingSource ? fixedAnchor : movingAnchor
+        };
+    }
+
+    /**
+     * Computes the route for an edge being created via the create-edge tool.
+     * The source end is always fixed; the target end either follows the cursor position
+     * or snaps to a target node's anchor.
+     *
+     * @param edge The feedback edge being created
+     * @param createData The create-edge data with source, position, and optional target
+     * @returns The route computation result
+     */
+    protected computeCreateEdgeRoute(edge: GEdge, createData: EdgeCreateData): RouteComputationResult {
+        const sourceBounds = (edge.index.getById(createData.sourceId) as BoundsAware | undefined)?.bounds;
+        if (sourceBounds == undefined) {
+            throw new Error("Cannot compute create-edge route: source bounds are undefined.");
+        }
+        if (!createData.sourceAnchor) {
+            throw new Error("Cannot compute create-edge route: source anchor is undefined.");
+        }
+
+        const sourceAnchor = createData.sourceAnchor;
+        const sourcePoint = this.anchorToPoint(sourceAnchor, sourceBounds);
+        let targetAnchor: EdgeAnchor;
+        let targetPoint: Point;
+
+        if (createData.anchor && createData.targetId) {
+            const targetBounds = (edge.index.getById(createData.targetId) as BoundsAware | undefined)?.bounds;
+            if (!targetBounds) {
+                throw new Error("Cannot compute create-edge route: target bounds are undefined.");
+            }
+
+            targetAnchor = createData.anchor;
+            targetPoint = this.anchorToPoint(targetAnchor, targetBounds);
+        } else if (createData.position) {
+            targetPoint = createData.position;
+            targetAnchor = { side: sourceAnchor.side, value: 0.5 };
+        } else {
+            throw new Error("Invalid create-edge data: must have either position or anchor with targetId.");
+        }
+
+        const normalizedPoints = this.normalizeRoutingPoints(
+            sourcePoint,
+            sourceAnchor.side,
+            [],
+            targetPoint,
+            targetAnchor.side
+        );
+
+        const route = this.simplifyRoutingPoints([sourcePoint, ...normalizedPoints, targetPoint]);
+
+        return {
+            route,
+            meta: edge.meta,
+            sourceAnchor,
+            targetAnchor
         };
     }
 

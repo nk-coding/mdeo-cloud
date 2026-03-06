@@ -2,9 +2,7 @@ import type { ValidationAcceptor, AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
 import {
     Association,
-    Class,
     Enum,
-    MetaModel,
     RangeMultiplicity,
     SingleMultiplicity,
     resolveClassChain,
@@ -14,6 +12,7 @@ import {
     type MultiplicityType,
     type PropertyType
 } from "@mdeo/language-metamodel";
+import { BaseMetamodelHelper } from "../features/baseMetamodelHelper.js";
 
 /**
  * Base link end interface that both model and transformation link ends must implement.
@@ -40,9 +39,19 @@ export interface BaseObjectInstance {
 
 /**
  * Abstract base validator providing shared validation logic for model-based languages.
+ *
+ * Extends {@link BaseMetamodelHelper} for shared metamodel traversal and adds
+ * validation-specific helpers for associations, multiplicities, and properties.
  */
-export abstract class BaseModelValidator {
-    constructor(protected readonly reflection: AstReflection) {}
+export abstract class BaseModelValidator extends BaseMetamodelHelper {
+    /**
+     * Creates a new validator.
+     *
+     * @param reflection The AST reflection used for runtime type checks
+     */
+    constructor(reflection: AstReflection) {
+        super(reflection);
+    }
 
     /**
      * Validates a link between two object instances.
@@ -223,66 +232,7 @@ export abstract class BaseModelValidator {
     }
 
     /**
-     * Finds all associations between two classes (considering class chains).
-     *
-     * @param class1 The first class
-     * @param class2 The second class
-     * @returns Array of associations between the two classes
-     */
-    protected findAssociationsBetweenClasses(class1: ClassType, class2: ClassType): AssociationType[] {
-        const result: AssociationType[] = [];
-        const class1Chain = resolveClassChain(class1, this.reflection);
-        const class2Chain = resolveClassChain(class2, this.reflection);
-
-        const metamodels = new Set<{ elements?: AstNode[] }>();
-
-        for (const cls of class1Chain) {
-            const metaModel = this.getMetaModel(cls);
-            if (metaModel) {
-                metamodels.add(metaModel);
-            }
-        }
-
-        for (const cls of class2Chain) {
-            const metaModel = this.getMetaModel(cls);
-            if (metaModel) {
-                metamodels.add(metaModel);
-            }
-        }
-
-        const class1ChainSet = new Set(class1Chain);
-        const class2ChainSet = new Set(class2Chain);
-
-        for (const metaModel of metamodels) {
-            for (const element of metaModel.elements ?? []) {
-                if (!this.reflection.isInstance(element, Association)) {
-                    continue;
-                }
-
-                const assoc = element;
-                const sourceClass = this.resolveToClass(assoc.source?.class?.ref);
-                const targetClass = this.resolveToClass(assoc.target?.class?.ref);
-
-                if (!sourceClass || !targetClass) {
-                    continue;
-                }
-
-                const sourceInClass1 = class1ChainSet.has(sourceClass);
-                const sourceInClass2 = class2ChainSet.has(sourceClass);
-                const targetInClass1 = class1ChainSet.has(targetClass);
-                const targetInClass2 = class2ChainSet.has(targetClass);
-
-                if ((sourceInClass1 && targetInClass2) || (sourceInClass2 && targetInClass1)) {
-                    result.push(assoc);
-                }
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Finds the association that contains a given property (as an association end).
+     * Finds the association that contains a given property as an association end.
      *
      * @param property The property to find the containing association for
      * @returns The containing association, or undefined if not found
@@ -413,42 +363,7 @@ export abstract class BaseModelValidator {
     }
 
     /**
-     * Gets the MetaModel containing a class.
-     *
-     * @param classType The class to find the metamodel for
-     * @returns The containing metamodel, or undefined if not found
-     */
-    protected getMetaModel(classType: ClassType): { elements?: AstNode[] } | undefined {
-        let current: AstNode | undefined = classType;
-        while (current != undefined) {
-            if (this.reflection.isInstance(current, MetaModel)) {
-                return current as { elements?: AstNode[] };
-            }
-            current = current.$container;
-        }
-        return undefined;
-    }
-
-    /**
-     * Resolves an AstNode to its actual Class.
-     * With the simplified import system, references directly point to Class nodes.
-     *
-     * @param classNode The class node to resolve
-     * @returns The resolved class type, or undefined if not a Class
-     */
-    protected resolveToClass(classNode: AstNode | undefined): ClassType | undefined {
-        if (classNode == undefined) {
-            return undefined;
-        }
-        if (this.reflection.isInstance(classNode, Class)) {
-            return classNode;
-        }
-        return undefined;
-    }
-
-    /**
      * Resolves an AstNode to its actual Enum.
-     * With the simplified import system, references directly point to Enum nodes.
      *
      * @param enumNode The enum node to resolve
      * @returns The resolved enum type, or undefined if not an Enum

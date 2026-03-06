@@ -40,6 +40,33 @@ export interface EdgeReconnectData {
 }
 
 /**
+ * Ephemeral data for an edge being created via the create-edge tool.
+ * Stored on the feedback edge model during the creation flow.
+ */
+export interface EdgeCreateData {
+    /**
+     * The ID of the source node.
+     */
+    sourceId: string;
+    /**
+     * The fixed source anchor selected when entering phase 2.
+     */
+    sourceAnchor: EdgeAnchor;
+    /**
+     * The current free position of the target end (used when not snapped to a target).
+     */
+    position?: Point;
+    /**
+     * The anchor when snapped to a target node.
+     */
+    anchor?: EdgeAnchor;
+    /**
+     * The ID of the target element if hovering over a valid target.
+     */
+    targetId?: string;
+}
+
+/**
  * Base client-side model for edge elements.
  * Extends the GLSP edge implementation with metadata and routing support.
  */
@@ -75,4 +102,9 @@ export class GEdge extends GChildElement implements Selectable, Locateable {
      * Data for reconnect mode, if the edge is currently being reconnected.
      */
     reconnectData?: EdgeReconnectData;
+
+    /**
+     * Data for create-edge mode, if this edge is a feedback preview during creation.
+     */
+    edgeCreateData?: EdgeCreateData;
 }

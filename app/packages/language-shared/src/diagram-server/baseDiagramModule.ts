@@ -3,7 +3,8 @@ import type {
     BindingTarget,
     ContextEditValidatorRegistry,
     InstanceMultiBinding,
-    OperationHandlerConstructor
+    OperationHandlerConstructor,
+    ActionHandlerConstructor
 } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import { ModelState } from "./modelState.js";
@@ -23,6 +24,8 @@ import { ExtendedContextEditValidatorRegistry } from "./contextEditValidationReg
 import { ModelSubmissionHandler } from "./modelSubmissionHandler.js";
 import { BaseLayoutEngine } from "./layoutEngine.js";
 import { LayoutOperationHandler } from "./handler/layoutOperationHandler.js";
+import { RequestCreateEdgeSchemaActionHandler } from "./handler/requestCreateEdgeSchemaActionHandler.js";
+import { CreateEdgeSchemaResolver } from "./createEdgeSchemaResolver.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =
@@ -60,7 +63,13 @@ export abstract class BaseDiagramModule extends DiagramModule {
         applyBindingTarget(context, ModelIdProvider, this.bindModelIdProvider()).inSingletonScope();
         applyBindingTarget(context, MetadataManager, this.bindMetadataManager()).inSingletonScope();
         applyBindingTarget(context, BaseLayoutEngine, this.bindCustomLayoutEngine()).inSingletonScope();
+        applyBindingTarget(context, CreateEdgeSchemaResolver, this.bindCreateEdgeSchemaResolver()).inSingletonScope();
         this.configureAdditional(context);
+    }
+
+    protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
+        super.configureActionHandlers(binding);
+        binding.add(RequestCreateEdgeSchemaActionHandler);
     }
 
     /**
@@ -120,4 +129,9 @@ export abstract class BaseDiagramModule extends DiagramModule {
      * @returns The binding target for the BaseLayoutEngine
      */
     protected abstract bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine>;
+
+    /**
+     * Binds the backend create-edge schema resolver.
+     */
+    protected abstract bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver>;
 }

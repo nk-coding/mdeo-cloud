@@ -68,6 +68,11 @@
     cursor: crosshair;
 }
 
+.sprotty .edge-creation-mode,
+.sprotty .edge-creation-mode * {
+    cursor: crosshair;
+}
+
 .sprotty .edge-check-pending-mode,
 .sprotty .edge-check-pending-mode * {
     cursor: wait;
