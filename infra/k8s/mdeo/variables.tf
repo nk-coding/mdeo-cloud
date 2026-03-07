@@ -88,3 +88,17 @@ variable "gateway_class_name" {
   description = "GatewayClass name to use for the mdeo Gateway (e.g. 'nginx', 'cilium', 'traefik')"
   default     = "nginx"
 }
+
+variable "gateway_https_listener" {
+  type        = bool
+  description = "Whether to add an HTTPS (port 443) listener to the Gateway (null = auto-detect from app_endpoint scheme). Set to false when TLS is terminated by an external reverse proxy so the gateway only needs the HTTP listener even if app_endpoint is https://..."
+  nullable    = true
+  default     = null
+}
+
+variable "gateway_annotations" {
+  type        = map(string)
+  description = "Annotations to add to the Gateway's infrastructure (propagated to the generated LoadBalancer Service). Use this to pass provider-specific hints, e.g. { \"metallb.universe.tf/loadBalancerIPs\" = \"1.2.3.4\" }."
+  nullable    = true
+  default     = null
+}

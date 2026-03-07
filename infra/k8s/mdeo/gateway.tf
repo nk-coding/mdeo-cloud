@@ -13,6 +13,9 @@ resource "kubernetes_manifest" "gateway" {
     }
     spec = {
       gatewayClassName = var.gateway_class_name
+      infrastructure = var.gateway_annotations != null ? {
+        annotations = var.gateway_annotations
+      } : null
       listeners = concat(
         [
           {
@@ -26,7 +29,7 @@ resource "kubernetes_manifest" "gateway" {
             }
           }
         ],
-        startswith(var.app_endpoint, "https://") ? [
+        (var.gateway_https_listener == null ? startswith(var.app_endpoint, "https://") : var.gateway_https_listener) ? [
           {
             name     = "https"
             port     = 443
