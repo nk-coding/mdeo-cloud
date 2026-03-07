@@ -34,6 +34,16 @@ export class ModelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver {
             return undefined;
         }
 
+        const sourceClass = sourceObject.class?.ref;
+        if (sourceClass == undefined) {
+            return undefined;
+        }
+
+        const associationResolver = new LinkAssociationResolver(this.modelState.languageServices.shared.AstReflection);
+        if (!associationResolver.hasAnyAssociation(sourceClass)) {
+            return undefined;
+        }
+
         return this.buildSchema(request.sourceElementId, undefined, {}, undefined);
     }
 

@@ -108,6 +108,45 @@ export abstract class BaseMetamodelHelper {
     }
 
     /**
+     * Finds all associations involving a class, considering its full inheritance
+     * chain and both association directions (incoming and outgoing).
+     *
+     * An association is included when the class (or any of its ancestors) appears
+     * as either the source or the target of the association.
+     *
+     * @param classType The class to find associations for
+     * @returns All associations where the class participates as source or target
+     */
+    public findAssociationsForClass(classType: ClassType): AssociationType[] {
+        const result: AssociationType[] = [];
+        const classChain = resolveClassChain(classType, this.reflection);
+        const metamodels = this.collectMetamodels(classChain);
+        const classChainSet = new Set(classChain);
+
+        for (const metaModel of metamodels) {
+            for (const element of metaModel.elements ?? []) {
+                if (!this.reflection.isInstance(element, Association)) {
+                    continue;
+                }
+
+                const assoc = element;
+                const sourceClass = this.resolveToClass(assoc.source?.class?.ref);
+                const targetClass = this.resolveToClass(assoc.target?.class?.ref);
+
+                if (!sourceClass || !targetClass) {
+                    continue;
+                }
+
+                if (classChainSet.has(sourceClass) || classChainSet.has(targetClass)) {
+                    result.push(assoc);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Narrows an AST node to a class type using runtime type reflection.
      *
      * @param node The candidate AST node

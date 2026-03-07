@@ -331,11 +331,7 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
                 cases.push("first");
             } else if (segmentIndex === 1) {
                 cases.push("second", "secondToLast");
-                routingPoints = [
-                    routingPoints[0],
-                    PointUtil.linear(routingPoints[0], routingPoints[1], 0.5),
-                    routingPoints[1]
-                ];
+                routingPoints = [routingPoints[0], routingPoints[1], routingPoints[0], routingPoints[1]];
             } else {
                 cases.push("last");
             }
@@ -451,7 +447,10 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
         const updatedSecondPoint = this.applySnappedCoordinate(secondPoint, snappedPoint, orientation);
         const projection = this.edgeRouter.projectAnchor(edge, updatedSecondPoint, sourceBounds);
 
-        if (projection.isDirect) {
+        if (
+            projection.isDirect &&
+            Orientation.fromSide(projection.anchor.side) !== Orientation.fromSide(sourceAnchor.side)
+        ) {
             return {
                 routingPoints: [updatedSecondPoint, ...routingPoints.slice(2)],
                 sourceAnchor: projection.anchor
@@ -492,7 +491,10 @@ export class FeedbackEdgeRouteMovingMouseListener extends DragAwareMouseListener
         const updatedPenultimate = this.applySnappedCoordinate(penultimatePoint, snappedPoint, orientation);
         const projection = this.edgeRouter.projectAnchor(edge, updatedPenultimate, targetBounds);
 
-        if (projection.isDirect) {
+        if (
+            projection.isDirect &&
+            Orientation.fromSide(projection.anchor.side) !== Orientation.fromSide(targetAnchor.side)
+        ) {
             return {
                 routingPoints: [...routingPoints.slice(0, penultimateIndex), updatedPenultimate],
                 targetAnchor: projection.anchor

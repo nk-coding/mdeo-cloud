@@ -103,6 +103,17 @@ export class LinkAssociationResolver extends BaseMetamodelHelper {
     }
 
     /**
+     * Checks whether a class has any known associations, considering its full
+     * inheritance chain and both incoming and outgoing association directions.
+     *
+     * @param classType The class to check
+     * @returns True when at least one association involves the class
+     */
+    hasAnyAssociation(classType: ClassType): boolean {
+        return this.findAssociationsForClass(classType).length > 0;
+    }
+
+    /**
      * Selects a unique candidate using disambiguation params.
      *
      * @param candidates Candidate associations for the source-target pair

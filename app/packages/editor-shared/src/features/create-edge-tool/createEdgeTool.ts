@@ -41,6 +41,20 @@ const CLICK_MAX_DURATION_MS = 180;
 const DRAG_MIN_DISTANCE_PX = 5;
 
 /**
+ * Tracks the state of an in-flight async schema validation request.
+ */
+interface SchemaRequest {
+    /**
+     * Monotonic token used to detect and discard stale responses.
+     */
+    requestToken: number;
+    /**
+     * The element ID that was last submitted for validation, if any.
+     */
+    schemaId?: string;
+}
+
+/**
  * On-demand tool for creating edges between nodes.
  * Implements a two-phase flow:
  * 1. Source selection: crosshair cursor, hover highlights valid source nodes with anchor cue.
@@ -125,13 +139,13 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
      */
     private highlightedSourceId?: string;
     /**
-     * Monotonic token to ignore stale async schema responses.
+     * Tracks the last async source-validation request (used in phase 1 hover and creation-start).
      */
-    private schemaRequestToken = 0;
+    private sourceRequest: SchemaRequest = { requestToken: 0 };
     /**
-     * Last target ID used for target-schema request.
+     * Tracks the last async target-validation request (used in phase 2 hover).
      */
-    private lastSchemaTargetId?: string;
+    private targetRequest: SchemaRequest = { requestToken: 0 };
     /**
      * Source node candidate captured at mouse-down (before async resolves).
      */
@@ -219,7 +233,7 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         this.clearMouseDownTracking();
 
         if (this.source == undefined) {
-            this.schemaRequestToken++;
+            this.sourceRequest.requestToken++;
             return [];
         }
 
@@ -234,7 +248,10 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
     }
 
     /**
-     * Handles mouse movement in phase 1 by highlighting valid source nodes.
+     * Handles mouse movement in phase 1 by asynchronously validating and highlighting source nodes.
+     * The highlight is only shown after {@link CreateEdgeProvider.getInitialSchema} confirms the
+     * node can act as a valid edge source, preventing misleading highlights for structurally
+     * connectable nodes that have no valid edge type to offer.
      *
      * @param target The current model target from sprotty
      * @param event The DOM mouse event
@@ -250,17 +267,50 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
             this.highlightedSourceId = undefined;
         }
 
-        if (node) {
-            const position = this.getRelativePositionForNode(node, event);
-            const anchor = this.computeNearestAnchor(position, node.bounds);
-            actions.push(
+        if (node == undefined || this.mouseDownSource != undefined) {
+            return actions;
+        }
+
+        if (this.sourceRequest.schemaId === node.id) {
+            if (this.highlightedSourceId === node.id) {
+                const position = this.getRelativePositionForNode(node, event);
+                const anchor = this.computeNearestAnchor(position, node.bounds);
+                actions.push(
+                    SetEdgeEditHighlightAction.create(node.id, {
+                        type: "create",
+                        anchorPosition: anchor
+                    })
+                );
+            }
+            return actions;
+        }
+
+        const requestToken = ++this.sourceRequest.requestToken;
+        this.sourceRequest.schemaId = node.id;
+        const position = this.getRelativePositionForNode(node, event);
+        const anchor = this.computeNearestAnchor(position, node.bounds);
+
+        this.tool.provider.getInitialSchema(node).then((schema) => {
+            if (requestToken !== this.sourceRequest.requestToken) {
+                return;
+            }
+            const edgeCandidate = schema ? this.tool.createEdgeFromSchema(schema) : undefined;
+            if (!edgeCandidate || !node.canConnect(edgeCandidate, "source")) {
+                if (this.highlightedSourceId === node.id) {
+                    this.tool.dispatchActions([SetEdgeEditHighlightAction.create(node.id, undefined)]);
+                    this.highlightedSourceId = undefined;
+                }
+                return;
+            }
+            this.tool.dispatchActions([
                 SetEdgeEditHighlightAction.create(node.id, {
                     type: "create",
                     anchorPosition: anchor
                 })
-            );
+            ]);
             this.highlightedSourceId = node.id;
-        }
+        });
+
         return actions;
     }
 
@@ -272,9 +322,9 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
      * @returns Nothing; actions are dispatched asynchronously
      */
     private startCreationMode(source: GNode, sourcePosition: Point): void {
-        const requestToken = ++this.schemaRequestToken;
+        const requestToken = ++this.sourceRequest.requestToken;
         this.tool.provider.getInitialSchema(source).then((schema) => {
-            if (!schema || requestToken !== this.schemaRequestToken) {
+            if (!schema || requestToken !== this.sourceRequest.requestToken) {
                 return;
             }
 
@@ -292,7 +342,7 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
             this.source = source;
             this.schema = schema;
             this.initialSchema = schema;
-            this.lastSchemaTargetId = undefined;
+            this.targetRequest = { requestToken: this.targetRequest.requestToken };
 
             const actions: Action[] = [];
             if (this.highlightedSourceId) {
@@ -324,14 +374,14 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
 
             const anchor = this.tool.edgeRouter.projectAnchor(candidateEdge, position, node.bounds).anchor;
 
-            if (this.lastSchemaTargetId !== node.id) {
-                const requestToken = ++this.schemaRequestToken;
+            if (this.targetRequest.schemaId !== node.id) {
+                const requestToken = ++this.targetRequest.requestToken;
                 const source = this.source;
                 const currentSchema = this.schema;
-                this.lastSchemaTargetId = node.id;
+                this.targetRequest.schemaId = node.id;
 
                 this.tool.provider.getTargetSchema(source, node, currentSchema).then((updatedSchema) => {
-                    if (requestToken !== this.schemaRequestToken || this.source == undefined) {
+                    if (requestToken !== this.targetRequest.requestToken || this.source == undefined) {
                         return;
                     }
                     if (updatedSchema == undefined) {
@@ -376,9 +426,9 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
             position,
             undefined,
             undefined,
-            this.lastSchemaTargetId != undefined ? this.schema?.template : undefined
+            this.targetRequest.schemaId != undefined ? this.schema?.template : undefined
         );
-        this.lastSchemaTargetId = undefined;
+        this.targetRequest.schemaId = undefined;
         return [action];
     }
 
@@ -596,7 +646,8 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         this.source = undefined;
         this.schema = undefined;
         this.initialSchema = undefined;
-        this.lastSchemaTargetId = undefined;
+        this.sourceRequest = { requestToken: this.sourceRequest.requestToken + 1 };
+        this.targetRequest = { requestToken: this.targetRequest.requestToken + 1 };
     }
 
     /**
