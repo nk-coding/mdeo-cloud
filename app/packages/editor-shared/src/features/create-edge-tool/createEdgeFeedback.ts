@@ -3,7 +3,7 @@ import { sharedImport } from "../../sharedImport.js";
 import type { Point } from "@eclipse-glsp/protocol";
 import type { EdgeAnchor } from "@mdeo/editor-protocol";
 import { GEdge } from "../../model/edge.js";
-import { GNode, type EdgeEditHighlight } from "../../model/node.js";
+import { EdgeEditHighlightState, type EdgeEditHighlight } from "../../model/node.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { TYPES } = sharedImport("@eclipse-glsp/sprotty");
@@ -190,13 +190,6 @@ export class UpdateCreateEdgeFeedbackCommand extends FeedbackCommand {
             return context.root;
         }
 
-        if (edge.edgeCreateData.targetId) {
-            const prevTarget = context.root.index.getById(edge.edgeCreateData.targetId);
-            if (prevTarget instanceof GNode) {
-                prevTarget.edgeEditHighlight = undefined;
-            }
-        }
-
         if (this.action.updatedSchema) {
             const parent = edge.parent;
             const idx = parent.children.indexOf(edge);
@@ -221,13 +214,6 @@ export class UpdateCreateEdgeFeedbackCommand extends FeedbackCommand {
                 anchor: this.action.anchor,
                 targetId: this.action.targetId
             };
-        }
-
-        if (this.action.targetId) {
-            const newTarget = context.root.index.getById(this.action.targetId);
-            if (newTarget instanceof GNode) {
-                newTarget.edgeEditHighlight = { type: "create" };
-            }
         }
 
         return context.root;
@@ -255,12 +241,6 @@ export class StopCreateEdgeFeedbackCommand extends FeedbackCommand {
     execute(context: CommandExecutionContext): CommandReturn {
         const edge = context.root.index.getById(this.action.edgeId);
         if (edge instanceof GEdge) {
-            if (edge.edgeCreateData?.targetId) {
-                const target = context.root.index.getById(edge.edgeCreateData.targetId);
-                if (target instanceof GNode) {
-                    target.edgeEditHighlight = undefined;
-                }
-            }
             edge.parent.remove(edge);
         }
         return context.root;
@@ -276,7 +256,7 @@ export interface SetEdgeEditHighlightAction extends Action {
     /**
      * The ID of the node to highlight.
      */
-    nodeId: string;
+    nodeId: string | undefined;
     /**
      * The highlight to apply, or undefined to clear.
      */
@@ -293,7 +273,10 @@ export namespace SetEdgeEditHighlightAction {
      * @param highlight The highlight to apply, or undefined to clear
      * @returns The action
      */
-    export function create(nodeId: string, highlight: EdgeEditHighlight | undefined): SetEdgeEditHighlightAction {
+    export function create(
+        nodeId: string | undefined,
+        highlight: EdgeEditHighlight | undefined
+    ): SetEdgeEditHighlightAction {
         return { kind: KIND, nodeId, highlight };
     }
 }
@@ -305,21 +288,22 @@ export namespace SetEdgeEditHighlightAction {
 export class SetEdgeEditHighlightCommand extends FeedbackCommand {
     static readonly KIND = SetEdgeEditHighlightAction.KIND;
 
-    constructor(@inject(TYPES.Action) protected action: SetEdgeEditHighlightAction) {
+    constructor(
+        @inject(TYPES.Action) protected action: SetEdgeEditHighlightAction,
+        @inject(EdgeEditHighlightState) protected highlightState: EdgeEditHighlightState
+    ) {
         super();
     }
 
     /**
-     * Applies or clears edge-edit highlight on a node.
+     * Updates the global edge-edit highlight state.
      *
      * @param context The command execution context
      * @returns The updated model root
      */
     execute(context: CommandExecutionContext): CommandReturn {
-        const node = context.root.index.getById(this.action.nodeId);
-        if (node instanceof GNode) {
-            node.edgeEditHighlight = this.action.highlight;
-        }
+        this.highlightState.nodeId = this.action.nodeId;
+        this.highlightState.highlight = this.action.highlight;
         return context.root;
     }
 }

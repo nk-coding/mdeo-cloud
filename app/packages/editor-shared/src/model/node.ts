@@ -5,6 +5,7 @@ import { GEdge } from "./edge.js";
 import type { Connectable } from "../features/edge-routing/connectable.js";
 
 const { GShapeElement } = sharedImport("@eclipse-glsp/sprotty");
+const { injectable } = sharedImport("inversify");
 
 /**
  * Describes the current edge-edit highlight state on a node.
@@ -21,6 +22,19 @@ export interface EdgeEditHighlight {
      * Used in create-edge phase 1 to show the projected start point.
      */
     anchorPosition?: EdgeAnchor;
+}
+
+/**
+ * Global injectable singleton that holds the current edge-edit highlight state.
+ * Only one node can be highlighted at a time; centralising state here prevents
+ * stale per-node flags from being rendered after model updates.
+ */
+@injectable()
+export class EdgeEditHighlightState {
+    /** The ID of the currently highlighted node, or undefined if none. */
+    nodeId?: string;
+    /** The highlight data to render on the highlighted node. */
+    highlight?: EdgeEditHighlight;
 }
 
 /**
@@ -46,13 +60,6 @@ export class GNode extends GShapeElement implements Selectable, Fadeable, Hovera
      * Indicates whether the node is currently being hovered over.
      */
     hoverFeedback: boolean = false;
-
-    /**
-     * Edge-edit highlight state for this node.
-     * Set when the node is a potential reconnect or create-edge target.
-     * Undefined when the node is not highlighted.
-     */
-    edgeEditHighlight?: EdgeEditHighlight;
 
     /**
      * Vertical alignment of the node. Defaults to "top".

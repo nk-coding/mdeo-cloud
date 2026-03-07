@@ -4,6 +4,7 @@ import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.UserService
 import com.mdeo.backend.service.JwtService
 import com.mdeo.common.model.*
+import com.mdeo.common.model.UserRoles
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -35,18 +36,15 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
             
             call.sessions.set(UserSession(
                 userId = user.id,
-                username = user.username,
-                isAdmin = user.roles.contains(UserRoles.ADMIN),
-                canCreateProject =
-                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
+                username = user.username
             ))
-            
+
+            val isAdmin = user.roles.contains(UserRoles.ADMIN)
             call.respond(LoginResponse(UserInfo(
                 id = user.id,
                 username = user.username,
-                isAdmin = user.roles.contains(UserRoles.ADMIN),
-                canCreateProject =
-                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
+                isAdmin = isAdmin,
+                canCreateProject = isAdmin || user.roles.contains(UserRoles.CREATE_PROJECT)
             )))
         }
 
@@ -69,18 +67,15 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
 
             call.sessions.set(UserSession(
                 userId = user.id,
-                username = user.username,
-                isAdmin = user.roles.contains(UserRoles.ADMIN),
-                canCreateProject =
-                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
+                username = user.username
             ))
 
+            val isAdmin = user.roles.contains(UserRoles.ADMIN)
             call.respond(LoginResponse(UserInfo(
                 id = user.id,
                 username = user.username,
-                isAdmin = user.roles.contains(UserRoles.ADMIN),
-                canCreateProject =
-                    user.roles.contains(UserRoles.ADMIN) || user.roles.contains(UserRoles.CREATE_PROJECT)
+                isAdmin = isAdmin,
+                canCreateProject = isAdmin || user.roles.contains(UserRoles.CREATE_PROJECT)
             )))
         }
         
@@ -103,14 +98,29 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
             val session = call.sessions.get<UserSession>()
             if (session == null) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Not authenticated"))
-            } else {
-                call.respond(UserInfo(
-                    id = session.userId,
-                    username = session.username,
-                    isAdmin = session.isAdmin,
-                    canCreateProject = session.isAdmin || session.canCreateProject
-                ))
+                return@get
             }
+
+            val userId = try {
+                java.util.UUID.fromString(session.userId)
+            } catch (_: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user ID"))
+                return@get
+            }
+
+            val user = userService.findById(userId)
+            if (user == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "User not found"))
+                return@get
+            }
+
+            val isAdmin = user.roles.contains(UserRoles.ADMIN)
+            call.respond(UserInfo(
+                id = session.userId,
+                username = session.username,
+                isAdmin = isAdmin,
+                canCreateProject = isAdmin || user.roles.contains(UserRoles.CREATE_PROJECT)
+            ))
         }
 
     }

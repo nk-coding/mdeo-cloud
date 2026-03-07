@@ -22,5 +22,8 @@ export * from "./views/enumLabelView.js";
 export * from "./views/enumNodeView.js";
 export * from "./views/enumTitleCompartmentView.js";
 export * from "./views/inheritanceEdgeView.js";
+export * from "./features/toolbox/edgeTypeIcons.js";
+export * from "./features/toolbox/metamodelToolbox.js";
+export * from "./features/toolbox/featureModule.js";
 export * from "./module.js";
 export * from "./plugin.js";

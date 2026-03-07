@@ -1,0 +1,140 @@
+import type { GNode, CreateEdgeResult } from "@mdeo/language-shared";
+import { sharedImport } from "@mdeo/language-shared";
+import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
+import { GClassNode } from "../model/classNode.js";
+import {
+    Association,
+    AssociationEnd,
+    MetamodelAssociationOperators,
+    type AssociationType,
+    type AssociationEndType,
+    type ClassType
+} from "../../../grammar/metamodelTypes.js";
+import { MetamodelElementType } from "../model/elementTypes.js";
+import { MetamodelBaseCreateEdgeOperationHandler } from "./metamodelBaseCreateEdgeOperationHandler.js";
+
+const { injectable } = sharedImport("inversify");
+
+/**
+ * Maps EdgeCreationType string values to their corresponding association operators.
+ */
+const EDGE_TYPE_TO_OPERATOR: Record<string, MetamodelAssociationOperators> = {
+    unidirectional: MetamodelAssociationOperators.NAVIGABLE_TO_TARGET,
+    bidirectional: MetamodelAssociationOperators.BIDIRECTIONAL,
+    composition: MetamodelAssociationOperators.COMPOSITION_TARGET,
+    "navigable-composition": MetamodelAssociationOperators.COMPOSITION_TARGET_NAVIGABLE_SOURCE
+};
+
+/**
+ * Params shape embedded in the create-edge schema for metamodel edges.
+ */
+interface MetamodelCreateEdgeParams {
+    edgeType?: string;
+    sourceLabel?: string;
+    targetLabel?: string;
+}
+
+/**
+ * Handles create-edge operations that produce association edges in the metamodel diagram.
+ * Inserts a new top-level association declaration in the source model.
+ */
+@injectable()
+export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOperationHandler {
+    override readonly operationType = "createEdge";
+    override label = "Create association edge";
+    readonly elementTypeIds = [MetamodelElementType.EDGE_ASSOCIATION];
+
+    protected override async createEdge(
+        operation: CreateEdgeOperation,
+        sourceElement: GNode,
+        targetElement: GNode
+    ): Promise<CreateEdgeResult | undefined> {
+        const sourceClass = this.resolveClass(sourceElement);
+        if (!sourceClass) {
+            return undefined;
+        }
+
+        if (!(targetElement instanceof GClassNode) || !targetElement.name) {
+            return undefined;
+        }
+
+        const params = (operation.schema.params ?? {}) as MetamodelCreateEdgeParams;
+        const edgeType = params.edgeType;
+        const operator = edgeType ? EDGE_TYPE_TO_OPERATOR[edgeType] : undefined;
+
+        if (!operator) {
+            return undefined;
+        }
+
+        return this.createAssociationEdge(sourceClass, targetElement.name, operator, params);
+    }
+
+    /**
+     * Creates an inheritance edge by adding a class extension to the source class.
+     *
+     * @param sourceClass The source class AST node
+     * @param targetClass The target class AST node
+     * @returns A CreateEdgeResult with the workspace edit to apply, or undefined on failure
+     */
+    /**
+     * Creates an association edge by inserting a new association declaration.
+     *
+     * @param sourceClass The source class AST node
+     * @param targetClass The target class AST node
+     * @param operator The association operator
+     * @param params The creation parameters
+     * @returns A CreateEdgeResult with the workspace edit to apply, or undefined on failure
+     */
+    private async createAssociationEdge(
+        sourceClass: ClassType,
+        targetClassName: string,
+        operator: MetamodelAssociationOperators,
+        params: MetamodelCreateEdgeParams
+    ): Promise<CreateEdgeResult | undefined> {
+        if (!sourceClass.name) {
+            return undefined;
+        }
+
+        const sourceEnd: AssociationEndType = {
+            $type: AssociationEnd.name,
+            class: { $refText: sourceClass.name, ref: sourceClass },
+            name: params.sourceLabel,
+            multiplicity: undefined
+        };
+
+        const targetEnd: AssociationEndType = {
+            $type: AssociationEnd.name,
+            class: { $refText: targetClassName, ref: undefined },
+            name: params.targetLabel,
+            multiplicity: undefined
+        };
+
+        const associationNode: AssociationType = {
+            $type: Association.name,
+            source: sourceEnd,
+            operator,
+            target: targetEnd
+        };
+
+        const rootCstNode = this.modelState.sourceModel?.$cstNode;
+        if (!rootCstNode) {
+            throw new Error("Root CST node is not available.");
+        }
+
+        const document = this.modelState.sourceModel?.$document;
+        const isEmpty = document?.textDocument.getText().trim().length === 0;
+
+        const serialized = await this.serializeNode(associationNode);
+        const workspaceEdit = await this.createInsertAfterNodeEdit(rootCstNode, serialized, !isEmpty);
+
+        const sourceProp = params.sourceLabel ?? "";
+        const targetProp = params.targetLabel ?? "";
+        const edgeId = `${Association.name}_${sourceClass.name}_${sourceProp}_${operator}_${targetClassName}_${targetProp}`;
+
+        return {
+            edgeId,
+            edgeType: MetamodelElementType.EDGE_ASSOCIATION,
+            workspaceEdit
+        };
+    }
+}

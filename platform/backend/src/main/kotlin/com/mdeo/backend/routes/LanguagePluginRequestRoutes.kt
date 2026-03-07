@@ -38,7 +38,7 @@ fun Route.languagePluginRequestRoutes(
                     return@post
                 }
 
-                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@post
                 }

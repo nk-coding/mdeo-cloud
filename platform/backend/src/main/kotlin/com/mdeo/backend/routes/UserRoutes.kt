@@ -40,7 +40,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                 return@get
             }
             
-            if (!session.isAdmin) {
+            if (!call.isAdmin()) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
                 return@get
             }
@@ -63,7 +63,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                     return@get
                 }
                 
-                if (!session.isAdmin) {
+                if (!call.isAdmin()) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
                     return@get
                 }
@@ -94,7 +94,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                     return@put
                 }
                 
-                if (!session.isAdmin) {
+                if (!call.isAdmin()) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
                     return@put
                 }
@@ -137,7 +137,7 @@ fun Route.userRoutes(userService: UserService, projectService: ProjectService) {
                     return@put
                 }
 
-                if (!session.isAdmin) {
+                if (!call.isAdmin()) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin access required"))
                     return@put
                 }

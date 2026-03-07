@@ -2,6 +2,7 @@ package com.mdeo.backend.plugins
 
 import com.auth0.jwt.interfaces.Payload
 import com.mdeo.backend.service.JwtService
+import com.mdeo.backend.service.UserService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -26,8 +27,11 @@ data class JwtPrincipal(
  * Configure session-based authentication using Ktor's built-in session authentication.
  *
  * Validates that a UserSession exists and returns an unauthorized response if validation fails.
+ * 
+ * @param jwtService Service for JWT operations, used to validate JWT tokens in the JWT authentication provider.
+ * @param userService Service for user operations, made available for per-request resolution to check user permissions.
  */
-fun Application.configureAuthentication(jwtService: JwtService) {
+fun Application.configureAuthentication(jwtService: JwtService, userService: UserService) {
     install(Authentication) {
         session<UserSession>(AUTH_SESSION) {
             validate { session ->
@@ -56,6 +60,7 @@ fun Application.configureAuthentication(jwtService: JwtService) {
             }
         }
     }
+    this.registerUserService(userService)
 }
 
 /**
@@ -79,18 +84,23 @@ fun ApplicationCall.getJwtPrincipal(): JwtPrincipal? {
 /**
  * Extension function to check if the current user has administrator privileges.
  *
- * @return true if the user is authenticated and has admin role, false otherwise
+ * Permissions are loaded lazily from the database and cached for the duration of the request.
+ * See [getUserPermissions] for the full resolution strategy.
+ *
+ * @return `true` if the authenticated session user holds the admin role, `false` otherwise.
  */
-fun ApplicationCall.isAdmin(): Boolean {
-    return getUserSession()?.isAdmin == true
+suspend fun ApplicationCall.isAdmin(): Boolean {
+    return getUserPermissions().isAdmin
 }
 
 /**
  * Extension function to check if the current user can create projects globally.
  *
- * @return true if the user is authenticated and has create-project permission
+ * Permissions are loaded lazily from the database and cached for the duration of the request.
+ * See [getUserPermissions] for the full resolution strategy.
+ *
+ * @return `true` if the user holds the admin or create-project role, `false` otherwise.
  */
-fun ApplicationCall.canCreateProject(): Boolean {
-    val session = getUserSession() ?: return false
-    return session.isAdmin || session.canCreateProject
+suspend fun ApplicationCall.canCreateProject(): Boolean {
+    return getUserPermissions().canCreateProject
 }

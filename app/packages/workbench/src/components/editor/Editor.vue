@@ -13,6 +13,7 @@
                     :tab="state.tab"
                     :language-plugin="state.languagePlugin.value!"
                     :editable="!state.languagePlugin.value!.isGenerated"
+                    :is-active="state.tab === activeTab"
                 />
             </ResizablePanel>
         </ResizablePanelGroup>

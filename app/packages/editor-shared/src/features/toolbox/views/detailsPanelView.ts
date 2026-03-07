@@ -48,6 +48,7 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
                     "h-full": true
                 }
             },
+            ...context.generateDetailsExtension(),
             html(
                 "div",
                 {

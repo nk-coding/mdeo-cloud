@@ -135,9 +135,10 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
      */
     private initialSchema?: CreateEdgeSchema;
     /**
-     * Currently highlighted source node ID in phase 1.
+     * Currently highlighted node ID (source in phase 1, target in phase 2).
+     * Only one can be highlighted at a time.
      */
-    private highlightedSourceId?: string;
+    private highlightedNodeId?: string;
     /**
      * Tracks the last async source-validation request (used in phase 1 hover and creation-start).
      */
@@ -218,9 +219,9 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         }
 
         this.mouseDownSource = node;
-        this.mouseDownGraphPosition = this.getRelativePositionForNode(node, event);
-        this.startCreationMode(node, this.mouseDownGraphPosition);
-        return [];
+        const sourcePosition = this.getRelativePositionForNode(node, event);
+        this.mouseDownGraphPosition = sourcePosition;
+        return this.startCreationMode(node, sourcePosition);
     }
 
     override mouseUp(target: GModelElement, event: MouseEvent): Action[] {
@@ -262,9 +263,9 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         const actualTarget = this.resolveActualTarget(target, event);
         const node = this.findConnectableNode(actualTarget, "source");
 
-        if (this.highlightedSourceId && this.highlightedSourceId !== node?.id) {
-            actions.push(SetEdgeEditHighlightAction.create(this.highlightedSourceId, undefined));
-            this.highlightedSourceId = undefined;
+        if (this.highlightedNodeId && this.highlightedNodeId !== node?.id) {
+            actions.push(SetEdgeEditHighlightAction.create(undefined, undefined));
+            this.highlightedNodeId = undefined;
         }
 
         if (node == undefined || this.mouseDownSource != undefined) {
@@ -272,7 +273,7 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         }
 
         if (this.sourceRequest.schemaId === node.id) {
-            if (this.highlightedSourceId === node.id) {
+            if (this.initialSchema != undefined) {
                 const position = this.getRelativePositionForNode(node, event);
                 const anchor = this.computeNearestAnchor(position, node.bounds);
                 actions.push(
@@ -296,64 +297,61 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
             }
             const edgeCandidate = schema ? this.tool.createEdgeFromSchema(schema) : undefined;
             if (!edgeCandidate || !node.canConnect(edgeCandidate, "source")) {
-                if (this.highlightedSourceId === node.id) {
-                    this.tool.dispatchActions([SetEdgeEditHighlightAction.create(node.id, undefined)]);
-                    this.highlightedSourceId = undefined;
+                this.initialSchema = undefined;
+                if (this.highlightedNodeId === node.id) {
+                    this.tool.dispatchActions([SetEdgeEditHighlightAction.create(undefined, undefined)]);
+                    this.highlightedNodeId = undefined;
                 }
                 return;
             }
+            this.initialSchema = schema;
             this.tool.dispatchActions([
                 SetEdgeEditHighlightAction.create(node.id, {
                     type: "create",
                     anchorPosition: anchor
                 })
             ]);
-            this.highlightedSourceId = node.id;
+            this.highlightedNodeId = node.id;
         });
 
         return actions;
     }
 
     /**
-     * Starts mode 2 by resolving the initial edge schema for a selected source.
+     * Transitions to phase 2 using the already-fetched schema from phase-1 hover.
+     * Returns an empty array if no schema has been loaded for the given source yet.
      *
      * @param source The selected source node
-     * @param sourcePosition The fixed graph position where mode 2 starts
-     * @returns Nothing; actions are dispatched asynchronously
+     * @param sourcePosition The fixed graph position where phase 2 starts
+     * @returns Actions to start the feedback edge, or an empty array if the schema is not ready
      */
-    private startCreationMode(source: GNode, sourcePosition: Point): void {
-        const requestToken = ++this.sourceRequest.requestToken;
-        this.tool.provider.getInitialSchema(source).then((schema) => {
-            if (!schema || requestToken !== this.sourceRequest.requestToken) {
-                return;
-            }
+    private startCreationMode(source: GNode, sourcePosition: Point): Action[] {
+        if (this.initialSchema == undefined || this.sourceRequest.schemaId !== source.id) {
+            return [];
+        }
 
-            const edgeCandidate = this.tool.createEdgeFromSchema(schema);
-            if (!edgeCandidate || !source.canConnect(edgeCandidate, "source")) {
-                return;
-            }
+        const schema = this.initialSchema;
+        const edgeCandidate = this.tool.createEdgeFromSchema(schema);
+        if (!edgeCandidate || !source.canConnect(edgeCandidate, "source")) {
+            return [];
+        }
 
-            const sourceAnchor = this.tool.edgeRouter.projectAnchor(
-                edgeCandidate,
-                sourcePosition,
-                source.bounds
-            ).anchor;
+        const sourceAnchor = this.tool.edgeRouter.projectAnchor(edgeCandidate, sourcePosition, source.bounds).anchor;
 
-            this.source = source;
-            this.schema = schema;
-            this.initialSchema = schema;
-            this.targetRequest = { requestToken: this.targetRequest.requestToken };
+        this.sourceRequest.requestToken++;
+        this.source = source;
+        this.schema = schema;
+        this.targetRequest = { requestToken: this.targetRequest.requestToken };
 
-            const actions: Action[] = [];
-            if (this.highlightedSourceId) {
-                actions.push(SetEdgeEditHighlightAction.create(this.highlightedSourceId, undefined));
-                this.highlightedSourceId = undefined;
-            }
-            actions.push(
-                StartCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, schema.template, sourcePosition, sourceAnchor)
-            );
-            this.tool.dispatchActions(actions);
-        });
+        const actions: Action[] = [];
+        if (this.highlightedNodeId) {
+            actions.push(SetEdgeEditHighlightAction.create(undefined, undefined));
+            this.highlightedNodeId = undefined;
+        }
+        actions.push(
+            StartCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, schema.template, sourcePosition, sourceAnchor)
+        );
+        return actions;
     }
 
     /**
@@ -374,13 +372,18 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
 
             const anchor = this.tool.edgeRouter.projectAnchor(candidateEdge, position, node.bounds).anchor;
 
+            const highlightActions: Action[] = [];
+            if (this.highlightedNodeId !== node.id) {
+                highlightActions.push(SetEdgeEditHighlightAction.create(node.id, { type: "create" }));
+                this.highlightedNodeId = node.id;
+            }
+
             if (this.targetRequest.schemaId !== node.id) {
                 const requestToken = ++this.targetRequest.requestToken;
                 const source = this.source;
-                const currentSchema = this.schema;
                 this.targetRequest.schemaId = node.id;
 
-                this.tool.provider.getTargetSchema(source, node, currentSchema).then((updatedSchema) => {
+                this.tool.provider.getTargetSchema(source, node).then((updatedSchema) => {
                     if (requestToken !== this.targetRequest.requestToken || this.source == undefined) {
                         return;
                     }
@@ -408,12 +411,18 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
                         )
                     );
                 });
-                return [];
+                return highlightActions;
             } else {
                 if (this.schema === this.initialSchema) {
-                    return [UpdateCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, position, undefined, undefined)];
+                    return [
+                        ...highlightActions,
+                        UpdateCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, position, undefined, undefined)
+                    ];
                 } else {
-                    return [UpdateCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, undefined, anchor, node.id)];
+                    return [
+                        ...highlightActions,
+                        UpdateCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, undefined, anchor, node.id)
+                    ];
                 }
             }
         }
@@ -429,7 +438,12 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
             this.targetRequest.schemaId != undefined ? this.schema?.template : undefined
         );
         this.targetRequest.schemaId = undefined;
-        return [action];
+        const result: Action[] = [action];
+        if (this.highlightedNodeId != undefined) {
+            result.push(SetEdgeEditHighlightAction.create(undefined, undefined));
+            this.highlightedNodeId = undefined;
+        }
+        return result;
     }
 
     /**
@@ -477,11 +491,12 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
             schema: this.schema
         };
 
-        const result: Action[] = [
-            StopCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID),
-            operation,
-            EnableDefaultToolsAction.create()
-        ];
+        const result: Action[] = [StopCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID)];
+        if (this.highlightedNodeId != undefined) {
+            result.push(SetEdgeEditHighlightAction.create(undefined, undefined));
+            this.highlightedNodeId = undefined;
+        }
+        result.push(operation, EnableDefaultToolsAction.create());
 
         this.resetState();
         return result;
@@ -495,9 +510,9 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
     cancelFromEscape(): Action[] {
         const actions: Action[] = [];
 
-        if (this.highlightedSourceId) {
-            actions.push(SetEdgeEditHighlightAction.create(this.highlightedSourceId, undefined));
-            this.highlightedSourceId = undefined;
+        if (this.highlightedNodeId) {
+            actions.push(SetEdgeEditHighlightAction.create(undefined, undefined));
+            this.highlightedNodeId = undefined;
         }
 
         if (this.source) {
@@ -627,9 +642,9 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
      */
     private cancelCreation(): Action[] {
         const result: Action[] = [StopCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID)];
-        if (this.highlightedSourceId) {
-            result.push(SetEdgeEditHighlightAction.create(this.highlightedSourceId, undefined));
-            this.highlightedSourceId = undefined;
+        if (this.highlightedNodeId != undefined) {
+            result.push(SetEdgeEditHighlightAction.create(undefined, undefined));
+            this.highlightedNodeId = undefined;
         }
         result.push(EnableDefaultToolsAction.create());
         this.resetState();
@@ -673,14 +688,14 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         if (this.source) {
             actions.push(StopCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID));
         }
-        if (this.highlightedSourceId) {
-            actions.push(SetEdgeEditHighlightAction.create(this.highlightedSourceId, undefined));
+        if (this.highlightedNodeId) {
+            actions.push(SetEdgeEditHighlightAction.create(undefined, undefined));
         }
         if (actions.length > 0) {
             this.tool.dispatchActions(actions);
         }
 
-        this.highlightedSourceId = undefined;
+        this.highlightedNodeId = undefined;
         this.resetState();
         this.clearMouseDownTracking();
         super.dispose();

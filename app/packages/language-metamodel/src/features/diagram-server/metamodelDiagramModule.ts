@@ -16,6 +16,8 @@ import { MetamodelReconnectEdgeOperationHandler } from "./handler/metamodelRecon
 import { CreateClassOperationHandler } from "./handler/createClassOperationHandler.js";
 import { CreateEnumOperationHandler } from "./handler/createEnumOperationHandler.js";
 import { MetamodelDeleteNodeOperationHandler } from "./handler/metamodelDeleteElementOperationHandler.js";
+import { CreateAssociationOperationHandler } from "./handler/createAssociationOperationHandler.js";
+import { CreateInheritanceOperationHandler } from "./handler/createInheritanceOperationHandler.js";
 import { MetamodelLabelEditValidator } from "./metamodelLabelEditValidator.js";
 import { MetamodelToolPaletteItemProvider } from "./metamodelToolPaletteItemProvider.js";
 import { MetamodelLayoutEngine } from "./metamodelLayoutEngine.js";
@@ -53,6 +55,8 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
         binding.add(CreateClassOperationHandler);
         binding.add(CreateEnumOperationHandler);
         binding.add(MetamodelDeleteNodeOperationHandler);
+        binding.add(CreateAssociationOperationHandler);
+        binding.add(CreateInheritanceOperationHandler);
     }
 
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {

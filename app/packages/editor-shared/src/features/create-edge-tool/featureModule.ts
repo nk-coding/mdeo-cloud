@@ -7,6 +7,7 @@ import {
     UpdateCreateEdgeFeedbackCommand
 } from "./createEdgeFeedback.js";
 import { CreateEdgeProvider } from "./createEdgeProvider.js";
+import { EdgeEditHighlightState } from "../../model/node.js";
 
 const { FeatureModule, configureCommand, bindAsService, TYPES } = sharedImport("@eclipse-glsp/client");
 
@@ -19,6 +20,7 @@ export const createEdgeToolModule = new FeatureModule(
     (bind, unbind, isBound) => {
         bindAsService({ bind }, TYPES.ITool, CreateEdgeTool);
         bind(CreateEdgeProvider).toSelf().inSingletonScope();
+        bind(EdgeEditHighlightState).toSelf().inSingletonScope();
 
         configureCommand({ bind, isBound }, StartCreateEdgeFeedbackCommand);
         configureCommand({ bind, isBound }, UpdateCreateEdgeFeedbackCommand);

@@ -3,7 +3,6 @@ import { sharedImport } from "../../sharedImport.js";
 import type { Point } from "@eclipse-glsp/protocol";
 import type { EdgeAnchor } from "@mdeo/editor-protocol";
 import { GEdge, type ReconnectEnd } from "../../model/edge.js";
-import { GNode } from "../../model/node.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { TYPES } = sharedImport("@eclipse-glsp/sprotty");
@@ -151,25 +150,12 @@ export class UpdateEdgeReconnectFeedbackCommand extends FeedbackCommand {
     execute(context: CommandExecutionContext): CommandReturn {
         const edge = context.root.index.getById(this.action.edgeId);
         if (edge instanceof GEdge && edge.reconnectData) {
-            if (edge.reconnectData.targetId) {
-                const prevTarget = context.root.index.getById(edge.reconnectData.targetId);
-                if (prevTarget instanceof GNode) {
-                    prevTarget.edgeEditHighlight = undefined;
-                }
-            }
             edge.reconnectData = {
                 position: this.action.position,
                 anchor: this.action.anchor,
                 targetId: this.action.targetId,
                 end: edge.reconnectData.end
             };
-
-            if (this.action.targetId) {
-                const newTarget = context.root.index.getById(this.action.targetId);
-                if (newTarget instanceof GNode) {
-                    newTarget.edgeEditHighlight = { type: "reconnect" };
-                }
-            }
         }
         return context.root;
     }
@@ -189,12 +175,6 @@ export class StopEdgeReconnectFeedbackCommand extends FeedbackCommand {
     execute(context: CommandExecutionContext): CommandReturn {
         const edge = context.root.index.getById(this.action.edgeId);
         if (edge instanceof GEdge && edge.reconnectData) {
-            if (edge.reconnectData.targetId) {
-                const target = context.root.index.getById(edge.reconnectData.targetId);
-                if (target instanceof GNode) {
-                    target.edgeEditHighlight = undefined;
-                }
-            }
             delete edge.reconnectData;
         }
         return context.root;

@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import "reflect-metadata";
 import { createContainer } from "@mdeo/editor-common";
-import { computed, inject, onMounted, ref, shallowRef, useId } from "vue";
+import { computed, inject, onMounted, ref, shallowRef, useId, watch } from "vue";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { workbenchStateKey } from "../workbench/util";
 import { DiagramLoader } from "@eclipse-glsp/client";
@@ -20,11 +20,13 @@ import type { ResetCanvasBoundsAction } from "@mdeo/editor-protocol";
 import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { EditMode, TYPES } from "@eclipse-glsp/sprotty";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
+import type { UpdateClientOperation } from "@mdeo/language-shared";
 
 const props = defineProps<{
     tab: EditorTab;
     languagePlugin: ResolvedWorkbenchLanguagePlugin;
     editable: boolean;
+    isActive: boolean;
 }>();
 
 const { glspClient } = inject(workbenchStateKey)!;
@@ -33,6 +35,21 @@ const editorContext = inject(editorContextKey)!;
 const id = useId();
 const sprottyWrapper = ref<HTMLElement | null>(null);
 const actionDispatcher = shallowRef<IActionDispatcher>();
+
+const diagramLoaded = ref(false);
+
+watch(
+    () => props.isActive,
+    (active) => {
+        if (active && diagramLoaded.value) {
+            const action: UpdateClientOperation = {
+                kind: "updateClientOperation",
+                isOperation: true
+            }
+            actionDispatcher.value?.dispatch(action);
+        }
+    }
+);
 
 const graphicalEditorPlugin = computed(() => {
     return props.languagePlugin.graphicalEditorPlugin;
@@ -64,5 +81,6 @@ onMounted(async () => {
 
     const diagramLoader = container.get(DiagramLoader);
     await diagramLoader.load({ initializeParameters: { applicationId: "mdeo" } });
+    diagramLoaded.value = true;
 });
 </script>

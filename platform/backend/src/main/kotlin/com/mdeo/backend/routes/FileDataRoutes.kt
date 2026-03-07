@@ -52,7 +52,7 @@ fun Route.fileDataRoutes(
                     return@get
                 }
                 
-                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@get
                 }

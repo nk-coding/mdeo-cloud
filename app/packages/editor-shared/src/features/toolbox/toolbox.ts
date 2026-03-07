@@ -140,6 +140,16 @@ export class Toolbox extends ToolPalette {
     }
 
     /**
+     * Generates additional content to be inserted before the search input in the details panel.
+     * Override in subclasses to add extension UI (e.g., edge type selectors).
+     *
+     * @returns Array of VNodes to render before the search container, empty by default
+     */
+    generateDetailsExtension(): VNode[] {
+        return [];
+    }
+
+    /**
      * Called before showing the toolbox.
      *
      * @param containerElement The container element

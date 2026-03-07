@@ -18,7 +18,7 @@ export class UpdateClientOperationHandler extends BaseOperationHandler {
     override readonly operationType = UpdateClientOperation.KIND;
 
     override createCommand(): MaybePromise<Command | undefined> {
-        return new OperationHandlerCommand(this.modelState, undefined, undefined);
+        return new OperationHandlerCommand(this.modelState, undefined, {});
     }
 }
 

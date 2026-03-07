@@ -248,7 +248,7 @@ private suspend fun ApplicationCall.validateProjectAccessWithJwt(projectService:
             return null
         }
         
-        if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+        if (!projectService.hasProjectPermission(projectId, userId, isAdmin(), ProjectPermission.READ)) {
             respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
             return null
         }
@@ -300,7 +300,7 @@ private suspend fun ApplicationCall.validateProjectAccessSessionOnly(
         return null
     }
     
-    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, requiredPermission)) {
+    if (!projectService.hasProjectPermission(projectId, userId, isAdmin(), requiredPermission)) {
         respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
         return null
     }

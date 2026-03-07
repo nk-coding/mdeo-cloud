@@ -27,6 +27,7 @@
                             :tab="{ fileUri: embed.uri, temporary: true }"
                             :language-plugin="<ResolvedWorkbenchLanguagePlugin>embed.languagePlugin"
                             :editable="false"
+                            is-active
                         />
                     </div>
                     <div v-else class="flex items-center gap-3 px-4 py-6 text-sm text-muted-foreground">

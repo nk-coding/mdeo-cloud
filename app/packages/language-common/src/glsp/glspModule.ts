@@ -1,4 +1,10 @@
-import type { ActionMessage, JsonRpcServerInstance, MaybePromise, ServerModule } from "@eclipse-glsp/server";
+import {
+    type ActionMessage,
+    type JsonRpcServerInstance,
+    type MaybePromise,
+    type ServerModule,
+    LogLevel
+} from "@eclipse-glsp/server";
 import type { PluginContext } from "../plugin/pluginContext.js";
 import type { Container, ContainerModule } from "inversify";
 import type { CustomGLSPServerLauncher, CustomGLSPServerLauncherOptions } from "./customLauncher.js";
@@ -66,7 +72,7 @@ function createContainer(
     const { createAppModule } = glspServerBrowser;
 
     const container = new Container();
-    const appModule = createAppModule();
+    const appModule = createAppModule({ logLevel: LogLevel.warn });
     container.load(appModule);
     return container;
 }

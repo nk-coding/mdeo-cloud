@@ -81,10 +81,6 @@ export interface RequestCreateEdgeTargetSchemaAction extends RequestAction<SetCr
      */
     targetElementId: string;
     /**
-     * Current schema at the client.
-     */
-    currentSchema: CreateEdgeSchema;
-    /**
      * Optional client-provided context payload.
      */
     context?: unknown;
@@ -93,10 +89,15 @@ export interface RequestCreateEdgeTargetSchemaAction extends RequestAction<SetCr
 export namespace RequestCreateEdgeTargetSchemaAction {
     export const KIND = "requestCreateEdgeTargetSchema";
 
+    /**
+     * Creates a request action for a target-specific create-edge schema update.
+     *
+     * @param options The action options, including source and target element IDs, optional context, and request ID
+     * @returns The created RequestCreateEdgeTargetSchemaAction
+     */
     export function create(options: {
         sourceElementId: string;
         targetElementId: string;
-        currentSchema: CreateEdgeSchema;
         context?: unknown;
         requestId?: string;
     }): RequestCreateEdgeTargetSchemaAction {
@@ -104,7 +105,6 @@ export namespace RequestCreateEdgeTargetSchemaAction {
             kind: KIND,
             sourceElementId: options.sourceElementId,
             targetElementId: options.targetElementId,
-            currentSchema: options.currentSchema,
             context: options.context,
             requestId: options.requestId ?? ""
         };
@@ -129,6 +129,12 @@ export interface SetCreateEdgeTargetSchemaAction extends ResponseAction {
 export namespace SetCreateEdgeTargetSchemaAction {
     export const KIND = "setCreateEdgeTargetSchema";
 
+    /**
+     * Creates a response action containing a target-specific schema update.
+     *
+     * @param options The action options, including the updated schema and response ID
+     * @returns The created SetCreateEdgeTargetSchemaAction
+     */
     export function create(options: {
         schema?: CreateEdgeSchema;
         responseId?: string;

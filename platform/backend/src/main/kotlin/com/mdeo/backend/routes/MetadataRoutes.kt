@@ -47,7 +47,7 @@ fun Route.metadataRoutes(metadataService: MetadataService, projectService: Proje
                 return@get
             }
 
-            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+            if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@get
             }
@@ -87,7 +87,7 @@ fun Route.metadataRoutes(metadataService: MetadataService, projectService: Proje
                 return@put
             }
 
-            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.WRITE)) {
+            if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.WRITE)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@put
             }
@@ -130,7 +130,7 @@ fun Route.metadataRoutes(metadataService: MetadataService, projectService: Proje
                 return@get
             }
 
-            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+            if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@get
             }
@@ -179,7 +179,7 @@ fun Route.metadataRoutes(metadataService: MetadataService, projectService: Proje
                 return@put
             }
 
-            if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.WRITE)) {
+            if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.WRITE)) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                 return@put
             }

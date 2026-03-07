@@ -2,6 +2,7 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.canCreateProject
 import com.mdeo.backend.plugins.getUserSession
+import com.mdeo.backend.plugins.isAdmin
 import com.mdeo.backend.service.AddProjectUserResult
 import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
@@ -42,7 +43,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                 return@get
             }
 
-            val projects = projectService.getProjectsForUser(userId, session.isAdmin)
+            val projects = projectService.getProjectsForUser(userId, call.isAdmin())
             call.respond(projects)
         }
 
@@ -86,7 +87,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                     return@get
                 }
 
-                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                     return@get
                 }
@@ -117,7 +118,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                     return@put
                 }
 
-                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.ADMIN)) {
+                if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.ADMIN)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                     return@put
                 }
@@ -155,7 +156,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                     return@delete
                 }
 
-                if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.ADMIN)) {
+                if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.ADMIN)) {
                     call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                     return@delete
                 }
@@ -187,7 +188,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@get
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                    if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                         return@get
                     }
@@ -213,7 +214,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@post
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, call.isAdmin(), ProjectPermission.ADMIN)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                         return@post
                     }
@@ -260,7 +261,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@put
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, call.isAdmin(), ProjectPermission.ADMIN)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                         return@put
                     }
@@ -309,7 +310,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@delete
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, call.isAdmin(), ProjectPermission.ADMIN)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                         return@delete
                     }
@@ -349,7 +350,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@get
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, userId, session.isAdmin, ProjectPermission.READ)) {
+                    if (!projectService.hasProjectPermission(projectId, userId, call.isAdmin(), ProjectPermission.READ)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied"))
                         return@get
                     }
@@ -374,7 +375,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@post
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, call.isAdmin(), ProjectPermission.ADMIN)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                         return@post
                     }
@@ -421,7 +422,7 @@ fun Route.projectRoutes(projectService: ProjectService) {
                         return@delete
                     }
 
-                    if (!projectService.hasProjectPermission(projectId, currentUserId, session.isAdmin, ProjectPermission.ADMIN)) {
+                    if (!projectService.hasProjectPermission(projectId, currentUserId, call.isAdmin(), ProjectPermission.ADMIN)) {
                         call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Project admin access required"))
                         return@delete
                     }

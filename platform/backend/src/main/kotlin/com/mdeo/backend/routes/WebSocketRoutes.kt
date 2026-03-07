@@ -1,6 +1,7 @@
 package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.getUserSession
+import com.mdeo.backend.plugins.isAdmin
 import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
 import com.mdeo.backend.service.SubscribeMessage
@@ -37,7 +38,7 @@ fun Route.webSocketRoutes(
         val handler = WebSocketMessageHandler(
             connectionId = connectionId,
             userId = session.userId,
-            isGlobalAdmin = session.isAdmin,
+            isGlobalAdmin = call.isAdmin(),
             webSocketService = webSocketService,
             projectService = projectService,
             session = this

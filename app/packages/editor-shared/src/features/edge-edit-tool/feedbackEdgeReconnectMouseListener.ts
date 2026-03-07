@@ -6,6 +6,7 @@ import {
     StopEdgeReconnectFeedbackAction,
     UpdateEdgeReconnectFeedbackAction
 } from "./reconnectFeedback.js";
+import { SetEdgeEditHighlightAction } from "../create-edge-tool/createEdgeFeedback.js";
 import type { EdgeEditTool } from "./edgeEditTool.js";
 import type { EdgeAnchor, ReconnectEdgeOperation } from "@mdeo/editor-protocol";
 import { GNode } from "../../model/node.js";
@@ -157,11 +158,15 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
                     undefined,
                     targetInfo.anchor,
                     targetInfo.targetId
-                )
+                ),
+                SetEdgeEditHighlightAction.create(targetInfo.targetId, { type: "reconnect" })
             ];
             this.currentTarget = targetInfo.target;
         } else {
-            actions = [UpdateEdgeReconnectFeedbackAction.create(this.edge.id, position, undefined, undefined)];
+            actions = [
+                UpdateEdgeReconnectFeedbackAction.create(this.edge.id, position, undefined, undefined),
+                SetEdgeEditHighlightAction.create(undefined, undefined)
+            ];
             this.currentTarget = undefined;
         }
 
@@ -195,6 +200,7 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
             result.push(StopEdgeReconnectFeedbackAction.create(edge.id));
         }
 
+        result.push(SetEdgeEditHighlightAction.create(undefined, undefined));
         this.resetTracking();
         this.cursorFeedback.add(cursorFeedbackAction(), cursorFeedbackAction()).submit();
 
@@ -238,6 +244,9 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
     }
 
     override dispose(): void {
+        if (this.isTracking) {
+            this.tool.dispatchActions([SetEdgeEditHighlightAction.create(undefined, undefined)]);
+        }
         this.resetTracking();
         this.cursorFeedback.dispose();
         super.dispose();

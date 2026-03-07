@@ -28,10 +28,9 @@ export interface CreateEdgeContextProvider {
      *
      * @param source The selected source node
      * @param target The currently hovered target node
-     * @param currentSchema The schema currently active on the client
      * @returns Opaque context payload forwarded to the server
      */
-    getTargetContext(source: GNode, target: GNode, currentSchema: CreateEdgeSchema): unknown;
+    getTargetContext(source: GNode, target: GNode): unknown;
 }
 
 /**
@@ -77,20 +76,14 @@ export class CreateEdgeProvider {
      *
      * @param source The source node
      * @param target The potential target node
-     * @param currentSchema The currently active schema
      * @returns An updated schema, or undefined to keep the current one
      */
-    async getTargetSchema(
-        source: GNode,
-        target: GNode,
-        currentSchema: CreateEdgeSchema
-    ): Promise<CreateEdgeSchema | undefined> {
+    async getTargetSchema(source: GNode, target: GNode): Promise<CreateEdgeSchema | undefined> {
         const response = await this.actionDispatcher.request(
             RequestCreateEdgeTargetSchemaAction.create({
                 sourceElementId: source.id,
                 targetElementId: target.id,
-                currentSchema,
-                context: this.contextProvider?.getTargetContext(source, target, currentSchema)
+                context: this.contextProvider?.getTargetContext(source, target)
             })
         );
         return response.schema;

@@ -1,11 +1,11 @@
 import type { Point } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
-import type { GNode } from "../model/node.js";
+import { EdgeEditHighlightState, type GNode } from "../model/node.js";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 import type { VNode } from "snabbdom";
 import { renderCreateEdgeEndpoint } from "./edgeView.js";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 const { svg, ShapeView } = sharedImport("@eclipse-glsp/sprotty");
 const { ResizeHandleLocation } = sharedImport("@eclipse-glsp/client");
 
@@ -37,6 +37,8 @@ export abstract class GNodeViewBase extends ShapeView {
      */
     static readonly INNER_POINT_SIZE = 8;
 
+    @inject(EdgeEditHighlightState) protected highlightState!: EdgeEditHighlightState;
+
     /**
      * Configuration for all resize handles (edges and corners)
      */
@@ -60,7 +62,7 @@ export abstract class GNodeViewBase extends ShapeView {
     protected renderBackgroundControlElements(model: Readonly<GNode>): VNode[] {
         const result: VNode[] = [];
 
-        if (model.edgeEditHighlight != undefined) {
+        if (this.highlightState.nodeId === model.id) {
             result.push(...this.renderEdgeEditHighlightBorder(model));
         }
 
@@ -81,8 +83,9 @@ export abstract class GNodeViewBase extends ShapeView {
     protected renderForegroundControlElements(model: Readonly<GNode>): VNode[] {
         const result: VNode[] = [];
 
-        if (model.edgeEditHighlight?.anchorPosition != undefined) {
-            result.push(this.renderEdgeEditHighlightAnchor(model, model.edgeEditHighlight.anchorPosition));
+        const highlight = this.highlightState.nodeId === model.id ? this.highlightState.highlight : undefined;
+        if (highlight?.anchorPosition != undefined) {
+            result.push(this.renderEdgeEditHighlightAnchor(model, highlight.anchorPosition));
         }
 
         return result;

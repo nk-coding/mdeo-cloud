@@ -211,9 +211,9 @@ function printAssociationEnd(context: PrintContext<AssociationEndType>): Doc {
  * @returns The formatted association
  */
 function printAssociation(context: PrintContext<AssociationType>): Doc {
-    const { ctx, path, print, printPrimitive, getPrimitive } = context;
+    const { ctx, path, print } = context;
     const start = path.call(print, "source");
-    const operator = printPrimitive(getPrimitive(ctx, "operator"), ID);
+    const operator = ctx.operator;
     const target = path.call(print, "target");
 
     return [start, " ", operator, " ", target];
