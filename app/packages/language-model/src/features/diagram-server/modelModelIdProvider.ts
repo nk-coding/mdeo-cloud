@@ -1,4 +1,5 @@
 import { AstReflectionKey, BaseModelIdProvider, sharedImport } from "@mdeo/language-shared";
+import type { ModelIdRegistry } from "@mdeo/language-shared";
 import type { AstNode, Reference } from "langium";
 import { Model, ObjectInstance, Link, LinkEnd, PropertyAssignment } from "../../grammar/modelTypes.js";
 import type {
@@ -29,7 +30,7 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
      * @param node The AST node
      * @returns The generated name/ID or undefined
      */
-    getName(node: AstNode): string | undefined {
+    getName(node: AstNode, _registry: ModelIdRegistry): string | undefined {
         if (this.reflection.isInstance(node, Model)) {
             return this.getModelName();
         } else if (this.reflection.isInstance(node, ObjectInstance)) {

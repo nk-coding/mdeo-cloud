@@ -5,7 +5,8 @@ import {
     GLabelView,
     configureDefaultModelElements,
     GCompartment,
-    GHorizontalDivider
+    GHorizontalDivider,
+    CreateEdgeContextProvider
 } from "@mdeo/editor-shared";
 import { ModelTransformationElementType } from "./model/elementTypes.js";
 import { GPatternInstanceNode } from "./model/patternInstanceNode.js";
@@ -44,6 +45,7 @@ import { GMatchNodeView } from "./views/matchNodeView.js";
 import { GMatchNodeCompartmentsView } from "./views/matchNodeCompartmentsView.js";
 import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
 import { GPatternLinkModifierLabelView } from "./views/patternLinkModifierLabelView.js";
+import { PatternLinkContextProvider } from "./features/create-edge/patternLinkContextProvider.js";
 
 const { FeatureModule, configureModelElement } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -56,6 +58,8 @@ export const modelTransformationDiagramModule = new FeatureModule(
         const context: BindingContext = { bind, isBound, unbind, rebind };
 
         configureDefaultModelElements(context);
+
+        bind(CreateEdgeContextProvider).to(PatternLinkContextProvider).inSingletonScope();
 
         configureModelElement(context, ModelTransformationElementType.COMPARTMENT, GCompartment, GCompartmentView);
 

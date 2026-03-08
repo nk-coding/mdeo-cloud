@@ -2,6 +2,7 @@ import { GEdge, GNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/edi
 import type { GModelElement, Point, Bounds } from "@eclipse-glsp/sprotty";
 import { GMatchNodeView } from "../views/matchNodeView.js";
 import { GMatchNodeCompartments } from "./matchNodeCompartments.js";
+import { GControlFlowEdge } from "./controlFlowEdge.js";
 
 const {
     connectableFeature,
@@ -161,6 +162,11 @@ export class GMatchNode extends GNode {
             return { x: point.x + tx, y: point.y + ty, width: point.width, height: point.height };
         }
         return { x: point.x + tx, y: point.y + ty, width: -1, height: -1 };
+    }
+
+    override canConnect(edge: GEdge): boolean {
+        console.log("can connect", edge)
+        return edge instanceof GControlFlowEdge;
     }
 }
 

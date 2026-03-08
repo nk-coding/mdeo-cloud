@@ -112,6 +112,54 @@ export class DefaultWorkspaceEditService implements WorkspaceEditService {
         return await this.serializer.serializeNode(node, document, this.serializer.guessFormattingOptions(document));
     }
 
+    insertIntoScope(
+        startNode: CstNode,
+        endNode: CstNode,
+        ensureNewlineBefore: boolean,
+        text: string,
+        document: LangiumDocument
+    ): WorkspaceEdit {
+        const { insertSpaces, tabSize } = this.serializer.guessFormattingOptions(document);
+        const indentStep = insertSpaces ? " ".repeat(tabSize) : "\t";
+
+        const openingIndentation = this.getIndentationForLine(startNode.range.start, document);
+        const closingIndentation = this.getIndentationForLine(endNode.range.start, document);
+        const contentIndentation = openingIndentation + indentStep;
+
+        const indentedContent = contentIndentation + this.applyIndentation(text, contentIndentation);
+
+        const onSameLine = startNode.range.start.line === endNode.range.start.line;
+
+        let prefix: string;
+        if (onSameLine) {
+            prefix = "\n";
+        } else if (ensureNewlineBefore) {
+            const docText = document.textDocument.getText();
+            const endOffset = document.textDocument.offsetAt(endNode.range.start);
+            const textBefore = docText.substring(0, endOffset);
+            const hasBlankLineBefore = textBefore.endsWith("\n\n") || textBefore.endsWith("\r\n\r\n");
+            prefix = hasBlankLineBefore ? "" : "\n";
+        } else {
+            prefix = "";
+        }
+
+        const suffix = "\n" + closingIndentation;
+
+        const insertPosition = endNode.range.start;
+        const uri = document.uri.toString();
+
+        return {
+            changes: {
+                [uri]: [
+                    {
+                        range: { start: insertPosition, end: insertPosition },
+                        newText: prefix + indentedContent + suffix
+                    }
+                ]
+            }
+        };
+    }
+
     private applyIndentation(content: string, indentation: string): string {
         return content
             .split("\n")

@@ -1,4 +1,5 @@
 import { BaseModelIdProvider, sharedImport } from "@mdeo/language-shared";
+import type { ModelIdRegistry } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import { GeneratedModel } from "../../../grammar/generatedModelTypes.js";
 import type { AstReflection } from "@mdeo/language-common";
@@ -22,7 +23,7 @@ export class GeneratedModelModelIdProvider extends BaseModelIdProvider {
      * @param node The AST node
      * @returns The generated name/ID or undefined
      */
-    getName(node: AstNode): string | undefined {
+    getName(node: AstNode, _registry: ModelIdRegistry): string | undefined {
         if (this.reflection.isInstance(node, GeneratedModel)) {
             return "model-graph";
         }

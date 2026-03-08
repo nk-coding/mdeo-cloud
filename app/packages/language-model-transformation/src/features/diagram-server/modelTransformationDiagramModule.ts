@@ -15,6 +15,7 @@ import { ModelTransformationMetadataManager } from "./modelTransformationMetadat
 import { ModelTransformationLayoutEngine } from "./modelTransformationLayoutEngine.js";
 import { ModelTransformationCreateEdgeSchemaResolver } from "./modelTransformationCreateEdgeSchemaResolver.js";
 import { CreatePatternInstanceOperationHandler } from "./handler/createPatternInstanceOperationHandler.js";
+import { CreatePatternLinkOperationHandler } from "./handler/createPatternLinkOperationHandler.js";
 import { ModelTransformationToolPaletteItemProvider } from "./modelTransformationToolPaletteItemProvider.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
@@ -53,6 +54,7 @@ export class ModelTransformationDiagramModule extends BaseDiagramModule {
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         super.configureOperationHandlers(binding);
         binding.add(CreatePatternInstanceOperationHandler);
+        binding.add(CreatePatternLinkOperationHandler);
     }
 
     protected override bindToolPaletteItemProvider(): BindingTarget<ToolPaletteItemProvider> {

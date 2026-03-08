@@ -5,7 +5,7 @@ import { sharedImport } from "../sharedImport.js";
 const { AstUtils } = sharedImport("langium");
 
 /**
- * Registry for managing unique IDs for all AST nodes in a model.
+ * Registry for managing unique IDs and names for all AST nodes in a model.
  */
 export interface ModelIdRegistry {
     /**
@@ -18,10 +18,19 @@ export interface ModelIdRegistry {
     getId(node: AstNode): string;
 
     /**
+     * Retrieves the pure name (not prefixed with node type) for the given AST node.
+     * This is the cached result of what the ModelIdProvider.getName produced.
+     *
+     * @param node The AST node to get the name for
+     * @returns The name, or undefined if the node has no assigned name
+     */
+    getName(node: AstNode): string | undefined;
+
+    /**
      * Retrieves the ID for the given AST node.
      * If not found, constructs an "unresolved" ID based on the node type and a unique counter.
      * Use with caution, as this may lead to non-deterministic IDs.
-     * This is mainly useful for ids for external entities where neigher edit nor metadata is available or required.
+     * This is mainly useful for ids for external entities where neither edit nor metadata is available or required.
      *
      * @param node The AST node to get the ID for
      * @returns The ID, or an "unresolved" ID if not assigned
@@ -38,7 +47,7 @@ export interface ModelIdRegistry {
 }
 
 /**
- * Default implementaiton for ModelIdRegistry that generates IDs for all nodes at initialization time and handles
+ * Default implementation for ModelIdRegistry that generates IDs for all nodes at initialization time and handles
  * uniqueness constraints by automatically appending counters when needed.
  */
 export class DefaultModelIdRegistry implements ModelIdRegistry {
@@ -46,6 +55,10 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
      * Mapping from AST nodes to their assigned unique IDs.
      */
     private readonly idMap = new Map<AstNode, string>();
+    /**
+     * Mapping from AST nodes to their assigned pure names (not type-prefixed).
+     */
+    private readonly nameMap = new Map<AstNode, string>();
     /**
      * Set of already used IDs to ensure uniqueness.
      */
@@ -76,6 +89,10 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
         return id;
     }
 
+    getName(node: AstNode): string | undefined {
+        return this.nameMap.get(node);
+    }
+
     getIdOrUnresolved(node: AstNode): string {
         const id = this.idMap.get(node);
         if (id == undefined) {
@@ -93,6 +110,8 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
 
     /**
      * Generates IDs for all nodes in the model tree.
+     * Traversal is pre-order (parent before child), so parent names are available
+     * when computing child names that depend on their parent's name.
      *
      * @param rootNode The root node to start traversal from
      */
@@ -102,8 +121,10 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
             const stream = AstUtils.streamAllContents(root);
 
             for (const node of stream) {
-                const baseId = this.idProvider.getId(node);
-                if (baseId !== undefined) {
+                const name = this.idProvider.getName(node, this);
+                if (name !== undefined) {
+                    this.nameMap.set(node, name);
+                    const baseId = `${node.$type}_${name}`;
                     const uniqueId = this.ensureUnique(baseId);
                     this.idMap.set(node, uniqueId);
                     this.usedIds.add(uniqueId);
@@ -140,7 +161,7 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
  */
 export class PlaceholderModelIdRegistry implements ModelIdRegistry {
     /**
-     * Mapping from AST nodes to their assigned unique IDs.
+     * Mapping from AST nodes to their assigned placeholder IDs.
      * Ensures that each node always returns the same placeholder ID.
      */
     private readonly idMap = new Map<AstNode, string>();
@@ -164,6 +185,10 @@ export class PlaceholderModelIdRegistry implements ModelIdRegistry {
             this.idMap.set(node, id);
         }
         return id;
+    }
+
+    getName(_node: AstNode): string | undefined {
+        return undefined;
     }
 
     getIdOrUnresolved(node: AstNode): string {

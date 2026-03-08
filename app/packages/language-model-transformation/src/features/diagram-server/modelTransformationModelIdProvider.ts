@@ -1,7 +1,8 @@
-import { AstReflectionKey, BaseModelIdProvider, sharedImport } from "@mdeo/language-shared";
-import type { AstNode, Reference } from "langium";
+import { AstReflectionKey, BaseModelIdProvider, sharedImport, type ModelIdRegistry } from "@mdeo/language-shared";
+import type { AstNode } from "langium";
 import {
     ModelTransformation,
+    BaseTransformationStatement,
     MatchStatement,
     IfMatchStatement,
     WhileMatchStatement,
@@ -12,25 +13,21 @@ import {
     StopStatement,
     Pattern,
     PatternObjectInstance,
+    PatternObjectInstanceReference,
+    PatternObjectInstanceDelete,
     PatternLink,
     PatternLinkEnd,
     PatternPropertyAssignment,
     WhereClause,
     PatternVariable,
     type PatternObjectInstanceType,
+    type PatternObjectInstanceReferenceType,
+    type PatternObjectInstanceDeleteType,
     type PatternLinkType,
     type PatternLinkEndType,
     type PatternPropertyAssignmentType,
     type WhereClauseType,
     type PatternVariableType,
-    type MatchStatementType,
-    type IfMatchStatementType,
-    type WhileMatchStatementType,
-    type UntilMatchStatementType,
-    type ForMatchStatementType,
-    type IfExpressionStatementType,
-    type WhileExpressionStatementType,
-    type StopStatementType,
     type PatternType
 } from "../../grammar/modelTransformationTypes.js";
 import type { AstReflection } from "@mdeo/language-common";
@@ -43,54 +40,39 @@ const { injectable, inject } = sharedImport("inversify");
  */
 @injectable()
 export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
-    /**
-     * Injected AST reflection service for type checking and model introspection.
-     */
     @inject(AstReflectionKey)
     protected reflection!: AstReflection;
 
-    /**
-     * Gets the name/ID for an AST node.
-     *
-     * @param node The AST node
-     * @returns The generated name/ID or undefined
-     */
-    getName(node: AstNode): string | undefined {
+    getName(node: AstNode, registry: ModelIdRegistry): string | undefined {
         if (this.reflection.isInstance(node, ModelTransformation)) {
-            return this.getTransformationName();
+            return "transformation-graph";
         }
 
-        if (this.reflection.isInstance(node, MatchStatement)) {
-            return this.getMatchStatementName(node);
-        }
-        if (this.reflection.isInstance(node, IfMatchStatement)) {
-            return this.getIfMatchStatementName(node);
-        }
-        if (this.reflection.isInstance(node, WhileMatchStatement)) {
-            return this.getWhileMatchStatementName(node);
-        }
-        if (this.reflection.isInstance(node, UntilMatchStatement)) {
-            return this.getUntilMatchStatementName(node);
-        }
-        if (this.reflection.isInstance(node, ForMatchStatement)) {
-            return this.getForMatchStatementName(node);
-        }
-        if (this.reflection.isInstance(node, IfExpressionStatement)) {
-            return this.getIfExpressionStatementName(node);
-        }
-        if (this.reflection.isInstance(node, WhileExpressionStatement)) {
-            return this.getWhileExpressionStatementName(node);
-        }
-        if (this.reflection.isInstance(node, StopStatement)) {
-            return this.getStopStatementName(node);
+        if (
+            this.reflection.isInstance(node, MatchStatement) ||
+            this.reflection.isInstance(node, IfMatchStatement) ||
+            this.reflection.isInstance(node, WhileMatchStatement) ||
+            this.reflection.isInstance(node, UntilMatchStatement) ||
+            this.reflection.isInstance(node, ForMatchStatement) ||
+            this.reflection.isInstance(node, IfExpressionStatement) ||
+            this.reflection.isInstance(node, WhileExpressionStatement) ||
+            this.reflection.isInstance(node, StopStatement)
+        ) {
+            return this.getHierarchicalStatementName(node, registry);
         }
 
         if (this.reflection.isInstance(node, Pattern)) {
-            return this.getPatternName(node);
+            return this.getPatternName(node, registry);
         }
 
         if (this.reflection.isInstance(node, PatternObjectInstance)) {
-            return this.getPatternObjectInstanceName(node);
+            return node.name ?? "unnamed";
+        }
+        if (this.reflection.isInstance(node, PatternObjectInstanceReference)) {
+            return this.getPatternObjectInstanceReferenceName(node, registry);
+        }
+        if (this.reflection.isInstance(node, PatternObjectInstanceDelete)) {
+            return this.getPatternObjectInstanceDeleteName(node, registry);
         }
         if (this.reflection.isInstance(node, PatternLink)) {
             return this.getPatternLinkName(node);
@@ -111,163 +93,100 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return undefined;
     }
 
-    /**
-     * Generates ID for ModelTransformation root node.
-     *
-     * @returns The transformation graph ID
-     */
-    private getTransformationName(): string {
-        return "transformation-graph";
+    private findParentStatement(container: AstNode): AstNode | undefined {
+        if (this.reflection.isInstance(container, BaseTransformationStatement)) {
+            return container;
+        }
+        if (this.reflection.isInstance(container, ModelTransformation)) {
+            return container;
+        }
+        const parentContainer = (container as AstNode).$container;
+        if (parentContainer != null) {
+            return this.findParentStatement(parentContainer);
+        }
+        return undefined;
     }
 
-    /**
-     * Gets the index of a statement within its container.
-     *
-     * @param node The statement node
-     * @returns The index as a string or empty string if not found
-     */
-    private getStatementIndex(node: AstNode): string {
+    private getHierarchicalStatementName(node: AstNode, registry: ModelIdRegistry): string {
         const container = node.$container;
-        if (container && "$containerProperty" in node) {
-            const prop = node.$containerProperty as string;
-            const containerValue = (container as unknown as Record<string, unknown>)[prop];
-            if (Array.isArray(containerValue)) {
-                const index = containerValue.indexOf(node);
-                if (index >= 0) {
-                    return String(index);
-                }
+        if (!container || !("$containerProperty" in node)) {
+            return "0";
+        }
+        const prop = node.$containerProperty as string;
+        const containerValue = (container as unknown as Record<string, unknown>)[prop];
+        let index = 0;
+        if (Array.isArray(containerValue)) {
+            const idx = containerValue.indexOf(node);
+            if (idx >= 0) {
+                index = idx;
             }
         }
-        return "";
+
+        const parent = this.findParentStatement(container);
+        if (parent == null || this.reflection.isInstance(parent, ModelTransformation)) {
+            return String(index);
+        }
+
+        const parentName = registry.getName(parent);
+        if (parentName !== undefined) {
+            return `${parentName}_${index}`;
+        }
+        return String(index);
     }
 
-    /**
-     * Generates ID for MatchStatement.
-     *
-     * @param node The match statement
-     * @returns The generated ID
-     */
-    private getMatchStatementName(node: MatchStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for IfMatchStatement.
-     *
-     * @param node The if-match statement
-     * @returns The generated ID
-     */
-    private getIfMatchStatementName(node: IfMatchStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for WhileMatchStatement.
-     *
-     * @param node The while-match statement
-     * @returns The generated ID
-     */
-    private getWhileMatchStatementName(node: WhileMatchStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for UntilMatchStatement.
-     *
-     * @param node The until-match statement
-     * @returns The generated ID
-     */
-    private getUntilMatchStatementName(node: UntilMatchStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for ForMatchStatement.
-     *
-     * @param node The for-match statement
-     * @returns The generated ID
-     */
-    private getForMatchStatementName(node: ForMatchStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for IfExpressionStatement.
-     *
-     * @param node The if-expression statement
-     * @returns The generated ID
-     */
-    private getIfExpressionStatementName(node: IfExpressionStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for WhileExpressionStatement.
-     *
-     * @param node The while-expression statement
-     * @returns The generated ID
-     */
-    private getWhileExpressionStatementName(node: WhileExpressionStatementType): string {
-        return this.getStatementIndex(node);
-    }
-
-    /**
-     * Generates ID for StopStatement.
-     *
-     * @param node The stop statement
-     * @returns The generated ID
-     */
-    private getStopStatementName(node: StopStatementType): string {
-        const index = this.getStatementIndex(node);
-        const keyword = node.keyword ?? "stop";
-        return index ? `${keyword}_${index}` : keyword;
-    }
-
-    /**
-     * Generates ID for Pattern.
-     *
-     * @param node The pattern
-     * @returns The generated ID
-     */
-    private getPatternName(node: PatternType): string {
+    private getPatternName(node: PatternType, registry: ModelIdRegistry): string {
         const container = node.$container;
         if (container) {
-            const containerId = this.getName(container);
-            if (containerId) {
-                return containerId;
+            const parent = this.findParentStatement(container);
+            if (parent != null && this.reflection.isInstance(parent, BaseTransformationStatement)) {
+                return registry.getName(parent) ?? "pattern";
             }
         }
         return "pattern";
     }
 
-    /**
-     * Generates ID for PatternObjectInstance based on name.
-     *
-     * @param node The pattern object instance
-     * @returns The generated ID
-     */
-    private getPatternObjectInstanceName(node: PatternObjectInstanceType): string {
-        return node.name ?? "unnamed";
+    private getPatternObjectInstanceReferenceName(
+        node: PatternObjectInstanceReferenceType,
+        registry: ModelIdRegistry
+    ): string {
+        const instanceRefName = node.instance.ref?.name ?? node.instance.$refText ?? "unnamed";
+        const container = node.$container;
+        if (container) {
+            const parent = this.findParentStatement(container);
+            if (parent != null && !this.reflection.isInstance(parent, ModelTransformation)) {
+                const parentName = registry.getName(parent);
+                if (parentName !== undefined) {
+                    return `${parentName}_ref_${instanceRefName}`;
+                }
+            }
+        }
+        return `ref_${instanceRefName}`;
     }
 
-    /**
-     * Generates ID for PatternLink based on source and target.
-     *
-     * @param node The pattern link
-     * @returns The generated ID
-     */
+    private getPatternObjectInstanceDeleteName(
+        node: PatternObjectInstanceDeleteType,
+        registry: ModelIdRegistry
+    ): string {
+        const instanceRefName = node.instance.ref?.name ?? node.instance.$refText ?? "unnamed";
+        const container = node.$container;
+        if (container) {
+            const parent = this.findParentStatement(container);
+            if (parent != null && !this.reflection.isInstance(parent, ModelTransformation)) {
+                const parentName = registry.getName(parent);
+                if (parentName !== undefined) {
+                    return `${parentName}_ref_${instanceRefName}`;
+                }
+            }
+        }
+        return `ref_${instanceRefName}`;
+    }
+
     private getPatternLinkName(node: PatternLinkType): string {
         const sourceEnd = this.formatPatternLinkEnd(node.source);
         const targetEnd = this.formatPatternLinkEnd(node.target);
         return `${sourceEnd}--${targetEnd}`;
     }
 
-    /**
-     * Formats a pattern link end for ID generation.
-     *
-     * @param linkEnd The pattern link end
-     * @returns The formatted string
-     */
     private formatPatternLinkEnd(linkEnd: PatternLinkEndType | undefined): string {
         if (linkEnd == undefined) {
             return "unresolved";
@@ -288,12 +207,6 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return objectName;
     }
 
-    /**
-     * Generates ID for PatternLinkEnd.
-     *
-     * @param node The pattern link end
-     * @returns The generated ID
-     */
     private getPatternLinkEndName(node: PatternLinkEndType): string {
         const parent = node.$container;
         if (parent != undefined && this.reflection.isInstance(parent, PatternLink)) {
@@ -305,31 +218,18 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return "linkEnd";
     }
 
-    /**
-     * Generates ID for PatternPropertyAssignment.
-     *
-     * @param node The pattern property assignment
-     * @returns The generated ID
-     */
     private getPatternPropertyAssignmentName(node: PatternPropertyAssignmentType): string {
         const propName = node.name?.$refText ?? node.name?.ref?.name ?? "unnamed";
         const parent = node.$container;
 
         if (parent != undefined && this.reflection.isInstance(parent, PatternObjectInstance)) {
             const parentObj = parent as PatternObjectInstanceType;
-            const parentId = this.getPatternObjectInstanceName(parentObj);
-            return `${parentId}@${propName}`;
+            return `${parentObj.name ?? "unnamed"}@${propName}`;
         }
 
         return propName;
     }
 
-    /**
-     * Generates ID for WhereClause.
-     *
-     * @param node The where clause
-     * @returns The generated ID
-     */
     private getWhereClauseName(node: WhereClauseType): string {
         const container = node.$container;
         if (container && "$containerProperty" in node) {
@@ -345,30 +245,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return "where";
     }
 
-    /**
-     * Generates ID for PatternVariable.
-     *
-     * @param node The pattern variable
-     * @returns The generated ID
-     */
     private getPatternVariableName(node: PatternVariableType): string {
         return node.name ?? "unnamed";
-    }
-
-    /**
-     * Resolves the class name from a class reference.
-     *
-     * @param classRef The class reference
-     * @returns The resolved class name
-     */
-    private resolveClassName(classRef: Reference<AstNode> | undefined): string {
-        if (classRef === undefined || classRef.error != undefined) {
-            return "unresolved";
-        }
-        const resolved = classRef.ref;
-        if (resolved && "name" in resolved && typeof resolved.name === "string") {
-            return resolved.name;
-        }
-        return "unknown";
     }
 }

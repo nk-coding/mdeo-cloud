@@ -342,7 +342,8 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         edges: Record<string, EdgeMetadata>
     ): { lastNodeId: string | undefined } {
         const nodeId = idRegistry.getId(stmt);
-        this.addMatchNode(nodeId, "match", stmt.pattern, idRegistry, nodes, edges);
+        const matchName = idRegistry.getName(stmt) ?? nodeId;
+        this.addMatchNode(nodeId, matchName, "match", stmt.pattern, idRegistry, nodes, edges);
         this.addControlFlowEdge(previousNodeId, nodeId, undefined, edges);
         return { lastNodeId: nodeId };
     }
@@ -358,10 +359,11 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         edges: Record<string, EdgeMetadata>
     ): { lastNodeId: string | undefined } {
         const stmtId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(stmtId);
         const pattern = stmt.ifBlock?.pattern;
+        const matchNodeId = pattern ? idRegistry.getId(pattern) : `${stmtId}_no-pattern`;
+        const matchName = (pattern ? idRegistry.getName(pattern) : undefined) ?? stmtId;
 
-        this.addMatchNode(matchNodeId, "if match", pattern, idRegistry, nodes, edges);
+        this.addMatchNode(matchNodeId, matchName, "if match", pattern, idRegistry, nodes, edges);
         this.addControlFlowEdge(previousNodeId, matchNodeId, undefined, edges);
 
         const thenStatements = stmt.ifBlock?.thenBlock?.statements ?? [];
@@ -437,9 +439,10 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         edges: Record<string, EdgeMetadata>
     ): { lastNodeId: string | undefined } {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.addMatchNode(matchNodeId, "while match", stmt.pattern, idRegistry, nodes, edges);
+        this.addMatchNode(matchNodeId, matchName, "while match", stmt.pattern, idRegistry, nodes, edges);
         this.addControlFlowEdge(previousNodeId, matchNodeId, undefined, edges);
 
         const doStatements = stmt.doBlock?.statements ?? [];
@@ -475,9 +478,10 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         edges: Record<string, EdgeMetadata>
     ): { lastNodeId: string | undefined } {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.addMatchNode(matchNodeId, "until match", stmt.pattern, idRegistry, nodes, edges);
+        this.addMatchNode(matchNodeId, matchName, "until match", stmt.pattern, idRegistry, nodes, edges);
         this.addControlFlowEdge(previousNodeId, matchNodeId, undefined, edges);
 
         const doStatements = stmt.doBlock?.statements ?? [];
@@ -513,9 +517,10 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         edges: Record<string, EdgeMetadata>
     ): { lastNodeId: string | undefined } {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.addMatchNode(matchNodeId, "for match", stmt.pattern, idRegistry, nodes, edges);
+        this.addMatchNode(matchNodeId, matchName, "for match", stmt.pattern, idRegistry, nodes, edges);
         this.addControlFlowEdge(previousNodeId, matchNodeId, undefined, edges);
 
         const doStatements = stmt.doBlock?.statements ?? [];
@@ -546,6 +551,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      */
     private addMatchNode(
         matchNodeId: string,
+        matchName: string,
         label: string,
         pattern: PatternType | undefined,
         idRegistry: ModelIdRegistry,
@@ -558,7 +564,8 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         };
 
         const localInstances = new Map<string, PatternObjectInstanceType>();
-        const referencedInstances = new Set<string>();
+        const referencedInstanceNodes = new Map<string, PatternObjectInstanceReferenceType>();
+        const referencedInstanceImplicit = new Set<string>();
         const deletedInstances = new Set<string>();
         const deletedInstanceNodes = new Map<string, PatternObjectInstanceDeleteType>();
 
@@ -574,7 +581,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     const ref = element as PatternObjectInstanceReferenceType;
                     const instanceName = ref.instance?.ref?.name;
                     if (instanceName) {
-                        referencedInstances.add(instanceName);
+                        referencedInstanceNodes.set(instanceName, ref);
                     }
                 }
                 if (this.reflection.isInstance(element, PatternObjectInstanceDelete)) {
@@ -589,14 +596,25 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     const link = element as PatternLinkType;
                     const sourceInstanceName = link.source?.object?.ref?.name;
                     const targetInstanceName = link.target?.object?.ref?.name;
-                    if (sourceInstanceName && !localInstances.has(sourceInstanceName)) {
-                        referencedInstances.add(sourceInstanceName);
+                    if (
+                        sourceInstanceName &&
+                        !localInstances.has(sourceInstanceName) &&
+                        !referencedInstanceNodes.has(sourceInstanceName)
+                    ) {
+                        referencedInstanceImplicit.add(sourceInstanceName);
                     }
-                    if (targetInstanceName && !localInstances.has(targetInstanceName)) {
-                        referencedInstances.add(targetInstanceName);
+                    if (
+                        targetInstanceName &&
+                        !localInstances.has(targetInstanceName) &&
+                        !referencedInstanceNodes.has(targetInstanceName)
+                    ) {
+                        referencedInstanceImplicit.add(targetInstanceName);
                     }
                 }
             }
+
+            // Maps instance name → its node ID within this pattern, for PatternLink resolution.
+            const instanceNodeIdsInPattern = new Map<string, string>();
 
             for (const [instanceName, instance] of localInstances) {
                 const instanceNodeId = idRegistry.getId(instance);
@@ -612,15 +630,15 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 };
 
                 this.addInstanceToMatchEdge(instanceNodeId, matchNodeId, edges);
-
                 this.declaredInstances.set(instanceName, instanceNodeId);
+                instanceNodeIdsInPattern.set(instanceName, instanceNodeId);
             }
 
-            for (const instanceName of referencedInstances) {
+            for (const [instanceName, ref] of referencedInstanceNodes) {
                 if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
                     const previousNodeId = this.declaredInstances.get(instanceName);
                     if (previousNodeId != undefined) {
-                        const refNodeId = ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+                        const refNodeId = idRegistry.getId(ref);
                         nodes[refNodeId] = {
                             type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
                             attrs: {
@@ -630,6 +648,26 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                         };
 
                         this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
+                        instanceNodeIdsInPattern.set(instanceName, refNodeId);
+                    }
+                }
+            }
+
+            for (const instanceName of referencedInstanceImplicit) {
+                if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
+                    const previousNodeId = this.declaredInstances.get(instanceName);
+                    if (previousNodeId != undefined) {
+                        const refNodeId = `PatternObjectInstanceReference_${matchName}_ref_${instanceName}`;
+                        nodes[refNodeId] = {
+                            type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
+                            attrs: {
+                                name: instanceName,
+                                isReference: true
+                            }
+                        };
+
+                        this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
+                        instanceNodeIdsInPattern.set(instanceName, refNodeId);
                     }
                 }
             }
@@ -641,7 +679,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                         referencedInstance?.class?.$refText ??
                         (referencedInstance?.class?.ref as { name?: string } | undefined)?.name;
 
-                    const delNodeId = ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+                    const delNodeId = idRegistry.getId(deleteElement);
                     nodes[delNodeId] = {
                         type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
                         attrs: {
@@ -653,12 +691,19 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                     };
 
                     this.addInstanceToMatchEdge(delNodeId, matchNodeId, edges);
+                    instanceNodeIdsInPattern.set(instanceName, delNodeId);
                 }
             }
 
             for (const element of pattern.elements) {
                 if (this.reflection.isInstance(element, PatternLink)) {
-                    this.addPatternLinkEdge(element as PatternLinkType, matchNodeId, idRegistry, nodes, edges);
+                    this.addPatternLinkEdge(
+                        element as PatternLinkType,
+                        instanceNodeIdsInPattern,
+                        idRegistry,
+                        nodes,
+                        edges
+                    );
                 }
             }
         }
@@ -689,7 +734,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      */
     private addPatternLinkEdge(
         link: PatternLinkType,
-        matchNodeId: string,
+        instanceNodeIdsInPattern: Map<string, string>,
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>,
         edges: Record<string, EdgeMetadata>
@@ -702,8 +747,8 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             return;
         }
 
-        const sourceId = this.resolveInstanceNodeId(sourceInstanceName, matchNodeId);
-        const targetId = this.resolveInstanceNodeId(targetInstanceName, matchNodeId);
+        const sourceId = this.resolveInstanceNodeId(sourceInstanceName, instanceNodeIdsInPattern);
+        const targetId = this.resolveInstanceNodeId(targetInstanceName, instanceNodeIdsInPattern);
 
         if (sourceId == undefined || targetId == undefined) {
             return;
@@ -720,13 +765,13 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         };
 
         if (link.source?.property != undefined) {
-            nodes[ModelTransformationIdGenerator.patternLinkSourceEndNode(edgeId)] = {
+            nodes[`${edgeId}#source-node`] = {
                 type: ModelTransformationElementType.NODE_PATTERN_LINK_END,
                 attrs: {}
             };
         }
         if (link.target?.property != undefined) {
-            nodes[ModelTransformationIdGenerator.patternLinkTargetEndNode(edgeId)] = {
+            nodes[`${edgeId}#target-node`] = {
                 type: ModelTransformationElementType.NODE_PATTERN_LINK_END,
                 attrs: {}
             };
@@ -735,13 +780,13 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
 
     /**
      * Resolves a pattern instance node ID by name.
+     * Checks the current pattern's instance map first, then falls back to declaredInstances.
      */
-    private resolveInstanceNodeId(instanceName: string, matchNodeId: string): string | undefined {
-        const declaredId = this.declaredInstances.get(instanceName);
-        if (declaredId != undefined) {
-            return declaredId;
-        }
-        return ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+    private resolveInstanceNodeId(
+        instanceName: string,
+        instanceNodeIdsInPattern: Map<string, string>
+    ): string | undefined {
+        return instanceNodeIdsInPattern.get(instanceName) ?? this.declaredInstances.get(instanceName);
     }
 
     /**
@@ -751,16 +796,20 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
      */
     private getFirstNodeId(stmt: BaseTransformationStatementType, idRegistry: ModelIdRegistry): string {
         if (this.reflection.isInstance(stmt, IfMatchStatement)) {
-            return ModelTransformationIdGenerator.matchNode(idRegistry.getId(stmt));
+            const pattern = (stmt as IfMatchStatementType).ifBlock?.pattern;
+            return pattern ? idRegistry.getId(pattern) : idRegistry.getId(stmt);
         }
         if (this.reflection.isInstance(stmt, WhileMatchStatement)) {
-            return ModelTransformationIdGenerator.matchNode(idRegistry.getId(stmt));
+            const pattern = (stmt as WhileMatchStatementType).pattern;
+            return pattern ? idRegistry.getId(pattern) : idRegistry.getId(stmt);
         }
         if (this.reflection.isInstance(stmt, UntilMatchStatement)) {
-            return ModelTransformationIdGenerator.matchNode(idRegistry.getId(stmt));
+            const pattern = (stmt as UntilMatchStatementType).pattern;
+            return pattern ? idRegistry.getId(pattern) : idRegistry.getId(stmt);
         }
         if (this.reflection.isInstance(stmt, ForMatchStatement)) {
-            return ModelTransformationIdGenerator.matchNode(idRegistry.getId(stmt));
+            const pattern = (stmt as ForMatchStatementType).pattern;
+            return pattern ? idRegistry.getId(pattern) : idRegistry.getId(stmt);
         }
         if (
             this.reflection.isInstance(stmt, IfExpressionStatement) ||

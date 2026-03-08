@@ -84,10 +84,11 @@ interface ScopeProcessingResult {
 @injectable()
 export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTransformationType> {
     /**
-     * Tracks instances that have been referenced in the current match.
-     * Used to avoid duplicating referenced instances.
+     * Tracks instances that have been referenced or deleted in the current match.
+     * Maps instance name to the node ID assigned to the ref/delete visual node.
+     * Used to resolve PatternLink endpoints to the correct node in the current match.
      */
-    private referencedInstancesInCurrentMatch = new Set<string>();
+    private referencedInstancesInCurrentMatch = new Map<string, string>();
 
     /**
      * Creates the graph model from the transformation source model.
@@ -264,7 +265,15 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        this.createMatchNode(graph, nodeId, "match", false, stmt.pattern, idRegistry);
+        this.createMatchNode(
+            graph,
+            nodeId,
+            idRegistry.getName(stmt) ?? nodeId,
+            "match",
+            false,
+            stmt.pattern,
+            idRegistry
+        );
         this.createControlFlowEdge(graph, previousNodeId, nodeId, undefined);
 
         return { lastNodeId: nodeId };
@@ -288,9 +297,10 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     ): ScopeProcessingResult {
         const stmtId = idRegistry.getId(stmt);
 
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(stmtId);
         const pattern = stmt.ifBlock?.pattern;
-        this.createMatchNode(graph, matchNodeId, "if match", false, pattern, idRegistry);
+        const matchNodeId = pattern ? idRegistry.getId(pattern) : `${stmtId}_no-pattern`;
+        const matchName = (pattern ? idRegistry.getName(pattern) : undefined) ?? stmtId;
+        this.createMatchNode(graph, matchNodeId, matchName, "if match", false, pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
 
         return this.processIfMatchStatementBranches(graph, stmt, stmtId, matchNodeId, idRegistry);
@@ -360,9 +370,10 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.createMatchNode(graph, matchNodeId, "while match", false, stmt.pattern, idRegistry);
+        this.createMatchNode(graph, matchNodeId, matchName, "while match", false, stmt.pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
 
         return this.processWhileMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
@@ -406,9 +417,10 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.createMatchNode(graph, matchNodeId, "until match", false, stmt.pattern, idRegistry);
+        this.createMatchNode(graph, matchNodeId, matchName, "until match", false, stmt.pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
 
         return this.processUntilMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
@@ -452,9 +464,10 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.createMatchNode(graph, matchNodeId, "for match", true, stmt.pattern, idRegistry);
+        this.createMatchNode(graph, matchNodeId, matchName, "for match", true, stmt.pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
 
         return this.processForMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
@@ -793,7 +806,15 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        this.createMatchNode(graph, nodeId, "match", false, stmt.pattern, idRegistry);
+        this.createMatchNode(
+            graph,
+            nodeId,
+            idRegistry.getName(stmt) ?? nodeId,
+            "match",
+            false,
+            stmt.pattern,
+            idRegistry
+        );
         this.createControlFlowEdge(graph, previousNodeId, nodeId, edgeLabel);
         return { lastNodeId: nodeId };
     }
@@ -809,9 +830,10 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const stmtId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(stmtId);
         const pattern = stmt.ifBlock?.pattern;
-        this.createMatchNode(graph, matchNodeId, "if match", false, pattern, idRegistry);
+        const matchNodeId = pattern ? idRegistry.getId(pattern) : `${stmtId}_no-pattern`;
+        const matchName = (pattern ? idRegistry.getName(pattern) : undefined) ?? stmtId;
+        this.createMatchNode(graph, matchNodeId, matchName, "if match", false, pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
         return this.processIfMatchStatementBranches(graph, stmt, stmtId, matchNodeId, idRegistry);
     }
@@ -827,8 +849,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
-        this.createMatchNode(graph, matchNodeId, "while match", false, stmt.pattern, idRegistry);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
+        this.createMatchNode(graph, matchNodeId, matchName, "while match", false, stmt.pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
         return this.processWhileMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
     }
@@ -844,8 +867,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
-        this.createMatchNode(graph, matchNodeId, "until match", false, stmt.pattern, idRegistry);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
+        this.createMatchNode(graph, matchNodeId, matchName, "until match", false, stmt.pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
         return this.processUntilMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
     }
@@ -861,8 +885,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): ScopeProcessingResult {
         const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = ModelTransformationIdGenerator.matchNode(nodeId);
-        this.createMatchNode(graph, matchNodeId, "for match", true, stmt.pattern, idRegistry);
+        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
+        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
+        this.createMatchNode(graph, matchNodeId, matchName, "for match", true, stmt.pattern, idRegistry);
         this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
         return this.processForMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
     }
@@ -931,6 +956,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     private createMatchNode(
         graph: GGraphType,
         nodeId: string,
+        matchName: string,
         label: string,
         multiple: boolean,
         pattern: PatternType | undefined,
@@ -941,7 +967,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         const node = GMatchNode.builder().id(nodeId).label(label).multiple(multiple).meta(metadata).build();
 
-        this.referencedInstancesInCurrentMatch.clear();
+        this.referencedInstancesInCurrentMatch = new Map<string, string>();
 
         const localInstances = new Map<string, PatternObjectInstanceType>();
         const referencedInstanceNodes = new Map<string, PatternObjectInstanceReferenceType | null>();
@@ -1002,20 +1028,20 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         for (const [instanceName, reference] of referencedInstanceNodes) {
             if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
-                this.createReferencedInstanceNode(node, instanceName, nodeId, reference ?? undefined, idRegistry);
+                this.createReferencedInstanceNode(node, instanceName, matchName, reference ?? undefined, idRegistry);
             }
         }
 
-        for (const [instanceName] of deletedInstanceNodes) {
+        for (const [instanceName, deleteElement] of deletedInstanceNodes) {
             if (!localInstances.has(instanceName)) {
-                this.createDeletedInstanceNode(node, instanceName, nodeId);
+                this.createDeletedInstanceNode(node, instanceName, deleteElement, idRegistry);
             }
         }
 
         if (pattern?.elements != undefined) {
             for (const element of pattern.elements) {
                 if (this.reflection.isInstance(element, PatternLink)) {
-                    this.createPatternLinkEdge(node, element as PatternLinkType, nodeId, idRegistry);
+                    this.createPatternLinkEdge(node, element as PatternLinkType, matchName, idRegistry);
                 }
             }
         }
@@ -1091,11 +1117,14 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     private createReferencedInstanceNode(
         parent: GMatchNode,
         instanceName: string,
-        matchNodeId: string,
+        matchName: string,
         reference: PatternObjectInstanceReferenceType | undefined,
         idRegistry: ModelIdRegistry
     ): void {
-        const nodeId = ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+        const nodeId =
+            reference != undefined
+                ? idRegistry.getId(reference)
+                : `PatternObjectInstanceReference_${matchName}_ref_${instanceName}`;
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
@@ -1115,7 +1144,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         }
 
         parent.children.push(node);
-        this.referencedInstancesInCurrentMatch.add(instanceName);
+        this.referencedInstancesInCurrentMatch.set(instanceName, nodeId);
     }
 
     /**
@@ -1127,10 +1156,16 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      *
      * @param parent The parent match node to add the child to
      * @param instanceName The name of the instance being deleted
-     * @param matchNodeId The ID of the containing match node, used to generate a stable node ID
+     * @param deleteElement The PatternObjectInstanceDelete AST node, used to look up the registry ID
+     * @param idRegistry The model ID registry
      */
-    private createDeletedInstanceNode(parent: GMatchNode, instanceName: string, matchNodeId: string): void {
-        const nodeId = ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+    private createDeletedInstanceNode(
+        parent: GMatchNode,
+        instanceName: string,
+        deleteElement: PatternObjectInstanceDeleteType,
+        idRegistry: ModelIdRegistry
+    ): void {
+        const nodeId = idRegistry.getId(deleteElement);
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
@@ -1151,7 +1186,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         node.children.push(modifierCompartment);
 
         parent.children.push(node);
-        this.referencedInstancesInCurrentMatch.add(instanceName);
+        this.referencedInstancesInCurrentMatch.set(instanceName, nodeId);
     }
 
     /**
@@ -1208,11 +1243,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const valueText = prop.value?.$cstNode?.text ?? "?";
             const propText = `${propName} ${operator} ${valueText}`;
 
-            const label = GPatternPropertyLabel.builder()
-                .id(ModelTransformationIdGenerator.propertyLabel(propId))
-                .text(propText)
-                .readonly(true)
-                .build();
+            const label = GPatternPropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(true).build();
 
             compartment.children.push(label);
         }
@@ -1249,7 +1280,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 const whereId = idRegistry.getId(where);
                 const exprText = where.expression?.$cstNode?.text ?? "?";
                 const label = GWhereClauseLabel.builder()
-                    .id(ModelTransformationIdGenerator.whereClauseLabel(whereId))
+                    .id(`${whereId}#label`)
                     .text(`where ${exprText}`)
                     .readonly(true)
                     .build();
@@ -1271,11 +1302,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 }
                 varText += ` = ${valueText}`;
 
-                const label = GVariableLabel.builder()
-                    .id(ModelTransformationIdGenerator.variableLabel(varId))
-                    .text(varText)
-                    .readonly(true)
-                    .build();
+                const label = GVariableLabel.builder().id(`${varId}#label`).text(varText).readonly(true).build();
                 variableLabels.push(label);
             }
         }
@@ -1339,7 +1366,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     private createPatternLinkEdge(
         parent: GMatchNode,
         link: PatternLinkType,
-        matchNodeId: string,
+        matchName: string,
         idRegistry: ModelIdRegistry
     ): void {
         const edgeId = idRegistry.getId(link);
@@ -1351,8 +1378,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             return;
         }
 
-        const sourceId = this.resolveInstanceNodeId(sourceInstanceRef, matchNodeId, idRegistry);
-        const targetId = this.resolveInstanceNodeId(targetInstanceRef, matchNodeId, idRegistry);
+        const sourceId = this.resolveInstanceNodeId(sourceInstanceRef, idRegistry);
+        const targetId = this.resolveInstanceNodeId(targetInstanceRef, idRegistry);
 
         if (sourceId == undefined || targetId == undefined) {
             return;
@@ -1408,13 +1435,15 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      */
     private resolveInstanceNodeId(
         instanceRef: PatternObjectInstanceType | undefined,
-        matchNodeId: string,
         idRegistry: ModelIdRegistry
     ): string | undefined {
         if (instanceRef == undefined) return undefined;
         const instanceName = instanceRef.name;
-        if (instanceName && this.referencedInstancesInCurrentMatch.has(instanceName)) {
-            return ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+        if (instanceName) {
+            const refNodeId = this.referencedInstancesInCurrentMatch.get(instanceName);
+            if (refNodeId != undefined) {
+                return refNodeId;
+            }
         }
         return idRegistry.getId(instanceRef);
     }
@@ -1436,13 +1465,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const validatedMetadata = this.modelState.getValidatedMetadata();
 
         if (sourceProperty != undefined) {
-            const nodeId = ModelTransformationIdGenerator.patternLinkSourceEndNode(edgeId);
+            const nodeId = `${edgeId}#source-node`;
             const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
             const endNode = GPatternLinkEndNode.builder().id(nodeId).end("target").meta(metadata).build();
 
             const label = GPatternLinkEndLabel.builder()
-                .id(ModelTransformationIdGenerator.patternLinkSourceEndLabel(edgeId))
+                .id(`${edgeId}#source-label`)
                 .text(sourceProperty)
                 .readonly(true)
                 .build();
@@ -1452,13 +1481,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         }
 
         if (targetProperty != undefined) {
-            const nodeId = ModelTransformationIdGenerator.patternLinkTargetEndNode(edgeId);
+            const nodeId = `${edgeId}#target-node`;
             const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
             const endNode = GPatternLinkEndNode.builder().id(nodeId).end("source").meta(metadata).build();
 
             const label = GPatternLinkEndLabel.builder()
-                .id(ModelTransformationIdGenerator.patternLinkTargetEndLabel(edgeId))
+                .id(`${edgeId}#target-label`)
                 .text(targetProperty)
                 .readonly(true)
                 .build();
@@ -1524,16 +1553,12 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         edge.meta = edgeMeta;
 
         if (label != undefined) {
-            const labelNodeId = ModelTransformationIdGenerator.controlFlowEdgeLabelNode(edgeId);
+            const labelNodeId = `${edgeId}#label-node`;
             const labelMetadata = this.getNodeMetadata(validatedMetadata, labelNodeId);
 
             const labelNode = GControlFlowLabelNode.builder().id(labelNodeId).end("source").meta(labelMetadata).build();
 
-            const labelElement = GControlFlowLabel.builder()
-                .id(ModelTransformationIdGenerator.controlFlowEdgeLabel(edgeId))
-                .text(label)
-                .readonly(true)
-                .build();
+            const labelElement = GControlFlowLabel.builder().id(`${edgeId}#label`).text(label).readonly(true).build();
 
             labelNode.children.push(labelElement);
             edge.children.push(labelNode);

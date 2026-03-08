@@ -38,6 +38,7 @@ export * from "./views/patternModifierTitleCompartmentView.js";
 export * from "./views/patternPropertyLabelView.js";
 export * from "./views/splitNodeView.js";
 export * from "./views/startNodeView.js";
+export * from "./features/create-edge/patternLinkContextProvider.js";
 export * from "./features/toolbox/featureModule.js";
 export * from "./features/toolbox/modelTransformationToolbox.js";
 export * from "./features/toolbox/nodeCreationMode.js";

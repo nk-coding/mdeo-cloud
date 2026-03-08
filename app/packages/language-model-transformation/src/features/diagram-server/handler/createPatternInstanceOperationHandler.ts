@@ -9,7 +9,7 @@ import {
     type ToolboxItemProvider
 } from "@mdeo/language-shared";
 import type { CreateNodeOperation, GhostElement, Args } from "@eclipse-glsp/protocol";
-import type { AstNode } from "langium";
+import type { AstNode, CompositeCstNode } from "langium";
 import {
     PatternObjectInstance,
     PatternObjectInstanceReference,
@@ -33,7 +33,6 @@ import {
     type ForMatchStatementType
 } from "../../../grammar/modelTransformationTypes.js";
 import { ModelTransformationElementType, PatternModifierKind } from "../model/elementTypes.js";
-import { ModelTransformationIdGenerator } from "../modelTransformationIdGenerator.js";
 import type { ModelTransformationMetadataManager } from "../modelTransformationMetadataManager.js";
 import type { ModelTransformationGModelFactory } from "../modelTransformationGModelFactory.js";
 import { GPatternInstanceNode } from "../model/patternInstanceNode.js";
@@ -105,14 +104,26 @@ export class CreatePatternInstanceOperationHandler
         let nodeId: string;
 
         if (actionType === "add-instance" && instanceName) {
+            const patternElementId = this.index.getElementId(pattern);
+            const patternName =
+                patternElementId != undefined && patternElementId.startsWith("Pattern_")
+                    ? patternElementId.slice("Pattern_".length)
+                    : undefined;
+
             if (modifier === "delete") {
                 const deleteNode = this.createDeleteAst(instanceName);
                 workspaceEdit = await this.insertIntoPattern(pattern, deleteNode);
-                nodeId = `${PatternObjectInstanceDelete.name}_${instanceName}`;
+                nodeId =
+                    patternName != undefined
+                        ? `${PatternObjectInstanceDelete.name}_${patternName}_ref_${instanceName}`
+                        : `${PatternObjectInstanceDelete.name}_${instanceName}`;
             } else {
                 const refNode = this.createReferenceAst(instanceName);
                 workspaceEdit = await this.insertIntoPattern(pattern, refNode);
-                nodeId = `${PatternObjectInstanceReference.name}_${instanceName}`;
+                nodeId =
+                    patternName != undefined
+                        ? `${PatternObjectInstanceReference.name}_${patternName}_ref_${instanceName}`
+                        : `${PatternObjectInstanceReference.name}_${instanceName}`;
             }
         } else {
             const className = operation.args?.className as string | undefined;
@@ -122,7 +133,7 @@ export class CreatePatternInstanceOperationHandler
             const modifierKind = this.modifierStringToKind(modifier);
             const newInstance = await this.createPatternObjectInstanceAst(className, modifierKind);
             workspaceEdit = await this.insertIntoPattern(pattern, newInstance);
-            nodeId = `${PatternObjectInstance.name}_${className}_${newInstance.name}`;
+            nodeId = `${PatternObjectInstance.name}_${newInstance.name}`;
         }
 
         return {
@@ -257,9 +268,9 @@ export class CreatePatternInstanceOperationHandler
     }
 
     /**
-     * Inserts a new pattern element AST node into the given pattern.
-     * If the pattern has existing elements, inserts after the last one.
-     * If the pattern is empty, inserts just before the closing brace.
+     * Inserts a new pattern element AST node into the given pattern using {@link insertIntoScope}.
+     * The serialized element is placed just before the closing `}` of the pattern block.
+     * When the pattern already contains elements, a blank line is added before the content.
      *
      * @param pattern The target pattern whose element list receives the new node
      * @param element The AST node to serialize and insert
@@ -267,47 +278,24 @@ export class CreatePatternInstanceOperationHandler
      * @throws {Error} If the pattern has no CST node and is therefore not backed by source text
      */
     private async insertIntoPattern(pattern: PatternType, element: AstNode): Promise<WorkspaceEdit> {
-        const document = this.getSourceDocument();
         const serialized = await this.serializeNode(element);
-
-        if (pattern.elements && pattern.elements.length > 0) {
-            const lastElement = pattern.elements[pattern.elements.length - 1];
-            const lastCst = lastElement.$cstNode;
-            if (lastCst) {
-                return await this.workspaceEditService.createInsertAfterNodeEdit(lastCst, serialized, document, true);
-            }
-        }
-
-        const patternCst = pattern.$cstNode;
+        const patternCst = pattern.$cstNode as CompositeCstNode | undefined;
         if (!patternCst) {
             throw new Error("Pattern has no CST node; cannot insert element.");
         }
-
-        const endPos = patternCst.range.end;
-        const insertPos = {
-            line: endPos.line,
-            character: Math.max(0, endPos.character - 1)
-        };
-
-        const uri = document.uri.toString();
-        return {
-            changes: {
-                [uri]: [
-                    {
-                        range: { start: insertPos, end: insertPos },
-                        newText: `\n  ${serialized}\n`
-                    }
-                ]
-            }
-        };
+        const content = patternCst.content;
+        const openBrace = content[0]!;
+        const closeBrace = content[content.length - 1]!;
+        const hasContent = (pattern.elements?.length ?? 0) > 0;
+        return this.insertIntoScope(openBrace, closeBrace, hasContent, serialized);
     }
 
     /**
      * Finds the Pattern AST node for the match node identified by containerId.
      *
      * The containerId is the ID of the GMatchNode as generated by the GModel factory:
-     * - Simple MatchStatement: id = statement index ("0", "1", …)
-     * - Derived match nodes (IfMatch, WhileMatch, …): id = "${stmtId}_match"
+     * - Simple MatchStatement: id = "MatchStatement_${name}" (e.g. "MatchStatement_0")
+     * - Derived match nodes (IfMatch, WhileMatch, …): id = "Pattern_${name}" (e.g. "Pattern_0_0")
      *
      * @param containerId The GModel ID of the target match node
      * @returns The matching `PatternType` AST node, or `undefined` if not found
@@ -345,21 +333,31 @@ export class CreatePatternInstanceOperationHandler
             }
         }
 
-        if (elementId !== undefined) {
-            const derivedMatchId = ModelTransformationIdGenerator.matchNode(elementId);
-            if (derivedMatchId === containerId) {
-                if (this.reflection.isInstance(node, IfMatchStatement)) {
-                    return (node as IfMatchStatementType).ifBlock?.pattern;
-                }
-                if (this.reflection.isInstance(node, WhileMatchStatement)) {
-                    return (node as WhileMatchStatementType).pattern;
-                }
-                if (this.reflection.isInstance(node, UntilMatchStatement)) {
-                    return (node as UntilMatchStatementType).pattern;
-                }
-                if (this.reflection.isInstance(node, ForMatchStatement)) {
-                    return (node as ForMatchStatementType).pattern;
-                }
+        if (this.reflection.isInstance(node, IfMatchStatement)) {
+            const pattern = (node as IfMatchStatementType).ifBlock?.pattern;
+            if (pattern != undefined && this.index.getElementId(pattern) === containerId) {
+                return pattern;
+            }
+        }
+
+        if (this.reflection.isInstance(node, WhileMatchStatement)) {
+            const pattern = (node as WhileMatchStatementType).pattern;
+            if (pattern != undefined && this.index.getElementId(pattern) === containerId) {
+                return pattern;
+            }
+        }
+
+        if (this.reflection.isInstance(node, UntilMatchStatement)) {
+            const pattern = (node as UntilMatchStatementType).pattern;
+            if (pattern != undefined && this.index.getElementId(pattern) === containerId) {
+                return pattern;
+            }
+        }
+
+        if (this.reflection.isInstance(node, ForMatchStatement)) {
+            const pattern = (node as ForMatchStatementType).pattern;
+            if (pattern != undefined && this.index.getElementId(pattern) === containerId) {
+                return pattern;
             }
         }
 

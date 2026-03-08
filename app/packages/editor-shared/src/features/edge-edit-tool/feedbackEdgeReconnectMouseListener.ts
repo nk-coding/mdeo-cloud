@@ -1,6 +1,6 @@
 import type { Action, Point } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../../sharedImport.js";
-import type { GModelElement } from "@eclipse-glsp/sprotty";
+import type { Connectable, GModelElement } from "@eclipse-glsp/sprotty";
 import {
     StartEdgeReconnectFeedbackAction,
     StopEdgeReconnectFeedbackAction,
@@ -218,12 +218,12 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
         target: GModelElement,
         position: Point
     ): { target: GNode; targetId: string; anchor: EdgeAnchor } | undefined {
-        const element = findParentByFeature(target, isConnectable);
+        const element = findParentByFeature(
+            target,
+            (element): element is Connectable & GModelElement =>
+                isConnectable(element) && element.canConnect(this.edge!, this.reconnectEnd!)
+        );
         if (element == undefined || !(element instanceof GNode)) {
-            return undefined;
-        }
-
-        if (!element.canConnect) {
             return undefined;
         }
 

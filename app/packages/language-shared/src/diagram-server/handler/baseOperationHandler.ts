@@ -128,4 +128,27 @@ export abstract class BaseOperationHandler extends OperationHandler {
         const document = this.getSourceDocument();
         return this.workspaceEditService.createInsertAfterNodeEdit(cstNode, content, document, ensureNewlineBefore);
     }
+
+    /**
+     * Creates a workspace edit to insert text inside a scope defined by its opening and closing CST nodes.
+     *
+     * The content is indented by one step relative to the opening node's line and placed just before
+     * the closing node. When `ensureNewlineBefore` is `true` and the nodes span multiple lines, a blank
+     * line is added before the content unless one already exists.
+     *
+     * @param startNode the CST node for the opening delimiter (e.g. `{`)
+     * @param endNode the CST node for the closing delimiter (e.g. `}`)
+     * @param ensureNewlineBefore whether to ensure a blank line before the content (only relevant when start/end are on different lines)
+     * @param text the already-serialized text to insert
+     * @returns the workspace edit that inserts the text before the closing delimiter
+     */
+    protected insertIntoScope(
+        startNode: CstNode,
+        endNode: CstNode,
+        ensureNewlineBefore: boolean,
+        text: string
+    ): WorkspaceEdit {
+        const document = this.getSourceDocument();
+        return this.workspaceEditService.insertIntoScope(startNode, endNode, ensureNewlineBefore, text, document);
+    }
 }

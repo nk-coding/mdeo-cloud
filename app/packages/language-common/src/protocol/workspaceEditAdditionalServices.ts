@@ -67,6 +67,30 @@ export interface WorkspaceEditService {
      * @returns the serialized string
      */
     serializeNode(node: AstNode, document: LangiumDocument): Promise<string>;
+
+    /**
+     * Creates a workspace edit that inserts text inside a scope delimited by start and end CST nodes.
+     *
+     * The content is inserted just before the closing node with indentation increased by one step
+     * relative to the start node's line. After the content a newline and the closing bracket's
+     * own indentation are appended so the closing bracket stays properly aligned.
+     *
+     * @param startNode the CST node for the opening delimiter (e.g. `{`)
+     * @param endNode the CST node for the closing delimiter (e.g. `}`)
+     * @param ensureNewlineBefore when `true` and the nodes are on different lines, a blank line is
+     *   inserted before the content unless one already exists; has no effect when the nodes share
+     *   a line (a single newline is always used in that case)
+     * @param text the already-serialized text to insert
+     * @param document the document to edit
+     * @returns the workspace edit that inserts the text before the closing delimiter
+     */
+    insertIntoScope(
+        startNode: CstNode,
+        endNode: CstNode,
+        ensureNewlineBefore: boolean,
+        text: string,
+        document: LangiumDocument
+    ): WorkspaceEdit;
 }
 
 /**

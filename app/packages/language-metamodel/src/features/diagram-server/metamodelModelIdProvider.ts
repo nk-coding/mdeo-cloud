@@ -1,4 +1,5 @@
 import { AstReflectionKey, BaseModelIdProvider, LanguageServicesKey, sharedImport } from "@mdeo/language-shared";
+import type { ModelIdRegistry } from "@mdeo/language-shared";
 import type { AstNode, Reference } from "langium";
 import {
     Class,
@@ -53,7 +54,7 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * @param node The AST node to get the name for
      * @returns The unique name/ID for the node, or undefined
      */
-    getName(node: AstNode): string | undefined {
+    getName(node: AstNode, registry: ModelIdRegistry): string | undefined {
         if (this.reflection.isInstance(node, MetaModel)) {
             return this.getMetaModelName(node);
         } else if (this.reflection.isInstance(node, Class)) {
@@ -74,7 +75,7 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
             this.reflection.isInstance(node, SingleMultiplicity) ||
             this.reflection.isInstance(node, RangeMultiplicity)
         ) {
-            return this.getMultiplicityName(node);
+            return this.getMultiplicityName(node, registry);
         }
         return undefined;
     }
@@ -197,12 +198,15 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * @param node The multiplicity node
      * @returns The formatted multiplicity ID
      */
-    private getMultiplicityName(node: SingleMultiplicityType | RangeMultiplicityType): string {
+    private getMultiplicityName(
+        node: SingleMultiplicityType | RangeMultiplicityType,
+        registry: ModelIdRegistry
+    ): string {
         const owning = node.$container;
         if (owning == undefined) {
             return "unknownParent_multiplicity";
         } else {
-            return `${this.getName(owning) ?? "unknownParent"}_multiplicity`;
+            return `${this.getName(owning, registry) ?? "unknownParent"}_multiplicity`;
         }
     }
 }

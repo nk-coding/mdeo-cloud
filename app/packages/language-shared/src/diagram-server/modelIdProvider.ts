@@ -1,4 +1,5 @@
 import type { AstNode } from "langium";
+import type { ModelIdRegistry } from "./modelIdRegistry.js";
 
 /**
  * Symbol for dependency injection of ModelIdProvider.
@@ -12,13 +13,15 @@ export const ModelIdProvider = Symbol("ModelIdProvider");
  */
 export interface ModelIdProvider {
     /**
-     * Generates a unique ID for the given AST node.
-     * The ID should be based on semantic information and be deterministic.
+     * Gets the name used for ID generation for the given AST node.
+     * The name is a pure semantic name, not prefixed with the node type.
+     * The registry is provided so that parent names can be looked up.
      *
-     * @param node The AST node to generate an ID for
-     * @returns The generated ID or undefined if the node type is not supported
+     * @param node The AST node to get the name for
+     * @param registry The model ID registry for looking up cached names of other nodes
+     * @returns The name string or undefined if the node type is not supported
      */
-    getId(node: AstNode): string | undefined;
+    getName(node: AstNode, registry: ModelIdRegistry): string | undefined;
 
     /**
      * Gets called with the root node to provide additional (root) nodes to analyze and index
@@ -31,25 +34,17 @@ export interface ModelIdProvider {
 
 /**
  * Base class for ModelIdProvider implementations.
- * Provides a default implementation that constructs IDs
- * using the node type and a name extracted from the node.
+ * Provides a default getAdditional implementation.
  */
 export abstract class BaseModelIdProvider implements ModelIdProvider {
-    getId(node: AstNode): string | undefined {
-        const name = this.getName(node);
-        if (name !== undefined) {
-            return `${node.$type}_${name}`;
-        }
-        return undefined;
-    }
-
     /**
      * Gets the name used for ID generation for the given AST node.
      *
      * @param node The AST node to get the name for
+     * @param registry The model ID registry for looking up cached names of other nodes
      * @returns The name string or undefined if not applicable
      */
-    abstract getName(node: AstNode): string | undefined;
+    abstract getName(node: AstNode, registry: ModelIdRegistry): string | undefined;
 
     getAdditional(_node: AstNode): AstNode[] {
         return [];
