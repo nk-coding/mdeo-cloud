@@ -71,7 +71,7 @@ export interface ToolboxEditEntry {
     /**
      * The group this entry belongs to
      */
-    group: string;
+    group: ToolboxGroupKey;
     /**
      * Keywords for search
      */
@@ -80,6 +80,16 @@ export interface ToolboxEditEntry {
      * The underlying palette item
      */
     paletteItem: PaletteItem;
+}
+
+/**
+ * Defines a group in the toolbox palette, used for grouping related tools together.
+ */
+export class ToolboxGroupKey {
+    constructor(
+        readonly name: string,
+        readonly sortString: string
+    ) {}
 }
 
 /**

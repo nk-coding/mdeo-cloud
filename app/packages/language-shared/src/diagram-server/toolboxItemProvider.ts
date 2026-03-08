@@ -1,4 +1,4 @@
-import type { PaletteItem } from "@eclipse-glsp/protocol";
+import type { Args, PaletteItem } from "@eclipse-glsp/protocol";
 import type { MaybePromise } from "@eclipse-glsp/protocol";
 import type { OperationHandler } from "@eclipse-glsp/server";
 
@@ -26,7 +26,8 @@ export interface ToolboxItemProvider extends OperationHandler {
     /**
      * Returns the toolbox items provided by this provider.
      *
+     * @param args Optional arguments that may influence the provided items (e.g., based on context)
      * @returns An array of grouped toolbox items, or a promise resolving to such an array
      */
-    getToolboxItems(): MaybePromise<GroupedToolboxItem[]>;
+    getToolboxItems(args: Args | undefined): MaybePromise<GroupedToolboxItem[]>;
 }

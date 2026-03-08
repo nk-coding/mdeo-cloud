@@ -13,7 +13,8 @@ import {
     sharedImport,
     ActionHandlerRegistry,
     generateExtendedParser,
-    type ActionHandlerRegistryAdditionalServices
+    type ActionHandlerRegistryAdditionalServices,
+    DefaultWorkspaceEditService
 } from "@mdeo/language-shared";
 import {
     defaultExtendedTypirServices,
@@ -117,6 +118,9 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
                     return registry;
                 },
                 ActionProvider: () => new ModelTransformationActionProvider()
+            },
+            workspace: {
+                WorkspaceEdit: (services) => new DefaultWorkspaceEditService(services)
             }
         },
         postCreate(services) {

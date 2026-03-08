@@ -35,7 +35,7 @@ export class MetamodelToolPaletteItemProvider extends BaseToolPaletteItemProvide
     override async getItems(_args?: Args): Promise<PaletteItem[]> {
         this.counter = 0;
 
-        const items = await this.getGroupedItems();
+        const items = await this.getGroupedItems(_args);
         const importItems = this.createImportPaletteItems();
 
         return [

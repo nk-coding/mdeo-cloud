@@ -90,7 +90,8 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                 repositionable: true,
                 deletable: false,
                 resizable: false,
-                reparentable: false
+                reparentable: false,
+                containableElementTypeIds: [ModelTransformationElementType.NODE_PATTERN_INSTANCE]
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_SPLIT,

@@ -1,8 +1,21 @@
 import type { VNode } from "snabbdom";
-import type { Action, IActionDispatcher, GModelRoot, PaletteItem } from "@eclipse-glsp/sprotty";
+import type {
+    Action,
+    IActionDispatcher,
+    GModelRoot,
+    PaletteItem,
+    SetContextActions,
+    Args
+} from "@eclipse-glsp/sprotty";
 import type MiniSearch from "minisearch";
 import { sharedImport } from "../../sharedImport.js";
-import { ToolType, type ToolDefinition, type ToolboxEditEntry, type ToolboxErrorState } from "./toolboxTypes.js";
+import {
+    ToolType,
+    ToolboxGroupKey,
+    type ToolDefinition,
+    type ToolboxEditEntry,
+    type ToolboxErrorState
+} from "./toolboxTypes.js";
 import { generateToolboxView } from "./views/toolboxView.js";
 import { enableTool } from "./tools.js";
 import { ScrollViewState } from "./views/scrollView.js";
@@ -14,7 +27,7 @@ const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES } = sharedImport("@eclipse-glsp/sprotty");
 import { HandTool } from "../hand-tool/handTool.js";
 
-const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction, MarqueeMouseTool } =
+const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction, MarqueeMouseTool, RequestContextActions } =
     sharedImport("@eclipse-glsp/client");
 const { init, classModule, propsModule, styleModule, eventListenersModule, attributesModule } =
     sharedImport("snabbdom");
@@ -176,8 +189,25 @@ export class Toolbox extends ToolPalette {
      * Sets the palette items and marks the toolbox as dynamic.
      */
     protected override async setPaletteItems(): Promise<void> {
-        await super.setPaletteItems();
+        const requestAction = RequestContextActions.create({
+            contextId: ToolPalette.ID,
+            editorContext: {
+                selectedElementIds: [],
+                args: this.generateRequestItemsArgs()
+            }
+        });
+        const response = await this.actionDispatcher.request<SetContextActions>(requestAction);
+        this.paletteItems = response.actions.map((action) => action as PaletteItem);
         this.dynamic = true;
+    }
+
+    /**
+     * Generates arguments for the toolbox items request. Can be overridden to provide context-specific arguments.
+     *
+     * @returns Arguments for the toolbox items request, or undefined if no arguments are needed
+     */
+    protected generateRequestItemsArgs(): Args | undefined {
+        return undefined;
     }
 
     /**
@@ -203,11 +233,12 @@ export class Toolbox extends ToolPalette {
 
         for (const item of this.paletteItems) {
             if (item.children) {
+                const groupKey = new ToolboxGroupKey(item.label, item.sortString);
                 for (const child of item.children) {
-                    this.toolboxEntries.push(this.createToolboxEntry(child, item.label));
+                    this.toolboxEntries.push(this.createToolboxEntry(child, groupKey));
                 }
             } else {
-                this.toolboxEntries.push(this.createToolboxEntry(item, ""));
+                this.toolboxEntries.push(this.createToolboxEntry(item, new ToolboxGroupKey("", item.sortString)));
             }
         }
     }
@@ -219,7 +250,7 @@ export class Toolbox extends ToolPalette {
      * @param group The group name
      * @returns The toolbox entry
      */
-    protected createToolboxEntry(item: PaletteItem, group: string): ToolboxEditEntry {
+    protected createToolboxEntry(item: PaletteItem, group: ToolboxGroupKey): ToolboxEditEntry {
         return {
             id: item.id,
             name: item.label,

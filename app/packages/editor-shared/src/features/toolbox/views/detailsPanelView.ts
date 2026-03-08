@@ -1,7 +1,7 @@
 import type { VNode } from "snabbdom";
 import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
-import type { ToolboxEditEntry } from "../toolboxTypes.js";
+import type { ToolboxEditEntry, ToolboxGroupKey } from "../toolboxTypes.js";
 
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -132,7 +132,7 @@ function generatePaletteItemsList(context: Toolbox): VNode[] {
  * @returns Array of grouped VNodes
  */
 function generateGroupedItems(context: Toolbox, items: ToolboxEditEntry[]): VNode[] {
-    const groups = new Map<string, ToolboxEditEntry[]>();
+    const groups = new Map<ToolboxGroupKey, ToolboxEditEntry[]>();
 
     for (const item of items) {
         const group = item.group || "Other";
@@ -143,11 +143,11 @@ function generateGroupedItems(context: Toolbox, items: ToolboxEditEntry[]): VNod
     }
 
     let currentIndex = 0;
-    const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.sortString.localeCompare(b.sortString));
     const result: VNode[] = [];
 
-    for (const [groupName, groupItems] of sortedGroups) {
-        result.push(generateToolboxItemGroupView(context, groupName, groupItems, currentIndex));
+    for (const [{ name }, groupItems] of sortedGroups) {
+        result.push(generateToolboxItemGroupView(context, name, groupItems, currentIndex));
         currentIndex += groupItems.length;
     }
 

@@ -560,6 +560,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         const localInstances = new Map<string, PatternObjectInstanceType>();
         const referencedInstances = new Set<string>();
         const deletedInstances = new Set<string>();
+        const deletedInstanceNodes = new Map<string, PatternObjectInstanceDeleteType>();
 
         if (pattern?.elements != undefined) {
             for (const element of pattern.elements) {
@@ -578,9 +579,10 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 }
                 if (this.reflection.isInstance(element, PatternObjectInstanceDelete)) {
                     const del = element as PatternObjectInstanceDeleteType;
-                    const instanceName = del.instance?.ref?.name;
+                    const instanceName = del.instance?.ref?.name ?? del.instance?.$refText;
                     if (instanceName) {
                         deletedInstances.add(instanceName);
+                        deletedInstanceNodes.set(instanceName, del);
                     }
                 }
                 if (this.reflection.isInstance(element, PatternLink)) {
@@ -629,6 +631,28 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
 
                         this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
                     }
+                }
+            }
+
+            for (const [instanceName, deleteElement] of deletedInstanceNodes) {
+                if (!localInstances.has(instanceName)) {
+                    const referencedInstance = deleteElement.instance?.ref;
+                    const typeName =
+                        referencedInstance?.class?.$refText ??
+                        (referencedInstance?.class?.ref as { name?: string } | undefined)?.name;
+
+                    const delNodeId = ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+                    nodes[delNodeId] = {
+                        type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
+                        attrs: {
+                            name: instanceName,
+                            typeName: typeName ?? undefined,
+                            isReference: true,
+                            modifier: "delete"
+                        }
+                    };
+
+                    this.addInstanceToMatchEdge(delNodeId, matchNodeId, edges);
                 }
             }
 

@@ -32,10 +32,10 @@ export class ModelToolPaletteItemProvider extends BaseToolPaletteItemProvider {
      * Creates a top-level "Create" group containing object creation items.
      * If the import is missing, shows a "Setup" section instead.
      *
-     * @param _args Optional arguments (unused)
+     * @param args Optional arguments (unused)
      * @returns Array of palette items organized by section
      */
-    override async getItems(_args?: Args): Promise<PaletteItem[]> {
+    override async getItems(args?: Args): Promise<PaletteItem[]> {
         this.counter = 0;
 
         const sourceModel = this.modelState.sourceModel as PartialModel;
@@ -54,7 +54,7 @@ export class ModelToolPaletteItemProvider extends BaseToolPaletteItemProvider {
             ];
         }
 
-        const items = await this.getGroupedItems();
+        const items = await this.getGroupedItems(args);
         const createItems = items.get("create-group");
 
         if (createItems == undefined || createItems.length === 0) {

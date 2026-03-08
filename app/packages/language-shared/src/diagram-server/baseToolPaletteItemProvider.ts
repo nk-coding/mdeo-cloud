@@ -1,4 +1,4 @@
-import type { PaletteItem } from "@eclipse-glsp/protocol";
+import type { Args, PaletteItem } from "@eclipse-glsp/protocol";
 import type { OperationHandler, OperationHandlerRegistry } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import type { ToolboxItemProvider } from "./toolboxItemProvider.js";
@@ -22,9 +22,10 @@ export abstract class BaseToolPaletteItemProvider extends ToolPaletteItemProvide
     /**
      * Constructs the list of palette items by gathering items from all registered ToolboxItemProviders.
      *
+     * @param args Optional arguments that may influence the provided items (e.g., based on context)
      * @returns An array of palette items organized by groups
      */
-    protected async getGroupedItems(): Promise<Map<string, PaletteItem[]>> {
+    protected async getGroupedItems(args: Args | undefined): Promise<Map<string, PaletteItem[]>> {
         const handlers = this.operationHandlerRegistry
             .getAll()
             .filter((handler) => this.isPaletteItemProvider(handler));
@@ -32,7 +33,7 @@ export abstract class BaseToolPaletteItemProvider extends ToolPaletteItemProvide
 
         for (const handler of handlers) {
             const toolboxProvider = handler as ToolboxItemProvider;
-            const toolboxItems = await toolboxProvider.getToolboxItems();
+            const toolboxItems = await toolboxProvider.getToolboxItems(args);
 
             for (const groupedItem of toolboxItems) {
                 const groupId = groupedItem.groupId;

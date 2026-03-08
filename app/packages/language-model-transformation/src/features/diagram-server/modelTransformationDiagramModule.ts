@@ -1,4 +1,11 @@
-import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
+import type {
+    BindingTarget,
+    DiagramConfiguration,
+    GModelFactory,
+    InstanceMultiBinding,
+    OperationHandlerConstructor,
+    ToolPaletteItemProvider
+} from "@eclipse-glsp/server";
 import type { BaseLayoutEngine, MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
 import { ModelTransformationGModelFactory } from "./modelTransformationGModelFactory.js";
@@ -7,6 +14,8 @@ import { ModelTransformationModelIdProvider } from "./modelTransformationModelId
 import { ModelTransformationMetadataManager } from "./modelTransformationMetadataManager.js";
 import { ModelTransformationLayoutEngine } from "./modelTransformationLayoutEngine.js";
 import { ModelTransformationCreateEdgeSchemaResolver } from "./modelTransformationCreateEdgeSchemaResolver.js";
+import { CreatePatternInstanceOperationHandler } from "./handler/createPatternInstanceOperationHandler.js";
+import { ModelTransformationToolPaletteItemProvider } from "./modelTransformationToolPaletteItemProvider.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
 const { injectable } = sharedImport("inversify");
@@ -39,5 +48,14 @@ export class ModelTransformationDiagramModule extends BaseDiagramModule {
 
     protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {
         return ModelTransformationCreateEdgeSchemaResolver;
+    }
+
+    protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
+        super.configureOperationHandlers(binding);
+        binding.add(CreatePatternInstanceOperationHandler);
+    }
+
+    protected override bindToolPaletteItemProvider(): BindingTarget<ToolPaletteItemProvider> {
+        return ModelTransformationToolPaletteItemProvider;
     }
 }

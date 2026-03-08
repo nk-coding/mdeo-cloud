@@ -946,6 +946,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const localInstances = new Map<string, PatternObjectInstanceType>();
         const referencedInstanceNodes = new Map<string, PatternObjectInstanceReferenceType | null>();
         const deletedInstances = new Set<string>();
+        const deletedInstanceNodes = new Map<string, PatternObjectInstanceDeleteType>();
 
         if (pattern?.elements != undefined) {
             for (const element of pattern.elements) {
@@ -966,9 +967,10 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 }
                 if (this.reflection.isInstance(element, PatternObjectInstanceDelete)) {
                     const del = element as PatternObjectInstanceDeleteType;
-                    const instanceName = del.instance?.ref?.name;
+                    const instanceName = del.instance?.ref?.name ?? del.instance?.$refText;
                     if (instanceName) {
                         deletedInstances.add(instanceName);
+                        deletedInstanceNodes.set(instanceName, del);
                     }
                 }
                 if (this.reflection.isInstance(element, PatternLink)) {
@@ -1001,6 +1003,12 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         for (const [instanceName, reference] of referencedInstanceNodes) {
             if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
                 this.createReferencedInstanceNode(node, instanceName, nodeId, reference ?? undefined, idRegistry);
+            }
+        }
+
+        for (const [instanceName] of deletedInstanceNodes) {
+            if (!localInstances.has(instanceName)) {
+                this.createDeletedInstanceNode(node, instanceName, nodeId);
             }
         }
 
@@ -1105,6 +1113,42 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         if (propertyChildren.length > 0) {
             node.children.push(...propertyChildren);
         }
+
+        parent.children.push(node);
+        this.referencedInstancesInCurrentMatch.add(instanceName);
+    }
+
+    /**
+     * Creates a deleted instance node (instance declared in a previous match, now deleted).
+     * The node is rendered with the DELETE modifier compartment to visually distinguish it.
+     *
+     * The type name is resolved from the referenced `PatternObjectInstance` when available,
+     * so the node shows `name : Type` just like a locally declared instance with DELETE modifier.
+     *
+     * @param parent The parent match node to add the child to
+     * @param instanceName The name of the instance being deleted
+     * @param matchNodeId The ID of the containing match node, used to generate a stable node ID
+     */
+    private createDeletedInstanceNode(parent: GMatchNode, instanceName: string, matchNodeId: string): void {
+        const nodeId = ModelTransformationIdGenerator.referencedInstance(matchNodeId, instanceName);
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
+
+        const node = GPatternInstanceNode.builder()
+            .id(nodeId)
+            .name(instanceName)
+            .modifier(PatternModifierKind.DELETE)
+            .meta(metadata)
+            .build();
+
+        const modifierCompartment = GPatternModifierTitleCompartment.builder().id(`${nodeId}#modifier-title`).build();
+        const label = GPatternInstanceNameLabel.builder()
+            .id(`${nodeId}#name`)
+            .text(instanceName)
+            .readonly(true)
+            .build();
+        modifierCompartment.children.push(label);
+        node.children.push(modifierCompartment);
 
         parent.children.push(node);
         this.referencedInstancesInCurrentMatch.add(instanceName);
