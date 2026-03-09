@@ -9,7 +9,7 @@ import { GLinkEndNode } from "./model/linkEndNode.js";
 import { GLinkEndLabel } from "./model/linkEndLabel.js";
 
 const { injectable } = sharedImport("inversify");
-const { ServerLayoutKind, getDefaultMapping } = sharedImport("@eclipse-glsp/server");
+const { ServerLayoutKind, getDefaultMapping, DefaultTypes } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Configuration for model diagrams defining layout behavior and element type mappings.
@@ -47,6 +47,14 @@ export class ModelDiagramConfiguration implements DiagramConfiguration {
      */
     get shapeTypeHints(): ShapeTypeHint[] {
         return [
+            {
+                elementTypeId: DefaultTypes.GRAPH,
+                repositionable: false,
+                deletable: false,
+                resizable: false,
+                reparentable: false,
+                containableElementTypeIds: [ModelElementType.NODE_OBJECT]
+            },
             {
                 elementTypeId: ModelElementType.NODE_OBJECT,
                 repositionable: true,

@@ -12,7 +12,7 @@ import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
 import { GAssociationMultiplicityNode } from "./model/associationMultiplicityNode.js";
 
 const { injectable } = sharedImport("inversify");
-const { ServerLayoutKind, getDefaultMapping } = sharedImport("@eclipse-glsp/server");
+const { ServerLayoutKind, getDefaultMapping, DefaultTypes } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Configuration for metamodel diagrams defining layout behavior and element type mappings.
@@ -44,11 +44,19 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
     get shapeTypeHints(): ShapeTypeHint[] {
         return [
             {
+                elementTypeId: DefaultTypes.GRAPH,
+                repositionable: false,
+                deletable: false,
+                resizable: false,
+                reparentable: false,
+                containableElementTypeIds: [MetamodelElementType.NODE_CLASS]
+            },
+            {
                 elementTypeId: MetamodelElementType.NODE_CLASS,
                 repositionable: true,
                 deletable: true,
                 resizable: true,
-                reparentable: false
+                reparentable: false,
             }
         ];
     }

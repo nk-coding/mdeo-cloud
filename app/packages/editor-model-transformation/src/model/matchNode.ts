@@ -1,5 +1,5 @@
 import { GEdge, GNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
-import type { GModelElement, Point, Bounds } from "@eclipse-glsp/sprotty";
+import type { GModelElement, Point, Bounds, GModelElementSchema } from "@eclipse-glsp/sprotty";
 import { GMatchNodeView } from "../views/matchNodeView.js";
 import { GMatchNodeCompartments } from "./matchNodeCompartments.js";
 import { GControlFlowEdge } from "./controlFlowEdge.js";
@@ -16,6 +16,7 @@ const {
     isBounds,
     isBoundsAware
 } = sharedImport("@eclipse-glsp/sprotty");
+const { containerFeature } = sharedImport("@eclipse-glsp/client")
 
 /**
  * Render information derived from a match node, used by both the view and the
@@ -58,7 +59,8 @@ export class GMatchNode extends GNode {
         moveFeature,
         fadeFeature,
         nodeLayoutMetadataFeature,
-        layoutContainerFeature
+        layoutContainerFeature,
+        containerFeature
     ];
 
     /**
@@ -165,7 +167,6 @@ export class GMatchNode extends GNode {
     }
 
     override canConnect(edge: GEdge): boolean {
-        console.log("can connect", edge)
         return edge instanceof GControlFlowEdge;
     }
 }

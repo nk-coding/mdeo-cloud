@@ -19,7 +19,7 @@ import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GVariableLabel } from "./model/variableLabel.js";
 
 const { injectable } = sharedImport("inversify");
-const { ServerLayoutKind, getDefaultMapping } = sharedImport("@eclipse-glsp/server");
+const { ServerLayoutKind, getDefaultMapping, DefaultTypes } = sharedImport("@eclipse-glsp/server");
 
 /**
  * Configuration for model transformation diagrams defining layout behavior and element type mappings.
@@ -71,6 +71,20 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
      */
     get shapeTypeHints(): ShapeTypeHint[] {
         return [
+            {
+                elementTypeId: DefaultTypes.GRAPH,
+                repositionable: false,
+                deletable: false,
+                resizable: false,
+                reparentable: false,
+                containableElementTypeIds: [
+                    ModelTransformationElementType.NODE_START,
+                    ModelTransformationElementType.NODE_END,
+                    ModelTransformationElementType.NODE_MATCH,
+                    ModelTransformationElementType.NODE_SPLIT,
+                    ModelTransformationElementType.NODE_MERGE
+                ]
+            },
             {
                 elementTypeId: ModelTransformationElementType.NODE_START,
                 repositionable: true,

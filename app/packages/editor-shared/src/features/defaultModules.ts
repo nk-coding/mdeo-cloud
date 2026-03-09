@@ -15,24 +15,11 @@ import { marqueeSelectionToolModule } from "./marquee-selection-tool/featureModu
 import { handToolModule } from "./hand-tool/featureModule.js";
 import { selectModule } from "./select/featureModule.js";
 import { createEdgeToolModule } from "./create-edge-tool/featureModule.js";
+import { createNodeToolModule } from "./create-node-tool/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
- * These modules are automatically included in editor configurations and provide:
- * - boundsModule: Custom bounds computation and feedback handling
- * - changeBoundsToolModule: Custom change bounds tool with SVG-based resize handles
- * - edgeEditToolModule: Custom edge editing tool for route manipulation
- * - elementFinderModule: Element finding from DOM elements or coordinates
- * - metadataModule: Metadata handling for diagram elements
- * - editLabelModule: Functionality for editing labels directly on the diagram
- * - edgeRoutingModule: Edge routing capabilities for automatic edge layout
- * - moveModule: Enhanced move command with custom edge morphing animations
- * - pointerToolModule: Pointer event handling and capture support
- * - reconnectEdgeModule: Reconnect edge operation support with metadata updates
- * - viewportModule: Viewport management and fit-to-screen functionality
- * - toolboxModule: Toolbox UI for tool selection and element palette
- * - gridModule: Grid snapping functionality for element alignment
- * marqueeSelectionToolModule: Marquee selection tool for selecting multiple elements
+ * These modules are automatically included in editor configurations
  */
 export const DEFAULT_MODULES = [
     boundsModule,
@@ -51,5 +38,6 @@ export const DEFAULT_MODULES = [
     marqueeSelectionToolModule,
     handToolModule,
     selectModule,
-    createEdgeToolModule
+    createEdgeToolModule,
+    createNodeToolModule
 ];
