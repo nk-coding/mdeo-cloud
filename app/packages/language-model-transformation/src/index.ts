@@ -31,6 +31,8 @@ export * from "./features/diagram-server/modelTransformationModelIdProvider.js";
 export * from "./features/diagram-server/modelTransformationToolPaletteItemProvider.js";
 export * from "./features/diagram-server/handler/createPatternInstanceOperationHandler.js";
 export * from "./features/diagram-server/handler/createPatternLinkOperationHandler.js";
+export * from "./features/diagram-server/handler/modelTransformationReconnectEdgeOperationHandler.js";
+export * from "./features/diagram-server/handler/modelTransformationDeleteElementOperationHandler.js";
 export * from "./features/stdlib/collections/Bag.js";
 export * from "./features/stdlib/collections/Collection.js";
 export * from "./features/stdlib/collections/List.js";

@@ -16,5 +16,5 @@ export interface CreateEdgeSchema {
     /**
      * Opaque backend parameters used to disambiguate creation semantics.
      */
-    params: Record<string, unknown>;
+    params: Record<string, any>;
 }

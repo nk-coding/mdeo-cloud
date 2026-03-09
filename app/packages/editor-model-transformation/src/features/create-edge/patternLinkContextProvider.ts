@@ -10,7 +10,9 @@ const { injectable, inject } = sharedImport("inversify");
  * both source and target endpoints have no modifier (persist-persist pair).
  */
 export interface PatternLinkEdgeContext {
-    /** The active node creation mode (e.g. `"persist"`, `"create"`, `"delete"`). */
+    /**
+     * The active node creation mode (e.g. `"persist"`, `"create"`, `"delete"`).
+     */
     mode: string;
 }
 

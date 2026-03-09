@@ -44,7 +44,7 @@ export class ModelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver {
             return undefined;
         }
 
-        return this.buildSchema(request.sourceElementId, undefined, {}, undefined);
+        return this.buildSchema(request.sourceElementId, undefined, {}, undefined, sourceClass.name);
     }
 
     override async getTargetSchema(request: TargetCreateEdgeSchemaRequest): Promise<CreateEdgeSchema | undefined> {
@@ -67,7 +67,17 @@ export class ModelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver {
         }
 
         if (candidates.length === 1) {
-            return this.buildSchema(request.sourceElementId, request.targetElementId, {}, undefined);
+            const candidate = candidates[0];
+            const assocSourceClass = candidate.sourceEnd.class?.ref?.name;
+            const assocTargetClass = candidate.targetEnd.class?.ref?.name;
+            return this.buildSchema(
+                request.sourceElementId,
+                request.targetElementId,
+                {},
+                undefined,
+                assocSourceClass,
+                assocTargetClass
+            );
         }
 
         const selected = candidates.find(
@@ -90,7 +100,16 @@ export class ModelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver {
             params.targetProperty = label.text;
         }
 
-        return this.buildSchema(request.sourceElementId, request.targetElementId, params, label);
+        const assocSourceClass = selected.sourceEnd.class?.ref?.name;
+        const assocTargetClass = selected.targetEnd.class?.ref?.name;
+        return this.buildSchema(
+            request.sourceElementId,
+            request.targetElementId,
+            params,
+            label,
+            assocSourceClass,
+            assocTargetClass
+        );
     }
 
     /**
@@ -111,16 +130,26 @@ export class ModelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver {
         sourceElementId: string,
         targetElementId: string | undefined,
         params: Record<string, unknown>,
-        label: { end: "source" | "target"; text: string } | undefined
+        label: { end: "source" | "target"; text: string } | undefined,
+        sourceClass?: string,
+        targetClass?: string
     ): CreateEdgeSchema {
         const edgeId = "__create-edge-schema";
 
-        const edge = GLinkEdge.builder()
+        const edgeBuilder = GLinkEdge.builder()
             .id(edgeId)
             .sourceId(sourceElementId)
             .targetId(targetElementId ?? sourceElementId)
-            .meta(EdgeLayoutMetadataUtil.create())
-            .build();
+            .meta(EdgeLayoutMetadataUtil.create());
+
+        if (sourceClass != undefined) {
+            edgeBuilder.sourceClass(sourceClass);
+        }
+        if (targetClass != undefined) {
+            edgeBuilder.targetClass(targetClass);
+        }
+
+        const edge = edgeBuilder.build();
 
         if (label != undefined) {
             const nodeId = `${edgeId}#${label.end}-node`;

@@ -31,9 +31,13 @@ export interface EdgeEditHighlight {
  */
 @injectable()
 export class EdgeEditHighlightState {
-    /** The ID of the currently highlighted node, or undefined if none. */
+    /**
+     * The ID of the currently highlighted node, or undefined if none.
+     */
     nodeId?: string;
-    /** The highlight data to render on the highlighted node. */
+    /**
+     * The highlight data to render on the highlighted node.
+     */
     highlight?: EdgeEditHighlight;
 }
 

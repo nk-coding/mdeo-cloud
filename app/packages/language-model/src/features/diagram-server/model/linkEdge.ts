@@ -17,6 +17,18 @@ export class GLinkEdge extends GEdge {
     targetProperty?: string;
 
     /**
+     * The name of the metamodel class required at the source of this link type.
+     * Used by the client to validate canConnect.
+     */
+    sourceClass?: string;
+
+    /**
+     * The name of the metamodel class required at the target of this link type.
+     * Used by the client to validate canConnect.
+     */
+    targetClass?: string;
+
+    /**
      * Creates a builder for GLinkEdge instances.
      *
      * @returns A new GLinkEdgeBuilder
@@ -50,6 +62,28 @@ export class GLinkEdgeBuilder<E extends GLinkEdge = GLinkEdge> extends GEdgeBuil
      */
     targetProperty(property: string): this {
         this.proxy.targetProperty = property;
+        return this;
+    }
+
+    /**
+     * Sets the source class constraint for this link type.
+     *
+     * @param sourceClass The metamodel class name required at the source
+     * @returns This builder for chaining
+     */
+    sourceClass(sourceClass: string): this {
+        this.proxy.sourceClass = sourceClass;
+        return this;
+    }
+
+    /**
+     * Sets the target class constraint for this link type.
+     *
+     * @param targetClass The metamodel class name required at the target
+     * @returns This builder for chaining
+     */
+    targetClass(targetClass: string): this {
+        this.proxy.targetClass = targetClass;
         return this;
     }
 }

@@ -56,7 +56,7 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
                 repositionable: true,
                 deletable: true,
                 resizable: true,
-                reparentable: false,
+                reparentable: false
             }
         ];
     }

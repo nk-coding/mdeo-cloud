@@ -1,6 +1,8 @@
-import { GRectangularNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
+import { FEEDBACK_EDGE_ID, GRectangularNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
+import type { GEdge } from "@mdeo/editor-shared";
 import type { GModelElement } from "@eclipse-glsp/sprotty";
-import type { PatternModifierKind } from "./elementTypes.js";
+import { PatternModifierKind } from "./elementTypes.js";
+import { GPatternLinkEdge } from "./patternLinkEdge.js";
 
 const { connectableFeature, deletableFeature, selectFeature, boundsFeature, moveFeature, fadeFeature } =
     sharedImport("@eclipse-glsp/sprotty");
@@ -39,6 +41,46 @@ export class GPatternInstanceNode extends GRectangularNode {
      * The modifier kind (none, create, delete, forbid, require)
      */
     modifier!: PatternModifierKind;
+
+    /**
+     * The class hierarchy of this instance (class name and all superclass names).
+     * Populated by the server to enable canConnect validation.
+     */
+    classHierarchy?: string[];
+
+    override canConnect(edge: GEdge, role: "source" | "target"): boolean {
+        if (edge instanceof GPatternLinkEdge) {
+            if (this.classHierarchy != null) {
+                if (role === "source" && edge.sourceClass != null) {
+                    if (!this.classHierarchy.includes(edge.sourceClass)) {
+                        return false;
+                    }
+                }
+                if (role === "target" && edge.targetClass != null) {
+                    if (!this.classHierarchy.includes(edge.targetClass)) {
+                        return false;
+                    }
+                }
+            }
+            if (edge.id !== FEEDBACK_EDGE_ID && !this.isModifierCompatibleWithEdge(edge.modifier)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Checks whether this node's modifier is compatible with the given edge modifier.
+     *
+     * A node with no modifier ({@link PatternModifierKind.NONE}) can be connected by any edge.
+     * A node with a specific modifier may only be connected by edges that share the same modifier.
+     *
+     * @param edgeModifier The modifier of the edge being connected
+     * @returns `true` if forming a connection is allowed, `false` otherwise
+     */
+    private isModifierCompatibleWithEdge(edgeModifier: PatternModifierKind): boolean {
+        return this.modifier === PatternModifierKind.NONE || this.modifier === edgeModifier;
+    }
 }
 
 /**

@@ -333,7 +333,7 @@ export class Toolbox extends ToolPalette {
      * @param tool The tool type to set
      */
     updateTool(tool: ToolType): void {
-        if (this.toolType === tool) {
+        if (this.toolType === tool && tool !== ToolType.POINTER) {
             return;
         }
 

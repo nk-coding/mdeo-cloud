@@ -1,5 +1,7 @@
 import type { GModelElement } from "@eclipse-glsp/sprotty";
 import { GRectangularNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
+import type { GEdge } from "@mdeo/editor-shared";
+import { GLinkEdge } from "./linkEdge.js";
 
 const { connectableFeature, deletableFeature, selectFeature, boundsFeature, moveFeature, fadeFeature } =
     sharedImport("@eclipse-glsp/sprotty");
@@ -33,6 +35,24 @@ export class GObjectNode extends GRectangularNode {
      * The type name (class) of the object
      */
     typeName?: string;
+
+    /**
+     * The class hierarchy of this instance (class name and all superclass names).
+     * Populated by the server to enable canConnect validation.
+     */
+    classHierarchy?: string[];
+
+    override canConnect(edge: GEdge, role: "source" | "target"): boolean {
+        if (edge instanceof GLinkEdge && this.classHierarchy != null) {
+            if (role === "source" && edge.sourceClass != null) {
+                return this.classHierarchy.includes(edge.sourceClass);
+            }
+            if (role === "target" && edge.targetClass != null) {
+                return this.classHierarchy.includes(edge.targetClass);
+            }
+        }
+        return true;
+    }
 }
 
 /**

@@ -123,6 +123,7 @@ export class CreateLinkOperationHandler extends BaseCreateEdgeOperationHandler {
 
     /**
      * Computes link IDs compatible with ModelModelIdProvider logic.
+     * Format: Link_{objectName}[_{property}]--{objectName}[_{property}]
      *
      * @param sourceObject The source object instance
      * @param targetObject The target object instance
@@ -136,17 +137,11 @@ export class CreateLinkOperationHandler extends BaseCreateEdgeOperationHandler {
         sourceProperty: string | undefined,
         targetProperty: string | undefined
     ): string {
-        const sourceClass = sourceObject.class?.ref?.name ?? sourceObject.class?.$refText ?? "unknown";
-        const targetClass = targetObject.class?.ref?.name ?? targetObject.class?.$refText ?? "unknown";
         const sourceName = sourceObject.name ?? "unnamed";
         const targetName = targetObject.name ?? "unnamed";
 
-        const sourceEnd = sourceProperty
-            ? `${sourceClass}_${sourceName}_${sourceProperty}`
-            : `${sourceClass}_${sourceName}`;
-        const targetEnd = targetProperty
-            ? `${targetClass}_${targetName}_${targetProperty}`
-            : `${targetClass}_${targetName}`;
+        const sourceEnd = sourceProperty ? `${sourceName}_${sourceProperty}` : sourceName;
+        const targetEnd = targetProperty ? `${targetName}_${targetProperty}` : targetName;
 
         return `${Link.name}_${sourceEnd}--${targetEnd}`;
     }

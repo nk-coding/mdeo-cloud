@@ -23,6 +23,12 @@ export class GPatternInstanceNode extends GNode {
     modifier!: PatternModifierKind;
 
     /**
+     * The class hierarchy of this instance (class name and all superclass names).
+     * Used by the client to validate canConnect against association source/target classes.
+     */
+    classHierarchy?: string[];
+
+    /**
      * Creates a builder for GPatternInstanceNode instances.
      *
      * @returns A new GPatternInstanceNodeBuilder
@@ -71,6 +77,17 @@ export class GPatternInstanceNodeBuilder<
      */
     modifier(modifier: PatternModifierKind): this {
         this.proxy.modifier = modifier;
+        return this;
+    }
+
+    /**
+     * Sets the class hierarchy of the pattern instance.
+     *
+     * @param hierarchy Array of class names from the instance class up through its superclasses
+     * @returns This builder for chaining
+     */
+    classHierarchy(hierarchy: string[]): this {
+        this.proxy.classHierarchy = hierarchy;
         return this;
     }
 }

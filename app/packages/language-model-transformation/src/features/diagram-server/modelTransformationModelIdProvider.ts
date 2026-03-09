@@ -93,6 +93,13 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return undefined;
     }
 
+    /**
+     * Traverses the container chain to find the nearest ancestor that is a
+     * {@link BaseTransformationStatement} or {@link ModelTransformation}.
+     *
+     * @param container The AST node to start searching from
+     * @returns The nearest parent statement or root transformation, or undefined if none is found
+     */
     private findParentStatement(container: AstNode): AstNode | undefined {
         if (this.reflection.isInstance(container, BaseTransformationStatement)) {
             return container;
@@ -107,6 +114,15 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return undefined;
     }
 
+    /**
+     * Generates a hierarchical name for a transformation statement based on its
+     * position index within its containing statement or root transformation.
+     * Nested statements produce compound names like "1_2" (index 2 inside statement 1).
+     *
+     * @param node The statement AST node to name
+     * @param registry The model ID registry for parent name lookup
+     * @returns The hierarchical index string
+     */
     private getHierarchicalStatementName(node: AstNode, registry: ModelIdRegistry): string {
         const container = node.$container;
         if (!container || !("$containerProperty" in node)) {
@@ -134,6 +150,14 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return String(index);
     }
 
+    /**
+     * Generates a name for a {@link Pattern} node by delegating to the name of
+     * its containing transformation statement.
+     *
+     * @param node The pattern node
+     * @param registry The model ID registry for parent statement name lookup
+     * @returns The pattern name derived from its containing statement, or "pattern" as fallback
+     */
     private getPatternName(node: PatternType, registry: ModelIdRegistry): string {
         const container = node.$container;
         if (container) {
@@ -145,6 +169,16 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return "pattern";
     }
 
+    /**
+     * Generates a name for a {@link PatternObjectInstanceReference} by combining
+     * the containing statement's name with the referenced instance name.
+     *
+     * Format: "{statementName}_ref_{instanceName}"
+     *
+     * @param node The pattern object instance reference node
+     * @param registry The model ID registry for parent statement name lookup
+     * @returns The compound name identifying this reference within its pattern
+     */
     private getPatternObjectInstanceReferenceName(
         node: PatternObjectInstanceReferenceType,
         registry: ModelIdRegistry
@@ -163,6 +197,16 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return `ref_${instanceRefName}`;
     }
 
+    /**
+     * Generates a name for a {@link PatternObjectInstanceDelete} by combining
+     * the containing statement's name with the referenced instance name.
+     *
+     * Format: "{statementName}_ref_{instanceName}"
+     *
+     * @param node The pattern object instance delete node
+     * @param registry The model ID registry for parent statement name lookup
+     * @returns The compound name identifying this delete node within its pattern
+     */
     private getPatternObjectInstanceDeleteName(
         node: PatternObjectInstanceDeleteType,
         registry: ModelIdRegistry
@@ -181,12 +225,30 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return `ref_${instanceRefName}`;
     }
 
+    /**
+     * Generates a name for a {@link PatternLink} from its formatted source and target ends.
+     *
+     * Format: "{sourceEnd}--{targetEnd}"
+     *
+     * @param node The pattern link node
+     * @returns The generated name combining both link ends
+     */
     private getPatternLinkName(node: PatternLinkType): string {
         const sourceEnd = this.formatPatternLinkEnd(node.source);
         const targetEnd = this.formatPatternLinkEnd(node.target);
         return `${sourceEnd}--${targetEnd}`;
     }
 
+    /**
+     * Formats a pattern link end for use in a link's name.
+     * Resolves the object reference to get the instance name, and appends the
+     * optional property with an underscore separator.
+     *
+     * Format: "{instanceName}" or "{instanceName}_{property}"
+     *
+     * @param linkEnd The pattern link end to format
+     * @returns The formatted string, or "unresolved" if the endpoint cannot be resolved
+     */
     private formatPatternLinkEnd(linkEnd: PatternLinkEndType | undefined): string {
         if (linkEnd == undefined) {
             return "unresolved";
@@ -207,6 +269,13 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return objectName;
     }
 
+    /**
+     * Generates a name for a {@link PatternLinkEnd} by appending "\@source" or "\@target"
+     * to its containing link's name.
+     *
+     * @param node The pattern link end node
+     * @returns The generated name for the link end, or "linkEnd" if the container is not a link
+     */
     private getPatternLinkEndName(node: PatternLinkEndType): string {
         const parent = node.$container;
         if (parent != undefined && this.reflection.isInstance(parent, PatternLink)) {
@@ -218,6 +287,15 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return "linkEnd";
     }
 
+    /**
+     * Generates a name for a {@link PatternPropertyAssignment} based on the parent
+     * instance name and the assigned property name.
+     *
+     * Format: "{instanceName}\@{propertyName}"
+     *
+     * @param node The pattern property assignment node
+     * @returns The generated name for the property assignment
+     */
     private getPatternPropertyAssignmentName(node: PatternPropertyAssignmentType): string {
         const propName = node.name?.$refText ?? node.name?.ref?.name ?? "unnamed";
         const parent = node.$container;
@@ -230,6 +308,12 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return propName;
     }
 
+    /**
+     * Generates a name for a {@link WhereClause} based on its index in the containing node.
+     *
+     * @param node The where clause node
+     * @returns The index-based name string, or "where" if the index cannot be determined
+     */
     private getWhereClauseName(node: WhereClauseType): string {
         const container = node.$container;
         if (container && "$containerProperty" in node) {
@@ -245,6 +329,12 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         return "where";
     }
 
+    /**
+     * Generates a name for a {@link PatternVariable} based on its declared name.
+     *
+     * @param node The pattern variable node
+     * @returns The variable's declared name, or "unnamed" if absent
+     */
     private getPatternVariableName(node: PatternVariableType): string {
         return node.name ?? "unnamed";
     }

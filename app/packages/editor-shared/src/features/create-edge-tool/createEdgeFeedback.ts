@@ -20,6 +20,11 @@ export interface StartCreateEdgeFeedbackAction extends Action {
      */
     edgeId: string;
     /**
+     * The ID of the parent container element into which the feedback edge should be inserted.
+     * When provided, the edge is added to that container; otherwise it falls back to root.
+     */
+    parentId?: string;
+    /**
      * The schema used to create the feedback edge model element.
      */
     schema: GModelElementSchema;
@@ -49,9 +54,10 @@ export namespace StartCreateEdgeFeedbackAction {
         edgeId: string,
         schema: GModelElementSchema,
         position: Point,
-        sourceAnchor: EdgeAnchor
+        sourceAnchor: EdgeAnchor,
+        parentId?: string
     ): StartCreateEdgeFeedbackAction {
-        return { kind: KIND, edgeId, schema, position, sourceAnchor };
+        return { kind: KIND, edgeId, parentId, schema, position, sourceAnchor };
     }
 }
 
@@ -160,7 +166,10 @@ export class StartCreateEdgeFeedbackCommand extends FeedbackCommand {
                 sourceAnchor: this.action.sourceAnchor,
                 position: this.action.position
             };
-            context.root.add(edge);
+            const parent = (
+                this.action.parentId ? (context.root.index.getById(this.action.parentId) ?? context.root) : context.root
+            ) as typeof context.root;
+            parent.add(edge);
         }
         return context.root;
     }

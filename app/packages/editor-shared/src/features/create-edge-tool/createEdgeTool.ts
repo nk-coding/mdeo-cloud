@@ -36,7 +36,8 @@ const CSS_CREATE_EDGE = "edge-creation-mode";
 /**
  * Unique feedback edge ID used during the creation flow.
  */
-const FEEDBACK_EDGE_ID = "__create-edge-feedback";
+export const FEEDBACK_EDGE_ID = "__create-edge-feedback";
+
 const CLICK_MAX_DURATION_MS = 180;
 const DRAG_MIN_DISTANCE_PX = 5;
 
@@ -343,13 +344,21 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         this.schema = schema;
         this.targetRequest = { requestToken: this.targetRequest.requestToken };
 
+        const parentId = source instanceof GChildElement ? source.parent.id : undefined;
+
         const actions: Action[] = [];
         if (this.highlightedNodeId) {
             actions.push(SetEdgeEditHighlightAction.create(undefined, undefined));
             this.highlightedNodeId = undefined;
         }
         actions.push(
-            StartCreateEdgeFeedbackAction.create(FEEDBACK_EDGE_ID, schema.template, sourcePosition, sourceAnchor)
+            StartCreateEdgeFeedbackAction.create(
+                FEEDBACK_EDGE_ID,
+                schema.template,
+                sourcePosition,
+                sourceAnchor,
+                parentId
+            )
         );
         return actions;
     }
@@ -537,6 +546,12 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         const element = findParentByFeature(target, isConnectable);
         if (!(element instanceof GNode)) {
             return undefined;
+        }
+
+        if (role === "target" && this.source != undefined) {
+            if (element.parent !== this.source.parent) {
+                return undefined;
+            }
         }
 
         const referenceEdge = edge ?? this.getFeedbackEdge(target) ?? this.tool.createEdgeFromSchema(this.schema);

@@ -220,15 +220,22 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
 
         for (const [id, currentNodeMeta] of Object.entries(currentMetadata.nodes)) {
             if (id in newMetadata.nodes) {
+                const newNodeMeta = newMetadata.nodes[id];
                 const verified = this.verifyMetadata(currentNodeMeta);
                 if (verified != undefined) {
                     modifiedNodes[id] = {
-                        ...currentNodeMeta,
+                        ...newNodeMeta,
                         meta: verified
                     };
                     hasChanges = true;
-                } else {
+                } else if (this.areAttributesEqual(currentNodeMeta.attrs, newNodeMeta.attrs)) {
                     modifiedNodes[id] = currentNodeMeta;
+                } else {
+                    modifiedNodes[id] = {
+                        ...newNodeMeta,
+                        meta: currentNodeMeta.meta
+                    };
+                    hasChanges = true;
                 }
             } else {
                 hasChanges = true;
@@ -236,15 +243,22 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
         }
         for (const [id, currentEdgeMeta] of Object.entries(currentMetadata.edges)) {
             if (id in newMetadata.edges) {
+                const newEdgeMeta = newMetadata.edges[id];
                 const verified = this.verifyMetadata(currentEdgeMeta);
                 if (verified != undefined) {
                     modifiedEdges[id] = {
-                        ...currentEdgeMeta,
+                        ...newEdgeMeta,
                         meta: verified
                     };
                     hasChanges = true;
-                } else {
+                } else if (this.areAttributesEqual(currentEdgeMeta.attrs, newEdgeMeta.attrs)) {
                     modifiedEdges[id] = currentEdgeMeta;
+                } else {
+                    modifiedEdges[id] = {
+                        ...newEdgeMeta,
+                        meta: currentEdgeMeta.meta
+                    };
+                    hasChanges = true;
                 }
             } else {
                 hasChanges = true;
@@ -259,6 +273,50 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
             nodes: modifiedNodes,
             edges: modifiedEdges
         };
+    }
+
+    /**
+     * Checks that two set of attributes are equal, considering nested objects and arrays.
+     * Only works for JSON-like structures
+     *
+     * @param attrs1 the first attributes object
+     * @param attrs2 the second attributes object
+     * @return true if the attributes are equal, false otherwise
+     */
+    private areAttributesEqual(attrs1: any, attrs2: any): boolean {
+        if (attrs1 === attrs2) {
+            return true;
+        }
+
+        if (attrs1 == null || attrs2 == null) {
+            return false;
+        }
+
+        if (typeof attrs1 !== typeof attrs2) {
+            return false;
+        }
+
+        if (Array.isArray(attrs1) && Array.isArray(attrs2)) {
+            if (attrs1.length !== attrs2.length) {
+                return false;
+            }
+            return attrs1.every((item, index) => this.areAttributesEqual(item, attrs2[index]));
+        }
+
+        if (Array.isArray(attrs1) !== Array.isArray(attrs2)) {
+            return false;
+        }
+
+        if (typeof attrs1 === "object") {
+            const keys1 = Object.keys(attrs1);
+            const keys2 = Object.keys(attrs2);
+            if (keys1.length !== keys2.length) {
+                return false;
+            }
+            return keys1.every((key) => this.areAttributesEqual(attrs1[key], attrs2[key]));
+        }
+
+        return false;
     }
 
     /**
@@ -432,8 +490,8 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
             .fill(0)
             .map(() => Array(size).fill(0));
 
-        const oldLoopAttrs = oldIds.map((id) => ({ ...oldLoops[id].attrs, type: oldLoops[id].type }));
-        const newLoopAttrs = newIds.map((id) => ({ ...newLoops[id].attrs, type: newLoops[id].type }));
+        const oldLoopAttrs = oldIds.map((id) => ({ ...oldLoops[id].attrs, id, type: oldLoops[id].type }));
+        const newLoopAttrs = newIds.map((id) => ({ ...newLoops[id].attrs, id, type: newLoops[id].type }));
 
         for (let i = 0; i < n; i++) {
             for (let j = 0; j < m; j++) {
@@ -524,6 +582,7 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
             const nodeLoops = loops[id] || {};
             const attrs: NodeAttributesWithLoops = {
                 ...node.attrs,
+                id,
                 type: node.type,
                 loops: nodeLoops
             };
@@ -532,6 +591,7 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
         for (const [id, edge] of Object.entries(regularEdges)) {
             graph.addEdge(edge.from, edge.to, id, {
                 ...edge.attrs,
+                id,
                 type: edge.type
             });
         }

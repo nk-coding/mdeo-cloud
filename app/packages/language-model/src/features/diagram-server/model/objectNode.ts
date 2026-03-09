@@ -17,6 +17,12 @@ export class GObjectNode extends GNode {
     typeName!: string;
 
     /**
+     * The class hierarchy of this instance (class name and all superclass names).
+     * Used by the client to validate canConnect against association source/target classes.
+     */
+    classHierarchy: string[] = [];
+
+    /**
      * Creates a builder for GObjectNode instances.
      *
      * @returns A new GObjectNodeBuilder
@@ -50,6 +56,17 @@ export class GObjectNodeBuilder<T extends GObjectNode = GObjectNode> extends GNo
      */
     typeName(typeName: string): this {
         this.proxy.typeName = typeName;
+        return this;
+    }
+
+    /**
+     * Sets the class hierarchy of the object instance.
+     *
+     * @param hierarchy Array of class names from the instance class up through its superclasses
+     * @returns This builder for chaining
+     */
+    classHierarchy(hierarchy: string[]): this {
+        this.proxy.classHierarchy = hierarchy;
         return this;
     }
 }

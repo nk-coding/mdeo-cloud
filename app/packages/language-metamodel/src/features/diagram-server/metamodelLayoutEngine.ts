@@ -49,7 +49,9 @@ export class MetamodelLayoutEngine extends BaseLayoutEngine {
             id: model.id,
             layoutOptions: {
                 "elk.algorithm": "layered",
-                "elk.direction": "DOWN"
+                "elk.direction": "DOWN",
+                "elk.layered.spacing.nodeNodeBetweenLayers": "40",
+                "elk.spacing.nodeNode": "30"
             },
             children: nodes,
             edges: edges

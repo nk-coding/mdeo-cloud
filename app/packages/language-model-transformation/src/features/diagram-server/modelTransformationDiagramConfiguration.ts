@@ -95,14 +95,14 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
             {
                 elementTypeId: ModelTransformationElementType.NODE_END,
                 repositionable: true,
-                deletable: false,
+                deletable: true,
                 resizable: false,
                 reparentable: false
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_MATCH,
                 repositionable: true,
-                deletable: false,
+                deletable: true,
                 resizable: false,
                 reparentable: false,
                 containableElementTypeIds: [ModelTransformationElementType.NODE_PATTERN_INSTANCE]
@@ -110,7 +110,7 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
             {
                 elementTypeId: ModelTransformationElementType.NODE_SPLIT,
                 repositionable: true,
-                deletable: false,
+                deletable: true,
                 resizable: false,
                 reparentable: false
             },
@@ -124,7 +124,7 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
             {
                 elementTypeId: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
                 repositionable: true,
-                deletable: false,
+                deletable: true,
                 resizable: true,
                 reparentable: false
             }
@@ -133,6 +133,7 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
 
     /**
      * Returns the edge type hints for model transformation diagram elements.
+     * Does NOT specify the link edge so that this can be handled correctly by the canConnect logic in the editor
      *
      * @returns Array of edge type hints
      */
@@ -142,7 +143,7 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                 elementTypeId: ModelTransformationElementType.EDGE_CONTROL_FLOW,
                 repositionable: false,
                 deletable: false,
-                routable: false,
+                routable: true,
                 sourceElementTypeIds: [
                     ModelTransformationElementType.NODE_START,
                     ModelTransformationElementType.NODE_MATCH,
@@ -155,14 +156,6 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                     ModelTransformationElementType.NODE_SPLIT,
                     ModelTransformationElementType.NODE_MERGE
                 ]
-            },
-            {
-                elementTypeId: ModelTransformationElementType.EDGE_PATTERN_LINK,
-                repositionable: false,
-                deletable: false,
-                routable: false,
-                sourceElementTypeIds: [ModelTransformationElementType.NODE_PATTERN_INSTANCE],
-                targetElementTypeIds: [ModelTransformationElementType.NODE_PATTERN_INSTANCE]
             }
         ];
     }

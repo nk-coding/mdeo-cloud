@@ -16,6 +16,8 @@ import { ModelTransformationLayoutEngine } from "./modelTransformationLayoutEngi
 import { ModelTransformationCreateEdgeSchemaResolver } from "./modelTransformationCreateEdgeSchemaResolver.js";
 import { CreatePatternInstanceOperationHandler } from "./handler/createPatternInstanceOperationHandler.js";
 import { CreatePatternLinkOperationHandler } from "./handler/createPatternLinkOperationHandler.js";
+import { ModelTransformationReconnectEdgeOperationHandler } from "./handler/modelTransformationReconnectEdgeOperationHandler.js";
+import { ModelTransformationDeleteElementOperationHandler } from "./handler/modelTransformationDeleteElementOperationHandler.js";
 import { ModelTransformationToolPaletteItemProvider } from "./modelTransformationToolPaletteItemProvider.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
@@ -55,6 +57,8 @@ export class ModelTransformationDiagramModule extends BaseDiagramModule {
         super.configureOperationHandlers(binding);
         binding.add(CreatePatternInstanceOperationHandler);
         binding.add(CreatePatternLinkOperationHandler);
+        binding.add(ModelTransformationReconnectEdgeOperationHandler);
+        binding.add(ModelTransformationDeleteElementOperationHandler);
     }
 
     protected override bindToolPaletteItemProvider(): BindingTarget<ToolPaletteItemProvider> {

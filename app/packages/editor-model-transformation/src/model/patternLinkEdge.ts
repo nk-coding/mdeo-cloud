@@ -20,4 +20,16 @@ export class GPatternLinkEdge extends GEdge {
      * The modifier kind (none, create, delete, forbid, require)
      */
     modifier!: PatternModifierKind;
+
+    /**
+     * The name of the metamodel class required at the source of this link type.
+     * Used by canConnect to validate source node eligibility.
+     */
+    sourceClass?: string;
+
+    /**
+     * The name of the metamodel class required at the target of this link type.
+     * Used by canConnect to validate target node eligibility.
+     */
+    targetClass?: string;
 }

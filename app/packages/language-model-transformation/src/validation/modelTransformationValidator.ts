@@ -69,6 +69,11 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
  * Provides validation for global uniqueness, required properties, and link validation.
  */
 export class ModelTransformationValidator extends BaseModelValidator {
+    /**
+     * Creates a new {@link ModelTransformationValidator}.
+     *
+     * @param services The extended Langium services providing workspace, reflection, and document access
+     */
     constructor(private readonly services: ExtendedLangiumServices) {
         super(services.shared.AstReflection);
     }
@@ -89,6 +94,9 @@ export class ModelTransformationValidator extends BaseModelValidator {
 
     /**
      * Checks that the metamodel path in a `using` declaration resolves to an existing document.
+     *
+     * @param transformation The model transformation whose import declaration is validated
+     * @param accept The validation acceptor
      */
     private validateMetamodelImport(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
         const metamodelImport = transformation.import;
@@ -427,7 +435,11 @@ export class ModelTransformationValidator extends BaseModelValidator {
     }
 
     /**
-     * Validates that conditional links connect only to compatible instance modifiers.
+     * Validates that both endpoints of a pattern link have a modifier compatible with the link's own modifier.
+     *
+     * Rules:
+     * - A link with modifier X may only connect to instances that have no modifier or modifier X.
+     * - A link with no modifier may only connect to instances that have no modifier.
      *
      * @param link The pattern link being validated
      * @param sourceObj The resolved source object instance
@@ -440,45 +452,42 @@ export class ModelTransformationValidator extends BaseModelValidator {
         targetObj: PatternObjectInstanceType,
         accept: ValidationAcceptor
     ): void {
-        const linkModifier = link.modifier?.modifier;
-
-        if (linkModifier === "forbid") {
-            this.validateLinkEndpointModifierCompatibility(link, sourceObj, "source", "forbid", "require", accept);
-            this.validateLinkEndpointModifierCompatibility(link, targetObj, "target", "forbid", "require", accept);
-        }
-
-        if (linkModifier === "require") {
-            this.validateLinkEndpointModifierCompatibility(link, sourceObj, "source", "require", "forbid", accept);
-            this.validateLinkEndpointModifierCompatibility(link, targetObj, "target", "require", "forbid", accept);
-        }
+        this.validateLinkEndpointModifierCompatibility(link, sourceObj, "source", accept);
+        this.validateLinkEndpointModifierCompatibility(link, targetObj, "target", accept);
     }
 
     /**
-     * Validates that a link endpoint object does not use an incompatible conditional modifier.
+     * Validates that a single link endpoint instance has a modifier compatible with the link's modifier.
+     *
+     * An endpoint is compatible when it has no modifier (always accepted as an endpoint by any link)
+     * or when its modifier exactly matches the link's modifier.
      *
      * @param link The pattern link being validated
-     * @param endpointObject The endpoint object instance
-     * @param endpointProperty The endpoint property name used for diagnostics
-     * @param linkModifier The modifier of the current link
-     * @param incompatibleModifier The modifier disallowed on the endpoint object
+     * @param endpointObject The endpoint object instance to check
+     * @param endpointProperty The property name of the endpoint used for diagnostics
      * @param accept The validation acceptor
      */
     private validateLinkEndpointModifierCompatibility(
         link: PatternLinkType,
         endpointObject: PatternObjectInstanceType,
         endpointProperty: "source" | "target",
-        linkModifier: "forbid" | "require",
-        incompatibleModifier: "forbid" | "require",
         accept: ValidationAcceptor
     ): void {
+        const linkModifier = link.modifier?.modifier;
         const endpointModifier = endpointObject.modifier?.modifier;
-        if (endpointModifier !== incompatibleModifier) {
+
+        if (endpointModifier == undefined || endpointModifier === "none") {
             return;
         }
 
+        if (endpointModifier === linkModifier) {
+            return;
+        }
+
+        const linkModifierLabel = linkModifier ?? "no modifier";
         accept(
             "error",
-            `A '${linkModifier}' link cannot be attached to a '${incompatibleModifier}' instance '${endpointObject.name}'.`,
+            `A '${linkModifierLabel}' link cannot be attached to a '${endpointModifier}' instance '${endpointObject.name}'.`,
             {
                 node: link,
                 property: endpointProperty
@@ -487,7 +496,12 @@ export class ModelTransformationValidator extends BaseModelValidator {
     }
 
     /**
-     * Validates that conditional instances are connected only by links with matching modifier.
+     * Validates that an instance with a non-default modifier is only connected by links
+     * that share the same modifier.
+     *
+     * Rules (from the instance's perspective):
+     * - Instances with no modifier are always compatible with any link modifier.
+     * - Instances with modifier X may only be connected by links that also have modifier X.
      *
      * @param obj The pattern object instance being validated
      * @param accept The validation acceptor
@@ -497,7 +511,8 @@ export class ModelTransformationValidator extends BaseModelValidator {
         accept: ValidationAcceptor
     ): void {
         const instanceModifier = obj.modifier?.modifier;
-        if (instanceModifier !== "forbid" && instanceModifier !== "require") {
+
+        if (instanceModifier == undefined || instanceModifier === "none") {
             return;
         }
 

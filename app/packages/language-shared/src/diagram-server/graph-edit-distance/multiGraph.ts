@@ -6,9 +6,11 @@
 export type NodeId = string;
 export type EdgeKey = string | number;
 export interface NodeAttributes extends Record<string, unknown> {
+    id: string;
     type: string;
 }
 export interface EdgeAttributes extends Record<string, unknown> {
+    id: string;
     type: string;
 }
 

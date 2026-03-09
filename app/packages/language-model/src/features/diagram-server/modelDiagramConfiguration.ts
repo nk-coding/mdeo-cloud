@@ -67,19 +67,11 @@ export class ModelDiagramConfiguration implements DiagramConfiguration {
 
     /**
      * Returns the edge type hints for model diagram elements.
+     * Does NOT specify the link edge so that this can be handled correctly by the canConnect logic in the editor
      *
      * @returns Array of edge type hints
      */
     get edgeTypeHints(): EdgeTypeHint[] {
-        return [
-            {
-                elementTypeId: ModelElementType.EDGE_LINK,
-                repositionable: true,
-                deletable: true,
-                routable: true,
-                sourceElementTypeIds: [ModelElementType.NODE_OBJECT],
-                targetElementTypeIds: [ModelElementType.NODE_OBJECT]
-            }
-        ];
+        return [];
     }
 }

@@ -23,6 +23,18 @@ export class GPatternLinkEdge extends GEdge {
     modifier!: PatternModifierKind;
 
     /**
+     * The name of the metamodel class required at the source of this link type.
+     * Used by the client to validate canConnect.
+     */
+    sourceClass?: string;
+
+    /**
+     * The name of the metamodel class required at the target of this link type.
+     * Used by the client to validate canConnect.
+     */
+    targetClass?: string;
+
+    /**
      * Creates a builder for GPatternLinkEdge instances.
      *
      * @returns A new GPatternLinkEdgeBuilder
@@ -67,6 +79,28 @@ export class GPatternLinkEdgeBuilder<E extends GPatternLinkEdge = GPatternLinkEd
      */
     modifier(modifier: PatternModifierKind): this {
         this.proxy.modifier = modifier;
+        return this;
+    }
+
+    /**
+     * Sets the source class constraint for this link type.
+     *
+     * @param sourceClass The metamodel class name required at the source
+     * @returns This builder for chaining
+     */
+    sourceClass(sourceClass: string): this {
+        this.proxy.sourceClass = sourceClass;
+        return this;
+    }
+
+    /**
+     * Sets the target class constraint for this link type.
+     *
+     * @param targetClass The metamodel class name required at the target
+     * @returns This builder for chaining
+     */
+    targetClass(targetClass: string): this {
+        this.proxy.targetClass = targetClass;
         return this;
     }
 }

@@ -1,10 +1,12 @@
-import type {
-    GNode,
-    ModelState,
-    GModelIndex,
-    CreateEdgeResult
+import type { GNode, ModelState, GModelIndex, CreateEdgeResult } from "@mdeo/language-shared";
+import {
+    BaseCreateEdgeOperationHandler,
+    sharedImport,
+    DefaultModelIdRegistry,
+    ModelIdProvider as ModelIdProviderKey,
+    type ModelIdProvider,
+    type ModelIdRegistry
 } from "@mdeo/language-shared";
-import { BaseCreateEdgeOperationHandler, sharedImport } from "@mdeo/language-shared";
 import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
 import { LinkAssociationResolver, type LinkAssociationDisambiguation } from "@mdeo/language-model";
 import type { AstNode } from "langium";
@@ -38,13 +40,12 @@ const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport(
  * modifier determination (persist-persist edge case).
  */
 export interface PatternLinkSchemaParams extends LinkAssociationDisambiguation {
-    [key: string]: unknown;
     /**
      * The modifier to apply to the new link.
      * Only relevant when both endpoints have NONE (persist) modifier, in which
      * case the schema resolver includes the user-selected context mode here.
      */
-    modifier?: string;
+    modifier: PatternModifierKind;
 }
 
 /**
@@ -52,13 +53,21 @@ export interface PatternLinkSchemaParams extends LinkAssociationDisambiguation {
  * Abstracts over PatternObjectInstance, PatternObjectInstanceReference, and PatternObjectInstanceDelete.
  */
 interface ResolvedPatternInstance {
-    /** The semantic name used in PatternLinkEnd references. */
+    /**
+     * The semantic name used in PatternLinkEnd references.
+     */
     name: string;
-    /** The metamodel class of this instance. */
+    /**
+     * The metamodel class of this instance.
+     */
     classType: ClassType;
-    /** The effective modifier of this instance in the current match. */
+    /**
+     * The effective modifier of this instance in the current match.
+     */
     modifier: PatternModifierKind;
-    /** The Pattern AST node that contains this element. */
+    /**
+     * The Pattern AST node that contains this element.
+     */
     pattern: PatternType;
 }
 
@@ -81,6 +90,9 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
 
     @inject(GModelIndexKey)
     protected readonly localIndex!: GModelIndex;
+
+    @inject(ModelIdProviderKey)
+    protected readonly idProvider!: ModelIdProvider;
 
     /**
      * Creates a new pattern link between two pattern instance nodes.
@@ -107,23 +119,22 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
             return undefined;
         }
 
-        const sourceInfo = this.resolvePatternInstance(sourceElement);
-        const targetInfo = this.resolvePatternInstance(targetElement);
+        const sourceModel = this.localModelState.sourceModel;
+        const registry: ModelIdRegistry | undefined =
+            sourceModel != undefined ? new DefaultModelIdRegistry(sourceModel, this.idProvider) : undefined;
+
+        const sourceInfo = this.resolvePatternInstance(sourceElement, registry);
+        const targetInfo = this.resolvePatternInstance(targetElement, registry);
         if (!sourceInfo || !targetInfo) {
             return undefined;
         }
 
-        // Edges can only be created between instances in the same pattern (same match).
         if (sourceInfo.pattern !== targetInfo.pattern) {
             return undefined;
         }
 
-        const params = operation.schema.params as PatternLinkSchemaParams | undefined;
-        const contextModifier = this.modifierStringToKind(params?.modifier);
-        const modifier = this.determineEdgeModifier(sourceInfo.modifier, targetInfo.modifier, contextModifier);
-        if (modifier === undefined) {
-            return undefined;
-        }
+        const params = operation.schema.params as PatternLinkSchemaParams;
+        const modifier = this.modifierStringToKind(params.modifier);
 
         const associationResolver = new LinkAssociationResolver(
             this.localModelState.languageServices.shared.AstReflection
@@ -141,7 +152,7 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
         const sourceProperty = params?.sourceProperty;
         const targetProperty = params?.targetProperty;
 
-                const modifierNode: PatternModifierType | undefined =
+        const modifierNode: PatternModifierType | undefined =
             modifier !== PatternModifierKind.NONE
                 ? { $type: PatternModifier.name, modifier: modifier as string }
                 : undefined;
@@ -164,12 +175,7 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
         const linkText = await this.serializeNode(linkNode);
         const workspaceEdit = this.insertLinkIntoPattern(sourceInfo.pattern, linkText);
 
-        const edgeId = this.computePatternLinkId(
-            sourceInfo.name,
-            targetInfo.name,
-            sourceProperty,
-            targetProperty
-        );
+        const edgeId = this.computePatternLinkId(sourceInfo.name, targetInfo.name, sourceProperty, targetProperty);
 
         return {
             edgeId,
@@ -186,10 +192,17 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
      * - {@link PatternObjectInstanceReference}: a reference to an instance from a prior match
      * - {@link PatternObjectInstanceDelete}: a deletion of an instance from a prior match
      *
+     * Uses the provided {@link ModelIdRegistry} to look up instance names consistently
+     * with the server's IdProvider, so the generated edge ID is guaranteed to match.
+     *
      * @param node The GPatternInstanceNode to resolve
+     * @param registry The model ID registry for consistent name resolution (may be undefined)
      * @returns Resolved instance information, or undefined if resolution fails
      */
-    private resolvePatternInstance(node: GPatternInstanceNode): ResolvedPatternInstance | undefined {
+    private resolvePatternInstance(
+        node: GPatternInstanceNode,
+        registry: ModelIdRegistry | undefined
+    ): ResolvedPatternInstance | undefined {
         const astNode = this.localIndex.getAstNode(node) as AstNode | undefined;
         if (!astNode) {
             return undefined;
@@ -199,7 +212,7 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
 
         if (reflection.isInstance(astNode, PatternObjectInstance)) {
             const instance = astNode as PatternObjectInstanceType;
-            const name = instance.name;
+            const name = registry?.getName(instance as AstNode) ?? instance.name;
             const classType = instance.class?.ref as ClassType | undefined;
             const modifier = this.modifierStringToKind(instance.modifier?.modifier);
             const pattern = instance.$container as PatternType;
@@ -211,11 +224,10 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
             const ref = astNode as PatternObjectInstanceReferenceType;
             const instance = ref.instance?.ref;
             if (!instance) return undefined;
-            const name = instance.name;
+            const name = registry?.getName(instance as AstNode) ?? instance.name;
             const classType = instance.class?.ref as ClassType | undefined;
             const pattern = ref.$container as PatternType;
             if (!name || !classType) return undefined;
-            // References appear as persist nodes in the current pattern.
             return { name, classType, modifier: PatternModifierKind.NONE, pattern };
         }
 
@@ -223,11 +235,10 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
             const del = astNode as PatternObjectInstanceDeleteType;
             const instance = del.instance?.ref;
             if (!instance) return undefined;
-            const name = instance.name;
+            const name = registry?.getName(instance as AstNode) ?? instance.name;
             const classType = instance.class?.ref as ClassType | undefined;
             const pattern = del.$container as PatternType;
             if (!name || !classType) return undefined;
-            // Delete nodes have the DELETE modifier.
             return { name, classType, modifier: PatternModifierKind.DELETE, pattern };
         }
 

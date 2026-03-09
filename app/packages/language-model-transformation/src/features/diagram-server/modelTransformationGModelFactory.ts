@@ -38,6 +38,8 @@ import {
     PatternObjectInstanceReference,
     PatternObjectInstanceDelete
 } from "../../grammar/modelTransformationTypes.js";
+import { resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
+import { LinkAssociationResolver } from "@mdeo/language-model";
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GMatchNode } from "./model/matchNode.js";
@@ -1075,11 +1077,19 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const name = instance.name ?? "unnamed";
         const typeName = instance.class?.$refText ?? instance.class?.ref?.name ?? undefined;
         const modifier = this.getPatternModifierKind(instance.modifier?.modifier);
+        const resolvedClass = instance.class?.ref as ClassType | undefined;
+        const classHierarchy =
+            resolvedClass != undefined
+                ? resolveClassChain(resolvedClass, this.reflection).map((c) => c.name)
+                : undefined;
 
         const node = GPatternInstanceNode.builder().id(nodeId).name(name).modifier(modifier).meta(metadata).build();
 
         if (typeName != undefined) {
             node.typeName = typeName;
+        }
+        if (classHierarchy != undefined) {
+            node.classHierarchy = classHierarchy;
         }
 
         if (modifier !== PatternModifierKind.NONE) {
@@ -1128,12 +1138,22 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
+        const resolvedClassForRef = reference?.instance?.ref?.class?.ref as ClassType | undefined;
+        const classHierarchyForRef =
+            resolvedClassForRef != undefined
+                ? resolveClassChain(resolvedClassForRef, this.reflection).map((c) => c.name)
+                : undefined;
+
         const node = GPatternInstanceNode.builder()
             .id(nodeId)
             .name(instanceName)
             .modifier(PatternModifierKind.NONE)
             .meta(metadata)
             .build();
+
+        if (classHierarchyForRef != undefined) {
+            node.classHierarchy = classHierarchyForRef;
+        }
 
         const headerChildren = this.createPatternInstanceHeader(nodeId, instanceName, undefined);
         node.children.push(...headerChildren);
@@ -1169,12 +1189,22 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
+        const resolvedClassForDel = deleteElement?.instance?.ref?.class?.ref as ClassType | undefined;
+        const classHierarchyForDel =
+            resolvedClassForDel != undefined
+                ? resolveClassChain(resolvedClassForDel, this.reflection).map((c) => c.name)
+                : undefined;
+
         const node = GPatternInstanceNode.builder()
             .id(nodeId)
             .name(instanceName)
             .modifier(PatternModifierKind.DELETE)
             .meta(metadata)
             .build();
+
+        if (classHierarchyForDel != undefined) {
+            node.classHierarchy = classHierarchyForDel;
+        }
 
         const modifierCompartment = GPatternModifierTitleCompartment.builder().id(`${nodeId}#modifier-title`).build();
         const label = GPatternInstanceNameLabel.builder()
@@ -1408,6 +1438,25 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         }
         if (targetProperty != undefined) {
             edgeBuilder.targetProperty(targetProperty);
+        }
+
+        const sourceClassType = sourceInstanceRef?.class?.ref as ClassType | undefined;
+        const targetClassType = targetInstanceRef?.class?.ref as ClassType | undefined;
+
+        if (sourceClassType != undefined && targetClassType != undefined) {
+            const resolver = new LinkAssociationResolver(this.reflection);
+            const candidates = resolver.findCandidates(sourceClassType, targetClassType);
+            const candidate = resolver.selectCandidate(candidates, { sourceProperty, targetProperty });
+            if (candidate != undefined) {
+                const srcClass = candidate.sourceEnd.class?.ref as ClassType | undefined;
+                const tgtClass = candidate.targetEnd.class?.ref as ClassType | undefined;
+                if (srcClass?.name != undefined) {
+                    edgeBuilder.sourceClass(srcClass.name);
+                }
+                if (tgtClass?.name != undefined) {
+                    edgeBuilder.targetClass(tgtClass.name);
+                }
+            }
         }
 
         const edge = edgeBuilder.build();

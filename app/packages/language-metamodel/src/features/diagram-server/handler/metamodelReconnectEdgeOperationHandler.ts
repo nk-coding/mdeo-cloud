@@ -2,6 +2,10 @@ import type { GEdge } from "@mdeo/language-shared";
 import {
     BaseReconnectEdgeOperationHandler,
     sharedImport,
+    DefaultModelIdRegistry,
+    ModelIdProvider as ModelIdProviderKey,
+    type ModelIdProvider,
+    type ModelIdRegistry,
     type ReconnectEndpoints,
     type ReconnectEdgeResult
 } from "@mdeo/language-shared";
@@ -19,7 +23,7 @@ import {
 } from "../../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "../model/elementTypes.js";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 const { GrammarUtils } = sharedImport("langium");
 
 /**
@@ -28,6 +32,8 @@ const { GrammarUtils } = sharedImport("langium");
  */
 @injectable()
 export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOperationHandler {
+    @inject(ModelIdProviderKey)
+    protected idProvider!: ModelIdProvider;
     override async createReconnectEdit(
         node: AstNode,
         operation: ReconnectEdgeOperation,
@@ -109,7 +115,9 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
         edits.push(await this.removeExtensionFromClass(oldSourceClass, extension));
         edits.push(await this.addExtensionToClass(newSourceClass, newTargetNode));
 
-        const newEdgeId = this.calculateExtensionEdgeId(endpoints.newSource.id, endpoints.newTarget.id);
+        const sourceClassName = this.getNodeName(newSourceNode) ?? "unknown";
+        const targetClassName = this.getNodeName(newTargetNode) ?? "unknown";
+        const newEdgeId = this.calculateExtensionEdgeId(sourceClassName, targetClassName);
 
         return {
             newEdgeId,
@@ -152,7 +160,9 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
         edits.push(await this.removeExtensionFromClass(oldSourceClass, extension));
         edits.push(await this.addExtensionToClass(newSourceClass, targetNode));
 
-        const newEdgeId = this.calculateExtensionEdgeId(endpoints.newSource.id, endpoints.newTarget.id);
+        const sourceClassName = this.getNodeName(newSourceNode) ?? "unknown";
+        const targetClassName = this.getNodeName(targetNode) ?? "unknown";
+        const newEdgeId = this.calculateExtensionEdgeId(sourceClassName, targetClassName);
 
         return {
             newEdgeId,
@@ -193,7 +203,9 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
         }
 
         const workspaceEdit = await this.replaceCstNode(classRefNode, newTargetName);
-        const newEdgeId = this.calculateExtensionEdgeId(endpoints.newSource.id, endpoints.newTarget.id);
+        const sourceNode = this.index.getAstNode(endpoints.newSource);
+        const sourceClassName = sourceNode != undefined ? (this.getNodeName(sourceNode) ?? "unknown") : "unknown";
+        const newEdgeId = this.calculateExtensionEdgeId(sourceClassName, newTargetName);
 
         return {
             newEdgeId,
@@ -240,11 +252,19 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
             edits.push(targetEdit);
         }
 
-        const newEdgeId = this.calculateAssociationEdgeId(
-            sourceChanged ? endpoints.newSource.id : endpoints.oldSource.id,
-            targetChanged ? endpoints.newTarget.id : endpoints.oldTarget.id,
-            association
+        const sourceModel = this.modelState.sourceModel;
+        const registry: ModelIdRegistry | undefined =
+            sourceModel != undefined ? new DefaultModelIdRegistry(sourceModel, this.idProvider) : undefined;
+
+        const sourceClassName = this.getClassNameFromRegistry(
+            registry,
+            sourceChanged ? endpoints.newSource.id : endpoints.oldSource.id
         );
+        const targetClassName = this.getClassNameFromRegistry(
+            registry,
+            targetChanged ? endpoints.newTarget.id : endpoints.oldTarget.id
+        );
+        const newEdgeId = this.calculateAssociationEdgeId(sourceClassName, targetClassName, association);
 
         const hasDuplicateId = this.checkDuplicateEdgeId(newEdgeId, operation.edgeElementId);
 
@@ -385,30 +405,55 @@ export class MetamodelReconnectEdgeOperationHandler extends BaseReconnectEdgeOpe
     }
 
     /**
-     * Calculates the ID for an extension edge.
+     * Calculates the ID for an extension edge using the subclass and superclass names.
+     * Matches the MetamodelModelIdProvider.getClassExtensionName format:
+     * ClassExtension_{subclassName}_{superclassName}
      *
-     * @param sourceId The source class ID
-     * @param targetId The target class ID
+     * @param sourceClassName The name of the extending (sub) class
+     * @param targetClassName The name of the extended (super) class
      * @returns The extension edge ID
      */
-    private calculateExtensionEdgeId(sourceId: string, targetId: string): string {
-        return `${ClassExtension.name}_${sourceId}_${targetId}`;
+    private calculateExtensionEdgeId(sourceClassName: string, targetClassName: string): string {
+        return `${ClassExtension.name}_${sourceClassName}_${targetClassName}`;
     }
 
     /**
-     * Calculates the ID for an association edge.
+     * Calculates the ID for an association edge using class names.
+     * Matches the MetamodelModelIdProvider.getAssociationName format:
+     * Association_{sourceClass}_{sourceProp}_{operator}_{targetClass}_{targetProp}
      *
-     * @param sourceId The source class ID
-     * @param targetId The target class ID
+     * @param sourceClassName The name of the source class
+     * @param targetClassName The name of the target class
      * @param association The association AST node
      * @returns The association edge ID
      */
-    private calculateAssociationEdgeId(sourceId: string, targetId: string, association: AssociationType): string {
+    private calculateAssociationEdgeId(
+        sourceClassName: string,
+        targetClassName: string,
+        association: AssociationType
+    ): string {
         const sourceProperty = association.source?.name ?? "";
         const targetProperty = association.target?.name ?? "";
         const operator = association.operator ?? "--";
 
-        return `${Association.name}_${sourceId}_${sourceProperty}_${operator}_${targetId}_${targetProperty}`;
+        return `${Association.name}_${sourceClassName}_${sourceProperty}_${operator}_${targetClassName}_${targetProperty}`;
+    }
+
+    /**
+     * Looks up the class name for a GModel endpoint by finding its AST node and
+     * querying the registry. Falls back to {@link getNodeName} if the registry is
+     * not available or returns no name.
+     *
+     * @param registry The model ID registry (may be undefined)
+     * @param endpointId The GModel element ID of the class endpoint
+     * @returns The class name, or "unknown" if not resolvable
+     */
+    private getClassNameFromRegistry(registry: ModelIdRegistry | undefined, endpointId: string): string {
+        const element = this.modelState.index.find(endpointId);
+        if (element == undefined) return "unknown";
+        const node = this.index.getAstNode(element);
+        if (node == undefined) return "unknown";
+        return registry?.getName(node as AstNode) ?? this.getNodeName(node) ?? "unknown";
     }
 
     /**

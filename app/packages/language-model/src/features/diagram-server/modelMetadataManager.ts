@@ -50,8 +50,6 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
 
     /**
      * Calculate the cost of transforming one node to another.
-     * Insertion/deletion: cost = 1
-     * Substitution: cost = 1 + (1 - similarity)
      *
      * @param node1 First NodeAttributes
      * @param node2 Second NodeAttributes
@@ -60,6 +58,9 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
     protected calculateNodeCost(node1: NodeAttributes | undefined, node2: NodeAttributes | undefined): number {
         if (node1 == undefined || node2 == undefined) {
             return 1;
+        }
+        if (node1.id === node2.id) {
+            return 0;
         }
 
         const type1 = node1.type as string;
@@ -71,11 +72,7 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
 
         if (type1 === ModelElementType.NODE_OBJECT) {
             const similarity = this.calculateObjectSimilarity(node1, node2);
-            return 1 + (1 - similarity);
-        }
-
-        if (type1.startsWith("label:")) {
-            return 1;
+            return 2 - similarity;
         }
 
         return 1;
@@ -92,6 +89,9 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
         if (edge1 == undefined || edge2 == undefined) {
             return 1;
         }
+        if (edge1.id === edge2.id) {
+            return 0;
+        }
 
         const type1 = edge1.type as string;
         const type2 = edge2.type as string;
@@ -102,7 +102,7 @@ export class ModelMetadataManager extends MetadataManager<PartialModel> {
 
         if (type1 === ModelElementType.EDGE_LINK) {
             const similarity = this.calculateLinkSimilarity(edge1, edge2);
-            return 1 + (1 - similarity);
+            return 2 - similarity;
         }
 
         return 1;

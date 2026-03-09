@@ -69,7 +69,7 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
 
     /**
      * Generates ID for Link based on source and target objects/properties.
-     * Format: "sourceClass_sourceObject_sourceProperty--targetClass_targetObject_targetProperty"
+     * Format: "sourceObject_sourceProperty--targetObject_targetProperty"
      *
      * @param node The link
      * @returns The generated ID
@@ -82,9 +82,10 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
 
     /**
      * Formats a link end for ID generation.
+     * Format: "objectName" or "objectName_property"
      *
      * @param linkEnd The link end
-     * @returns The formatted string
+     * @returns The formatted string, or "unresolved" if the endpoint cannot be resolved
      */
     private formatLinkEnd(linkEnd: PartialLinkEnd | undefined): string {
         if (linkEnd == undefined) {
@@ -98,13 +99,12 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
 
         const obj = objectRef.ref as PartialObjectInstance;
         const objectName = obj.name ?? "unnamed";
-        const className = this.resolveClassName(obj.class);
         const property = linkEnd.property?.$refText ?? "";
 
         if (property) {
-            return `${className}_${objectName}_${property}`;
+            return `${objectName}_${property}`;
         }
-        return `${className}_${objectName}`;
+        return objectName;
     }
 
     /**

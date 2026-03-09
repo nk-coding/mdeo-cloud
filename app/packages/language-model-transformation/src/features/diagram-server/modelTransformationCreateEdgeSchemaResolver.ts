@@ -1,6 +1,11 @@
 import type { CreateEdgeSchema } from "@mdeo/editor-protocol";
 import { CreateEdgeSchemaResolver, sharedImport } from "@mdeo/language-shared";
-import type { ModelState, GModelIndex, InitialCreateEdgeSchemaRequest, TargetCreateEdgeSchemaRequest } from "@mdeo/language-shared";
+import type {
+    ModelState,
+    GModelIndex,
+    InitialCreateEdgeSchemaRequest,
+    TargetCreateEdgeSchemaRequest
+} from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import {
     PatternObjectInstance,
@@ -8,8 +13,7 @@ import {
     PatternObjectInstanceDelete,
     type PatternObjectInstanceType,
     type PatternObjectInstanceReferenceType,
-    type PatternObjectInstanceDeleteType,
-    type PatternType
+    type PatternObjectInstanceDeleteType
 } from "../../grammar/modelTransformationTypes.js";
 import type { ClassType } from "@mdeo/language-metamodel";
 import { LinkAssociationResolver } from "@mdeo/language-model";
@@ -31,7 +35,9 @@ const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport(
  * edge modifier for persist-persist pairs.
  */
 interface PatternLinkCreationContext {
-    /** The active node creation mode string (e.g. `"persist"`, `"create"`, `"delete"`). */
+    /**
+     * The active node creation mode string (e.g. `"persist"`, `"create"`, `"delete"`).
+     */
     mode?: string;
 }
 
@@ -68,14 +74,25 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             return undefined;
         }
 
-        const associationResolver = new LinkAssociationResolver(
-            this.modelState.languageServices.shared.AstReflection
-        );
+        const associationResolver = new LinkAssociationResolver(this.modelState.languageServices.shared.AstReflection);
         if (!associationResolver.hasAnyAssociation(sourceInfo.classType)) {
             return undefined;
         }
 
-        return this.buildSchema(request.sourceElementId, undefined, {});
+        const context = request.context as PatternLinkCreationContext | undefined;
+
+        return this.buildSchema(
+            request.sourceElementId,
+            undefined,
+            {
+                modifier:
+                    sourceInfo.modifier === PatternModifierKind.NONE
+                        ? this.modifierStringToKind(context?.mode)
+                        : sourceInfo.modifier
+            },
+            undefined,
+            sourceInfo.classType.name
+        );
     }
 
     /**
@@ -101,11 +118,6 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             return undefined;
         }
 
-        // Edges can only be created between instances in the same pattern.
-        if (sourceInfo.pattern !== targetInfo.pattern) {
-            return undefined;
-        }
-
         const context = request.context as PatternLinkCreationContext | undefined;
         const contextModifier = this.modifierStringToKind(context?.mode);
         const modifier = this.determineEdgeModifier(sourceInfo.modifier, targetInfo.modifier, contextModifier);
@@ -113,21 +125,30 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             return undefined;
         }
 
-        const associationResolver = new LinkAssociationResolver(
-            this.modelState.languageServices.shared.AstReflection
-        );
+        const associationResolver = new LinkAssociationResolver(this.modelState.languageServices.shared.AstReflection);
         const candidates = associationResolver.findCandidates(sourceInfo.classType, targetInfo.classType);
         if (candidates.length === 0) {
             return undefined;
         }
 
-        const params: PatternLinkSchemaParams = { modifier: modifier === PatternModifierKind.NONE ? undefined : modifier };
+        const params: PatternLinkSchemaParams = {
+            modifier: modifier
+        };
 
         if (candidates.length === 1) {
-            return this.buildSchema(request.sourceElementId, request.targetElementId, params);
+            const candidate = candidates[0];
+            const assocSourceClass = candidate.sourceEnd.class?.ref?.name;
+            const assocTargetClass = candidate.targetEnd.class?.ref?.name;
+            return this.buildSchema(
+                request.sourceElementId,
+                request.targetElementId,
+                params,
+                undefined,
+                assocSourceClass,
+                assocTargetClass
+            );
         }
 
-        // Multiple candidates: pick the one with a preferred label for disambiguation.
         const selected = candidates.find(
             (candidate) => associationResolver.choosePreferredLabel(candidate) !== undefined
         );
@@ -146,7 +167,16 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             params.targetProperty = label.text;
         }
 
-        return this.buildSchema(request.sourceElementId, request.targetElementId, params, label);
+        const assocSourceClass = selected.sourceEnd.class?.ref?.name;
+        const assocTargetClass = selected.targetEnd.class?.ref?.name;
+        return this.buildSchema(
+            request.sourceElementId,
+            request.targetElementId,
+            params,
+            label,
+            assocSourceClass,
+            assocTargetClass
+        );
     }
 
     /**
@@ -165,17 +195,27 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
         sourceElementId: string,
         targetElementId: string | undefined,
         params: PatternLinkSchemaParams,
-        label?: { end: "source" | "target"; text: string }
+        label?: { end: "source" | "target"; text: string },
+        sourceClass?: string,
+        targetClass?: string
     ): CreateEdgeSchema {
         const edgeId = "__create-edge-schema";
 
-        const edge = GPatternLinkEdge.builder()
+        const edgeBuilder = GPatternLinkEdge.builder()
             .id(edgeId)
             .sourceId(sourceElementId)
             .targetId(targetElementId ?? sourceElementId)
-            .modifier(PatternModifierKind.NONE)
-            .meta(EdgeLayoutMetadataUtil.create())
-            .build();
+            .modifier(params.modifier)
+            .meta(EdgeLayoutMetadataUtil.create());
+
+        if (sourceClass != undefined) {
+            edgeBuilder.sourceClass(sourceClass);
+        }
+        if (targetClass != undefined) {
+            edgeBuilder.targetClass(targetClass);
+        }
+
+        const edge = edgeBuilder.build();
 
         if (label !== undefined) {
             const nodeId = `${edgeId}#${label.end}-node`;
@@ -214,7 +254,7 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
      */
     protected resolvePatternInstanceByElementId(
         elementId: string
-    ): { classType: ClassType; modifier: PatternModifierKind; pattern: PatternType } | undefined {
+    ): { classType: ClassType; modifier: PatternModifierKind } | undefined {
         const modelElement = this.modelState.index.find(elementId);
         if (modelElement === undefined || !(modelElement instanceof GPatternInstanceNode)) {
             return undefined;
@@ -231,24 +271,21 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             const classType = instance.class?.ref as ClassType | undefined;
             if (!classType) return undefined;
             const modifier = this.modifierStringToKind(instance.modifier?.modifier);
-            const pattern = instance.$container as PatternType;
-            return { classType, modifier, pattern };
+            return { classType, modifier };
         }
 
         if (reflection.isInstance(astNode, PatternObjectInstanceReference)) {
             const ref = astNode as PatternObjectInstanceReferenceType;
             const classType = ref.instance?.ref?.class?.ref as ClassType | undefined;
             if (!classType) return undefined;
-            const pattern = ref.$container as PatternType;
-            return { classType, modifier: PatternModifierKind.NONE, pattern };
+            return { classType, modifier: PatternModifierKind.NONE };
         }
 
         if (reflection.isInstance(astNode, PatternObjectInstanceDelete)) {
             const del = astNode as PatternObjectInstanceDeleteType;
             const classType = del.instance?.ref?.class?.ref as ClassType | undefined;
             if (!classType) return undefined;
-            const pattern = del.$container as PatternType;
-            return { classType, modifier: PatternModifierKind.DELETE, pattern };
+            return { classType, modifier: PatternModifierKind.DELETE };
         }
 
         return undefined;
@@ -267,35 +304,19 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
         targetModifier: PatternModifierKind,
         contextModifier: PatternModifierKind
     ): PatternModifierKind | undefined {
-        const isForbidRequire = (m: PatternModifierKind): boolean =>
-            m === PatternModifierKind.FORBID || m === PatternModifierKind.REQUIRE;
-        const isCreateDelete = (m: PatternModifierKind): boolean =>
-            m === PatternModifierKind.CREATE || m === PatternModifierKind.DELETE;
-        const isPersist = (m: PatternModifierKind): boolean => m === PatternModifierKind.NONE;
-
-        // Cross-group combinations are always invalid.
-        if (isForbidRequire(sourceModifier) && isCreateDelete(targetModifier)) return undefined;
-        if (isCreateDelete(sourceModifier) && isForbidRequire(targetModifier)) return undefined;
-
-        // Both persist: use the context mode.
-        if (isPersist(sourceModifier) && isPersist(targetModifier)) {
-            return contextModifier;
-        }
-
-        // At least one CREATE/DELETE: edge is create/delete.
-        if (isCreateDelete(sourceModifier) || isCreateDelete(targetModifier)) {
-            return isCreateDelete(sourceModifier) ? sourceModifier : targetModifier;
-        }
-
-        // At least one FORBID/REQUIRE: edge is forbid/require.
-        if (isForbidRequire(sourceModifier) && isForbidRequire(targetModifier)) {
-            if (sourceModifier !== targetModifier) return undefined;
+        if (sourceModifier === PatternModifierKind.NONE) {
+            if (targetModifier === PatternModifierKind.NONE) {
+                return contextModifier;
+            } else {
+                return targetModifier;
+            }
+        } else if (targetModifier === PatternModifierKind.NONE) {
             return sourceModifier;
+        } else if (sourceModifier === targetModifier) {
+            return sourceModifier;
+        } else {
+            return undefined;
         }
-        if (isForbidRequire(sourceModifier)) return sourceModifier;
-        if (isForbidRequire(targetModifier)) return targetModifier;
-
-        return undefined;
     }
 
     /**

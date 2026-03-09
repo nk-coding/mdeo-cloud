@@ -99,8 +99,6 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
 
     /**
      * Calculate the cost of transforming one node to another.
-     * Insertion/deletion: cost = 1
-     * Substitution: cost = 1 + (1 - similarity)
      *
      * @param node1 First NodeAttributes
      * @param node2 Second NodeAttributes
@@ -109,6 +107,9 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
     protected calculateNodeCost(node1: NodeAttributes | undefined, node2: NodeAttributes | undefined): number {
         if (node1 == undefined || node2 == undefined) {
             return 1;
+        }
+        if (node1.id === node2.id) {
+            return 0;
         }
 
         const type1 = node1.type as string;
@@ -119,15 +120,13 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         }
 
         if (type1 === ModelTransformationElementType.NODE_MATCH) {
-            return this.calculateMatchSimilarity(node1, node2);
+            const similarity = this.calculateMatchSimilarity(node1, node2);
+            return 2 - similarity;
         }
 
         if (type1 === ModelTransformationElementType.NODE_PATTERN_INSTANCE) {
-            return this.calculatePatternInstanceSimilarity(node1, node2);
-        }
-
-        if (type1.startsWith("label:")) {
-            return 1;
+            const similarity = this.calculatePatternInstanceSimilarity(node1, node2);
+            return 2 - similarity;
         }
 
         return 1;
@@ -147,7 +146,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         if (label1 === label2) {
             return 1;
         }
-        return 1.5;
+        return 0;
     }
 
     /**
@@ -168,10 +167,10 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         }
 
         if (name1 === name2 || type1Attr === type2Attr) {
-            return 1.5;
+            return 0.5;
         }
 
-        return 2;
+        return 0;
     }
 
     /**
@@ -184,6 +183,9 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
     protected calculateEdgeCost(edge1: EdgeAttributes | undefined, edge2: EdgeAttributes | undefined): number {
         if (edge1 == undefined || edge2 == undefined) {
             return 1;
+        }
+        if (edge1.id === edge2.id) {
+            return 0;
         }
 
         const type1 = edge1.type as string;

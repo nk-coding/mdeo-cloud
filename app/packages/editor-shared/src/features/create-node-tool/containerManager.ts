@@ -7,6 +7,7 @@ const { injectable } = sharedImport("inversify");
 const { ContainerManager: GLSPContainerManager } = sharedImport("@eclipse-glsp/client");
 const { findChildrenAtPosition, isContainable, CSS_GHOST_ELEMENT, DEFAULT_INSERT_OPTIONS } =
     sharedImport("@eclipse-glsp/client");
+const { translatePoint } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * Custom container manager that automatically considers all elements at the drop position as potential containers, instead of just the topmost one.
@@ -28,21 +29,32 @@ export class ContainerManager extends GLSPContainerManager {
         if (container == undefined) {
             valid = false;
         }
-        console.log(elementTypeId, location, container, valid);
-        return { elementTypeId, container, location, valid, options };
+        let relativeLocation = location;
+        if (container != undefined) {
+            const translatedPoint = translatePoint(location, proxy.root, container);
+            relativeLocation = {
+                x: translatedPoint.x,
+                y: translatedPoint.y
+            };
+        }
+
+        return { elementTypeId, container, location: relativeLocation, valid, options };
     }
 
     /**
      * Finds a container for the given location and context by considering all elements at the position as potential containers.
-     * 
+     *
      * @param location The location for which to find a container.
      * @param ctx The context element to start the search from.
      * @param elementTypeId The type of the element to be created, used for validating potential containers.
      * @returns The found container element or undefined if no suitable container is found.
      */
-    protected findContainerExtended(location: Point, ctx: GModelElement, elementTypeId: string): ContainerElement | undefined {
+    protected findContainerExtended(
+        location: Point,
+        ctx: GModelElement,
+        elementTypeId: string
+    ): ContainerElement | undefined {
         const elements = [ctx.root, ...findChildrenAtPosition(ctx.root, location)];
-        console.log(elements)
         return elements
             .reverse()
             .find(

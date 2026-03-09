@@ -3,6 +3,7 @@ import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } fro
 import type { ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/editor-protocol";
 import { ID } from "@mdeo/language-common";
+import { resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import type {
     PartialModel,
     PartialObjectInstance,
@@ -17,6 +18,7 @@ import { GLinkEndNode } from "./model/linkEndNode.js";
 import { GLinkEndLabel } from "./model/linkEndLabel.js";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { ModelElementType } from "./model/elementTypes.js";
+import { LinkAssociationResolver } from "./linkAssociationResolver.js";
 import {
     EnumValue,
     ListValue,
@@ -118,8 +120,17 @@ export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
         const objectName = obj.name ?? "unnamed";
         const classRef = obj.class;
         const typeName = classRef?.$refText ?? (classRef?.ref as { name?: string } | undefined)?.name ?? "Unknown";
+        const resolvedClass = classRef?.ref as ClassType | undefined;
+        const classHierarchy =
+            resolvedClass != undefined ? resolveClassChain(resolvedClass, this.reflection).map((c) => c.name) : [];
 
-        const node = GObjectNode.builder().id(nodeId).name(objectName).typeName(typeName).meta(metadata).build();
+        const node = GObjectNode.builder()
+            .id(nodeId)
+            .name(objectName)
+            .typeName(typeName)
+            .classHierarchy(classHierarchy)
+            .meta(metadata)
+            .build();
 
         node.children.push(
             ...this.createObjectHeader(nodeId, objectName, typeName),
@@ -346,6 +357,25 @@ export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
         }
         if (targetProperty) {
             edgeBuilder.targetProperty(targetProperty);
+        }
+
+        const sourceClassType = sourceObj.class?.ref as ClassType | undefined;
+        const targetClassType = targetObj.class?.ref as ClassType | undefined;
+
+        if (sourceClassType != undefined && targetClassType != undefined) {
+            const resolver = new LinkAssociationResolver(this.reflection);
+            const candidates = resolver.findCandidates(sourceClassType, targetClassType);
+            const candidate = resolver.selectCandidate(candidates, { sourceProperty, targetProperty });
+            if (candidate != undefined) {
+                const srcClass = candidate.sourceEnd.class?.ref as ClassType | undefined;
+                const tgtClass = candidate.targetEnd.class?.ref as ClassType | undefined;
+                if (srcClass?.name != undefined) {
+                    edgeBuilder.sourceClass(srcClass.name);
+                }
+                if (tgtClass?.name != undefined) {
+                    edgeBuilder.targetClass(tgtClass.name);
+                }
+            }
         }
 
         const edge = edgeBuilder.build();

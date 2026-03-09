@@ -59,20 +59,21 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Calculate the cost of transforming one node to another.
-     * Insertion/deletion: cost = 1
-     * Substitution: cost = 1 + similarity (0-1)
      *
      * @param node1 first NodeAttributes
      * @param node2 second NodeAttributes
      * @returns cost of transformation
      */
-    protected calculateNodeCost(node1: NodeAttributes | undefined, node2: NodeAttributes | undefined): number {
+    protected override calculateNodeCost(node1: NodeAttributes | undefined, node2: NodeAttributes | undefined): number {
         if (node1 == undefined || node2 == undefined) {
             return 1;
         }
+        if (node1.id === node2.id) {
+            return 0;
+        }
 
-        const type1 = node1.type as string;
-        const type2 = node2.type as string;
+        const type1 = node1.type;
+        const type2 = node2.type;
 
         if (type1 !== type2) {
             return 2;
@@ -80,11 +81,7 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
         if (type1 === MetamodelElementType.NODE_CLASS) {
             const similarity = this.calculateClassSimilarity(node1, node2);
-            return 1 + (1 - similarity);
-        }
-
-        if (type1.startsWith("label:")) {
-            return 1;
+            return 2 - similarity;
         }
 
         return 1;
@@ -92,16 +89,17 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
 
     /**
      * Calculate the cost of transforming one edge to another.
-     * Insertion/deletion: cost = 1
-     * Substitution: cost = 1 + similarity (0-1)
      *
      * @param edge1 first EdgeAttributes
      * @param edge2 second EdgeAttributes
      * @returns cost of transformation
      */
-    protected calculateEdgeCost(edge1: EdgeAttributes | undefined, edge2: EdgeAttributes | undefined): number {
+    protected override calculateEdgeCost(edge1: EdgeAttributes | undefined, edge2: EdgeAttributes | undefined): number {
         if (edge1 == undefined || edge2 == undefined) {
             return 1;
+        }
+        if (edge1.id === edge2.id) {
+            return 0;
         }
 
         const type1 = edge1.type as string;
@@ -112,12 +110,12 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
         }
 
         if (type1 === MetamodelElementType.EDGE_INHERITANCE) {
-            return 1;
+            return 0;
         }
 
         if (type1 === MetamodelElementType.EDGE_ASSOCIATION) {
             const similarity = this.calculateAssociationSimilarity(edge1, edge2);
-            return 1 + (1 - similarity);
+            return 2 - similarity;
         }
 
         return 1;
@@ -620,10 +618,6 @@ export class MetamodelMetadataManager extends MetadataManager<PartialMetaModel> 
     private calculateClassSimilarity(node1: NodeAttributes, node2: NodeAttributes): number {
         const props1 = (node1.properties as string[]) || [];
         const props2 = (node2.properties as string[]) || [];
-
-        if (props1.length === 0 && props2.length === 0) {
-            return 1;
-        }
 
         const maxProps = Math.max(props1.length, props2.length);
         if (maxProps === 0) {
