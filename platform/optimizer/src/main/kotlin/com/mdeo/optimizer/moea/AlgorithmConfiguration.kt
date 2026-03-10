@@ -21,12 +21,16 @@ import org.moeaframework.problem.Problem
  * @param solutionGenerator The solution generator to wire into the algorithm.
  * @param objectives List of objective functions.
  * @param constraints List of constraint functions.
+ * @param scriptTimeoutMs Combined timeout in milliseconds for evaluating all objectives and
+ *   constraints of a single solution.  Derived from [SolverConfig.effectiveScriptTimeoutMs]
+ *   multiplied by the number of guidance functions.  `null` disables the timeout.
  */
 class AlgorithmConfiguration(
     private val solverConfig: SolverConfig,
     val solutionGenerator: SolutionGenerator,
     private val objectives: List<GuidanceFunction>,
-    private val constraints: List<GuidanceFunction>
+    private val constraints: List<GuidanceFunction>,
+    private val scriptTimeoutMs: Long? = null
 ) {
     /**
      * Builds MOEA typed properties from the solver config.
@@ -52,7 +56,7 @@ class AlgorithmConfiguration(
      * Creates the MOEA problem.
      */
     fun createProblem(): Problem {
-        return OptimizationProblem(objectives, constraints, solutionGenerator)
+        return OptimizationProblem(objectives, constraints, solutionGenerator, scriptTimeoutMs)
     }
 
     /**

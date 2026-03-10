@@ -7,10 +7,13 @@ import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.modeltransformation.service.GraphToModelDataConverter
+import com.mdeo.modeltransformation.service.ModelDataGraphLoader
 import com.mdeo.modeltransformationexecution.database.TransformationExecutionsTable
 import com.mdeo.modeltransformationexecution.database.TransformationResultFilesTable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
@@ -37,12 +40,18 @@ import kotlin.uuid.toKotlinUuid
  * Service for executing model transformations.
  * Implements ExecutionServiceWithFileTree to support result file trees.
  *
+ * Execution is asynchronous: [createAndStartExecution] returns as soon as the config is
+ * parsed and the execution record is created.  The transformation itself runs in a background
+ * coroutine bound to [executionScope].
+ *
  * @param apiClient Client for backend API communication
  * @param timeoutMs Execution timeout in milliseconds
+ * @param executionScope Scope in which background execution coroutines are launched
  */
 class TransformationExecutionService(
     private val apiClient: TransformationApiClient,
-    private val timeoutMs: Long
+    private val timeoutMs: Long,
+    private val executionScope: CoroutineScope
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(TransformationExecutionService::class.java)
     private val graphLoader = ModelDataGraphLoader()
@@ -68,7 +77,7 @@ class TransformationExecutionService(
 
         logger.info("Created transformation execution $executionId for project $projectId")
 
-        withContext(Dispatchers.Default) {
+        executionScope.launch(Dispatchers.Default) {
             try {
                 withTimeout(timeoutMs) {
                     executeTransformation(executionId, projectId, filePath, modelPath, jwtToken)
@@ -142,11 +151,24 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Extracts the model path from the execution request data.
+     *
+     * @param data The JSON request payload.
+     * @return The model path string.
+     */
     private fun extractModelPath(data: JsonElement): String {
         return data.jsonObject["modelPath"]?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("modelPath is required in data")
     }
     
+    /**
+     * Validates that the provided paths are non-blank, within length limits, and contain no
+     * path-traversal sequences.
+     *
+     * @param transformationPath Path to the transformation file.
+     * @param modelPath Path to the input model file.
+     */
     private fun validateInputs(transformationPath: String, modelPath: String) {
         require(transformationPath.isNotBlank()) { "transformationPath cannot be empty" }
         require(modelPath.isNotBlank()) { "modelPath cannot be empty" }
@@ -156,6 +178,14 @@ class TransformationExecutionService(
         require(modelPath.length <= MAX_PATH_LENGTH) { "Path too long" }
     }
     
+    /**
+     * Inserts a new execution record in the database with state [ExecutionState.SUBMITTED].
+     *
+     * @param executionId Unique identifier for this execution.
+     * @param projectId Project that owns the execution.
+     * @param transformationPath Path to the transformation file.
+     * @param modelPath Path to the input model file.
+     */
     private fun createExecutionRecord(
         executionId: UUID,
         projectId: UUID,
@@ -178,6 +208,16 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Fetches all required data, runs the transformation engine, and stores the result.
+     * Updates execution state at each phase. On error the state is set to FAILED.
+     *
+     * @param executionId The execution to drive.
+     * @param projectId Project context for API calls.
+     * @param transformationPath Path to the transformation file.
+     * @param modelPath Path to the input model file.
+     * @param jwtToken Bearer token for backend API authentication.
+     */
     private suspend fun executeTransformation(
         executionId: UUID,
         projectId: UUID,
@@ -207,6 +247,16 @@ class TransformationExecutionService(
         logger.info("Execution $executionId completed successfully")
     }
     
+    /**
+     * Fetches the typed AST for the given transformation file from the backend API.
+     * Sets execution state to FAILED if the fetch returns null.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param transformationPath Path to the transformation file.
+     * @param jwtToken Authentication token.
+     * @return The typed AST, or `null` if unavailable.
+     */
     private suspend fun fetchTypedAst(
         executionId: UUID,
         projectId: UUID,
@@ -230,6 +280,16 @@ class TransformationExecutionService(
         return typedAst
     }
 
+    /**
+     * Fetches the metamodel data for the given path from the backend API.
+     * Sets execution state to FAILED if the fetch returns null.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param metamodelPath Path to the metamodel file.
+     * @param jwtToken Authentication token.
+     * @return The metamodel data, or `null` if unavailable.
+     */
     private suspend fun fetchMetamodelData(
         executionId: UUID,
         projectId: UUID,
@@ -253,6 +313,16 @@ class TransformationExecutionService(
         return metamodelData
     }
     
+    /**
+     * Fetches the model data for the given path from the backend API.
+     * Sets execution state to FAILED if the fetch returns null.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param modelPath Path to the model file.
+     * @param jwtToken Authentication token.
+     * @return The model data, or `null` if unavailable.
+     */
     private suspend fun fetchModelData(
         executionId: UUID,
         projectId: UUID,
@@ -272,6 +342,18 @@ class TransformationExecutionService(
         return modelData
     }
     
+    /**
+     * Executes the transformation engine over a TinkerGraph loaded from [modelData].
+     * Converts the resulting graph back to [ModelData] on success, or updates the execution
+     * state to FAILED and returns null on failure or explicit kill.
+     *
+     * @param executionId Execution to update on error.
+     * @param typedAst Compiled transformation program.
+     * @param metamodelData Metamodel for the transformation.
+     * @param modelData Initial model to transform.
+     * @param jwtToken Authentication token used to report errors.
+     * @return The transformed model, or `null` on failure.
+     */
     private fun runTransformation(
         executionId: UUID,
         typedAst: com.mdeo.modeltransformation.ast.TypedAst,
@@ -317,6 +399,13 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Persists the failure reason and sets the execution state to FAILED.
+     *
+     * @param executionId The failed execution.
+     * @param failure The failure result from the transformation engine.
+     * @param jwtToken Authentication token for the state update API call.
+     */
     private fun handleTransformationFailure(
         executionId: UUID,
         failure: TransformationExecutionResult.Failure,
@@ -337,6 +426,12 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Sets the execution state to FAILED when the transformation was explicitly killed.
+     *
+     * @param executionId The execution that was killed.
+     * @param jwtToken Authentication token for the state update API call.
+     */
     private fun handleTransformationKilled(executionId: UUID, jwtToken: String) {
         val errorMessage = "Transformation killed explicitly."
         
@@ -353,6 +448,12 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Serialises [resultModel] to JSON and inserts it as the result file in the database.
+     *
+     * @param executionId The execution whose result is being stored.
+     * @param resultModel The transformed model to persist.
+     */
     private fun storeResult(executionId: UUID, resultModel: ModelData) {
         val jsonContent = json.encodeToString(resultModel)
         
@@ -367,6 +468,15 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Updates the execution state in the database and calls the backend progress API.
+     * Also sets [startedAt] or [completedAt] timestamps as appropriate.
+     *
+     * @param executionId The execution to update.
+     * @param state New [ExecutionState] string.
+     * @param progressText Human-readable progress message, or `null` to clear.
+     * @param jwtToken Authentication token for the backend API call.
+     */
     private suspend fun updateState(
         executionId: UUID,
         state: String,
@@ -396,6 +506,12 @@ class TransformationExecutionService(
         apiClient.updateExecutionState(executionId.toString(), state, progressText, jwtToken)
     }
     
+    /**
+     * Sets the execution state to FAILED with a timeout message.
+     *
+     * @param executionId The timed-out execution.
+     * @param jwtToken Authentication token for the state update API call.
+     */
     private suspend fun handleTimeout(executionId: UUID, jwtToken: String) {
         logger.error("Execution timeout after ${timeoutMs}ms")
         updateState(
@@ -406,6 +522,13 @@ class TransformationExecutionService(
         )
     }
     
+    /**
+     * Persists the exception message and sets the execution state to FAILED.
+     *
+     * @param executionId The failed execution.
+     * @param e The unexpected exception.
+     * @param jwtToken Authentication token for the state update API call.
+     */
     private suspend fun handleUnexpectedError(executionId: UUID, e: Exception, jwtToken: String) {
         logger.error("Unexpected error during execution", e)
         
@@ -425,12 +548,24 @@ class TransformationExecutionService(
         )
     }
     
+    /**
+     * Looks up an execution record by its ID.
+     *
+     * @param executionId The execution to look up.
+     * @return The database row, or `null` if not found.
+     */
     private fun findExecution(executionId: UUID) = transaction {
         TransformationExecutionsTable.selectAll()
             .where { TransformationExecutionsTable.id eq executionId.toKotlinUuid() }
             .firstOrNull()
     }
     
+    /**
+     * Dispatches to the appropriate summary builder based on execution state.
+     *
+     * @param execution The database row for the execution.
+     * @return Markdown-formatted summary string.
+     */
     private fun buildExecutionSummary(execution: org.jetbrains.exposed.v1.core.ResultRow): String {
         val state = execution[TransformationExecutionsTable.state]
         val error = execution[TransformationExecutionsTable.error]
@@ -471,6 +606,13 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Builds a summary for a failed transformation execution.
+     *
+     * @param error Optional error message from the execution.
+     * @param logs Optional log messages captured during execution.
+     * @return Markdown summary string.
+     */
     private fun buildFailedSummary(error: String?, logs: String?): String {
         return buildString {
             append("## Transformation Failed\n\n")
@@ -484,6 +626,14 @@ class TransformationExecutionService(
         }
     }
     
+    /**
+     * Filters a list of file entries to those whose name starts with [path].
+     * Returns all entries when [path] is null or blank.
+     *
+     * @param files The full list of result file entries.
+     * @param path Optional path prefix filter.
+     * @return Filtered list of file entries.
+     */
     private fun filterFilesByPath(files: List<FileEntry>, path: String?): List<FileEntry> {
         if (path.isNullOrBlank()) return files
         return files.filter { it.name.startsWith(path) }

@@ -34,6 +34,10 @@ import type { ServiceMdeoMetamodelResolver } from "../serviceMdeoMetamodelResolv
 
 /**
  * Extracts the absolute path for a using-path node.
+ *
+ * @param usingPath The using-path AST node.
+ * @param document The Langium document used to resolve the relative path.
+ * @returns The absolute file system path.
  */
 function extractUsingPath(usingPath: UsingPathType, document: LangiumDocument): string {
     const relativePath = usingPath.path ?? "";
@@ -69,6 +73,10 @@ function extractEdgeMutation(mutation: EdgeMutationType): EdgeMutationData {
 
 /**
  * Extracts mutations block data.
+ *
+ * @param mutations The mutations block AST node.
+ * @param document The Langium document for resolving using-path entries.
+ * @returns The extracted mutations block data.
  */
 function extractMutationsBlock(mutations: MutationsBlockType, document: LangiumDocument): MutationsBlockData {
     return {
@@ -95,6 +103,9 @@ function extractSearchData(section: SearchSectionType, document: LangiumDocument
 /**
  * Converts an AST mutation step node to a MutationStepConfig matching
  * the Kotlin sealed class @SerialName discriminators ("Fixed" / "Interval").
+ *
+ * @param step The mutation step value AST node.
+ * @returns The corresponding {@link MutationStepConfig} for serialisation.
  */
 function extractMutationStepValue(step: MutationStepValueType): MutationStepConfig {
     const typed = step as unknown as { $type: string; value?: number; n?: number; lower?: number; upper?: number };
@@ -114,6 +125,9 @@ function extractMutationStepValue(step: MutationStepValueType): MutationStepConf
 
 /**
  * Extracts mutation block data.
+ *
+ * @param mutation The mutation block AST node.
+ * @returns The extracted mutation block data.
  */
 function extractMutationBlock(mutation: MutationBlockType): MutationBlockData {
     const step = mutation.step[0];
@@ -126,6 +140,9 @@ function extractMutationBlock(mutation: MutationBlockType): MutationBlockData {
 
 /**
  * Extracts algorithm parameters block data.
+ *
+ * @param params The algorithm parameters AST node.
+ * @returns The extracted algorithm parameters data.
  */
 function extractAlgorithmParameters(params: AlgorithmParametersType): AlgorithmParametersData {
     const mutation = params.mutation[0];
@@ -142,6 +159,9 @@ function extractAlgorithmParameters(params: AlgorithmParametersType): AlgorithmP
 
 /**
  * Extracts termination block data.
+ *
+ * @param termination The termination block AST node.
+ * @returns The extracted termination block data.
  */
 function extractTerminationBlock(termination: TerminationBlockType): TerminationBlockData {
     return {
@@ -154,6 +174,9 @@ function extractTerminationBlock(termination: TerminationBlockType): Termination
 
 /**
  * Extracts solver section data.
+ *
+ * @param section The solver section AST node.
+ * @returns The extracted solver section data, including the optional scriptTimeout.
  */
 function extractSolverData(section: SolverSectionType): SolverSectionData {
     const parameters = section.parameters[0];
@@ -162,7 +185,8 @@ function extractSolverData(section: SolverSectionType): SolverSectionData {
         algorithm: section.algorithm[0] as SolverSectionData["algorithm"],
         parameters: parameters ? extractAlgorithmParameters(parameters as AlgorithmParametersType) : undefined,
         termination: termination ? extractTerminationBlock(termination as TerminationBlockType) : undefined,
-        batches: section.batches[0]
+        batches: section.batches[0],
+        scriptTimeout: section.scriptTimeout[0]
     };
 }
 

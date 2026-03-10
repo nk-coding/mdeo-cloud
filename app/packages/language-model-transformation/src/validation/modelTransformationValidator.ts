@@ -10,6 +10,7 @@ import {
     ForMatchStatement,
     IfExpressionStatement,
     WhileExpressionStatement,
+    StopStatement,
     Pattern,
     PatternLink,
     PatternObjectInstance,
@@ -19,6 +20,8 @@ import {
     type PatternLinkType,
     type PatternType,
     type TransformationStatementType,
+    type StatementsScopeType,
+    type BaseTransformationStatementType,
     type IfExpressionStatementType,
     type WhileExpressionStatementType,
     type ElseIfBranchType,
@@ -44,6 +47,7 @@ interface ModelTransformationAstTypes {
     ModelTransformation: ModelTransformationType;
     PatternObjectInstance: PatternObjectInstanceType;
     PatternLink: PatternLinkType;
+    StatementsScope: StatementsScopeType;
 }
 
 /**
@@ -58,7 +62,8 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
     const checks: ValidationChecks<ModelTransformationAstTypes> = {
         ModelTransformation: validator.validateTransformation.bind(validator),
         PatternObjectInstance: validator.validateObjectInstance.bind(validator),
-        PatternLink: validator.validateLink.bind(validator)
+        PatternLink: validator.validateLink.bind(validator),
+        StatementsScope: validator.validateStatementsScopeDeadCode.bind(validator)
     };
 
     registry.register(checks, validator);
@@ -90,6 +95,18 @@ export class ModelTransformationValidator extends BaseModelValidator {
         const allNames = new MultiMap<string, NamedElement>();
         this.collectAllNames(transformation, allNames);
         this.reportDuplicateNames(allNames, accept);
+
+        this.checkForUnreachableStatements(transformation.statements ?? [], accept);
+    }
+
+    /**
+     * Validates a statements scope for unreachable statements after a terminating statement.
+     *
+     * @param scope The statements scope to validate
+     * @param accept The validation acceptor
+     */
+    validateStatementsScopeDeadCode(scope: StatementsScopeType, accept: ValidationAcceptor): void {
+        this.checkForUnreachableStatements(scope.statements ?? [], accept);
     }
 
     /**
@@ -533,6 +550,77 @@ export class ModelTransformationValidator extends BaseModelValidator {
             });
             return;
         }
+    }
+
+    /**
+     * Checks a flat list of statements for unreachable code and reports the first
+     * statement that follows a definitely-terminating statement.
+     *
+     * @param statements The ordered list of statements to check
+     * @param accept The validation acceptor
+     */
+    private checkForUnreachableStatements(
+        statements: BaseTransformationStatementType[],
+        accept: ValidationAcceptor
+    ): void {
+        for (let i = 0; i < statements.length; i++) {
+            if (this.isDefinitelyTerminating(statements[i])) {
+                for (let j = i + 1; j < statements.length; j++) {
+                    accept("error", "Unreachable statement: this code follows a statement that always terminates.", {
+                        node: statements[j]
+                    });
+                }
+                return;
+            }
+        }
+    }
+
+    /**
+     * Determines whether a statement will always terminate the surrounding scope,
+     * either by being a direct stop/kill statement or by being an if/else construct
+     * where every branch is definitely terminating.
+     *
+     * @param statement The statement to analyse
+     * @returns `true` if the statement is guaranteed to terminate the enclosing scope
+     */
+    private isDefinitelyTerminating(statement: BaseTransformationStatementType): boolean {
+        if (this.reflection.isInstance(statement, StopStatement)) {
+            return true;
+        }
+        if (this.reflection.isInstance(statement, IfExpressionStatement)) {
+            if (!statement.elseBlock) {
+                return false;
+            }
+            return (
+                this.scopeDefinitelyTerminates(statement.thenBlock) &&
+                (statement.elseIfBranches ?? []).every((b) => this.scopeDefinitelyTerminates(b.block)) &&
+                this.scopeDefinitelyTerminates(statement.elseBlock)
+            );
+        }
+        if (this.reflection.isInstance(statement, IfMatchStatement)) {
+            if (!statement.elseBlock) {
+                return false;
+            }
+            return (
+                this.scopeDefinitelyTerminates(statement.ifBlock.thenBlock) &&
+                this.scopeDefinitelyTerminates(statement.elseBlock)
+            );
+        }
+        return false;
+    }
+
+    /**
+     * Determines whether a statements scope is definitely terminating, i.e., at least
+     * one of its statements is definitely terminating.
+     *
+     * @param scope The scope to analyse, or `undefined`
+     * @returns `true` if the scope definitely terminates; `false` if the scope is absent or has no terminating statement
+     */
+    private scopeDefinitelyTerminates(scope: StatementsScopeType | undefined): boolean {
+        if (scope == undefined) {
+            return false;
+        }
+        return (scope.statements ?? []).some((stmt) => this.isDefinitelyTerminating(stmt));
     }
 
     /**

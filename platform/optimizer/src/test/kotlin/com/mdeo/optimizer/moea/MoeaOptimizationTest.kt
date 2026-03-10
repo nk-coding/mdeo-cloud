@@ -5,6 +5,7 @@ import com.mdeo.optimizer.graph.TinkerGraphBackend
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy
 import com.mdeo.optimizer.solution.Solution
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -90,18 +91,18 @@ class MoeaOptimizationTest {
     }
 
     @Test
-    fun `execute completes without InaccessibleObjectException`() {
+    fun `execute completes without InaccessibleObjectException`() = runBlocking {
         val config = createAlgorithmConfig()
         val optimization = MoeaOptimization()
 
-        val result = assertDoesNotThrow { optimization.execute(config) }
+        val result = assertDoesNotThrow { runBlocking { optimization.execute(config) } }
 
         assertNotNull(result)
         assertNotNull(result.getObservations())
     }
 
     @Test
-    fun `execute returns non-empty result series`() {
+    fun `execute returns non-empty result series`() = runBlocking {
         val config = createAlgorithmConfig(evolutions = 3)
         val optimization = MoeaOptimization()
 
@@ -112,7 +113,7 @@ class MoeaOptimizationTest {
     }
 
     @Test
-    fun `execute returns final solutions`() {
+    fun `execute returns final solutions`() = runBlocking {
         val config = createAlgorithmConfig()
         val optimization = MoeaOptimization()
 
@@ -126,16 +127,16 @@ class MoeaOptimizationTest {
     }
 
     @Test
-    fun `execute with identity mutation does not crash`() {
+    fun `execute with identity mutation does not crash`() = runBlocking {
         val config = createAlgorithmConfig(mutationStrategy = IdentityMutationStrategy())
         val optimization = MoeaOptimization()
 
-        val result = assertDoesNotThrow { optimization.execute(config) }
+        val result = assertDoesNotThrow { runBlocking { optimization.execute(config) } }
         assertNotNull(result)
     }
 
     @Test
-    fun `execute with multiple objectives works`() {
+    fun `execute with multiple objectives works`() = runBlocking {
         val objectives = listOf(
             VertexCountObjective(),
             ConstantObjective(42.0)
@@ -153,7 +154,7 @@ class MoeaOptimizationTest {
     }
 
     @Test
-    fun `execute with constraints works`() {
+    fun `execute with constraints works`() = runBlocking {
         val constraints = listOf(ConstantObjective(0.0)) // Always satisfied
         val config = createAlgorithmConfig(constraints = constraints)
         val optimization = MoeaOptimization()
@@ -169,7 +170,7 @@ class MoeaOptimizationTest {
 
     @ParameterizedTest
     @EnumSource(value = AlgorithmType::class, names = ["NSGAII", "SPEA2", "RANDOM"])
-    fun `execute works with different algorithms`(algorithmType: AlgorithmType) {
+    fun `execute works with different algorithms`(algorithmType: AlgorithmType) = runBlocking {
         val config = createAlgorithmConfig(
             algorithmType = algorithmType,
             populationSize = 10,
@@ -177,7 +178,7 @@ class MoeaOptimizationTest {
         )
         val optimization = MoeaOptimization()
 
-        val result = assertDoesNotThrow { optimization.execute(config) }
+        val result = assertDoesNotThrow { runBlocking { optimization.execute(config) } }
         assertNotNull(result)
         assertFalse(result.getFinalSolutions().isEmpty())
     }

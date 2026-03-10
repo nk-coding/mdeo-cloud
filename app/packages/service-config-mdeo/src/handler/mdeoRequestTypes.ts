@@ -89,6 +89,11 @@ export interface SolverSectionData {
     parameters?: AlgorithmParametersData;
     termination?: TerminationBlockData;
     batches?: number;
+    /**
+     * Per-evaluation timeout for constraint and objective scripts, in seconds.
+     * Same unit as `termination.time`. Optional; defaults to 30 s on the backend.
+     */
+    scriptTimeout?: number;
 }
 
 /**

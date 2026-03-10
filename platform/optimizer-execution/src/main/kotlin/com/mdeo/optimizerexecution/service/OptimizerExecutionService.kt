@@ -10,7 +10,7 @@ import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import com.mdeo.modeltransformation.service.GraphToModelDataConverter
-import com.mdeo.modeltransformationexecution.service.ModelDataGraphLoader
+import com.mdeo.modeltransformation.service.ModelDataGraphLoader
 import com.mdeo.optimizer.OptimizationOrchestrator
 import com.mdeo.optimizer.config.*
 import com.mdeo.optimizer.rulegen.MutationRuleGenerator
@@ -30,8 +30,11 @@ import com.mdeo.script.runtime.ExecutionEnvironment
 import com.mdeo.script.runtime.model.ModelDataScriptModel
 import com.mdeo.script.runtime.model.ScriptModel
 import com.mdeo.optimizer.graph.GraphBackend
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
@@ -64,12 +67,18 @@ import kotlin.uuid.toKotlinUuid
  * 6. Run the evolutionary optimization
  * 7. Store results and update execution state
  *
+ * Execution is asynchronous: [createAndStartExecution] returns as soon as the config is
+ * parsed and the execution record is created.  The optimization itself runs in a background
+ * coroutine bound to [executionScope].
+ *
  * @param apiClient Client for backend API communication
- * @param timeoutMs Execution timeout in milliseconds
+ * @param timeoutMs Overall execution timeout in milliseconds
+ * @param executionScope Scope in which background execution coroutines are launched
  */
 class OptimizerExecutionService(
     private val apiClient: OptimizerApiClient,
-    private val timeoutMs: Long
+    private val timeoutMs: Long,
+    private val executionScope: CoroutineScope
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(OptimizerExecutionService::class.java)
     private val scriptCompiler = ScriptCompiler()
@@ -97,7 +106,7 @@ class OptimizerExecutionService(
         createExecutionRecord(executionId, projectId, filePath, data)
         logger.info("Created optimizer execution $executionId for project $projectId")
 
-        withContext(Dispatchers.Default) {
+        executionScope.launch(Dispatchers.Default) {
             try {
                 withTimeout(timeoutMs) {
                     runOptimization(executionId, projectId, config, jwtToken)
@@ -174,6 +183,16 @@ class OptimizerExecutionService(
 
     // ========================= Execution pipeline =========================
 
+    /**
+     * Full optimization pipeline: fetches metamodel, model, transformation ASTs, script ASTs,
+     * compiles scripts, wires guidance functions, and runs the optimizer.
+     * Updates execution state at each phase; sets state to FAILED on any error.
+     *
+     * @param executionId The execution record to drive.
+     * @param projectId Project context for all API calls.
+     * @param config Parsed optimization configuration.
+     * @param jwtToken Bearer token for backend API authentication.
+     */
     private suspend fun runOptimization(
         executionId: UUID,
         projectId: UUID,
@@ -273,7 +292,19 @@ class OptimizerExecutionService(
         )
 
         val result = try {
-            orchestrator.run()
+            orchestrator.run { generation ->
+                val approxEvaluations = generation * config.solver.parameters.population
+                updateState(
+                    executionId,
+                    ExecutionState.RUNNING,
+                    "Generation $generation (~$approxEvaluations evaluations)",
+                    jwtToken
+                )
+                checkCancelled(executionId)
+            }
+        } catch (e: CancellationException) {
+            logger.info("Optimizer execution $executionId stopped: ${e.message}")
+            return
         } catch (e: Exception) {
             logger.error("Optimization failed", e)
             updateState(executionId, ExecutionState.FAILED, "Optimization failed: ${e.message}", jwtToken)
@@ -288,6 +319,16 @@ class OptimizerExecutionService(
 
     // ========================= Data fetching =========================
 
+    /**
+     * Fetches metamodel data from the backend API.
+     * Sets execution state to FAILED and returns null when the fetch fails.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param metamodelPath Path to the metamodel file.
+     * @param jwtToken Authentication token.
+     * @return The metamodel data, or `null` on failure.
+     */
     private suspend fun fetchMetamodelData(
         executionId: UUID, projectId: UUID, metamodelPath: String, jwtToken: String
     ): MetamodelData? {
@@ -298,6 +339,16 @@ class OptimizerExecutionService(
         return data
     }
 
+    /**
+     * Fetches model data from the backend API.
+     * Sets execution state to FAILED and returns null when the fetch fails.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param modelPath Path to the model file.
+     * @param jwtToken Authentication token.
+     * @return The model data, or `null` on failure.
+     */
     private suspend fun fetchModelData(
         executionId: UUID, projectId: UUID, modelPath: String, jwtToken: String
     ): ModelData? {
@@ -308,6 +359,16 @@ class OptimizerExecutionService(
         return data
     }
 
+    /**
+     * Fetches all transformation typed ASTs for the given paths from the backend API.
+     * Fails fast: returns null and sets execution state to FAILED if any path cannot be resolved.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param usingPaths Ordered list of transformation file paths to fetch.
+     * @param jwtToken Authentication token.
+     * @return Map from path to typed AST, or `null` if any fetch failed.
+     */
     private suspend fun fetchAllTransformations(
         executionId: UUID,
         projectId: UUID,
@@ -329,6 +390,16 @@ class OptimizerExecutionService(
         return result
     }
 
+    /**
+     * Fetches all script typed ASTs for the given paths from the backend API.
+     * Fails fast: returns null and sets execution state to FAILED if any path cannot be resolved.
+     *
+     * @param executionId Execution to update on failure.
+     * @param projectId Project context.
+     * @param scriptPaths Set of script file paths to fetch.
+     * @param jwtToken Authentication token.
+     * @return Map from path to typed AST, or `null` if any fetch failed.
+     */
     private suspend fun fetchAllScripts(
         executionId: UUID,
         projectId: UUID,
@@ -350,6 +421,12 @@ class OptimizerExecutionService(
         return result
     }
 
+    /**
+     * Collects the unique set of script file paths referenced by objective and constraint configs.
+     *
+     * @param goal The goal configuration containing objectives and constraints.
+     * @return Deduplicated set of script file paths.
+     */
     private fun collectScriptPaths(goal: GoalConfig): Set<String> {
         val paths = mutableSetOf<String>()
         goal.objectives.forEach { paths.add(it.path) }
@@ -359,6 +436,16 @@ class OptimizerExecutionService(
 
     // ========================= Script compilation =========================
 
+    /**
+     * Compiles all fetched script ASTs together with the metamodel.
+     * Sets execution state to FAILED and returns null if compilation throws.
+     *
+     * @param executionId Execution to update on failure.
+     * @param scriptAsts Map of path → typed AST for all scripts.
+     * @param metamodelData Metamodel used during compilation.
+     * @param jwtToken Authentication token for error reporting.
+     * @return The compiled program, or `null` on compile error.
+     */
     private suspend fun compileScripts(
         executionId: UUID,
         scriptAsts: Map<String, ScriptTypedAst>,
@@ -443,6 +530,15 @@ class OptimizerExecutionService(
 
     // ========================= Result storage =========================
 
+    /**
+     * Serialises all Pareto-front solutions and a markdown summary, then persists them
+     * in the result-files table.
+     *
+     * @param executionId The execution whose results are being stored.
+     * @param result The completed search result containing the final population.
+     * @param metamodelData Metamodel used to convert graph state back to model data.
+     * @param metamodelUri URI of the metamodel, embedded in each serialised model.
+     */
     private fun storeResults(
         executionId: UUID,
         result: SearchResult,
@@ -489,6 +585,12 @@ class OptimizerExecutionService(
         }
     }
 
+    /**
+     * Builds a markdown result summary table for the given Pareto-front solutions.
+     *
+     * @param solutions List of solution results from the final population.
+     * @return Markdown-formatted summary string.
+     */
     private fun buildResultSummary(
         solutions: List<com.mdeo.optimizer.moea.SolutionResult>
     ): String {
@@ -517,10 +619,21 @@ class OptimizerExecutionService(
 
     // ========================= Config parsing =========================
 
+    /**
+     * Deserialises the raw JSON request payload into an [OptimizationConfig].
+     *
+     * @param data The JSON element from the execution request.
+     * @return The parsed [OptimizationConfig].
+     */
     private fun parseOptimizationConfig(data: JsonElement): OptimizationConfig {
         return json.decodeFromJsonElement(OptimizationConfig.serializer(), data)
     }
 
+    /**
+     * Validates the parsed configuration, throwing [IllegalArgumentException] on any violation.
+     *
+     * @param config The configuration to validate.
+     */
     private fun validateConfig(config: OptimizationConfig) {
         require(config.problem.metamodelPath.isNotBlank()) { "metamodelPath cannot be empty" }
         require(config.problem.modelPath.isNotBlank()) { "modelPath cannot be empty" }
@@ -534,6 +647,14 @@ class OptimizerExecutionService(
 
     // ========================= State management =========================
 
+    /**
+     * Inserts a new execution record in the database with state [ExecutionState.SUBMITTED].
+     *
+     * @param executionId Unique identifier for this execution.
+     * @param projectId Project that owns the execution.
+     * @param filePath Path to the config file that triggered the execution.
+     * @param data The raw JSON config data, stored for debugging.
+     */
     private fun createExecutionRecord(
         executionId: UUID, projectId: UUID, filePath: String, data: JsonElement
     ) {
@@ -553,6 +674,15 @@ class OptimizerExecutionService(
         }
     }
 
+    /**
+     * Updates the execution state in the database and notifies the backend progress API.
+     * Also sets [startedAt] or [completedAt] timestamps as appropriate.
+     *
+     * @param executionId The execution to update.
+     * @param state New [ExecutionState] string.
+     * @param progressText Human-readable progress message, or `null` to clear.
+     * @param jwtToken Authentication token for the backend API call.
+     */
     private suspend fun updateState(
         executionId: UUID, state: String, progressText: String?, jwtToken: String
     ) {
@@ -574,6 +704,12 @@ class OptimizerExecutionService(
         apiClient.updateExecutionState(executionId.toString(), state, progressText, jwtToken)
     }
 
+    /**
+     * Sets the execution state to FAILED with a timeout message.
+     *
+     * @param executionId The timed-out execution.
+     * @param jwtToken Authentication token for the state update API call.
+     */
     private suspend fun handleTimeout(executionId: UUID, jwtToken: String) {
         logger.error("Optimizer execution timeout after ${timeoutMs}ms")
         updateState(
@@ -582,6 +718,35 @@ class OptimizerExecutionService(
         )
     }
 
+    /**
+     * Checks whether the execution was cancelled or deleted since the last generation.
+     * Throws [kotlinx.coroutines.CancellationException] to abort the optimization loop when
+     * the execution record is missing (deleted) or its state is [ExecutionState.CANCELLED].
+     *
+     * @param executionId The execution to inspect.
+     */
+    private suspend fun checkCancelled(executionId: UUID) {
+        val state = withContext(Dispatchers.IO) {
+            transaction {
+                OptimizerExecutionsTable.selectAll()
+                    .where { OptimizerExecutionsTable.id eq executionId.toKotlinUuid() }
+                    .firstOrNull()
+                    ?.get(OptimizerExecutionsTable.state)
+            }
+        }
+        if (state == null || state == ExecutionState.CANCELLED) {
+            logger.info("Optimizer execution $executionId was cancelled or deleted — stopping")
+            throw kotlinx.coroutines.CancellationException("Optimization was cancelled or deleted")
+        }
+    }
+
+    /**
+     * Persists the exception message and sets the execution state to FAILED.
+     *
+     * @param executionId The failed execution.
+     * @param e The unexpected exception.
+     * @param jwtToken Authentication token for the state update API call.
+     */
     private suspend fun handleUnexpectedError(executionId: UUID, e: Exception, jwtToken: String) {
         logger.error("Unexpected error during optimization", e)
         transaction {
@@ -597,12 +762,25 @@ class OptimizerExecutionService(
         )
     }
 
+    /**
+     * Looks up an execution record by its ID.
+     *
+     * @param executionId The execution to look up.
+     * @return The database row, or `null` if not found.
+     */
     private fun findExecution(executionId: UUID) = transaction {
         OptimizerExecutionsTable.selectAll()
             .where { OptimizerExecutionsTable.id eq executionId.toKotlinUuid() }
             .firstOrNull()
     }
 
+    /**
+     * Builds a markdown summary for the given execution record.
+     * Returns stored summary markdown for completed executions, or a short failure/state string.
+     *
+     * @param execution The database row for the execution.
+     * @return Markdown-formatted summary string.
+     */
     private fun buildSummary(execution: org.jetbrains.exposed.v1.core.ResultRow): String {
         val state = execution[OptimizerExecutionsTable.state]
         val error = execution[OptimizerExecutionsTable.error]

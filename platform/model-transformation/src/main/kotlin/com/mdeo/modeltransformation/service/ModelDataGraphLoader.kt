@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformationexecution.service
+package com.mdeo.modeltransformation.service
 
 import com.mdeo.expression.ast.types.ClassData
 import com.mdeo.expression.ast.types.MetamodelData
@@ -7,7 +7,6 @@ import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.model.ModelData
 import com.mdeo.modeltransformation.ast.model.ModelDataInstance
 import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
-import com.mdeo.modeltransformation.service.GraphToModelDataConverter
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Vertex

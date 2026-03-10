@@ -82,7 +82,9 @@ const configMdeoServicePlugin: ServicePluginDefinition = {
                 "provider",
                 "algorithm",
                 "parameters",
-                "termination"
+                "termination",
+                "batches",
+                "scriptTimeout"
             ],
             serverContributionPlugins: [createMdeoContributionPlugin()]
         }

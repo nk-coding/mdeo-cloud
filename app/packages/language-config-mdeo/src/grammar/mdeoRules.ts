@@ -257,6 +257,7 @@ export const TerminationBlockRule = createRule("ConfigMdeoTerminationBlockRule")
  *           evolutions = 500
  *       }
  *       batches = 1
+ *       scriptTimeout = 30
  *   }
  */
 export const SolverSectionContentRule = createRule("SolverSectionContentRule")
@@ -273,7 +274,8 @@ export const SolverSectionContentRule = createRule("SolverSectionContentRule")
                 ),
                 add("parameters", AlgorithmParametersBlockRule),
                 add("termination", TerminationBlockRule),
-                group("batches", "=", add("batches", INT))
+                group("batches", "=", add("batches", INT)),
+                group("scriptTimeout", "=", add("scriptTimeout", INT))
             ),
             many(NEWLINE)
         ),

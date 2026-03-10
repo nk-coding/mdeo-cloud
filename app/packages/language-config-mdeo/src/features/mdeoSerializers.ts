@@ -84,6 +84,9 @@ function printSearchSection(context: PrintContext<SearchSectionType>): Doc {
 
 /**
  * Prints the solver section content.
+ *
+ * @param context The print context
+ * @returns The formatted solver section content
  */
 function printSolverSection(context: PrintContext<SolverSectionType>): Doc {
     const { ctx, path, print, printPrimitive } = context;
@@ -103,6 +106,9 @@ function printSolverSection(context: PrintContext<SolverSectionType>): Doc {
     if (ctx.batches.length > 0) {
         contentDocs.push(["batches = ", printPrimitive({ value: ctx.batches[0] }, INT)]);
     }
+    if (ctx.scriptTimeout.length > 0) {
+        contentDocs.push(["scriptTimeout = ", printPrimitive({ value: ctx.scriptTimeout[0] }, INT)]);
+    }
 
     if (contentDocs.length > 0) {
         docs.push(indent([hardline, doc.builders.join(hardline, contentDocs)]));
@@ -114,6 +120,9 @@ function printSolverSection(context: PrintContext<SolverSectionType>): Doc {
 
 /**
  * Prints the parameters block.
+ *
+ * @param context The print context
+ * @returns The formatted parameters block
  */
 function printAlgorithmParameters(context: PrintContext<AlgorithmParametersType>): Doc {
     const { ctx, path, print, printPrimitive } = context;
@@ -139,6 +148,9 @@ function printAlgorithmParameters(context: PrintContext<AlgorithmParametersType>
 
 /**
  * Prints the termination block.
+ *
+ * @param context The print context
+ * @returns The formatted termination block
  */
 function printTerminationBlock(context: PrintContext<TerminationBlockType>): Doc {
     const { ctx, printPrimitive } = context;
@@ -163,6 +175,9 @@ function printTerminationBlock(context: PrintContext<TerminationBlockType>): Doc
 
 /**
  * Prints the mutation sub-block.
+ *
+ * @param context The print context
+ * @returns The formatted mutation block
  */
 function printMutationBlock(context: PrintContext<MutationBlockType>): Doc {
     const { ctx, path, print } = context;
@@ -187,6 +202,9 @@ function printMutationBlock(context: PrintContext<MutationBlockType>): Doc {
 
 /**
  * Prints the archive sub-block (PESA2/PAES only).
+ *
+ * @param context The print context
+ * @returns The formatted archive block
  */
 function printArchiveBlock(context: PrintContext<ArchiveBlockType>): Doc {
     const { ctx, printPrimitive } = context;
@@ -204,6 +222,9 @@ function printArchiveBlock(context: PrintContext<ArchiveBlockType>): Doc {
 /**
  * Prints a numeric step size.
  * Example: 3
+ *
+ * @param context The print context
+ * @returns The formatted numeric step
  */
 function printMutationStepNumeric(context: PrintContext<MutationStepNumericType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
@@ -213,6 +234,9 @@ function printMutationStepNumeric(context: PrintContext<MutationStepNumericType>
 /**
  * Prints a fixed(N) step size.
  * Example: fixed(3)
+ *
+ * @param context The print context
+ * @returns The formatted fixed(N) step
  */
 function printMutationStepFixedN(context: PrintContext<MutationStepFixedNType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;
@@ -222,6 +246,9 @@ function printMutationStepFixedN(context: PrintContext<MutationStepFixedNType>):
 /**
  * Prints an interval(lower, upper) step size.
  * Example: interval(1, 5)
+ *
+ * @param context The print context
+ * @returns The formatted interval step
  */
 function printMutationStepInterval(context: PrintContext<MutationStepIntervalType>): Doc {
     const { ctx, printPrimitive, getPrimitive } = context;

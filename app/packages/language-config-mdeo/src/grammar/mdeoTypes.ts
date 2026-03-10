@@ -218,15 +218,18 @@ export type TerminationBlockType = ASTType<typeof TerminationBlock>;
 /**
  * The solver `{ }` section content.
  *
- * - `algorithm`   — algorithm name (`NSGAII` | `IBEA` | … | `RANDOM`)
- * - `parameters`  — algorithm parameters block
- * - `termination` — termination condition block
- * - `batches`     — number of independent runs
+ * - `algorithm`     — algorithm name (`NSGAII` | `IBEA` | … | `RANDOM`)
+ * - `parameters`    — algorithm parameters block
+ * - `termination`   — termination condition block
+ * - `batches`       — number of independent runs
+ * - `scriptTimeout` — per-script evaluation timeout in seconds (same unit as `termination.time`);
+ *                     optional, defaults to 30 s, maximum 600 s (10 minutes)
  */
 export const SolverSection = createInterface("ConfigMdeoSolverSection").attrs({
     algorithm: [Union("NSGAII", "IBEA", "SPEA2", "SMSMOEA", "VEGA", "PESA2", "PAES", "RANDOM")],
     parameters: [AlgorithmParameters],
     termination: [TerminationBlock],
-    batches: [Number]
+    batches: [Number],
+    scriptTimeout: [Number]
 });
 export type SolverSectionType = ASTType<typeof SolverSection>;

@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformationexecution.service
+package com.mdeo.modeltransformation.service
 
 import com.mdeo.expression.ast.types.ClassData
 import com.mdeo.expression.ast.types.EnumData

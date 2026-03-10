@@ -45,7 +45,8 @@ fun Application.module(appConfig: AppConfig) {
     val apiClient = TransformationApiClient(appConfig.backendApiUrl)
     val executionService = TransformationExecutionService(
         apiClient,
-        appConfig.executionTimeoutMs
+        appConfig.executionTimeoutMs,
+        this
     )
     
     monitor.subscribe(ApplicationStopped) {

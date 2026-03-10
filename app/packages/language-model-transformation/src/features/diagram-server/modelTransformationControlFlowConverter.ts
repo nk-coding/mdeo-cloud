@@ -211,6 +211,11 @@ interface TraversalResult {
      * this label.  Used by while-expression to propagate "else".
      */
     exitLabel?: string;
+    /**
+     * Optional label element id for the outgoing edge label. When set, the
+     * edge should use this id for the label element (factory-only).
+     */
+    exitLabelElementId?: string;
 }
 
 /**
@@ -275,10 +280,6 @@ export class ModelTransformationControlFlowConverter {
             edges: [...this.edges]
         };
     }
-
-    // -----------------------------------------------------------------------
-    // Accumulation helpers
-    // -----------------------------------------------------------------------
 
     /**
      * Appends a node to the internal accumulator.
@@ -345,6 +346,7 @@ export class ModelTransformationControlFlowConverter {
     ): TraversalResult {
         let currentNodeId: string | undefined = previousNodeId;
         let pendingLabel: string | undefined = incomingLabel;
+        let pendingLabelElementId: string | undefined = undefined;
 
         for (const stmt of statements) {
             if (stmt == undefined || currentNodeId == undefined) {
@@ -353,9 +355,10 @@ export class ModelTransformationControlFlowConverter {
             const result = this.processStatement(stmt, currentNodeId, pendingLabel);
             currentNodeId = result.lastNodeId;
             pendingLabel = result.exitLabel;
+            pendingLabelElementId = result.exitLabelElementId;
         }
 
-        return { lastNodeId: currentNodeId, exitLabel: pendingLabel };
+        return { lastNodeId: currentNodeId, exitLabel: pendingLabel, exitLabelElementId: pendingLabelElementId };
     }
 
     /**
@@ -682,7 +685,7 @@ export class ModelTransformationControlFlowConverter {
         const thenStatements = stmt.thenBlock?.statements ?? [];
         let thenResult: TraversalResult;
         if (thenStatements.length === 0) {
-            thenResult = { lastNodeId: splitId, exitLabel: conditionText };
+            thenResult = { lastNodeId: splitId, exitLabel: conditionText, exitLabelElementId: stmtId };
         } else {
             thenResult = this.processBranch(thenStatements, splitId, conditionText, stmtId);
         }
@@ -704,7 +707,11 @@ export class ModelTransformationControlFlowConverter {
                 : undefined;
             let elseIfResult: TraversalResult;
             if (elseIfStatements.length === 0) {
-                elseIfResult = { lastNodeId: elseIfSplitId, exitLabel: elseIfConditionText };
+                elseIfResult = {
+                    lastNodeId: elseIfSplitId,
+                    exitLabel: elseIfConditionText,
+                    exitLabelElementId: elseIfBranchLabelId
+                };
             } else {
                 elseIfResult = this.processBranch(
                     elseIfStatements,
@@ -741,7 +748,7 @@ export class ModelTransformationControlFlowConverter {
                 if (sourceId === lastElseIfSplitId && stmt.elseBlock == undefined) {
                     this.pushEdge(sourceId, mergeNodeId, "else");
                 } else if (result.exitLabel != undefined) {
-                    this.pushEdge(sourceId, mergeNodeId, result.exitLabel);
+                    this.pushEdge(sourceId, mergeNodeId, result.exitLabel, result.exitLabelElementId);
                 } else {
                     this.pushEdge(sourceId, mergeNodeId);
                 }
@@ -838,6 +845,7 @@ export class ModelTransformationControlFlowConverter {
 
         let currentNodeId = firstResult.lastNodeId;
         let pendingLabel = firstResult.exitLabel;
+        let pendingLabelElementId = firstResult.exitLabelElementId;
         for (let i = 1; i < statements.length; i++) {
             const stmt = statements[i];
             if (stmt == undefined || currentNodeId == undefined) {
@@ -846,8 +854,9 @@ export class ModelTransformationControlFlowConverter {
             const result = this.processStatement(stmt, currentNodeId, pendingLabel);
             currentNodeId = result.lastNodeId;
             pendingLabel = result.exitLabel;
+            pendingLabelElementId = result.exitLabelElementId;
         }
 
-        return { lastNodeId: currentNodeId, exitLabel: pendingLabel };
+        return { lastNodeId: currentNodeId, exitLabel: pendingLabel, exitLabelElementId: pendingLabelElementId };
     }
 }

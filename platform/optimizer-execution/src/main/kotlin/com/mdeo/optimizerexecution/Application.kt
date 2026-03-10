@@ -33,7 +33,7 @@ fun Application.module(appConfig: AppConfig) {
     OptimizerTables.createTables()
 
     val apiClient = OptimizerApiClient(appConfig.backendApiUrl)
-    val executionService = OptimizerExecutionService(apiClient, appConfig.executionTimeoutMs)
+    val executionService = OptimizerExecutionService(apiClient, appConfig.executionTimeoutMs, this)
 
     monitor.subscribe(ApplicationStopped) {
         databaseFactory.close()

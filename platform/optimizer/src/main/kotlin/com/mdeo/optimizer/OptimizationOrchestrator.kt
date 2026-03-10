@@ -3,6 +3,7 @@ package com.mdeo.optimizer
 import com.mdeo.expression.ast.types.MetamodelData
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.optimizer.config.OptimizationConfig
+import com.mdeo.optimizer.config.SolverConfig
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.moea.AlgorithmConfiguration
 import com.mdeo.optimizer.moea.MoeaOptimization
@@ -41,16 +42,32 @@ class OptimizationOrchestrator(
      * Runs the optimization and returns the search result.
      *
      * Creates the mutation strategy from configuration, builds the MOEA algorithm
-     * configuration, and executes the specified number of batches. Currently returns
-     * the result of the last batch.
+     * configuration, and executes the specified number of batches.  The
+     * [onGenerationComplete] callback is invoked after every generation so that callers
+     * can report progress and check for cancellation.
      *
+     * The combined per-solution evaluation timeout is derived from
+     * [SolverConfig.effectiveScriptTimeoutMs] multiplied by the total number of objective and
+     * constraint functions, ensuring each individual script gets a fair share of the budget.
+     *
+     * @param onGenerationComplete Suspend callback that receives the 1-based generation counter.
+     *   Throwing [kotlinx.coroutines.CancellationException] from this callback aborts the search.
      * @return The [SearchResult] containing the final approximation set and metrics.
      */
-    fun run(): SearchResult {
+    suspend fun run(onGenerationComplete: suspend (generation: Int) -> Unit = {}): SearchResult {
         logger.info(
             "Starting optimization: algorithm=${config.solver.algorithm}, " +
                 "objectives=${objectives.size}, constraints=${constraints.size}, " +
                 "transformations=${transformations.size}, batches=${config.solver.batches}"
+        )
+
+        val perScriptTimeoutMs = config.solver.effectiveScriptTimeoutMs()
+        val guidanceFunctionCount = (objectives.size + constraints.size).coerceAtLeast(1)
+        val combinedScriptTimeoutMs = perScriptTimeoutMs * guidanceFunctionCount
+
+        logger.debug(
+            "Script evaluation timeout: ${perScriptTimeoutMs}ms per script × " +
+                "$guidanceFunctionCount function(s) = ${combinedScriptTimeoutMs}ms combined"
         )
 
         val mutationStrategy = MutationStrategyFactory.create(
@@ -68,7 +85,8 @@ class OptimizationOrchestrator(
             solverConfig = config.solver,
             solutionGenerator = solutionGenerator,
             objectives = objectives,
-            constraints = constraints
+            constraints = constraints,
+            scriptTimeoutMs = combinedScriptTimeoutMs
         )
 
         val batches = config.solver.batches.coerceAtLeast(1)
@@ -77,7 +95,7 @@ class OptimizationOrchestrator(
         for (batch in 1..batches) {
             logger.info("Running optimization batch $batch/$batches with algorithm ${config.solver.algorithm}")
             val optimization = MoeaOptimization()
-            val result = optimization.execute(algorithmConfig)
+            val result = optimization.execute(algorithmConfig, onGenerationComplete)
 
             if (bestResult == null) {
                 bestResult = result
