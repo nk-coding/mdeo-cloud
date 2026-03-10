@@ -44,7 +44,11 @@ import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GMatchNodeView } from "./views/matchNodeView.js";
 import { GMatchNodeCompartmentsView } from "./views/matchNodeCompartmentsView.js";
 import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
+import { GPatternLinkModifierNode } from "./model/patternLinkModifierNode.js";
+import { GPatternModifierLabel } from "./model/patternModifierLabel.js";
 import { GPatternLinkModifierLabelView } from "./views/patternLinkModifierLabelView.js";
+import { GPatternLinkModifierNodeView } from "./views/patternLinkModifierNodeView.js";
+import { GPatternModifierLabelView } from "./views/patternModifierLabelView.js";
 import { PatternLinkContextProvider } from "./features/create-edge/patternLinkContextProvider.js";
 
 const { FeatureModule, configureModelElement } = sharedImport("@eclipse-glsp/sprotty");
@@ -157,6 +161,18 @@ export const modelTransformationDiagramModule = new FeatureModule(
             ModelTransformationElementType.LABEL_PATTERN_LINK_MODIFIER,
             GPatternLinkModifierLabel,
             GPatternLinkModifierLabelView
+        );
+        configureModelElement(
+            context,
+            ModelTransformationElementType.NODE_PATTERN_LINK_MODIFIER,
+            GPatternLinkModifierNode,
+            GPatternLinkModifierNodeView
+        );
+        configureModelElement(
+            context,
+            ModelTransformationElementType.LABEL_PATTERN_MODIFIER,
+            GPatternModifierLabel,
+            GPatternModifierLabelView
         );
     },
     { featureId: Symbol("modelTransformationDiagram") }

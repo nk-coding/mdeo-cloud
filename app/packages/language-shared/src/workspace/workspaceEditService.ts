@@ -1,9 +1,9 @@
 import type { AstSerializer, AstSerializerAdditionalServices, WorkspaceEditService } from "@mdeo/language-common";
 import type { AstNode, CstNode, LangiumCoreServices, LangiumDocument } from "langium";
-import type { Position, WorkspaceEdit } from "vscode-languageserver-types";
+import type { WorkspaceEdit, Position as PositionType } from "vscode-languageserver-types";
 import { sharedImport } from "../sharedImport.js";
 
-const { Range } = sharedImport("vscode-languageserver-types");
+const { Range, Position } = sharedImport("vscode-languageserver-types");
 
 /**
  * Default implementation of the WorkspaceEditService.
@@ -34,10 +34,40 @@ export class DefaultWorkspaceEditService implements WorkspaceEditService {
         return mergedEdit;
     }
 
-    deleteCstNode(cstNode: CstNode, documentUri: string): WorkspaceEdit {
-        const edit: WorkspaceEdit = {
+    deleteCstNode(cstNode: CstNode, document: LangiumDocument): WorkspaceEdit {
+        const uri = document.uri.toString();
+        const text = document.textDocument.getText();
+
+        const start = cstNode.range.start;
+        const end = cstNode.range.end;
+
+        const startOfStartLine = Position.create(start.line, 0);
+        const removalEnd = Position.create(end.line + 1, 0);
+
+        const textDocument = document.textDocument;
+        const prefixBeforeNode = text.substring(textDocument.offsetAt(startOfStartLine), textDocument.offsetAt(start));
+        const suffixAfterNode = text.substring(textDocument.offsetAt(end), textDocument.offsetAt(removalEnd));
+
+        const onlyWhitespaceBefore = /^\s*$/.test(prefixBeforeNode);
+        const onlyWhitespaceAfter = /^\s*$/.test(suffixAfterNode);
+
+        if (onlyWhitespaceBefore && onlyWhitespaceAfter) {
+            const removalRange = Range.create(startOfStartLine, removalEnd);
+            return {
+                changes: {
+                    [uri]: [
+                        {
+                            range: removalRange,
+                            newText: ""
+                        }
+                    ]
+                }
+            };
+        }
+
+        return {
             changes: {
-                [documentUri]: [
+                [uri]: [
                     {
                         range: cstNode.range,
                         newText: ""
@@ -45,7 +75,6 @@ export class DefaultWorkspaceEditService implements WorkspaceEditService {
                 ]
             }
         };
-        return edit;
     }
 
     async replaceCstNode(
@@ -74,7 +103,7 @@ export class DefaultWorkspaceEditService implements WorkspaceEditService {
         return edit;
     }
 
-    getIndentationForLine(position: Position, document: LangiumDocument): string {
+    getIndentationForLine(position: PositionType, document: LangiumDocument): string {
         const line = document.textDocument.getText(Range.create(position.line, 0, position.line + 1, 0));
         const match = line.match(/^\s*/);
         return match ? match[0] : "";
@@ -169,7 +198,7 @@ export class DefaultWorkspaceEditService implements WorkspaceEditService {
 
     private calculateNewlinePrefix(
         text: string,
-        insertPosition: Position,
+        insertPosition: PositionType,
         document: LangiumDocument,
         ensureNewlineBefore: boolean
     ): string {

@@ -64,11 +64,6 @@ export class GMatchNode extends GNode {
     ];
 
     /**
-     * The name/label for this match block (e.g., "match", "for match", "if match")
-     */
-    label!: string;
-
-    /**
      * Whether this is a "for match" (multiple matches iteration)
      */
     multiple!: boolean;

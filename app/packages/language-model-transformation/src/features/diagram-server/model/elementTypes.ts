@@ -89,6 +89,16 @@ export enum ModelTransformationElementType {
     LABEL_PATTERN_LINK_MODIFIER = "label:pattern-link-modifier",
 
     /**
+     * Node wrapping a pattern link modifier label
+     */
+    NODE_PATTERN_LINK_MODIFIER = "node:pattern-link-modifier",
+
+    /**
+     * Label displaying a pattern instance modifier (create/delete/forbid/require)
+     */
+    LABEL_PATTERN_MODIFIER = "label:pattern-modifier",
+
+    /**
      * Horizontal divider line between compartments
      */
     DIVIDER = "divider:horizontal",

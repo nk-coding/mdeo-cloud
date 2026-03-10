@@ -2,7 +2,7 @@ import type { Point, RenderingContext } from "@eclipse-glsp/sprotty";
 import { sharedImport, GEdgeView, type EdgeAttachment, EdgeAttachmentPosition, type GEdge } from "@mdeo/editor-shared";
 import type { GPatternLinkEdge } from "../model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "../model/patternLinkEndNode.js";
-import { GPatternLinkModifierLabel } from "../model/patternLinkModifierLabel.js";
+import { GPatternLinkModifierNode } from "../model/patternLinkModifierNode.js";
 import { PatternModifierKind } from "../model/elementTypes.js";
 import type { VNode } from "snabbdom";
 
@@ -49,7 +49,7 @@ export class GPatternLinkEdgeView extends GEdgeView {
                         child.end === "source" ? EdgeAttachmentPosition.SOURCE_LEFT : EdgeAttachmentPosition.TARGET_LEFT
                 };
                 attachments.push(attachment);
-            } else if (child instanceof GPatternLinkModifierLabel) {
+            } else if (child instanceof GPatternLinkModifierNode) {
                 const attachment: EdgeAttachment = {
                     vnode: context.renderElement(child),
                     bounds: child.bounds,

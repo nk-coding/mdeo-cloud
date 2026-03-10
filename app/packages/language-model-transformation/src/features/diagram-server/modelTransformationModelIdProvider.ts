@@ -20,6 +20,7 @@ import {
     PatternPropertyAssignment,
     WhereClause,
     PatternVariable,
+    ElseIfBranch,
     type PatternObjectInstanceType,
     type PatternObjectInstanceReferenceType,
     type PatternObjectInstanceDeleteType,
@@ -88,6 +89,10 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         }
         if (this.reflection.isInstance(node, PatternVariable)) {
             return this.getPatternVariableName(node);
+        }
+
+        if (this.reflection.isInstance(node, ElseIfBranch)) {
+            return this.getElseIfBranchName(node, registry);
         }
 
         return undefined;
@@ -337,5 +342,35 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
      */
     private getPatternVariableName(node: PatternVariableType): string {
         return node.name ?? "unnamed";
+    }
+
+    /**
+     * Generates a name for an {@link ElseIfBranch} based on its position index within
+     * its containing {@link IfExpressionStatement} and the name of the parent statement.
+     *
+     * Format: "{parentName}_elseif_{index}"
+     *
+     * @param node The else-if branch node
+     * @param registry The model ID registry for parent name lookup
+     * @returns The compound name identifying this else-if branch
+     */
+    private getElseIfBranchName(node: AstNode, registry: ModelIdRegistry): string {
+        const container = node.$container;
+        if (container && "$containerProperty" in node) {
+            const prop = node.$containerProperty as string;
+            const containerValue = (container as unknown as Record<string, unknown>)[prop];
+            let index = 0;
+            if (Array.isArray(containerValue)) {
+                const idx = containerValue.indexOf(node);
+                if (idx >= 0) index = idx;
+            }
+            const parent = this.findParentStatement(container);
+            if (parent != null && !this.reflection.isInstance(parent, ModelTransformation)) {
+                const parentName = registry.getName(parent);
+                if (parentName !== undefined) return `${parentName}_elseif_${index}`;
+            }
+            return `elseif_${index}`;
+        }
+        return "elseif";
     }
 }

@@ -7,11 +7,6 @@ import { ModelTransformationElementType } from "./elementTypes.js";
  */
 export class GMatchNode extends GNode {
     /**
-     * The name/label for this match block (e.g., "match", "for match")
-     */
-    label!: string;
-
-    /**
      * Whether this is a "for match" (multiple matches iteration)
      */
     multiple!: boolean;
@@ -31,17 +26,6 @@ export class GMatchNode extends GNode {
  * Provides fluent API for constructing match nodes.
  */
 export class GMatchNodeBuilder<T extends GMatchNode = GMatchNode> extends GNodeBuilder<T> {
-    /**
-     * Sets the label for the match block.
-     *
-     * @param label The label text
-     * @returns This builder for chaining
-     */
-    label(label: string): this {
-        this.proxy.label = label;
-        return this;
-    }
-
     /**
      * Sets whether this is a multiple match (for match).
      *

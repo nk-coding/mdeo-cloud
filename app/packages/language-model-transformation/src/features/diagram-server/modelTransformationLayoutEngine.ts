@@ -10,6 +10,7 @@ import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
 import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
+import { GPatternLinkModifierNode } from "./model/patternLinkModifierNode.js";
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GSplitNode } from "./model/splitNode.js";
@@ -31,6 +32,9 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
      * Returns center/center alignment for split, merge, start, and end nodes so that
      * the center point of these circular/diamond-shaped nodes is snapped to the grid.
      * All other nodes use the default top-left alignment.
+     *
+     * @param nodeId The ID of the node whose alignment should be determined
+     * @returns The alignment for the node, center/center for circular/diamond nodes, default otherwise
      */
     protected override getNodeAlignment(nodeId: string): NodeAlignment {
         const element = this.modelState.index.find(nodeId);
@@ -48,6 +52,12 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
     /**
      * Transforms the GModel to an ELK graph for layout computation.
      * Creates a hierarchical graph with match nodes containing pattern instances.
+     *
+     * Control flow edge labels are given ELK placement {@code CENTER} because
+     * {@link GControlFlowEdgeView} renders them at the middle of the edge
+     * ({@link EdgeAttachmentPosition.MIDDLE_LEFT}). Using {@code CENTER} makes ELK
+     * reserve space at the correct location, preventing labels from overlapping
+     * intermediate nodes.
      *
      * @param model The GModelRoot to transform
      * @param operation The layout operation containing bounds information
@@ -76,11 +86,12 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                     labels: child.children
                         .filter((label) => label instanceof GControlFlowLabelNode)
                         .map((label) => ({
+                            id: label.id,
                             text: "_",
                             width: bounds[label.id]?.width,
                             height: bounds[label.id]?.height,
                             layoutOptions: {
-                                "elk.edgeLabels.placement": "HEAD"
+                                "elk.edgeLabels.placement": "CENTER"
                             }
                         }))
                 });
@@ -129,7 +140,9 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                     labels: child.children
                         .filter(
                             (label) =>
-                                label instanceof GPatternLinkEndNode || label instanceof GPatternLinkModifierLabel
+                                label instanceof GPatternLinkEndNode ||
+                                label instanceof GPatternLinkModifierNode ||
+                                label instanceof GPatternLinkModifierLabel
                         )
                         .map((label) => {
                             if (label instanceof GPatternLinkEndNode) {

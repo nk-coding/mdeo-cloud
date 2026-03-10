@@ -3,6 +3,7 @@ import type {
     DiagramConfiguration,
     GModelFactory,
     InstanceMultiBinding,
+    LabelEditValidator,
     OperationHandlerConstructor,
     ToolPaletteItemProvider
 } from "@eclipse-glsp/server";
@@ -18,6 +19,8 @@ import { CreatePatternInstanceOperationHandler } from "./handler/createPatternIn
 import { CreatePatternLinkOperationHandler } from "./handler/createPatternLinkOperationHandler.js";
 import { ModelTransformationReconnectEdgeOperationHandler } from "./handler/modelTransformationReconnectEdgeOperationHandler.js";
 import { ModelTransformationDeleteElementOperationHandler } from "./handler/modelTransformationDeleteElementOperationHandler.js";
+import { ModelTransformationApplyLabelEditOperationHandler } from "./handler/modelTransformationApplyLabelEditOperationHandler.js";
+import { ModelTransformationLabelEditValidator } from "./modelTransformationLabelEditValidator.js";
 import { ModelTransformationToolPaletteItemProvider } from "./modelTransformationToolPaletteItemProvider.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
@@ -59,6 +62,11 @@ export class ModelTransformationDiagramModule extends BaseDiagramModule {
         binding.add(CreatePatternLinkOperationHandler);
         binding.add(ModelTransformationReconnectEdgeOperationHandler);
         binding.add(ModelTransformationDeleteElementOperationHandler);
+        binding.add(ModelTransformationApplyLabelEditOperationHandler);
+    }
+
+    protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {
+        return ModelTransformationLabelEditValidator;
     }
 
     protected override bindToolPaletteItemProvider(): BindingTarget<ToolPaletteItemProvider> {

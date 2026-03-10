@@ -132,6 +132,10 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
      * @returns A validation status if invalid, undefined otherwise
      */
     private validatePropertyValueLabel(label: string, element: GPropertyLabel): ValidationStatusType | undefined {
+        if (label.trim().length === 0) {
+            return undefined;
+        }
+
         const parsed = parseModelPropertyLabel(label, this.modelState.languageServices.parser.Lexer);
 
         if (typeof parsed === "string") {

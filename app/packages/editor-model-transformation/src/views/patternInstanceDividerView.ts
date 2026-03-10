@@ -22,12 +22,11 @@ export class GPatternInstanceDividerView extends GHorizontalDividerView {
         return {
             "w-full": true,
             "border-b-2": true,
-            "border-create": parentInstance != null && parentInstance.modifier === PatternModifierKind.CREATE,
-            "border-delete": parentInstance != null && parentInstance.modifier === PatternModifierKind.DELETE,
-            "border-forbid": parentInstance != null && parentInstance.modifier === PatternModifierKind.FORBID,
-            "border-require": parentInstance != null && parentInstance.modifier === PatternModifierKind.REQUIRE,
-            "border-foreground": parentInstance != null && parentInstance.modifier === PatternModifierKind.NONE,
-            "border-current": parentInstance == null
+            "border-create": parentInstance?.modifier === PatternModifierKind.CREATE,
+            "border-delete": parentInstance?.modifier === PatternModifierKind.DELETE,
+            "border-forbid": parentInstance?.modifier === PatternModifierKind.FORBID,
+            "border-require": parentInstance?.modifier === PatternModifierKind.REQUIRE,
+            "border-foreground": parentInstance?.modifier === PatternModifierKind.NONE
         };
     }
 }

@@ -119,6 +119,13 @@ export class ModelApplyLabelEditOperationHandler extends BaseApplyLabelEditOpera
         node: PartialPropertyAssignment,
         text: string
     ): Promise<WorkspaceEdit | undefined> {
+        if (text.trim().length === 0) {
+            if (node.$cstNode == undefined) {
+                return undefined;
+            }
+            return this.deleteCstNode(node.$cstNode);
+        }
+
         const parsed = parseModelPropertyLabel(text, this.modelState.languageServices.parser.Lexer);
         if (typeof parsed === "string") {
             return undefined;

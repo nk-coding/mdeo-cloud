@@ -27,7 +27,7 @@ export class EditLabelTool extends DirectLabelEditTool {
 export class EditLabelMouseListener extends MouseListener {
     override doubleClick(target: GModelElement): (Action | Promise<Action>)[] {
         const editableLabel = getEditableLabel(target);
-        if (editableLabel) {
+        if (editableLabel != undefined) {
             return [UpdateLabelEditAction.create(editableLabel.id, true)];
         }
         return [];

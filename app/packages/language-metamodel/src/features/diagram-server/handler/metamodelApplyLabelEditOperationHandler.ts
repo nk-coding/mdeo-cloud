@@ -46,6 +46,12 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
         } else if (this.reflection.isInstance(node, Enum)) {
             return this.createNameEdit(node, operation.text);
         } else if (this.reflection.isInstance(node, EnumEntry)) {
+            if (operation.text.trim().length === 0) {
+                if (node.$cstNode == undefined) {
+                    return undefined;
+                }
+                return this.deleteCstNode(node.$cstNode);
+            }
             return this.createNameEdit(node, operation.text);
         } else if (this.reflection.isInstance(node, Property)) {
             return await this.createRenamePropertyEdit(node, operation.text);
@@ -78,6 +84,13 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
      * @returns a workspace edit for renaming the property, or undefined if parsing fails
      */
     private async createRenamePropertyEdit(node: PropertyType, text: string): Promise<WorkspaceEdit | undefined> {
+        if (text.trim().length === 0) {
+            if (node.$cstNode == undefined) {
+                return undefined;
+            }
+            return this.deleteCstNode(node.$cstNode);
+        }
+
         const parsed = parsePropertyLabel(text);
         if (parsed == undefined) {
             return undefined;

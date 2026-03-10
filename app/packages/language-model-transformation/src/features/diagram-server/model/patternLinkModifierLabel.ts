@@ -1,18 +1,12 @@
-import { GModelElement, GModelElementBuilder } from "@mdeo/language-shared";
-import type { PatternModifierKind } from "./elementTypes.js";
+import { GLabel, GLabelBuilder } from "@mdeo/language-shared";
 import { ModelTransformationElementType } from "./elementTypes.js";
 
 /**
  * Server-side model for a pattern link modifier label.
- * Displayed in the middle of a pattern link edge when a modifier
- * (create/delete/forbid/require) is present on the link.
+ * Displayed as a child of GPatternLinkModifierNode, showing the modifier
+ * keyword with guillemets (e.g. «create», «delete», «forbid», «require»).
  */
-export class GPatternLinkModifierLabel extends GModelElement {
-    /**
-     * The modifier kind driving which text/colour to show
-     */
-    modifier!: PatternModifierKind;
-
+export class GPatternLinkModifierLabel extends GLabel {
     /**
      * Creates a builder for GPatternLinkModifierLabel instances.
      *
@@ -30,15 +24,4 @@ export class GPatternLinkModifierLabel extends GModelElement {
  */
 export class GPatternLinkModifierLabelBuilder<
     T extends GPatternLinkModifierLabel = GPatternLinkModifierLabel
-> extends GModelElementBuilder<T> {
-    /**
-     * Sets the modifier kind.
-     *
-     * @param modifier The pattern modifier kind
-     * @returns This builder for chaining
-     */
-    modifier(modifier: PatternModifierKind): this {
-        this.proxy.modifier = modifier;
-        return this;
-    }
-}
+> extends GLabelBuilder<T> {}

@@ -48,6 +48,9 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
             );
         }
         if (element.type === MetamodelElementType.LABEL_ENUM_ENTRY) {
+            if (label.trim().length === 0) {
+                return ValidationStatus.NONE;
+            }
             return (
                 this.validateIdentifier(label, "Enum entry") ??
                 this.validateEnumEntry(label, element as GEnumEntryLabel) ??
@@ -141,6 +144,10 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * @returns a validation status if the label is invalid, undefined otherwise
      */
     private validatePropertyLabel(label: string, element: GPropertyLabel): ValidationStatusType | undefined {
+        if (label.trim().length === 0) {
+            return undefined;
+        }
+
         const formatValidation = this.validatePropertyFormat(label);
         if (formatValidation != undefined) {
             return formatValidation;

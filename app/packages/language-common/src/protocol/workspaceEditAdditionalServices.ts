@@ -18,10 +18,10 @@ export interface WorkspaceEditService {
      * Creates a workspace edit that deletes the text corresponding to the given CST node.
      *
      * @param cstNode the CST node to delete
-     * @param documentUri the URI of the document to edit
+     * @param document the document to edit
      * @returns the workspace edit that performs the deletion
      */
-    deleteCstNode(cstNode: CstNode, documentUri: string): WorkspaceEdit;
+    deleteCstNode(cstNode: CstNode, document: LangiumDocument): WorkspaceEdit;
 
     /**
      * Creates a workspace edit that replaces the text corresponding to the given CST node.

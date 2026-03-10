@@ -5,32 +5,13 @@ import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
 import { NodeLayoutMetadataUtil, EdgeLayoutMetadataUtil } from "./metadataTypes.js";
 import {
     type ModelTransformationType,
-    type BaseTransformationStatementType,
-    type MatchStatementType,
-    type IfMatchStatementType,
-    type WhileMatchStatementType,
-    type UntilMatchStatementType,
-    type ForMatchStatementType,
-    type IfExpressionStatementType,
-    type WhileExpressionStatementType,
-    type StopStatementType,
-    type PatternType,
     type PatternObjectInstanceType,
     type PatternLinkType,
     type PatternPropertyAssignmentType,
     type WhereClauseType,
     type PatternVariableType,
-    type ElseIfBranchType,
     type PatternObjectInstanceReferenceType,
     type PatternObjectInstanceDeleteType,
-    MatchStatement,
-    IfMatchStatement,
-    WhileMatchStatement,
-    UntilMatchStatement,
-    ForMatchStatement,
-    IfExpressionStatement,
-    WhileExpressionStatement,
-    StopStatement,
     PatternObjectInstance,
     PatternLink,
     WhereClause,
@@ -38,6 +19,13 @@ import {
     PatternObjectInstanceReference,
     PatternObjectInstanceDelete
 } from "../../grammar/modelTransformationTypes.js";
+import {
+    ModelTransformationControlFlowConverter,
+    type ControlFlowNode,
+    type ControlFlowMatchNode,
+    type ControlFlowSplitNode,
+    type ControlFlowEndNode
+} from "./modelTransformationControlFlowConverter.js";
 import { resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import { LinkAssociationResolver } from "@mdeo/language-model";
 import { GStartNode } from "./model/startNode.js";
@@ -57,6 +45,8 @@ import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkEndLabel } from "./model/patternLinkEndLabel.js";
 import { GPatternLinkModifierLabel } from "./model/patternLinkModifierLabel.js";
+import { GPatternLinkModifierNode } from "./model/patternLinkModifierNode.js";
+import { GPatternModifierLabel } from "./model/patternModifierLabel.js";
 import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GVariableLabel } from "./model/variableLabel.js";
 import { EndNodeKind, ModelTransformationElementType, PatternModifierKind } from "./model/elementTypes.js";
@@ -66,18 +56,6 @@ const { injectable } = sharedImport("inversify");
 const { GGraph } = sharedImport("@eclipse-glsp/server");
 
 type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
-
-/**
- * Result of processing a statements scope.
- * Contains the optional last node ID if the scope does not terminate.
- */
-interface ScopeProcessingResult {
-    /**
-     * The ID of the last node in the scope, if the scope does not terminate with stop/kill.
-     * Undefined if the scope terminates.
-     */
-    lastNodeId: string | undefined;
-}
 
 /**
  * Factory for creating graph models from model transformation source models.
@@ -102,872 +80,72 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     override createModelInternal(sourceModel: ModelTransformationType, idRegistry: ModelIdRegistry): GModelRoot {
         const graph = GGraph.builder().id("transformation-graph").addCssClass("editor-model-transformation").build();
 
-        const startNodeId = this.createStartNode(graph);
+        const converter = new ModelTransformationControlFlowConverter(sourceModel, idRegistry, this.reflection);
+        const cfg = converter.convert();
 
-        const statements = sourceModel.statements ?? [];
-        const result = this.processStatements(graph, statements, startNodeId, idRegistry);
-
-        if (result.lastNodeId != undefined) {
-            const endNodeId = this.createImplicitEndNode(graph);
-            this.createControlFlowEdge(graph, result.lastNodeId, endNodeId, undefined);
+        for (const node of cfg.nodes) {
+            this.createCFGNode(graph, node, idRegistry);
+        }
+        for (const edge of cfg.edges) {
+            this.createControlFlowEdge(graph, edge.sourceId, edge.targetId, edge.label, edge.labelElementId);
         }
 
         return graph;
     }
 
     /**
-     * Creates a start node for the transformation.
+     * Dispatches a single control-flow graph node to the appropriate GModel creator.
      *
-     * @param graph The graph to add the node to
-     * @returns The ID of the created start node
+     * @param graph The graph to add elements to.
+     * @param node The control-flow node to render.
+     * @param idRegistry The model ID registry, required for match-node pattern content.
      */
-    private createStartNode(graph: GGraphType): string {
+    private createCFGNode(graph: GGraphType, node: ControlFlowNode, idRegistry: ModelIdRegistry): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
-        const nodeId = "start";
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-
-        const node = GStartNode.builder().id(nodeId).meta(metadata).build();
-        graph.children.push(node);
-
-        return nodeId;
-    }
-
-    /**
-     * Creates an implicit end node when the transformation doesn't explicitly terminate.
-     *
-     * @param graph The graph to add the node to
-     * @returns The ID of the created end node
-     */
-    private createImplicitEndNode(graph: GGraphType): string {
-        const validatedMetadata = this.modelState.getValidatedMetadata();
-        const nodeId = "implicit_end";
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-
-        const node = GEndNode.builder().id(nodeId).kind(EndNodeKind.STOP).meta(metadata).build();
-        graph.children.push(node);
-
-        return nodeId;
-    }
-
-    /**
-     * Creates an explicit end node for stop/kill statements.
-     *
-     * @param graph The graph to add the node to
-     * @param stmt The stop statement
-     * @param idRegistry The model ID registry
-     * @returns The ID of the created end node
-     */
-    private createEndNode(graph: GGraphType, stmt: StopStatementType, idRegistry: ModelIdRegistry): string {
-        const validatedMetadata = this.modelState.getValidatedMetadata();
-        const nodeId = idRegistry.getId(stmt);
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-        const kind = stmt.keyword === "kill" ? EndNodeKind.KILL : EndNodeKind.STOP;
-
-        const node = GEndNode.builder().id(nodeId).kind(kind).meta(metadata).build();
-        graph.children.push(node);
-
-        return nodeId;
-    }
-
-    /**
-     * Processes a list of statements and creates the control flow graph.
-     *
-     * @param graph The graph to add elements to
-     * @param statements The statements to process
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the last node ID if not terminated
-     */
-    private processStatements(
-        graph: GGraphType,
-        statements: BaseTransformationStatementType[],
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        let currentNodeId: string | undefined = previousNodeId;
-
-        for (const stmt of statements) {
-            if (stmt == undefined || currentNodeId == undefined) {
-                continue;
+        switch (node.kind) {
+            case "start": {
+                const metadata = this.getNodeMetadata(validatedMetadata, node.id);
+                graph.children.push(GStartNode.builder().id(node.id).meta(metadata).build());
+                break;
             }
-
-            const result = this.processStatement(graph, stmt, currentNodeId, idRegistry);
-            currentNodeId = result.lastNodeId;
-        }
-
-        return { lastNodeId: currentNodeId };
-    }
-
-    /**
-     * Processes a single statement and creates the appropriate graph elements.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The statement to process
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the last node ID if not terminated
-     */
-    private processStatement(
-        graph: GGraphType,
-        stmt: BaseTransformationStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        if (this.reflection.isInstance(stmt, MatchStatement)) {
-            return this.processMatchStatement(graph, stmt as MatchStatementType, previousNodeId, idRegistry);
-        }
-        if (this.reflection.isInstance(stmt, IfMatchStatement)) {
-            return this.processIfMatchStatement(graph, stmt as IfMatchStatementType, previousNodeId, idRegistry);
-        }
-        if (this.reflection.isInstance(stmt, WhileMatchStatement)) {
-            return this.processWhileMatchStatement(graph, stmt as WhileMatchStatementType, previousNodeId, idRegistry);
-        }
-        if (this.reflection.isInstance(stmt, UntilMatchStatement)) {
-            return this.processUntilMatchStatement(graph, stmt as UntilMatchStatementType, previousNodeId, idRegistry);
-        }
-        if (this.reflection.isInstance(stmt, ForMatchStatement)) {
-            return this.processForMatchStatement(graph, stmt as ForMatchStatementType, previousNodeId, idRegistry);
-        }
-        if (this.reflection.isInstance(stmt, IfExpressionStatement)) {
-            return this.processIfExpressionStatement(
-                graph,
-                stmt as IfExpressionStatementType,
-                previousNodeId,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, WhileExpressionStatement)) {
-            return this.processWhileExpressionStatement(
-                graph,
-                stmt as WhileExpressionStatementType,
-                previousNodeId,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, StopStatement)) {
-            return this.processStopStatement(graph, stmt as StopStatementType, previousNodeId, idRegistry);
-        }
-
-        return { lastNodeId: previousNodeId };
-    }
-
-    /**
-     * Processes a simple match statement.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The match statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the match node ID
-     */
-    private processMatchStatement(
-        graph: GGraphType,
-        stmt: MatchStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        this.createMatchNode(
-            graph,
-            nodeId,
-            idRegistry.getName(stmt) ?? nodeId,
-            "match",
-            false,
-            stmt.pattern,
-            idRegistry
-        );
-        this.createControlFlowEdge(graph, previousNodeId, nodeId, undefined);
-
-        return { lastNodeId: nodeId };
-    }
-
-    /**
-     * Processes an if-match statement.
-     * Creates a match node with two outgoing branches (then/else).
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The if-match statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the merge node ID if not all branches terminate
-     */
-    private processIfMatchStatement(
-        graph: GGraphType,
-        stmt: IfMatchStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const stmtId = idRegistry.getId(stmt);
-
-        const pattern = stmt.ifBlock?.pattern;
-        const matchNodeId = pattern ? idRegistry.getId(pattern) : `${stmtId}_no-pattern`;
-        const matchName = (pattern ? idRegistry.getName(pattern) : undefined) ?? stmtId;
-        this.createMatchNode(graph, matchNodeId, matchName, "if match", false, pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
-
-        return this.processIfMatchStatementBranches(graph, stmt, stmtId, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes the branches of an if-match statement (shared logic).
-     */
-    private processIfMatchStatementBranches(
-        graph: GGraphType,
-        stmt: IfMatchStatementType,
-        stmtId: string,
-        matchNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const thenBlock = stmt.ifBlock?.thenBlock;
-        const thenStatements = thenBlock?.statements ?? [];
-        const thenResult = this.processStatementsWithEdge(graph, thenStatements, matchNodeId, "then", idRegistry);
-
-        let elseResult: ScopeProcessingResult = { lastNodeId: matchNodeId };
-        if (stmt.elseBlock != undefined) {
-            const elseStatements = stmt.elseBlock.statements ?? [];
-            if (elseStatements.length > 0) {
-                elseResult = this.processStatementsWithEdge(graph, elseStatements, matchNodeId, "else", idRegistry);
+            case "end": {
+                const cfgEndNode = node as ControlFlowEndNode;
+                const metadata = this.getNodeMetadata(validatedMetadata, cfgEndNode.id);
+                const kind = cfgEndNode.endKind === "kill" ? EndNodeKind.KILL : EndNodeKind.STOP;
+                graph.children.push(GEndNode.builder().id(cfgEndNode.id).kind(kind).meta(metadata).build());
+                break;
+            }
+            case "match": {
+                const cfgMatchNode = node as ControlFlowMatchNode;
+                this.createMatchNode(graph, cfgMatchNode, idRegistry);
+                break;
+            }
+            case "split": {
+                const cfgSplitNode = node as ControlFlowSplitNode;
+                this.createSplitNode(graph, cfgSplitNode.id, cfgSplitNode.conditionText);
+                break;
+            }
+            case "merge": {
+                this.createMergeNode(graph, node.id);
+                break;
             }
         }
-
-        if (thenResult.lastNodeId != undefined || elseResult.lastNodeId != undefined) {
-            const mergeNodeId = ModelTransformationIdGenerator.mergeNode(stmtId);
-            this.createMergeNode(graph, mergeNodeId);
-
-            if (thenResult.lastNodeId != undefined) {
-                this.createControlFlowEdge(graph, thenResult.lastNodeId, mergeNodeId, undefined);
-            }
-            if (elseResult.lastNodeId != undefined && stmt.elseBlock != undefined) {
-                if (elseResult.lastNodeId === matchNodeId) {
-                    if (thenResult.lastNodeId !== matchNodeId) {
-                        this.createControlFlowEdge(graph, matchNodeId, mergeNodeId, "else");
-                    }
-                } else {
-                    this.createControlFlowEdge(graph, elseResult.lastNodeId, mergeNodeId, undefined);
-                }
-            } else if (elseResult.lastNodeId != undefined && thenResult.lastNodeId !== matchNodeId) {
-                this.createControlFlowEdge(graph, matchNodeId, mergeNodeId, "else");
-            }
-
-            return { lastNodeId: mergeNodeId };
-        }
-
-        return { lastNodeId: undefined };
-    }
-
-    /**
-     * Processes a while-match statement.
-     * Creates a loop back from the do block to the match.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The while-match statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the match node ID as exit point
-     */
-    private processWhileMatchStatement(
-        graph: GGraphType,
-        stmt: WhileMatchStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
-        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
-
-        this.createMatchNode(graph, matchNodeId, matchName, "while match", false, stmt.pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
-
-        return this.processWhileMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes the body of a while-match statement (shared logic).
-     */
-    private processWhileMatchStatementBody(
-        graph: GGraphType,
-        stmt: WhileMatchStatementType,
-        matchNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const doStatements = stmt.doBlock?.statements ?? [];
-        if (doStatements.length > 0) {
-            const doResult = this.processStatementsWithEdge(graph, doStatements, matchNodeId, "match", idRegistry);
-
-            if (doResult.lastNodeId != undefined) {
-                this.createControlFlowEdge(graph, doResult.lastNodeId, matchNodeId, undefined);
-            }
-        }
-
-        return { lastNodeId: matchNodeId };
-    }
-
-    /**
-     * Processes an until-match statement.
-     * Executes the do block until the pattern matches.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The until-match statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the match node ID as exit point
-     */
-    private processUntilMatchStatement(
-        graph: GGraphType,
-        stmt: UntilMatchStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
-        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
-
-        this.createMatchNode(graph, matchNodeId, matchName, "until match", false, stmt.pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
-
-        return this.processUntilMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes the body of an until-match statement (shared logic).
-     */
-    private processUntilMatchStatementBody(
-        graph: GGraphType,
-        stmt: UntilMatchStatementType,
-        matchNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const doStatements = stmt.doBlock?.statements ?? [];
-        if (doStatements.length > 0) {
-            const doResult = this.processStatementsWithEdge(graph, doStatements, matchNodeId, "no match", idRegistry);
-
-            if (doResult.lastNodeId != undefined) {
-                this.createControlFlowEdge(graph, doResult.lastNodeId, matchNodeId, undefined);
-            }
-        }
-
-        return { lastNodeId: matchNodeId };
-    }
-
-    /**
-     * Processes a for-match statement.
-     * Iterates over all matches of the pattern.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The for-match statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the match node ID as exit point
-     */
-    private processForMatchStatement(
-        graph: GGraphType,
-        stmt: ForMatchStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
-        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
-
-        this.createMatchNode(graph, matchNodeId, matchName, "for match", true, stmt.pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, undefined);
-
-        return this.processForMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes the body of a for-match statement (shared logic).
-     */
-    private processForMatchStatementBody(
-        graph: GGraphType,
-        stmt: ForMatchStatementType,
-        matchNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const doStatements = stmt.doBlock?.statements ?? [];
-        if (doStatements.length > 0) {
-            const doResult = this.processStatementsWithEdge(graph, doStatements, matchNodeId, "each", idRegistry);
-
-            if (doResult.lastNodeId != undefined) {
-                this.createControlFlowEdge(graph, doResult.lastNodeId, matchNodeId, undefined);
-            }
-        }
-
-        return { lastNodeId: matchNodeId };
-    }
-
-    /**
-     * Processes an if-expression statement.
-     * Creates a split node for the condition and branches.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The if-expression statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the merge node ID if not all branches terminate
-     */
-    private processIfExpressionStatement(
-        graph: GGraphType,
-        stmt: IfExpressionStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const stmtId = idRegistry.getId(stmt);
-
-        const splitId = `${stmtId}_split`;
-        const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createSplitNode(graph, splitId, conditionText);
-        this.createControlFlowEdge(graph, previousNodeId, splitId, undefined);
-
-        return this.processIfExpressionStatementBranches(graph, stmt, stmtId, splitId, idRegistry);
-    }
-
-    /**
-     * Processes the branches of an if-expression statement (shared logic).
-     */
-    private processIfExpressionStatementBranches(
-        graph: GGraphType,
-        stmt: IfExpressionStatementType,
-        stmtId: string,
-        splitId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const branchResults: ScopeProcessingResult[] = [];
-
-        const thenStatements = stmt.thenBlock?.statements ?? [];
-        const thenResult = this.processStatementsWithEdge(graph, thenStatements, splitId, "true", idRegistry);
-        branchResults.push(thenResult);
-
-        let lastElseIfSplitId = splitId;
-        for (let i = 0; i < (stmt.elseIfBranches?.length ?? 0); i++) {
-            const elseIfBranch = stmt.elseIfBranches![i] as ElseIfBranchType;
-            const elseIfSplitId = `${stmtId}_elseif_${i}_split`;
-            const elseIfConditionText = elseIfBranch.condition?.$cstNode?.text ?? "?";
-
-            this.createSplitNode(graph, elseIfSplitId, elseIfConditionText);
-            this.createControlFlowEdge(graph, lastElseIfSplitId, elseIfSplitId, "false");
-
-            const elseIfStatements = elseIfBranch.block?.statements ?? [];
-            const elseIfResult = this.processStatementsWithEdge(
-                graph,
-                elseIfStatements,
-                elseIfSplitId,
-                "true",
-                idRegistry
-            );
-            branchResults.push(elseIfResult);
-
-            lastElseIfSplitId = elseIfSplitId;
-        }
-
-        if (stmt.elseBlock != undefined) {
-            const elseStatements = stmt.elseBlock.statements ?? [];
-            const elseResult = this.processStatementsWithEdge(
-                graph,
-                elseStatements,
-                lastElseIfSplitId,
-                "false",
-                idRegistry
-            );
-            branchResults.push(elseResult);
-        } else {
-            branchResults.push({ lastNodeId: lastElseIfSplitId });
-        }
-
-        const nonTerminatingBranches = branchResults.filter((r) => r.lastNodeId != undefined);
-        if (nonTerminatingBranches.length > 0) {
-            const mergeNodeId = ModelTransformationIdGenerator.mergeNode(stmtId);
-            this.createMergeNode(graph, mergeNodeId);
-
-            const connectedToMerge = new Set<string>();
-            for (const result of nonTerminatingBranches) {
-                const sourceId = result.lastNodeId!;
-                if (connectedToMerge.has(sourceId)) {
-                    continue;
-                }
-                connectedToMerge.add(sourceId);
-
-                if (sourceId === lastElseIfSplitId && stmt.elseBlock == undefined) {
-                    this.createControlFlowEdge(graph, sourceId, mergeNodeId, "false");
-                } else {
-                    this.createControlFlowEdge(graph, sourceId, mergeNodeId, undefined);
-                }
-            }
-
-            return { lastNodeId: mergeNodeId };
-        }
-
-        return { lastNodeId: undefined };
-    }
-
-    /**
-     * Processes a while-expression statement.
-     * Creates a split node for the condition with a loop.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The while-expression statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result containing the split node ID as exit point
-     */
-    private processWhileExpressionStatement(
-        graph: GGraphType,
-        stmt: WhileExpressionStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const stmtId = idRegistry.getId(stmt);
-
-        const splitId = `${stmtId}_split`;
-        const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createSplitNode(graph, splitId, conditionText);
-        this.createControlFlowEdge(graph, previousNodeId, splitId, undefined);
-
-        return this.processWhileExpressionStatementBody(graph, stmt, splitId, idRegistry);
-    }
-
-    /**
-     * Processes the body of a while-expression statement (shared logic).
-     */
-    private processWhileExpressionStatementBody(
-        graph: GGraphType,
-        stmt: WhileExpressionStatementType,
-        splitId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const bodyStatements = stmt.block?.statements ?? [];
-        const bodyResult = this.processStatementsWithEdge(graph, bodyStatements, splitId, "true", idRegistry);
-
-        if (bodyResult.lastNodeId != undefined) {
-            this.createControlFlowEdge(graph, bodyResult.lastNodeId, splitId, undefined);
-        }
-
-        return { lastNodeId: splitId };
-    }
-
-    /**
-     * Processes a stop/kill statement.
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The stop statement
-     * @param previousNodeId The ID of the previous node to connect from
-     * @param idRegistry The model ID registry
-     * @returns The result with undefined lastNodeId (terminated)
-     */
-    private processStopStatement(
-        graph: GGraphType,
-        stmt: StopStatementType,
-        previousNodeId: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const endNodeId = this.createEndNode(graph, stmt, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, endNodeId, undefined);
-
-        return { lastNodeId: undefined };
-    }
-
-    /**
-     * Helper to process statements and create an initial edge with a label.
-     *
-     * @param graph The graph to add elements to
-     * @param statements The statements to process
-     * @param sourceNodeId The source node ID for the initial edge
-     * @param label The label for the initial edge
-     * @param idRegistry The model ID registry
-     * @returns The processing result
-     */
-    private processStatementsWithEdge(
-        graph: GGraphType,
-        statements: BaseTransformationStatementType[],
-        sourceNodeId: string,
-        label: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        if (statements.length === 0) {
-            return { lastNodeId: sourceNodeId };
-        }
-
-        const firstStmt = statements[0]!;
-        const firstResult = this.processStatementWithInitialEdge(graph, firstStmt, sourceNodeId, label, idRegistry);
-
-        let currentNodeId = firstResult.lastNodeId;
-        for (let i = 1; i < statements.length; i++) {
-            const stmt = statements[i];
-            if (stmt == undefined || currentNodeId == undefined) {
-                continue;
-            }
-            const result = this.processStatement(graph, stmt, currentNodeId, idRegistry);
-            currentNodeId = result.lastNodeId;
-        }
-
-        return { lastNodeId: currentNodeId };
-    }
-
-    /**
-     * Processes a statement with a custom initial edge label.
-     * Used when the incoming edge needs a specific label (e.g., "true", "false").
-     *
-     * @param graph The graph to add elements to
-     * @param stmt The statement to process
-     * @param previousNodeId The ID of the previous node
-     * @param edgeLabel The label for the incoming edge
-     * @param idRegistry The model ID registry
-     * @returns The processing result
-     */
-    private processStatementWithInitialEdge(
-        graph: GGraphType,
-        stmt: BaseTransformationStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        if (this.reflection.isInstance(stmt, MatchStatement)) {
-            return this.processMatchStatementWithLabel(
-                graph,
-                stmt as MatchStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, IfMatchStatement)) {
-            return this.processIfMatchStatementWithLabel(
-                graph,
-                stmt as IfMatchStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, WhileMatchStatement)) {
-            return this.processWhileMatchStatementWithLabel(
-                graph,
-                stmt as WhileMatchStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, UntilMatchStatement)) {
-            return this.processUntilMatchStatementWithLabel(
-                graph,
-                stmt as UntilMatchStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, ForMatchStatement)) {
-            return this.processForMatchStatementWithLabel(
-                graph,
-                stmt as ForMatchStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, IfExpressionStatement)) {
-            return this.processIfExpressionStatementWithLabel(
-                graph,
-                stmt as IfExpressionStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, WhileExpressionStatement)) {
-            return this.processWhileExpressionStatementWithLabel(
-                graph,
-                stmt as WhileExpressionStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-        if (this.reflection.isInstance(stmt, StopStatement)) {
-            return this.processStopStatementWithLabel(
-                graph,
-                stmt as StopStatementType,
-                previousNodeId,
-                edgeLabel,
-                idRegistry
-            );
-        }
-
-        return { lastNodeId: previousNodeId };
-    }
-
-    /**
-     * Processes a match statement with a custom edge label.
-     */
-    private processMatchStatementWithLabel(
-        graph: GGraphType,
-        stmt: MatchStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        this.createMatchNode(
-            graph,
-            nodeId,
-            idRegistry.getName(stmt) ?? nodeId,
-            "match",
-            false,
-            stmt.pattern,
-            idRegistry
-        );
-        this.createControlFlowEdge(graph, previousNodeId, nodeId, edgeLabel);
-        return { lastNodeId: nodeId };
-    }
-
-    /**
-     * Processes an if-match statement with a custom edge label.
-     */
-    private processIfMatchStatementWithLabel(
-        graph: GGraphType,
-        stmt: IfMatchStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const stmtId = idRegistry.getId(stmt);
-        const pattern = stmt.ifBlock?.pattern;
-        const matchNodeId = pattern ? idRegistry.getId(pattern) : `${stmtId}_no-pattern`;
-        const matchName = (pattern ? idRegistry.getName(pattern) : undefined) ?? stmtId;
-        this.createMatchNode(graph, matchNodeId, matchName, "if match", false, pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
-        return this.processIfMatchStatementBranches(graph, stmt, stmtId, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes a while-match statement with a custom edge label.
-     */
-    private processWhileMatchStatementWithLabel(
-        graph: GGraphType,
-        stmt: WhileMatchStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
-        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
-        this.createMatchNode(graph, matchNodeId, matchName, "while match", false, stmt.pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
-        return this.processWhileMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes an until-match statement with a custom edge label.
-     */
-    private processUntilMatchStatementWithLabel(
-        graph: GGraphType,
-        stmt: UntilMatchStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
-        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
-        this.createMatchNode(graph, matchNodeId, matchName, "until match", false, stmt.pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
-        return this.processUntilMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes a for-match statement with a custom edge label.
-     */
-    private processForMatchStatementWithLabel(
-        graph: GGraphType,
-        stmt: ForMatchStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const nodeId = idRegistry.getId(stmt);
-        const matchNodeId = stmt.pattern ? idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
-        const matchName = (stmt.pattern ? idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
-        this.createMatchNode(graph, matchNodeId, matchName, "for match", true, stmt.pattern, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, matchNodeId, edgeLabel);
-        return this.processForMatchStatementBody(graph, stmt, matchNodeId, idRegistry);
-    }
-
-    /**
-     * Processes an if-expression statement with a custom edge label.
-     */
-    private processIfExpressionStatementWithLabel(
-        graph: GGraphType,
-        stmt: IfExpressionStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const stmtId = idRegistry.getId(stmt);
-        const splitId = `${stmtId}_split`;
-        const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createSplitNode(graph, splitId, conditionText);
-        this.createControlFlowEdge(graph, previousNodeId, splitId, edgeLabel);
-        return this.processIfExpressionStatementBranches(graph, stmt, stmtId, splitId, idRegistry);
-    }
-
-    /**
-     * Processes a while-expression statement with a custom edge label.
-     */
-    private processWhileExpressionStatementWithLabel(
-        graph: GGraphType,
-        stmt: WhileExpressionStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const stmtId = idRegistry.getId(stmt);
-        const splitId = `${stmtId}_split`;
-        const conditionText = stmt.condition?.$cstNode?.text ?? "?";
-        this.createSplitNode(graph, splitId, conditionText);
-        this.createControlFlowEdge(graph, previousNodeId, splitId, edgeLabel);
-        return this.processWhileExpressionStatementBody(graph, stmt, splitId, idRegistry);
-    }
-
-    /**
-     * Processes a stop statement with a custom edge label.
-     */
-    private processStopStatementWithLabel(
-        graph: GGraphType,
-        stmt: StopStatementType,
-        previousNodeId: string,
-        edgeLabel: string,
-        idRegistry: ModelIdRegistry
-    ): ScopeProcessingResult {
-        const endNodeId = this.createEndNode(graph, stmt, idRegistry);
-        this.createControlFlowEdge(graph, previousNodeId, endNodeId, edgeLabel);
-        return { lastNodeId: undefined };
     }
 
     /**
      * Creates a match node with its pattern elements.
+    /**
+     * Creates a match node with its pattern elements.
      *
      * @param graph The graph to add the node to
-     * @param nodeId The node ID
-     * @param label The label for the match node
-     * @param multiple Whether this is a "for match" (multiple matches)
-     * @param pattern The pattern definition
+     * @param cfgMatchNode The control flow match node to render
      * @param idRegistry The model ID registry
      */
-    private createMatchNode(
-        graph: GGraphType,
-        nodeId: string,
-        matchName: string,
-        label: string,
-        multiple: boolean,
-        pattern: PatternType | undefined,
-        idRegistry: ModelIdRegistry
-    ): void {
+    private createMatchNode(graph: GGraphType, cfgMatchNode: ControlFlowMatchNode, idRegistry: ModelIdRegistry): void {
         const validatedMetadata = this.modelState.getValidatedMetadata();
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
+        const metadata = this.getNodeMetadata(validatedMetadata, cfgMatchNode.id);
 
-        const node = GMatchNode.builder().id(nodeId).label(label).multiple(multiple).meta(metadata).build();
+        const node = GMatchNode.builder().id(cfgMatchNode.id).multiple(cfgMatchNode.multiple).meta(metadata).build();
 
         this.referencedInstancesInCurrentMatch = new Map<string, string>();
 
@@ -976,8 +154,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const deletedInstances = new Set<string>();
         const deletedInstanceNodes = new Map<string, PatternObjectInstanceDeleteType>();
 
-        if (pattern?.elements != undefined) {
-            for (const element of pattern.elements) {
+        if (cfgMatchNode.pattern?.elements != undefined) {
+            for (const element of cfgMatchNode.pattern.elements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
                     const instance = element as PatternObjectInstanceType;
                     if (instance.name) {
@@ -1019,8 +197,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
         }
 
-        if (pattern?.elements != undefined) {
-            for (const element of pattern.elements) {
+        if (cfgMatchNode.pattern?.elements != undefined) {
+            for (const element of cfgMatchNode.pattern.elements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
                     const instance = element as PatternObjectInstanceType;
                     this.createPatternInstanceNode(node, instance, idRegistry);
@@ -1030,7 +208,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         for (const [instanceName, reference] of referencedInstanceNodes) {
             if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
-                this.createReferencedInstanceNode(node, instanceName, matchName, reference ?? undefined, idRegistry);
+                this.createReferencedInstanceNode(
+                    node,
+                    instanceName,
+                    cfgMatchNode.id,
+                    reference ?? undefined,
+                    idRegistry
+                );
             }
         }
 
@@ -1040,16 +224,20 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
         }
 
-        if (pattern?.elements != undefined) {
-            for (const element of pattern.elements) {
+        if (cfgMatchNode.pattern?.elements != undefined) {
+            for (const element of cfgMatchNode.pattern.elements) {
                 if (this.reflection.isInstance(element, PatternLink)) {
-                    this.createPatternLinkEdge(node, element as PatternLinkType, matchName, idRegistry);
+                    this.createPatternLinkEdge(node, element as PatternLinkType, cfgMatchNode.id, idRegistry);
                 }
             }
         }
 
-        if (pattern?.elements != undefined) {
-            const container = this.createConstraintCompartments(nodeId, pattern.elements, idRegistry);
+        if (cfgMatchNode.pattern?.elements != undefined) {
+            const container = this.createConstraintCompartments(
+                cfgMatchNode.id,
+                cfgMatchNode.pattern.elements,
+                idRegistry
+            );
             if (container != undefined) {
                 node.children.push(container);
             }
@@ -1096,12 +284,15 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const modifierCompartment = GPatternModifierTitleCompartment.builder()
                 .id(`${nodeId}#modifier-title`)
                 .build();
-            const labelText = typeName != undefined ? `${name} : ${typeName}` : name;
-            const label = GPatternInstanceNameLabel.builder()
-                .id(`${nodeId}#name`)
-                .text(labelText)
-                .readonly(true)
+
+            const modifierLabel = GPatternModifierLabel.builder()
+                .id(`${nodeId}#modifier-label`)
+                .text(`\u00ab${modifier}\u00bb`)
                 .build();
+            modifierCompartment.children.push(modifierLabel);
+
+            const labelText = typeName != undefined ? `${name} : ${typeName}` : name;
+            const label = GPatternInstanceNameLabel.builder().id(`${nodeId}#name`).text(labelText).build();
             modifierCompartment.children.push(label);
             node.children.push(modifierCompartment);
         } else {
@@ -1207,11 +398,15 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         }
 
         const modifierCompartment = GPatternModifierTitleCompartment.builder().id(`${nodeId}#modifier-title`).build();
-        const label = GPatternInstanceNameLabel.builder()
-            .id(`${nodeId}#name`)
-            .text(instanceName)
+
+        const modifierLabel = GPatternModifierLabel.builder()
+            .id(`${nodeId}#modifier-label`)
+            .text(`\u00ab${PatternModifierKind.DELETE}\u00bb`)
             .readonly(true)
             .build();
+        modifierCompartment.children.push(modifierLabel);
+
+        const label = GPatternInstanceNameLabel.builder().id(`${nodeId}#name`).text(instanceName).build();
         modifierCompartment.children.push(label);
         node.children.push(modifierCompartment);
 
@@ -1234,7 +429,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             .build();
 
         const labelText = typeName != undefined ? `${name} : ${typeName}` : name;
-        const label = GPatternInstanceNameLabel.builder().id(`${nodeId}#name`).text(labelText).readonly(true).build();
+        const label = GPatternInstanceNameLabel.builder().id(`${nodeId}#name`).text(labelText).build();
 
         compartment.children.push(label);
         return [compartment];
@@ -1273,7 +468,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const valueText = prop.value?.$cstNode?.text ?? "?";
             const propText = `${propName} ${operator} ${valueText}`;
 
-            const label = GPatternPropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(true).build();
+            const label = GPatternPropertyLabel.builder().id(`${propId}#label`).text(propText).build();
 
             compartment.children.push(label);
         }
@@ -1309,11 +504,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 const where = element as WhereClauseType;
                 const whereId = idRegistry.getId(where);
                 const exprText = where.expression?.$cstNode?.text ?? "?";
-                const label = GWhereClauseLabel.builder()
-                    .id(`${whereId}#label`)
-                    .text(`where ${exprText}`)
-                    .readonly(true)
-                    .build();
+                const label = GWhereClauseLabel.builder().id(`${whereId}#label`).text(`where ${exprText}`).build();
                 whereClauseLabels.push(label);
             }
         }
@@ -1332,7 +523,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 }
                 varText += ` = ${valueText}`;
 
-                const label = GVariableLabel.builder().id(`${varId}#label`).text(varText).readonly(true).build();
+                const label = GVariableLabel.builder().id(`${varId}#label`).text(varText).build();
                 variableLabels.push(label);
             }
         }
@@ -1464,11 +655,22 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         this.addPatternLinkLabels(edge, edgeId, sourceProperty, targetProperty);
 
         if (modifier !== PatternModifierKind.NONE) {
+            const modifierNodeId = `${edgeId}#modifier-node`;
+            const modifierNodeMetadata = this.getNodeMetadata(validatedMetadata, modifierNodeId);
+
+            const modifierNode = GPatternLinkModifierNode.builder()
+                .id(modifierNodeId)
+                .modifier(modifier)
+                .meta(modifierNodeMetadata)
+                .build();
+
             const modifierLabel = GPatternLinkModifierLabel.builder()
                 .id(`${edgeId}#modifier-label`)
-                .modifier(modifier)
+                .text(`\u00ab${modifier}\u00bb`)
                 .build();
-            edge.children.push(modifierLabel);
+
+            modifierNode.children.push(modifierLabel);
+            edge.children.push(modifierNode);
         }
 
         parent.children.push(edge);
@@ -1582,12 +784,14 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param sourceId The source node ID
      * @param targetId The target node ID
      * @param label The optional edge label
+     * @param labelId When provided, use as the label element's ID and make it editable
      */
     private createControlFlowEdge(
         graph: GGraphType,
         sourceId: string,
         targetId: string,
-        label: string | undefined
+        label: string | undefined,
+        labelId?: string
     ): void {
         const edgeId = ModelTransformationIdGenerator.controlFlowEdge(sourceId, targetId);
         const validatedMetadata = this.modelState.getValidatedMetadata();
@@ -1607,7 +811,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
             const labelNode = GControlFlowLabelNode.builder().id(labelNodeId).end("source").meta(labelMetadata).build();
 
-            const labelElement = GControlFlowLabel.builder().id(`${edgeId}#label`).text(label).readonly(true).build();
+            const actualLabelId = labelId ?? `${edgeId}#label`;
+            const isReadonly = labelId == undefined;
+            const labelElement = GControlFlowLabel.builder().id(actualLabelId).text(label).readonly(isReadonly).build();
 
             labelNode.children.push(labelElement);
             edge.children.push(labelNode);

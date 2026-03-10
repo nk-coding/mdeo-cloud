@@ -74,7 +74,8 @@ export abstract class BaseOperationHandler extends OperationHandler {
      * @returns the workspace edit that performs the deletion
      */
     protected deleteCstNode(cstNode: CstNode): WorkspaceEdit {
-        return this.workspaceEditService.deleteCstNode(cstNode, this.modelState.sourceUri!);
+        const document = this.getSourceDocument();
+        return this.workspaceEditService.deleteCstNode(cstNode, document);
     }
 
     /**
