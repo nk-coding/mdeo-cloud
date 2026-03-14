@@ -2,7 +2,7 @@ import type { MaybePromise } from "@eclipse-glsp/protocol";
 import type { Command } from "@eclipse-glsp/server";
 import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
-import type { TriggerActionOperation } from "@mdeo/editor-protocol";
+import type { TriggerActionOperation } from "@mdeo/protocol-common";
 import { createTriggerActionProtocol, type ActionStartParams } from "@mdeo/language-common";
 
 const { injectable } = sharedImport("inversify");

@@ -1,6 +1,6 @@
 import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, ShapeTypeHint } from "@eclipse-glsp/server";
 import { sharedImport } from "@mdeo/language-shared";
-import { MetamodelElementType } from "./model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import { GClassNode } from "./model/classNode.js";
 import { GClassLabel } from "./model/classLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";
@@ -56,6 +56,20 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
                 repositionable: true,
                 deletable: true,
                 resizable: true,
+                reparentable: false
+            },
+            {
+                elementTypeId: MetamodelElementType.NODE_ASSOCIATION_PROPERTY,
+                repositionable: false,
+                deletable: false,
+                resizable: false,
+                reparentable: false
+            },
+            {
+                elementTypeId: MetamodelElementType.NODE_ASSOCIATION_MULTIPLICITY,
+                repositionable: false,
+                deletable: true,
+                resizable: false,
                 reparentable: false
             }
         ];

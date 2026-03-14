@@ -1,5 +1,7 @@
-import type { Type, TypeEdge } from "typir";
-import { TypeGraph } from "typir";
+import { sharedImport } from "@mdeo/language-shared";
+import type { Type, TypeEdge, TypeGraph as TypeGraphType } from "typir";
+
+const { TypeGraph } = sharedImport("typir");
 
 /**
  * Edge relation for type dependencies.
@@ -78,7 +80,7 @@ export class CustomTypeGraph extends TypeGraph {
  * @param dependentType The type that depends on another type
  * @param dependencyType The depended-on type
  */
-export function addDependsOnTypeEdge(graph: TypeGraph, dependentType: Type, dependencyType: Type): void {
+export function addDependsOnTypeEdge(graph: TypeGraphType, dependentType: Type, dependencyType: Type): void {
     if (dependentType === dependencyType) {
         return;
     }

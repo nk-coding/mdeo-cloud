@@ -238,7 +238,9 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
 
         const nameNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
         if (nameNode != undefined) {
-            const renameEdit = this.createRenameWorkspaceEdit(nameNode, parseIdentifier(parsed.name));
+            const serializer = this.modelState.languageServices.AstSerializer;
+            const serializedName = serializer.serializePrimitive({ value: parseIdentifier(parsed.name) }, ID);
+            const renameEdit = this.createRenameWorkspaceEdit(nameNode, serializedName);
             if (renameEdit != undefined) {
                 edits.push(renameEdit);
             }

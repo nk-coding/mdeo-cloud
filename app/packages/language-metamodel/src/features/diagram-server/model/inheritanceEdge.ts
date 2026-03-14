@@ -1,5 +1,5 @@
 import { GEdge, GEdgeBuilder } from "@mdeo/language-shared";
-import { MetamodelElementType } from "./elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 
 /**
  * Edge representing an inheritance relationship (extends).

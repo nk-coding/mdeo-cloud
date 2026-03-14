@@ -28,6 +28,16 @@ export abstract class BaseLabelEditValidator extends LabelEditValidator {
     }
 
     /**
+     * Validates a label edit for an unknown model element.
+     * This method is called when the model element being edited cannot be found in the model state.
+     * This can happen when a new label is inserted into the client model and its temporary ID does not yet exist on the server side.
+     *
+     * @param text the new label text
+     * @param modelElementId the ID of the model element being edited
+     */
+    abstract validateUnknown(text: string, modelElementId: string): ValidationStatus;
+
+    /**
      * Creates an error validation status with the given message
      *
      * @param message the error message

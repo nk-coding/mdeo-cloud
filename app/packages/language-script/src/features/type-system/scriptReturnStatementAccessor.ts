@@ -24,7 +24,7 @@ export class ScriptReturnStatementAccessor<
 
     getStatementsFromScope(node: AstNode): AstNode[] | undefined {
         if (this.typir.langium.LangiumServices.AstReflection.isInstance(node, statementTypes.statementsScopeType)) {
-            return (node as any).statements;
+            return node.statements;
         }
         return undefined;
     }

@@ -1,5 +1,5 @@
 import { GEdge, GEdgeBuilder } from "@mdeo/language-shared";
-import { ModelElementType } from "./elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 
 /**
  * Edge representing a link between two object instances.

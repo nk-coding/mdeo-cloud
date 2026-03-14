@@ -3,7 +3,7 @@ import { sharedImport, GEdgeView, type EdgeAttachment, EdgeAttachmentPosition, t
 import type { GPatternLinkEdge } from "../model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "../model/patternLinkEndNode.js";
 import { GPatternLinkModifierNode } from "../model/patternLinkModifierNode.js";
-import { PatternModifierKind } from "../model/elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import type { VNode } from "snabbdom";
 
 const { injectable } = sharedImport("inversify");

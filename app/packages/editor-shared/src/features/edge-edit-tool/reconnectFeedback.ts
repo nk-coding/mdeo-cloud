@@ -1,7 +1,7 @@
 import type { Action, CommandExecutionContext, CommandReturn } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../../sharedImport.js";
 import type { Point } from "@eclipse-glsp/protocol";
-import type { EdgeAnchor } from "@mdeo/editor-protocol";
+import type { EdgeAnchor } from "@mdeo/protocol-common";
 import { GEdge, type ReconnectEnd } from "../../model/edge.js";
 
 const { injectable, inject } = sharedImport("inversify");

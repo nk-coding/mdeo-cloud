@@ -5,7 +5,7 @@ import {
     RequestCreateEdgeInitialSchemaAction,
     RequestCreateEdgeTargetSchemaAction,
     type CreateEdgeSchema
-} from "@mdeo/editor-protocol";
+} from "@mdeo/protocol-common";
 
 const { injectable, inject, optional } = sharedImport("inversify");
 const { TYPES } = sharedImport("@eclipse-glsp/sprotty");

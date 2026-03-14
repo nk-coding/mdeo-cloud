@@ -23,7 +23,7 @@ import { GInheritanceEdgeView } from "./views/inheritanceEdgeView.js";
 import { GAssociationEdgeView } from "./views/associationEdgeView.js";
 import { GAssociationPropertyNodeView } from "./views/associationPropertyNodeView.js";
 import { GAssociationMultiplicityNodeView } from "./views/associationMultiplicityNodeView.js";
-import { MetamodelElementType } from "./model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import { GClassNode } from "./model/classNode.js";
 import { GEnumNode } from "./model/enumNode.js";
 import { GEnumLabel } from "./model/enumLabel.js";
@@ -32,6 +32,9 @@ import { GEnumNodeView } from "./views/enumNodeView.js";
 import { GEnumLabelView } from "./views/enumLabelView.js";
 import { GEnumTitleCompartment } from "./model/enumTitleCompartment.js";
 import { GEnumTitleCompartmentView } from "./views/enumTitleCompartmentView.js";
+import { GEnumEntryLabelView } from "./views/enumEntryLabelView.js";
+import { GPropertyLabelView } from "./views/propertyLabelView.js";
+import { GAssociationMultiplicityLabelView } from "./views/associationMultiplicityLabelView.js";
 
 const { FeatureModule, configureModelElement, editLabelFeature } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -66,10 +69,10 @@ export const metamodelDiagramModule = new FeatureModule(
         configureModelElement(context, MetamodelElementType.LABEL_ENUM_NAME, GEnumLabel, GEnumLabelView, {
             enable: [editLabelFeature]
         });
-        configureModelElement(context, MetamodelElementType.LABEL_ENUM_ENTRY, GEnumEntryLabel, GLabelView, {
+        configureModelElement(context, MetamodelElementType.LABEL_ENUM_ENTRY, GEnumEntryLabel, GEnumEntryLabelView, {
             enable: [editLabelFeature]
         });
-        configureModelElement(context, MetamodelElementType.LABEL_PROPERTY, GPropertyLabel, GLabelView);
+        configureModelElement(context, MetamodelElementType.LABEL_PROPERTY, GPropertyLabel, GPropertyLabelView);
         configureModelElement(context, MetamodelElementType.LABEL_ASSOCIATION_END, GAssociationEndLabel, GLabelView);
         configureModelElement(
             context,
@@ -81,7 +84,7 @@ export const metamodelDiagramModule = new FeatureModule(
             context,
             MetamodelElementType.LABEL_ASSOCIATION_MULTIPLICITY,
             GAssociationMultiplicityLabel,
-            GLabelView
+            GAssociationMultiplicityLabelView
         );
 
         configureModelElement(context, MetamodelElementType.EDGE_INHERITANCE, GInheritanceEdge, GInheritanceEdgeView);

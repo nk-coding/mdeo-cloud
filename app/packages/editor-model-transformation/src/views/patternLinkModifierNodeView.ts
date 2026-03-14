@@ -2,7 +2,7 @@ import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import { sharedImport, GSimpleNodeView, type GNode } from "@mdeo/editor-shared";
 import type { GPatternLinkModifierNode } from "../model/patternLinkModifierNode.js";
-import { PatternModifierKind } from "../model/elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 
 const { injectable } = sharedImport("inversify");
 const { selectFeature } = sharedImport("@eclipse-glsp/sprotty");

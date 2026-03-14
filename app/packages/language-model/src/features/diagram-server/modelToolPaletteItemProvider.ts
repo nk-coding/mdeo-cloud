@@ -2,7 +2,7 @@ import type { Args, PaletteItem } from "@eclipse-glsp/protocol";
 import type { ModelState } from "@mdeo/language-shared";
 import { BaseToolPaletteItemProvider, sharedImport } from "@mdeo/language-shared";
 import type { PartialModel } from "../../grammar/modelPartialTypes.js";
-import type { TriggerActionOperation } from "@mdeo/editor-protocol";
+import type { TriggerActionOperation } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");

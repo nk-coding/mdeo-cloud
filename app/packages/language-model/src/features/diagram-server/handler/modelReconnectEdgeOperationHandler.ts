@@ -9,12 +9,12 @@ import {
     type ReconnectEndpoints,
     type ReconnectEdgeResult
 } from "@mdeo/language-shared";
-import type { ReconnectEdgeOperation } from "@mdeo/editor-protocol";
+import type { ReconnectEdgeOperation } from "@mdeo/protocol-common";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { Link } from "../../../grammar/modelTypes.js";
 import type { PartialLink, PartialObjectInstance } from "../../../grammar/modelPartialTypes.js";
-import { ModelElementType } from "../model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 
 const { injectable, inject } = sharedImport("inversify");
 const { GrammarUtils } = sharedImport("langium");

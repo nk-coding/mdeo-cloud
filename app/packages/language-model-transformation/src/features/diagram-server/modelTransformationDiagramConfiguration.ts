@@ -1,6 +1,6 @@
 import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, ShapeTypeHint } from "@eclipse-glsp/server";
 import { sharedImport } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./model/elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GMatchNode } from "./model/matchNode.js";

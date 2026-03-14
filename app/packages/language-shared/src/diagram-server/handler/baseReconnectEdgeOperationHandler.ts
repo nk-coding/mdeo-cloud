@@ -1,5 +1,5 @@
 import type { Command } from "@eclipse-glsp/server";
-import type { ReconnectEdgeOperation as ReconnectEdgeOperationType } from "@mdeo/editor-protocol";
+import type { ReconnectEdgeOperation as ReconnectEdgeOperationType } from "@mdeo/protocol-common";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import type { GNode } from "../model/node.js";

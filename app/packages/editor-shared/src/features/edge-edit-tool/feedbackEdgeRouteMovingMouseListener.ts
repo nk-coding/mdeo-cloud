@@ -10,7 +10,7 @@ import type {
     EdgeAnchor,
     AnchorSide,
     UpdateRoutingInformationOperation
-} from "@mdeo/editor-protocol";
+} from "@mdeo/protocol-common";
 import type { Bounds as BoundsType } from "@eclipse-glsp/protocol";
 
 const { DragAwareMouseListener, getAbsolutePosition, cursorFeedbackAction, isSelected, CursorCSS } =

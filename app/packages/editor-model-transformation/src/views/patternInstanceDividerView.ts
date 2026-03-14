@@ -1,6 +1,6 @@
 import { GHorizontalDividerView, sharedImport } from "@mdeo/editor-shared";
 import type { GHorizontalDivider } from "@mdeo/editor-shared";
-import { PatternModifierKind } from "../model/elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { isPatternInstanceNode } from "../model/patternInstanceNode.js";
 
 const { injectable } = sharedImport("inversify");
@@ -26,7 +26,7 @@ export class GPatternInstanceDividerView extends GHorizontalDividerView {
             "border-delete": parentInstance?.modifier === PatternModifierKind.DELETE,
             "border-forbid": parentInstance?.modifier === PatternModifierKind.FORBID,
             "border-require": parentInstance?.modifier === PatternModifierKind.REQUIRE,
-            "border-foreground": parentInstance?.modifier === PatternModifierKind.NONE
+            "border-foreground": parentInstance?.modifier === PatternModifierKind.NONE || parentInstance == undefined
         };
     }
 }

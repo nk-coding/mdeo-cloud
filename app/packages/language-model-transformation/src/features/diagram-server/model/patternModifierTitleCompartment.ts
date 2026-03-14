@@ -1,5 +1,5 @@
 import { GCompartment, GCompartmentBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Compartment that displays a pattern modifier stereotype (e.g. «create», «delete», «forbid», «require»)

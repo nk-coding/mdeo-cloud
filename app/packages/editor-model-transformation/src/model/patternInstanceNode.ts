@@ -1,7 +1,7 @@
 import { FEEDBACK_EDGE_ID, GRectangularNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
 import type { GEdge } from "@mdeo/editor-shared";
 import type { GModelElement } from "@eclipse-glsp/sprotty";
-import { PatternModifierKind } from "./elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { GPatternLinkEdge } from "./patternLinkEdge.js";
 
 const { connectableFeature, deletableFeature, selectFeature, boundsFeature, moveFeature, fadeFeature } =

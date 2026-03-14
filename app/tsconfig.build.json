@@ -9,6 +9,18 @@
             "path": "packages/language-common"
         },
         {
+            "path": "packages/protocol-common"
+        },
+        {
+            "path": "packages/protocol-metamodel"
+        },
+        {
+            "path": "packages/protocol-model"
+        },
+        {
+            "path": "packages/protocol-model-transformation"
+        },
+        {
             "path": "packages/language-shared"
         },
         {
@@ -34,9 +46,6 @@
         },
         {
             "path": "packages/language-script"
-        },
-        {
-            "path": "packages/editor-protocol"
         },
         {
             "path": "packages/editor-common"

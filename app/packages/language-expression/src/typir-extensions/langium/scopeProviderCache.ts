@@ -22,7 +22,7 @@ export function generateScopeProviderCache<Specifics extends TypirLangiumSpecifi
         protected readonly cache: WorkspaceCacheType<unknown, Scope<Specifics>>;
 
         constructor(services: ExtendedTypirServices<Specifics> & TypirLangiumServices<Specifics>) {
-            this.cache = new WorkspaceCache(services.langium.LangiumServices as any, DocumentState.IndexedReferences);
+            this.cache = new WorkspaceCache(services.langium.LangiumServices, DocumentState.IndexedReferences);
         }
 
         cacheSet(languageNode: Specifics["LanguageType"], scope: Scope<Specifics>): void {

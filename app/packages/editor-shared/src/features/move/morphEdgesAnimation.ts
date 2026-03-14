@@ -1,4 +1,4 @@
-import type { EdgeAnchor } from "@mdeo/editor-protocol";
+import type { EdgeAnchor } from "@mdeo/protocol-common";
 import type { EdgeMemento } from "./edgeMemento.js";
 import type { EdgeRouter } from "../edge-routing/edgeRouter.js";
 import type { CommandExecutionContext, GModelRoot, Point } from "@eclipse-glsp/sprotty";

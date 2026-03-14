@@ -20,6 +20,13 @@ import { CreatePatternLinkOperationHandler } from "./handler/createPatternLinkOp
 import { ModelTransformationReconnectEdgeOperationHandler } from "./handler/modelTransformationReconnectEdgeOperationHandler.js";
 import { ModelTransformationDeleteElementOperationHandler } from "./handler/modelTransformationDeleteElementOperationHandler.js";
 import { ModelTransformationApplyLabelEditOperationHandler } from "./handler/modelTransformationApplyLabelEditOperationHandler.js";
+import { AddPropertyValueComparisonOperationHandler } from "./handler/addPropertyValueComparisonOperationHandler.js";
+import { AddWhereClauseOperationHandler } from "./handler/addWhereClauseOperationHandler.js";
+import { AddVariableOperationHandler } from "./handler/addVariableOperationHandler.js";
+import { ChangeLinkTypeOperationHandler } from "./handler/changeLinkTypeOperationHandler.js";
+import { ChangePatternElementModifierOperationHandler } from "./handler/changePatternElementModifierOperationHandler.js";
+import { InsertControlFlowStatementOperationHandler } from "./handler/insertControlFlowStatementOperationHandler.js";
+import { ConvertMatchNodeOperationHandler } from "./handler/convertMatchNodeOperationHandler.js";
 import { ModelTransformationLabelEditValidator } from "./modelTransformationLabelEditValidator.js";
 import { ModelTransformationToolPaletteItemProvider } from "./modelTransformationToolPaletteItemProvider.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
@@ -63,6 +70,13 @@ export class ModelTransformationDiagramModule extends BaseDiagramModule {
         binding.add(ModelTransformationReconnectEdgeOperationHandler);
         binding.add(ModelTransformationDeleteElementOperationHandler);
         binding.add(ModelTransformationApplyLabelEditOperationHandler);
+        binding.add(AddPropertyValueComparisonOperationHandler);
+        binding.add(AddWhereClauseOperationHandler);
+        binding.add(AddVariableOperationHandler);
+        binding.add(ChangeLinkTypeOperationHandler);
+        binding.add(ChangePatternElementModifierOperationHandler);
+        binding.add(InsertControlFlowStatementOperationHandler);
+        binding.add(ConvertMatchNodeOperationHandler);
     }
 
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {

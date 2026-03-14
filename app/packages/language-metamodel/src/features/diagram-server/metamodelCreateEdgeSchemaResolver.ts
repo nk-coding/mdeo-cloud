@@ -1,11 +1,11 @@
-import type { CreateEdgeSchema } from "@mdeo/editor-protocol";
+import type { CreateEdgeSchema } from "@mdeo/protocol-common";
 import { CreateEdgeSchemaResolver, sharedImport } from "@mdeo/language-shared";
 import type { ModelState, GModelIndex } from "@mdeo/language-shared";
 import type { InitialCreateEdgeSchemaRequest, TargetCreateEdgeSchemaRequest } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import type { GModelElementSchema } from "@eclipse-glsp/protocol";
 import { Class, type ClassType } from "../../grammar/metamodelTypes.js";
-import { MetamodelElementType, AssociationEndKind } from "./model/elementTypes.js";
+import { MetamodelElementType, AssociationEndKind } from "@mdeo/protocol-metamodel";
 import { GAssociationEdge } from "./model/associationEdge.js";
 import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
 import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
@@ -13,6 +13,7 @@ import { GInheritanceEdge } from "./model/inheritanceEdge.js";
 import { GClassNode } from "./model/classNode.js";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { collectAllPropertyNames } from "../../validation/metamodelValidator.js";
+import { generateDefaultPropertyName } from "./handler/metamodelHandlerUtils.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -182,12 +183,16 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
      * already-used names. If the base name is taken, numerically suffixed
      * candidates are tried until a free one is found.
      *
+     * The base conversion is delegated to {@link generateDefaultPropertyName} so
+     * that both the create-edge flow and the change-association-end flow use the
+     * same naming convention.
+     *
      * @param baseName The base class name to derive the property name from
      * @param usedNames The set of already-used property names in the target class
      * @returns A unique property name derived from baseName
      */
     private computePropertyName(baseName: string, usedNames: Set<string>): string {
-        const base = baseName.charAt(0).toLowerCase() + baseName.slice(1);
+        const base = generateDefaultPropertyName(baseName);
         if (!usedNames.has(base)) {
             return base;
         }

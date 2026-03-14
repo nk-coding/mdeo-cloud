@@ -11,7 +11,7 @@
             "path": "../language-common"
         },
         {
-            "path": "../editor-protocol"
+            "path": "../protocol-common"
         }
     ]
 }

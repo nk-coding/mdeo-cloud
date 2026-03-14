@@ -1,4 +1,4 @@
-import type { CreateEdgeSchema } from "@mdeo/editor-protocol";
+import type { CreateEdgeSchema } from "@mdeo/protocol-common";
 import { CreateEdgeSchemaResolver, sharedImport } from "@mdeo/language-shared";
 import type {
     ModelState,
@@ -21,7 +21,7 @@ import { GPatternInstanceNode } from "./model/patternInstanceNode.js";
 import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkEndLabel } from "./model/patternLinkEndLabel.js";
-import { ModelTransformationElementType, PatternModifierKind } from "./model/elementTypes.js";
+import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import type { GModelElementSchema } from "@eclipse-glsp/protocol";
 import type { PatternLinkSchemaParams } from "./handler/createPatternLinkOperationHandler.js";

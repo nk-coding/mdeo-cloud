@@ -5,7 +5,7 @@ import {
     RequestCreateEdgeTargetSchemaAction,
     SetCreateEdgeInitialSchemaAction,
     SetCreateEdgeTargetSchemaAction
-} from "@mdeo/editor-protocol";
+} from "@mdeo/protocol-common";
 import { CreateEdgeSchemaResolver } from "../createEdgeSchemaResolver.js";
 
 const { injectable, inject } = sharedImport("inversify");

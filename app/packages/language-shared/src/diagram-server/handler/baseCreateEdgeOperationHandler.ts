@@ -4,7 +4,7 @@ import type { EdgeMetadata } from "../metadata.js";
 import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
-import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
+import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import { GNode } from "../model/node.js";
 
 const { injectable } = sharedImport("inversify");

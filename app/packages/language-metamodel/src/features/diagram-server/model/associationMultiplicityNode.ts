@@ -1,5 +1,5 @@
 import { GNode, GNodeBuilder } from "@mdeo/language-shared";
-import { MetamodelElementType } from "./elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 
 /**
  * Node for association multiplicity information.

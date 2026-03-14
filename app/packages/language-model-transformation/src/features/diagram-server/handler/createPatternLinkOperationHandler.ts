@@ -7,7 +7,7 @@ import {
     type ModelIdProvider,
     type ModelIdRegistry
 } from "@mdeo/language-shared";
-import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
+import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import { LinkAssociationResolver, type LinkAssociationDisambiguation } from "@mdeo/language-model";
 import type { AstNode } from "langium";
 import type { CompositeCstNode } from "langium";
@@ -27,7 +27,7 @@ import {
     type PatternType
 } from "../../../grammar/modelTransformationTypes.js";
 import type { ClassType } from "@mdeo/language-metamodel";
-import { ModelTransformationElementType, PatternModifierKind } from "../model/elementTypes.js";
+import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { GPatternInstanceNode } from "../model/patternInstanceNode.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 

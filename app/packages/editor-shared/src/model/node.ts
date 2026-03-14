@@ -1,6 +1,6 @@
 import type { Fadeable, FluentIterable, Hoverable, Point, Selectable } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
-import type { NodeLayoutMetadata, EdgeAnchor } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata, EdgeAnchor } from "@mdeo/protocol-common";
 import { GEdge } from "./edge.js";
 import type { Connectable } from "../features/edge-routing/connectable.js";
 

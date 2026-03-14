@@ -1,5 +1,5 @@
-import type { CreateEdgeSchema } from "@mdeo/editor-protocol";
-import { ModelElementType } from "./model/elementTypes.js";
+import type { CreateEdgeSchema } from "@mdeo/protocol-common";
+import { ModelElementType } from "@mdeo/protocol-model";
 import { sharedImport, CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 import type { ModelState, GModelIndex } from "@mdeo/language-shared";
 import type { InitialCreateEdgeSchemaRequest, TargetCreateEdgeSchemaRequest } from "@mdeo/language-shared";

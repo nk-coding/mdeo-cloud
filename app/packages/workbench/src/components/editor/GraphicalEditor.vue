@@ -16,7 +16,7 @@ import { workbenchStateKey } from "../workbench/util";
 import { DiagramLoader } from "@eclipse-glsp/client";
 import { editorContextKey } from "@/lib/editorPlugin";
 import { useResizeObserver } from "@vueuse/core";
-import type { ResetCanvasBoundsAction } from "@mdeo/editor-protocol";
+import type { ResetCanvasBoundsAction } from "@mdeo/protocol-common";
 import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { EditMode, TYPES } from "@eclipse-glsp/sprotty";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";

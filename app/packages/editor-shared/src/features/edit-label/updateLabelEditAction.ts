@@ -70,7 +70,10 @@ export class UpdateLabelEditCommand extends Command {
     }
 
     override execute(context: CommandExecutionContext): CommandReturn {
-        const label = context.root.index.getById(this.action.labelId) as GLabel;
+        const label = context.root.index.getById(this.action.labelId) as GLabel | undefined;
+        if (label == undefined) {
+            return LocalRequestBoundsAction.fromCommand(context, this.actionDispatcher, this.action);
+        }
         label.editMode = this.action.editMode;
         if (this.action.tempText != undefined) {
             label.tempText = this.action.tempText;

@@ -1,6 +1,6 @@
 import { BaseLabelEditValidator, parseIdentifier, sharedImport, type GModelIndex } from "@mdeo/language-shared";
 import type { GModelElement, ValidationStatus as ValidationStatusType } from "@eclipse-glsp/server";
-import { MetamodelElementType } from "./model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import type { GClassNode } from "./model/classNode.js";
 import type { GEnumNode } from "./model/enumNode.js";
 import type { GClassLabel } from "./model/classLabel.js";
@@ -18,6 +18,8 @@ import {
     MetamodelPrimitiveTypes
 } from "../../grammar/metamodelTypes.js";
 import { collectAllPropertyNames } from "../../validation/metamodelValidator.js";
+import { NEW_PROPERTY_LABEL_PREFIX } from "./handler/addPropertyOperationHandler.js";
+import { NEW_ENUM_ENTRY_LABEL_PREFIX } from "./handler/addEnumEntryOperationHandler.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -67,6 +69,133 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
             return this.validateMultiplicity(label) ?? ValidationStatus.NONE;
         }
         return ValidationStatus.NONE;
+    }
+
+    /**
+     * Validates a label edit for a newly inserted placeholder label whose element does not
+     * yet exist in the server-side model index.
+     *
+     * Handles all insert actions defined in this package:
+     * - {@link NEW_PROPERTY_LABEL_PREFIX} — new property placeholder on a class node
+     * - {@link NEW_ENUM_ENTRY_LABEL_PREFIX} — new enum-entry placeholder on an enum node
+     *
+     * @param text The label text currently being entered
+     * @param modelElementId The temporary label element ID from the {@link InsertNewLabelAction}
+     * @returns Validation status for the in-progress edit
+     */
+    override validateUnknown(text: string, modelElementId: string): ValidationStatusType {
+        if (modelElementId.startsWith(NEW_PROPERTY_LABEL_PREFIX)) {
+            return this.validateNewPropertyLabel(text, modelElementId) ?? ValidationStatus.NONE;
+        }
+        if (modelElementId.startsWith(NEW_ENUM_ENTRY_LABEL_PREFIX)) {
+            return this.validateNewEnumEntryLabel(text, modelElementId) ?? ValidationStatus.NONE;
+        }
+        return ValidationStatus.NONE;
+    }
+
+    /**
+     * Validates the label text for a brand-new (not yet committed) property.
+     *
+     * Checks format, type validity, multiplicity, and uniqueness within the class hierarchy
+     * by looking up the parent class node from the label ID.
+     *
+     * @param text The label text
+     * @param modelElementId The placeholder label ID containing the parent class node ID
+     * @returns A validation status if invalid, undefined otherwise
+     */
+    private validateNewPropertyLabel(text: string, modelElementId: string): ValidationStatusType | undefined {
+        if (text.trim().length === 0) {
+            return undefined;
+        }
+
+        const formatValidation = this.validatePropertyFormat(text);
+        if (formatValidation != undefined) {
+            return formatValidation;
+        }
+
+        const parsed = parsePropertyLabel(text);
+        if (parsed == undefined) {
+            return this.error(
+                "Invalid property format. Expected: 'name: type' or 'name: type[multiplicity]'. " +
+                    "Valid multiplicity formats: [*], [+], [?], [number], [number..*], [number..number]"
+            );
+        }
+
+        const identifierValidation = this.validateRawIdentifier(parsed.identifier, "Property identifier");
+        if (identifierValidation != undefined) {
+            return identifierValidation;
+        }
+
+        const typeValidation = this.validatePropertyType(parsed.type);
+        if (typeValidation != undefined) {
+            return typeValidation;
+        }
+
+        if (parsed.multiplicity != undefined) {
+            const multiplicityValidation = this.validateMultiplicity(parsed.multiplicity);
+            if (multiplicityValidation != undefined) {
+                return multiplicityValidation;
+            }
+        }
+
+        // Uniqueness check: look up the parent class node from the label ID
+        const classNodeId = modelElementId.substring(NEW_PROPERTY_LABEL_PREFIX.length);
+        const classElement = this.modelState.index.find(classNodeId);
+        if (classElement != undefined) {
+            const classAstNode = this.index.getAstNode(classElement);
+            const reflection = this.reflection;
+            if (classAstNode != undefined && reflection.isInstance(classAstNode, Class)) {
+                const parsedIdentifier = parseIdentifier(parsed.identifier);
+                const allPropertyNames = collectAllPropertyNames(classAstNode as ClassType, reflection);
+                if (allPropertyNames.some((name) => name === parsedIdentifier)) {
+                    return this.error(
+                        `A property with the name '${parsedIdentifier}' already exists in the class hierarchy.`
+                    );
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Validates the label text for a brand-new (not yet committed) enum entry.
+     *
+     * Checks that the name is a valid identifier and is unique within the parent enum by
+     * looking up the parent enum node from the label ID.
+     *
+     * @param text The label text
+     * @param modelElementId The placeholder label ID containing the parent enum node ID
+     * @returns A validation status if invalid, undefined otherwise
+     */
+    private validateNewEnumEntryLabel(text: string, modelElementId: string): ValidationStatusType | undefined {
+        if (text.trim().length === 0) {
+            return undefined;
+        }
+
+        const trimmedName = text.trim();
+        const identifierValidation = this.validateIdentifier(trimmedName, "Enum entry");
+        if (identifierValidation != undefined) {
+            return identifierValidation;
+        }
+
+        // Uniqueness check: look up the parent enum node from the label ID
+        const enumNodeId = modelElementId.substring(NEW_ENUM_ENTRY_LABEL_PREFIX.length);
+        const enumElement = this.modelState.index.find(enumNodeId);
+        if (enumElement != undefined) {
+            const enumAstNode = this.index.getAstNode(enumElement);
+            const reflection = this.reflection;
+            if (enumAstNode != undefined && reflection.isInstance(enumAstNode, Enum)) {
+                const enumType = enumAstNode as EnumType;
+                for (const entry of enumType.entries ?? []) {
+                    if (entry.name === trimmedName) {
+                        return this.error(`An entry with the name '${trimmedName}' already exists in this enum.`);
+                    }
+                }
+            }
+        }
+
+        return undefined;
     }
 
     /**

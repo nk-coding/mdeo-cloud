@@ -1,7 +1,7 @@
 import type { Action } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../../sharedImport.js";
 import type { ActionDispatcher, CommandExecutionContext, CommandReturn } from "@eclipse-glsp/sprotty";
-import type { LayoutOperation } from "@mdeo/editor-protocol";
+import type { LayoutOperation } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { Command, TYPES, isBoundsAware } = sharedImport("@eclipse-glsp/sprotty");

@@ -1,5 +1,5 @@
 import { GCompartment, GCompartmentBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Container node that wraps the bottom compartments of a match node.

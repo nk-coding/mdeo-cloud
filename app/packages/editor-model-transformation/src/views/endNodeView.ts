@@ -2,7 +2,7 @@ import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 import type { GEndNode } from "../model/endNode.js";
-import { EndNodeKind } from "../model/elementTypes.js";
+import { EndNodeKind } from "@mdeo/protocol-model-transformation";
 
 const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");

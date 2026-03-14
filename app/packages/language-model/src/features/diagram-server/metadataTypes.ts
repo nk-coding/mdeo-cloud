@@ -1,5 +1,5 @@
 import type { Point } from "@eclipse-glsp/protocol";
-import type { NodePositionMetadata, NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodePositionMetadata, NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/protocol-common";
 
 /**
  * Helper function to validate if an object is a valid Point.

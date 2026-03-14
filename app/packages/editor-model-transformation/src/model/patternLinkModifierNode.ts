@@ -1,5 +1,5 @@
 import { GNode, sharedImport } from "@mdeo/editor-shared";
-import { PatternModifierKind } from "./elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 
 const { boundsFeature } = sharedImport("@eclipse-glsp/sprotty");
 

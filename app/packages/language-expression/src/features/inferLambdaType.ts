@@ -122,7 +122,7 @@ function inferFromAssignment<Specifics extends TypirLangiumSpecifics>(
     assignmentNode: AssignmentStatementType,
     services: ExpressionTypirServices<Specifics>
 ): LambdaTypeInferenceResult<Specifics> {
-    const leftType = services.Inference.inferType((assignmentNode as any).left);
+    const leftType = services.Inference.inferType(assignmentNode.left);
 
     if (Array.isArray(leftType)) {
         return createInferenceProblem(services, lambdaNode, "Cannot infer type of assignment target.", leftType);

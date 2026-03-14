@@ -1,5 +1,5 @@
 import { GNode, GNodeBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Node representing the start of the transformation.

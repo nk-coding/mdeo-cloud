@@ -75,10 +75,12 @@ export abstract class GNodeViewBase extends ShapeView {
     }
 
     /**
-     * Renders all control elements (selection rectangle and resize handles) for the node that should be rendered in front of the node.
+     * Renders all control elements for the node that should be rendered in front of the node.
+     * Context action rails are no longer rendered here; they are handled by
+     * {@link ContextActionsUIExtension} as a DOM overlay.
      *
      * @param model The model of the element
-     * @returns The control elements
+     * @returns The foreground control VNodes
      */
     protected renderForegroundControlElements(model: Readonly<GNode>): VNode[] {
         const result: VNode[] = [];

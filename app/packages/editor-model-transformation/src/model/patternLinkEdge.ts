@@ -1,5 +1,5 @@
 import { GEdge } from "@mdeo/editor-shared";
-import type { PatternModifierKind } from "./elementTypes.js";
+import type { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 
 /**
  * Client-side model for pattern link edges.

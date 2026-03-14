@@ -66,7 +66,7 @@
         "vue-sonner": "^2.0.9"
     },
     "devDependencies": {
-        "@mdeo/editor-protocol": "^0.1.0",
+        "@mdeo/protocol-common": "^0.1.0",
         "@mdeo/language-shared": "^0.1.0",
         "@types/hast": "^3.0.4",
         "@types/node": "^25.3.1",

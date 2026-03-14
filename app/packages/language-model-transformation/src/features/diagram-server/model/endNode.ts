@@ -1,6 +1,6 @@
 import { GNode, GNodeBuilder } from "@mdeo/language-shared";
-import type { EndNodeKind } from "./elementTypes.js";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import type { EndNodeKind } from "@mdeo/protocol-model-transformation";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Node representing the end of a control flow path (stop or kill).

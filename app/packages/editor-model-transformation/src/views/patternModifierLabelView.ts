@@ -1,7 +1,7 @@
 import { GLabelView, sharedImport } from "@mdeo/editor-shared";
 import type { GLabel } from "@mdeo/editor-shared";
 import { isPatternInstanceNode } from "../model/patternInstanceNode.js";
-import { PatternModifierKind } from "../model/elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 
 const { injectable } = sharedImport("inversify");
 const { findParentByFeature } = sharedImport("@eclipse-glsp/sprotty");

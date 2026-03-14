@@ -124,7 +124,7 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
             }
         },
         postCreate(services) {
-            initializeLangiumTypirServices(services as any, services.typir);
+            initializeLangiumTypirServices(services, services.typir);
             registerDefaultTokenSerializers(services);
             registerTypeSerializers(services, typeTypes);
             registerExpressionSerializers(services, expressionTypes);

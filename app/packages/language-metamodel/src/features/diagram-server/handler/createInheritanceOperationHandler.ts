@@ -1,6 +1,6 @@
 import type { GNode, CreateEdgeResult } from "@mdeo/language-shared";
 import { sharedImport } from "@mdeo/language-shared";
-import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
+import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import {
     ClassExtension,
     ClassExtensions,
@@ -8,7 +8,7 @@ import {
     type ClassExtensionType,
     type ClassExtensionsType
 } from "../../../grammar/metamodelTypes.js";
-import { MetamodelElementType } from "../model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import { MetamodelBaseCreateEdgeOperationHandler } from "./metamodelBaseCreateEdgeOperationHandler.js";
 import { GClassNode } from "../model/classNode.js";
 

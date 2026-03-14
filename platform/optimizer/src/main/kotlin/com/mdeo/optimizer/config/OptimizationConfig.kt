@@ -136,10 +136,14 @@ data class SolverConfig(
     val scriptTimeout: Int? = null
 ) {
     companion object {
-        /** Default per-script timeout when none is configured: 30 seconds. */
+        /**
+         * Default per-script timeout when none is configured: 30 seconds. 
+         */
         const val DEFAULT_SCRIPT_TIMEOUT_SECONDS: Int = 30
 
-        /** Maximum allowed per-script timeout: 10 minutes (600 seconds). */
+        /**
+         * Maximum allowed per-script timeout: 10 minutes (600 seconds). 
+         */
         const val MAX_SCRIPT_TIMEOUT_SECONDS: Int = 600
     }
 

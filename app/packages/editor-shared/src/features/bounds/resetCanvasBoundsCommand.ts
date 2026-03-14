@@ -1,5 +1,5 @@
 import type { CommandExecutionContext, CommandReturn } from "@eclipse-glsp/sprotty";
-import type { ResetCanvasBoundsAction } from "@mdeo/editor-protocol";
+import type { ResetCanvasBoundsAction } from "@mdeo/protocol-common";
 import { sharedImport } from "../../sharedImport.js";
 
 const { injectable, inject } = sharedImport("inversify");

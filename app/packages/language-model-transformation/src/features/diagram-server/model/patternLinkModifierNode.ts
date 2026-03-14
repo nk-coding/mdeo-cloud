@@ -1,6 +1,6 @@
 import { GNode, GNodeBuilder } from "@mdeo/language-shared";
-import type { PatternModifierKind } from "./elementTypes.js";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import type { PatternModifierKind } from "@mdeo/protocol-model-transformation";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Server-side model for a pattern link modifier node.

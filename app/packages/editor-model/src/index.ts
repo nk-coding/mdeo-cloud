@@ -1,4 +1,3 @@
-export * from "./model/elementTypes.js";
 export * from "./model/linkEdge.js";
 export * from "./model/linkEndLabel.js";
 export * from "./model/linkEndNode.js";
@@ -9,5 +8,6 @@ export * from "./views/linkEdgeView.js";
 export * from "./views/linkEndNodeView.js";
 export * from "./views/objectLabelView.js";
 export * from "./views/objectNodeView.js";
+export * from "./views/propertyValueLabelView.js";
 export * from "./module.js";
 export * from "./plugin.js";

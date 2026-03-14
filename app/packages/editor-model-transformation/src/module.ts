@@ -8,7 +8,7 @@ import {
     GHorizontalDivider,
     CreateEdgeContextProvider
 } from "@mdeo/editor-shared";
-import { ModelTransformationElementType } from "./model/elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import { GPatternInstanceNode } from "./model/patternInstanceNode.js";
 import { GPatternModifierTitleCompartment } from "./model/patternModifierTitleCompartment.js";
 import { GPatternInstanceNameLabel } from "./model/patternInstanceNameLabel.js";
@@ -48,6 +48,8 @@ import { GPatternLinkModifierNode } from "./model/patternLinkModifierNode.js";
 import { GPatternModifierLabel } from "./model/patternModifierLabel.js";
 import { GPatternLinkModifierLabelView } from "./views/patternLinkModifierLabelView.js";
 import { GPatternLinkModifierNodeView } from "./views/patternLinkModifierNodeView.js";
+import { GWhereClauseLabelView } from "./views/whereClauseLabelView.js";
+import { GVariableLabelView } from "./views/variableLabelView.js";
 import { GPatternModifierLabelView } from "./views/patternModifierLabelView.js";
 import { PatternLinkContextProvider } from "./features/create-edge/patternLinkContextProvider.js";
 
@@ -149,12 +151,17 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GMatchNodeCompartmentsView
         );
 
-        configureModelElement(context, ModelTransformationElementType.LABEL_VARIABLE, GVariableLabel, GLabelView);
+        configureModelElement(
+            context,
+            ModelTransformationElementType.LABEL_VARIABLE,
+            GVariableLabel,
+            GVariableLabelView
+        );
         configureModelElement(
             context,
             ModelTransformationElementType.LABEL_WHERE_CLAUSE,
             GWhereClauseLabel,
-            GLabelView
+            GWhereClauseLabelView
         );
         configureModelElement(
             context,

@@ -20,6 +20,8 @@ import { ModelToolPaletteItemProvider } from "./modelToolPaletteItemProvider.js"
 import { ModelLayoutEngine } from "./modelLayoutEngine.js";
 import { ModelCreateEdgeSchemaResolver } from "./modelCreateEdgeSchemaResolver.js";
 import { CreateLinkOperationHandler } from "./handler/createLinkOperationHandler.js";
+import { AddPropertyValueOperationHandler } from "./handler/addPropertyValueOperationHandler.js";
+import { ChangeLinkTypeOperationHandler } from "./handler/changeLinkTypeOperationHandler.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
 
 const { injectable } = sharedImport("inversify");
@@ -53,6 +55,8 @@ export class ModelDiagramModule extends BaseDiagramModule {
         binding.add(CreateLinkOperationHandler);
         binding.add(CreateObjectOperationHandler);
         binding.add(ModelDeleteElementOperationHandler);
+        binding.add(AddPropertyValueOperationHandler);
+        binding.add(ChangeLinkTypeOperationHandler);
     }
 
     protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {

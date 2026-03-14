@@ -1,6 +1,6 @@
 import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, ShapeTypeHint } from "@eclipse-glsp/server";
 import { sharedImport } from "@mdeo/language-shared";
-import { ModelElementType } from "./model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 import { GObjectNode } from "./model/objectNode.js";
 import { GObjectNameLabel } from "./model/objectNameLabel.js";
 import { GPropertyLabel } from "./model/propertyLabel.js";

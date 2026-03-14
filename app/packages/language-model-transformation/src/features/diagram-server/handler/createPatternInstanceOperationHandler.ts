@@ -32,7 +32,7 @@ import {
     type UntilMatchStatementType,
     type ForMatchStatementType
 } from "../../../grammar/modelTransformationTypes.js";
-import { ModelTransformationElementType, PatternModifierKind } from "../model/elementTypes.js";
+import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import type { ModelTransformationMetadataManager } from "../modelTransformationMetadataManager.js";
 import type { ModelTransformationGModelFactory } from "../modelTransformationGModelFactory.js";
 import { GPatternInstanceNode } from "../model/patternInstanceNode.js";

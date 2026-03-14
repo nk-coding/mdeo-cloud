@@ -1,5 +1,5 @@
 import { GCompartment, GCompartmentBuilder } from "@mdeo/language-shared";
-import { MetamodelElementType } from "./elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 
 /**
  * Compartment for grouping labels within an enum title.

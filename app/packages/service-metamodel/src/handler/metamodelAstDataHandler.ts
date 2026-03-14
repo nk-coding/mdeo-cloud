@@ -1,5 +1,5 @@
-import type { MetamodelServices } from "@mdeo/language-metamodel";
-import { MetaModel } from "@mdeo/language-metamodel";
+import type { AssociationEndType, MetamodelServices } from "@mdeo/language-metamodel";
+import { Association, Class, Enum, EnumTypeReference, MetaModel, RangeMultiplicity } from "@mdeo/language-metamodel";
 import type { SingleMultiplicityType, RangeMultiplicityType } from "@mdeo/language-metamodel";
 import { hasErrors, type FileDataHandler } from "@mdeo/service-common";
 import { resolveRelativePath } from "@mdeo/language-shared";
@@ -137,20 +137,26 @@ function convertMultiplicity(mult: SingleMultiplicityType | RangeMultiplicityTyp
         return { lower: 1, upper: 1 };
     }
 
-    const type = (mult as any).$type as string | undefined;
-
-    if (type?.includes("Range")) {
+    if (mult.$type === RangeMultiplicity.name) {
         const range = mult as RangeMultiplicityType;
         const upper = range.upper === "*" ? -1 : (range.upperNumeric ?? 0);
         return { lower: range.lower ?? 0, upper };
     }
 
     const single = mult as SingleMultiplicityType;
-    if (single.value === "*") return { lower: 0, upper: -1 };
-    if (single.value === "+") return { lower: 1, upper: -1 };
-    if (single.value === "?") return { lower: 0, upper: 1 };
+    if (single.value === "*") {
+        return { lower: 0, upper: -1 };
+    }
+    if (single.value === "+") {
+        return { lower: 1, upper: -1 };
+    }
+    if (single.value === "?") {
+        return { lower: 0, upper: 1 };
+    }
     const n = single.numericValue;
-    if (n != undefined) return { lower: n, upper: n };
+    if (n != undefined) {
+        return { lower: n, upper: n };
+    }
     return { lower: 1, upper: 1 };
 }
 
@@ -198,51 +204,45 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
     const associations: AssociationData[] = [];
 
     for (const element of root.elements) {
-        const elementType = (element as any).$type as string | undefined;
-
-        if (elementType === "Class") {
-            const cls = element as any;
+        if (reflection.isInstance(element, Class)) {
             classes.push({
-                name: cls.name ?? "",
-                isAbstract: cls.isAbstract ?? false,
-                extends: (cls.extensions?.extensions ?? []).map((ext: any) => ext.class?.$refText ?? ""),
-                properties: (cls.properties ?? []).map((prop: any) => {
-                    const propType = (prop.type as any)?.$type as string | undefined;
-                    const isEnumType = propType?.includes("EnumTypeReference");
+                name: element.name ?? "",
+                isAbstract: element.isAbstract ?? false,
+                extends: (element.extensions?.extensions ?? []).map((ext) => ext.class?.$refText ?? ""),
+                properties: (element.properties ?? []).map((prop) => {
                     const result: PropertyData = {
                         name: prop.name ?? "",
                         multiplicity: convertMultiplicity(prop.multiplicity)
                     };
-                    if (isEnumType) {
-                        result.enumType = (prop.type as any).enum?.$refText ?? "";
+                    if (reflection.isInstance(prop.type, EnumTypeReference)) {
+                        result.enumType = prop.type.enum?.$refText ?? "";
                     } else {
-                        result.primitiveType = (prop.type as any)?.name ?? "";
+                        result.primitiveType = prop.type?.name ?? "";
                     }
                     return result;
                 })
             });
-        } else if (elementType === "Enum") {
-            const enumDef = element as any;
+        } else if (reflection.isInstance(element, Enum)) {
             enums.push({
-                name: enumDef.name ?? "",
-                entries: (enumDef.entries ?? []).map((entry: any) => entry.name ?? "")
+                name: element.name ?? "",
+                entries: (element.entries ?? []).map((entry) => entry.name ?? "")
             });
-        } else if (elementType === "Association") {
-            const assoc = element as any;
-
-            const mapEnd = (end: any): AssociationEndData => {
+        } else if (reflection.isInstance(element, Association)) {
+            const mapEnd = (end: AssociationEndType): AssociationEndData => {
                 const result: AssociationEndData = {
                     className: end.class?.$refText ?? "",
                     multiplicity: convertMultiplicity(end.multiplicity)
                 };
-                if (end.name != undefined) result.name = end.name;
+                if (end.name != undefined) {
+                    result.name = end.name;
+                }
                 return result;
             };
 
             associations.push({
-                source: mapEnd(assoc.source),
-                operator: assoc.operator ?? "",
-                target: mapEnd(assoc.target)
+                source: mapEnd(element.source),
+                operator: element.operator ?? "",
+                target: mapEnd(element.target)
             });
         }
     }

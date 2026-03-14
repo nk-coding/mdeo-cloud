@@ -1,5 +1,5 @@
 import { sharedImport } from "../../sharedImport.js";
-import type { EdgeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
 import type { GModelElement } from "@eclipse-glsp/server";
 
 const { GModelElement: GModelElementBase, GModelElementBuilder } = sharedImport("@eclipse-glsp/server");

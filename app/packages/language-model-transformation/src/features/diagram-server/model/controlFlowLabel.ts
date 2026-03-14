@@ -1,5 +1,5 @@
 import { GLabel, GLabelBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Label for control flow edges.

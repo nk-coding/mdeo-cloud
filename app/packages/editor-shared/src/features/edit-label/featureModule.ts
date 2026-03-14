@@ -1,5 +1,6 @@
 import { sharedImport } from "../../sharedImport.js";
 import { EditLabelTool } from "./editLabelTool.js";
+import { InsertNewLabelCommand, RemoveNewLabelCommand } from "./insertNewLabelFeedback.js";
 import { UpdateLabelEditCommand } from "./updateLabelEditAction.js";
 
 const { FeatureModule, configureCommand } = sharedImport("@eclipse-glsp/sprotty");
@@ -13,6 +14,8 @@ export const editLabelModule = new FeatureModule(
         bind(EditLabelTool).toSelf().inSingletonScope();
         rebind(DirectLabelEditTool).toService(EditLabelTool);
         configureCommand({ bind, isBound }, UpdateLabelEditCommand);
+        configureCommand({ bind, isBound }, InsertNewLabelCommand);
+        configureCommand({ bind, isBound }, RemoveNewLabelCommand);
     },
     { featureId: Symbol("edit-label") }
 );

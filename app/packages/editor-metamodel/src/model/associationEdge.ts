@@ -1,5 +1,5 @@
 import { GEdge } from "@mdeo/editor-shared";
-import { AssociationEndKind } from "./elementTypes.js";
+import { AssociationEndKind } from "@mdeo/protocol-metamodel";
 
 /**
  * Client-side model for association edges.

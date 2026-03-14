@@ -2,7 +2,7 @@ import type { ELK, ElkExtendedEdge, ElkNode } from "elkjs";
 import { sharedImport } from "../sharedImport.js";
 import type { ActionDispatcher, GModelRoot } from "@eclipse-glsp/server";
 import type { ModelState } from "./modelState.js";
-import type { EdgeLayoutMetadata, LayoutOperation, NodePositionMetadata } from "@mdeo/editor-protocol";
+import type { EdgeLayoutMetadata, LayoutOperation, NodePositionMetadata } from "@mdeo/protocol-common";
 import type { MetadataEdits } from "./handler/operationHandlerCommand.js";
 
 /**

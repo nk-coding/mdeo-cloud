@@ -8,7 +8,7 @@ import type { CreateNodeResult, GroupedToolboxItem, ToolboxItemProvider } from "
 import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
 import { Enum, EnumEntry, type EnumType } from "../../../grammar/metamodelTypes.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import { MetamodelElementType } from "../model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
 import type { MetamodelMetadataManager } from "../metamodelMetadataManager.js";
 

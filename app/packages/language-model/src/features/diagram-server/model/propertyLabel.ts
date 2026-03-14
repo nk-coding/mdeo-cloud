@@ -1,5 +1,5 @@
 import { GLabel, GLabelBuilder } from "@mdeo/language-shared";
-import { ModelElementType } from "./elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 
 /**
  * Label for property assignment display.

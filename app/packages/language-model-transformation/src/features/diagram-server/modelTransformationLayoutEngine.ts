@@ -1,5 +1,5 @@
 import type { GModelRoot } from "@eclipse-glsp/server";
-import type { LayoutOperation } from "@mdeo/editor-protocol";
+import type { LayoutOperation } from "@mdeo/protocol-common";
 import { BaseLayoutEngine, GEdge, GNode, sharedImport } from "@mdeo/language-shared";
 import type { NodeAlignment } from "@mdeo/language-shared";
 import type { ElkExtendedEdge, ElkNode } from "elkjs";
@@ -55,7 +55,7 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
      *
      * Control flow edge labels are given ELK placement {@code CENTER} because
      * {@link GControlFlowEdgeView} renders them at the middle of the edge
-     * ({@link EdgeAttachmentPosition.MIDDLE_LEFT}). Using {@code CENTER} makes ELK
+     * ({@link EdgeAttachmentPosition.MIDDLE}). Using {@code CENTER} makes ELK
      * reserve space at the correct location, preventing labels from overlapping
      * intermediate nodes.
      *

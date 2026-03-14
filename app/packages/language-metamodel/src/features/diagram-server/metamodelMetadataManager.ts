@@ -11,7 +11,7 @@ import {
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes, Attributes } from "@mdeo/language-shared";
 import type { AstNode, LangiumDocument } from "langium";
-import { MetamodelElementType } from "./model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import type {
     PartialMetaModel,
     PartialClass,

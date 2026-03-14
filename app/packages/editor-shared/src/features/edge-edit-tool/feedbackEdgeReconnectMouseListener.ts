@@ -8,7 +8,7 @@ import {
 } from "./reconnectFeedback.js";
 import { SetEdgeEditHighlightAction } from "../create-edge-tool/createEdgeFeedback.js";
 import type { EdgeEditTool } from "./edgeEditTool.js";
-import type { EdgeAnchor, ReconnectEdgeOperation } from "@mdeo/editor-protocol";
+import type { EdgeAnchor, ReconnectEdgeOperation } from "@mdeo/protocol-common";
 import { GNode } from "../../model/node.js";
 import { GEdge, type ReconnectEnd } from "../../model/edge.js";
 import { isConnectable } from "../edge-routing/connectable.js";

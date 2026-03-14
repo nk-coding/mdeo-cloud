@@ -1,5 +1,6 @@
 import { boundsModule } from "./bounds/featureModule.js";
 import { changeBoundsToolModule } from "./change-bounds-tool/featureModule.js";
+import { contextActionsModule } from "./context-actions/featureModule.js";
 import { edgeEditToolModule } from "./edge-edit-tool/featureModule.js";
 import { edgeRoutingModule } from "./edge-routing/featureModule.js";
 import { elementFinderModule } from "./element-finder/featureModule.js";
@@ -16,6 +17,7 @@ import { handToolModule } from "./hand-tool/featureModule.js";
 import { selectModule } from "./select/featureModule.js";
 import { createEdgeToolModule } from "./create-edge-tool/featureModule.js";
 import { createNodeToolModule } from "./create-node-tool/featureModule.js";
+import { iconRegistryModule } from "./icon-registry/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
@@ -24,6 +26,7 @@ import { createNodeToolModule } from "./create-node-tool/featureModule.js";
 export const DEFAULT_MODULES = [
     boundsModule,
     changeBoundsToolModule,
+    contextActionsModule,
     edgeEditToolModule,
     elementFinderModule,
     metadataModule,
@@ -39,5 +42,6 @@ export const DEFAULT_MODULES = [
     handToolModule,
     selectModule,
     createEdgeToolModule,
-    createNodeToolModule
+    createNodeToolModule,
+    iconRegistryModule
 ];

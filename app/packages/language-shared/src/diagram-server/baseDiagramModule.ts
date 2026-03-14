@@ -1,8 +1,10 @@
 import type {
     BindingContext,
     BindingTarget,
+    ContextActionsProvider,
     ContextEditValidatorRegistry,
     InstanceMultiBinding,
+    MultiBinding,
     OperationHandlerConstructor,
     ActionHandlerConstructor
 } from "@eclipse-glsp/server";
@@ -24,8 +26,10 @@ import { ExtendedContextEditValidatorRegistry } from "./contextEditValidationReg
 import { ModelSubmissionHandler } from "./modelSubmissionHandler.js";
 import { BaseLayoutEngine } from "./layoutEngine.js";
 import { LayoutOperationHandler } from "./handler/layoutOperationHandler.js";
+import { ResetLayoutOperationHandler } from "./handler/resetLayoutOperationHandler.js";
 import { RequestCreateEdgeSchemaActionHandler } from "./handler/requestCreateEdgeSchemaActionHandler.js";
 import { CreateEdgeSchemaResolver } from "./createEdgeSchemaResolver.js";
+import { DefaultContextActionsProvider } from "../features/contextActions/defaultContextActionsProvider.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =
@@ -65,6 +69,11 @@ export abstract class BaseDiagramModule extends DiagramModule {
         applyBindingTarget(context, BaseLayoutEngine, this.bindCustomLayoutEngine()).inSingletonScope();
         applyBindingTarget(context, CreateEdgeSchemaResolver, this.bindCreateEdgeSchemaResolver()).inSingletonScope();
         this.configureAdditional(context);
+    }
+
+    protected override configureContextActionProviders(binding: MultiBinding<ContextActionsProvider>): void {
+        super.configureContextActionProviders(binding);
+        binding.add(DefaultContextActionsProvider);
     }
 
     protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
@@ -107,6 +116,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         binding.add(TriggerActionOperationHandler);
         binding.add(UpdateRoutingInformationOperationHandler);
         binding.add(LayoutOperationHandler);
+        binding.add(ResetLayoutOperationHandler);
     }
 
     /**

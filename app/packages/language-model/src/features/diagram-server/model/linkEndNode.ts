@@ -1,5 +1,5 @@
 import { GNode, GNodeBuilder } from "@mdeo/language-shared";
-import { ModelElementType } from "./elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 
 /**
  * Node for link end label (source or target).

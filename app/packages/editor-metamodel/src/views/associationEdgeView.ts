@@ -9,7 +9,7 @@ import type { RenderingContext } from "@eclipse-glsp/sprotty";
 import type { GAssociationEdge } from "../model/associationEdge.js";
 import { GAssociationPropertyNode } from "../model/associationPropertyNode.js";
 import { GAssociationMultiplicityNode } from "../model/associationMultiplicityNode.js";
-import { AssociationEndKind } from "../model/elementTypes.js";
+import { AssociationEndKind } from "@mdeo/protocol-metamodel";
 import type { GNode } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");

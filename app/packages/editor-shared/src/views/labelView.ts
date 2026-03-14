@@ -9,6 +9,8 @@ import { sharedImport } from "../sharedImport.js";
 import type { Attrs, VNode, VNodeData } from "snabbdom";
 import type { GLabel } from "../model/label.js";
 import { UpdateLabelEditAction } from "../features/edit-label/updateLabelEditAction.js";
+import { RemoveNewLabelAction } from "@mdeo/protocol-common";
+import type { Operation } from "@eclipse-glsp/protocol";
 
 const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES, ApplyLabelEditOperation, matchesKeystroke } = sharedImport("@eclipse-glsp/sprotty");
@@ -19,7 +21,7 @@ const { html, TYPES, ApplyLabelEditOperation, matchesKeystroke } = sharedImport(
  * Supports validation via IEditLabelValidator and IEditLabelValidationDecorator.
  */
 @injectable()
-export class GLabelView implements IView {
+export abstract class GLabelView implements IView {
     /**
      * Injected action dispatcher for dispatching label update actions.
      */
@@ -35,6 +37,13 @@ export class GLabelView implements IView {
      */
     protected validationTimeout: number | undefined = undefined;
 
+    /**
+     * Renders the label element, switching between display and edit mode.
+     *
+     * @param model The label model to render
+     * @param context The rendering context
+     * @returns The rendered VNode or undefined
+     */
     render(model: Readonly<GLabel>, context: RenderingContext): VNode | undefined {
         if (model.editMode) {
             return this.renderEditControl(model, context);
@@ -258,12 +267,21 @@ export class GLabelView implements IView {
      * Applies the label edit by dispatching an operation if the text changed,
      * or exits edit mode if the text is unchanged.
      *
+     * For new labels (isNewLabel = true), dispatches a custom operation from the registry
+     * instead of the standard ApplyLabelEditOperation. For existing labels, follows the
+     * standard edit flow. In new-label mode, an empty text value is treated as a cancel.
+     *
      * @param model The label model being edited
      */
     protected async applyLabelEdit(model: Readonly<GLabel>): Promise<void> {
         const tempText = model.tempText ?? model.text;
 
-        if (tempText === model.text) {
+        if (model.isNewLabel && tempText.trim() === "") {
+            this.cancelEdit(model);
+            return;
+        }
+
+        if (tempText === model.text && !model.isNewLabel) {
             this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, false));
             return;
         }
@@ -274,16 +292,55 @@ export class GLabelView implements IView {
             return;
         }
 
-        this.actionDispatcher.dispatch(ApplyLabelEditOperation.create({ labelId: model.id, text: tempText }));
+        if (model.isNewLabel) {
+            const operation = this.createNewLabelOperation(model, tempText);
+            if (operation) {
+                this.actionDispatcher.dispatchAll([
+                    RemoveNewLabelAction.create({
+                        insertedElementIds: model.insertedElementIds ?? [],
+                        containerElementId: model.containerElementId ?? ""
+                    }),
+                    operation
+                ]);
+            } else {
+                this.cancelEdit(model);
+            }
+        } else {
+            this.actionDispatcher.dispatch(ApplyLabelEditOperation.create({ labelId: model.id, text: tempText }));
+        }
+    }
+
+    /**
+     * Creates the commit operation for a newly created label.
+     *
+     * Subclasses can use {@code newLabelOperationKind} and {@code parentElementId}
+     * to dispatch label-specific operations.
+     *
+     * @param _model The label model being edited
+     * @param _editText The text entered by the user
+     * @returns The created operation, or void if no operation should be dispatched
+     */
+    protected createNewLabelOperation(_model: Readonly<GLabel>, _editText: string): Operation {
+        throw new Error("createNewLabelOperation must be implemented by subclasses to handle new label commits");
     }
 
     /**
      * Cancels the label edit and exits edit mode without saving changes.
+     * For new labels, dispatches a {@link RemoveNewLabelAction} to remove the temporary element.
      *
      * @param model The label model being edited
      */
     protected cancelEdit(model: Readonly<GLabel>): void {
-        this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, false));
+        if (model.isNewLabel) {
+            this.actionDispatcher.dispatch(
+                RemoveNewLabelAction.create({
+                    insertedElementIds: model.insertedElementIds ?? [],
+                    containerElementId: model.containerElementId ?? ""
+                })
+            );
+        } else {
+            this.actionDispatcher.dispatch(UpdateLabelEditAction.create(model.id, false));
+        }
     }
 
     /**

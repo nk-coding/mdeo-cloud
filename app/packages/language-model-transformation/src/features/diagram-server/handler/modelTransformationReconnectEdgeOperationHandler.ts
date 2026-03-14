@@ -9,7 +9,7 @@ import {
     type ReconnectEndpoints,
     type ReconnectEdgeResult
 } from "@mdeo/language-shared";
-import type { ReconnectEdgeOperation } from "@mdeo/editor-protocol";
+import type { ReconnectEdgeOperation } from "@mdeo/protocol-common";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import {
@@ -22,7 +22,7 @@ import {
     type PatternObjectInstanceReferenceType,
     type PatternObjectInstanceDeleteType
 } from "../../../grammar/modelTransformationTypes.js";
-import { ModelTransformationElementType } from "../model/elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import { GPatternLinkEdge } from "../model/patternLinkEdge.js";
 
 const { injectable, inject } = sharedImport("inversify");

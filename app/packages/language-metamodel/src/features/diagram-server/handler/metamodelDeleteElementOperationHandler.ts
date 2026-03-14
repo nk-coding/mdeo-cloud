@@ -18,6 +18,9 @@ import {
 } from "../../../grammar/metamodelTypes.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
+import type { ContextActionRequestContext } from "@mdeo/language-shared";
+import type { ContextItem } from "@mdeo/protocol-common";
+import { isImportedElement } from "./metamodelHandlerUtils.js";
 
 const { injectable } = sharedImport("inversify");
 const { AstUtils } = sharedImport("langium");
@@ -27,6 +30,30 @@ const { AstUtils } = sharedImport("langium");
  */
 @injectable()
 export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperationHandler {
+    /**
+     * Returns a delete context item only for local (non-imported) nodes.
+     * Edges are excluded entirely to reduce context-menu clutter — associations and
+     * inheritance edges can still be deleted via keyboard or toolbar actions.
+     *
+     * @param element The selected diagram element
+     * @param context Additional request context
+     * @returns A delete context item when appropriate, otherwise an empty array
+     */
+    override getContextItems(element: GModelElement, context: ContextActionRequestContext): ContextItem[] {
+        // Do not offer delete for any edge type in the context menu
+        const isEdge = this.diagramConfiguration.edgeTypeHints.some((h) => h.elementTypeId === element.type);
+        if (isEdge) {
+            return [];
+        }
+
+        // Do not offer delete for imported (read-only) elements
+        if (isImportedElement(element)) {
+            return [];
+        }
+
+        return super.getContextItems(element, context);
+    }
+
     protected override async executeDelete(operation: DeleteElementOperation): Promise<DeleteOperationResult> {
         const elementsToDelete = this.convertIdsToElements(operation.elementIds);
         const allElementsToDelete = this.formTransitiveClosure(elementsToDelete);

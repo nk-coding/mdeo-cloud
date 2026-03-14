@@ -5,7 +5,7 @@ import type { VNode } from "snabbdom";
 import { GNodeViewBase } from "./nodeViewBase.js";
 
 const { injectable } = sharedImport("inversify");
-const { svg, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
+const { svg, html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * Abstract view for node elements that render their content inside an HTML foreignObject.
@@ -33,7 +33,16 @@ export abstract class GNodeView extends GNodeViewBase {
                     [ATTR_BBOX_ELEMENT]: true
                 }
             },
-            this.renderForeignElement(model, context)
+            html(
+                "div",
+                {
+                    class: {
+                        relative: true,
+                        "w-fit": true
+                    }
+                },
+                this.renderForeignElement(model, context)
+            )
         );
         return svg(
             "g",

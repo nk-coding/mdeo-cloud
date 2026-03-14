@@ -22,7 +22,8 @@
         "watch:css": "npx @tailwindcss/cli -i ./src/styles/index.css -o ./dist/styles.css --watch"
     },
     "dependencies": {
-        "@mdeo/editor-shared": "^0.1.0"
+        "@mdeo/editor-shared": "^0.1.0",
+        "@mdeo/protocol-metamodel": "^0.1.0"
     },
     "devDependencies": {
         "@eclipse-glsp/sprotty": "^2.6.0",

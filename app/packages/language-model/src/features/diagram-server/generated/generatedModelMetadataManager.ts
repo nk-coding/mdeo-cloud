@@ -1,5 +1,5 @@
 import { sharedImport, type GraphMetadata, type NodeMetadata, type EdgeMetadata } from "@mdeo/language-shared";
-import { ModelElementType } from "../model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 import type { PartialGeneratedModel } from "../../../grammar/generatedModelPartialTypes.js";
 import type { ModelData, ModelDataInstance, ModelDataLink } from "../../modelData.js";
 import { ModelMetadataManager } from "../modelMetadataManager.js";

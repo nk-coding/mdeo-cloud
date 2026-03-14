@@ -13,6 +13,9 @@
         },
         {
             "path": "../language-shared"
+        },
+        {
+            "path": "../protocol-model"
         }
     ],
     "include": ["src/**/*.ts"],

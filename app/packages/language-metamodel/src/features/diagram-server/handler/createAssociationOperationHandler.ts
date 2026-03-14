@@ -1,6 +1,6 @@
 import type { GNode, CreateEdgeResult } from "@mdeo/language-shared";
 import { sharedImport } from "@mdeo/language-shared";
-import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
+import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import { GClassNode } from "../model/classNode.js";
 import {
     Association,
@@ -10,7 +10,7 @@ import {
     type AssociationEndType,
     type ClassType
 } from "../../../grammar/metamodelTypes.js";
-import { MetamodelElementType } from "../model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import { MetamodelBaseCreateEdgeOperationHandler } from "./metamodelBaseCreateEdgeOperationHandler.js";
 
 const { injectable } = sharedImport("inversify");

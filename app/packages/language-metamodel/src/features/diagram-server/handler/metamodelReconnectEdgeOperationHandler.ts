@@ -9,7 +9,7 @@ import {
     type ReconnectEndpoints,
     type ReconnectEdgeResult
 } from "@mdeo/language-shared";
-import type { ReconnectEdgeOperation } from "@mdeo/editor-protocol";
+import type { ReconnectEdgeOperation } from "@mdeo/protocol-common";
 import type { AstNode, CstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import {
@@ -21,7 +21,7 @@ import {
     type ClassExtensionType,
     type ClassType
 } from "../../../grammar/metamodelTypes.js";
-import { MetamodelElementType } from "../model/elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 
 const { injectable, inject } = sharedImport("inversify");
 const { GrammarUtils } = sharedImport("langium");

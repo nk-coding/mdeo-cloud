@@ -1,5 +1,5 @@
 import { GEdge, GEdgeBuilder } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 
 /**
  * Edge representing control flow between nodes.

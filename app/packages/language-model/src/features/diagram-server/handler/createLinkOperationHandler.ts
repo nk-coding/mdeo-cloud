@@ -1,10 +1,10 @@
 import type { GNode, ModelState, GModelIndex } from "@mdeo/language-shared";
 import { BaseCreateEdgeOperationHandler, sharedImport, type CreateEdgeResult } from "@mdeo/language-shared";
-import type { CreateEdgeOperation } from "@mdeo/editor-protocol";
+import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import type { PartialObjectInstance } from "../../../grammar/modelPartialTypes.js";
 import { ObjectInstance, Link, LinkEnd } from "../../../grammar/modelTypes.js";
 import type { LinkType, LinkEndType } from "../../../grammar/modelTypes.js";
-import { ModelElementType } from "../model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 import { LinkAssociationResolver, type LinkAssociationDisambiguation } from "../linkAssociationResolver.js";
 import type { AstNode } from "langium";
 

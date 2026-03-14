@@ -1,7 +1,7 @@
 import type { Command } from "@eclipse-glsp/server";
 import type { CreateNodeOperation } from "@eclipse-glsp/protocol";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 import type { NodeMetadata } from "../metadata.js";
 import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";

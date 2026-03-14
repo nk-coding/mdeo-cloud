@@ -3,7 +3,7 @@ import { GRectangularNodeView, sharedImport } from "@mdeo/editor-shared";
 import type { GRectangularNode } from "@mdeo/editor-shared";
 import type { VNode } from "snabbdom";
 import type { GPatternInstanceNode } from "../model/patternInstanceNode.js";
-import { PatternModifierKind } from "../model/elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 
 const { injectable } = sharedImport("inversify");
 

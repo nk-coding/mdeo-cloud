@@ -1,5 +1,5 @@
 import { GEdge, GEdgeBuilder } from "@mdeo/language-shared";
-import { MetamodelElementType, AssociationEndKind } from "./elementTypes.js";
+import { MetamodelElementType, AssociationEndKind } from "@mdeo/protocol-metamodel";
 
 /**
  * Edge representing an association relationship.

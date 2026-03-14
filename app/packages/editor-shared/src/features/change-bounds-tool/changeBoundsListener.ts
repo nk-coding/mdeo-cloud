@@ -11,7 +11,7 @@ import type {
     PartialChangeBoundsOperation,
     EdgeRoutingUpdate,
     UpdateRoutingInformationOperation
-} from "@mdeo/editor-protocol";
+} from "@mdeo/protocol-common";
 import type { ExtendedSetBoundsFeedbackAction } from "../metadata/setBoundsFeedbackCommand.js";
 import { sharedImport } from "../../sharedImport.js";
 import { GNode } from "../../model/node.js";

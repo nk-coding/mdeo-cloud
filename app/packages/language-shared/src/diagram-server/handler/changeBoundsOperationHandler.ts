@@ -4,7 +4,7 @@ import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { NodeMetadata } from "../metadata.js";
-import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable } = sharedImport("inversify");
 const { ChangeBoundsOperation } = sharedImport("@eclipse-glsp/protocol");

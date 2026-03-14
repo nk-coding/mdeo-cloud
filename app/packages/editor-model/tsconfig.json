@@ -10,6 +10,9 @@
         },
         {
             "path": "../editor-shared"
+        },
+        {
+            "path": "../protocol-model"
         }
     ],
     "include": ["src/**/*.ts"],

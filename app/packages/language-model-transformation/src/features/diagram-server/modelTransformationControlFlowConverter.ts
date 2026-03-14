@@ -74,12 +74,7 @@ export interface ControlFlowMatchNode {
      */
     readonly id: string;
     /**
-     * Short human-readable label describing the match variant,
-     * e.g. "match", "if match", "while match", "until match", "for match".
-     */
-    readonly matchTypeLabel: string;
-    /**
-     * Display name derived from the pattern or statement, used as the node header.
+     * The name part of the id
      */
     readonly matchName: string;
     /**
@@ -292,6 +287,9 @@ export class ModelTransformationControlFlowConverter {
 
     /**
      * Creates an edge and appends it to the internal accumulator.
+     * When a label is provided it is included in the edge ID so that two labeled
+     * edges with different labels between the same source and target nodes remain
+     * distinct (e.g. "then" and "else" edges from an if-match pattern node).
      *
      * @param sourceId The source node ID.
      * @param targetId The target node ID.
@@ -299,7 +297,7 @@ export class ModelTransformationControlFlowConverter {
      * @param labelElementId Optional GModel label element ID (factory-only).
      */
     private pushEdge(sourceId: string, targetId: string, label?: string, labelElementId?: string): void {
-        const id = ModelTransformationIdGenerator.controlFlowEdge(sourceId, targetId);
+        const id = ModelTransformationIdGenerator.controlFlowEdge(sourceId, targetId, label);
         let edge: ControlFlowEdge;
         if (label != undefined && labelElementId != undefined) {
             edge = { id, sourceId, targetId, label, labelElementId };
@@ -316,18 +314,11 @@ export class ModelTransformationControlFlowConverter {
      *
      * @param id The node ID.
      * @param matchName The display name shown in the node header.
-     * @param matchTypeLabel Short type label such as "match" or "if match".
      * @param multiple true when this iterates over all matches (for-match).
      * @param pattern The optional pattern AST node.
      */
-    private pushMatchNode(
-        id: string,
-        matchName: string,
-        matchTypeLabel: string,
-        multiple: boolean,
-        pattern: PatternType | undefined
-    ): void {
-        this.pushNode({ kind: "match", id, matchTypeLabel, matchName, multiple, pattern });
+    private pushMatchNode(id: string, matchName: string, multiple: boolean, pattern: PatternType | undefined): void {
+        this.pushNode({ kind: "match", id, matchName, multiple, pattern });
     }
 
     /**
@@ -460,7 +451,7 @@ export class ModelTransformationControlFlowConverter {
     ): TraversalResult {
         const nodeId = this.idRegistry.getId(stmt);
         const matchName = this.idRegistry.getName(stmt) ?? nodeId;
-        this.pushMatchNode(nodeId, matchName, "match", false, stmt.pattern);
+        this.pushMatchNode(nodeId, matchName, false, stmt.pattern);
         this.pushEdge(previousNodeId, nodeId, incomingLabel, incomingLabelElementId);
         return { lastNodeId: nodeId };
     }
@@ -486,7 +477,7 @@ export class ModelTransformationControlFlowConverter {
         const matchNodeId = pattern != undefined ? this.idRegistry.getId(pattern) : `${stmtId}_no-pattern`;
         const matchName = (pattern != undefined ? this.idRegistry.getName(pattern) : undefined) ?? stmtId;
 
-        this.pushMatchNode(matchNodeId, matchName, "if match", false, pattern);
+        this.pushMatchNode(matchNodeId, matchName, false, pattern);
         this.pushEdge(previousNodeId, matchNodeId, incomingLabel, incomingLabelElementId);
 
         return this.processIfMatchBranches(stmt, stmtId, matchNodeId);
@@ -495,6 +486,10 @@ export class ModelTransformationControlFlowConverter {
     /**
      * Processes the then/else branches of an if-match statement.
      *
+     * Both the "then" and "else" edges are always emitted — even when the else block
+     * does not exist in the source — so that the diagram always offers an insertion
+     * point on the else path.
+     *
      * @param stmt The if-match statement.
      * @param stmtId The statement registry ID, used to derive the merge node ID.
      * @param matchNodeId The match node acting as the branch origin.
@@ -502,33 +497,22 @@ export class ModelTransformationControlFlowConverter {
      */
     private processIfMatchBranches(stmt: IfMatchStatementType, stmtId: string, matchNodeId: string): TraversalResult {
         const thenStatements = stmt.ifBlock?.thenBlock?.statements ?? [];
-        const thenResult = this.processBranch(thenStatements, matchNodeId, "then");
+        const elseStatements = stmt.elseBlock?.statements ?? [];
 
-        let elseResult: TraversalResult = { lastNodeId: matchNodeId };
-        if (stmt.elseBlock != undefined) {
-            const elseStatements = stmt.elseBlock.statements ?? [];
-            if (elseStatements.length > 0) {
-                elseResult = this.processBranch(elseStatements, matchNodeId, "else");
-            }
-        }
+        const thenResult = this.processBranch(thenStatements, matchNodeId, "then");
+        // Always process the else path so the else edge is always present in the diagram,
+        // even when no else block exists in the code.
+        const elseResult = this.processBranch(elseStatements, matchNodeId, "else");
 
         if (thenResult.lastNodeId != undefined || elseResult.lastNodeId != undefined) {
             const mergeNodeId = ModelTransformationIdGenerator.mergeNode(stmtId);
             this.pushNode({ kind: "merge", id: mergeNodeId });
 
             if (thenResult.lastNodeId != undefined) {
-                this.pushEdge(thenResult.lastNodeId, mergeNodeId);
+                this.pushEdge(thenResult.lastNodeId, mergeNodeId, thenResult.exitLabel, thenResult.exitLabelElementId);
             }
-            if (elseResult.lastNodeId != undefined && stmt.elseBlock != undefined) {
-                if (elseResult.lastNodeId === matchNodeId) {
-                    if (thenResult.lastNodeId !== matchNodeId) {
-                        this.pushEdge(matchNodeId, mergeNodeId, "else");
-                    }
-                } else {
-                    this.pushEdge(elseResult.lastNodeId, mergeNodeId);
-                }
-            } else if (elseResult.lastNodeId != undefined && thenResult.lastNodeId !== matchNodeId) {
-                this.pushEdge(matchNodeId, mergeNodeId, "else");
+            if (elseResult.lastNodeId != undefined) {
+                this.pushEdge(elseResult.lastNodeId, mergeNodeId, elseResult.exitLabel, elseResult.exitLabelElementId);
             }
 
             return { lastNodeId: mergeNodeId };
@@ -557,7 +541,7 @@ export class ModelTransformationControlFlowConverter {
         const matchNodeId = stmt.pattern != undefined ? this.idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
         const matchName = (stmt.pattern != undefined ? this.idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.pushMatchNode(matchNodeId, matchName, "while match", false, stmt.pattern);
+        this.pushMatchNode(matchNodeId, matchName, false, stmt.pattern);
         this.pushEdge(previousNodeId, matchNodeId, incomingLabel, incomingLabelElementId);
 
         const doStatements = stmt.doBlock?.statements ?? [];
@@ -591,7 +575,7 @@ export class ModelTransformationControlFlowConverter {
         const matchNodeId = stmt.pattern != undefined ? this.idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
         const matchName = (stmt.pattern != undefined ? this.idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.pushMatchNode(matchNodeId, matchName, "until match", false, stmt.pattern);
+        this.pushMatchNode(matchNodeId, matchName, false, stmt.pattern);
         this.pushEdge(previousNodeId, matchNodeId, incomingLabel, incomingLabelElementId);
 
         const doStatements = stmt.doBlock?.statements ?? [];
@@ -625,7 +609,7 @@ export class ModelTransformationControlFlowConverter {
         const matchNodeId = stmt.pattern != undefined ? this.idRegistry.getId(stmt.pattern) : `${nodeId}_no-pattern`;
         const matchName = (stmt.pattern != undefined ? this.idRegistry.getName(stmt.pattern) : undefined) ?? nodeId;
 
-        this.pushMatchNode(matchNodeId, matchName, "for match", true, stmt.pattern);
+        this.pushMatchNode(matchNodeId, matchName, true, stmt.pattern);
         this.pushEdge(previousNodeId, matchNodeId, incomingLabel, incomingLabelElementId);
 
         const doStatements = stmt.doBlock?.statements ?? [];
@@ -667,6 +651,12 @@ export class ModelTransformationControlFlowConverter {
 
     /**
      * Processes the then/else-if/else branches of an if-expression statement.
+     *
+     * The else path is always processed (even when no else block exists in the source)
+     * so that the diagram always shows an "else" edge. Deduplication of merge-node
+     * connections is keyed on `sourceId + label` rather than `sourceId` alone, which
+     * allows separate labeled edges (e.g. the condition-text edge and the "else" edge)
+     * from the same split node to both be retained.
      *
      * @param stmt The if-expression statement.
      * @param stmtId The statement registry ID, used to derive merge and else-if split IDs.
@@ -724,31 +714,32 @@ export class ModelTransformationControlFlowConverter {
             lastElseIfSplitId = elseIfSplitId;
         }
 
-        if (stmt.elseBlock != undefined) {
-            const elseStatements = stmt.elseBlock.statements ?? [];
-            const elseResult = this.processBranch(elseStatements, lastElseIfSplitId, "else");
-            branchResults.push(elseResult);
-        } else {
-            branchResults.push({ lastNodeId: lastElseIfSplitId });
-        }
+        // Always process the else path (using empty statements when no else block exists)
+        // so that the "else" edge is always present in the diagram.
+        const elseStatements = stmt.elseBlock?.statements ?? [];
+        const elseResult = this.processBranch(elseStatements, lastElseIfSplitId, "else");
+        branchResults.push(elseResult);
 
         const nonTerminating = branchResults.filter((r) => r.lastNodeId != undefined);
         if (nonTerminating.length > 0) {
             const mergeNodeId = ModelTransformationIdGenerator.mergeNode(stmtId);
             this.pushNode({ kind: "merge", id: mergeNodeId });
 
+            // Deduplicate by (sourceId + label) so that two differently-labelled edges
+            // from the same source node (e.g. the condition-text edge and the "else" edge
+            // when both branches are empty) are both preserved.
             const connectedToMerge = new Set<string>();
             for (const result of nonTerminating) {
                 const sourceId = result.lastNodeId!;
-                if (connectedToMerge.has(sourceId)) {
+                const label = result.exitLabel;
+                const key = `${sourceId}:${label ?? ""}`;
+                if (connectedToMerge.has(key)) {
                     continue;
                 }
-                connectedToMerge.add(sourceId);
+                connectedToMerge.add(key);
 
-                if (sourceId === lastElseIfSplitId && stmt.elseBlock == undefined) {
-                    this.pushEdge(sourceId, mergeNodeId, "else");
-                } else if (result.exitLabel != undefined) {
-                    this.pushEdge(sourceId, mergeNodeId, result.exitLabel, result.exitLabelElementId);
+                if (label != undefined) {
+                    this.pushEdge(sourceId, mergeNodeId, label, result.exitLabelElementId);
                 } else {
                     this.pushEdge(sourceId, mergeNodeId);
                 }
@@ -821,8 +812,10 @@ export class ModelTransformationControlFlowConverter {
      * or looping construct.
      *
      * The branchLabel is placed on the edge from sourceNodeId to the first
-     * statement entry node.  When statements is empty no edge is emitted and
-     * sourceNodeId is returned unchanged.
+     * statement entry node.  When statements is empty no edge is emitted,
+     * sourceNodeId is returned unchanged, and branchLabel is propagated as
+     * exitLabel so that callers can still attach the label to the outgoing edge
+     * from the branch origin (e.g. to a merge node).
      *
      * @param statements The branch body statements.
      * @param sourceNodeId The node from which the branch originates.
@@ -837,7 +830,7 @@ export class ModelTransformationControlFlowConverter {
         branchLabelElementId?: string
     ): TraversalResult {
         if (statements.length === 0) {
-            return { lastNodeId: sourceNodeId };
+            return { lastNodeId: sourceNodeId, exitLabel: branchLabel, exitLabelElementId: branchLabelElementId };
         }
 
         const firstStmt = statements[0]!;

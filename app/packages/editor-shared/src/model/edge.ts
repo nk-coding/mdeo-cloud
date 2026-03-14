@@ -1,6 +1,6 @@
 import type { Locateable, Selectable } from "@eclipse-glsp/protocol";
 import { sharedImport } from "../sharedImport.js";
-import type { EdgeLayoutMetadata, EdgeAnchor } from "@mdeo/editor-protocol";
+import type { EdgeLayoutMetadata, EdgeAnchor } from "@mdeo/protocol-common";
 import type { Point } from "@eclipse-glsp/protocol";
 
 const {

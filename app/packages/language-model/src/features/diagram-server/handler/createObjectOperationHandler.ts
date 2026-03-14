@@ -21,7 +21,7 @@ import {
     type PropertyAssignmentType,
     type SimpleValueType
 } from "../../../grammar/modelTypes.js";
-import { ModelElementType } from "../model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 import type { ModelGModelFactory } from "../modelGModelFactory.js";
 import type { ModelMetadataManager } from "../modelMetadataManager.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";

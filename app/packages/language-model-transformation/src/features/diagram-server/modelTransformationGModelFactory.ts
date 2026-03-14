@@ -1,7 +1,7 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
 import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } from "@mdeo/language-shared";
 import type { ModelIdRegistry, GraphMetadata } from "@mdeo/language-shared";
-import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 import { NodeLayoutMetadataUtil, EdgeLayoutMetadataUtil } from "./metadataTypes.js";
 import {
     type ModelTransformationType,
@@ -49,7 +49,8 @@ import { GPatternLinkModifierNode } from "./model/patternLinkModifierNode.js";
 import { GPatternModifierLabel } from "./model/patternModifierLabel.js";
 import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GVariableLabel } from "./model/variableLabel.js";
-import { EndNodeKind, ModelTransformationElementType, PatternModifierKind } from "./model/elementTypes.js";
+import { EndNodeKind, ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
+import { ID } from "@mdeo/language-common";
 import { ModelTransformationIdGenerator } from "./modelTransformationIdGenerator.js";
 
 const { injectable } = sharedImport("inversify");
@@ -200,8 +201,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         if (cfgMatchNode.pattern?.elements != undefined) {
             for (const element of cfgMatchNode.pattern.elements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
-                    const instance = element as PatternObjectInstanceType;
-                    this.createPatternInstanceNode(node, instance, idRegistry);
+                    this.createPatternInstanceNode(node, element, idRegistry);
                 }
             }
         }
@@ -211,7 +211,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 this.createReferencedInstanceNode(
                     node,
                     instanceName,
-                    cfgMatchNode.id,
+                    cfgMatchNode.matchName,
                     reference ?? undefined,
                     idRegistry
                 );
@@ -227,7 +227,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         if (cfgMatchNode.pattern?.elements != undefined) {
             for (const element of cfgMatchNode.pattern.elements) {
                 if (this.reflection.isInstance(element, PatternLink)) {
-                    this.createPatternLinkEdge(node, element as PatternLinkType, cfgMatchNode.id, idRegistry);
+                    this.createPatternLinkEdge(node, element, idRegistry);
                 }
             }
         }
@@ -463,7 +463,11 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             if (prop == undefined) continue;
 
             const propId = idRegistry.getId(prop);
-            const propName = prop.name?.$refText ?? prop.name?.ref?.name ?? "?";
+            const rawPropName = prop.name?.$refText ?? prop.name?.ref?.name ?? "?";
+            const propName = this.modelState.languageServices.AstSerializer.serializePrimitive(
+                { value: rawPropName },
+                ID
+            );
             const operator = prop.operator ?? "=";
             const valueText = prop.value?.$cstNode?.text ?? "?";
             const propText = `${propName} ${operator} ${valueText}`;
@@ -515,9 +519,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 const variable = element as PatternVariableType;
                 const varId = idRegistry.getId(variable);
                 const name = variable.name ?? "?";
+                const serializedName = this.modelState.languageServices.AstSerializer.serializePrimitive(
+                    { value: name },
+                    ID
+                );
                 const typeText = variable.type?.$cstNode?.text;
                 const valueText = variable.value?.$cstNode?.text ?? "?";
-                let varText = `var ${name}`;
+                let varText = `var ${serializedName}`;
                 if (typeText != undefined) {
                     varText += `: ${typeText}`;
                 }
@@ -581,15 +589,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      *
      * @param parent The parent node (match node)
      * @param link The pattern link
-     * @param matchNodeId The ID of the containing match node
      * @param idRegistry The model ID registry
      */
-    private createPatternLinkEdge(
-        parent: GMatchNode,
-        link: PatternLinkType,
-        matchName: string,
-        idRegistry: ModelIdRegistry
-    ): void {
+    private createPatternLinkEdge(parent: GMatchNode, link: PatternLinkType, idRegistry: ModelIdRegistry): void {
         const edgeId = idRegistry.getId(link);
 
         const sourceInstanceRef = link.source?.object?.ref;
@@ -793,7 +795,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         label: string | undefined,
         labelId?: string
     ): void {
-        const edgeId = ModelTransformationIdGenerator.controlFlowEdge(sourceId, targetId);
+        const edgeId = ModelTransformationIdGenerator.controlFlowEdge(sourceId, targetId, label);
         const validatedMetadata = this.modelState.getValidatedMetadata();
         const metadata = validatedMetadata.edges[edgeId]?.meta;
         const edgeMeta =

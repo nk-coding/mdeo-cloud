@@ -1,5 +1,5 @@
 import type { GModelRoot } from "@eclipse-glsp/server";
-import type { LayoutOperation } from "@mdeo/editor-protocol";
+import type { LayoutOperation } from "@mdeo/protocol-common";
 import { BaseLayoutEngine, GEdge, GNode, sharedImport } from "@mdeo/language-shared";
 import type { ElkExtendedEdge, ElkNode } from "elkjs";
 import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";

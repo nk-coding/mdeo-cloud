@@ -1,6 +1,6 @@
 import type { Action, GModelElement, IActionDispatcher, IModelFactory } from "@eclipse-glsp/sprotty";
 import type { Point } from "@eclipse-glsp/protocol";
-import type { EdgeAnchor, CreateEdgeOperation, CreateEdgeSchema } from "@mdeo/editor-protocol";
+import type { EdgeAnchor, CreateEdgeOperation, CreateEdgeSchema } from "@mdeo/protocol-common";
 import { sharedImport } from "../../sharedImport.js";
 import { EdgeRouter } from "../edge-routing/edgeRouter.js";
 import { ElementFinder } from "../element-finder/elementFinder.js";

@@ -1,6 +1,6 @@
 import { GLabelView, sharedImport } from "@mdeo/editor-shared";
 import type { GLabel } from "@mdeo/editor-shared";
-import { PatternModifierKind } from "../model/elementTypes.js";
+import { PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { isPatternInstanceNode } from "../model/patternInstanceNode.js";
 
 const { injectable } = sharedImport("inversify");

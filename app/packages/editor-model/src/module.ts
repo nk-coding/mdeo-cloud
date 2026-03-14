@@ -16,9 +16,10 @@ import { GLinkEndNode } from "./model/linkEndNode.js";
 import { GLinkEndLabel } from "./model/linkEndLabel.js";
 import { GObjectNodeView } from "./views/objectNodeView.js";
 import { GObjectLabelView } from "./views/objectLabelView.js";
+import { GPropertyValueLabelView } from "./views/propertyValueLabelView.js";
 import { GLinkEdgeView } from "./views/linkEdgeView.js";
 import { GLinkEndNodeView } from "./views/linkEndNodeView.js";
-import { ModelElementType } from "./model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 
 const { FeatureModule, configureModelElement, editLabelFeature } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -37,7 +38,7 @@ export const modelDiagramModule = new FeatureModule(
         configureModelElement(context, ModelElementType.LABEL_OBJECT_NAME, GObjectLabel, GObjectLabelView, {
             enable: [editLabelFeature]
         });
-        configureModelElement(context, ModelElementType.LABEL_PROPERTY, GPropertyLabel, GLabelView);
+        configureModelElement(context, ModelElementType.LABEL_PROPERTY, GPropertyLabel, GPropertyValueLabelView);
 
         configureModelElement(context, ModelElementType.EDGE_LINK, GLinkEdge, GLinkEdgeView);
 

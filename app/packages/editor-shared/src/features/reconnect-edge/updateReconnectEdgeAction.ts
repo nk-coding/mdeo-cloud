@@ -1,7 +1,7 @@
 import { sharedImport } from "../../sharedImport.js";
 import type { GEdge } from "../../model/edge.js";
 import type { Action, IActionDispatcher, CommandExecutionContext, CommandReturn } from "@eclipse-glsp/sprotty";
-import type { EdgeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { Command, TYPES } = sharedImport("@eclipse-glsp/sprotty");

@@ -70,10 +70,7 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
         protected readonly computePackageMap: (document: LangiumDocument) => Map<string, string[]>
     ) {
         super(typir, types);
-        this.packageMapCache = new WorkspaceCache(
-            typir.langium.LangiumServices as any,
-            DocumentState.IndexedReferences
-        );
+        this.packageMapCache = new WorkspaceCache(typir.langium.LangiumServices, DocumentState.IndexedReferences);
     }
 
     override registerRules(): void {

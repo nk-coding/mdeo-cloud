@@ -7,6 +7,7 @@ import type {
 } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import type { ModelState } from "./modelState.js";
+import { BaseLabelEditValidator } from "./baseLabelEditValidator.js";
 
 const { inject, injectable, multiInject, optional } = sharedImport("inversify");
 const {
@@ -44,17 +45,21 @@ export class ExtendedContextEditValidatorRegistry
 }
 
 /**
- * A lenient version of the ValidateLabelEditAdapter that does not error
- * when the model element is not found, but instead returns an ERROR status.
+ * A lenient version of the ValidateLabelEditAdapter that handles missing model
+ * elements gracefully.
+ *
+ * When a new label is first inserted into the client model its temporary ID
+ * does not yet exist on the server side.
  */
 class LenientValidateLabelEditAdapter extends ValidateLabelEditAdapter {
     override validate(action: RequestEditValidationAction): ValidationStatusType {
         const element = this.modelState.index.find(action.modelElementId);
         if (element == undefined) {
-            return {
-                severity: ValidationStatus.Severity.ERROR,
-                message: `Model element with ID ${action.modelElementId} not found.`
-            };
+            if (this.labelEditValidator instanceof BaseLabelEditValidator) {
+                return this.labelEditValidator.validateUnknown(action.text, action.modelElementId);
+            } else {
+                return super.validate(action);
+            }
         }
         if (element instanceof GModelElement) {
             return this.labelEditValidator.validate(action.text, element);

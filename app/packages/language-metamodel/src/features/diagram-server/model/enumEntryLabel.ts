@@ -1,5 +1,5 @@
 import { GLabel, GLabelBuilder } from "@mdeo/language-shared";
-import { MetamodelElementType } from "./elementTypes.js";
+import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 
 /**
  * Label for an enum entry.

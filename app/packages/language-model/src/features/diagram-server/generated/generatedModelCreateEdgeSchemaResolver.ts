@@ -1,4 +1,4 @@
-import type { CreateEdgeSchema } from "@mdeo/editor-protocol";
+import type { CreateEdgeSchema } from "@mdeo/protocol-common";
 import { CreateEdgeSchemaResolver, sharedImport } from "@mdeo/language-shared";
 import type { InitialCreateEdgeSchemaRequest, TargetCreateEdgeSchemaRequest } from "@mdeo/language-shared";
 

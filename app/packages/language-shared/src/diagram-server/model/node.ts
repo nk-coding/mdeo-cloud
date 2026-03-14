@@ -1,5 +1,5 @@
 import { sharedImport } from "../../sharedImport.js";
-import type { NodeLayoutMetadata } from "@mdeo/editor-protocol";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { GModelElement, GModelElementBuilder } = sharedImport("@eclipse-glsp/server");
 

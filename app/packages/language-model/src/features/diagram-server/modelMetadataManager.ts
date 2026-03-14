@@ -10,7 +10,7 @@ import {
     type ModelIdProvider as ModelIdProviderType
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
-import { ModelElementType } from "./model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 import type { PartialModel, PartialObjectInstance, PartialLink } from "../../grammar/modelPartialTypes.js";
 import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 

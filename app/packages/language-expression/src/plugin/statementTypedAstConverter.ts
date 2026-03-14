@@ -43,7 +43,7 @@ export abstract class StatementTypedAstConverter extends TypedAstConverter {
      */
     protected getStatementsFromBody(body: AstNode): AstNode[] {
         if (this.reflection.isInstance(body, this.statementTypes.statementsScopeType)) {
-            return (body as any).statements ?? [];
+            return body.statements ?? [];
         }
         return [];
     }

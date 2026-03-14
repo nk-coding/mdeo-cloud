@@ -4,7 +4,7 @@ import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { EdgeMetadata } from "../metadata.js";
-import type { EdgeLayoutMetadata, UpdateRoutingInformationOperation } from "@mdeo/editor-protocol";
+import type { EdgeLayoutMetadata, UpdateRoutingInformationOperation } from "@mdeo/protocol-common";
 
 const { injectable } = sharedImport("inversify");
 

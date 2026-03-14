@@ -8,12 +8,18 @@
 export class ModelTransformationIdGenerator {
     /**
      * Generates an ID for a control flow edge.
+     * When a label is provided, it is included in the ID to make edges unique
+     * even when multiple labeled edges exist between the same source and target nodes.
      *
      * @param sourceId The source node ID
      * @param targetId The target node ID
+     * @param label Optional edge label (e.g. "then", "else", condition text)
      * @returns The edge ID
      */
-    static controlFlowEdge(sourceId: string, targetId: string): string {
+    static controlFlowEdge(sourceId: string, targetId: string, label?: string): string {
+        if (label != undefined) {
+            return `${sourceId}@${targetId}:${label}`;
+        }
         return `${sourceId}@${targetId}`;
     }
 

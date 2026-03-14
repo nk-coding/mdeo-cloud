@@ -10,7 +10,7 @@ import {
     type ModelIdProvider as ModelIdProviderType
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
-import { ModelTransformationElementType } from "./model/elementTypes.js";
+import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import type {
     ModelTransformationType,
     PatternType,
@@ -244,15 +244,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 break;
             case "match": {
                 const matchNode = node as ControlFlowMatchNode;
-                this.addMatchNode(
-                    matchNode.id,
-                    matchNode.matchName,
-                    matchNode.matchTypeLabel,
-                    matchNode.pattern,
-                    idRegistry,
-                    nodes,
-                    edges
-                );
+                this.addMatchNode(matchNode.id, matchNode.matchName, matchNode.pattern, idRegistry, nodes, edges);
                 break;
             }
             case "split":
@@ -299,15 +291,13 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
     private addMatchNode(
         matchNodeId: string,
         matchName: string,
-        label: string,
         pattern: PatternType | undefined,
         idRegistry: ModelIdRegistry,
         nodes: Record<string, NodeMetadata>,
         edges: Record<string, EdgeMetadata>
     ): void {
         nodes[matchNodeId] = {
-            type: ModelTransformationElementType.NODE_MATCH,
-            attrs: { label }
+            type: ModelTransformationElementType.NODE_MATCH
         };
 
         const localInstances = new Map<string, PatternObjectInstanceType>();
@@ -319,43 +309,32 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         if (pattern?.elements != undefined) {
             for (const element of pattern.elements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
-                    const instance = element as PatternObjectInstanceType;
-                    if (instance.name) {
-                        localInstances.set(instance.name, instance);
+                    if (element.name != undefined) {
+                        localInstances.set(element.name, element);
                     }
                 }
                 if (this.reflection.isInstance(element, PatternObjectInstanceReference)) {
-                    const ref = element as PatternObjectInstanceReferenceType;
-                    const instanceName = ref.instance?.ref?.name;
+                    const instanceName = element.instance?.ref?.name;
                     if (instanceName) {
-                        referencedInstanceNodes.set(instanceName, ref);
+                        referencedInstanceNodes.set(instanceName, element);
                     }
                 }
                 if (this.reflection.isInstance(element, PatternObjectInstanceDelete)) {
-                    const del = element as PatternObjectInstanceDeleteType;
-                    const instanceName = del.instance?.ref?.name ?? del.instance?.$refText;
+                    const instanceName = element.instance?.ref?.name ?? element.instance?.$refText;
                     if (instanceName) {
                         deletedInstances.add(instanceName);
-                        deletedInstanceNodes.set(instanceName, del);
+                        deletedInstanceNodes.set(instanceName, element);
                     }
                 }
+            }
+            for (const element of pattern.elements) {
                 if (this.reflection.isInstance(element, PatternLink)) {
-                    const link = element as PatternLinkType;
-                    const sourceInstanceName = link.source?.object?.ref?.name;
-                    const targetInstanceName = link.target?.object?.ref?.name;
-                    if (
-                        sourceInstanceName &&
-                        !localInstances.has(sourceInstanceName) &&
-                        !referencedInstanceNodes.has(sourceInstanceName)
-                    ) {
-                        referencedInstanceImplicit.add(sourceInstanceName);
-                    }
-                    if (
-                        targetInstanceName &&
-                        !localInstances.has(targetInstanceName) &&
-                        !referencedInstanceNodes.has(targetInstanceName)
-                    ) {
-                        referencedInstanceImplicit.add(targetInstanceName);
+                    const sourceInstanceName = element.source?.object?.ref?.name;
+                    const targetInstanceName = element.target?.object?.ref?.name;
+                    for (const name of [sourceInstanceName, targetInstanceName]) {
+                        if (name != undefined) {
+                            referencedInstanceImplicit.add(name);
+                        }
                     }
                 }
             }
@@ -399,21 +378,22 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             }
 
             for (const instanceName of referencedInstanceImplicit) {
-                if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
-                    const previousNodeId = this.declaredInstances.get(instanceName);
-                    if (previousNodeId != undefined) {
-                        const refNodeId = `PatternObjectInstanceReference_${matchName}_ref_${instanceName}`;
-                        nodes[refNodeId] = {
-                            type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
-                            attrs: {
-                                name: instanceName,
-                                isReference: true
-                            }
-                        };
+                if (
+                    !localInstances.has(instanceName) &&
+                    !deletedInstances.has(instanceName) &&
+                    !referencedInstanceNodes.has(instanceName)
+                ) {
+                    const refNodeId = `PatternObjectInstanceReference_${matchName}_ref_${instanceName}`;
+                    nodes[refNodeId] = {
+                        type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
+                        attrs: {
+                            name: instanceName,
+                            isReference: true
+                        }
+                    };
 
-                        this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
-                        instanceNodeIdsInPattern.set(instanceName, refNodeId);
-                    }
+                    this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
+                    instanceNodeIdsInPattern.set(instanceName, refNodeId);
                 }
             }
 

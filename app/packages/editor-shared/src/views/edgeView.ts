@@ -3,8 +3,9 @@ import { sharedImport } from "../sharedImport.js";
 import type { GEdge, EdgeReconnectData } from "../model/edge.js";
 import type { VNode } from "snabbdom";
 import { EdgeRouter, type RouteComputationResult } from "../features/edge-routing/edgeRouter.js";
-import type { AnchorSide } from "@mdeo/editor-protocol";
+import type { AnchorSide } from "@mdeo/protocol-common";
 import { findViewportZoom } from "../base/findViewportZoom.js";
+import type { ContextActionRailOrientation } from "../features/context-actions/contextActions.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, Point: PointUtil } = sharedImport("@eclipse-glsp/sprotty");
@@ -30,14 +31,48 @@ export interface EdgeMarkerData {
 
 /**
  * Position of an edge attachment.
+ *
+ * SOURCE_LEFT, SOURCE_RIGHT, TARGET_LEFT, TARGET_RIGHT, MIDDLE_LEFT, MIDDLE_RIGHT are for text/label
+ * attachments (properties, multiplicity, etc.) and use a dedicated stacking algorithm.
+ * START, END, MIDDLE are used exclusively by context action rails with a separate placement algorithm.
  */
 export enum EdgeAttachmentPosition {
+    /**
+     * Label attachment at the source end, on the left/above side of the edge line
+     */
     SOURCE_LEFT = "source-left",
+    /**
+     * Label attachment at the source end, on the right/below side of the edge line
+     */
     SOURCE_RIGHT = "source-right",
+    /**
+     * Label attachment at the target end, on the left/above side of the edge line
+     */
     TARGET_LEFT = "target-left",
+    /**
+     * Label attachment at the target end, on the right/below side of the edge line
+     */
     TARGET_RIGHT = "target-right",
+    /**
+     * Label attachment at the edge midpoint, on the left/above side of the edge line
+     */
     MIDDLE_LEFT = "middle-left",
-    MIDDLE_RIGHT = "middle-right"
+    /**
+     * Label attachment at the edge midpoint, on the right/below side of the edge line
+     */
+    MIDDLE_RIGHT = "middle-right",
+    /**
+     * Context action rail at the start/source endpoint of the edge
+     */
+    START = "start",
+    /**
+     * Context action rail at the end/target endpoint of the edge
+     */
+    END = "end",
+    /**
+     * Context action rail at the midpoint of the edge
+     */
+    MIDDLE = "middle"
 }
 
 /**
@@ -50,6 +85,14 @@ export interface EdgeAttachment {
      */
     vnode: VNode | undefined;
     /**
+     * Optional renderer callback for attachments that need the final absolute position.
+     */
+    renderAt?: (position: Point, orientation: ContextActionRailOrientation) => VNode | undefined;
+    /**
+     * Layout orientation used when renderAt is provided.
+     */
+    orientation?: ContextActionRailOrientation;
+    /**
      * The bounds of the attachment element
      */
     bounds: Bounds;
@@ -57,6 +100,11 @@ export interface EdgeAttachment {
      * The target position along the edge
      */
     position: EdgeAttachmentPosition;
+    /**
+     * When true, this attachment is placed on the opposite side of the midpoint
+     * from where visual MIDDLE attachments go. Used by context action rails at MIDDLE.
+     */
+    oppositeMiddleSide?: boolean;
 }
 
 /**
@@ -254,6 +302,12 @@ export abstract class GEdgeView implements IView {
     /**
      * Renders a group of attachments at a specific position.
      *
+     * For SOURCE_LEFT/RIGHT and TARGET_LEFT/RIGHT (label positions at endpoints), applies
+     * `attachmentDistanceFromElement` offset before stacking with the label stacking algorithm.
+     * For MIDDLE_LEFT/RIGHT, uses the label stacking algorithm without element offset.
+     * For START/END/MIDDLE (context rail positions), uses the rail stacking algorithm with no
+     * distanceFromElement applied for START/END.
+     *
      * @param attachments The attachments in the group
      * @param position The position along the edge
      * @param routeResult The route data
@@ -278,37 +332,40 @@ export abstract class GEdgeView implements IView {
             return [];
         }
 
-        const isHorizontal = Math.abs(anchorInfo.dx) > Math.abs(anchorInfo.dy);
-        const isLeftSide = this.determineAttachmentSide(position);
         let anchorPoint = anchorInfo.anchorPoint;
 
-        if (
-            (position === EdgeAttachmentPosition.SOURCE_LEFT ||
-                position === EdgeAttachmentPosition.SOURCE_RIGHT ||
-                position === EdgeAttachmentPosition.TARGET_LEFT ||
-                position === EdgeAttachmentPosition.TARGET_RIGHT) &&
-            anchorInfo.anchorSide
-        ) {
-            const direction = this.getDirectionFromSide(anchorInfo.anchorSide);
-            const distanceFromElement = this.attachmentDistanceFromElement;
-            const markerOffset =
-                position === EdgeAttachmentPosition.SOURCE_LEFT || position === EdgeAttachmentPosition.SOURCE_RIGHT
+        if (GEdgeView.isLabelPosition(position)) {
+            // For SOURCE_*/TARGET_* label positions, offset away from the element before stacking
+            if (
+                (GEdgeView.isSourceLabelPosition(position) || GEdgeView.isTargetLabelPosition(position)) &&
+                anchorInfo.anchorSide
+            ) {
+                const direction = this.getDirectionFromSide(anchorInfo.anchorSide);
+                const distanceFromElement = this.attachmentDistanceFromElement;
+                const markerOffset = GEdgeView.isSourceLabelPosition(position)
                     ? sourceElementOffset
                     : targetElementOffset;
-            const totalOffset = distanceFromElement + (markerOffset ?? 0);
-            anchorPoint = {
-                x: anchorPoint.x + direction.x * totalOffset,
-                y: anchorPoint.y + direction.y * totalOffset
-            };
+                const totalOffset = distanceFromElement + markerOffset;
+                anchorPoint = {
+                    x: anchorPoint.x + direction.x * totalOffset,
+                    y: anchorPoint.y + direction.y * totalOffset
+                };
+            }
+            return this.stackLabelAttachments(attachments, anchorPoint, position, anchorInfo);
         }
 
-        return this.stackAttachments(attachments, anchorPoint, position, isHorizontal, isLeftSide, anchorInfo);
+        // Context rail positions (START, END, MIDDLE): no distanceFromElement for START/END
+        return this.stackAttachments(attachments, anchorPoint, position, anchorInfo);
     }
 
     /**
      * Gets the anchor information for an attachment position.
      *
-     * @param position The attachment position
+     * For START, returns the source point and direction from source toward the next route point.
+     * For END, returns the target point and direction from target toward the previous route point.
+     * For MIDDLE, returns the midpoint and direction along the middle segment.
+     *
+     * @param position The attachment position (START, END, or MIDDLE)
      * @param routeResult The route data
      * @returns The anchor point, direction vector, and optional anchor side, or undefined if not computable
      */
@@ -321,12 +378,28 @@ export abstract class GEdgeView implements IView {
             return undefined;
         }
 
+        // Normalize label positions to their equivalent base positions for anchor computation
+        let basePosition: EdgeAttachmentPosition = position;
+        if (position === EdgeAttachmentPosition.SOURCE_LEFT || position === EdgeAttachmentPosition.SOURCE_RIGHT) {
+            basePosition = EdgeAttachmentPosition.START;
+        } else if (
+            position === EdgeAttachmentPosition.TARGET_LEFT ||
+            position === EdgeAttachmentPosition.TARGET_RIGHT
+        ) {
+            basePosition = EdgeAttachmentPosition.END;
+        } else if (
+            position === EdgeAttachmentPosition.MIDDLE_LEFT ||
+            position === EdgeAttachmentPosition.MIDDLE_RIGHT
+        ) {
+            basePosition = EdgeAttachmentPosition.MIDDLE;
+        }
+
         let anchorPoint: Point;
         let dx: number;
         let dy: number;
         let anchorSide: AnchorSide | undefined;
 
-        if (position === EdgeAttachmentPosition.SOURCE_LEFT || position === EdgeAttachmentPosition.SOURCE_RIGHT) {
+        if (basePosition === EdgeAttachmentPosition.START) {
             anchorPoint = route[0];
             anchorSide = routeResult.sourceAnchor?.side;
             if (anchorSide) {
@@ -337,10 +410,7 @@ export abstract class GEdgeView implements IView {
                 dx = route[1].x - route[0].x;
                 dy = route[1].y - route[0].y;
             }
-        } else if (
-            position === EdgeAttachmentPosition.TARGET_LEFT ||
-            position === EdgeAttachmentPosition.TARGET_RIGHT
-        ) {
+        } else if (basePosition === EdgeAttachmentPosition.END) {
             anchorPoint = route[route.length - 1];
             anchorSide = routeResult.targetAnchor?.side;
             if (anchorSide) {
@@ -351,10 +421,7 @@ export abstract class GEdgeView implements IView {
                 dx = route[route.length - 2].x - route[route.length - 1].x;
                 dy = route[route.length - 2].y - route[route.length - 1].y;
             }
-        } else if (
-            position === EdgeAttachmentPosition.MIDDLE_LEFT ||
-            position === EdgeAttachmentPosition.MIDDLE_RIGHT
-        ) {
+        } else if (basePosition === EdgeAttachmentPosition.MIDDLE) {
             const middleIndex = Math.floor(route.length / 2);
             anchorPoint = PointUtil.linear(route[middleIndex - 1], route[middleIndex], 0.5);
             const directionPoint = route[middleIndex];
@@ -387,53 +454,80 @@ export abstract class GEdgeView implements IView {
     }
 
     /**
-     * Determines whether attachments should be on the left side.
+     * Returns true if the position is a label attachment position
+     * (SOURCE_LEFT/RIGHT, TARGET_LEFT/RIGHT, MIDDLE_LEFT/RIGHT).
      *
-     * @param position The attachment position
-     * @returns True if attachments should be on the left side
+     * @param position The attachment position to check
+     * @returns true if this is a label position
      */
-    private determineAttachmentSide(position: EdgeAttachmentPosition): boolean {
-        if (
-            position === EdgeAttachmentPosition.MIDDLE_LEFT ||
+    private static isLabelPosition(position: EdgeAttachmentPosition): boolean {
+        return (
             position === EdgeAttachmentPosition.SOURCE_LEFT ||
-            position === EdgeAttachmentPosition.TARGET_LEFT
-        ) {
-            return true;
-        }
-        if (
-            position === EdgeAttachmentPosition.MIDDLE_RIGHT ||
             position === EdgeAttachmentPosition.SOURCE_RIGHT ||
-            position === EdgeAttachmentPosition.TARGET_RIGHT
-        ) {
-            return false;
-        }
-        return false;
+            position === EdgeAttachmentPosition.TARGET_LEFT ||
+            position === EdgeAttachmentPosition.TARGET_RIGHT ||
+            position === EdgeAttachmentPosition.MIDDLE_LEFT ||
+            position === EdgeAttachmentPosition.MIDDLE_RIGHT
+        );
     }
 
     /**
-     * Stacks and renders attachments at the computed position.
+     * Returns true if the position is a source-end label position (SOURCE_LEFT or SOURCE_RIGHT).
      *
-     * Attachments are always stacked vertically (along the Y axis).
-     * When attached to vertical lines they are aligned with the line (same Y as the anchor),
-     * when attached to horizontal lines they are aligned with the box (same X as the anchor).
-     * For horizontal middle attachments, the group is vertically centered around the anchor.
+     * @param position The attachment position to check
+     * @returns true if this is a source label position
+     */
+    private static isSourceLabelPosition(position: EdgeAttachmentPosition): boolean {
+        return position === EdgeAttachmentPosition.SOURCE_LEFT || position === EdgeAttachmentPosition.SOURCE_RIGHT;
+    }
+
+    /**
+     * Returns true if the position is a target-end label position (TARGET_LEFT or TARGET_RIGHT).
      *
-     * The stack direction is always outwards from the box or line, depending on the context.
+     * @param position The attachment position to check
+     * @returns true if this is a target label position
+     */
+    private static isTargetLabelPosition(position: EdgeAttachmentPosition): boolean {
+        return position === EdgeAttachmentPosition.TARGET_LEFT || position === EdgeAttachmentPosition.TARGET_RIGHT;
+    }
+
+    /**
+     * Determines whether the attachment position is on the left or above side of the edge.
+     *
+     * Left/above side: SOURCE_LEFT, TARGET_LEFT, MIDDLE_LEFT.
+     * Right/below side: SOURCE_RIGHT, TARGET_RIGHT, MIDDLE_RIGHT.
+     *
+     * @param position A label attachment position
+     * @returns true if the attachment should be placed on the left/above side
+     */
+    private static determineAttachmentSide(position: EdgeAttachmentPosition): boolean {
+        return (
+            position === EdgeAttachmentPosition.SOURCE_LEFT ||
+            position === EdgeAttachmentPosition.TARGET_LEFT ||
+            position === EdgeAttachmentPosition.MIDDLE_LEFT
+        );
+    }
+
+    /**
+     * Stacks and renders label attachments (SOURCE_LEFT/RIGHT, TARGET_LEFT/RIGHT, MIDDLE_LEFT/RIGHT)
+     * at the computed anchor position.
+     *
+     * For horizontal edges: attachments are placed above (LEFT) or below (RIGHT) the edge, stacking
+     * outward, and offset horizontally along the edge direction.
+     * For vertical edges: attachments are placed to the left (LEFT) or right (RIGHT) of the edge,
+     * stacking outward, and offset vertically in the edge direction.
+     * For MIDDLE_LEFT/RIGHT on vertical edges: attachments are centered vertically around the anchor.
      *
      * @param attachments The attachments to stack
-     * @param anchorPoint The anchor point on the edge
-     * @param position The logical attachment position (source/target/middle, left/right)
-     * @param isHorizontal Whether the local edge segment is horizontal
-     * @param isLeftSide Whether attachments are on the logical left side
+     * @param anchorPoint The anchor point on the edge (already offset from element for SOURCE/TARGET)
+     * @param position The label attachment position
      * @param anchorInfo Direction and side information for the anchor
-     * @returns An array of VNodes for the stacked attachments
+     * @returns An array of VNodes for the stacked label attachments
      */
-    private stackAttachments(
+    private stackLabelAttachments(
         attachments: EdgeAttachment[],
         anchorPoint: Point,
         position: EdgeAttachmentPosition,
-        isHorizontal: boolean,
-        isLeftSide: boolean,
         anchorInfo: { dx: number; dy: number; anchorSide?: AnchorSide }
     ): VNode[] {
         const vnodes: VNode[] = [];
@@ -441,24 +535,21 @@ export abstract class GEdgeView implements IView {
             return vnodes;
         }
 
+        const isHorizontal = Math.abs(anchorInfo.dx) > Math.abs(anchorInfo.dy);
+        const isLeftSide = GEdgeView.determineAttachmentSide(position);
         const sideSign = isLeftSide ? -1 : 1;
-
         const distanceToLine = this.attachmentDistanceToLine;
-
-        const baseLineX = anchorPoint.x;
-        const baseLineY = anchorPoint.y;
-
         const isMiddle =
             position === EdgeAttachmentPosition.MIDDLE_LEFT || position === EdgeAttachmentPosition.MIDDLE_RIGHT;
         const isMiddleHorizontal = isMiddle && isHorizontal;
         const isMiddleVertical = isMiddle && !isHorizontal;
 
+        // For non-horizontal non-middle-vertical edges, determine vertical stacking direction
         let verticalSign = 1;
         if (!isHorizontal && !isMiddleVertical) {
             if (Math.abs(anchorInfo.dy) > Math.abs(anchorInfo.dx)) {
                 verticalSign = anchorInfo.dy >= 0 ? 1 : -1;
             }
-
             if (
                 position === EdgeAttachmentPosition.SOURCE_LEFT ||
                 position === EdgeAttachmentPosition.SOURCE_RIGHT ||
@@ -473,10 +564,11 @@ export abstract class GEdgeView implements IView {
             }
         }
 
+        // For vertical middle: center the entire stack vertically around the anchor
         let totalHeight = 0;
         if (isMiddleVertical) {
-            for (const attachment of attachments) {
-                totalHeight += attachment.bounds.height;
+            for (const a of attachments) {
+                totalHeight += a.bounds.height;
             }
             totalHeight += (attachments.length - 1) * this.attachmentDistanceBetween;
         }
@@ -486,53 +578,138 @@ export abstract class GEdgeView implements IView {
         for (const attachment of attachments) {
             const width = attachment.bounds.width;
             const height = attachment.bounds.height;
-
             let centerX: number;
             let centerY: number;
 
             if (isHorizontal) {
                 const verticalDir = isLeftSide ? -1 : 1;
-                const baseY = baseLineY + verticalDir * distanceToLine;
-
+                const baseY = anchorPoint.y + verticalDir * distanceToLine;
                 if (isMiddleHorizontal) {
-                    centerX = baseLineX;
+                    centerX = anchorPoint.x;
                 } else if (Math.abs(anchorInfo.dx) > 0) {
                     const alongDir = anchorInfo.dx >= 0 ? 1 : -1;
-                    centerX = baseLineX + alongDir * (width / 2);
+                    centerX = anchorPoint.x + alongDir * (width / 2);
                 } else {
-                    centerX = baseLineX;
+                    centerX = anchorPoint.x;
                 }
-
-                const localOffset = currentOffset + height / 2;
-                centerY = baseY + verticalDir * localOffset;
+                centerY = baseY + verticalDir * (currentOffset + height / 2);
             } else {
-                const baseX = baseLineX + sideSign * distanceToLine;
+                // Vertical edge
+                const baseX = anchorPoint.x + sideSign * distanceToLine;
                 centerX = baseX + sideSign * (width / 2);
-
-                const localOffset = currentOffset + height / 2;
                 if (isMiddleVertical) {
-                    centerY = baseLineY + localOffset;
+                    centerY = anchorPoint.y + (currentOffset + height / 2);
                 } else {
-                    centerY = baseLineY + verticalSign * localOffset;
+                    centerY = anchorPoint.y + verticalSign * (currentOffset + height / 2);
                 }
             }
 
             const finalX = centerX - width / 2;
             const finalY = centerY - height / 2;
 
-            const transformedGroup = svg(
-                "g",
-                {
-                    attrs: {
-                        transform: `translate(${finalX}, ${finalY})`
-                    }
-                },
-                attachment.vnode
+            vnodes.push(
+                svg(
+                    "g",
+                    {
+                        attrs: {
+                            transform: `translate(${finalX}, ${finalY})`
+                        }
+                    },
+                    attachment.vnode
+                )
             );
 
-            vnodes.push(transformedGroup);
-
             currentOffset += height + this.attachmentDistanceBetween;
+        }
+
+        return vnodes;
+    }
+
+    /**
+     * Stacks and renders context action rail attachments (START, END, MIDDLE) at the computed position.
+     *
+     * For START/END: the rail is placed in the direction opposite to where the edge is travelling,
+     * centered on the edge axis. No distanceFromElement offset is applied — the raw route endpoint is used.
+     * For MIDDLE: visual attachments go on one side (left/above by default),
+     * context action rails (oppositeMiddleSide=true) go on the opposite side.
+     *
+     * @param attachments The attachments to stack
+     * @param anchorPoint The anchor point on the edge
+     * @param position The context rail position (START, END, or MIDDLE)
+     * @param anchorInfo Direction and side information for the anchor
+     * @returns An array of VNodes for the stacked attachments
+     */
+    private stackAttachments(
+        attachments: EdgeAttachment[],
+        anchorPoint: Point,
+        position: EdgeAttachmentPosition,
+        anchorInfo: { dx: number; dy: number; anchorSide?: AnchorSide }
+    ): VNode[] {
+        const vnodes: VNode[] = [];
+        if (attachments.length === 0) {
+            return vnodes;
+        }
+
+        const isEdgeHorizontal = Math.abs(anchorInfo.dx) > Math.abs(anchorInfo.dy);
+        const distanceToLine = this.attachmentDistanceToLine;
+        const isMiddle = position === EdgeAttachmentPosition.MIDDLE;
+
+        const edgeDirSign = isEdgeHorizontal ? (anchorInfo.dx >= 0 ? 1 : -1) : anchorInfo.dy >= 0 ? 1 : -1;
+
+        for (const attachment of attachments) {
+            const width = attachment.bounds.width;
+            const height = attachment.bounds.height;
+
+            let centerX: number;
+            let centerY: number;
+
+            if (isMiddle) {
+                const defaultSideSign = -1;
+                const sideSign = attachment.oppositeMiddleSide ? -defaultSideSign : defaultSideSign;
+
+                if (isEdgeHorizontal) {
+                    centerX = anchorPoint.x;
+                    centerY = anchorPoint.y + sideSign * (distanceToLine + height / 2);
+                } else {
+                    centerX = anchorPoint.x + sideSign * (distanceToLine + width / 2);
+                    centerY = anchorPoint.y;
+                }
+            } else {
+                const oppositeSign = -edgeDirSign;
+
+                if (isEdgeHorizontal) {
+                    centerX = anchorPoint.x + oppositeSign * (distanceToLine + width / 2);
+                    centerY = anchorPoint.y;
+                } else {
+                    centerX = anchorPoint.x;
+                    centerY = anchorPoint.y + oppositeSign * (distanceToLine + height / 2);
+                }
+            }
+
+            const finalX = centerX - width / 2;
+            const finalY = centerY - height / 2;
+
+            if (attachment.renderAt != undefined) {
+                const rendered = attachment.renderAt(
+                    { x: finalX, y: finalY },
+                    attachment.orientation ?? (isEdgeHorizontal ? "horizontal" : "vertical")
+                );
+                if (rendered != undefined) {
+                    vnodes.push(rendered);
+                }
+            } else {
+                const transformedGroup = svg(
+                    "g",
+                    {
+                        attrs: {
+                            transform: `translate(${finalX}, ${finalY})`
+                        }
+                    },
+                    attachment.vnode
+                );
+
+                vnodes.push(transformedGroup);
+            }
         }
 
         return vnodes;
@@ -722,6 +899,7 @@ export abstract class GEdgeView implements IView {
      * Renders non-interactive endpoint indicators for create-edge feedback.
      * Both source and target endpoints stay visible during phase 2.
      *
+     * @param model The edge model
      * @param route The computed route
      * @returns Endpoint indicator VNodes
      */

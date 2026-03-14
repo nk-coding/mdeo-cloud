@@ -1,5 +1,5 @@
 import { GNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
-import type { EndNodeKind } from "./elementTypes.js";
+import type { EndNodeKind } from "@mdeo/protocol-model-transformation";
 
 const { boundsFeature, selectFeature, deletableFeature, moveFeature, connectableFeature } =
     sharedImport("@eclipse-glsp/sprotty");

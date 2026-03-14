@@ -1,6 +1,6 @@
 import { BaseLabelEditValidator, sharedImport, type GModelIndex } from "@mdeo/language-shared";
 import type { GModelElement, ValidationStatus as ValidationStatusType } from "@eclipse-glsp/server";
-import { ModelTransformationElementType, PatternModifierKind } from "./model/elementTypes.js";
+import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import type { GPatternInstanceNode } from "./model/patternInstanceNode.js";
 import {
     PatternObjectInstance,
@@ -16,8 +16,9 @@ import {
     parseVariableLabel,
     parseModelTransformationPropertyLabel as parsePropertyLabel
 } from "./modelTransformationLabelParseUtils.js";
-
-export { parseModelTransformationPropertyLabel } from "./modelTransformationLabelParseUtils.js";
+import { NEW_PROPERTY_COMPARISON_LABEL_PREFIX } from "./handler/addPropertyValueComparisonOperationHandler.js";
+import { NEW_VARIABLE_LABEL_PREFIX } from "./handler/addVariableOperationHandler.js";
+import { NEW_WHERE_CLAUSE_LABEL_PREFIX } from "./handler/addWhereClauseOperationHandler.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -66,6 +67,139 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
             default:
                 return ValidationStatus.NONE;
         }
+    }
+
+    /**
+     * Validates a label edit for a newly inserted placeholder label whose element does not
+     * yet exist in the server-side model index.
+     *
+     * Handles all insert actions defined in this package:
+     * - {@link NEW_PROPERTY_COMPARISON_LABEL_PREFIX} — new property-comparison label (with or
+     *   without a pre-selected property); validates format and operator/modifier compatibility
+     *   by parsing the full text rather than the label ID.
+     * - {@link NEW_VARIABLE_LABEL_PREFIX} — new variable placeholder; validates format and
+     *   name uniqueness.
+     * - {@link NEW_WHERE_CLAUSE_LABEL_PREFIX} — new where-clause placeholder; validates the
+     *   {@code where } prefix and non-empty expression.
+     *
+     * @param text The label text currently being entered
+     * @param modelElementId The temporary label element ID
+     * @returns Validation status for the in-progress edit
+     */
+    override validateUnknown(text: string, modelElementId: string): ValidationStatusType {
+        if (modelElementId.startsWith(NEW_PROPERTY_COMPARISON_LABEL_PREFIX)) {
+            if (text.trim().length === 0) {
+                return ValidationStatus.NONE;
+            }
+            const rest = modelElementId.substring(NEW_PROPERTY_COMPARISON_LABEL_PREFIX.length);
+            const sepIdx = rest.indexOf("@@");
+            const nodeId = sepIdx >= 0 ? rest.substring(0, sepIdx) : rest;
+            return this.validatePropertyLabelForNode(text, nodeId) ?? ValidationStatus.NONE;
+        }
+        if (modelElementId.startsWith(NEW_VARIABLE_LABEL_PREFIX)) {
+            return this.validateNewVariableLabel(text) ?? ValidationStatus.NONE;
+        }
+        if (modelElementId.startsWith(NEW_WHERE_CLAUSE_LABEL_PREFIX)) {
+            return this.validateWhereClauseLabel(text) ?? ValidationStatus.NONE;
+        }
+        return ValidationStatus.NONE;
+    }
+
+    /**
+     * Core validation for a pattern property label given the parent instance node ID.
+     *
+     * Parses the label, validates the property name as an identifier, allows an empty value
+     * while the user is still typing, then checks operator validity against the instance modifier
+     * resolved from the GModel node.
+     *
+     * @param text The label text
+     * @param nodeId The ID of the parent pattern instance node
+     * @returns A validation status if invalid, undefined otherwise
+     */
+    private validatePropertyLabelForNode(text: string, nodeId: string): ValidationStatusType | undefined {
+        const parsed = parsePropertyLabel(text);
+        if (typeof parsed === "string") {
+            return this.error(parsed);
+        }
+
+        const nameValidation = this.validateRawIdentifier(parsed.name, "Property name");
+        if (nameValidation != undefined) {
+            return nameValidation;
+        }
+
+        // Allow empty value while the user is still typing
+        if (parsed.value.trim().length === 0) {
+            return undefined;
+        }
+
+        const modifier = this.getModifierFromNodeId(nodeId);
+        return this.validateOperatorForModifier(parsed.operator, modifier);
+    }
+
+    /**
+     * Validates a new variable label with no pre-existing AST node.
+     *
+     * Checks format and name uniqueness against the current diagram model, identical
+     * to {@link validateVariableLabel} but without needing an existing {@link PatternVariable}
+     * node to look up the current name.
+     *
+     * @param text The current label text (expected format: `var name[: type] = expr`)
+     * @returns A validation status if invalid, undefined otherwise
+     */
+    private validateNewVariableLabel(text: string): ValidationStatusType | undefined {
+        if (text.trim().length === 0) {
+            return undefined;
+        }
+
+        const parsed = parseVariableLabel(text);
+        if (parsed == undefined) {
+            return this.error("Invalid variable format. Expected: var name[: type] = expression");
+        }
+
+        const nameValidation = this.validateRawIdentifier(parsed.name, "Variable name");
+        if (nameValidation != undefined) {
+            return nameValidation;
+        }
+
+        if (parsed.value.trim().length === 0) {
+            return this.error("Variable value expression cannot be empty.");
+        }
+
+        const trimmedName = parsed.name.trim();
+        if (this.nameExistsElsewhere(trimmedName, undefined)) {
+            return this.error(`A variable or instance named '${trimmedName}' already exists.`);
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Resolves the modifier of the pattern instance identified by `nodeId` from the GModel index.
+     *
+     * Returns `'reference'` when the AST node is a {@link PatternObjectInstanceReference}.
+     *
+     * @param nodeId The GModel node ID of the pattern instance
+     * @returns The modifier kind, `'reference'`, or undefined if the node cannot be resolved
+     */
+    private getModifierFromNodeId(nodeId: string): PatternModifierKind | "reference" | undefined {
+        const element = this.modelState.index.find(nodeId);
+        if (element == undefined) {
+            return undefined;
+        }
+
+        const astNode = this.index.getAstNode(element);
+        if (astNode == undefined) {
+            return undefined;
+        }
+
+        if (this.reflection.isInstance(astNode, PatternObjectInstance)) {
+            return modifierStringToKind((astNode as PatternObjectInstanceType).modifier?.modifier);
+        }
+        if (this.reflection.isInstance(astNode, PatternObjectInstanceReference)) {
+            return "reference";
+        }
+
+        return undefined;
     }
 
     /**
@@ -136,7 +270,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
             return this.error(parsed);
         }
 
-        const nameValidation = this.validateIdentifier(parsed.name, "Property name");
+        const nameValidation = this.validateRawIdentifier(parsed.name, "Property name");
         if (nameValidation != undefined) {
             return nameValidation;
         }
@@ -195,7 +329,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
             return this.error("Invalid variable format. Expected: var name[: type] = expression");
         }
 
-        const nameValidation = this.validateIdentifier(parsed.name, "Variable name");
+        const nameValidation = this.validateRawIdentifier(parsed.name, "Variable name");
         if (nameValidation != undefined) {
             return nameValidation;
         }

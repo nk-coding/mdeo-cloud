@@ -39,4 +39,41 @@ export class GLabel extends GChildElement {
      * Stores the validation result for the current edit
      */
     validationResult?: EditLabelValidationResult;
+
+    /**
+     * Indicates if this label was just created and requires special handling.
+     * When true, the label view will dispatch a custom operation instead of ApplyLabelEditOperation
+     * and automatically enter edit mode for immediate user input.
+     */
+    isNewLabel?: boolean;
+
+    /**
+     * Specifies which operation factory to use when creating a new label.
+     * Maps to the operation kind (e.g., "addPropertyLabel", "addEnumEntryLabel").
+     * Only used when isNewLabel is true.
+     */
+    newLabelOperationKind?: string;
+
+    /**
+     * The parent element ID that provides context for new label operations.
+     * For example, when creating a property label, this would be the containing class ID.
+     * Only used when isNewLabel is true.
+     */
+    parentElementId?: string;
+
+    /**
+     * The IDs of the root-level GModel elements that were inserted by the corresponding
+     * {@link InsertNewLabelAction} (set by {@code InsertNewLabelCommand} after insertion).
+     * Used by the label view when building a {@link RemoveNewLabelAction}.
+     * Only populated when isNewLabel is true.
+     */
+    insertedElementIds?: string[];
+
+    /**
+     * The ID of the GModel element that directly contains the inserted template elements
+     * (set by {@code InsertNewLabelCommand} after insertion).
+     * Used by the label view when building a {@link RemoveNewLabelAction}.
+     * Only populated when isNewLabel is true.
+     */
+    containerElementId?: string;
 }

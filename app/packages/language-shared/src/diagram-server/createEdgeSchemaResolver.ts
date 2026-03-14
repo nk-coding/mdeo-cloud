@@ -1,4 +1,4 @@
-import type { CreateEdgeSchema } from "@mdeo/editor-protocol";
+import type { CreateEdgeSchema } from "@mdeo/protocol-common";
 
 /**
  * Request payload for resolving the initial create-edge schema.

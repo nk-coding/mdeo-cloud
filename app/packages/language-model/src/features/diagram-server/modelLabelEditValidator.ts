@@ -1,6 +1,6 @@
 import { BaseLabelEditValidator, parseIdentifier, sharedImport, type GModelIndex } from "@mdeo/language-shared";
 import type { GModelElement, ValidationStatus as ValidationStatusType } from "@eclipse-glsp/server";
-import { ModelElementType } from "./model/elementTypes.js";
+import { ModelElementType } from "@mdeo/protocol-model";
 import type { GObjectNode } from "./model/objectNode.js";
 import type { GObjectNameLabel } from "./model/objectNameLabel.js";
 import type { GPropertyLabel } from "./model/propertyLabel.js";
@@ -20,12 +20,13 @@ import {
     type EnumTypeReferenceType,
     type MultiplicityType
 } from "@mdeo/language-metamodel";
-import { PropertyAssignment, type ObjectInstanceType } from "../../grammar/modelTypes.js";
+import { PropertyAssignment, ObjectInstance, type ObjectInstanceType } from "../../grammar/modelTypes.js";
 import type { PartialPropertyAssignment } from "../../grammar/modelPartialTypes.js";
 import type { IToken } from "chevrotain";
 import { FLOAT, ID, INT, STRING } from "@mdeo/language-common";
 import { BOOLEAN } from "../../grammar/modelRules.js";
 import type { Lexer } from "langium";
+import { NEW_PROPERTY_VALUE_LABEL_PREFIX } from "./handler/addPropertyValueOperationHandler.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -58,6 +59,120 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
         }
 
         return ValidationStatus.NONE;
+    }
+
+    /**
+     * Validates a label edit for a newly inserted placeholder label whose element does not
+     * yet exist in the server-side model index.
+     *
+     * Handles all insert actions defined in this package:
+     * - {@link NEW_PROPERTY_VALUE_LABEL_PREFIX} — new property-value label (with or without
+     *   a pre-selected property); validates format, property existence, and value type by
+     *   parsing the full {@code propName = value} text rather than the label ID.
+     *
+     * @param text The label text currently being entered
+     * @param modelElementId The temporary label element ID
+     * @returns Validation status for the in-progress edit
+     */
+    override validateUnknown(text: string, modelElementId: string): ValidationStatusType {
+        if (modelElementId.startsWith(NEW_PROPERTY_VALUE_LABEL_PREFIX)) {
+            if (text.trim().length === 0) {
+                return ValidationStatus.NONE;
+            }
+            const rest = modelElementId.substring(NEW_PROPERTY_VALUE_LABEL_PREFIX.length);
+            const sepIdx = rest.indexOf("@@");
+            const nodeId = sepIdx >= 0 ? rest.substring(0, sepIdx) : rest;
+            return this.validatePropertyValueForObject(text, nodeId) ?? ValidationStatus.NONE;
+        }
+        return ValidationStatus.NONE;
+    }
+
+    /**
+     * Validates a property-value label against the object identified by {@code nodeId}.
+     *
+     * Performs full validation including format, property existence, and value type-checking
+     * identical to what would be done for an existing {@link LABEL_PROPERTY} element.
+     * Skips class-level validation gracefully when the object node cannot be resolved.
+     *
+     * @param text The label text
+     * @param nodeId The ID of the parent object node in the GModel
+     * @returns A validation status if invalid, undefined otherwise
+     */
+    private validatePropertyValueForObject(text: string, nodeId: string): ValidationStatusType | undefined {
+        const formatResult = this.validatePropertyValueFormat(text);
+        if (formatResult != undefined) {
+            return formatResult;
+        }
+
+        const parsed = parseModelPropertyLabel(text, this.modelState.languageServices.parser.Lexer);
+        if (typeof parsed === "string") {
+            return this.error(parsed);
+        }
+
+        // Allow empty value while the user is still typing
+        if (parsed.value.trim().length === 0) {
+            return undefined;
+        }
+
+        const tokenValidation = this.validateValueTokens(parsed.valueTokens);
+        if (tokenValidation != undefined) {
+            return tokenValidation;
+        }
+
+        // Look up the parent object node to obtain the class definition
+        const objectElement = this.modelState.index.find(nodeId);
+        if (objectElement == undefined) {
+            return undefined;
+        }
+
+        const objectAstNode = this.index.getAstNode(objectElement);
+        if (objectAstNode == undefined || !this.reflection.isInstance(objectAstNode, ObjectInstance)) {
+            return undefined;
+        }
+
+        const objectNode = objectAstNode as ObjectInstanceType;
+
+        const classRef = objectNode.class?.ref;
+        if (classRef == undefined || !this.reflection.isInstance(classRef, Class)) {
+            return undefined;
+        }
+
+        const classType = classRef as ClassType;
+        const classChain = resolveClassChain(classType, this.reflection);
+        const propertyName = parseIdentifier(parsed.name);
+        let propertyDef: PropertyType | undefined;
+
+        for (const cls of classChain) {
+            propertyDef = (cls.properties ?? []).find((p) => (p as PropertyType).name === propertyName) as
+                | PropertyType
+                | undefined;
+            if (propertyDef != undefined) {
+                break;
+            }
+        }
+
+        if (propertyDef == undefined) {
+            const nameProvider = this.modelState.languageServices.references.NameProvider;
+            return this.error(
+                `Property '${propertyName}' does not exist on class '${nameProvider.getName(classRef)}'.`
+            );
+        }
+
+        return this.validatePropertyValue(parsed.valueTokens, propertyDef);
+    }
+
+    /**
+     * Validates that the label text has the minimal `propName = value` format.
+     *
+     * @param text The label text
+     * @returns A validation status if the format is clearly invalid, undefined otherwise
+     */
+    private validatePropertyValueFormat(text: string): ValidationStatusType | undefined {
+        const parsed = parseModelPropertyLabel(text, this.modelState.languageServices.parser.Lexer);
+        if (typeof parsed === "string") {
+            return this.error(parsed);
+        }
+        return undefined;
     }
 
     /**

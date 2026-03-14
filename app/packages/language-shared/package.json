@@ -20,7 +20,7 @@
     "devDependencies": {
         "@eclipse-glsp/protocol": "^2.6.0",
         "@eclipse-glsp/server": "^2.6.0",
-        "@mdeo/editor-protocol": "^0.1.0",
+        "@mdeo/protocol-common": "^0.1.0",
         "chevrotain": "~11.1.1",
         "elkjs": "^0.11.0",
         "inversify": "^6.2.2",
