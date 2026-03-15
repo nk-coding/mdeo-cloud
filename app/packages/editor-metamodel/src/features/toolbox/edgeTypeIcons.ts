@@ -1,6 +1,12 @@
 import type { IconNode } from "lucide";
 
 /**
+ * Custom icon for a plain (no decorator) association line.
+ * Rendered as a single diagonal line without any arrow head or diamond.
+ */
+export const PlainLineIcon: IconNode = [["path", { d: "M1.5 22.5L22.5 1.5" }]];
+
+/**
  * Custom icon for a unidirectional association arrow.
  */
 export const UnidirectionalAssociationIcon: IconNode = [

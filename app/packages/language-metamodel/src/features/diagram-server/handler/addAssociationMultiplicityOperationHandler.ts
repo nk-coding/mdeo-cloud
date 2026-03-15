@@ -5,7 +5,8 @@ import {
     SingleMultiplicity,
     type AssociationType,
     type AssociationEndType,
-    type SingleMultiplicityType
+    type SingleMultiplicityType,
+    type MultiplicityType
 } from "../../../grammar/metamodelTypes.js";
 import type { AddAssociationMultiplicityOperation } from "@mdeo/protocol-metamodel";
 import { MetamodelElementType } from "@mdeo/protocol-metamodel";
@@ -14,12 +15,18 @@ import type { Command, GModelElement } from "@eclipse-glsp/server";
 import type { ContextActionRequestContext, ContextItemProvider, GEdge } from "@mdeo/language-shared";
 import type { ContextItem } from "@mdeo/protocol-common";
 import { EdgeAttachmentPosition, InsertNewLabelAction } from "@mdeo/protocol-common";
-import { isImportedElement } from "./metamodelHandlerUtils.js";
+import { isImportedElement, parseMultiplicity } from "./metamodelHandlerUtils.js";
 import { GAssociationMultiplicityNode } from "../model/associationMultiplicityNode.js";
 import { GAssociationMultiplicityLabel } from "../model/associationMultiplicityLabel.js";
 import { NodeLayoutMetadataUtil } from "../metadataTypes.js";
 
 const { injectable } = sharedImport("inversify");
+
+/**
+ * Prefix used to build unique IDs for new-multiplicity placeholder labels.
+ * The full label ID is `${NEW_MULTIPLICITY_LABEL_PREFIX}${edgeId}-${end}`.
+ */
+export const NEW_MULTIPLICITY_LABEL_PREFIX = "__new-multiplicity-label-";
 
 /**
  * Handler for adding multiplicity labels to association ends.
@@ -62,21 +69,19 @@ export class AddAssociationMultiplicityOperationHandler extends BaseOperationHan
             return undefined;
         }
 
-        const requestedValue = operation.multiplicityValue?.trim();
-        const multiplicityValue =
-            requestedValue === "*" || requestedValue === "+" || requestedValue === "?" ? requestedValue : "*";
-
-        const defaultMultiplicity: SingleMultiplicityType = {
-            $type: SingleMultiplicity.name,
-            value: multiplicityValue,
-            numericValue: undefined
-        };
+        const requestedValue = operation.multiplicityValue?.trim() ?? "";
+        const multiplicityAst: MultiplicityType =
+            parseMultiplicity(requestedValue) ??
+            ({
+                $type: SingleMultiplicity.name,
+                value: "*"
+            } as SingleMultiplicityType);
 
         const newEndAst: AssociationEndType = {
             $type: AssociationEnd.name,
             class: endAst.class,
             name: endAst.name,
-            multiplicity: defaultMultiplicity
+            multiplicity: multiplicityAst
         };
 
         const edit = await this.replaceCstNode(endCstNode, newEndAst as unknown as AstNode);
@@ -106,12 +111,11 @@ export class AddAssociationMultiplicityOperationHandler extends BaseOperationHan
         for (const end of ["source", "target"] as const) {
             const endAst = end === "source" ? association?.source : association?.target;
             const existingMultiplicity = endAst?.multiplicity;
-            // Only show action if the end has a property name defined but no multiplicity yet
             if (existingMultiplicity != undefined || endAst?.name == undefined) {
                 continue;
             }
 
-            const position = end === "source" ? EdgeAttachmentPosition.START : EdgeAttachmentPosition.END;
+            const position = end === "source" ? EdgeAttachmentPosition.END : EdgeAttachmentPosition.START;
             const nodeEnd = end === "source" ? "target" : "source";
             items.push({
                 id: `add-multiplicity-${edge.id}-${end}`,
@@ -145,7 +149,7 @@ export class AddAssociationMultiplicityOperationHandler extends BaseOperationHan
         nodeEnd: "source" | "target"
     ): InsertNewLabelAction {
         const wrapperId = `__new-multiplicity-${edge.id}-${end}`;
-        const labelId = `__new-multiplicity-label-${edge.id}-${end}`;
+        const labelId = `${NEW_MULTIPLICITY_LABEL_PREFIX}${edge.id}-${end}`;
         const defaultMeta = NodeLayoutMetadataUtil.create(0, 0);
 
         const label = GAssociationMultiplicityLabel.builder()

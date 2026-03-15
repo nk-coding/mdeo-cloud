@@ -592,6 +592,8 @@ export class ModelTransformationControlFlowConverter {
     /**
      * Processes a for-match statement.
      * Iterates over all matches of the pattern, looping back on each iteration.
+     * When the do-block is empty, a self-loop edge labelled "each" is emitted so
+     * that insertion points are still available in the diagram.
      *
      * @param stmt The for-match statement.
      * @param previousNodeId The predecessor node ID.
@@ -618,6 +620,10 @@ export class ModelTransformationControlFlowConverter {
             if (doResult.lastNodeId != undefined) {
                 this.pushEdge(doResult.lastNodeId, matchNodeId);
             }
+        } else {
+            // Empty do-block: emit a self-loop so the diagram still shows an "each"
+            // edge and users can insert statements there via the context action.
+            this.pushEdge(matchNodeId, matchNodeId, "each");
         }
 
         return { lastNodeId: matchNodeId };

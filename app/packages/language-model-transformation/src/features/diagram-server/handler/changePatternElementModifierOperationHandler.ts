@@ -29,8 +29,9 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
     /**
      * Creates a command to apply a modifier change on the target pattern element.
      * Supports both inserting a new modifier (when none exists) and replacing or removing an existing one.
-     * When the target element is a `PatternObjectInstance`, connected `PatternLink` instances that
-     * already carry a modifier are updated to the same modifier value.
+     * When the target element is a `PatternObjectInstance`, all adjacent `PatternLink` instances —
+     * whether they have an existing modifier or none — are updated to the same modifier value so
+     * that the pattern remains consistent.
      *
      * @param operation - The change-modifier operation containing the element ID and the new modifier
      * @returns A command applying the workspace edit, or `undefined` when the element or AST node
@@ -64,6 +65,9 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
      * References, implicit references, and delete-references are excluded because their modifier
      * is not locally editable.
      *
+     * For pattern links the action is only offered when both connected instances carry no modifier,
+     * since a link that already shares a modifier with an instance should not be changed in isolation.
+     *
      * @param element - The selected element
      * @param _context - Additional request context
      * @returns Context actions for this handler, or an empty array if the element is not applicable
@@ -76,27 +80,40 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
             if (astNode == undefined || !this.reflection.isInstance(astNode, PatternObjectInstance)) {
                 return [];
             }
-        } else if (element.type !== ModelTransformationElementType.EDGE_PATTERN_LINK) {
+        } else if (element.type === ModelTransformationElementType.EDGE_PATTERN_LINK) {
+            // Only offer the action for links whose both endpoints have no modifier.
+            const linkAstNode = this.index.getAstNode(element);
+            if (linkAstNode == undefined || !this.reflection.isInstance(linkAstNode, PatternLink)) {
+                return [];
+            }
+            const link = linkAstNode as PatternLinkType;
+            const sourceInstance = link.source?.object?.ref;
+            const targetInstance = link.target?.object?.ref;
+            if (sourceInstance?.modifier != undefined || targetInstance?.modifier != undefined) {
+                return [];
+            }
+        } else {
             return [];
         }
 
         const modifierOptions = [
-            { label: "None", modifier: PatternModifierKind.NONE },
-            { label: "Create", modifier: PatternModifierKind.CREATE },
-            { label: "Delete", modifier: PatternModifierKind.DELETE },
-            { label: "Forbid", modifier: PatternModifierKind.FORBID },
-            { label: "Require", modifier: PatternModifierKind.REQUIRE }
+            { label: "None", modifier: PatternModifierKind.NONE, icon: "square" },
+            { label: "Create", modifier: PatternModifierKind.CREATE, icon: "square-plus" },
+            { label: "Delete", modifier: PatternModifierKind.DELETE, icon: "square-x" },
+            { label: "Forbid", modifier: PatternModifierKind.FORBID, icon: "square-slash" },
+            { label: "Require", modifier: PatternModifierKind.REQUIRE, icon: "square-check" }
         ];
 
         return [
             {
                 id: `change-modifier-${element.id}`,
                 label: "Change Modifier",
-                icon: "settings-2",
+                icon: "square-dot",
                 sortString: "c",
                 children: modifierOptions.map((option) => ({
                     id: `change-modifier-${element.id}-${option.modifier}`,
                     label: option.label,
+                    icon: option.icon,
                     action: ChangePatternElementModifierOperation.create({
                         elementId: element.id,
                         modifier: option.modifier
@@ -111,7 +128,8 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
      * When the modifier is `NONE`, the existing modifier CST node is deleted.
      * Otherwise the modifier keyword is replaced in-place (if one already exists) or a new keyword
      * is inserted before the instance name (if no modifier is present yet).
-     * Connected `PatternLink` elements that already carry a modifier are updated to the same value.
+     * All adjacent `PatternLink` elements — whether they carry an existing modifier or none at all —
+     * are updated to the same modifier value so the pattern stays consistent.
      *
      * @param node - The PatternObjectInstance AST node
      * @param modifier - The new modifier kind to apply
@@ -153,7 +171,9 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
                 edits.push({ changes: { [uri]: [TextEdit.insert(nameNode.range.start, `${modifierText} `)] } });
             }
 
-            // Propagate to connected links that already carry a modifier.
+            // Propagate to all adjacent links, regardless of whether they already
+            // carry a modifier or not — when a node is assigned a modifier for the
+            // first time, its links should follow suit.
             const container = node.$container;
             if (container != undefined) {
                 const elements = (container as unknown as { elements?: unknown[] }).elements ?? [];
@@ -162,14 +182,27 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
                         const link = element as PatternLinkType;
                         const sourceRef = link.source?.object?.ref;
                         const targetRef = link.target?.object?.ref;
-                        if (
-                            (sourceRef === node || targetRef === node) &&
-                            link.modifier != undefined &&
-                            link.modifier.$cstNode != undefined
-                        ) {
-                            const linkModCstNode = GrammarUtils.findNodeForProperty(link.modifier.$cstNode, "modifier");
-                            if (linkModCstNode != undefined) {
-                                edits.push(await this.replaceCstNode(linkModCstNode, modifierText));
+                        if (sourceRef === node || targetRef === node) {
+                            if (link.modifier != undefined && link.modifier.$cstNode != undefined) {
+                                // Replace an existing modifier keyword in place.
+                                const linkModCstNode = GrammarUtils.findNodeForProperty(
+                                    link.modifier.$cstNode,
+                                    "modifier"
+                                );
+                                if (linkModCstNode != undefined) {
+                                    edits.push(await this.replaceCstNode(linkModCstNode, modifierText));
+                                }
+                            } else if (link.$cstNode != undefined) {
+                                // Insert a new modifier keyword before the link source.
+                                const sourceCstNode = GrammarUtils.findNodeForProperty(link.$cstNode, "source");
+                                if (sourceCstNode != undefined) {
+                                    const uri = this.getSourceDocument().uri.toString();
+                                    edits.push({
+                                        changes: {
+                                            [uri]: [TextEdit.insert(sourceCstNode.range.start, `${modifierText} `)]
+                                        }
+                                    });
+                                }
                             }
                         }
                     }

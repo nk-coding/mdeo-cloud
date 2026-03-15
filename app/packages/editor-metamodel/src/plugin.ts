@@ -1,6 +1,7 @@
 import type { ContainerConfiguration } from "@eclipse-glsp/sprotty";
 import { metamodelDiagramModule } from "./module.js";
 import { metamodelToolboxModule } from "./features/toolbox/featureModule.js";
+import { metamodelIconRegistryModule } from "./features/icon-registry/featureModule.js";
 import { DEFAULT_MODULES } from "@mdeo/editor-shared";
 
 /**
@@ -9,9 +10,11 @@ import { DEFAULT_MODULES } from "@mdeo/editor-shared";
  * - Default shared modules for diagram editing
  * - Metamodel diagram module for metamodel-specific elements and views
  * - Metamodel toolbox module for connection type selection and palette items
+ * - Metamodel icon registry module for custom association and composition icons
  */
 export const metamodelEditorPlugin: ContainerConfiguration = [
     ...DEFAULT_MODULES,
     metamodelDiagramModule,
-    metamodelToolboxModule
+    metamodelToolboxModule,
+    metamodelIconRegistryModule
 ];

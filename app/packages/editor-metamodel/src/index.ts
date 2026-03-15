@@ -1,3 +1,5 @@
+export * from "./features/icon-registry/featureModule.js";
+export * from "./features/icon-registry/metamodelIconRegistry.js";
 export * from "./features/toolbox/createEdgeContextProvider.js";
 export * from "./features/toolbox/edgeCreationType.js";
 export * from "./features/toolbox/edgeTypeExtensionView.js";

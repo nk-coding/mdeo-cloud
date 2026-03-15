@@ -1,5 +1,10 @@
 import type { DeleteElementOperation, GModelElement } from "@eclipse-glsp/server";
-import { BaseDeleteElementOperationHandler, type DeleteOperationResult, sharedImport } from "@mdeo/language-shared";
+import {
+    BaseDeleteElementOperationHandler,
+    type DeleteOperationResult,
+    GEdge,
+    sharedImport
+} from "@mdeo/language-shared";
 import {
     Class,
     Association,
@@ -21,6 +26,7 @@ import type { WorkspaceEdit } from "vscode-languageserver-types";
 import type { ContextActionRequestContext } from "@mdeo/language-shared";
 import type { ContextItem } from "@mdeo/protocol-common";
 import { isImportedElement } from "./metamodelHandlerUtils.js";
+import { GAssociationMultiplicityNode } from "../model/associationMultiplicityNode.js";
 
 const { injectable } = sharedImport("inversify");
 const { AstUtils } = sharedImport("langium");
@@ -40,13 +46,10 @@ export class MetamodelDeleteNodeOperationHandler extends BaseDeleteElementOperat
      * @returns A delete context item when appropriate, otherwise an empty array
      */
     override getContextItems(element: GModelElement, context: ContextActionRequestContext): ContextItem[] {
-        // Do not offer delete for any edge type in the context menu
-        const isEdge = this.diagramConfiguration.edgeTypeHints.some((h) => h.elementTypeId === element.type);
-        if (isEdge) {
+        if (element instanceof GEdge || isImportedElement(element) || element instanceof GAssociationMultiplicityNode) {
             return [];
         }
 
-        // Do not offer delete for imported (read-only) elements
         if (isImportedElement(element)) {
             return [];
         }

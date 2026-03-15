@@ -23,6 +23,7 @@ import {
     ModelTransformation,
     StatementsScope,
     type BaseTransformationStatementType,
+    type ForMatchStatementType,
     type IfMatchStatementType,
     type IfMatchConditionAndBlockType,
     type PatternType,
@@ -31,7 +32,7 @@ import {
 
 const { injectable } = sharedImport("inversify");
 const { Range } = sharedImport("vscode-languageserver-types");
-const { AstUtils } = sharedImport("langium");
+const { AstUtils, GrammarUtils } = sharedImport("langium");
 
 /**
  * Handler for inserting control-flow statements from edge context actions.
@@ -67,6 +68,12 @@ export class InsertControlFlowStatementOperationHandler extends BaseOperationHan
         }
 
         const newText = this.buildStatementText(statementKind);
+
+        // Self-loop edges arise from for-match statements with an empty do-block.
+        // Insert the new statement directly inside the do-block scope.
+        if (sourceNodeId === targetNodeId) {
+            return this.handleSelfLoopInsertion(sourceNodeId, newText, sourceModel);
+        }
 
         const targetStmt = this.findOuterStatementForNodeId(targetNodeId);
         if (targetStmt?.$cstNode != undefined) {
@@ -153,8 +160,65 @@ export class InsertControlFlowStatementOperationHandler extends BaseOperationHan
     }
 
     /**
+     * Handles insertion for a self-loop edge (source and target are the same node).
+     *
+     * Self-loop edges are generated for `for-match` statements whose do-block is empty.
+     * The new statement is inserted directly inside the do-block scope of the enclosing
+     * `ForMatchStatement`.
+     *
+     * @param loopNodeId The match-node ID — both source and target of the self-loop.
+     * @param newText The source text to insert.
+     * @param sourceModel The transformation root AST node.
+     * @returns A command wrapping the workspace edit, or `undefined` when the for-match
+     *          statement or its do-block CST cannot be located.
+     */
+    private async handleSelfLoopInsertion(
+        loopNodeId: string,
+        newText: string,
+        sourceModel: ModelTransformationType
+    ): Promise<Command | undefined> {
+        // Resolve the ForMatchStatement that owns this match node.
+        let forMatchStmt: ForMatchStatementType | undefined;
+
+        const outerStmt = this.findOuterStatementForNodeId(loopNodeId);
+        if (outerStmt != undefined && this.reflection.isInstance(outerStmt, ForMatchStatement)) {
+            forMatchStmt = outerStmt as ForMatchStatementType;
+        }
+
+        // Fall back: for the synthetic no-pattern node (id = "${stmtId}_no-pattern"),
+        // locate the ForMatchStatement directly via the registry ID encoded in the node ID.
+        if (forMatchStmt == undefined) {
+            const noPatternSuffix = "_no-pattern";
+            if (loopNodeId.endsWith(noPatternSuffix)) {
+                const stmtId = loopNodeId.slice(0, -noPatternSuffix.length);
+                const found = this.findStatementById(stmtId, sourceModel);
+                if (found != undefined && this.reflection.isInstance(found, ForMatchStatement)) {
+                    forMatchStmt = found as ForMatchStatementType;
+                }
+            }
+        }
+
+        if (forMatchStmt == undefined) {
+            return undefined;
+        }
+
+        const doBlockCst = forMatchStmt.doBlock?.$cstNode;
+        if (doBlockCst == undefined) {
+            return undefined;
+        }
+
+        const openBrace = GrammarUtils.findNodeForKeyword(doBlockCst, "{");
+        const closeBrace = GrammarUtils.findNodeForKeyword(doBlockCst, "}");
+        if (openBrace == undefined || closeBrace == undefined) {
+            return undefined;
+        }
+
+        const edit = this.insertIntoScope(openBrace, closeBrace, false, newText);
+        return new OperationHandlerCommand(this.modelState, edit, undefined);
+    }
+
+    /**
      * Returns the placeholder text for a new statement of the given kind.
-     * Multi-line texts use `\n` as line separator; continuation lines carry no
      * extra leading indentation (the workspace-edit utilities add the correct
      * indentation when inserting the text).
      *

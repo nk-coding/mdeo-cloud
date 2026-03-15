@@ -171,9 +171,9 @@ export class ChangeAssociationEndOperationHandler extends BaseOperationHandler i
         const currentKinds = this.getEndKindsFromOperator(association?.operator);
         const items: ContextItem[] = [];
         const endTypes = [
-            { kind: AssociationEndKind.NONE, label: "None" },
-            { kind: AssociationEndKind.ARROW, label: "Arrow" },
-            { kind: AssociationEndKind.COMPOSITION, label: "Composition" }
+            { kind: AssociationEndKind.NONE, label: "None", icon: "none-association" },
+            { kind: AssociationEndKind.ARROW, label: "Arrow", icon: "unidirectional-association" },
+            { kind: AssociationEndKind.COMPOSITION, label: "Composition", icon: "composition" }
         ];
 
         for (const endType of ["source", "target"] as const) {
@@ -188,6 +188,7 @@ export class ChangeAssociationEndOperationHandler extends BaseOperationHandler i
                 .map((endKind) => ({
                     id: `change-assoc-end-${edge.id}-${endType}-${endKind.kind}`,
                     label: endKind.label,
+                    icon: endKind.icon,
                     action: ChangeAssociationEndOperation.create({
                         edgeId: edge.id,
                         end: endType,

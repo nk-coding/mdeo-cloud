@@ -8,20 +8,6 @@ const { icons } = sharedImport("lucide");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
- * Converts kebab-case icon names to PascalCase Lucide export names.
- *
- * @param iconName Icon name in kebab-case format
- * @returns Icon name in PascalCase format
- */
-function toLucideExportName(iconName: string): string {
-    return iconName
-        .split("-")
-        .filter((part) => part.length > 0)
-        .map((part) => `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`)
-        .join("");
-}
-
-/**
  * Default implementation of IconRegistry using lucide icons.
  *
  * Provides a mapping of icon names (kebab-case) to lucide IconNode objects,
@@ -44,6 +30,36 @@ function toLucideExportName(iconName: string): string {
 @injectable()
 export class DefaultIconRegistry implements IconRegistry {
     /**
+     * Converts kebab-case icon names to PascalCase Lucide export names.
+     *
+     * Subclasses may override this method to customise the name-mapping strategy.
+     *
+     * @param iconName Icon name in kebab-case format (e.g. "square-plus")
+     * @returns Icon name in PascalCase format suitable for lucide lookup (e.g. "SquarePlus")
+     */
+    protected toLucideExportName(iconName: string): string {
+        return iconName
+            .split("-")
+            .filter((part) => part.length > 0)
+            .map((part) => `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`)
+            .join("");
+    }
+
+    /**
+     * Resolves a normalised (lower-case, trimmed) icon name to a lucide {@link IconNode}.
+     *
+     * Override this method in a subclass to inject custom, non-lucide icons by name before
+     * falling back to the standard lucide library lookup.
+     *
+     * @param iconName Icon name in lower-case kebab-case format
+     * @returns The matching {@link IconNode}, or `undefined` when the icon is not found
+     */
+    protected getIconNode(iconName: string): IconNode | undefined {
+        const lookupName = this.toLucideExportName(iconName);
+        return (icons as Record<string, IconNode | undefined>)[lookupName];
+    }
+
+    /**
      * Get an icon by name and convert it to a Snabbdom VNode.
      *
      * The icon name is case-insensitive and should use kebab-case format
@@ -57,10 +73,9 @@ export class DefaultIconRegistry implements IconRegistry {
      */
     getIcon(iconName: string, size: number = 24, cssClass?: string): VNode | undefined {
         const normalizedName = iconName.toLowerCase().trim();
-        const lookupName = toLucideExportName(normalizedName);
-        const iconNode = (icons as Record<string, IconNode | undefined>)[lookupName];
+        const iconNode = this.getIconNode(normalizedName);
 
-        if (!iconNode) {
+        if (iconNode == undefined) {
             return undefined;
         }
 
