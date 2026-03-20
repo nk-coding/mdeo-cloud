@@ -23,7 +23,6 @@ import { MetamodelToolPaletteItemProvider } from "./metamodelToolPaletteItemProv
 import { MetamodelLayoutEngine } from "./metamodelLayoutEngine.js";
 import { MetamodelCreateEdgeSchemaResolver } from "./metamodelCreateEdgeSchemaResolver.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
-import { AddAssociationMultiplicityOperationHandler } from "./handler/addAssociationMultiplicityOperationHandler.js";
 import { AddEnumEntryOperationHandler } from "./handler/addEnumEntryOperationHandler.js";
 import { AddPropertyOperationHandler } from "./handler/addPropertyOperationHandler.js";
 import { ChangeAssociationEndOperationHandler } from "./handler/changeAssociationEndOperationHandler.js";
@@ -65,7 +64,6 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
         binding.add(ChangeAssociationEndOperationHandler);
         binding.add(AddPropertyOperationHandler);
         binding.add(AddEnumEntryOperationHandler);
-        binding.add(AddAssociationMultiplicityOperationHandler);
     }
 
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {

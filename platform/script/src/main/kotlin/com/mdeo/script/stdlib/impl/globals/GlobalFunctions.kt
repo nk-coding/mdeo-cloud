@@ -1,6 +1,6 @@
 package com.mdeo.script.stdlib.impl.globals
 
-import com.mdeo.script.runtime.ExecutionContext
+import com.mdeo.script.runtime.ScriptContext
 import com.mdeo.script.stdlib.impl.collections.Bag
 import com.mdeo.script.stdlib.impl.collections.BagImpl
 import com.mdeo.script.stdlib.impl.collections.ListImpl
@@ -21,15 +21,16 @@ object GlobalFunctions {
     /**
      * Prints a string to the execution's output stream followed by a newline.
      *
-     * Uses the ExecutionContext to determine the correct output stream.
+     * Uses the [ScriptContext] to determine the correct output stream.
      * This allows the output to be captured when executing scripts through
      * the ExecutionEnvironment.
      *
+     * @param context The script execution context providing the print stream.
      * @param value The string to print.
      */
     @JvmStatic
-    fun println(value: String) {
-        ExecutionContext.getConsole().println(value)
+    fun println(context: ScriptContext, value: String) {
+        context.printStream.println(value)
     }
 
     /**

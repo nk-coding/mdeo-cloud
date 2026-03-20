@@ -57,7 +57,7 @@ export class ModelDataConverter {
         const links = this.convertLinks(model.links ?? []);
 
         return {
-            metamodelUri: model.import?.file ?? "",
+            metamodelPath: model.import?.file ?? "",
             instances,
             links
         };

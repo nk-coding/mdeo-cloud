@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":common"))
     implementation(project(":execution-common"))
     implementation(project(":expression"))
+    implementation(project(":metamodel"))
     implementation(project(":script"))
     implementation(project(":model-transformation"))
     

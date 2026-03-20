@@ -2,6 +2,7 @@ package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.VariableScope
+import com.mdeo.modeltransformation.graph.VertexRef
 
 /**
  * Test-only helper extension functions for TransformationExecutionContext.
@@ -45,7 +46,7 @@ fun TransformationExecutionContext.testBindVariables(bindings: Map<String, Any?>
 fun TransformationExecutionContext.testBindInstance(instanceName: String, vertexId: Any): TransformationExecutionContext {
     val newScope = variableScope.withVariable(
         instanceName, 
-        VariableBinding.InstanceBinding(vertexId)
+        VariableBinding.InstanceBinding(VertexRef(vertexId))
     )
     // Use reflection to reconstruct context with same parent
     val constructor = TransformationExecutionContext::class.java.getDeclaredConstructor(

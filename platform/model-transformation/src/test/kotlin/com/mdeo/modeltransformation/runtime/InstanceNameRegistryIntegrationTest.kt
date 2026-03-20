@@ -6,6 +6,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.BeforeEach
@@ -30,13 +31,12 @@ class InstanceNameRegistryIntegrationTest {
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
-        val g = graph.traversal()
         
         val expressionRegistry = ExpressionCompilerRegistry.createDefaultRegistry()
         val statementRegistry = StatementExecutorRegistry.createDefaultRegistry()
         
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry

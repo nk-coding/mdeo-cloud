@@ -1,19 +1,21 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.AssociationEndData
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.AssociationEndData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedIfMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -109,6 +111,11 @@ class NestedMatchScopeVariableTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -134,14 +141,13 @@ class NestedMatchScopeVariableTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = emptyList()
         )
 
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -175,7 +181,7 @@ class NestedMatchScopeVariableTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `nested match should access variable from outer match scope in where clause`() {
         // Create test data: a single house
-        g.addV("House").property("address", "test address").next()
+        g.addV("House").property(graphKey("House", "address"), "test address").next()
 
         // Build the nested if-match statement structure
         // This mirrors the JSON structure from Prompt.md
@@ -251,7 +257,7 @@ class NestedMatchScopeVariableTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `nested match should access outer variable in create property assignment`() {
         // Create test data
-        g.addV("House").property("address", "outer address").next()
+        g.addV("House").property(graphKey("House", "address"), "outer address").next()
 
         // Build nested if-match with property assignment referencing outer variable
         // if match { house: House {} } then {
@@ -322,9 +328,9 @@ class NestedMatchScopeVariableTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `triple nested match should access variables from all outer scopes`() {
         // Create test data
-        g.addV("House").property("address", "house1").next()
-        g.addV("House").property("address", "house2").next()
-        g.addV("House").property("address", "house3").next()
+        g.addV("House").property(graphKey("House", "address"), "house1").next()
+        g.addV("House").property(graphKey("House", "address"), "house2").next()
+        g.addV("House").property(graphKey("House", "address"), "house3").next()
 
         // if match { h1: House {} } then {
         //   if match { h2: House {} } then {

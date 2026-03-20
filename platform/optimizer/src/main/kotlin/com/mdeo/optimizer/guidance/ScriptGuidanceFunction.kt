@@ -1,45 +1,33 @@
 package com.mdeo.optimizer.guidance
 
-import com.mdeo.optimizer.graph.GraphBackend
 import com.mdeo.optimizer.solution.Solution
-import com.mdeo.script.runtime.ExecutionContext
-import com.mdeo.script.runtime.ExecutionEnvironment
-import com.mdeo.script.runtime.model.ScriptModel
+import com.mdeo.script.runtime.ScriptContext
+import com.mdeo.script.runtime.SimpleScriptContext
 import org.slf4j.LoggerFactory
+import java.io.PrintStream
+import java.lang.reflect.InvocationTargetException
 
-/**
- * A [GuidanceFunction] backed by a compiled script function.
- *
- * The script function is a no-arg function that accesses the model through
- * [ExecutionContext.requireModel()]. Before invocation, this adapter sets
- * up the context with a [ScriptModel] backed by the candidate's graph.
- *
- * @param environment The compiled script execution environment.
- * @param filePath Path of the script file containing the function.
- * @param functionName Name of the no-arg function to invoke.
- * @param metamodelData Metamodel used to create the script model.
- * @param graphToModelData Converter from graph to ModelData (for script model creation).
- * @param conversionStrategy Whether to eagerly or lazily convert model data.
- * @param scriptModelFactory Factory for creating ScriptModel instances from the graph.
- */
 class ScriptGuidanceFunction(
-    private val environment: ExecutionEnvironment,
-    private val filePath: String,
-    private val functionName: String,
-    private val scriptModelFactory: ScriptModelFactory
+    private val clazz: Class<*>,
+    private val jvmMethodName: String,
+    private val printStream: PrintStream,
+    override val name: String
 ) : GuidanceFunction {
 
     private val logger = LoggerFactory.getLogger(ScriptGuidanceFunction::class.java)
 
-    override val name: String get() = "$filePath::$functionName"
-
     override fun computeFitness(solution: Solution): Double {
-        val model = scriptModelFactory.create(solution.graphBackend)
-
-        return ExecutionContext.withContext(System.out, model) {
-            val result = environment.invoke(filePath, functionName)
-            toDouble(result)
+        val model = solution.modelGraph.toModel()
+        val context = SimpleScriptContext(printStream, model)
+        val instance = clazz.getDeclaredConstructor(ScriptContext::class.java).newInstance(context)
+        val method = clazz.methods.find { it.name == jvmMethodName && it.parameterCount == 0 }
+            ?: error("JVM method '$jvmMethodName' not found in class '${clazz.name}'")
+        val result = try {
+            method.invoke(instance)
+        } catch (e: InvocationTargetException) {
+            throw e.cause ?: e
         }
+        return toDouble(result)
     }
 
     private fun toDouble(value: Any?): Double {
@@ -57,14 +45,4 @@ class ScriptGuidanceFunction(
             }
         }
     }
-}
-
-/**
- * Factory for creating [ScriptModel] instances from a [GraphBackend].
- *
- * This indirection allows switching between eager and lazy conversion strategies,
- * and also supports future Gremlin-native ScriptModel implementations.
- */
-interface ScriptModelFactory {
-    fun create(graphBackend: GraphBackend): ScriptModel
 }

@@ -6,6 +6,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
@@ -29,7 +30,7 @@ class StatementExecutorRegistryTest {
         registry = StatementExecutorRegistry()
         graph = TinkerGraph.open()
         engine = TransformationEngine(
-            traversalSource = graph.traversal(),
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry

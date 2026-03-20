@@ -43,6 +43,8 @@ import com.mdeo.expression.ast.types.Parameter
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.runtime.ExecutionEnvironment
+import com.mdeo.script.runtime.ScriptContext
+import com.mdeo.script.runtime.SimpleScriptContext
 
 /**
  * DSL builder for creating TypedAST structures programmatically.
@@ -632,7 +634,8 @@ class CompilerTestHelper {
         val input = CompilationInput(mapOf(TEST_FILE_PATH to ast))
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        return env.invoke(TEST_FILE_PATH, functionName, *args)
+        val context: ScriptContext = SimpleScriptContext(System.out, null)
+        return env.invoke(TEST_FILE_PATH, functionName, context, *args)
     }
     
     /**

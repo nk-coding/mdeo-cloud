@@ -1,18 +1,20 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.EnumData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.data.EnumData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
@@ -114,6 +116,13 @@ class EnumCreateBlockTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propertyName: String): String {
+        val mapping = metamodel.metadata.classes[className]!!.propertyFields[propertyName]!!
+        return "prop_${mapping.fieldIndex}"
+    }
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -195,9 +204,8 @@ class EnumCreateBlockTest {
         val ast = buildAst()
 
         val engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )
@@ -216,7 +224,7 @@ class EnumCreateBlockTest {
         val testVertex = testVertices[0]
 
         // The `value` property should be set to the enum string representation
-        val valueProperty = testVertex.property<String>("value")
+        val valueProperty = testVertex.property<String>(graphKey("Test", "value"))
         assertTrue(
             valueProperty.isPresent,
             "The 'value' property on the created Test vertex should be present. " +

@@ -110,14 +110,23 @@ class AlgorithmConfigurationTest {
 
     // -- helpers --
 
+    private val metamodel = com.mdeo.metamodel.Metamodel.compile(com.mdeo.metamodel.data.MetamodelData())
+
+    private fun createEmptyModelGraph(): com.mdeo.modeltransformation.graph.TinkerModelGraph {
+        return com.mdeo.modeltransformation.graph.TinkerModelGraph.create(
+            com.mdeo.metamodel.data.ModelData(metamodelPath = "", instances = emptyList(), links = emptyList()),
+            metamodel
+        )
+    }
+
     private fun createDummySolutionGenerator(): SolutionGenerator {
-        val backend = com.mdeo.optimizer.graph.TinkerGraphBackend()
-        backend.traversal().addV("test").next()
+        val modelGraph = createEmptyModelGraph()
+        modelGraph.traversal().addV("test").next()
         return SolutionGenerator(
             initialSolutionProvider = {
-                val b = com.mdeo.optimizer.graph.TinkerGraphBackend()
-                b.traversal().addV("test").next()
-                com.mdeo.optimizer.solution.Solution(b)
+                val mg = createEmptyModelGraph()
+                mg.traversal().addV("test").next()
+                com.mdeo.optimizer.solution.Solution(mg)
             },
             mutationStrategy = object : com.mdeo.optimizer.operators.MutationStrategy {
                 override fun mutate(solution: com.mdeo.optimizer.solution.Solution) = solution.deepCopy()

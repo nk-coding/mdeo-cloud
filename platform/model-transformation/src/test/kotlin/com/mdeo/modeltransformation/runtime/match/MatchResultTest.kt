@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.runtime.match
 
 import com.mdeo.modeltransformation.compiler.VariableBinding
+import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.testBindVariable
 import com.mdeo.modeltransformation.runtime.testBindInstance
@@ -41,12 +42,14 @@ class MatchResultTest {
 
         @Test
         fun `Matched with instance mappings`() {
+            val ref123 = VertexRef("v-123")
+            val ref456 = VertexRef("v-456")
             val result = MatchResult.Matched(
-                instanceMappings = mapOf("house" to "v-123", "room" to "v-456")
+                instanceMappings = mapOf("house" to ref123, "room" to ref456)
             )
             
-            assertEquals("v-123", result.instanceMappings["house"])
-            assertEquals("v-456", result.instanceMappings["room"])
+            assertEquals("v-123", result.instanceMappings["house"]?.rawId)
+            assertEquals("v-456", result.instanceMappings["room"]?.rawId)
         }
 
         @Test
@@ -99,7 +102,7 @@ class MatchResultTest {
         fun `applyTo adds instance mappings to context`() {
             val context = TransformationExecutionContext.empty()
             val matched = MatchResult.Matched(
-                instanceMappings = mapOf("house" to "v-123")
+                instanceMappings = mapOf("house" to VertexRef("v-123"))
             )
             
             val result = matched.applyTo(context)
@@ -115,7 +118,7 @@ class MatchResultTest {
             
             val matched = MatchResult.Matched(
                 bindings = mapOf("new" to 200),
-                instanceMappings = mapOf("newNode" to "v-111")
+                instanceMappings = mapOf("newNode" to VertexRef("v-111"))
             )
             
             val result = matched.applyTo(context)

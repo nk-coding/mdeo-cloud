@@ -24,14 +24,15 @@ tasks.test {
 dependencies {
     implementation(project(":common"))
     implementation(project(":expression"))
+    implementation(project(":metamodel"))
     implementation(libs.kotlinx.serialization.json)
     
     // Apache TinkerPop Gremlin
     implementation(libs.gremlin.core)
+    implementation(libs.tinkergraph.gremlin)
     
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.junit.jupiter.params)
-    testImplementation(libs.tinkergraph.gremlin)
 }

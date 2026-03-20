@@ -35,7 +35,6 @@ class OptimizationSolution : MoeaSolution {
     ) : super(other) {
         this.mutator = other.mutator
 
-        // Deep copy the solution variable
         val otherSolution = other.getOptimizationSolution()
         setVariable(0, OptimizationVariable(otherSolution.deepCopy(), mutator))
     }

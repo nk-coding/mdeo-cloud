@@ -1,17 +1,19 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -97,6 +99,11 @@ class MatchPropertyConditionTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -116,14 +123,13 @@ class MatchPropertyConditionTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = emptyList()
         )
 
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -146,7 +152,7 @@ class MatchPropertyConditionTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `match with inline property condition should find matching house and create house2`() {
         // Create test data: a house with address="example"
-        g.addV("House").property("address", "example").next()
+        g.addV("House").property(graphKey("House", "address"), "example").next()
 
         // Build the failing match pattern:
         // match {
@@ -241,11 +247,11 @@ class MatchPropertyConditionTest {
         assertIs<TransformationExecutionResult.Success>(result, "Match should succeed with inline property condition")
         
         // Verify that house2 was created with the correct address
-        val house2List = g.V().hasLabel("House").has("address", "exampletesting").toList()
+        val house2List = g.V().hasLabel("House").has(graphKey("House", "address"), "exampletesting").toList()
         assertEquals(1, house2List.size, "Should create exactly one house2 with address='exampletesting'")
         
         // Verify original house still exists
-        val originalHouse = g.V().hasLabel("House").has("address", "example").toList()
+        val originalHouse = g.V().hasLabel("House").has(graphKey("House", "address"), "example").toList()
         assertEquals(1, originalHouse.size, "Original house should still exist")
     }
 
@@ -258,7 +264,7 @@ class MatchPropertyConditionTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `match with where clause should find matching house and create house2`() {
         // Create test data: a house with address="example"
-        g.addV("House").property("address", "example").next()
+        g.addV("House").property(graphKey("House", "address"), "example").next()
 
         // Build the working match pattern:
         // match {
@@ -366,11 +372,11 @@ class MatchPropertyConditionTest {
         assertIs<TransformationExecutionResult.Success>(result, "Match should succeed with where clause")
         
         // Verify that house2 was created with the correct address
-        val house2List = g.V().hasLabel("House").has("address", "exampletesting").toList()
+        val house2List = g.V().hasLabel("House").has(graphKey("House", "address"), "exampletesting").toList()
         assertEquals(1, house2List.size, "Should create exactly one house2 with address='exampletesting'")
         
         // Verify original house still exists
-        val originalHouse = g.V().hasLabel("House").has("address", "example").toList()
+        val originalHouse = g.V().hasLabel("House").has(graphKey("House", "address"), "example").toList()
         assertEquals(1, originalHouse.size, "Original house should still exist")
     }
 
@@ -384,7 +390,7 @@ class MatchPropertyConditionTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `inline property condition and where clause should behave identically`() {
         // Create two identical houses
-        g.addV("House").property("address", "example").next()
+        g.addV("House").property(graphKey("House", "address"), "example").next()
         
         // First, test the where clause pattern (which works)
         val workingPatternStatement = TypedMatchStatement(
@@ -477,12 +483,12 @@ class MatchPropertyConditionTest {
         val workingResult = engine.executeStatement(workingPatternStatement, context)
         assertIs<TransformationExecutionResult.Success>(workingResult, "Where clause pattern should succeed")
         
-        val house2WithWhere = g.V().hasLabel("House").has("address", "exampletesting").toList()
+        val house2WithWhere = g.V().hasLabel("House").has(graphKey("House", "address"), "exampletesting").toList()
         assertEquals(1, house2WithWhere.size, "Where clause should create house2")
         
         // Now test the inline condition pattern (currently fails)
         // First, clean up the created house2
-        g.V().hasLabel("House").has("address", "exampletesting").drop().iterate()
+        g.V().hasLabel("House").has(graphKey("House", "address"), "exampletesting").drop().iterate()
         
         val failingPatternStatement = TypedMatchStatement(
             pattern = TypedPattern(
@@ -560,7 +566,7 @@ class MatchPropertyConditionTest {
         val failingResult = engine.executeStatement(failingPatternStatement, context)
         assertIs<TransformationExecutionResult.Success>(failingResult, "Inline property condition pattern should also succeed")
         
-        val house2WithInline = g.V().hasLabel("House").has("address", "exampletesting").toList()
+        val house2WithInline = g.V().hasLabel("House").has(graphKey("House", "address"), "exampletesting").toList()
         assertEquals(1, house2WithInline.size, "Inline property condition should create house2 just like where clause")
     }
 }

@@ -1,19 +1,21 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.AssociationEndData
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.AssociationEndData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -111,6 +113,11 @@ class MatchBlockVariableReferenceTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -136,14 +143,13 @@ class MatchBlockVariableReferenceTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = emptyList()
         )
 
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -175,8 +181,8 @@ class MatchBlockVariableReferenceTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `match block should reference variable declared in same block for property comparison`() {
         // Create test data: two houses, one matching and one non-matching
-        g.addV("House").property("address", "example").next()
-        g.addV("House").property("address", "different").next()
+        g.addV("House").property(graphKey("House", "address"), "example").next()
+        g.addV("House").property(graphKey("House", "address"), "different").next()
 
         // Build the match statement structure exactly as shown in Prompt.md
         // This mirrors the JSON AST structure from Prompt.md lines 150-176
@@ -227,7 +233,7 @@ class MatchBlockVariableReferenceTest {
         
         // The match should have found exactly one house (the one with address="example")
         // We can verify by checking the graph
-        val houses = g.V().hasLabel("House").has("address", "example").toList()
+        val houses = g.V().hasLabel("House").has(graphKey("House", "address"), "example").toList()
         assertEquals(1, houses.size, "Should find exactly one house matching the variable value")
     }
 
@@ -238,9 +244,9 @@ class MatchBlockVariableReferenceTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `match block should reference numeric variable in same block for property comparison`() {
         // Create test data: rooms with different values
-        g.addV("Room").property("category", "living").property("value", 42).next()
-        g.addV("Room").property("category", "bedroom").property("value", 100).next()
-        g.addV("Room").property("category", "kitchen").property("value", 42).next()
+        g.addV("Room").property(graphKey("Room", "category"), "living").property(graphKey("Room", "value"), 42).next()
+        g.addV("Room").property(graphKey("Room", "category"), "bedroom").property(graphKey("Room", "value"), 100).next()
+        g.addV("Room").property(graphKey("Room", "category"), "kitchen").property(graphKey("Room", "value"), 42).next()
 
         val matchStatement = TypedMatchStatement(
             pattern = TypedPattern(
@@ -285,7 +291,7 @@ class MatchBlockVariableReferenceTest {
         
         // Should find two rooms with value=42
         // Verify by checking the graph directly
-        val rooms = g.V().hasLabel("Room").has("value", 42).toList()
+        val rooms = g.V().hasLabel("Room").has(graphKey("Room", "value"), 42).toList()
         assertEquals(2, rooms.size, "Should find exactly two rooms with value=42")
     }
 
@@ -296,8 +302,8 @@ class MatchBlockVariableReferenceTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `match block should reference multiple variables declared in same block`() {
         // Create test data
-        g.addV("Room").property("category", "living").property("value", 100).next()
-        g.addV("Room").property("category", "bedroom").property("value", 50).next()
+        g.addV("Room").property(graphKey("Room", "category"), "living").property(graphKey("Room", "value"), 100).next()
+        g.addV("Room").property(graphKey("Room", "category"), "bedroom").property(graphKey("Room", "value"), 50).next()
 
         val matchStatement = TypedMatchStatement(
             pattern = TypedPattern(
@@ -361,7 +367,7 @@ class MatchBlockVariableReferenceTest {
         
         // Should find exactly one room matching both conditions
         // Verify by checking the graph directly
-        val rooms = g.V().hasLabel("Room").has("category", "living").has("value", 100).toList()
+        val rooms = g.V().hasLabel("Room").has(graphKey("Room", "category"), "living").has(graphKey("Room", "value"), 100).toList()
         assertEquals(1, rooms.size, "Should find exactly one room matching both variable values")
     }
 
@@ -387,7 +393,7 @@ class MatchBlockVariableReferenceTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `match block variable should reference matched instance property in create statement`() {
         // Create test data: a house with an address
-        g.addV("House").property("address", "123 Main St").next()
+        g.addV("House").property(graphKey("House", "address"), "123 Main St").next()
         
         // Build the match statement:
         // match {
@@ -457,7 +463,7 @@ class MatchBlockVariableReferenceTest {
         assertEquals(2, houses.size, "Should have 2 houses: original and newly created")
         
         // Verify the new house has the correct address
-        val housesWithCorrectAddress = g.V().hasLabel("House").has("address", "123 Main St").toList()
+        val housesWithCorrectAddress = g.V().hasLabel("House").has(graphKey("House", "address"), "123 Main St").toList()
         assertEquals(2, housesWithCorrectAddress.size, "Both houses should have address '123 Main St'")
     }
 }

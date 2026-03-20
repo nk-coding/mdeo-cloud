@@ -93,17 +93,20 @@ class FunctionDefinitionImpl(
  * File-scope functions typically don't support overloading, so this helper creates
  * a FunctionDefinition with exactly one signature accessible via the empty string key.
  *
- * @param name The function name.
+ * @param name The function name (used for registry lookup).
  * @param parameters The function parameters.
  * @param returnType The return type.
  * @param ownerClass The JVM internal class name owning this function.
+ * @param jvmMethodName The actual JVM method name to invoke (may differ from [name] when
+ *   artificial names like `fn0`, `fn1` are assigned during compilation).
  * @return A FunctionDefinition with a single overload.
  */
 fun createSimpleFileFunction(
     name: String,
     parameters: List<FunctionParameter>,
     returnType: ReturnType,
-    ownerClass: String
+    ownerClass: String,
+    jvmMethodName: String = name
 ): FunctionDefinition {
     val impl = FunctionDefinitionImpl(name, ownerClass)
     
@@ -113,11 +116,11 @@ fun createSimpleFileFunction(
     
     val descriptor = MethodDescriptorUtil.buildDescriptor(parameters.map { it.type }, returnType)
     
-    val signature = StaticFunctionSignatureDefinition(
+    val signature = InstanceFunctionSignatureDefinition(
         overloadKey = "",
         descriptor = descriptor,
         ownerClass = ownerClass,
-        jvmMethodName = name,
+        jvmMethodName = jvmMethodName,
         isVarArgs = false,
         parameterTypes = paramTypes,
         returnType = returnType

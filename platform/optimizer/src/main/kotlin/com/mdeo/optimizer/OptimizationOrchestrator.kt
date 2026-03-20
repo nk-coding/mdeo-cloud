@@ -1,6 +1,5 @@
 package com.mdeo.optimizer
 
-import com.mdeo.expression.ast.types.MetamodelData
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.optimizer.config.OptimizationConfig
 import com.mdeo.optimizer.config.SolverConfig
@@ -16,24 +15,22 @@ import org.slf4j.LoggerFactory
 /**
  * Main orchestrator for optimization runs.
  *
- * Ported from OptimisationInterpreter.java. Wires together the solver configuration,
- * mutation strategy, guidance functions, and the initial solution provider, then runs
- * the evolutionary search using the MOEA Framework.
+ * Wires together the solver configuration, mutation strategy, guidance functions,
+ * and the initial solution provider, then runs the evolutionary search using the
+ * MOEA Framework.
  *
  * @param config Full optimization configuration (problem, goal, search, solver).
- * @param objectives Objective guidance functions (fitness evaluators).
+ * @param objectives Objective guidance functions.
  * @param constraints Constraint guidance functions.
  * @param transformations Pre-fetched and validated transformation typed ASTs, keyed by file path.
- * @param metamodelData The metamodel data used for transformation execution.
  * @param initialSolutionProvider Factory for creating an initial candidate solution
- *   (model loaded into a [GraphBackend]).
+ *   (model loaded into a [ModelGraph][com.mdeo.modeltransformation.graph.ModelGraph]).
  */
 class OptimizationOrchestrator(
     private val config: OptimizationConfig,
     private val objectives: List<GuidanceFunction>,
     private val constraints: List<GuidanceFunction>,
     private val transformations: Map<String, TypedAst>,
-    private val metamodelData: MetamodelData,
     private val initialSolutionProvider: () -> Solution
 ) {
     private val logger = LoggerFactory.getLogger(OptimizationOrchestrator::class.java)
@@ -72,8 +69,7 @@ class OptimizationOrchestrator(
 
         val mutationStrategy = MutationStrategyFactory.create(
             config.solver.parameters.mutation,
-            transformations,
-            metamodelData
+            transformations
         )
 
         val solutionGenerator = SolutionGenerator(

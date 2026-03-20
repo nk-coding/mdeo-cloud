@@ -158,11 +158,12 @@ export const AssociationEndWithPropertyRule = createRule("AssociationEndWithProp
 
 /**
  * Association end rule without property.
- * Matches an association end that only specifies a class (e.g., "Class[*]").
+ * Matches an association end that only specifies a class (e.g., "Class").
+ * Multiplicity is not allowed without a property name.
  */
 export const AssociationEndWithoutPropertyRule = createRule("AssociationEndWithoutPropertyRule")
     .returns(AssociationEnd)
-    .as(({ set }) => [set("class", ref(Class, ID)), optional(set("multiplicity", MultiplicityRule))]);
+    .as(({ set }) => [set("class", ref(Class, ID))]);
 
 /**
  * Association end rule.

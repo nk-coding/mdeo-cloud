@@ -1,5 +1,10 @@
 package com.mdeo.modeltransformation.ast.model
 
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
+import com.mdeo.metamodel.data.ModelDataLink
+import com.mdeo.metamodel.data.ModelDataPropertyValue
+import com.mdeo.metamodel.data.ModelDataPropertyValueSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Nested
@@ -408,7 +413,7 @@ class ModelDataSerializationTest {
         @Test
         fun `deserialize complete model`() {
             val jsonString = """{
-                "metamodelUri": "file:///path/to/metamodel.mm",
+                "metamodelPath": "file:///path/to/metamodel.mm",
                 "instances": [
                     {
                         "name": "person1",
@@ -436,7 +441,7 @@ class ModelDataSerializationTest {
             }"""
             val result = json.decodeFromString<ModelData>(jsonString)
 
-            assertEquals("file:///path/to/metamodel.mm", result.metamodelUri)
+            assertEquals("file:///path/to/metamodel.mm", result.metamodelPath)
             assertEquals(2, result.instances.size)
             assertEquals(1, result.links.size)
             assertEquals("person1", result.instances[0].name)
@@ -446,13 +451,13 @@ class ModelDataSerializationTest {
         @Test
         fun `deserialize empty model`() {
             val jsonString = """{
-                "metamodelUri": "file:///empty.mm",
+                "metamodelPath": "file:///empty.mm",
                 "instances": [],
                 "links": []
             }"""
             val result = json.decodeFromString<ModelData>(jsonString)
 
-            assertEquals("file:///empty.mm", result.metamodelUri)
+            assertEquals("file:///empty.mm", result.metamodelPath)
             assertEquals(0, result.instances.size)
             assertEquals(0, result.links.size)
         }
@@ -460,7 +465,7 @@ class ModelDataSerializationTest {
         @Test
         fun `deserialize model with complex properties`() {
             val jsonString = """{
-                "metamodelUri": "file:///complex.mm",
+                "metamodelPath": "file:///complex.mm",
                 "instances": [
                     {
                         "name": "obj1",
@@ -494,7 +499,7 @@ class ModelDataSerializationTest {
         @Test
         fun `serialize complete model roundtrip`() {
             val original = ModelData(
-                metamodelUri = "file:///test/metamodel.mm",
+                metamodelPath = "file:///test/metamodel.mm",
                 instances = listOf(
                     ModelDataInstance(
                         name = "instance1",
@@ -528,7 +533,7 @@ class ModelDataSerializationTest {
         @Test
         fun `serialize model with special characters in strings`() {
             val original = ModelData(
-                metamodelUri = "file:///path/with spaces/metamodel.mm",
+                metamodelPath = "file:///path/with spaces/metamodel.mm",
                 instances = listOf(
                     ModelDataInstance(
                         name = "instance_with-special.chars",

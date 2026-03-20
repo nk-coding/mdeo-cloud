@@ -12,19 +12,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * MOEA Framework problem definition for the optimizer.
- *
- * Evaluates candidate solutions using configured objective and constraint functions.
- * Ported from MoeaOptimisationProblem.java.
- *
- * @param objectives The objective fitness functions.
- * @param constraints The constraint fitness functions.
- * @param solutionGenerator Generates new/initial solutions.
- * @param scriptTimeoutMs Combined per-solution evaluation timeout in milliseconds;
- *   computed externally as `perScriptTimeout * (objectives + constraints)`.
- *   When `null`, no timeout is enforced.
- */
 class OptimizationProblem(
     private val objectives: List<GuidanceFunction>,
     private val constraints: List<GuidanceFunction>,
@@ -34,10 +21,6 @@ class OptimizationProblem(
 
     private val logger = LoggerFactory.getLogger(OptimizationProblem::class.java)
 
-    /**
-     * Thread pool for timed script evaluations.  Uses daemon threads so stuck evaluations do not
-     * prevent JVM shutdown.  Only created when [scriptTimeoutMs] is non-null.
-     */
     private val executor = if (scriptTimeoutMs != null) {
         val counter = AtomicInteger()
         Executors.newCachedThreadPool(ThreadFactory { runnable ->
@@ -45,25 +28,16 @@ class OptimizationProblem(
         })
     } else null
 
-    /**
-     * Evaluates one candidate solution by invoking all objective and constraint functions.
-     *
-     * When [scriptTimeoutMs] is set the entire evaluation block runs in a separate daemon thread
-     * and must complete within the combined timeout.  A timeout causes the whole optimization run
-     * to fail by throwing [RuntimeException].
-     *
-     * @param solution The MOEA Framework solution whose objective and constraint values are set.
-     */
     override fun evaluate(solution: MoeaSolution) {
         val optSolution = (solution as OptimizationSolution)
         val candidate = optSolution.getOptimizationSolution()
 
         val evaluation: () -> Unit = {
-            objectives.forEachIndexed { index, objective ->
-                optSolution.setObjectiveValue(index, objective.computeFitness(candidate))
+            objectives.forEachIndexed { index, fn ->
+                optSolution.setObjectiveValue(index, fn.computeFitness(candidate))
             }
-            constraints.forEachIndexed { index, constraint ->
-                optSolution.setConstraintValue(index, constraint.computeFitness(candidate))
+            constraints.forEachIndexed { index, fn ->
+                optSolution.setConstraintValue(index, fn.computeFitness(candidate))
             }
         }
 

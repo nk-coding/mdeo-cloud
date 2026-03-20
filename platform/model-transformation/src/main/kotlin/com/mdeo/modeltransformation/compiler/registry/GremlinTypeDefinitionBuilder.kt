@@ -138,7 +138,7 @@ class GremlinTypeDefinitionBuilder(
         name: String,
         compiler: (GraphTraversal<*, *>) -> CompilationResult
     ): GremlinTypeDefinitionBuilder {
-        properties[name] = SimpleGremlinPropertyDefinition(name, compiler)
+        properties[name] = SimpleGremlinPropertyDefinition(name, compiler = compiler)
         return this
     }
 
@@ -158,16 +158,17 @@ class GremlinTypeDefinitionBuilder(
     /**
      * Adds a graph property to this type.
      *
-     * Graph properties use `.values(propertyName)` to retrieve values from graph elements.
-     * This is the standard way to access properties on vertices/edges in Gremlin.
+     * Graph properties use `.values(graphKey)` to retrieve values from graph elements.
+     * The property is registered under [name] for lookup, but uses [graphKey] in the traversal.
      *
-     * @param name The property name in the graph.
+     * @param name The property name for lookup in the type registry.
+     * @param graphKey The key used in the graph for storage/retrieval (defaults to [name]).
      * @return This builder, for method chaining.
      */
     @Suppress("UNCHECKED_CAST")
-    fun graphProperty(name: String): GremlinTypeDefinitionBuilder {
-        properties[name] = SimpleGremlinPropertyDefinition(name) { receiver ->
-            val traversal = (receiver as GraphTraversal<Any, Any>).values<Any>(name)
+    fun graphProperty(name: String, graphKey: String = name): GremlinTypeDefinitionBuilder {
+        properties[name] = SimpleGremlinPropertyDefinition(name, graphKey) { receiver ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).values<Any>(graphKey)
             CompilationResult.of(traversal as GraphTraversal<Any, Any>)
         }
         return this
@@ -275,11 +276,13 @@ class GremlinTypeDefinitionBuilder(
 /**
  * Simple implementation of [GremlinPropertyDefinition] with a traversal compiler.
  *
- * @param name The property name.
+ * @param name The property name for lookup.
+ * @param graphKey The key used in the graph for this property (defaults to [name]).
  * @param compiler A function that compiles the property access in traversal mode.
  */
 class SimpleGremlinPropertyDefinition(
     override val name: String,
+    override val graphKey: String = name,
     private val compiler: (GraphTraversal<*, *>) -> CompilationResult
 ) : GremlinPropertyDefinition {
 

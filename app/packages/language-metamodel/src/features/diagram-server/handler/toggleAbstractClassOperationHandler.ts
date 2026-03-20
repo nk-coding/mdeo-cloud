@@ -39,12 +39,7 @@ export class ToggleAbstractClassOperationHandler extends BaseOperationHandler im
 
         const classNode = astNode as ClassType;
         const currentAbstract = classNode.isAbstract ?? false;
-        const targetAbstract =
-            operation.makeAbstract !== undefined
-                ? operation.makeAbstract
-                : operation.targetAbstract !== undefined
-                  ? operation.targetAbstract
-                  : !currentAbstract;
+        const targetAbstract = operation.makeAbstract !== undefined ? operation.makeAbstract : !currentAbstract;
 
         if (targetAbstract === currentAbstract) {
             return undefined;

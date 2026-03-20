@@ -8,6 +8,7 @@ import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.util.ASMUtil
+import com.mdeo.script.compiler.ScriptCompiler
 import com.mdeo.script.compiler.registry.type.TypeRegistry
 import com.mdeo.script.compiler.registry.type.MethodDefinition
 import org.objectweb.asm.Label
@@ -170,6 +171,16 @@ class MemberCallCompiler : AbstractCallCompiler() {
             if (targetType is ClassTypeRef) {
                 CoercionUtil.emitBoxing(targetType, mv)
             }
+        }
+
+        if (methodDef.requiresContext) {
+            mv.visitVarInsn(Opcodes.ALOAD, 0)
+            mv.visitFieldInsn(
+                Opcodes.GETFIELD,
+                context.currentClassName,
+                ScriptCompiler.CONTEXT_FIELD_NAME,
+                ScriptCompiler.CONTEXT_DESCRIPTOR
+            )
         }
 
         if (methodDef.isVarArgs) {

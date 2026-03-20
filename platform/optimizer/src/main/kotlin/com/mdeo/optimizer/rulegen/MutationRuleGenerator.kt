@@ -1,6 +1,6 @@
 package com.mdeo.optimizer.rulegen
 
-import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.optimizer.config.RefinementConfig
 import org.slf4j.LoggerFactory
 

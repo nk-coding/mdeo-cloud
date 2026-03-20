@@ -1,9 +1,9 @@
 package com.mdeo.modeltransformationexecution.service
 
 import com.mdeo.execution.common.api.BackendApiClient
-import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.modeltransformation.ast.TypedAst
-import com.mdeo.modeltransformation.ast.model.ModelData
+import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatementSerializer
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement

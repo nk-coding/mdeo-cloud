@@ -1,40 +1,55 @@
 package com.mdeo.modeltransformation.service
 
-import com.mdeo.expression.ast.types.ClassData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.ClassData
+import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
-import com.mdeo.modeltransformation.ast.model.ModelData
-import com.mdeo.modeltransformation.ast.model.ModelDataInstance
-import com.mdeo.modeltransformation.ast.model.ModelDataLink
-import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
-import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
+import com.mdeo.metamodel.data.ModelDataLink
+import com.mdeo.metamodel.data.ModelDataPropertyValue
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Edge
 import org.apache.tinkerpop.gremlin.structure.Vertex
 
 /**
- * Converts a TinkerPop graph back to ModelData format.
+ * Converts a TinkerPop graph back to [ModelData] format.
+ *
+ * Vertex properties are stored under `prop_X` graph keys (matching the compiled
+ * instance class field names from the [Metamodel]). This converter maps them back
+ * to the original metamodel property names.
+ *
+ * @param metamodel The compiled metamodel for graph key resolution.
  */
 class GraphToModelDataConverter(
-    private val metamodelData: MetamodelData,
-    private val types: List<ReturnType>,
-    private val typeRegistry: TypeRegistry
+    private val metamodel: Metamodel
 ) {
 
+    private val metamodelData: MetamodelData = metamodel.data
     private val classMap: Map<String, ClassData> = metamodelData.classes.associateBy { it.name }
+
+    /**
+     * Builds a reverse mapping from graph key (e.g. "prop_2") to property name for a class.
+     * Includes inherited property fields.
+     */
+    private fun buildGraphKeyToPropertyName(className: String): Map<String, String> {
+        val classMeta = metamodel.metadata.classes[className] ?: return emptyMap()
+        return classMeta.propertyFields.entries.associate { (name, mapping) ->
+            "prop_${mapping.fieldIndex}" to name
+        }
+    }
 
     fun convert(
         g: GraphTraversalSource,
-        metamodelUri: String,
+        metamodelPath: String,
         nameRegistry: InstanceNameRegistry
     ): ModelData {
         val instances = extractInstances(g, nameRegistry)
         val links = extractLinks(g, nameRegistry)
 
         return ModelData(
-            metamodelUri = metamodelUri,
+            metamodelPath = metamodelPath,
             instances = instances,
             links = links
         )
@@ -64,7 +79,7 @@ class GraphToModelDataConverter(
         )
     }
 
-    private fun findPropertyInHierarchy(className: String, propertyName: String): com.mdeo.expression.ast.types.PropertyData? {
+    private fun findPropertyInHierarchy(className: String, propertyName: String): com.mdeo.metamodel.data.PropertyData? {
         val classData = classMap[className] ?: return null
         val property = classData.properties.find { it.name == propertyName }
         if (property != null) return property
@@ -76,22 +91,20 @@ class GraphToModelDataConverter(
     }
 
     private fun extractProperties(vertex: Vertex, className: String): Map<String, ModelDataPropertyValue> {
-        val classData = classMap[className]
-            ?: throw IllegalStateException("No metamodel class found for $className")
+        val graphKeyToName = buildGraphKeyToPropertyName(className)
 
         val vertexPropertyMap = mutableMapOf<String, MutableList<Any?>>()
         vertex.properties<Any>().forEachRemaining { vertexProperty ->
             val key = vertexProperty.key()
-            if (!vertexPropertyMap.containsKey(key)) {
-                vertexPropertyMap[key] = mutableListOf()
-            }
-            vertexPropertyMap[key]!!.add(vertexProperty.value())
+            vertexPropertyMap.getOrPut(key) { mutableListOf() }.add(vertexProperty.value())
         }
 
-        return vertexPropertyMap.mapNotNull { (propertyName, values) ->
+        return vertexPropertyMap.mapNotNull { (graphKey, values) ->
+            val propertyName = graphKeyToName[graphKey] ?: graphKey
+
             val propData = findPropertyInHierarchy(className, propertyName)
                 ?: throw IllegalStateException(
-                    "No type information found for property $propertyName of class $className in metamodel"
+                    "No type information found for property $propertyName (graph key: $graphKey) of class $className in metamodel"
                 )
 
             val isCollectionType = propData.multiplicity.isMultiple()

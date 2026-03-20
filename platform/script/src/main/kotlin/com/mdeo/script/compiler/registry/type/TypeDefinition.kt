@@ -165,6 +165,16 @@ interface MethodDefinition {
     val returnType: ReturnType
 
     /**
+     * Whether this method requires a [ScriptContext] as an additional parameter.
+     *
+     * When true, the caller pushes `this.__ctx` onto the stack between the
+     * receiver and the regular arguments. The [emitInvocation] implementation
+     * can then consume the context from the stack.
+     */
+    val requiresContext: Boolean
+        get() = false
+
+    /**
      * Emits the method invocation bytecode.
      *
      * The receiver (for instance methods) or receiver value (for static helpers)

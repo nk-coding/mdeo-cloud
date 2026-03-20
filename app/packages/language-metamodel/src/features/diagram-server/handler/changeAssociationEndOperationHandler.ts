@@ -41,7 +41,7 @@ export class ChangeAssociationEndOperationHandler extends BaseOperationHandler i
      * @returns A command wrapping the merged workspace edit, or undefined
      */
     override async createCommand(operation: ChangeAssociationEndOperation): Promise<Command | undefined> {
-        const edgeId = operation.associationId ?? operation.edgeId;
+        const edgeId = operation.associationId;
         const gmodelElement = this.modelState.index.get(edgeId);
         if (gmodelElement == undefined) {
             return undefined;
@@ -58,8 +58,8 @@ export class ChangeAssociationEndOperationHandler extends BaseOperationHandler i
             return undefined;
         }
 
-        const endPosition = operation.endPosition ?? operation.end;
-        const newKind = operation.newEndType ?? operation.newKind;
+        const endPosition = operation.endPosition;
+        const newKind = operation.newEndType;
 
         const currentKinds = this.getEndKindsFromOperator(currentOperator);
         const newSourceKind = endPosition === "source" ? newKind : currentKinds.sourceKind;
@@ -190,9 +190,9 @@ export class ChangeAssociationEndOperationHandler extends BaseOperationHandler i
                     label: endKind.label,
                     icon: endKind.icon,
                     action: ChangeAssociationEndOperation.create({
-                        edgeId: edge.id,
-                        end: endType,
-                        newKind: endKind.kind
+                        associationId: edge.id,
+                        endPosition: endType,
+                        newEndType: endKind.kind
                     })
                 }));
 

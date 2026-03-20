@@ -7,6 +7,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
@@ -29,7 +30,7 @@ class TransformationEngineTest {
         graph = TinkerGraph.open()
         registry = StatementExecutorRegistry()
         engine = TransformationEngine(
-            traversalSource = graph.traversal(),
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = registry
@@ -53,7 +54,7 @@ class TransformationEngineTest {
             )
             
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -75,7 +76,7 @@ class TransformationEngineTest {
             )
             
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -98,7 +99,7 @@ class TransformationEngineTest {
             )
             
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -128,7 +129,7 @@ class TransformationEngineTest {
             )
             
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -154,7 +155,7 @@ class TransformationEngineTest {
             )
             
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -257,7 +258,7 @@ class TransformationEngineTest {
                 statements = emptyList()
             )
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -278,7 +279,7 @@ class TransformationEngineTest {
                 statements = emptyList()
             )
             engine = TransformationEngine(
-                traversalSource = graph.traversal(),
+                modelGraph = TinkerModelGraph.wrap(graph),
                 ast = ast,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = registry
@@ -295,7 +296,7 @@ class TransformationEngineTest {
         @Test
         fun `create returns configured engine`() {
             val ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList())
-            val newEngine = TransformationEngine.create(graph.traversal(), ast)
+            val newEngine = TransformationEngine.create(modelGraph = TinkerModelGraph.wrap(graph), ast = ast)
             
             // Should have all default executors registered
             assertTrue(newEngine.statementExecutorRegistry.executorCount() > 0)

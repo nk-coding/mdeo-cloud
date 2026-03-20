@@ -223,9 +223,10 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
 
     /**
      * Updates the multiplicity of an association end.
+     * Requires the end to have a property name, since the grammar does not permit
+     * explicit multiplicity on association ends without a property.
      *
-     * @param node The association node
-     * @param end The end to update ("source" or "target")
+     * @param node The association end node
      * @param multiplicityText The new multiplicity text
      * @returns A workspace edit for updating the multiplicity
      */
@@ -233,6 +234,10 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
         node: AssociationEndType,
         multiplicityText: string
     ): Promise<WorkspaceEdit | undefined> {
+        if (node.name == undefined) {
+            throw new Error("Cannot set multiplicity on an association end without a property name.");
+        }
+
         const multiplicityAst = parseMultiplicity(multiplicityText);
         if (multiplicityAst == undefined) {
             throw new Error("Invalid multiplicity format.");

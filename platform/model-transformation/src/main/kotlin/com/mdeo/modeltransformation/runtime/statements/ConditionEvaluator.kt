@@ -69,7 +69,7 @@ class ConditionEvaluator(private val engine: TransformationEngine) {
             
             for (name in referencedIdentifiers) {
                 if (instances.containsKey(name) && scope.getVariable(name) == null) {
-                    scope.setBinding(name, VariableBinding.InstanceBinding(vertexId = null))
+                    scope.setBinding(name, VariableBinding.InstanceBinding(vertexRef = null))
                 }
             }
 

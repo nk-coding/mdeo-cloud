@@ -3,21 +3,19 @@ package com.mdeo.optimizerexecution.service
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.execution.common.routes.FileEntry
 import com.mdeo.execution.common.service.ExecutionServiceWithFileTree
-import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst as TransformationTypedAst
-import com.mdeo.modeltransformation.ast.model.ModelData
-import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
-import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
-import com.mdeo.modeltransformation.service.GraphToModelDataConverter
-import com.mdeo.modeltransformation.service.ModelDataGraphLoader
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.modeltransformation.graph.ModelGraph
+import com.mdeo.modeltransformation.graph.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.optimizer.OptimizationOrchestrator
 import com.mdeo.optimizer.config.*
 import com.mdeo.optimizer.rulegen.MutationRuleGenerator
-import com.mdeo.optimizer.graph.TinkerGraphBackend
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
-import com.mdeo.optimizer.guidance.ScriptModelFactory
 import com.mdeo.optimizer.moea.SearchResult
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.optimizerexecution.database.OptimizerExecutionsTable
@@ -27,9 +25,7 @@ import com.mdeo.script.compiler.CompilationInput
 import com.mdeo.script.compiler.CompiledProgram
 import com.mdeo.script.compiler.ScriptCompiler
 import com.mdeo.script.runtime.ExecutionEnvironment
-import com.mdeo.script.runtime.model.ModelDataScriptModel
-import com.mdeo.script.runtime.model.ScriptModel
-import com.mdeo.optimizer.graph.GraphBackend
+import com.mdeo.metamodel.Model
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,8 +35,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -82,7 +76,6 @@ class OptimizerExecutionService(
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(OptimizerExecutionService::class.java)
     private val scriptCompiler = ScriptCompiler()
-    private val graphLoader = ModelDataGraphLoader()
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     companion object {
@@ -203,6 +196,7 @@ class OptimizerExecutionService(
         updateState(executionId, ExecutionState.INITIALIZING, "Fetching metamodel...", jwtToken)
         val metamodelData = fetchMetamodelData(executionId, projectId, config.problem.metamodelPath, jwtToken)
             ?: return
+        val metamodel = Metamodel.compile(metamodelData)
 
         // --- Phase 2: Fetch model ---
         updateState(executionId, ExecutionState.INITIALIZING, "Fetching model...", jwtToken)
@@ -262,18 +256,22 @@ class OptimizerExecutionService(
 
         // --- Phase 6: Build guidance functions ---
         val environment = ExecutionEnvironment(compiledProgram)
-        val scriptModelFactory = createScriptModelFactory(metamodelData, modelData, environment)
+        val clazz = environment.scriptProgramClass
 
         val objectives = config.goal.objectives.map { obj ->
-            ScriptGuidanceFunction(environment, obj.path, obj.functionName, scriptModelFactory)
+            val jvmMethodName = compiledProgram.functionLookup[obj.path]?.get(obj.functionName)
+                ?: error("Function '${obj.functionName}' not found in '${obj.path}'")
+            ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${obj.path}::${obj.functionName}")
         }
         val constraints = config.goal.constraints.map { con ->
-            ScriptGuidanceFunction(environment, con.path, con.functionName, scriptModelFactory)
+            val jvmMethodName = compiledProgram.functionLookup[con.path]?.get(con.functionName)
+                ?: error("Function '${con.functionName}' not found in '${con.path}'")
+            ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${con.path}::${con.functionName}")
         }
 
         // --- Phase 7: Create initial solution provider ---
         val initialSolutionProvider = createInitialSolutionProvider(
-            modelData, metamodelData
+            modelData, metamodel
         )
 
         // --- Phase 8: Run optimizer ---
@@ -287,7 +285,6 @@ class OptimizerExecutionService(
             objectives = objectives,
             constraints = constraints,
             transformations = transformations,
-            metamodelData = metamodelData,
             initialSolutionProvider = initialSolutionProvider
         )
 
@@ -312,7 +309,7 @@ class OptimizerExecutionService(
         }
 
         // --- Phase 9: Store results ---
-        storeResults(executionId, result, metamodelData, modelData.metamodelUri)
+        storeResults(executionId, result)
         updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
         logger.info("Optimizer execution $executionId completed")
     }
@@ -469,63 +466,17 @@ class OptimizerExecutionService(
 
     /**
      * Creates a factory that produces fresh initial [Solution] instances by loading
-     * the [modelData] into new [TinkerGraphBackend]s.
+     * the [modelData] into new [MdeoModelGraph]s.
      */
     private fun createInitialSolutionProvider(
         modelData: ModelData,
-        metamodelData: MetamodelData
+        metamodel: Metamodel
     ): () -> Solution {
         return {
-            val backend = TinkerGraphBackend()
-            val g = backend.traversal()
-            val nameRegistry = InstanceNameRegistry()
-            graphLoader.load(g, modelData, nameRegistry, metamodelData)
-            Solution(backend)
+            val modelGraph = MdeoModelGraph.create(modelData, metamodel)
+            //val modelGraph = TinkerModelGraph.create(modelData, metamodel)
+            Solution(modelGraph)
         }
-    }
-
-    /**
-     * Creates a [ScriptModelFactory] that converts graph state to [ScriptModel]
-     * for use by guidance functions (objectives/constraints).
-     *
-     * Uses the eager conversion strategy: graph → ModelData → ModelDataScriptModel.
-     */
-    private fun createScriptModelFactory(
-        metamodelData: MetamodelData,
-        modelData: ModelData,
-        environment: ExecutionEnvironment
-    ): ScriptModelFactory {
-        return object : ScriptModelFactory {
-            override fun create(graphBackend: GraphBackend): ScriptModel {
-                val g = graphBackend.traversal()
-                val nameRegistry = buildNameRegistryFromGraph(g)
-                val converter = GraphToModelDataConverter(
-                    metamodelData = metamodelData,
-                    types = emptyList(),
-                    typeRegistry = TypeRegistry.GLOBAL
-                )
-                val convertedModelData = converter.convert(g, modelData.metamodelUri, nameRegistry)
-                return ModelDataScriptModel(
-                    modelData = convertedModelData,
-                    metamodelData = metamodelData,
-                    classLoader = environment.classLoader,
-                    program = environment.program
-                )
-            }
-        }
-    }
-
-    /**
-     * Builds an [InstanceNameRegistry] from the current graph state.
-     * Assigns names based on vertex labels and IDs.
-     */
-    private fun buildNameRegistryFromGraph(g: GraphTraversalSource): InstanceNameRegistry {
-        val registry = InstanceNameRegistry()
-        g.V().toList().forEach { vertex ->
-            val baseName = "${vertex.label()}${vertex.id()}"
-            registry.registerWithUniqueName(vertex.id(), baseName)
-        }
-        return registry
     }
 
     // ========================= Result storage =========================
@@ -536,29 +487,17 @@ class OptimizerExecutionService(
      *
      * @param executionId The execution whose results are being stored.
      * @param result The completed search result containing the final population.
-     * @param metamodelData Metamodel used to convert graph state back to model data.
-     * @param metamodelUri URI of the metamodel, embedded in each serialised model.
      */
     private fun storeResults(
         executionId: UUID,
-        result: SearchResult,
-        metamodelData: MetamodelData,
-        metamodelUri: String
+        result: SearchResult
     ) {
         val solutions = result.getFinalSolutions()
         val solutionGraphs = result.getFinalSolutionGraphs()
         val summaryContent = buildResultSummary(solutions)
 
-        // Convert each solution's graph to ModelData JSON outside the transaction
-        val converter = GraphToModelDataConverter(
-            metamodelData = metamodelData,
-            types = emptyList(),
-            typeRegistry = TypeRegistry.GLOBAL
-        )
         val solutionModelFiles = solutionGraphs.map { solution ->
-            val g = solution.graphBackend.traversal()
-            val nameRegistry = buildNameRegistryFromGraph(g)
-            val modelData = converter.convert(g, metamodelUri, nameRegistry)
+            val modelData = solution.modelGraph.toModelData()
             json.encodeToString(modelData)
         }
 

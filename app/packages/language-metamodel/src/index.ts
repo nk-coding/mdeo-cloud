@@ -1,5 +1,4 @@
 export * from "./action-handlers/importFileActionHandler.js";
-export * from "./features/diagram-server/handler/addAssociationMultiplicityOperationHandler.js";
 export * from "./features/diagram-server/handler/addEnumEntryOperationHandler.js";
 export * from "./features/diagram-server/handler/addPropertyOperationHandler.js";
 export * from "./features/diagram-server/handler/associationEndKinds.js";

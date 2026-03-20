@@ -3,7 +3,10 @@ package com.mdeo.script.compiler.expressions
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
 import com.mdeo.script.compiler.CompilationContext
+import com.mdeo.script.compiler.ScriptCompiler
+import com.mdeo.script.compiler.registry.function.InstanceFunctionSignatureDefinition
 import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 
 /**
  * Compiles function call expressions to bytecode using the unified registry system.
@@ -37,8 +40,10 @@ class FunctionCallCompiler : AbstractCallCompiler() {
     /**
      * Compiles a function call expression to bytecode.
      *
-     * Resolves the function through the unified registry and emits proper
-     * INVOKESTATIC bytecode with parameter coercion and return type handling.
+     * Resolves the function through the unified registry and emits the appropriate
+     * invocation bytecode. For instance methods (file-scope functions), pushes the
+     * receiver before arguments. For context-aware static functions (stdlib),
+     * pushes `this.__ctx` before user arguments.
      *
      * @throws IllegalStateException if function is not found in registry
      */
@@ -51,6 +56,14 @@ class FunctionCallCompiler : AbstractCallCompiler() {
         val signature = funcDef.getOverload(functionCall.overload)
             ?: error("Overload '${functionCall.overload}' not found for function '${functionCall.name}'")
         
+        if (signature is InstanceFunctionSignatureDefinition) {
+            emitInstanceReceiver(mv)
+        }
+
+        if (signature.requiresContext) {
+            emitContextLoad(context, mv)
+        }
+
         if (signature.isVarArgs) {
             compileVarArgsArray(functionCall.arguments, context, mv)
         } else {
@@ -66,5 +79,32 @@ class FunctionCallCompiler : AbstractCallCompiler() {
         
         val expectedReturnType = context.getType(functionCall.evalType)
         emitReturnTypeCoercion(expectedReturnType, signature.returnType, mv)
+    }
+
+    /**
+     * Emits the receiver instance for an instance method call.
+     *
+     * Since all script functions are compiled into a single [ScriptProgram] class,
+     * the receiver is always `this` regardless of which file the target function
+     * was originally defined in.
+     */
+    private fun emitInstanceReceiver(mv: MethodVisitor) {
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+    }
+
+    /**
+     * Emits bytecode to load `this.__ctx` onto the stack.
+     *
+     * @param context The compilation context containing the class name.
+     * @param mv The method visitor.
+     */
+    private fun emitContextLoad(context: CompilationContext, mv: MethodVisitor) {
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+        mv.visitFieldInsn(
+            Opcodes.GETFIELD,
+            context.currentClassName,
+            ScriptCompiler.CONTEXT_FIELD_NAME,
+            ScriptCompiler.CONTEXT_DESCRIPTOR
+        )
     }
 }

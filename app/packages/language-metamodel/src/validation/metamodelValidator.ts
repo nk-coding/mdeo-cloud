@@ -807,6 +807,7 @@ export class MetamodelValidator {
 
     /**
      * Validates multiplicity at an association end.
+     * An association end with multiplicity must also have a property name.
      */
     private validateAssociationEndMultiplicity(
         end: AssociationEndType | undefined,
@@ -814,6 +815,15 @@ export class MetamodelValidator {
         accept: ValidationAcceptor
     ): void {
         if (!end?.multiplicity) {
+            return;
+        }
+
+        if (!end.name) {
+            accept(
+                "error",
+                "An association end cannot have a multiplicity without a property name. Add a property name or remove the multiplicity.",
+                { node: association, property: association.source === end ? "source" : "target" }
+            );
             return;
         }
 

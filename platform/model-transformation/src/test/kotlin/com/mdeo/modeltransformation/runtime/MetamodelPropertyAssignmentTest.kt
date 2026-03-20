@@ -1,19 +1,21 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.AssociationEndData
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.AssociationEndData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.match.MatchResult
@@ -94,6 +96,11 @@ class MetamodelPropertyAssignmentTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -103,9 +110,8 @@ class MetamodelPropertyAssignmentTest {
         val statementRegistry = StatementExecutorRegistry.createDefaultRegistry()
 
         engine = TransformationEngine(
-            traversalSource = g,
-            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()), // Dummy AST for manual setup
-            metamodelData = metamodelData,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
+            ast = TypedAst(types = emptyList(), metamodelPath = "", statements = emptyList()), // Dummy AST for manual setup
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -166,7 +172,7 @@ class MetamodelPropertyAssignmentTest {
     @Test
     fun `category from house_address should be set on created Room with metamodel types`() {
         // Create a House vertex in the graph
-        g.addV("House").property("address", "123 Main St").next()
+        g.addV("House").property(graphKey("House", "address"), "123 Main St").next()
 
         // Set engine types to match the real typed AST
         setEngineTypes()
@@ -242,18 +248,18 @@ class MetamodelPropertyAssignmentTest {
         assertTrue(result is MatchResult.Matched, "Match should succeed")
         result as MatchResult.Matched
 
-        val roomId = result.instanceMappings["newRoom"]
+        val roomId = result.instanceMappings["newRoom"]?.rawId
         assertNotNull(roomId, "newRoom should be mapped")
 
         val room = g.V(roomId).next()
 
         // value = 100 * 10 should work (pure constant)
-        val valueProperty = room.property<Int>("value")
+        val valueProperty = room.property<Int>(graphKey("Room", "value"))
         assertTrue(valueProperty.isPresent, "value property should exist")
         assertEquals(1000, valueProperty.value(), "value should be 100*10=1000")
 
         // category = house.address MUST be set
-        val categoryProperty = room.property<String>("category")
+        val categoryProperty = room.property<String>(graphKey("Room", "category"))
         assertTrue(categoryProperty.isPresent, "category property MUST exist - this is the bug if it fails")
         assertEquals("123 Main St", categoryProperty.value(), "category should equal house.address")
     }
@@ -268,12 +274,12 @@ class MetamodelPropertyAssignmentTest {
     @Test
     fun `engine execute should auto-register metamodel types from metamodelData`() {
         // Create a House vertex in the graph
-        g.addV("House").property("address", "456 Oak Ave").next()
+        g.addV("House").property(graphKey("House", "address"), "456 Oak Ave").next()
 
         // Build a full TypedAst - this is what the real system produces
         val ast = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = listOf(
                 TypedMatchStatement(
                     pattern = TypedPattern(
@@ -340,9 +346,8 @@ class MetamodelPropertyAssignmentTest {
 
         // Execute the full AST through the engine - this should auto-register metamodel types
         val testEngine = TransformationEngine(
-             traversalSource = g,
+             modelGraph = TinkerModelGraph.wrap(graph, metamodel),
              ast = ast,
-             metamodelData = metamodelData,
              expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
              statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )
@@ -357,12 +362,12 @@ class MetamodelPropertyAssignmentTest {
         val room = rooms[0]
 
         // value = 100 * 10
-        val valueProperty = room.property<Int>("value")
+        val valueProperty = room.property<Int>(graphKey("Room", "value"))
         assertTrue(valueProperty.isPresent, "value property should exist")
         assertEquals(1000, valueProperty.value())
 
         // category = house.address - THE BUG: this is missing without the fix  
-        val categoryProperty = room.property<String>("category")
+        val categoryProperty = room.property<String>(graphKey("Room", "category"))
         assertTrue(categoryProperty.isPresent, "category property MUST exist (was silently skipped before fix)")
         assertEquals("456 Oak Ave", categoryProperty.value(), "category should equal house.address")
     }

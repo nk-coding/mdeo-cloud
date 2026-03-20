@@ -1,17 +1,19 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.EnumData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.data.EnumData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.compiler.expressions.EqualityCompilerUtil
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
@@ -71,9 +73,8 @@ class EnumSupportTest {
         g = graph.traversal()
 
         engine = TransformationEngine(
-            traversalSource = g,
-            ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
-            metamodelData = metamodelData,
+            modelGraph = TinkerModelGraph.wrap(graph, Metamodel.compile(metamodelData)),
+            ast = TypedAst(types = emptyList(), metamodelPath = "", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )

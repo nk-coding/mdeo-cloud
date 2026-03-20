@@ -8,6 +8,7 @@ import com.mdeo.script.ast.TypedParameter
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.script.runtime.ExecutionEnvironment
+import com.mdeo.script.runtime.SimpleScriptContext
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -103,7 +104,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(30, result)
     }
@@ -187,7 +188,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(42L, result)
     }
@@ -270,7 +271,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(100, result)
     }
@@ -353,7 +354,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(5.0, result)
     }
@@ -437,7 +438,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleC.script", "testFunction")
+        val result = env.invoke("file://moduleC.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(30, result)
     }
@@ -530,7 +531,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         // Should be 10 (5 * 2 from local), NOT 50 (5 * 10 from imported)
         assertEquals(10, result)
@@ -630,7 +631,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(11, result)
     }
@@ -700,7 +701,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals("Hello, World", result)
     }
@@ -767,7 +768,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(9876543211L, result)
     }
@@ -866,7 +867,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(30, result)
     }
@@ -956,7 +957,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(60.5, result)
     }
@@ -1059,7 +1060,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleA.script", "testFunction")
+        val result = env.invoke("file://moduleA.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(110, result)
     }
@@ -1147,7 +1148,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleA.script", "testFunction")
+        val result = env.invoke("file://moduleA.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(42, result)
     }
@@ -1227,7 +1228,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleA.script", "testFunction")
+        val result = env.invoke("file://moduleA.script", "testFunction", SimpleScriptContext(System.out, null))
 
         assertEquals(999, result)
     }
@@ -1312,7 +1313,7 @@ class ImportedFunctionCallTest {
         val env = ExecutionEnvironment(program)
         
         // Test calling from file A - this will call funcA() and funcB() from B
-        val resultA = env.invoke("file://moduleA.script", "callBoth")
+        val resultA = env.invoke("file://moduleA.script", "callBoth", SimpleScriptContext(System.out, null))
         assertEquals(30, resultA)
     }
 
@@ -1434,7 +1435,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleA.script", "testFunction")
+        val result = env.invoke("file://moduleA.script", "testFunction", SimpleScriptContext(System.out, null))
 
         // 1000 (from D) + 100 (from C) + 10 (from B) = 1110
         assertEquals(1110, result)
@@ -1503,7 +1504,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         // The imported function should be called, returning 42
         assertEquals(42, result)
@@ -1580,7 +1581,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleB.script", "testFunction")
+        val result = env.invoke("file://moduleB.script", "testFunction", SimpleScriptContext(System.out, null))
 
         // Local function should be called, returning 5 (not 100 from import)
         assertEquals(5, result)
@@ -1665,7 +1666,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleA.script", "testFunction")
+        val result = env.invoke("file://moduleA.script", "testFunction", SimpleScriptContext(System.out, null))
 
         // Should resolve through all aliases to originalFunc which returns 7
         assertEquals(7, result)
@@ -1756,7 +1757,7 @@ class ImportedFunctionCallTest {
 
         val program = compiler.compile(input)
         val env = ExecutionEnvironment(program)
-        val result = env.invoke("file://moduleA.script", "testFunction")
+        val result = env.invoke("file://moduleA.script", "testFunction", SimpleScriptContext(System.out, null))
 
         // 6 * 7 = 42
         assertEquals(42, result)

@@ -36,11 +36,12 @@ object GlobalFunctionRegistrar {
      * Creates the println function definition.
      *
      * println(string) - prints a string followed by a newline.
+     * The JVM method takes a ScriptContext as its first argument (injected automatically).
      */
     private fun createPrintln(): FunctionDefinition {
         return globalFunction("println") {
-            staticOverload("") {
-                descriptor = "(Ljava/lang/String;)V"
+            contextAwareOverload("") {
+                descriptor = "(Lcom/mdeo/script/runtime/ScriptContext;Ljava/lang/String;)V"
                 owner = GLOBAL_HELPER
                 jvmMethod = "println"
                 parameterTypes = listOf(BuiltinTypes.STRING)

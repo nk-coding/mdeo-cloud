@@ -80,6 +80,21 @@ class GlobalFunctionBuilder(private val name: String) {
     }
 
     /**
+     * Adds a context-aware static overload whose first JVM parameter is a ScriptContext.
+     *
+     * The [FunctionCallCompiler] will automatically push `this.__ctx` before the
+     * user-visible arguments when it sees [FunctionSignatureDefinition.requiresContext].
+     *
+     * @param overloadKey The unique key identifying this overload.
+     * @param block Builder for configuring the overload.
+     */
+    fun contextAwareOverload(overloadKey: String = "", block: StaticOverloadBuilder.() -> Unit) {
+        val builder = StaticOverloadBuilder(overloadKey, isVarArgs = false, isContextAware = true)
+        builder.block()
+        overloads.add(builder.build())
+    }
+
+    /**
      * Builds the global function definition.
      *
      * @return A FunctionDefinition with all configured overloads.
@@ -98,7 +113,8 @@ class GlobalFunctionBuilder(private val name: String) {
  */
 class StaticOverloadBuilder(
     private val overloadKey: String,
-    private val isVarArgs: Boolean = false
+    private val isVarArgs: Boolean = false,
+    private val isContextAware: Boolean = false
 ) {
     /**
      * The JVM method descriptor.
@@ -129,6 +145,17 @@ class StaticOverloadBuilder(
      * Builds the function signature definition.
      */
     fun build(): FunctionSignatureDefinition {
+        if (isContextAware) {
+            return ContextAwareStaticFunctionSignatureDefinition(
+                overloadKey = overloadKey,
+                descriptor = descriptor,
+                ownerClass = owner,
+                jvmMethodName = jvmMethod,
+                isVarArgs = isVarArgs,
+                parameterTypes = parameterTypes,
+                returnType = returnType
+            )
+        }
         return StaticFunctionSignatureDefinition(
             overloadKey = overloadKey,
             descriptor = descriptor,

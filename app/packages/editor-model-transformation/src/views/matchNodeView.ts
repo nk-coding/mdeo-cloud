@@ -3,6 +3,7 @@ import type { VNode } from "snabbdom";
 import { sharedImport, GNodeViewBase } from "@mdeo/editor-shared";
 import type { GMatchNode } from "../model/matchNode.js";
 import type { GMatchNodeCompartments } from "../model/matchNodeCompartments.js";
+import { MATCH_NODE_INNER_PADDING } from "@mdeo/protocol-model-transformation";
 
 const { injectable } = sharedImport("inversify");
 const { svg, html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
@@ -12,7 +13,7 @@ export class GMatchNodeView extends GNodeViewBase {
     /**
      * Padding between the pattern content (instances, links) and the match node's outline/container area.
      */
-    static readonly INNER_PADDING = 20;
+    static readonly INNER_PADDING = MATCH_NODE_INNER_PADDING;
 
     /**
      * Minimum width/height for the pattern content area, to ensure a reasonable size when no pattern elements are present or when they have zero-size bounds.

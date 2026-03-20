@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.match.MatchResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -36,7 +37,7 @@ class NamePropertyConflictTest {
         val statementRegistry = StatementExecutorRegistry.createDefaultRegistry()
         
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()), // Dummy AST
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
@@ -94,7 +95,7 @@ class NamePropertyConflictTest {
         result as MatchResult.Matched
         
         // Get the created vertex
-        val vertexId = result.instanceMappings["person1"]
+        val vertexId = result.instanceMappings["person1"]?.rawId
         assertNotNull(vertexId, "person1 should be mapped to a vertex")
         
         val vertex = g.V(vertexId).next()
@@ -206,8 +207,8 @@ class NamePropertyConflictTest {
         result as MatchResult.Matched
         
         // Both persons should have "Charlie" as their name property
-        val p1Id = result.instanceMappings["p1"]
-        val p2Id = result.instanceMappings["p2"]
+        val p1Id = result.instanceMappings["p1"]?.rawId
+        val p2Id = result.instanceMappings["p2"]?.rawId
         
         assertNotNull(p1Id)
         assertNotNull(p2Id)

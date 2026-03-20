@@ -857,6 +857,6 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         if (metadata != undefined && NodeLayoutMetadataUtil.isValid(metadata)) {
             return metadata;
         }
-        return NodeLayoutMetadataUtil.create(0, 0);
+        return NodeLayoutMetadataUtil.create(0, 0, 250);
     }
 }

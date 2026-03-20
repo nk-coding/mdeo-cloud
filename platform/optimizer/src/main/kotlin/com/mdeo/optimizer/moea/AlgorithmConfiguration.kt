@@ -15,15 +15,12 @@ import org.moeaframework.problem.Problem
 /**
  * Configuration container for a MOEA Framework algorithm run.
  *
- * Ported from MoeaFrameworkAlgorithmConfiguration.java.
- *
- * @param solverConfig Solver configuration from the optimizer config.
- * @param solutionGenerator The solution generator to wire into the algorithm.
- * @param objectives List of objective functions.
- * @param constraints List of constraint functions.
- * @param scriptTimeoutMs Combined timeout in milliseconds for evaluating all objectives and
- *   constraints of a single solution.  Derived from [SolverConfig.effectiveScriptTimeoutMs]
- *   multiplied by the number of guidance functions.  `null` disables the timeout.
+ * @param solverConfig       Solver configuration from the optimizer config.
+ * @param solutionGenerator  The solution generator to wire into the algorithm.
+ * @param objectives         List of objective guidance functions.
+ * @param constraints        List of constraint guidance functions.
+ * @param scriptTimeoutMs    Combined timeout in milliseconds for evaluating all objectives and
+ *   constraints of a single solution.  `null` disables the timeout.
  */
 class AlgorithmConfiguration(
     private val solverConfig: SolverConfig,

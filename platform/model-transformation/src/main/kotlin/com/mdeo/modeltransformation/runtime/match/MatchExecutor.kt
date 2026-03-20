@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.runtime.match
 
 import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
@@ -13,6 +14,7 @@ import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.LabelIdGenerator
 import com.mdeo.modeltransformation.compiler.SequentialLabelIdGenerator
 import com.mdeo.modeltransformation.compiler.VariableBinding
+import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.compiler.expressions.EqualityCompilerUtil
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationEngine
@@ -110,6 +112,14 @@ class MatchExecutor {
     /**
      * Executes pattern match with a specified limit.
      *
+     * If the engine is running in non-deterministic mode ([TransformationEngine.deterministic] is
+     * false), this method first calls [com.mdeo.modeltransformation.graph.ModelGraph.resetNondeterminism]
+     * on the engine's model graph before building and executing the traversal. Resetting before
+     * every individual match (rather than once per transformation) ensures that different match
+     * steps within the same transformation can each explore a fresh, independently-shuffled
+     * iteration order — preventing earlier matches from artificially constraining the outcomes
+     * of later ones.
+     *
      * @param pattern The pattern to match.
      * @param context The current execution context.
      * @param engine The transformation engine.
@@ -122,12 +132,16 @@ class MatchExecutor {
         engine: TransformationEngine,
         limit: Long
     ): List<MatchResult.Matched> {
+        if (!engine.deterministic) {
+            engine.modelGraph.resetNondeterminism()
+        }
+
         val elements = PatternCategories.from(pattern)
 
         val scope = context.variableScope
         for (name in elements.allInstanceNames) {
             if (scope.getVariable(name) == null) {
-                scope.setBinding(name, VariableBinding.InstanceBinding(vertexId = null))
+                scope.setBinding(name, VariableBinding.InstanceBinding(vertexRef = null))
             }
         }
 
@@ -227,6 +241,7 @@ class MatchExecutor {
             t = addIslandConstraints(t, elements, context, engine)
             t = addPropertyWhereConstraints(t, allMatchableInstances, context, engine)
             t = addWhereClauseConstraints(t, elements.whereClauses, context, engine)
+            t = addInjectiveMatchConstraints(t, allMatchableInstances, engine)
             t
         } else {
             var t = buildMatchStep(
@@ -236,10 +251,11 @@ class MatchExecutor {
             t = addIslandConstraints(t, elements, context, engine)
             t = addPropertyWhereConstraints(t, allMatchableInstances, context, engine)
             t = addWhereClauseConstraints(t, elements.whereClauses, context, engine)
+            t = addInjectiveMatchConstraints(t, allMatchableInstances, engine)
             t
         }
 
-        traversal = applyLimit(traversal, limit, engine.deterministic)
+        traversal = applyLimit(traversal, limit)
 
         val matchedInstanceNames = elements.matchableInstances.map { it.objectInstance.name }
         traversal = addCreateVertexSteps(traversal, elements.createInstances, context, engine, matchedInstanceNames, compilationContext)
@@ -251,6 +267,64 @@ class MatchExecutor {
 
         val variableLabels = elements.variables.map { VariableBinding.variableLabel(it.variable.name) }
         return addSelectStep(traversal, elements.allInstanceNames, variableLabels)
+    }
+
+    /**
+     * Checks whether two class names are type-compatible, meaning one could be a
+     * subtype of the other (or they are the same type). If either class name is null,
+     * the instance could match any vertex, so they are always considered compatible.
+     *
+     * @param classNameA The class name of the first instance (nullable)
+     * @param classNameB The class name of the second instance (nullable)
+     * @param engine The transformation engine providing the type registry
+     * @return True if the two types could potentially match the same vertex
+     */
+    private fun areTypesCompatible(classNameA: String?, classNameB: String?, engine: TransformationEngine): Boolean {
+        if (classNameA == null || classNameB == null) return true
+        val typeRefA = ClassTypeRef(`package` = engine.classPackage, type = classNameA, isNullable = false)
+        val typeRefB = ClassTypeRef(`package` = engine.classPackage, type = classNameB, isNullable = false)
+        return engine.typeRegistry.isSubtypeOf(typeRefA, typeRefB) || engine.typeRegistry.isSubtypeOf(typeRefB, typeRefA)
+    }
+
+    /**
+     * Adds injective match constraints to ensure that all matchable and delete instances
+     * bind to distinct vertices. For each pair of type-compatible instances, adds a
+     * `where(stepLabel_a, P.neq(stepLabel_b))` constraint.
+     *
+     * @param traversal The traversal to extend with injective constraints
+     * @param matchableInstances The list of matchable and delete instances
+     * @param engine The transformation engine providing the type registry
+     * @return The extended traversal with injective constraints added
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun addInjectiveMatchConstraints(
+        traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        matchableInstances: List<TypedPatternObjectInstanceElement>,
+        engine: TransformationEngine
+    ): GraphTraversal<Vertex, Map<String, Any>> {
+        var result = traversal
+
+        for (i in matchableInstances.indices) {
+            for (j in i + 1 until matchableInstances.size) {
+                val a = matchableInstances[i]
+                val b = matchableInstances[j]
+
+                if (a.objectInstance.name == b.objectInstance.name) {
+                    continue
+                }
+
+                if (!areTypesCompatible(a.objectInstance.className, b.objectInstance.className, engine)) {
+                    continue
+                }
+
+                result = result.where(
+                    VariableBinding.stepLabel(a.objectInstance.name),
+                    P.neq(VariableBinding.stepLabel(b.objectInstance.name))
+                ) as GraphTraversal<Vertex, Map<String, Any>>
+            }
+        }
+
+        return result
     }
 
     /**
@@ -277,31 +351,23 @@ class MatchExecutor {
     }
 
     /**
-     * Applies limit (or random sampling) to the traversal.
+     * Applies a limit to the traversal.
      *
-     * When [deterministic] is true and [limit] > 0 the standard `limit()` step is used,
-     * which always picks the first candidate in traversal order.
-     *
-     * When [deterministic] is false and [limit] == 1 the `sample(1)` step is used instead,
-     * which selects a uniformly random element from all candidates — desirable for
-     * search-based optimisation. For limits other than 1 in non-deterministic mode,
-     * `limit()` is still used because `sample()` semantics are only meaningful for
-     * single-pick operations.
+     * Always uses `limit()` to pick the first N candidates in traversal order.
+     * Non-determinism for search-based optimisation is achieved by randomizing
+     * the graph's vertex order before each match step (by shuffling the nodes in the graph copy)
+     * not by sampling from all matches.
      *
      * @param traversal The traversal to apply the limit to.
      * @param limit Maximum number of results to return (values <= 0 mean no limit).
-     * @param deterministic When false and limit == 1, uses sample(1) instead of limit(1).
      * @return The traversal with the appropriate step applied.
      */
-    @Suppress("UNCHECKED_CAST")
     private fun applyLimit(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         limit: Long,
-        deterministic: Boolean = true
     ): GraphTraversal<Vertex, Map<String, Any>> {
         return when {
             limit <= 0 -> traversal
-            !deterministic && limit == 1L -> traversal.sample(1) as GraphTraversal<Vertex, Map<String, Any>>
             else -> traversal.limit(limit) as GraphTraversal<Vertex, Map<String, Any>>
         }
     }
@@ -333,7 +399,7 @@ class MatchExecutor {
             val name = instance.objectInstance.name
 
             result = result.addV(className).`as`(VariableBinding.stepLabel(name)) as GraphTraversal<Vertex, Map<String, Any>>
-            result = addCreateVertexProperties(result, name, instance.objectInstance.properties, context, engine, matchedInstanceNames, compilationContext)
+            result = addCreateVertexProperties(result, className, name, instance.objectInstance.properties, context, engine, matchedInstanceNames, compilationContext)
         }
 
         return result
@@ -347,6 +413,7 @@ class MatchExecutor {
      * - Collection values: set via sideEffect with Cardinality.list
      *
      * @param traversal The traversal with the newly created vertex as current element
+     * @param className The metamodel class name of the vertex being created
      * @param instanceName The name of the instance being created
      * @param properties The properties to set
      * @param context The transformation execution context
@@ -358,6 +425,7 @@ class MatchExecutor {
     @Suppress("UNCHECKED_CAST")
     private fun addCreateVertexProperties(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        className: String?,
         instanceName: String,
         properties: List<TypedPatternPropertyAssignment>,
         context: TransformationExecutionContext,
@@ -373,20 +441,22 @@ class MatchExecutor {
         }
 
         for (property in simpleProperties) {
+            val graphKey = engine.resolvePropertyGraphKey(className, property.propertyName)
             val compilationResult = compilePropertyExpression(property.value, context, engine, matchedInstanceNames)!!
             if (compilationResult is CompilationResult.ValueResult) {
                 val value = compilationResult.value
                 if (value != null) {
-                    result = result.property(property.propertyName, value)
+                    result = result.property(graphKey, value)
                         as GraphTraversal<Vertex, Map<String, Any>>
                 }
             } else {
-                result = result.property(property.propertyName, compilationResult.traversal)
+                result = result.property(graphKey, compilationResult.traversal)
                     as GraphTraversal<Vertex, Map<String, Any>>
             }
         }
 
         for (property in listProperties) {
+            val graphKey = engine.resolvePropertyGraphKey(className, property.propertyName)
             val listResult = compilePropertyExpression(property.value, context, engine, matchedInstanceNames)!!
             val listTraversal = listResult.traversal as GraphTraversal<Any, Any>
             val valueLabel = compilationContext.getUniqueId()
@@ -397,7 +467,7 @@ class MatchExecutor {
                     .select<Any>(VariableBinding.stepLabel(instanceName))
                     .property(
                         VertexProperty.Cardinality.list,
-                        property.propertyName,
+                        graphKey,
                         AnonymousTraversal.select<Any, Any>(valueLabel)
                     )
             ) as GraphTraversal<Vertex, Map<String, Any>>
@@ -461,23 +531,25 @@ class MatchExecutor {
     ): GraphTraversal<Vertex, Map<String, Any>> {
         var result = traversal
         val name = instance.objectInstance.name
+        val className = instance.objectInstance.className
 
         for (property in instance.objectInstance.properties) {
             if (property.operator != "=") continue
 
+            val graphKey = engine.resolvePropertyGraphKey(className, property.propertyName)
             val expressionType = resolveExpressionType(property.value, engine)
             val isCollection = isCollectionType(expressionType, engine)
 
             if (isCollection) {
                 val listResult = compilePropertyExpression(property.value, context, engine, matchedInstanceNames)
                 if (listResult != null) {
-                    result = setListPropertyViaSideEffect(result, name, property.propertyName, listResult, compilationContext)
+                    result = setListPropertyViaSideEffect(result, name, graphKey, listResult, compilationContext)
                 }
             } else {
                 val value = getPropertyValue(property.value, context, engine, matchedInstanceNames)
                 result = result.sideEffect(
                     AnonymousTraversal.select<Any, Any>(VariableBinding.stepLabel(name))
-                        .property(property.propertyName, value)
+                        .property(graphKey, value)
                 ) as GraphTraversal<Vertex, Map<String, Any>>
             }
         }
@@ -491,18 +563,18 @@ class MatchExecutor {
      * Clears existing property values, then evaluates the list traversal and adds each
      * emitted value as a separate property value with Cardinality.list.
      *
-     * @param traversal The main traversal to extend
-     * @param instanceName The name of the instance to set the property on
-     * @param propertyName The name of the property to set
-     * @param listResult The CompilationResult that emits list element values
-     * @param compilationContext The shared compilation context for unique ID generation
-     * @return The extended traversal with sideEffect steps for list property management
+     * @param traversal The main traversal to extend.
+     * @param instanceName The name of the instance to set the property on.
+     * @param graphKey The graph property key (e.g. "prop_2").
+     * @param listResult The CompilationResult that emits list element values.
+     * @param compilationContext The shared compilation context for unique ID generation.
+     * @return The extended traversal with sideEffect steps for list property management.
      */
     @Suppress("UNCHECKED_CAST")
     private fun setListPropertyViaSideEffect(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         instanceName: String,
-        propertyName: String,
+        graphKey: String,
         listResult: CompilationResult,
         compilationContext: CompilationContext
     ): GraphTraversal<Vertex, Map<String, Any>> {
@@ -510,7 +582,7 @@ class MatchExecutor {
 
         result = result.sideEffect(
             AnonymousTraversal.select<Any, Any>(VariableBinding.stepLabel(instanceName))
-                .properties<Any>(propertyName)
+                .properties<Any>(graphKey)
                 .drop()
         ) as GraphTraversal<Vertex, Map<String, Any>>
 
@@ -523,7 +595,7 @@ class MatchExecutor {
                 .select<Any>(VariableBinding.stepLabel(instanceName))
                 .property(
                     VertexProperty.Cardinality.list,
-                    propertyName,
+                    graphKey,
                     AnonymousTraversal.select<Any, Any>(valueLabel)
                 )
         ) as GraphTraversal<Vertex, Map<String, Any>>
@@ -778,7 +850,8 @@ class MatchExecutor {
                     ?: throw IllegalStateException("Failed to compile property expression for ${property.propertyName}")
 
                 if (compilationResult is CompilationResult.ValueResult) {
-                    clause = clause.has(property.propertyName, compilationResult.value) as GraphTraversal<Any, Any>
+                    val graphKey = engine.resolvePropertyGraphKey(className, property.propertyName)
+                    clause = clause.has(graphKey, compilationResult.value) as GraphTraversal<Any, Any>
                 }
             }
         }
@@ -1037,7 +1110,7 @@ class MatchExecutor {
 
             val targetInstance = islandInstanceMap[toNode]
             if (targetInstance != null) {
-                chain = applyPropertyEqualityConstraints(chain, targetInstance.objectInstance.properties, context, engine)
+                chain = applyPropertyEqualityConstraints(chain, targetInstance.objectInstance.className, targetInstance.objectInstance.properties, context, engine)
             }
 
             if (toNode in matchableNames || toNode in nodesNeedingBacktrackLabel) {
@@ -1150,21 +1223,23 @@ class MatchExecutor {
     /**
      * Applies all equality property constraints (== operator) from [properties] to [traversal].
      *
-     * For constant values (ValueResult), applies `.has(propertyName, value)` inline.
+     * For constant values (ValueResult), applies `.has(graphKey, value)` inline.
      * For non-constant expressions, builds an equality traversal using [EqualityCompilerUtil].
      *
      * Used in island chain traversals and disconnected island constraints where the traversal
      * head is already positioned on the target vertex.
      *
-     * @param traversal The traversal currently positioned on the target vertex
-     * @param properties The property assignments to filter by
-     * @param context The transformation execution context
-     * @param engine The transformation engine
-     * @return The traversal extended with property constraint steps
+     * @param traversal The traversal currently positioned on the target vertex.
+     * @param className The metamodel class name of the vertex (for graph key resolution).
+     * @param properties The property assignments to filter by.
+     * @param context The transformation execution context.
+     * @param engine The transformation engine.
+     * @return The traversal extended with property constraint steps.
      */
     @Suppress("UNCHECKED_CAST")
     private fun applyPropertyEqualityConstraints(
         traversal: GraphTraversal<Any, Any>,
+        className: String?,
         properties: List<TypedPatternPropertyAssignment>,
         context: TransformationExecutionContext,
         engine: TransformationEngine
@@ -1172,11 +1247,12 @@ class MatchExecutor {
         var result = traversal
         for (property in properties) {
             if (property.operator != "==") continue
+            val graphKey = engine.resolvePropertyGraphKey(className, property.propertyName)
             val compilationResult = compilePropertyExpression(property.value, context, engine, emptyList())
             if (compilationResult is CompilationResult.ValueResult) {
-                result = result.has(property.propertyName, compilationResult.value) as GraphTraversal<Any, Any>
+                result = result.has(graphKey, compilationResult.value) as GraphTraversal<Any, Any>
             } else if (compilationResult != null) {
-                val propertyTraversal = AnonymousTraversal.values<Vertex, Any>(property.propertyName) as GraphTraversal<Any, Any>
+                val propertyTraversal = AnonymousTraversal.values<Vertex, Any>(graphKey) as GraphTraversal<Any, Any>
                 val expressionTraversal = compileExpressionToTraversal(
                     property.value, engine, context,
                     AnonymousTraversal.`as`<Any>(ANCHOR_LABEL)
@@ -1228,7 +1304,7 @@ class MatchExecutor {
             val countPredicate = if (isNegative) P.eq(0L) else P.gt(0L)
             var clause: GraphTraversal<Any, Any> = AnonymousTraversal.V<Any>()
                 .hasLabel(className) as GraphTraversal<Any, Any>
-            clause = applyPropertyEqualityConstraints(clause, instance.objectInstance.properties, context, engine)
+            clause = applyPropertyEqualityConstraints(clause, instance.objectInstance.className, instance.objectInstance.properties, context, engine)
             result = result.where(clause.count().`is`(countPredicate)) as GraphTraversal<Vertex, Map<String, Any>>
         }
         return result
@@ -1295,15 +1371,16 @@ class MatchExecutor {
             for (property in instance.objectInstance.properties) {
                 if (property.operator == "==") {
                     val compilationResult = compilePropertyExpression(property.value, context, engine, emptyList())
+                    val graphKey = engine.resolvePropertyGraphKey(className, property.propertyName)
 
                     if (className == null && compilationResult is CompilationResult.ValueResult) {
                         result = result.where(
                             AnonymousTraversal.select<Any, Any>(instanceLabel)
-                                .has(property.propertyName, compilationResult.value)
+                                .has(graphKey, compilationResult.value)
                         ) as GraphTraversal<Vertex, Map<String, Any>>
                     } else if (compilationResult != null && compilationResult !is CompilationResult.ValueResult) {
                         val propertyTraversal = AnonymousTraversal.select<Any, Any>(instanceLabel)
-                            .values<Any>(property.propertyName) as GraphTraversal<Any, Any>
+                            .values<Any>(graphKey) as GraphTraversal<Any, Any>
 
                         val expressionTraversal = compileExpressionToTraversal(
                             property.value,
@@ -1599,7 +1676,7 @@ class MatchExecutor {
             context.variableScope.setBinding(variableName, VariableBinding.ValueBinding(value))
         }
 
-        val instanceMappings = mutableMapOf<String, Any>()
+        val instanceMappings = mutableMapOf<String, VertexRef>()
         val matchedNodeIds = mutableSetOf<Any>()
         val createdNodeIds = mutableSetOf<Any>()
         val deletedNodeIds = mutableSetOf<Any>()
@@ -1626,7 +1703,7 @@ class MatchExecutor {
      * @param value The vertex or value from the traversal result
      * @param createInstanceNames Set of instance names marked for creation
      * @param deleteInstanceNames Set of instance names marked for deletion
-     * @param instanceMappings Mutable map to populate with name-to-vertexId mappings
+     * @param instanceMappings Mutable map to populate with name-to-VertexRef mappings
      * @param matchedNodeIds Mutable set to add matched node IDs to
      * @param createdNodeIds Mutable set to add created node IDs to
      * @param deletedNodeIds Mutable set to add deleted node IDs to
@@ -1637,28 +1714,27 @@ class MatchExecutor {
         value: Any?,
         createInstanceNames: Set<String>,
         deleteInstanceNames: Set<String>,
-        instanceMappings: MutableMap<String, Any>,
+        instanceMappings: MutableMap<String, VertexRef>,
         matchedNodeIds: MutableSet<Any>,
         createdNodeIds: MutableSet<Any>,
         deletedNodeIds: MutableSet<Any>,
         engine: TransformationEngine
     ) {
         if (value is Vertex) {
-            val vertexId = value.id()
-            instanceMappings[name] = vertexId
+            val rawId = value.id()
+            val vertexRef = engine.modelGraph.createVertexRef(rawId)
+            instanceMappings[name] = vertexRef
             when {
                 createInstanceNames.contains(name) -> {
-                    createdNodeIds.add(vertexId)
-                    engine.instanceNameRegistry.registerWithUniqueName(vertexId, name)
+                    createdNodeIds.add(rawId)
+                    engine.instanceNameRegistry.registerWithUniqueName(rawId, name)
                 }
                 deleteInstanceNames.contains(name) -> {
-                    matchedNodeIds.add(vertexId)
-                    deletedNodeIds.add(vertexId)
+                    matchedNodeIds.add(rawId)
+                    deletedNodeIds.add(rawId)
                 }
-                else -> matchedNodeIds.add(vertexId)
+                else -> matchedNodeIds.add(rawId)
             }
-        } else if (value != null) {
-            instanceMappings[name] = value
         }
     }
 

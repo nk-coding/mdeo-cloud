@@ -858,7 +858,7 @@ class TraversalCompilerTest {
             // Add a vertex and label it
             val vertex = graph.addVertex(T.label, "Person", "name", "Bob")
             
-            val scope = VariableScope.of("person" to VariableBinding.InstanceBinding(vertexId = null), scopeIndex = 0)
+            val scope = VariableScope.of("person" to VariableBinding.InstanceBinding(vertexRef = null), scopeIndex = 0)
             val contextWithScope = CompilationContext(
                 types = context.types,
                 currentScope = scope,
@@ -877,7 +877,7 @@ class TraversalCompilerTest {
         fun `resolves match-defined variable`() {
             graph.addVertex(T.label, "Person", "name", "Charlie")
             
-            val scope = VariableScope.of("p" to VariableBinding.InstanceBinding(vertexId = null), scopeIndex = 0)
+            val scope = VariableScope.of("p" to VariableBinding.InstanceBinding(vertexRef = null), scopeIndex = 0)
             val contextWithMatch = CompilationContext(
                 types = context.types,
                 currentScope = scope,

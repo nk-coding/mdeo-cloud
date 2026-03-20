@@ -6,6 +6,7 @@ plugins {
 dependencies {
     implementation(project(":common"))
     implementation(project(":expression"))
+    implementation(project(":metamodel"))
     implementation(project(":model-transformation"))
     implementation(project(":script"))
     implementation(libs.kotlinx.serialization.json)
@@ -30,11 +31,14 @@ dependencies {
 tasks.test {
     // When asyncProfilerLib is set (e.g. -PasyncProfilerLib=.../libasyncProfiler.so),
     // attach the agent at JVM startup and dump collapsed stacks to asyncProfilerOutput.
+    // asyncProfilerEvent controls the event type (cpu, alloc, live, ...).
     // The shell script converts the .collapsed file to an interactive HTML flame graph.
     val profilerLib = findProperty("asyncProfilerLib") as? String
     if (profilerLib != null) {
         val outputFile = (findProperty("asyncProfilerOutput") as? String)
             ?: "${rootProject.rootDir}/tools/profile.collapsed"
-        jvmArgs("-agentpath:$profilerLib=start,event=cpu,file=$outputFile")
+        val event = (findProperty("asyncProfilerEvent") as? String) ?: "cpu"
+        val agentEvent = if (event == "live") "alloc,live" else event
+        jvmArgs("-agentpath:$profilerLib=start,event=$agentEvent,interval=1000000,file=$outputFile")
     }
 }

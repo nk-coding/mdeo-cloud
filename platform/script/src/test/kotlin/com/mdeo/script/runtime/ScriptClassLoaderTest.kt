@@ -14,58 +14,57 @@ import kotlin.test.assertNotNull
 class ScriptClassLoaderTest {
     
     @Test
-    fun `loadClassForFile loads class for valid file URI`() {
-        val bytecode = createSimpleBytecode("com/test/TestClass")
+    fun `loadClassForFile loads script program class for a known file`() {
+        val bytecode = createSimpleBytecode(CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME)
         val program = CompiledProgram(
-            allBytecodes = mapOf("com.test.TestClass" to bytecode),
-            scriptFileToClass = mapOf("test://test.script" to "com.test.TestClass")
+            allBytecodes = mapOf(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME to bytecode),
+            functionLookup = mapOf("test://test.script" to mapOf("fn" to "fn0"))
         )
-        
+
         val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
         val clazz = classLoader.loadClassForFile("test://test.script")
-        
+
         assertNotNull(clazz)
-        assertEquals("com.test.TestClass", clazz.name)
+        assertEquals(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME, clazz.name)
     }
-    
+
     @Test
     fun `loadClassForFile throws for unknown file URI`() {
         val program = CompiledProgram(emptyMap())
         val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
-        
+
         assertThrows<ClassNotFoundException> {
             classLoader.loadClassForFile("test://unknown.script")
         }
     }
-    
+
     @Test
-    fun `loadClassForFile caches loaded classes`() {
-        val bytecode = createSimpleBytecode("com/test/CachedClass")
+    fun `loadClassForFile caches loaded class`() {
+        val bytecode = createSimpleBytecode(CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME)
         val program = CompiledProgram(
-            allBytecodes = mapOf("com.test.CachedClass" to bytecode),
-            scriptFileToClass = mapOf("test://test.script" to "com.test.CachedClass")
+            allBytecodes = mapOf(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME to bytecode),
+            functionLookup = mapOf("test://test.script" to mapOf("fn" to "fn0"))
         )
-        
+
         val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
         val clazz1 = classLoader.loadClassForFile("test://test.script")
         val clazz2 = classLoader.loadClassForFile("test://test.script")
-        
+
         assert(clazz1 === clazz2)
     }
-    
+
     @Test
-    fun `findClass loads class by name`() {
-        val bytecode = createSimpleBytecode("com/test/FindableClass")
+    fun `findClass loads class by binary name`() {
+        val bytecode = createSimpleBytecode(CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME)
         val program = CompiledProgram(
-            allBytecodes = mapOf("com.test.FindableClass" to bytecode),
-            scriptFileToClass = mapOf("test://test.script" to "com.test.FindableClass")
+            allBytecodes = mapOf(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME to bytecode)
         )
-        
+
         val classLoader = ScriptClassLoader(program, ScriptClassLoaderTest::class.java.classLoader)
-        val clazz = classLoader.loadClass("com.test.FindableClass")
-        
+        val clazz = classLoader.loadClass(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME)
+
         assertNotNull(clazz)
-        assertEquals("com.test.FindableClass", clazz.name)
+        assertEquals(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME, clazz.name)
     }
     
     /**

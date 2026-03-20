@@ -24,7 +24,7 @@ tasks.test {
 dependencies {
     implementation(project(":common"))
     implementation(project(":expression"))
-    implementation(project(":model-transformation"))
+    implementation(project(":metamodel"))
     implementation(libs.kotlinx.serialization.json)
     
     // Apache Commons Collections for Bag implementation

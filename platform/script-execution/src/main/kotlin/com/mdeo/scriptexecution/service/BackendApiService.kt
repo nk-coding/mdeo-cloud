@@ -1,7 +1,7 @@
 package com.mdeo.scriptexecution.service
 
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.modeltransformation.ast.model.ModelData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.ModelData
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.common.model.ApiError
 import com.mdeo.expression.ast.expressions.TypedExpression

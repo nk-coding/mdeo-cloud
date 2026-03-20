@@ -1,7 +1,10 @@
 package com.mdeo.optimizer.moea
 
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.*
-import com.mdeo.optimizer.graph.TinkerGraphBackend
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy
 import com.mdeo.optimizer.solution.Solution
@@ -20,13 +23,15 @@ import org.junit.jupiter.params.provider.EnumSource
  */
 class MoeaOptimizationTest {
 
+    private val metamodel = Metamodel.compile(MetamodelData())
+
     /**
      * Simple objective that counts vertices in the graph. 
      */
     private class VertexCountObjective : GuidanceFunction {
         override val name = "VertexCount"
         override fun computeFitness(solution: Solution): Double {
-            return solution.graphBackend.traversal().V().count().next().toDouble()
+            return solution.modelGraph.traversal().V().count().next().toDouble()
         }
     }
 
@@ -51,16 +56,19 @@ class MoeaOptimizationTest {
     private class AddVertexMutationStrategy : MutationStrategy {
         override fun mutate(solution: Solution): Solution {
             val copy = solution.deepCopy()
-            copy.graphBackend.traversal().addV("node").next()
+            copy.modelGraph.traversal().addV("node").next()
             return copy
         }
     }
 
     private fun createInitialSolution(): Solution {
-        val backend = TinkerGraphBackend()
+        val modelGraph = TinkerModelGraph.create(
+            ModelData(metamodelPath = "", instances = emptyList(), links = emptyList()),
+            metamodel
+        )
         // Seed the graph with a single vertex
-        backend.traversal().addV("root").property("name", "initial").next()
-        return Solution(backend)
+        modelGraph.traversal().addV("root").property("name", "initial").next()
+        return Solution(modelGraph)
     }
 
     private fun createAlgorithmConfig(

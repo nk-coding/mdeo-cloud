@@ -1,6 +1,9 @@
 package com.mdeo.optimizer.moea
 
-import com.mdeo.optimizer.graph.TinkerGraphBackend
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy
 import com.mdeo.optimizer.solution.Solution
@@ -14,10 +17,12 @@ import org.moeaframework.core.initialization.RandomInitialization
  */
 class OptimizationProblemTest {
 
+    private val metamodel = Metamodel.compile(MetamodelData())
+
     private class CountingObjective : GuidanceFunction {
         override val name = "VertexCount"
         override fun computeFitness(solution: Solution): Double {
-            return solution.graphBackend.traversal().V().count().next().toDouble()
+            return solution.modelGraph.traversal().V().count().next().toDouble()
         }
     }
 
@@ -28,15 +33,18 @@ class OptimizationProblemTest {
     private class AddVertexMutationStrategy : MutationStrategy {
         override fun mutate(solution: Solution): Solution {
             val copy = solution.deepCopy()
-            copy.graphBackend.traversal().addV("node").next()
+            copy.modelGraph.traversal().addV("node").next()
             return copy
         }
     }
 
     private fun createSolution(): Solution {
-        val backend = TinkerGraphBackend()
-        backend.traversal().addV("root").next()
-        return Solution(backend)
+        val modelGraph = TinkerModelGraph.create(
+            ModelData(metamodelPath = "", instances = emptyList(), links = emptyList()),
+            metamodel
+        )
+        modelGraph.traversal().addV("root").next()
+        return Solution(modelGraph)
     }
 
     @Test
@@ -64,8 +72,8 @@ class OptimizationProblemTest {
         val copy = original.copy() as OptimizationSolution
 
         // Both should have independent graph backends
-        val origGraph = original.getOptimizationSolution().graphBackend
-        val copyGraph = copy.getOptimizationSolution().graphBackend
+        val origGraph = original.getOptimizationSolution().modelGraph
+        val copyGraph = copy.getOptimizationSolution().modelGraph
 
         // Modify copy's graph — original should be unaffected
         copyGraph.traversal().addV("extra").next()
@@ -85,9 +93,9 @@ class OptimizationProblemTest {
         val solution = gen.createNewSolution(1, 0)
         val variable = solution.getVariable(0) as OptimizationVariable
 
-        val countBefore = variable.solution.graphBackend.traversal().V().count().next()
+        val countBefore = variable.solution.modelGraph.traversal().V().count().next()
         variable.randomize()
-        val countAfter = variable.solution.graphBackend.traversal().V().count().next()
+        val countAfter = variable.solution.modelGraph.traversal().V().count().next()
 
         assertTrue(countAfter > countBefore, "Randomize should add a vertex via mutation")
     }
@@ -136,14 +144,14 @@ class OptimizationProblemTest {
 
         val parent = gen.createNewSolution(1, 0)
         val parentCount = parent.getOptimizationSolution()
-            .graphBackend.traversal().V().count().next()
+            .modelGraph.traversal().V().count().next()
 
         val offspring = variation.evolve(arrayOf(parent))
 
         assertEquals(1, offspring.size, "Should produce exactly one offspring")
         val childCount = (offspring[0] as OptimizationSolution)
             .getOptimizationSolution()
-            .graphBackend.traversal().V().count().next()
+            .modelGraph.traversal().V().count().next()
 
         assertTrue(childCount > parentCount, "Offspring should have more vertices than parent")
     }

@@ -1,5 +1,7 @@
 package com.mdeo.modeltransformation.compiler
 
+import com.mdeo.modeltransformation.graph.VertexRef
+
 /**
  * Represents a variable binding in a scope.
  *
@@ -21,17 +23,24 @@ sealed interface VariableBinding {
      * A binding to a named instance in the model transformation.
      *
      * Named instances are graph vertices that can be:
-     * - Unresolved (vertexId = null): References to matched instances before execution
-     * - Resolved (vertexId != null): References to actual vertices after match execution
+     * - Unresolved (vertexRef = null): References to matched instances before execution
+     * - Resolved (vertexRef != null): References to actual vertices after match execution
      *
-     * When vertexId is null, the identifier compiler uses select() with a step label.
-     * When vertexId is set, the identifier compiler uses V(vertexId) to access the vertex.
+     * When vertexRef is null, the identifier compiler uses select() with a step label.
+     * When vertexRef is set, the identifier compiler uses V(vertexRef.rawId) to access the vertex.
      *
-     * @param vertexId The unique identifier of the vertex, or null if not yet resolved.
+     * Using a [VertexRef] wrapper (rather than storing the raw ID directly) ensures
+     * that the binding remains valid after [com.mdeo.modeltransformation.graph.ModelGraph.resetNondeterminism]
+     * rebuilds the graph with new vertex IDs.
+     *
+     * @param vertexRef A stable reference to the vertex, or null if not yet resolved.
      */
     data class InstanceBinding(
-        var vertexId: Any?
-    ) : VariableBinding
+        var vertexRef: VertexRef?
+    ) : VariableBinding {
+        /** The current raw vertex ID, or null if this binding is not yet resolved. */
+        val vertexId: Any? get() = vertexRef?.rawId
+    }
     
     /**
      * A binding to a label in a Gremlin match() clause.
@@ -55,7 +64,7 @@ sealed interface VariableBinding {
          * Returns the name as-is, providing a centralized place for step label generation.
          * This function can be modified to add prefixes/suffixes without breaking existing code.
          */
-        fun stepLabel(name: String): String = "$name"
+        fun stepLabel(name: String): String = name
         
         /**
          * Generates a step label for a variable name used in match clauses.

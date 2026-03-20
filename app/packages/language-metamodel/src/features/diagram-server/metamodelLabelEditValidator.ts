@@ -20,7 +20,6 @@ import {
 import { collectAllPropertyNames } from "../../validation/metamodelValidator.js";
 import { NEW_PROPERTY_LABEL_PREFIX } from "./handler/addPropertyOperationHandler.js";
 import { NEW_ENUM_ENTRY_LABEL_PREFIX } from "./handler/addEnumEntryOperationHandler.js";
-import { NEW_MULTIPLICITY_LABEL_PREFIX } from "./handler/addAssociationMultiplicityOperationHandler.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -90,9 +89,6 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         }
         if (modelElementId.startsWith(NEW_ENUM_ENTRY_LABEL_PREFIX)) {
             return this.validateNewEnumEntryLabel(text, modelElementId) ?? ValidationStatus.NONE;
-        }
-        if (modelElementId.startsWith(NEW_MULTIPLICITY_LABEL_PREFIX)) {
-            return this.validateNewMultiplicityLabel(text) ?? ValidationStatus.NONE;
         }
         return ValidationStatus.NONE;
     }
@@ -198,22 +194,6 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
         }
 
         return undefined;
-    }
-
-    /**
-     * Validates the label text for a brand-new (not yet committed) multiplicity.
-     *
-     * An empty text is valid and will produce the default `*` multiplicity.
-     * Any non-empty text must match the standard multiplicity format.
-     *
-     * @param text The label text currently being entered
-     * @returns A validation status if invalid, undefined otherwise
-     */
-    private validateNewMultiplicityLabel(text: string): ValidationStatusType | undefined {
-        if (text.trim().length === 0) {
-            return undefined;
-        }
-        return this.validateMultiplicity(text.trim());
     }
 
     /**

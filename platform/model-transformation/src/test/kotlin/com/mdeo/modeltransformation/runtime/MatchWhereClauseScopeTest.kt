@@ -1,17 +1,19 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
@@ -77,6 +79,11 @@ class MatchWhereClauseScopeTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -96,14 +103,13 @@ class MatchWhereClauseScopeTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = emptyList()
         )
 
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -132,9 +138,9 @@ class MatchWhereClauseScopeTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `where clause should access matched variable in same pattern`() {
         // Create test data: multiple houses with different addresses
-        g.addV("House").property("address", "example1").next()
-        g.addV("House").property("address", "example2").next()
-        g.addV("House").property("address", "example3").next()
+        g.addV("House").property(graphKey("House", "address"), "example1").next()
+        g.addV("House").property(graphKey("House", "address"), "example2").next()
+        g.addV("House").property(graphKey("House", "address"), "example3").next()
 
         // Create a match statement with a where clause that references the matched variable
         // The transformation is:
@@ -190,7 +196,7 @@ class MatchWhereClauseScopeTest {
         // Verify that the matched house has the correct address
         val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
         val houseVertex = g.V(houseId).next()
-        val address = houseVertex.property<String>("address").value()
+        val address = houseVertex.property<String>(graphKey("House", "address")).value()
         assertEquals("example2", address, "Expected to match the house with address 'example2'")
     }
 
@@ -201,8 +207,8 @@ class MatchWhereClauseScopeTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `where clause with not equals should work`() {
         // Create test data
-        g.addV("House").property("address", "example1").next()
-        g.addV("House").property("address", "example2").next()
+        g.addV("House").property(graphKey("House", "address"), "example1").next()
+        g.addV("House").property(graphKey("House", "address"), "example2").next()
 
         // match { house: House {} where house.address != "example1" }
         val matchStatement = TypedMatchStatement(
@@ -249,7 +255,7 @@ class MatchWhereClauseScopeTest {
         // Verify that the matched house does not have address "example1"
         val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
         val houseVertex = g.V(houseId).next()
-        val address = houseVertex.property<String>("address").value()
+        val address = houseVertex.property<String>(graphKey("House", "address")).value()
         assertEquals("example2", address)
     }
 
@@ -260,9 +266,9 @@ class MatchWhereClauseScopeTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `multiple where clauses should access matched variable`() {
         // Create test data
-        g.addV("House").property("address", "example1").next()
-        g.addV("House").property("address", "example2").next()
-        g.addV("House").property("address", "example3").next()
+        g.addV("House").property(graphKey("House", "address"), "example1").next()
+        g.addV("House").property(graphKey("House", "address"), "example2").next()
+        g.addV("House").property(graphKey("House", "address"), "example3").next()
 
         // Test that multiple where clauses can reference the same matched variable
         // match {
@@ -335,7 +341,7 @@ class MatchWhereClauseScopeTest {
         
         val houseId = (context.variableScope.getVariable("house") as? VariableBinding.InstanceBinding)?.vertexId
         val houseVertex = g.V(houseId).next()
-        val address = houseVertex.property<String>("address").value()
+        val address = houseVertex.property<String>(graphKey("House", "address")).value()
         assertEquals("example2", address)
     }
 }

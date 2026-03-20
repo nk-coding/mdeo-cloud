@@ -1,81 +1,41 @@
 package com.mdeo.script.compiler.model
 
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.MetamodelMetadata
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.EnumData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.data.EnumData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
-import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.registry.property.GlobalPropertyRegistry
 import com.mdeo.script.compiler.registry.property.StaticGlobalPropertyDefinition
-import com.mdeo.script.compiler.registry.type.InstancePropertyDefinition
+import com.mdeo.script.compiler.registry.type.DirectFieldPropertyDefinition
 import com.mdeo.script.compiler.registry.type.MethodDefinition
 import com.mdeo.script.compiler.registry.type.PropertyDefinition
-import com.mdeo.script.compiler.registry.type.TypeDefinition
 import com.mdeo.script.compiler.registry.type.TypeDefinitionImpl
 import com.mdeo.script.compiler.registry.type.TypeRegistry
+import com.mdeo.script.compiler.ScriptCompiler
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
 /**
  * Registers metamodel types into a TypeRegistry for script compilation.
  *
- * This registrar creates type definitions for:
- * - Enum containers (e.g., "enum-container/path.Color") with properties for each entry
- * - Enum value types (e.g., "enum/path.Color") as type markers
- * - Class instance types (e.g., "class/path.Foo") with property getters
- * - A global "Model" type with typed allInstances() overloads
+ * Uses a compiled [Metamodel] to look up generated class names (instance classes,
+ * enum value/container classes, class container classes) and field mappings (`prop_X`).
  *
- * This mirrors the TransformationEngine.createTypeRegistry pattern.
+ * Property access emits GETFIELD instructions via [DirectFieldPropertyDefinition]
+ * instead of delegating to a backing interface.
  */
 object ScriptMetamodelTypeRegistrar {
 
-    /**
-     * Package prefix for enum container types. 
-     */
     const val ENUM_CONTAINER_PACKAGE = "enum-container"
-
-    /**
-     * Package prefix for enum value types. 
-     */
     const val ENUM_PACKAGE = "enum"
-
-    /**
-     * Package prefix for class types. 
-     */
     const val CLASS_PACKAGE = "class"
-
-    /**
-     * Package prefix for class container types. 
-     */
     const val CLASS_CONTAINER_PACKAGE = "class-container"
 
-    /**
-     * Package for the model global. 
-     */
-    const val MODEL_PACKAGE = "model"
-
-    /**
-     * Type name for the model global. 
-     */
-    const val MODEL_TYPE_NAME = "Model"
-
-    /**
-     * Internal name of ExecutionContext class (formerly ModelContext). 
-     */
-    private const val MODEL_CONTEXT_CLASS = "com/mdeo/script/runtime/ExecutionContext"
-
-    /**
-     * Internal name of ScriptModel class. 
-     */
-    private const val SCRIPT_MODEL_CLASS = "com/mdeo/script/runtime/model/ScriptModel"
-
-    /**
-     * Combined result of metamodel compilation: a TypeRegistry enriched with metamodel types
-     * and a file-scope property registry mapping class/enum container names to their singletons.
-     */
     data class MetamodelCompilationResult(
         val typeRegistry: TypeRegistry,
         val fileScopeRegistry: GlobalPropertyRegistry
@@ -84,15 +44,16 @@ object ScriptMetamodelTypeRegistrar {
     /**
      * Creates a type registry and file-scope property registry enriched with metamodel types.
      *
-     * @param metamodelData The metamodel containing class and enum definitions.
+     * @param metamodel The compiled metamodel.
      * @param metamodelPath The absolute path of the metamodel file.
-     * @return A MetamodelCompilationResult with TypeRegistry and file-scope GlobalPropertyRegistry.
      */
     fun createRegistry(
-        metamodelData: MetamodelData,
+        metamodel: Metamodel,
         metamodelPath: String
     ): MetamodelCompilationResult {
         val registry = TypeRegistry(parent = TypeRegistry.GLOBAL)
+        val metamodelData = metamodel.data
+        val metadata = metamodel.metadata
 
         for (enumData in metamodelData.enums) {
             registerEnumContainer(registry, enumData, metamodelPath)
@@ -101,24 +62,15 @@ object ScriptMetamodelTypeRegistrar {
 
         val classMap = metamodelData.classes.associateBy { it.name }
         for (classData in metamodelData.classes) {
-            registerClassType(registry, classData, metamodelPath, classMap, metamodelData)
+            registerClassType(registry, classData, metamodelPath, classMap, metamodelData, metadata)
             registerClassContainerType(registry, classData, metamodelPath)
         }
-
-        registerModelType(registry, metamodelData, metamodelPath)
 
         val fileScopeRegistry = buildFileScopeRegistry(metamodelData, metamodelPath)
 
         return MetamodelCompilationResult(registry, fileScopeRegistry)
     }
 
-    /**
-     * Builds a GlobalPropertyRegistry for file-scope identifiers (scope level 1).
-     *
-     * Registers:
-     * - Each class name → GETSTATIC <ClassContainer>.INSTANCE
-     * - Each enum name  → GETSTATIC <EnumContainer>.INSTANCE
-     */
     private fun buildFileScopeRegistry(
         metamodelData: MetamodelData,
         metamodelPath: String
@@ -126,7 +78,7 @@ object ScriptMetamodelTypeRegistrar {
         val registry = GlobalPropertyRegistry()
 
         for (classData in metamodelData.classes) {
-            val containerClass = ScriptClassBytecodeGenerator.getClassContainerClassName(classData.name)
+            val containerClass = Metamodel.getClassContainerClassName(classData.name)
             registry.registerProperty(
                 StaticGlobalPropertyDefinition(
                     name = classData.name,
@@ -138,7 +90,7 @@ object ScriptMetamodelTypeRegistrar {
         }
 
         for (enumData in metamodelData.enums) {
-            val containerClass = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name)
+            val containerClass = Metamodel.getEnumContainerClassName(enumData.name)
             registry.registerProperty(
                 StaticGlobalPropertyDefinition(
                     name = enumData.name,
@@ -152,19 +104,14 @@ object ScriptMetamodelTypeRegistrar {
         return registry
     }
 
-    /**
-     * Registers a class container type with an `all()` method.
-     *
-     * The class container is accessed like: `House.all()` returning `Collection<House>`.
-     */
     private fun registerClassContainerType(
         registry: TypeRegistry,
         classData: ClassData,
         metamodelPath: String
     ) {
         val typePackage = "$CLASS_CONTAINER_PACKAGE$metamodelPath"
-        val containerClassName = ScriptClassBytecodeGenerator.getClassContainerClassName(classData.name)
-        val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name)
+        val containerClassName = Metamodel.getClassContainerClassName(classData.name)
+        val instanceClassName = Metamodel.getInstanceClassName(classData.name)
 
         val typeDef = TypeDefinitionImpl(
             typePackage = typePackage,
@@ -182,26 +129,20 @@ object ScriptMetamodelTypeRegistrar {
         registry.register(typeDef)
     }
 
-    /**
-     * Registers an enum container type with properties for each entry.
-     *
-     * The enum container is accessed like: `Color.RED`
-     * Each entry property returns the corresponding EnumValue singleton.
-     */
     private fun registerEnumContainer(
         registry: TypeRegistry,
         enumData: EnumData,
         metamodelPath: String
     ) {
         val typePackage = "$ENUM_CONTAINER_PACKAGE$metamodelPath"
+        val containerClass = Metamodel.getEnumContainerClassName(enumData.name)
+        val valueClass = Metamodel.getEnumValueClassName(enumData.name)
+
         val typeDef = TypeDefinitionImpl(
             typePackage = typePackage,
             typeName = enumData.name,
-            jvmClassName = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name)
+            jvmClassName = containerClass
         )
-
-        val containerClass = ScriptEnumBytecodeGenerator.getEnumContainerClassName(enumData.name)
-        val valueClass = ScriptEnumBytecodeGenerator.getEnumValueClassName(enumData.name)
 
         for (entry in enumData.entries) {
             typeDef.addProperty(EnumEntryPropertyDefinition(
@@ -214,18 +155,13 @@ object ScriptMetamodelTypeRegistrar {
         registry.register(typeDef)
     }
 
-    /**
-     * Registers an enum value type (just a type marker).
-     *
-     * This type is used for property types that reference enums.
-     */
     private fun registerEnumValueType(
         registry: TypeRegistry,
         enumData: EnumData,
         metamodelPath: String
     ) {
         val typePackage = "$ENUM_PACKAGE$metamodelPath"
-        val valueClassName = ScriptEnumBytecodeGenerator.getEnumValueClassName(enumData.name)
+        val valueClassName = Metamodel.getEnumValueClassName(enumData.name)
         val typeDef = TypeDefinitionImpl(
             typePackage = typePackage,
             typeName = enumData.name,
@@ -236,18 +172,17 @@ object ScriptMetamodelTypeRegistrar {
         registry.register(typeDef)
     }
 
-    /**
-     * Registers a class type with property getters.
-     */
     private fun registerClassType(
         registry: TypeRegistry,
         classData: ClassData,
         metamodelPath: String,
         classMap: Map<String, ClassData>,
-        metamodelData: MetamodelData
+        metamodelData: MetamodelData,
+        metadata: MetamodelMetadata
     ) {
         val typePackage = "$CLASS_PACKAGE$metamodelPath"
-        val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name)
+        val instanceClassName = Metamodel.getInstanceClassName(classData.name)
+        val classMeta = metadata.classes[classData.name]
 
         val extendsRefs = classData.extends.map { superName ->
             ClassTypeRef(`package` = typePackage, type = superName, isNullable = false)
@@ -264,86 +199,56 @@ object ScriptMetamodelTypeRegistrar {
         )
 
         for (property in classData.properties) {
-            val propDef = createPropertyDefinition(property, instanceClassName, metamodelPath, metamodelData)
-            typeDef.addProperty(propDef)
+            val fieldMapping = classMeta?.propertyFields?.get(property.name)
+            if (fieldMapping != null) {
+                val isMultiple = property.multiplicity.isMultiple()
+                val scriptDescriptor = getScriptPropertyDescriptor(property, isMultiple)
+                typeDef.addProperty(DirectFieldPropertyDefinition(
+                    name = property.name,
+                    descriptor = scriptDescriptor,
+                    ownerClass = instanceClassName,
+                    fieldName = "prop_${fieldMapping.fieldIndex}",
+                    fieldDescriptor = fieldMapping.fieldDescriptor,
+                    upper = fieldMapping.upper
+                ))
+            }
         }
 
-        val associations = findAssociationsForClass(classData.name, metamodelData)
-        for ((propertyName, targetClassName, isMultiple) in associations) {
-            val assocPropDef = createAssociationPropertyDefinition(
-                propertyName, targetClassName, instanceClassName, metamodelPath, isMultiple
-            )
-            typeDef.addProperty(assocPropDef)
+        if (classMeta != null) {
+            for ((roleName, linkMapping) in classMeta.linkFields) {
+                val isOwnLink = isOwnLink(classData.name, roleName, metamodelData)
+                if (isOwnLink) {
+                    val scriptLinkDescriptor = if (linkMapping.upper == 1) {
+                        val targetInternalName = Metamodel.getInstanceClassName(linkMapping.oppositeClassName)
+                        "L$targetInternalName;"
+                    } else {
+                        "Ljava/util/Set;"
+                    }
+                    typeDef.addProperty(DirectFieldPropertyDefinition(
+                        name = roleName,
+                        descriptor = scriptLinkDescriptor,
+                        ownerClass = instanceClassName,
+                        fieldName = "prop_${linkMapping.fieldIndex}",
+                        fieldDescriptor = linkMapping.fieldDescriptor,
+                        upper = linkMapping.upper
+                    ))
+                }
+            }
         }
 
         registry.register(typeDef)
     }
 
-    /**
-     * Creates a property definition for a metamodel property.
-     */
-    private fun createPropertyDefinition(
+    private fun getScriptPropertyDescriptor(
         property: PropertyData,
-        instanceClassName: String,
-        metamodelPath: String,
-        metamodelData: MetamodelData
-    ): PropertyDefinition {
-        val isMultiple = property.multiplicity.isMultiple()
-        val descriptor = getPropertyDescriptor(property, metamodelPath, isMultiple)
-        val methodName = "get${property.name.replaceFirstChar { it.uppercase() }}"
-
-        return InstancePropertyDefinition(
-            name = property.name,
-            descriptor = descriptor,
-            ownerClass = instanceClassName,
-            isInterface = false,
-            getterName = methodName
-        )
-    }
-
-    /**
-     * Creates a property definition for an association.
-     */
-    private fun createAssociationPropertyDefinition(
-        propertyName: String,
-        targetClassName: String,
-        instanceClassName: String,
-        metamodelPath: String,
-        isMultiple: Boolean
-    ): PropertyDefinition {
-        val targetInstanceClass = ScriptClassBytecodeGenerator.getInstanceClassName(targetClassName)
-        val descriptor = if (isMultiple) {
-            "Ljava/util/List;"
-        } else {
-            "L$targetInstanceClass;"
-        }
-        val methodName = "get${propertyName.replaceFirstChar { it.uppercase() }}"
-
-        return InstancePropertyDefinition(
-            name = propertyName,
-            descriptor = descriptor,
-            ownerClass = instanceClassName,
-            isInterface = false,
-            getterName = methodName
-        )
-    }
-
-    /**
-     * Gets the JVM descriptor for a property.
-     */
-    private fun getPropertyDescriptor(
-        property: PropertyData,
-        metamodelPath: String,
         isMultiple: Boolean
     ): String {
-        if (isMultiple) {
-            return "Ljava/util/List;"
-        }
+        if (isMultiple) return "Ljava/util/List;"
 
         return when {
             property.primitiveType != null -> when (property.primitiveType?.lowercase()) {
                 "string" -> "Ljava/lang/String;"
-                "int", "integer" -> "Ljava/lang/Integer;"
+                "int" -> "Ljava/lang/Integer;"
                 "long" -> "Ljava/lang/Long;"
                 "float" -> "Ljava/lang/Float;"
                 "double" -> "Ljava/lang/Double;"
@@ -351,78 +256,26 @@ object ScriptMetamodelTypeRegistrar {
                 else -> "Ljava/lang/Object;"
             }
             property.enumType != null -> {
-                val enumValueClass = ScriptEnumBytecodeGenerator.getEnumValueClassName(property.enumType!!)
+                val enumValueClass = Metamodel.getEnumValueClassName(property.enumType!!)
                 "L$enumValueClass;"
             }
             else -> "Ljava/lang/Object;"
         }
     }
 
-    /**
-     * Finds associations where the given class is one of the ends.
-     */
-    private fun findAssociationsForClass(
+    private fun isOwnLink(
         className: String,
+        roleName: String,
         metamodelData: MetamodelData
-    ): List<Triple<String, String, Boolean>> {
-        val result = mutableListOf<Triple<String, String, Boolean>>()
-
+    ): Boolean {
         for (assoc in metamodelData.associations) {
-            if (assoc.source.className == className && assoc.source.name != null) {
-                result.add(
-                    Triple(
-                        assoc.source.name!!,
-                        assoc.target.className,
-                        assoc.source.multiplicity.isMultiple()
-                    )
-                )
-            }
-            if (assoc.target.className == className && assoc.target.name != null) {
-                result.add(
-                    Triple(
-                        assoc.target.name!!,
-                        assoc.source.className,
-                        assoc.target.multiplicity.isMultiple()
-                    )
-                )
-            }
+            if (assoc.source.className == className && assoc.source.name == roleName) return true
+            if (assoc.target.className == className && assoc.target.name == roleName) return true
         }
-
-        return result
-    }
-
-    /**
-     * Registers the Model type with allInstances method overloads.
-     */
-    private fun registerModelType(
-        registry: TypeRegistry,
-        metamodelData: MetamodelData,
-        metamodelPath: String
-    ) {
-        val typeDef = TypeDefinitionImpl(
-            typePackage = MODEL_PACKAGE,
-            typeName = MODEL_TYPE_NAME,
-            jvmClassName = SCRIPT_MODEL_CLASS
-        )
-
-        for (classData in metamodelData.classes) {
-            val instanceClassName = ScriptClassBytecodeGenerator.getInstanceClassName(classData.name)
-            typeDef.addMethod(AllInstancesMethodDefinition(
-                overloadKey = classData.name,
-                targetClassName = classData.name,
-                instanceClassName = instanceClassName
-            ))
-        }
-
-        registry.register(typeDef)
+        return false
     }
 }
 
-/**
- * Property definition for enum entry access (static field).
- *
- * Emits GETSTATIC to load the enum singleton.
- */
 private class EnumEntryPropertyDefinition(
     override val name: String,
     private val containerClass: String,
@@ -450,45 +303,6 @@ private class EnumEntryPropertyDefinition(
     }
 }
 
-/**
- * Method definition for model.allInstances(className).
- *
- * Emits a call to ExecutionContext.requireModel().getAllInstances(className).
- */
-private class AllInstancesMethodDefinition(
-    override val overloadKey: String,
-    private val targetClassName: String,
-    private val instanceClassName: String
-) : MethodDefinition {
-
-    override val name: String = "allInstances"
-    override val descriptor: String = "()Ljava/util/List;"
-    override val isStatic: Boolean = false
-    override val ownerClass: String = "com/mdeo/script/runtime/model/ScriptModel"
-    override val isInterface: Boolean = false
-    override val jvmMethodName: String = "getAllInstances"
-    override val isVarArgs: Boolean = false
-    override val parameterTypes: List<ValueType> = emptyList()
-    override val returnType: ReturnType = 
-        ClassTypeRef(`package` = "builtin", type = "List", isNullable = false)
-
-    override fun emitInvocation(mv: MethodVisitor) {
-        mv.visitLdcInsn(targetClassName)
-        mv.visitMethodInsn(
-            Opcodes.INVOKEVIRTUAL,
-            ownerClass,
-            jvmMethodName,
-            "(Ljava/lang/String;)Ljava/util/List;",
-            false
-        )
-    }
-}
-/**
- * Method definition for class container `all()` calls (e.g. `House.all()`).
- *
- * Pops the class container receiver, then calls
- * `ExecutionContext.requireModel().getAllInstances(className)`.
- */
 private class ClassContainerAllMethodDefinition(
     private val className: String,
     private val containerClassName: String,
@@ -508,23 +322,33 @@ private class ClassContainerAllMethodDefinition(
     override val returnType: ReturnType =
         ClassTypeRef(`package` = "builtin", type = "Collection", isNullable = false)
 
+    override val requiresContext: Boolean
+        get() = true
+
     override fun emitInvocation(mv: MethodVisitor) {
+        // Stack: [containerInstance, scriptContext]
+        // Discard the container instance — we access the model through ScriptContext.
+        mv.visitInsn(Opcodes.SWAP)
         mv.visitInsn(Opcodes.POP)
+
+        // Stack: [scriptContext]
         mv.visitMethodInsn(
-            Opcodes.INVOKESTATIC,
-            "com/mdeo/script/runtime/ExecutionContext",
-            "requireModel",
-            "()Lcom/mdeo/script/runtime/model/ScriptModel;",
-            false
+            Opcodes.INVOKEINTERFACE,
+            ScriptCompiler.CONTEXT_INTERNAL_NAME,
+            "getModel",
+            "()Lcom/mdeo/metamodel/Model;",
+            true
         )
         mv.visitLdcInsn(className)
         mv.visitMethodInsn(
             Opcodes.INVOKEVIRTUAL,
-            "com/mdeo/script/runtime/model/ScriptModel",
+            "com/mdeo/metamodel/Model",
             "getAllInstances",
             "(Ljava/lang/String;)Ljava/util/List;",
             false
         )
+
+        // Wrap result in BagImpl(Collection)
         mv.visitTypeInsn(Opcodes.NEW, "com/mdeo/script/stdlib/impl/collections/BagImpl")
         mv.visitInsn(Opcodes.DUP_X1)
         mv.visitInsn(Opcodes.SWAP)
@@ -538,12 +362,6 @@ private class ClassContainerAllMethodDefinition(
     }
 }
 
-/**
- * Method definition for `getEntry()` on enum value types.
- *
- * Emits INVOKEVIRTUAL on the enum value class to call its `getEntry()` method,
- * which returns the String name of the enum entry (e.g. "ACTIVE").
- */
 private class EnumValueGetEntryMethodDefinition(
     private val valueClassName: String
 ) : MethodDefinition {

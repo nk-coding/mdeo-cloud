@@ -115,9 +115,17 @@ interface GremlinTypeDefinition {
 interface GremlinPropertyDefinition {
 
     /**
-     * The property name.
+     * The property name used for lookup in the type registry.
      */
     val name: String
+
+    /**
+     * The key used to store/retrieve this property in the graph.
+     *
+     * For metamodel properties backed by compiled instance classes, this is `prop_X`
+     * where X is the field index. For built-in or non-graph properties, defaults to [name].
+     */
+    val graphKey: String get() = name
 
     /**
      * Compiles an access to this property using traversal mode.

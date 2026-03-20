@@ -1,8 +1,9 @@
 package com.mdeo.modeltransformation.runtime
 
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.ClassData
-import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.ClassData
+import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
@@ -10,39 +11,76 @@ import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
+import com.mdeo.modeltransformation.graph.ModelGraph
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
 /**
  * Main entry point for executing model transformations.
  *
- * The TransformationEngine executes a TypedAst against a graph using the provided
- * GraphTraversalSource. It maintains execution state through a TransformationExecutionContext
- * and delegates statement execution to registered StatementExecutors.
+ * The TransformationEngine executes a [TypedAst] against the graph provided by a [ModelGraph].
+ * It maintains execution state through a [TransformationExecutionContext] and delegates
+ * statement execution to registered [StatementExecutor][StatementExecutorRegistry] instances.
  *
  * The engine processes statements sequentially, updating the context as bindings
  * are established through pattern matching. If a statement fails (e.g., a match
  * doesn't apply when required), the transformation terminates with a failure result.
  *
- * @param traversalSource The Gremlin GraphTraversalSource for graph operations.
+ * The [traversalSource] property is computed lazily from [modelGraph] on each access.
+ * This ensures that if the underlying graph is rebuilt (e.g., via
+ * [ModelGraph.resetNondeterminism]), subsequent traversals automatically operate on
+ * the fresh graph without requiring an engine restart.
+ *
+ * @param modelGraph The model graph providing the graph traversal source and metamodel.
  * @param ast The TypedAst containing transformation statements.
- * @param metamodelData The metamodel data containing class and association definitions.
  * @param expressionCompilerRegistry Registry for compiling expressions to GraphTraversal.
  * @param statementExecutorRegistry Registry for executing transformation statements.
  * @param deterministic When true (default), single-match statements use `limit(1)` which always
- *   selects the first candidate in traversal order. When false, `sample(1)` is used instead,
- *   picking a uniformly random candidate from all matches and thus introducing non-determinism.
- *   Set to false for search-based optimisation runs where variety across iterations is desired.
+ *   selects the first candidate in traversal order. When false, the [ModelGraph] nondeterminism
+ *   is reset before each match (see [ModelGraph.resetNondeterminism]), so each single-match step
+ *   still uses `limit(1)` but operates on a freshly shuffled traversal order. Set to false for
+ *   search-based optimisation runs where variety across iterations is desired.
  */
 class TransformationEngine(
-    val traversalSource: GraphTraversalSource,
+    val modelGraph: ModelGraph,
     val ast: TypedAst,
-    val metamodelData: MetamodelData = MetamodelData.empty(),
     val expressionCompilerRegistry: ExpressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
     val statementExecutorRegistry: StatementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry(),
     val deterministic: Boolean = true
 ) {
 
-    val instanceNameRegistry: InstanceNameRegistry = InstanceNameRegistry()
+    /**
+     * The Gremlin [GraphTraversalSource] obtained from [modelGraph] on each access.
+     *
+     * Because this is a computed property, it always returns a traversal source bound
+     * to the current underlying graph — even if [ModelGraph.resetNondeterminism] has
+     * replaced the internal graph since engine construction.
+     */
+    val traversalSource: GraphTraversalSource get() = modelGraph.traversal()
+
+    /**
+     * The compiled metamodel derived from [modelGraph].
+     *
+     * Because this is a computed property, it always reflects the metamodel of the
+     * ModelGraph. In practice, the metamodel is constant for the lifetime of the engine.
+     */
+    val metamodel: Metamodel get() = modelGraph.metamodel
+
+    /**
+     * The metamodel data, derived from the compiled [metamodel].
+     *
+     * This is a computed property; it re-evaluates on each access but in practice the
+     * metamodel (and its data) are constant for the engine's lifetime.
+     */
+    val metamodelData: MetamodelData get() = metamodel.data
+
+    /**
+     * The instance-name registry owned by [modelGraph].
+     *
+     * Reusing the graph's registry keeps input-model names, created-node registrations, and
+     * graph-to-model conversion in sync throughout a transformation run.
+     */
+    val instanceNameRegistry: InstanceNameRegistry get() = modelGraph.nameRegistry
 
     /**
      * The types list from the currently executing TypedAst.
@@ -210,7 +248,8 @@ class TransformationEngine(
             }
 
             for (property in classData.properties) {
-                builder.graphProperty(property.name)
+                val graphKey = resolvePropertyGraphKey(classData.name, property.name)
+                builder.graphProperty(property.name, graphKey)
             }
 
             val associations = classAssociations[classData.name] ?: emptyList()
@@ -284,27 +323,49 @@ class TransformationEngine(
         return result
     }
 
+    /**
+     * Resolves the graph property key for a given class and property name.
+     *
+     * When the metamodel has metadata for the class, the graph key is `prop_X` where X
+     * is the field index from the compiled instance class. When [className] is null or
+     * not found in the metadata, falls back to a best-effort search across all classes
+     * and ultimately returns the property name unchanged.
+     *
+     * @param className The metamodel class name, or null for untyped instances.
+     * @param propertyName The logical property name.
+     * @return The graph key (e.g. "prop_2") or the original property name as fallback.
+     */
+    fun resolvePropertyGraphKey(className: String?, propertyName: String): String {
+        if (className != null) {
+            val mapping = metamodel.metadata.classes[className]?.propertyFields?.get(propertyName)
+            if (mapping != null) return "prop_${mapping.fieldIndex}"
+        }
+        for ((_, classMeta) in metamodel.metadata.classes) {
+            val mapping = classMeta.propertyFields[propertyName]
+            if (mapping != null) return "prop_${mapping.fieldIndex}"
+        }
+        return propertyName
+    }
+
     companion object {
         /**
-         * Creates a TransformationEngine with default registries.
+         * Creates a [TransformationEngine] with default registries.
          *
-         * @param traversalSource The Gremlin GraphTraversalSource.
-         * @param ast The TypedAst to execute.
-         * @param metamodelData The metamodel data containing class and association definitions.
+         * @param modelGraph The model graph providing both the traversal source and the metamodel.
+         * @param ast The [TypedAst] to execute.
          * @param deterministic When true (default) single-match steps use `limit(1)`; when false
-         *   they use `sample(1)` for non-deterministic match selection.
-         * @return A new TransformationEngine with default configuration.
+         *   the model graph nondeterminism is reset before each match so that `limit(1)` operates
+         *   on a freshly shuffled traversal order.
+         * @return A new [TransformationEngine] with default configuration.
          */
         fun create(
-            traversalSource: GraphTraversalSource, 
+            modelGraph: ModelGraph,
             ast: TypedAst,
-            metamodelData: MetamodelData = MetamodelData.empty(),
             deterministic: Boolean = true
         ): TransformationEngine {
             return TransformationEngine(
-                traversalSource = traversalSource,
+                modelGraph = modelGraph,
                 ast = ast,
-                metamodelData = metamodelData,
                 expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
                 statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry(),
                 deterministic = deterministic

@@ -1,12 +1,13 @@
 package com.mdeo.modeltransformation.service
 
-import com.mdeo.expression.ast.types.ClassData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.ClassData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
-import com.mdeo.modeltransformation.ast.model.ModelData
-import com.mdeo.modeltransformation.ast.model.ModelDataInstance
-import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
+import com.mdeo.metamodel.data.ModelDataPropertyValue
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Vertex
@@ -14,41 +15,41 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import org.slf4j.LoggerFactory
 
 /**
- * Loads ModelData into a TinkerGraph.
- * 
+ * Loads [ModelData] into a TinkerGraph.
+ *
  * Creates vertices for instances and edges for links, preserving
- * all property values and using the edge label format from EdgeLabelUtils.
- * 
- * Instance names are registered in the InstanceNameRegistry instead of being
- * stored as properties in the graph, avoiding conflicts with metamodel properties.
- * 
- * List properties are stored using VertexProperty.Cardinality.list, with each
- * element added as a separate property value. This ensures portability to
- * remote graph databases.
- * 
- * Enum values are stored using the backtick format `EnumName`.`entryName` that
- * matches the format used for enum values in the transformation scope.
+ * all property values and using the edge label format from [EdgeLabelUtils].
+ *
+ * Instance names are registered in the [InstanceNameRegistry] instead of being
+ * stored as graph properties, avoiding conflicts with metamodel properties.
+ *
+ * Properties are stored under `prop_X` graph keys matching the compiled instance
+ * class field names from the [Metamodel]. List properties use
+ * [VertexProperty.Cardinality.list] with each element added separately.
+ *
+ * Enum values are stored using the backtick format `` `EnumName`.`entryName` ``
+ * matching the format used for enum values in the transformation scope.
  */
 class ModelDataGraphLoader {
     private val logger = LoggerFactory.getLogger(ModelDataGraphLoader::class.java)
     
     /**
-     * Loads ModelData into the graph.
+     * Loads [ModelData] into the graph.
      *
-     * @param g The graph traversal source
-     * @param modelData The model data to load
-     * @param nameRegistry Registry for tracking vertex ID to name mappings
-     * @param metamodelData The metamodel data used to look up enum type names for enum properties
-     * @return Map of instance names to their vertices
+     * @param g The graph traversal source.
+     * @param modelData The model data to load.
+     * @param nameRegistry Registry for tracking vertex ID to name mappings.
+     * @param metamodel The compiled metamodel for property graph key resolution and enum lookup.
+     * @return Map of instance names to their vertices.
      */
     fun load(
         g: GraphTraversalSource,
         modelData: ModelData,
         nameRegistry: InstanceNameRegistry,
-        metamodelData: MetamodelData
+        metamodel: Metamodel
     ): Map<String, Vertex> {
-        val classMap = metamodelData.classes.associateBy { it.name }
-        val vertexMap = createVertices(g, modelData.instances, nameRegistry, classMap)
+        val classMap = metamodel.data.classes.associateBy { it.name }
+        val vertexMap = createVertices(g, modelData.instances, nameRegistry, classMap, metamodel)
         createEdges(g, modelData, vertexMap)
         return vertexMap
     }
@@ -60,10 +61,11 @@ class ModelDataGraphLoader {
         g: GraphTraversalSource,
         instances: List<ModelDataInstance>,
         nameRegistry: InstanceNameRegistry,
-        classMap: Map<String, ClassData>
+        classMap: Map<String, ClassData>,
+        metamodel: Metamodel
     ): Map<String, Vertex> {
         return instances.associate { instance ->
-            instance.name to createVertex(g, instance, nameRegistry, classMap)
+            instance.name to createVertex(g, instance, nameRegistry, classMap, metamodel)
         }
     }
     
@@ -78,12 +80,14 @@ class ModelDataGraphLoader {
         g: GraphTraversalSource,
         instance: ModelDataInstance,
         nameRegistry: InstanceNameRegistry,
-        classMap: Map<String, ClassData>
+        classMap: Map<String, ClassData>,
+        metamodel: Metamodel
     ): Vertex {
         var traversal = g.addV(instance.className)
         
         for ((propertyName, propertyValue) in instance.properties) {
-            traversal = addPropertyValue(traversal, instance.className, propertyName, propertyValue, classMap)
+            val graphKey = resolveGraphKey(metamodel, instance.className, propertyName)
+            traversal = addPropertyValue(traversal, instance.className, propertyName, graphKey, propertyValue, classMap)
         }
         
         val vertex = traversal.next()
@@ -102,6 +106,7 @@ class ModelDataGraphLoader {
         traversal: org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal<Vertex, Vertex>,
         className: String,
         propertyName: String,
+        graphKey: String,
         propertyValue: ModelDataPropertyValue,
         classMap: Map<String, ClassData>
     ): org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal<Vertex, Vertex> {
@@ -111,7 +116,7 @@ class ModelDataGraphLoader {
                 for (element in propertyValue.values) {
                     val value = convertScalarPropertyValue(element, className, propertyName, classMap)
                     if (value != null) {
-                        result = result.property(VertexProperty.Cardinality.list, propertyName, value)
+                        result = result.property(VertexProperty.Cardinality.list, graphKey, value)
                     }
                 }
                 result
@@ -119,7 +124,7 @@ class ModelDataGraphLoader {
             else -> {
                 val value = convertScalarPropertyValue(propertyValue, className, propertyName, classMap)
                 if (value != null) {
-                    traversal.property(propertyName, value)
+                    traversal.property(graphKey, value)
                 } else {
                     traversal
                 }
@@ -209,7 +214,7 @@ class ModelDataGraphLoader {
      */
     private fun createEdge(
         g: GraphTraversalSource,
-        link: com.mdeo.modeltransformation.ast.model.ModelDataLink,
+        link: com.mdeo.metamodel.data.ModelDataLink,
         vertexMap: Map<String, Vertex>
     ) {
         val sourceVertex = vertexMap[link.sourceName]
@@ -230,5 +235,10 @@ class ModelDataGraphLoader {
         )
         
         g.V(sourceVertex).addE(edgeLabel).to(targetVertex).next()
+    }
+
+    private fun resolveGraphKey(metamodel: Metamodel, className: String, propertyName: String): String {
+        val mapping = metamodel.metadata.classes[className]?.propertyFields?.get(propertyName)
+        return mapping?.let { "prop_${it.fieldIndex}" } ?: propertyName
     }
 }

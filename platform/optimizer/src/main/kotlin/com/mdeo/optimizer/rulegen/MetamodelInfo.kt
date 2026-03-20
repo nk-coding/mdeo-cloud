@@ -1,6 +1,6 @@
 package com.mdeo.optimizer.rulegen
 
-import com.mdeo.expression.ast.types.MetamodelData
+import com.mdeo.metamodel.data.MetamodelData
 
 /**
  * Multiplicity and naming information for the "opposite" end of a bidirectional association.

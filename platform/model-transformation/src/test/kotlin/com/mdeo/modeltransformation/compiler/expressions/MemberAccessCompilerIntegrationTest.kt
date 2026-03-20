@@ -111,7 +111,7 @@ class MemberAccessCompilerIntegrationTest {
             
             // Create context with person variable in scope
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
-                "p" to VariableBinding.InstanceBinding(vertexId = null)
+                "p" to VariableBinding.InstanceBinding(vertexRef = null)
             ))
             val contextWithScope = CompilationContext(
                 types = context.types,
@@ -143,7 +143,7 @@ class MemberAccessCompilerIntegrationTest {
             
             // Create context with person variable in scope
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
-                "p" to VariableBinding.InstanceBinding(vertexId = null)
+                "p" to VariableBinding.InstanceBinding(vertexRef = null)
             ))
             val contextWithScope = CompilationContext(
                 types = context.types,
@@ -180,7 +180,7 @@ class MemberAccessCompilerIntegrationTest {
             
             // Create context with person variable in scope
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
-                "p" to VariableBinding.InstanceBinding(vertexId = null)
+                "p" to VariableBinding.InstanceBinding(vertexRef = null)
             ))
             val contextWithScope = CompilationContext(
                 types = context.types,
@@ -221,7 +221,7 @@ class MemberAccessCompilerIntegrationTest {
                 typeRegistry = context.typeRegistry
             )
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
-                "a" to VariableBinding.InstanceBinding(vertexId = null)
+                "a" to VariableBinding.InstanceBinding(vertexRef = null)
             ))
             val contextWithScope = CompilationContext(
                 types = contextWithAddressType.types,
@@ -260,7 +260,7 @@ class MemberAccessCompilerIntegrationTest {
             
             // Create context with person variable in scope
             val scope = VariableScope(scopeIndex = 0, bindings = mutableMapOf(
-                "p" to VariableBinding.InstanceBinding(vertexId = null)
+                "p" to VariableBinding.InstanceBinding(vertexRef = null)
             ))
             val contextWithScope = CompilationContext(
                 types = context.types,

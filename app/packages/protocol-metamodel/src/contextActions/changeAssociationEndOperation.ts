@@ -27,27 +27,6 @@ export interface ChangeAssociationEndOperation extends Operation {
      * The new association end type to apply.
      */
     newEndType: AssociationEndKind;
-
-    /**
-     * Backward-compatible alias of {@link associationId}.
-     *
-     * @deprecated Use {@link associationId} instead.
-     */
-    edgeId: string;
-
-    /**
-     * Backward-compatible alias of {@link endPosition}.
-     *
-     * @deprecated Use {@link endPosition} instead.
-     */
-    end: "source" | "target";
-
-    /**
-     * Backward-compatible alias of {@link newEndType}.
-     *
-     * @deprecated Use {@link newEndType} instead.
-     */
-    newKind: AssociationEndKind;
 }
 
 /**
@@ -80,50 +59,18 @@ export namespace ChangeAssociationEndOperation {
     }
 
     /**
-     * Legacy operation payload shape for backward compatibility.
-     */
-    export interface LegacyOptions {
-        /**
-         * Legacy association identifier.
-         */
-        edgeId: string;
-
-        /**
-         * Legacy end selector.
-         */
-        end: "source" | "target";
-
-        /**
-         * Legacy association end type.
-         */
-        newKind: AssociationEndKind;
-    }
-
-    /**
-     * Supported payload for creating this operation.
-     */
-    export type Options = CanonicalOptions | LegacyOptions;
-
-    /**
      * Create a {@link ChangeAssociationEndOperation}.
      *
      * @param options The operation payload.
      * @returns A new change-association-end operation.
      */
-    export function create(options: Options): ChangeAssociationEndOperation {
-        const associationId = "associationId" in options ? options.associationId : options.edgeId;
-        const endPosition = "endPosition" in options ? options.endPosition : options.end;
-        const newEndType = "newEndType" in options ? options.newEndType : options.newKind;
-
+    export function create(options: CanonicalOptions): ChangeAssociationEndOperation {
         return {
             kind: KIND,
             isOperation: true,
-            associationId,
-            endPosition,
-            newEndType,
-            edgeId: associationId,
-            end: endPosition,
-            newKind: newEndType
+            associationId: options.associationId,
+            endPosition: options.endPosition,
+            newEndType: options.newEndType
         };
     }
 

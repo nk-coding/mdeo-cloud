@@ -1,10 +1,10 @@
 package com.mdeo.optimizer.rulegen
 
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.AssociationEndData
-import com.mdeo.expression.ast.types.ClassData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.AssociationEndData
+import com.mdeo.metamodel.data.ClassData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement

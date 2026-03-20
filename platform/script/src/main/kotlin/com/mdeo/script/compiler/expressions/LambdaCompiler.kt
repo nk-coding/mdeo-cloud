@@ -181,7 +181,7 @@ class LambdaCompiler : ExpressionCompiler() {
         val methodDescriptor = buildSyntheticMethodDescriptor(effectiveLambdaType, capturedVariables, context)
 
         val mv = cw.visitMethod(
-            Opcodes.ACC_PRIVATE or Opcodes.ACC_STATIC or Opcodes.ACC_SYNTHETIC,
+            Opcodes.ACC_PRIVATE or Opcodes.ACC_SYNTHETIC,
             methodName,
             methodDescriptor,
             null,
@@ -300,7 +300,7 @@ class LambdaCompiler : ExpressionCompiler() {
         context: CompilationContext
     ) {
         val indexAssigner = LocalVariableIndexAssigner(context)
-        indexAssigner.assignIndices(lambdaParamsScope, isStatic = true)
+        indexAssigner.assignIndices(lambdaParamsScope, isStatic = false)
     }
 
     /**
@@ -356,6 +356,10 @@ class LambdaCompiler : ExpressionCompiler() {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
+        // Load `this` — the lambda's synthetic method is an instance method and
+        // needs access to the same instance (and its __ctx field).
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+
         for (captured in capturedVariables) {
             val loadOpcode = if (captured.isRef) {
                 Opcodes.ALOAD
@@ -374,7 +378,7 @@ class LambdaCompiler : ExpressionCompiler() {
 
         val implMethodDescriptor = buildSyntheticMethodDescriptor(lambdaType, capturedVariables, context)
         val implMethodHandle = org.objectweb.asm.Handle(
-            Opcodes.H_INVOKESTATIC,
+            Opcodes.H_INVOKESPECIAL,
             context.currentClassName,
             methodName,
             implMethodDescriptor,
@@ -420,7 +424,9 @@ class LambdaCompiler : ExpressionCompiler() {
             }
         }
         val functionalInterface = getFunctionalInterface(lambdaType, context)
-        return "($capturedParams)L$functionalInterface;"
+        // `this` is passed as the first captured argument so the synthetic instance
+        // method has access to the script class (and its __ctx field).
+        return "(L${context.currentClassName};$capturedParams)L$functionalInterface;"
     }
 
     /**

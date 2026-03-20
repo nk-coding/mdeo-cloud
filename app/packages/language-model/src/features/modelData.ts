@@ -60,9 +60,9 @@ export interface ModelDataLink {
  */
 export interface ModelData {
     /**
-     * URI of the imported metamodel file.
+     * Path of the imported metamodel file.
      */
-    metamodelUri: string;
+    metamodelPath: string;
 
     /**
      * All object instances in the model.

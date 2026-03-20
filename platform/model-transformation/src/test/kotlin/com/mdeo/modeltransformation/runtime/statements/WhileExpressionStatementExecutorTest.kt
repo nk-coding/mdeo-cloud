@@ -14,6 +14,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedWhileExpressionStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
@@ -49,7 +50,7 @@ class WhileExpressionStatementExecutorTest {
             .register(executor)
         
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = registry,
             statementExecutorRegistry = statementRegistry

@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.runtime.match
 
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
+import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 
 /**
@@ -20,14 +21,14 @@ sealed interface MatchResult {
      * about which nodes were matched vs created.
      *
      * @param bindings Variable bindings established by the match.
-     * @param instanceMappings Maps instance names to their matched/created vertex IDs.
-     * @param matchedNodeIds Set of vertex IDs that were matched (not created).
-     * @param createdNodeIds Set of vertex IDs that were created by the pattern.
-     * @param deletedNodeIds Set of vertex IDs that were deleted by the pattern.
+     * @param instanceMappings Maps instance names to their matched/created [VertexRef]s.
+     * @param matchedNodeIds Set of raw vertex IDs that were matched (not created).
+     * @param createdNodeIds Set of raw vertex IDs that were created by the pattern.
+     * @param deletedNodeIds Set of raw vertex IDs that were deleted by the pattern.
      */
     data class Matched(
         val bindings: Map<String, Any?> = emptyMap(),
-        val instanceMappings: Map<String, Any> = emptyMap(),
+        val instanceMappings: Map<String, VertexRef> = emptyMap(),
         val matchedNodeIds: Set<Any> = emptySet(),
         val createdNodeIds: Set<Any> = emptySet(),
         val deletedNodeIds: Set<Any> = emptySet(),
@@ -49,12 +50,12 @@ sealed interface MatchResult {
         fun applyTo(context: TransformationExecutionContext): TransformationExecutionContext {
             val scope = context.variableScope
             
-            for ((name, vertexId) in instanceMappings) {
+            for ((name, vertexRef) in instanceMappings) {
                 val binding = scope.getVariable(name) as? com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding
                 if (binding != null) {
-                    binding.vertexId = vertexId
+                    binding.vertexRef = vertexRef
                 } else {
-                    scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding(vertexId))
+                    scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding(vertexRef))
                 }
             }
             
@@ -81,12 +82,12 @@ sealed interface MatchResult {
         fun applyToCopy(context: TransformationExecutionContext): TransformationExecutionContext {
             val scope = context.variableScope.copy()
             
-            for ((name, vertexId) in instanceMappings) {
+            for ((name, vertexRef) in instanceMappings) {
                 val binding = scope.getVariable(name) as? com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding
                 if (binding != null) {
-                    binding.vertexId = vertexId
+                    binding.vertexRef = vertexRef
                 } else {
-                    scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding(vertexId))
+                    scope.setBinding(name, com.mdeo.modeltransformation.compiler.VariableBinding.InstanceBinding(vertexRef))
                 }
             }
             

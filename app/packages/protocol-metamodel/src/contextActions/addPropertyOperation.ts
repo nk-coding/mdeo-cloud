@@ -22,13 +22,6 @@ export interface AddPropertyOperation extends NewLabelOperation {
      * The name of the property to create.
      */
     propertyName: string;
-
-    /**
-     * Backward-compatible alias of {@link propertyName}.
-     *
-     * @deprecated Use {@link propertyName} instead.
-     */
-    initialValue?: string;
 }
 
 /**
@@ -69,8 +62,7 @@ export namespace AddPropertyOperation {
             classId: options.classId,
             propertyName: value,
             parentElementId: options.classId,
-            labelText: value,
-            initialValue: value
+            labelText: value
         };
     }
 

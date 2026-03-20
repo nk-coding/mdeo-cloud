@@ -195,10 +195,10 @@ function printAssociationEnd(context: PrintContext<AssociationEndType>): Doc {
     if (ctx.name != undefined) {
         docs.push(".");
         docs.push(printPrimitive(getPrimitive(ctx, "name"), ID));
-    }
 
-    if (ctx.multiplicity != undefined) {
-        docs.push(path.call(print, "multiplicity"));
+        if (ctx.multiplicity != undefined) {
+            docs.push(path.call(print, "multiplicity"));
+        }
     }
 
     return docs;

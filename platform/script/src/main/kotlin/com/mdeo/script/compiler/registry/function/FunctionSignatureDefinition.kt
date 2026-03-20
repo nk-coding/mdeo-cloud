@@ -61,6 +61,16 @@ interface FunctionSignatureDefinition {
     val returnType: ReturnType
 
     /**
+     * Whether this function requires a [ScriptContext] as the first JVM argument.
+     *
+     * When true, the caller must push `this.__ctx` onto the stack before the
+     * user-visible arguments. The JVM descriptor already includes the context
+     * parameter, but [parameterTypes] does NOT — it only lists user-visible params.
+     */
+    val requiresContext: Boolean
+        get() = false
+
+    /**
      * Emits the method invocation bytecode.
      *
      * All arguments should already be on the stack when this is called.
@@ -97,6 +107,81 @@ class StaticFunctionSignatureDefinition(
     override fun emitInvocation(mv: MethodVisitor) {
         mv.visitMethodInsn(
             Opcodes.INVOKESTATIC,
+            ownerClass,
+            jvmMethodName,
+            descriptor,
+            false
+        )
+    }
+}
+
+/**
+ * Signature for static methods whose first JVM parameter is a [ScriptContext].
+ *
+ * The JVM [descriptor] already includes the context parameter, but the user-visible
+ * [parameterTypes] list does NOT contain it. The caller (e.g. [FunctionCallCompiler])
+ * checks [requiresContext] and pushes `this.__ctx` before the regular arguments.
+ *
+ * @param overloadKey The overload key.
+ * @param descriptor The full JVM method descriptor including the ScriptContext parameter.
+ * @param ownerClass The owner class internal name.
+ * @param jvmMethodName The JVM method name to invoke.
+ * @param isVarArgs Whether this is a varargs method.
+ * @param parameterTypes The user-visible parameter types (without ScriptContext).
+ * @param returnType The return type.
+ */
+class ContextAwareStaticFunctionSignatureDefinition(
+    override val overloadKey: String,
+    override val descriptor: String,
+    override val ownerClass: String,
+    override val jvmMethodName: String,
+    override val isVarArgs: Boolean = false,
+    override val parameterTypes: List<ValueType>,
+    override val returnType: ReturnType
+) : FunctionSignatureDefinition {
+
+    override val requiresContext: Boolean
+        get() = true
+
+    override fun emitInvocation(mv: MethodVisitor) {
+        mv.visitMethodInsn(
+            Opcodes.INVOKESTATIC,
+            ownerClass,
+            jvmMethodName,
+            descriptor,
+            false
+        )
+    }
+}
+
+/**
+ * Signature for instance methods on generated script classes.
+ *
+ * Used for file-scope functions which are now compiled as instance methods.
+ * The caller must push a receiver instance onto the stack before the arguments.
+ * Emits [Opcodes.INVOKEVIRTUAL] instead of [Opcodes.INVOKESTATIC].
+ *
+ * @param overloadKey The overload key (empty string for file-scope functions).
+ * @param descriptor The JVM method descriptor (does NOT include the receiver).
+ * @param ownerClass The owner class internal name.
+ * @param jvmMethodName The JVM method name to invoke.
+ * @param isVarArgs Whether this is a varargs method.
+ * @param parameterTypes The parameter types for coercion.
+ * @param returnType The return type for coercion.
+ */
+class InstanceFunctionSignatureDefinition(
+    override val overloadKey: String,
+    override val descriptor: String,
+    override val ownerClass: String,
+    override val jvmMethodName: String,
+    override val isVarArgs: Boolean = false,
+    override val parameterTypes: List<ValueType>,
+    override val returnType: ReturnType
+) : FunctionSignatureDefinition {
+
+    override fun emitInvocation(mv: MethodVisitor) {
+        mv.visitMethodInsn(
+            Opcodes.INVOKEVIRTUAL,
             ownerClass,
             jvmMethodName,
             descriptor,

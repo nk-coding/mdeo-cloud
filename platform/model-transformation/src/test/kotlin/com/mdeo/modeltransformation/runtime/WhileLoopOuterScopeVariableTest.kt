@@ -1,13 +1,14 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.AssociationEndData
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.AssociationEndData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
@@ -15,6 +16,7 @@ import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedWhileExpressionStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -98,6 +100,11 @@ class WhileLoopOuterScopeVariableTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -128,9 +135,8 @@ class WhileLoopOuterScopeVariableTest {
         )
 
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -167,7 +173,7 @@ class WhileLoopOuterScopeVariableTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `while loop should access variable from outer match statement`() {
         // Create a House vertex with an address
-        g.addV("House").property("address", "test address").next()
+        g.addV("House").property(graphKey("House", "address"), "test address").next()
 
         // First match: match the house
         val matchStatement = TypedMatchStatement(
@@ -316,7 +322,7 @@ class WhileLoopOuterScopeVariableTest {
         assertEquals(5L, linkedRoomCount, "Expected 5 rooms to be linked to the house")
         
         // Verify that room values are 0, 1, 2, 3, 4 (the size of rooms at time of creation)
-        val roomValues = g.V().hasLabel("Room").values<Any>("value").toList().map { (it as Number).toLong() }.sorted()
+        val roomValues = g.V().hasLabel("Room").values<Any>(graphKey("Room", "value")).toList().map { (it as Number).toLong() }.sorted()
         assertEquals(listOf(0L, 1L, 2L, 3L, 4L), roomValues, "Room values should be 0-4")
     }
 }

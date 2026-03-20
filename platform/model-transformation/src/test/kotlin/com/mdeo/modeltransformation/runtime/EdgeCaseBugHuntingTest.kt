@@ -5,6 +5,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.statements.*
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
@@ -44,7 +45,7 @@ class EdgeCaseBugHuntingTest {
         val expressionRegistry = ExpressionCompilerRegistry.createDefaultRegistry()
         
         engine = TransformationEngine(
-            traversalSource = graph.traversal(),
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()), // Dummy AST
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry

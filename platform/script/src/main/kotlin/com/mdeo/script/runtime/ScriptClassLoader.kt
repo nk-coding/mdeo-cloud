@@ -5,13 +5,13 @@ import com.mdeo.script.compiler.CompiledProgram
 /**
  * Class loader for compiled script programs.
  *
- * Loads all bytecodes produced by the ScriptCompiler (script classes, generated functional
- * interfaces, and generated model classes) from a single flat [CompiledProgram.allBytecodes]
- * map.  A unified cache ensures each class is defined exactly once regardless of how it is
- * first requested.
+ * Loads all bytecodes produced by the ScriptCompiler (the single ScriptProgram class,
+ * generated functional interfaces, and generated model classes) from a single flat
+ * [CompiledProgram.allBytecodes] map.  A unified cache ensures each class is defined
+ * exactly once regardless of how it is first requested.
  *
- * Use [loadClassForFile] to obtain the top-level script class for a source file, and
- * [loadClass] for any other class by binary name.
+ * Use [loadScriptProgramClass] to load the single compiled script class, and
+ * [loadClassForFile] to obtain the same class after verifying a source file was compiled.
  *
  * @param program The compiled program containing all bytecodes and lookup maps.
  * @param parent  The parent ClassLoader – must be supplied explicitly.
@@ -22,19 +22,31 @@ class ScriptClassLoader(
 ) : ClassLoader(parent) {
 
     /**
-     * Single unified cache of all classes that have been defined by this loader. 
+     * Single unified cache of all classes that have been defined by this loader.
      */
     private val loadedClasses = mutableMapOf<String, Class<*>>()
 
     /**
+     * Loads the single [CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME] class that contains
+     * all compiled script functions.
+     */
+    fun loadScriptProgramClass(): Class<*> {
+        return loadClass(CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME)
+    }
+
+    /**
      * Loads the top-level JVM class that was compiled from [filePath].
      *
-     * @throws ClassNotFoundException if no class was compiled for [filePath].
+     * Verifies that [filePath] is present in [CompiledProgram.functionLookup] before
+     * loading, so that callers receive a [ClassNotFoundException] for unknown files.
+     *
+     * @throws ClassNotFoundException if no functions were compiled for [filePath].
      */
     fun loadClassForFile(filePath: String): Class<*> {
-        val binaryName = program.scriptFileToClass[filePath]
-            ?: throw ClassNotFoundException("No compiled class for file: $filePath")
-        return loadClass(binaryName)
+        if (!program.functionLookup.containsKey(filePath)) {
+            throw ClassNotFoundException("No compiled class for file: $filePath")
+        }
+        return loadScriptProgramClass()
     }
 
     /**

@@ -1,19 +1,21 @@
 package com.mdeo.modeltransformation.runtime
 
 import com.mdeo.expression.ast.expressions.*
-import com.mdeo.expression.ast.types.AssociationData
-import com.mdeo.expression.ast.types.AssociationEndData
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.AssociationData
+import com.mdeo.metamodel.data.AssociationEndData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -131,6 +133,11 @@ class ReferenceMatchTest {
         )
     )
 
+    private val metamodel = Metamodel.compile(metamodelData)
+
+    private fun graphKey(className: String, propName: String): String =
+        "prop_${metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex}"
+
     @BeforeEach
     fun setup() {
         graph = TinkerGraph.open()
@@ -156,14 +163,13 @@ class ReferenceMatchTest {
         // Create AST with types
         val ast = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = emptyList()
         )
 
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = ast,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
         )
@@ -194,7 +200,7 @@ class ReferenceMatchTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `delete reference match should delete instance from previous match`() {
         // Create test data: a single house
-        g.addV("House").property("address", "123 Main St").next()
+        g.addV("House").property(graphKey("House", "address"), "123 Main St").next()
 
         // Verify initial state: 1 house exists
         val initialHouseCount = g.V().hasLabel("House").count().next()
@@ -240,15 +246,14 @@ class ReferenceMatchTest {
         // Create AST with both statements
         val transformationAst = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = listOf(matchHouseStatement, deleteHouseStatement)
         )
 
         // Create engine with the transformation AST
         val transformationEngine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = transformationAst,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )
@@ -291,10 +296,10 @@ class ReferenceMatchTest {
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     fun `update reference match should update instance from previous match`() {
         // Create test data: a single house with an initial address
-        g.addV("House").property("address", "123 Main St").next()
+        g.addV("House").property(graphKey("House", "address"), "123 Main St").next()
 
         // Verify initial state
-        val initialAddress = g.V().hasLabel("House").values<String>("address").next()
+        val initialAddress = g.V().hasLabel("House").values<String>(graphKey("House", "address")).next()
         assertEquals("123 Main St", initialAddress, "Initial address should be '123 Main St'")
 
         // Build transformation with two match statements:
@@ -346,15 +351,14 @@ class ReferenceMatchTest {
         // Create AST with both statements
         val transformationAst = TypedAst(
             types = types,
-            metamodelPath = "./metamodel.mm",
+            metamodelPath = "",
             statements = listOf(matchHouseStatement, updateHouseStatement)
         )
 
         // Create engine with the transformation AST
         val transformationEngine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph, metamodel),
             ast = transformationAst,
-            metamodelData = metamodelData,
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )
@@ -375,7 +379,7 @@ class ReferenceMatchTest {
         )
 
         // Verify final state: address should be updated
-        val finalAddress = g.V().hasLabel("House").values<String>("address").next()
+        val finalAddress = g.V().hasLabel("House").values<String>(graphKey("House", "address")).next()
         assertEquals("example", finalAddress, "Address should be updated to 'example'")
     }
 }

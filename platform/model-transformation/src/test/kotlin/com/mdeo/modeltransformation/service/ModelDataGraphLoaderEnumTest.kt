@@ -1,13 +1,14 @@
 package com.mdeo.modeltransformation.service
 
-import com.mdeo.expression.ast.types.ClassData
-import com.mdeo.expression.ast.types.EnumData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
-import com.mdeo.modeltransformation.ast.model.ModelData
-import com.mdeo.modeltransformation.ast.model.ModelDataInstance
-import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
+import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.data.ClassData
+import com.mdeo.metamodel.data.EnumData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
+import com.mdeo.metamodel.data.ModelDataPropertyValue
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
@@ -58,7 +59,7 @@ class ModelDataGraphLoaderEnumTest {
         )
 
         val modelData = ModelData(
-            metamodelUri = "test",
+            metamodelPath = "test",
             instances = listOf(
                 ModelDataInstance(
                     name = "order1",
@@ -69,9 +70,10 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, metamodelData)
+        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
 
-        val statusValues = g.V().has("status").values<String>("status").toList()
+        // Property "status" is stored under graph key "prop_0"
+        val statusValues = g.V().has("prop_0").values<String>("prop_0").toList()
         assertEquals(1, statusValues.size)
         assertEquals("`OrderStatus`.`PENDING`", statusValues.first())
     }
@@ -98,7 +100,7 @@ class ModelDataGraphLoaderEnumTest {
         )
 
         val modelData = ModelData(
-            metamodelUri = "test",
+            metamodelPath = "test",
             instances = listOf(
                 ModelDataInstance(
                     name = "item1",
@@ -116,9 +118,10 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, metamodelData)
+        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
 
-        val tagValues = g.V().has("tags").values<String>("tags").toList()
+        // Property "tags" is stored under graph key "prop_0"
+        val tagValues = g.V().has("prop_0").values<String>("prop_0").toList()
         assertEquals(2, tagValues.size)
         assertEquals(listOf("`Tag`.`A`", "`Tag`.`B`"), tagValues.sorted())
     }
@@ -151,7 +154,7 @@ class ModelDataGraphLoaderEnumTest {
         )
 
         val modelData = ModelData(
-            metamodelUri = "test",
+            metamodelPath = "test",
             instances = listOf(
                 ModelDataInstance(
                     name = "special1",
@@ -162,9 +165,10 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, metamodelData)
+        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
 
-        val statusValues = g.V().has("status").values<String>("status").toList()
+        // Property "status" is stored under graph key "prop_0" (inherited from BaseOrder)
+        val statusValues = g.V().has("prop_0").values<String>("prop_0").toList()
         assertEquals(1, statusValues.size)
         assertEquals("`Status`.`OPEN`", statusValues.first())
     }
@@ -188,7 +192,7 @@ class ModelDataGraphLoaderEnumTest {
         )
 
         val modelData = ModelData(
-            metamodelUri = "test",
+            metamodelPath = "test",
             instances = listOf(
                 ModelDataInstance(
                     name = "product1",
@@ -199,9 +203,10 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, metamodelData)
+        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
 
-        val labelValues = g.V().has("label").values<String>("label").toList()
+        // Property "label" is stored under graph key "prop_0"
+        val labelValues = g.V().has("prop_0").values<String>("prop_0").toList()
         assertEquals(1, labelValues.size)
         assertEquals("hello", labelValues.first())
     }

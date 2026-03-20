@@ -22,13 +22,6 @@ export interface AddEnumEntryOperation extends NewLabelOperation {
      * The entry name to create.
      */
     entryName: string;
-
-    /**
-     * Backward-compatible alias of {@link entryName}.
-     *
-     * @deprecated Use {@link entryName} instead.
-     */
-    initialValue?: string;
 }
 
 /**
@@ -69,8 +62,7 @@ export namespace AddEnumEntryOperation {
             enumId: options.enumId,
             entryName: value,
             parentElementId: options.enumId,
-            labelText: value,
-            initialValue: value
+            labelText: value
         };
     }
 

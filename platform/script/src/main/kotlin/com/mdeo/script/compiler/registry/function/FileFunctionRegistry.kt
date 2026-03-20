@@ -39,12 +39,15 @@ class FileFunctionRegistry(
      *
      * Extracts parameter types from the TypedFunction and stores them in the registry.
      * File-scope functions are registered with a single overload using the empty string key.
+     * The [jvmMethodName] is the artificial method name (e.g. `fn0`) assigned during
+     * compilation; the function is still looked up by [func.name].
      *
      * @param func The typed function from the AST.
      * @param ast The TypedAst containing the types array.
-     * @param ownerClass The JVM internal class name for this file.
+     * @param ownerClass The JVM internal class name that owns all compiled functions.
+     * @param jvmMethodName The artificial JVM method name assigned during compilation.
      */
-    fun registerLocalFunction(func: TypedFunction, ast: TypedAst, ownerClass: String) {
+    fun registerLocalFunction(func: TypedFunction, ast: TypedAst, ownerClass: String, jvmMethodName: String) {
         val parameters = func.parameters.map { param ->
             FunctionParameter(
                 name = param.name,
@@ -56,7 +59,8 @@ class FileFunctionRegistry(
             name = func.name,
             parameters = parameters,
             returnType = ast.types[func.returnType],
-            ownerClass = ownerClass
+            ownerClass = ownerClass,
+            jvmMethodName = jvmMethodName
         )
 
         localFunctions[func.name] = definition
@@ -123,45 +127,35 @@ class FileFunctionRegistry(
         /**
          * Creates FileFunctionRegistry instances for all files in a compilation.
          *
-         * This is a two-phase process:
-         * 1. Create registries for all files with empty import maps
-         * 2. Link them together for cross-file import resolution
+         * All functions are registered against [ownerClassName] (the single
+         * [CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME] class). The [functionLookup]
+         * supplies the pre-assigned artificial JVM method name for each function so that
+         * call-site bytecode resolves to the correct `fn0`/`fn1`/… method.
+         *
+         * Registries are linked together so that imported functions can be resolved
+         * through cross-file lookups at compilation time.
          *
          * @param files Map of file paths to their TypedAst.
          * @param globalRegistry The global function registry to use as parent.
-         * @param classNameResolver Function to convert a file path to a JVM class name.
+         * @param ownerClassName JVM internal class name of the single generated class.
+         * @param functionLookup Maps (filePath → functionName → jvmMethodName).
          * @return Map of file paths to their FileFunctionRegistry instances.
          */
         fun createForCompilation(
             files: Map<String, TypedAst>,
             globalRegistry: FunctionRegistry,
-            classNameResolver: (String) -> String
+            ownerClassName: String,
+            functionLookup: Map<String, Map<String, String>>
         ): Map<String, FileFunctionRegistry> {
-            val registries = mutableMapOf<String, FileFunctionRegistry>()
-
-            for ((path, ast) in files) {
-                val className = classNameResolver(path)
-                val registry = FileFunctionRegistry(globalRegistry, emptyMap())
-
-                for (func in ast.functions) {
-                    registry.registerLocalFunction(func, ast, className)
-                }
-
-                for (import in ast.imports) {
-                    registry.registerImport(import)
-                }
-
-                registries[path] = registry
-            }
-
             val linkedRegistries = mutableMapOf<String, FileFunctionRegistry>()
-            
+
             for ((path, ast) in files) {
-                val className = classNameResolver(path)
                 val linkedRegistry = FileFunctionRegistry(globalRegistry, linkedRegistries)
+                val fileLookup = functionLookup[path] ?: emptyMap()
 
                 for (func in ast.functions) {
-                    linkedRegistry.registerLocalFunction(func, ast, className)
+                    val jvmName = fileLookup[func.name] ?: func.name
+                    linkedRegistry.registerLocalFunction(func, ast, ownerClassName, jvmName)
                 }
 
                 for (import in ast.imports) {

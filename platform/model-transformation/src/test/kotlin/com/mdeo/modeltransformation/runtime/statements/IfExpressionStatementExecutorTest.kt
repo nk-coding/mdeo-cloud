@@ -16,6 +16,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedIfExpressionStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
@@ -73,7 +74,7 @@ class IfExpressionStatementExecutorTest {
             .register(executor)
         
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = registry,
             statementExecutorRegistry = statementRegistry

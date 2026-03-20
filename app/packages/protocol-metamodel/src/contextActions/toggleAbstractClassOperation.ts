@@ -20,13 +20,6 @@ export interface ToggleAbstractClassOperation extends Operation {
      * If omitted, the server may derive the target state from current model data.
      */
     makeAbstract?: boolean;
-
-    /**
-     * Backward-compatible alias of {@link makeAbstract}.
-     *
-     * @deprecated Use {@link makeAbstract} instead.
-     */
-    targetAbstract?: boolean;
 }
 
 /**
@@ -64,8 +57,7 @@ export namespace ToggleAbstractClassOperation {
             kind: KIND,
             isOperation: true,
             classId: options.classId,
-            makeAbstract: options.makeAbstract,
-            targetAbstract: options.makeAbstract
+            makeAbstract: options.makeAbstract
         };
     }
 

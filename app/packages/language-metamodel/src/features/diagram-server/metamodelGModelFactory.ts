@@ -709,12 +709,30 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         this.applyRoutingPoints(edge, metadata);
 
         if (assoc.source != undefined) {
-            const startNodes = this.createAssociationEndNodes(idRegistry, assoc.source, "target", validatedMetadata);
+            // Source end nodes are displayed near the target (end="target")
+            // They are navigable when the targetKind indicates an arrow or composition
+            const sourceEndNavigable = targetKind !== AssociationEndKind.NONE;
+            const startNodes = this.createAssociationEndNodes(
+                idRegistry,
+                assoc.source,
+                "target",
+                validatedMetadata,
+                sourceEndNavigable
+            );
             edge.children.push(...startNodes);
         }
 
         if (assoc.target != undefined) {
-            const targetNodes = this.createAssociationEndNodes(idRegistry, assoc.target, "source", validatedMetadata);
+            // Target end nodes are displayed near the source (end="source")
+            // They are navigable when the sourceKind indicates an arrow or composition
+            const targetEndNavigable = sourceKind !== AssociationEndKind.NONE;
+            const targetNodes = this.createAssociationEndNodes(
+                idRegistry,
+                assoc.target,
+                "source",
+                validatedMetadata,
+                targetEndNavigable
+            );
             edge.children.push(...targetNodes);
         }
 
@@ -724,56 +742,78 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
     /**
      * Creates nodes for an association endpoint with property name and/or multiplicity.
      *
+     * The multiplicity node is always created when the end is navigable, using "0..1"
+     * as the default display text when no explicit multiplicity is defined in the AST.
+     * If the end has no property name, the multiplicity label is shown as read-only
+     * (since the grammar no longer allows multiplicity without a property name).
+     *
      * @param idRegistry The ID registry for AST node ID generation
      * @param associationEnd The association end definition
      * @param target Whether this is at "source" or "target" of the association
      * @param validatedMetadata The validated metadata containing node placement
+     * @param isNavigable Whether this end is navigable (determines if multiplicity is shown)
      * @returns An array of created nodes (property and/or multiplicity)
      */
     private createAssociationEndNodes(
         idRegistry: ModelIdRegistry,
         associationEnd: PartialAssociationEnd,
         target: "source" | "target",
-        validatedMetadata: GraphMetadata
+        validatedMetadata: GraphMetadata,
+        isNavigable: boolean
     ): GModelElement[] {
         const nodes: GModelElement[] = [];
         const property = associationEnd.name;
         const multiplicity = associationEnd.multiplicity;
+        const associationEndId = idRegistry.getId(associationEnd);
 
         if (property != undefined) {
-            const propertyId = idRegistry.getId(associationEnd);
-            const propertyMeta = validatedMetadata.nodes[propertyId];
+            const propertyMeta = validatedMetadata.nodes[associationEndId];
             const metadata =
                 propertyMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(propertyMeta.meta)
                     ? propertyMeta.meta
                     : NodeLayoutMetadataUtil.create(0, 0);
 
-            const propertyNode = GAssociationPropertyNode.builder().id(propertyId).end(target).meta(metadata).build();
+            const propertyNode = GAssociationPropertyNode.builder()
+                .id(associationEndId)
+                .end(target)
+                .meta(metadata)
+                .build();
 
-            const propertyLabel = GAssociationPropertyLabel.builder().id(`${propertyId}-label`).text(property).build();
+            const propertyLabel = GAssociationPropertyLabel.builder()
+                .id(`${associationEndId}#property-label`)
+                .text(property)
+                .build();
 
             propertyNode.children.push(propertyLabel);
             nodes.push(propertyNode);
         }
 
-        if (multiplicity != undefined) {
-            const multiplicityId = idRegistry.getId(multiplicity);
-            const multiplicityMeta = validatedMetadata.nodes[multiplicityId];
+        if (isNavigable) {
+            const multiplicityNodeId = `${associationEndId}#multiplicity`;
+            const multiplicityMeta = validatedMetadata.nodes[multiplicityNodeId];
             const metadata =
                 multiplicityMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(multiplicityMeta.meta)
                     ? multiplicityMeta.meta
                     : NodeLayoutMetadataUtil.create(0, 0);
 
+            const multiplicityText =
+                multiplicity != undefined ? this.formatMultiplicity(multiplicity) : "0..1";
+            // Only allow editing the multiplicity if the end has a property name.
+            // Without a property name, the grammar does not permit explicit multiplicity.
+            const multiplicityReadonly = property == undefined;
+
+            const multiplicityLabel = GAssociationMultiplicityLabel.builder()
+                .id(`${associationEndId}#multiplicity-label`)
+                .text(multiplicityText)
+                .readonly(multiplicityReadonly)
+                .build();
+
             const multiplicityNode = GAssociationMultiplicityNode.builder()
-                .id(multiplicityId)
+                .id(multiplicityNodeId)
                 .end(target)
                 .meta(metadata)
                 .build();
 
-            const multiplicityLabel = GAssociationMultiplicityLabel.builder()
-                .id(`${multiplicityId}-label`)
-                .text(this.formatMultiplicity(multiplicity))
-                .build();
             multiplicityNode.children.push(multiplicityLabel);
             nodes.push(multiplicityNode);
         }

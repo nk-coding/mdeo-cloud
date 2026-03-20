@@ -25,7 +25,14 @@ subprojects {
     }
 
     tasks.withType<Test> {
-        useJUnitPlatform()
+        // Tests tagged "performance" run only when -Pperformance is passed on the Gradle CLI.
+        // This keeps the normal `./gradlew test` fast while still allowing the full suite
+        // (including long-running optimization benchmarks) to run on demand.
+        useJUnitPlatform {
+            if (!project.hasProperty("performance")) {
+                excludeTags("performance")
+            }
+        }
 
         // MOEA Framework's Instrumenter uses deep reflection; open JDK internal modules
         jvmArgs(

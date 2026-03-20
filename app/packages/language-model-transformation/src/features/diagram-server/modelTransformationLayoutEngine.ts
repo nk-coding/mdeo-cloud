@@ -15,6 +15,7 @@ import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GSplitNode } from "./model/splitNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
+import { MATCH_NODE_INNER_PADDING } from "@mdeo/protocol-model-transformation";
 
 const { injectable } = sharedImport("inversify");
 
@@ -170,7 +171,8 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
             }
         }
 
-        const bottomPadding = 20 + compartmentHeight;
+        const bottomPadding = MATCH_NODE_INNER_PADDING + compartmentHeight;
+        const topPadding = MATCH_NODE_INNER_PADDING * 2;
 
         return {
             id: matchNode.id,
@@ -180,7 +182,7 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                 "elk.algorithm": "layered",
                 "elk.direction": "RIGHT",
                 "elk.spacing.nodeNode": "30",
-                "elk.padding": `[top=40,left=20,bottom=${bottomPadding},right=20]`
+                "elk.padding": `[top=${topPadding},left=${MATCH_NODE_INNER_PADDING},bottom=${bottomPadding},right=${MATCH_NODE_INNER_PADDING}]`
             },
             children: childNodes,
             edges: childEdges

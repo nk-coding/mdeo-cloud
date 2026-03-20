@@ -3,11 +3,11 @@ package com.mdeo.modeltransformationexecution.service
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.execution.common.routes.FileEntry
 import com.mdeo.execution.common.service.ExecutionServiceWithFileTree
-import com.mdeo.modeltransformation.ast.model.ModelData
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.Metamodel
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
-import com.mdeo.modeltransformation.service.GraphToModelDataConverter
-import com.mdeo.modeltransformation.service.ModelDataGraphLoader
+import com.mdeo.modeltransformation.graph.MdeoModelGraph
 import com.mdeo.modeltransformationexecution.database.TransformationExecutionsTable
 import com.mdeo.modeltransformationexecution.database.TransformationResultFilesTable
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +21,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -54,7 +53,6 @@ class TransformationExecutionService(
     private val executionScope: CoroutineScope
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(TransformationExecutionService::class.java)
-    private val graphLoader = ModelDataGraphLoader()
     private val json = Json { prettyPrint = true }
     
     companion object {
@@ -235,10 +233,11 @@ class TransformationExecutionService(
 
         val metamodelData = fetchMetamodelData(executionId, projectId, typedAst.metamodelPath, jwtToken)
             ?: return
+        val metamodel = Metamodel.compile(metamodelData)
 
         updateState(executionId, ExecutionState.RUNNING, "Executing transformation...", jwtToken)
 
-        val resultModel = runTransformation(executionId, typedAst, metamodelData, modelData, jwtToken)
+        val resultModel = runTransformation(executionId, typedAst, metamodel, modelData, jwtToken)
             ?: return
 
         storeResult(executionId, resultModel)
@@ -295,7 +294,7 @@ class TransformationExecutionService(
         projectId: UUID,
         metamodelPath: String,
         jwtToken: String
-    ): com.mdeo.expression.ast.types.MetamodelData? {
+    ): com.mdeo.metamodel.data.MetamodelData? {
         val metamodelData = apiClient.getMetamodelData(
             projectId.toString(),
             metamodelPath,
@@ -343,7 +342,7 @@ class TransformationExecutionService(
     }
     
     /**
-     * Executes the transformation engine over a TinkerGraph loaded from [modelData].
+     * Executes the transformation engine over a graph loaded from [modelData].
      * Converts the resulting graph back to [ModelData] on success, or updates the execution
      * state to FAILED and returns null on failure or explicit kill.
      *
@@ -357,29 +356,22 @@ class TransformationExecutionService(
     private fun runTransformation(
         executionId: UUID,
         typedAst: com.mdeo.modeltransformation.ast.TypedAst,
-        metamodelData: com.mdeo.expression.ast.types.MetamodelData,
+        metamodel: Metamodel,
         modelData: ModelData,
         jwtToken: String
     ): ModelData? {
-        val graph = TinkerGraph.open()
+        val modelGraph = MdeoModelGraph.create(modelData, metamodel)
         
         return try {
-            val g = graph.traversal()
-            val engine = TransformationEngine.create(g, typedAst, metamodelData, deterministic = false)
-            
-            graphLoader.load(g, modelData, engine.instanceNameRegistry, metamodelData)
+            val engine = TransformationEngine.create(
+                modelGraph, typedAst, deterministic = false
+            )
             
             val result = engine.execute()
             
-            val graphConverter = GraphToModelDataConverter(
-                metamodelData = engine.metamodelData,
-                types = engine.types,
-                typeRegistry = engine.typeRegistry
-            )
-            
             when (result) {
                 is TransformationExecutionResult.Success -> {
-                    graphConverter.convert(g, modelData.metamodelUri, engine.instanceNameRegistry)
+                    modelGraph.toModelData()
                 }
                 is TransformationExecutionResult.Failure -> {
                     handleTransformationFailure(executionId, result, jwtToken)
@@ -387,7 +379,7 @@ class TransformationExecutionService(
                 }
                 is TransformationExecutionResult.Stopped -> {
                     if (result.isNormalStop) {
-                        graphConverter.convert(g, modelData.metamodelUri, engine.instanceNameRegistry)
+                        modelGraph.toModelData()
                     } else {
                         handleTransformationKilled(executionId, jwtToken)
                         null
@@ -395,7 +387,7 @@ class TransformationExecutionService(
                 }
             }
         } finally {
-            graph.close()
+            modelGraph.close()
         }
     }
     

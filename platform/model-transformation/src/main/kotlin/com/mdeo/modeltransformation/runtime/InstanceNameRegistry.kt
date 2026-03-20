@@ -109,6 +109,18 @@ class InstanceNameRegistry {
     fun getAllMappings(): Map<Any, String> {
         return idToName.toMap()
     }
+
+    /**
+     * Removes registration for a vertex ID.
+     *
+     * @param vertexId The vertex ID to remove.
+     * @return The previously registered name, or null if none existed.
+     */
+    fun unregister(vertexId: Any): String? {
+        val name = idToName.remove(vertexId) ?: return null
+        nameToId.remove(name)
+        return name
+    }
     
     /**
      * Clears all registrations.
@@ -121,5 +133,16 @@ class InstanceNameRegistry {
         idToName.clear()
         nameToId.clear()
         nameCounters.clear()
+    }
+
+    /**
+     * Creates an independent copy of this registry, including suffix counters.
+     */
+    fun copy(): InstanceNameRegistry {
+        val copy = InstanceNameRegistry()
+        copy.idToName.putAll(idToName)
+        copy.nameToId.putAll(nameToId)
+        copy.nameCounters.putAll(nameCounters)
+        return copy
     }
 }

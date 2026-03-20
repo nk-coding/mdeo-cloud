@@ -1,15 +1,15 @@
 package com.mdeo.scriptexecution.service
 
 import com.mdeo.execution.common.service.ExecutionService as CommonExecutionService
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.modeltransformation.ast.model.ModelData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.ModelData
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.compiler.CompilationInput
 import com.mdeo.script.compiler.CompiledProgram
 import com.mdeo.script.compiler.ScriptCompiler
-import com.mdeo.script.runtime.ExecutionContext
 import com.mdeo.script.runtime.ExecutionEnvironment
-import com.mdeo.script.runtime.model.ModelDataScriptModel
+import com.mdeo.script.runtime.SimpleScriptContext
+import com.mdeo.metamodel.Model
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.scriptexecution.database.ExecutionsTable
 import kotlinx.coroutines.Dispatchers
@@ -380,7 +380,7 @@ class ExecutionService(
      * Runs the compiled program and persists the result and output to the database.
      *
      * @param modelContext Optional model/metamodel context; when present a
-     *   [ModelDataScriptModel] is injected into the execution environment.
+     *   [Model] is injected into the execution environment.
      */
     private suspend fun runCompiledScript(
         executionId: UUID,
@@ -398,18 +398,14 @@ class ExecutionService(
         try {
             val env = ExecutionEnvironment(compiledProgram)
 
-            val scriptModel = if (modelContext != null) {
-                ModelDataScriptModel(
-                    modelContext.modelData, modelContext.metamodelData,
-                    env.classLoader, env.program
-                )
+            val model = if (modelContext != null && compiledProgram.metamodel != null) {
+                compiledProgram.metamodel!!.loadModel(modelContext.modelData)
             } else {
                 null
             }
 
-            val result = ExecutionContext.withContext(printStream, scriptModel) {
-                env.invoke(filePath, methodName)
-            }
+            val context = SimpleScriptContext(printStream, model)
+            val result = env.invoke(filePath, methodName, context)
 
             val capturedOutput = outputStream.toString(Charsets.UTF_8)
             val resultString = result?.toString() ?: "null"

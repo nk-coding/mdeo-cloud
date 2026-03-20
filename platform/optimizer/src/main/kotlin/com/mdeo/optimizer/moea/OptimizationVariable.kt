@@ -16,7 +16,7 @@ class OptimizationVariable(
 ) : Variable {
 
     override fun copy(): Variable {
-        return OptimizationVariable(solution.deepCopy(), mutator)
+        return OptimizationVariable(solution, mutator)
     }
 
     /**

@@ -19,6 +19,7 @@ application {
 dependencies {
     implementation(project(":common"))
     implementation(project(":expression"))
+    implementation(project(":metamodel"))
     implementation(project(":model-transformation"))
     implementation(project(":script"))
     implementation(project(":optimizer"))

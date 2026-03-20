@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.runtime.match.MatchResult
@@ -64,7 +65,7 @@ class ListLiteralPropertyAssignmentTest {
         val statementRegistry = StatementExecutorRegistry.createDefaultRegistry()
         
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = emptyList(), metamodelPath = "./metamodel.mm", statements = emptyList()),
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
@@ -148,7 +149,7 @@ class ListLiteralPropertyAssignmentTest {
         result as MatchResult.Matched
         
         // Get the created node vertex
-        val nodeId = result.instanceMappings["node"]
+        val nodeId = result.instanceMappings["node"]?.rawId
         assertNotNull(nodeId, "node should be mapped to a vertex")
         
         val node = g.V(nodeId).next()
@@ -207,7 +208,7 @@ class ListLiteralPropertyAssignmentTest {
         assertTrue(result is MatchResult.Matched, "Match should succeed")
         result as MatchResult.Matched
         
-        val nodeId = result.instanceMappings["node"]
+        val nodeId = result.instanceMappings["node"]?.rawId
         assertNotNull(nodeId, "node should be mapped to a vertex")
         
         val node = g.V(nodeId).next()
@@ -256,7 +257,7 @@ class ListLiteralPropertyAssignmentTest {
         assertTrue(result is MatchResult.Matched, "Match should succeed")
         result as MatchResult.Matched
         
-        val nodeId = result.instanceMappings["node"]
+        val nodeId = result.instanceMappings["node"]?.rawId
         assertNotNull(nodeId, "node should be mapped to a vertex")
         
         val node = g.V(nodeId).next()
@@ -353,7 +354,7 @@ class ListLiteralPropertyAssignmentTest {
         result as MatchResult.Matched
         
         // Get the created node vertex
-        val nodeId = result.instanceMappings["node"]
+        val nodeId = result.instanceMappings["node"]?.rawId
         assertNotNull(nodeId, "node should be mapped to a vertex")
         
         val node = g.V(nodeId).next()

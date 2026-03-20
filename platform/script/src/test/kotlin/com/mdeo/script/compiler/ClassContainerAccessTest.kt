@@ -1,24 +1,26 @@
 package com.mdeo.script.compiler
 
-import com.mdeo.expression.ast.types.ClassData
+import com.mdeo.metamodel.data.ClassData
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.expression.ast.types.EnumData
-import com.mdeo.expression.ast.types.MetamodelData
-import com.mdeo.expression.ast.types.MultiplicityData
-import com.mdeo.expression.ast.types.PropertyData
+import com.mdeo.metamodel.data.EnumData
+import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.MultiplicityData
+import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.expression.ast.types.VoidType
-import com.mdeo.modeltransformation.ast.model.ModelData
-import com.mdeo.modeltransformation.ast.model.ModelDataInstance
-import com.mdeo.modeltransformation.ast.model.ModelDataPropertyValue
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
+import com.mdeo.metamodel.data.ModelDataPropertyValue
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.compiler.model.ScriptMetamodelTypeRegistrar
-import com.mdeo.script.runtime.ExecutionContext
 import com.mdeo.script.runtime.ExecutionEnvironment
-import com.mdeo.script.runtime.model.ModelDataScriptModel
+import com.mdeo.script.runtime.SimpleScriptContext
+import com.mdeo.metamodel.Model
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -85,7 +87,7 @@ class ClassContainerAccessTest {
         val program = compiler.compile(input, metamodelData)
 
         val modelData = ModelData(
-            metamodelUri = metamodelPath,
+            metamodelPath = metamodelPath,
             instances = listOf(
                 ModelDataInstance(
                     name = "house1",
@@ -104,11 +106,10 @@ class ClassContainerAccessTest {
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
         val env = ExecutionEnvironment(program)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
+        val model = program.metamodel!!.loadModel(modelData)
 
-        ExecutionContext.withContext(ps, model) {
-            env.invoke(testFilePath, "test")
-        }
+        val context = SimpleScriptContext(ps, model)
+        env.invoke(testFilePath, "test", context)
         val output = baos.toString(Charsets.UTF_8)
 
         val lines = output.lines().filter { it.isNotBlank() }
@@ -200,7 +201,7 @@ class ClassContainerAccessTest {
         val input = CompilationInput(mapOf(testFilePath to ast))
         val program = compiler.compile(input, metamodelData)
 
-        val result = ExecutionEnvironment(program).invoke(testFilePath, "getActiveEntry")
+        val result = ExecutionEnvironment(program).invoke(testFilePath, "getActiveEntry", SimpleScriptContext(System.out, null))
 
         assertEquals("ACTIVE", result,
             "Expected Status.ACTIVE.getEntry() to return \"ACTIVE\", but got: $result")
@@ -285,7 +286,7 @@ class ClassContainerAccessTest {
         val program = compiler.compile(input, metamodelData)
 
         val modelData = ModelData(
-            metamodelUri = metamodelPath,
+            metamodelPath = metamodelPath,
             instances = listOf(
                 ModelDataInstance(
                     name = "t1",
@@ -301,17 +302,15 @@ class ClassContainerAccessTest {
         val baos = ByteArrayOutputStream()
         val ps = PrintStream(baos, true, Charsets.UTF_8)
         val env = ExecutionEnvironment(program)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
+        val model = program.metamodel!!.loadModel(modelData)
 
         // Verify class container
-        ExecutionContext.withContext(ps, model) {
-            env.invoke(testFilePath, "printTagLabels")
-        }
+        env.invoke(testFilePath, "printTagLabels", SimpleScriptContext(ps, model))
         val tagLabels = baos.toString(Charsets.UTF_8).lines().filter { it.isNotBlank() }
         assertEquals(listOf("urgent"), tagLabels)
 
         // Verify enum container
-        val priorityEntry = env.invoke(testFilePath, "getHighEntry")
+        val priorityEntry = env.invoke(testFilePath, "getHighEntry", SimpleScriptContext(System.out, null))
         assertEquals("HIGH", priorityEntry)
     }
 
@@ -432,7 +431,7 @@ class ClassContainerAccessTest {
         val input = CompilationInput(mapOf(testFilePath to ast))
         val program = compiler.compile(input, metamodelData)
 
-        val result = ExecutionEnvironment(program).invoke(testFilePath, "test")
+        val result = ExecutionEnvironment(program).invoke(testFilePath, "test", SimpleScriptContext(System.out, null))
 
         assertEquals("ACTIVE", result,
             "Expected Status.ACTIVE.toString() to return \"ACTIVE\", but got: $result")
@@ -451,10 +450,10 @@ class ClassContainerAccessTest {
      * }
      * ```
      * executed against a model with one House instance named `"house1"` must return
-     * `"House:house1"`.
+     * `"House"`.
      */
     @Test
-    fun `toString on class instance returns class name and instance name`() {
+    fun `toString on class instance returns the class name`() {
         val metamodelData = MetamodelData(
             path = metamodelPath,
             classes = listOf(ClassData(name = "House", isAbstract = false, properties = emptyList()))
@@ -501,7 +500,7 @@ class ClassContainerAccessTest {
         val program = compiler.compile(input, metamodelData)
 
         val modelData = ModelData(
-            metamodelUri = metamodelPath,
+            metamodelPath = metamodelPath,
             instances = listOf(
                 ModelDataInstance(
                     name = "house1",
@@ -513,14 +512,12 @@ class ClassContainerAccessTest {
         )
 
         val env = ExecutionEnvironment(program)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
+        val model = program.metamodel!!.loadModel(modelData)
 
-        val result = ExecutionContext.withContext(System.out, model) {
-            env.invoke(testFilePath, "test")
-        }
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
 
-        assertEquals("House:house1", result,
-            "Expected house.toString() to return \"House:house1\", but got: $result")
+        assertEquals("House", result,
+            "Expected house.toString() to return the class name, but got: $result")
     }
 
     // -------------------------------------------------------------------------
@@ -539,7 +536,7 @@ class ClassContainerAccessTest {
      * ```
      * executed against an empty model must return 0.
      *
-     * Bug: [ModelDataScriptModel.getAllInstances] returns `kotlin.collections.EmptyList`
+     * Bug: `Model.getAllInstances` returns `kotlin.collections.EmptyList`
      * (via Kotlin's `emptyList()`) when there are no instances for a class.
      * The generated script bytecode calls
      * `INVOKEINTERFACE com/mdeo/script/stdlib/impl/collections/ReadonlyCollection size ()I`
@@ -594,36 +591,180 @@ class ClassContainerAccessTest {
 
         // Empty model – no Room instances, so getAllInstances("Room") returns emptyList()
         val modelData = ModelData(
-            metamodelUri = metamodelPath,
+            metamodelPath = metamodelPath,
             instances = emptyList(),
             links = emptyList()
         )
 
         val env = ExecutionEnvironment(program)
-        val model = ModelDataScriptModel(modelData, metamodelData, env.classLoader, program)
+        val model = program.metamodel!!.loadModel(modelData)
 
         // This should return 0 but currently throws IncompatibleClassChangeError
         // because getAllInstances() returns kotlin.collections.EmptyList instead
         // of a ReadonlyCollection implementation.
-        val result = ExecutionContext.withContext(System.out, model) {
-            env.invoke(testFilePath, "countRooms")
-        }
+        val result = env.invoke(testFilePath, "countRooms", SimpleScriptContext(System.out, model))
 
         assertEquals(0, result, "Room.all().size() should return 0 for an empty model")
     }
 
     // -------------------------------------------------------------------------
-    // Helpers
+    // Multiplicity validation via script access
     // -------------------------------------------------------------------------
 
+    private fun buildWidgetMetamodel(vararg properties: PropertyData): MetamodelData =
+        MetamodelData(
+            path = metamodelPath,
+            classes = listOf(
+                ClassData(
+                    name = "Widget",
+                    isAbstract = false,
+                    properties = properties.toList()
+                )
+            )
+        )
+
     /**
-     * Captures console output produced by [block].
+     * Builds the TypedAST for:
+     * ```
+     * fun test(): String {
+     *     for (w in Widget.all()) {
+     *         return w.<propertyName>
+     *     }
+     *     return ""
+     * }
+     * ```
      */
-    private fun captureOutput(block: () -> Unit): String {
-        val baos = ByteArrayOutputStream()
-        val ps = PrintStream(baos, true, Charsets.UTF_8)
-        ExecutionContext.withContext(ps, null) { block() }
-        return baos.toString(Charsets.UTF_8)
+    private fun buildWidgetPropertyAccessAst(propertyName: String): TypedAst = buildTypedAst {
+        val voidIdx = addType(VoidType())
+        val stringIdx = addType(ClassTypeRef("builtin", "string", false))
+        val widgetIdx = addType(ClassTypeRef(classPackage, "Widget", false))
+        val collWidgetIdx = addType(ClassTypeRef("builtin", "Collection", false))
+        val widgetContIdx = addType(ClassTypeRef(classContainerPackage, "Widget", false))
+
+        function(
+            name = "test",
+            returnType = stringIdx,
+            body = listOf(
+                forStmt(
+                    variableName = "w",
+                    variableType = widgetIdx,
+                    iterable = memberCall(
+                        expression = identifier("Widget", widgetContIdx, scope = 1),
+                        member = "all",
+                        overload = "",
+                        arguments = emptyList(),
+                        resultTypeIndex = collWidgetIdx
+                    ),
+                    body = listOf(
+                        returnStmt(
+                            memberAccess(
+                                expression = identifier("w", widgetIdx, scope = 4),
+                                member = propertyName,
+                                resultTypeIndex = stringIdx
+                            )
+                        )
+                    )
+                ),
+                returnStmt(stringLiteral("", stringIdx))
+            )
+        )
+    }
+
+    /**
+     * Accessing a [1..1] property on an instance that has exactly 1 value works.
+     */
+    @Test
+    fun `script access to required single property with value succeeds`() {
+        val metamodelData = buildWidgetMetamodel(
+            PropertyData(name = "label", primitiveType = "string", multiplicity = MultiplicityData.single())
+        )
+        val ast = buildWidgetPropertyAccessAst("label")
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = listOf(
+                ModelDataInstance("w1", "Widget", mapOf("label" to ModelDataPropertyValue.StringValue("hello")))
+            ),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertEquals("hello", result)
+    }
+
+    /**
+     * Accessing a [1..1] property on an instance that has 0 values returns null
+     * (single-valued properties no longer use Set backing, so no exception is thrown).
+     */
+    @Test
+    fun `script access to required single property with no value returns null`() {
+        val metamodelData = buildWidgetMetamodel(
+            PropertyData(name = "label", primitiveType = "string", multiplicity = MultiplicityData.single())
+        )
+        val ast = buildWidgetPropertyAccessAst("label")
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = listOf(
+                ModelDataInstance("w1", "Widget", emptyMap())
+            ),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertNull(result)
+    }
+
+    /**
+     * Accessing a [0..1] property on an instance that has 0 values returns null.
+     */
+    @Test
+    fun `script access to optional single property with no value returns null`() {
+        val metamodelData = buildWidgetMetamodel(
+            PropertyData(name = "tooltip", primitiveType = "string", multiplicity = MultiplicityData.optional())
+        )
+        val ast = buildWidgetPropertyAccessAst("tooltip")
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = listOf(
+                ModelDataInstance("w1", "Widget", emptyMap())
+            ),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertNull(result)
+    }
+
+    /**
+     * Accessing a [0..1] property on an instance that has 1 value returns that value.
+     */
+    @Test
+    fun `script access to optional single property with value returns value`() {
+        val metamodelData = buildWidgetMetamodel(
+            PropertyData(name = "tooltip", primitiveType = "string", multiplicity = MultiplicityData.optional())
+        )
+        val ast = buildWidgetPropertyAccessAst("tooltip")
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = listOf(
+                ModelDataInstance("w1", "Widget", mapOf("tooltip" to ModelDataPropertyValue.StringValue("tip")))
+            ),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertEquals("tip", result)
     }
 
 }

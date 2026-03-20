@@ -1,25 +1,31 @@
 package com.mdeo.script.compiler
 
+import com.mdeo.metamodel.Metamodel
+
 /**
  * Represents a compiled script program ready for class-loading and execution.
  *
- * All bytecodes produced by the compiler (script classes, lambda interfaces, model instance
- * classes, enum classes and their containers) are merged into a single flat map keyed by
- * JVM binary class name (dot-separated, e.g. `com.mdeo.script.generated.Script_...`).
+ * All functions from all script files are compiled into a single JVM class ([SCRIPT_PROGRAM_BINARY_NAME]).
+ * The [functionLookup] maps each (filePath, functionName) pair to the artificial JVM method name
+ * (`fn0`, `fn1`, ...) assigned during compilation.
  *
- * Separate lookup maps allow callers to resolve names without any string manipulation.
+ * All bytecodes (the script program class, generated lambda interfaces, and metamodel classes)
+ * are stored in [allBytecodes] keyed by JVM binary class name (dot-separated).
  *
- * @param allBytecodes           All bytecodes keyed by JVM binary class name.
- * @param scriptFileToClass      Maps each script file path to the binary class name of its
- *                               top-level generated class.
- * @param instanceClassNames     Maps each metamodel class name (e.g. "Car") to the binary
- *                               class name of the generated [ModelInstance] subclass.
- * @param enumContainerClassNames Maps each metamodel enum name (e.g. "Color") to the binary
- *                               class name of the generated enum container class.
+ * @param allBytecodes   All bytecodes keyed by JVM binary class name.
+ * @param functionLookup Maps each script file path to a map of function name → JVM method name.
+ * @param metamodel      The compiled metamodel, or null if no metamodel was used.
  */
 data class CompiledProgram(
     val allBytecodes: Map<String, ByteArray>,
-    val scriptFileToClass: Map<String, String> = emptyMap(),
-    val instanceClassNames: Map<String, String> = emptyMap(),
-    val enumContainerClassNames: Map<String, String> = emptyMap()
-)
+    val functionLookup: Map<String, Map<String, String>> = emptyMap(),
+    val metamodel: Metamodel? = null
+) {
+    companion object {
+        /** JVM binary class name (dot-separated) of the single generated script class. */
+        const val SCRIPT_PROGRAM_BINARY_NAME = "com.mdeo.script.generated.ScriptProgram"
+
+        /** JVM internal class name (slash-separated) of the single generated script class. */
+        const val SCRIPT_PROGRAM_INTERNAL_NAME = "com/mdeo/script/generated/ScriptProgram"
+    }
+}

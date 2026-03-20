@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.match.MatchResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -43,7 +44,7 @@ class StringConcatenationRuntimeTest {
         val statementRegistry = StatementExecutorRegistry.createDefaultRegistry()
         
         engine = TransformationEngine(
-            traversalSource = g,
+            modelGraph = TinkerModelGraph.wrap(graph),
             ast = TypedAst(types = types, metamodelPath = "test://model", statements = emptyList()),
             expressionCompilerRegistry = expressionRegistry,
             statementExecutorRegistry = statementRegistry
@@ -90,7 +91,7 @@ class StringConcatenationRuntimeTest {
         result as MatchResult.Matched
         
         // Get the created vertex
-        val vertexId = result.instanceMappings["room1"]
+        val vertexId = result.instanceMappings["room1"]?.rawId
         assertNotNull(vertexId, "room1 should be mapped to a vertex")
         
         val vertex = g.V(vertexId).next()
@@ -139,7 +140,7 @@ class StringConcatenationRuntimeTest {
         assertTrue(result is MatchResult.Matched)
         result as MatchResult.Matched
         
-        val vertexId = result.instanceMappings["room1"]
+        val vertexId = result.instanceMappings["room1"]?.rawId
         assertNotNull(vertexId)
         
         val vertex = g.V(vertexId).next()
@@ -188,7 +189,7 @@ class StringConcatenationRuntimeTest {
         assertTrue(result is MatchResult.Matched)
         result as MatchResult.Matched
         
-        val vertexId = result.instanceMappings["room1"]
+        val vertexId = result.instanceMappings["room1"]?.rawId
         assertNotNull(vertexId)
         
         val vertex = g.V(vertexId).next()
