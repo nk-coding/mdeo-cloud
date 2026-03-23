@@ -128,7 +128,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -147,7 +147,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -166,7 +166,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       SCRIPT_EXECUTION_SERVICE_URL: ${SCRIPT_EXECUTION_SERVICE_URL:-http://script-execution:8080}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
@@ -186,7 +186,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL: ${MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL:-http://model-transformation-execution:8080}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
@@ -254,7 +254,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -273,7 +273,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -292,7 +292,7 @@ services:
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
-      BACKEND_API_URL: "http://backend:8080"
+      BACKEND_API_URL: "http://backend:8080/api"
       OPTIMIZER_EXECUTION_SERVICE_URL: ${OPTIMIZER_EXECUTION_SERVICE_URL:-http://optimizer-execution-0:8080}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:

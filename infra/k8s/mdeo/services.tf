@@ -7,7 +7,7 @@ locals {
       env = {
         PORT                  = "3000"
         HOST                  = "0.0.0.0"
-        BACKEND_API_URL       = "http://backend:8080"
+        BACKEND_API_URL       = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES = tostring(var.max_langium_instances)
       }
     }
@@ -17,7 +17,7 @@ locals {
       env = {
         PORT                  = "3000"
         HOST                  = "0.0.0.0"
-        BACKEND_API_URL       = "http://backend:8080"
+        BACKEND_API_URL       = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES = tostring(var.max_langium_instances)
       }
     }
@@ -27,7 +27,7 @@ locals {
       env = {
         PORT                         = "3000"
         HOST                         = "0.0.0.0"
-        BACKEND_API_URL              = "http://backend:8080"
+        BACKEND_API_URL              = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES        = tostring(var.max_langium_instances)
         SCRIPT_EXECUTION_SERVICE_URL = "http://script-execution:8080"
       }
@@ -38,7 +38,7 @@ locals {
       env = {
         PORT                                       = "3000"
         HOST                                       = "0.0.0.0"
-        BACKEND_API_URL                            = "http://backend:8080"
+        BACKEND_API_URL                            = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES                      = tostring(var.max_langium_instances)
         MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL = "http://model-transformation-execution:8080"
       }
@@ -49,7 +49,7 @@ locals {
       env = {
         PORT                  = "3000"
         HOST                  = "0.0.0.0"
-        BACKEND_API_URL       = "http://backend:8080"
+        BACKEND_API_URL       = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES = tostring(var.max_langium_instances)
       }
     }
@@ -59,7 +59,7 @@ locals {
       env = {
         PORT                  = "3000"
         HOST                  = "0.0.0.0"
-        BACKEND_API_URL       = "http://backend:8080"
+        BACKEND_API_URL       = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES = tostring(var.max_langium_instances)
       }
     }
@@ -69,7 +69,7 @@ locals {
       env = {
         PORT                           = "3000"
         HOST                           = "0.0.0.0"
-        BACKEND_API_URL                = "http://backend:8080"
+        BACKEND_API_URL                = "http://backend:8080/api"
         MAX_LANGIUM_INSTANCES          = tostring(var.max_langium_instances)
         OPTIMIZER_EXECUTION_SERVICE_URL = "http://optimizer-execution:8080"
       }
@@ -85,7 +85,7 @@ locals {
         PLUGIN_CONFIG_SERVICE                 = "http://service-config:3000"
         PLUGIN_CONFIG_OPTIMIZATION_SERVICE    = "http://service-config-optimization:3000"
         PLUGIN_CONFIG_MDEO_SERVICE            = "http://service-config-mdeo:3000"
-        BACKEND_SERVICE                       = "http://backend:8080"
+        BACKEND_SERVICE                       = "http://backend:8080/api"
       }
     }
   }

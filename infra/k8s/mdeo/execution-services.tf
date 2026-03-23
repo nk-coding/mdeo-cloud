@@ -107,7 +107,7 @@ resource "kubernetes_deployment_v1" "execution" {
 
           env {
             name  = "BACKEND_API_URL"
-            value = "http://backend:8080"
+            value = "http://backend:8080/api"
           }
 
           env {
@@ -264,7 +264,7 @@ resource "kubernetes_stateful_set_v1" "optimizer_execution" {
 
           env {
             name  = "BACKEND_API_URL"
-            value = "http://backend:8080"
+            value = "http://backend:8080/api"
           }
 
           env {
