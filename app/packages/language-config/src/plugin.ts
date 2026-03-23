@@ -58,7 +58,10 @@ export const configPluginProvider: LangiumLanguagePluginProvider<ConfigAdditiona
                 parser: {
                     TokenBuilder: () =>
                         new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
-                    ValueConverter: () => new IdValueConverter()
+                    ValueConverter: () => new IdValueConverter(),
+                    ParserConfig: () => ({
+                        maxLookahead: 4
+                    })
                 },
                 references: {
                     ScopeProvider: (services) =>

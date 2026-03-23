@@ -7,6 +7,7 @@ import { classType, typeRef, genericTypeRef, lambdaType } from "../../typir-exte
 export const OrderedCollectionType = classType("OrderedCollection")
     .generics("T")
     .extends("ReadonlyOrderedCollection", { T: genericTypeRef("T") })
+    .extends("Collection", { T: genericTypeRef("T") })
     .method("removeAt", (m) =>
         m.signature((s) =>
             s.param("index", typeRef("builtin", DefaultTypeNames.Int).build()).returns(genericTypeRef("T"))

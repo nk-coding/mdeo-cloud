@@ -101,7 +101,6 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
     );
 
     const ExpressionRule = expressionRules.expressionRule;
-    const AssignableExpressionRule = expressionRules.assignableExpressionRule;
 
     const deserializationContext = GrammarDeserializationContext.create(
         [BaseExpression, BaseExtension],
@@ -111,14 +110,16 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
 
     const resolvedPlugins = resolvePlugins(plugins, deserializationContext);
 
-    /**
-     * The extension expression rule
-     */
-    const ExtensionExpressionRule = createRule("ScriptExtensionExpressionRule")
-        .returns(ExtensionExpression)
-        .as(({ set }) => [or(...resolvedPlugins.rules.map((rule) => set("extension", rule)))]);
+    if (resolvedPlugins.rules.length > 0) {
+        /**
+         * The extension expression rule
+         */
+        const ExtensionExpressionRule = createRule("ScriptExtensionExpressionRule")
+            .returns(ExtensionExpression)
+            .as(({ set }) => [or(...resolvedPlugins.rules.map((rule) => set("extension", rule)))]);
 
-    additionalExpressionRules.push(ExtensionExpressionRule);
+        additionalExpressionRules.push(ExtensionExpressionRule);
+    }
 
     /**
      * Return statement rule.
@@ -130,14 +131,9 @@ export function generateScriptRule(plugins: ScriptContributionPlugin[]): {
     /**
      * The statement rules.
      */
-    const StatementsScopeRule = generateStatementRules(
-        statementConfig,
-        statementTypes,
-        ExpressionRule,
-        AssignableExpressionRule,
-        TypeRule,
-        [ReturnStatementRule]
-    ).statementsScopeRule;
+    const StatementsScopeRule = generateStatementRules(statementConfig, statementTypes, ExpressionRule, TypeRule, [
+        ReturnStatementRule
+    ]).statementsScopeRule;
 
     /**
      * Function parameter rule.

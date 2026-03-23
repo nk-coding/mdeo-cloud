@@ -7,6 +7,16 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.round
 import kotlin.math.abs
+import kotlin.math.sqrt
+import kotlin.math.sin
+import kotlin.math.cos
+import kotlin.math.tan
+import kotlin.math.asin
+import kotlin.math.acos
+import kotlin.math.atan
+import kotlin.math.sinh
+import kotlin.math.cosh
+import kotlin.math.tanh
 
 /**
  * Helper methods for the Double type in the script language.
@@ -211,4 +221,94 @@ object DoubleHelper {
      */
     @JvmStatic
     fun isInfinite(value: Double): Boolean = value.isInfinite()
+
+    /**
+     * Returns the square root of a double.
+     *
+     * @param value the double value
+     * @return the square root
+     */
+    @JvmStatic
+    fun sqrt(value: Double): Double = kotlin.math.sqrt(value)
+
+    /**
+     * Returns the sine of a double (in radians).
+     *
+     * @param value the angle in radians
+     * @return the sine
+     */
+    @JvmStatic
+    fun sin(value: Double): Double = kotlin.math.sin(value)
+
+    /**
+     * Returns the cosine of a double (in radians).
+     *
+     * @param value the angle in radians
+     * @return the cosine
+     */
+    @JvmStatic
+    fun cos(value: Double): Double = kotlin.math.cos(value)
+
+    /**
+     * Returns the tangent of a double (in radians).
+     *
+     * @param value the angle in radians
+     * @return the tangent
+     */
+    @JvmStatic
+    fun tan(value: Double): Double = kotlin.math.tan(value)
+
+    /**
+     * Returns the arc sine of a double.
+     *
+     * @param value the value (must be between -1 and 1)
+     * @return the arc sine in radians
+     */
+    @JvmStatic
+    fun asin(value: Double): Double = kotlin.math.asin(value)
+
+    /**
+     * Returns the arc cosine of a double.
+     *
+     * @param value the value (must be between -1 and 1)
+     * @return the arc cosine in radians
+     */
+    @JvmStatic
+    fun acos(value: Double): Double = kotlin.math.acos(value)
+
+    /**
+     * Returns the arc tangent of a double.
+     *
+     * @param value the double value
+     * @return the arc tangent in radians
+     */
+    @JvmStatic
+    fun atan(value: Double): Double = kotlin.math.atan(value)
+
+    /**
+     * Returns the hyperbolic sine of a double.
+     *
+     * @param value the double value
+     * @return the hyperbolic sine
+     */
+    @JvmStatic
+    fun sinh(value: Double): Double = kotlin.math.sinh(value)
+
+    /**
+     * Returns the hyperbolic cosine of a double.
+     *
+     * @param value the double value
+     * @return the hyperbolic cosine
+     */
+    @JvmStatic
+    fun cosh(value: Double): Double = kotlin.math.cosh(value)
+
+    /**
+     * Returns the hyperbolic tangent of a double.
+     *
+     * @param value the double value
+     * @return the hyperbolic tangent
+     */
+    @JvmStatic
+    fun tanh(value: Double): Double = kotlin.math.tanh(value)
 }

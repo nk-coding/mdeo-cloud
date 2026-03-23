@@ -49,7 +49,7 @@ export const RangeMultiplicityRule = createRule("ConfigRangeMultiplicityRule")
  */
 export const MultiplicityRule = createRule("ConfigMultiplicityRule")
     .returns(Multiplicity)
-    .as(() => ["[", or(SingleMultiplicityRule, RangeMultiplicityRule), "]"]);
+    .as(() => ["[", or(RangeMultiplicityRule, SingleMultiplicityRule), "]"]);
 
 /**
  * Problem section content rule (without keyword).

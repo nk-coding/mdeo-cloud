@@ -222,9 +222,9 @@ export function generateModelTransformationRules(): {
                 or(
                     add("elements", PatternVariableRule),
                     add("elements", PatternObjectInstanceReferenceRule),
-                    add("elements", PatternObjectDeleteRule),
                     add("elements", PatternObjectInstanceRule),
                     add("elements", PatternLinkRule),
+                    add("elements", PatternObjectDeleteRule),
                     add("elements", WhereClauseRule),
                     NEWLINE
                 )

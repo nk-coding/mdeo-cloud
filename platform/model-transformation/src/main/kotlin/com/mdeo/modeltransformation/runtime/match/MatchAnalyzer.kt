@@ -104,14 +104,14 @@ class MatchAnalyzer(val scope: VariableScope) {
             }
             is TypedMemberCallExpression -> {
                 analyzeExpression(expression.expression)
-                expression.arguments.forEach { analyzeExpression(it) }
+                expression.arguments.forEach { analyzeExpression(it.value) }
             }
             is TypedFunctionCallExpression -> {
-                expression.arguments.forEach { analyzeExpression(it) }
+                expression.arguments.forEach { analyzeExpression(it.value) }
             }
             is TypedExpressionCallExpression -> {
                 analyzeExpression(expression.expression)
-                expression.arguments.forEach { analyzeExpression(it) }
+                expression.arguments.forEach { analyzeExpression(it.value) }
             }
             is TypedExtensionCallExpression -> {
                 expression.arguments.forEach { arg ->

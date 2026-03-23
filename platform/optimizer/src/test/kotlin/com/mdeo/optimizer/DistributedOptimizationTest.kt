@@ -81,7 +81,9 @@ class DistributedOptimizationTest {
         private val evaluatorByNodeId: Map<String, LocalMutationEvaluator> =
             nodeIds.zip(nodes).toMap()
 
-        /** Distributes [total] solutions across [nodeIds.size] nodes, round-robin style. */
+        /**
+         * Distributes [total] solutions across [nodeIds.size] nodes, round-robin style. 
+         */
         private fun distributeCount(total: Int): List<Int> {
             val nodeCount = nodes.size
             val base = total / nodeCount

@@ -183,16 +183,6 @@ export class ExpressionConfig {
     readonly expressionRuleName: string;
 
     /**
-     * The name for the AssignableExpression type.
-     */
-    readonly assignableExpressionTypeName: string;
-
-    /**
-     * The name for the AssignableExpression rule.
-     */
-    readonly assignableExpressionRuleName: string;
-
-    /**
      * The name for the TypeCastExpression type.
      */
     readonly typeCastExpressionTypeName: string;
@@ -278,8 +268,6 @@ export class ExpressionConfig {
         this.bracketedExpressionTypeName = prefix + "BracketedExpression";
         this.bracketedExpressionRuleName = prefix + "BracketedExpressionRule";
         this.expressionRuleName = prefix + "ExpressionRule";
-        this.assignableExpressionTypeName = prefix + "AssignableExpression";
-        this.assignableExpressionRuleName = prefix + "AssignableExpressionRule";
         this.typeCastExpressionTypeName = prefix + "TypeCastExpression";
         this.typeCheckExpressionTypeName = prefix + "TypeCheckExpression";
         this.assertNonNullExpressionTypeName = prefix + "AssertNonNullExpression";

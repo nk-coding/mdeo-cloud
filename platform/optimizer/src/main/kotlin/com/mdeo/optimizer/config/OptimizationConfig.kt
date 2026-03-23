@@ -226,12 +226,16 @@ enum class MutationStrategy { RANDOM, REPETITIVE }
 /** Configures the number of mutation steps applied per offspring, either fixed or random in an interval. */
 @Serializable
 sealed class MutationStepConfig {
-    /** Always apply exactly [n] steps. */
+    /**
+     * Always apply exactly [n] steps. 
+     */
     @Serializable
     @SerialName("Fixed")
     data class Fixed(val n: Int) : MutationStepConfig()
 
-    /** Randomly pick a count from [[lower], [upper]). */
+    /**
+     * Randomly pick a count from [[lower], [upper]). 
+     */
     @Serializable
     @SerialName("Interval")
     data class Interval(val lower: Int, val upper: Int) : MutationStepConfig()

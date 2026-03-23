@@ -1,6 +1,5 @@
 package com.mdeo.expression.ast.expressions
 
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -11,7 +10,7 @@ import kotlinx.serialization.Serializable
  * @param evalType Index into the types array for the type this expression evaluates to.
  * @param name The name of the function being called.
  * @param overload Overload identifier for the function being called.
- * @param arguments Array of argument expressions.
+ * @param arguments List of arguments with their expected parameter types.
  */
 @Serializable
 data class TypedFunctionCallExpression(
@@ -20,5 +19,5 @@ data class TypedFunctionCallExpression(
     val name: String,
     val overload: String,
     @SerialName("arguments")
-    override val arguments: List<@Contextual TypedExpression>
+    override val arguments: List<TypedCallArgument>
 ) : TypedCallExpression

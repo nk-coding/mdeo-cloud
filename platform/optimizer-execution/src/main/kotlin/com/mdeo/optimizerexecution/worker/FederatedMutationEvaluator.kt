@@ -27,7 +27,9 @@ class FederatedMutationEvaluator(
     private val allocationRequest: WorkerAllocationRequest
 ) : MutationEvaluator {
 
-    /** Fast lookup from nodeId to WorkerClient, built once at construction time. */
+    /**
+     * Fast lookup from nodeId to WorkerClient, built once at construction time. 
+     */
     private val workerByNodeId: Map<String, WorkerClient> = workers.associateBy { it.nodeId }
 
     override fun getNodeIds(): Set<String> = workerByNodeId.keys

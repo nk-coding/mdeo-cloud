@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.LambdaType
 import com.mdeo.expression.ast.types.ReturnType
+import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.LambdaInterfaceRegistry
@@ -66,12 +67,12 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
         context.compileExpression(exprCall.expression, mv, calleeType)
         
         val registry = context.getLambdaInterfaceRegistry()
-        val normalizedKey = registry.createKey(calleeType)
         
         val lookupResult = registry.getInterfaceForLambdaType(calleeType)
         val functionalInterface = lookupResult.interfaceName
+        val isPredefined = functionalInterface.startsWith("com/mdeo/script/runtime")
         
-        compileArguments(exprCall, calleeType, context, mv)
+        compileArguments(exprCall, calleeType, isPredefined, context, mv)
         
         val methodDescriptor = buildMethodDescriptor(calleeType, context)
         
@@ -87,27 +88,32 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
     /**
      * Compiles all arguments for the expression call.
      *
-     * For predefined generic interfaces (Func0-3, Action0-3, Predicate1),
-     * arguments need to be boxed to Object. For generated interfaces,
-     * arguments use the actual types directly.
+     * Uses the resolved parameter types from each [TypedCallArgument] for coercion.
+     * For predefined generic interfaces (Func0-3, Action0-3), all JVM parameters are Object,
+     * so primitives must be boxed. For generated interfaces, the JVM parameters match the
+     * lambda's actual parameter types.
      *
      * @param exprCall The expression call containing the arguments.
-     * @param calleeType The actual lambda type being called.
+     * @param lambdaType The lambda type of the callee.
+     * @param isPredefined Whether the functional interface is a predefined generic one.
      * @param context The compilation context.
      * @param mv The method visitor for emitting bytecode.
      */
     private fun compileArguments(
         exprCall: TypedExpressionCallExpression,
-        calleeType: LambdaType,
+        lambdaType: LambdaType,
+        isPredefined: Boolean,
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        val parameterTypes = calleeType.parameters.map { it.type }
-        for ((index, arg) in exprCall.arguments.withIndex()) {
-            val argType = context.getType(arg.evalType)
-            val targetType = if (index < parameterTypes.size) parameterTypes[index] else argType
-            context.compileExpression(arg, mv, targetType)
+        val jvmParamTypes: List<ValueType> = if (isPredefined) {
+            // Predefined interfaces use Object for all parameters
+            lambdaType.parameters.map { ClassTypeRef("builtin", "Any", true) }
+        } else {
+            // Generated interfaces use the actual types from the lambda
+            lambdaType.parameters.map { it.type }
         }
+        compileArgumentsWithCoercion(exprCall.arguments, context, mv, signatureParameterTypes = jvmParamTypes)
     }
     
     /**

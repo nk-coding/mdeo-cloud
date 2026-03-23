@@ -431,13 +431,13 @@ class ScopeBuilder(
             is TypedMemberCallExpression -> {
                 collectFromExpression(expression.expression, scope)
                 for (arg in expression.arguments) {
-                    collectFromExpression(arg, scope)
+                    collectFromExpression(arg.value, scope)
                 }
             }
 
             is TypedCallExpression -> {
                 for (arg in expression.arguments) {
-                    collectFromExpression(arg, scope)
+                    collectFromExpression(arg.value, scope)
                 }
             }
 

@@ -10,7 +10,6 @@ import {
 } from "@mdeo/language-common";
 import {
     IdValueConverter,
-    NewlineAwareTokenBuilder,
     DefaultAstSerializer,
     SerializerFormatter,
     registerDefaultTokenSerializers,
@@ -34,6 +33,7 @@ import { ScriptTypeSystem } from "./features/type-system/scriptTypeSystem.js";
 import { ScriptScopeProvider } from "./features/type-system/scriptScopeProvider.js";
 import { registerScriptSerializers } from "./features/scriptSerializers.js";
 import { expressionConfig, expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
+import { ScriptTokenBuilder } from "./features/scriptTokenBuilder.js";
 import { ScriptLangiumScopeProvider } from "./features/scriptScopeProvider.js";
 import { ScriptExternalReferenceCollector } from "./features/scriptExternalReferenceCollector.js";
 import { registerScriptValidationChecks } from "./features/scriptValidator.js";
@@ -83,10 +83,12 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
             additionalTerminals: [WS, HIDDEN_NEWLINE, ML_COMMENT, SL_COMMENT],
             module: {
                 parser: {
-                    TokenBuilder: () =>
-                        new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
+                    TokenBuilder: () => new ScriptTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
                     ValueConverter: () => new IdValueConverter(),
-                    ...generateExtendedParser(generateExpressionRuleOverride(expressionConfig))
+                    ...generateExtendedParser(generateExpressionRuleOverride(expressionConfig)),
+                    ParserConfig: () => ({
+                        maxLookahead: 4
+                    })
                 },
                 references: {
                     ScopeProvider: (services) => new ScriptLangiumScopeProvider(services),

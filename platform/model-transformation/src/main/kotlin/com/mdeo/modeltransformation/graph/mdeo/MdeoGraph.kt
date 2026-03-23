@@ -46,7 +46,9 @@ class MdeoGraph private constructor(
     private var nextVpId: Int
 ) : Graph {
 
-    /** Secondary constructor for a fresh empty graph. */
+    /**
+     * Secondary constructor for a fresh empty graph. 
+     */
     private constructor(metamodel: Metamodel) : this(
         metamodel,
         HashMap(),
@@ -119,7 +121,9 @@ class MdeoGraph private constructor(
 
     private val graphFeatures = MdeoGraphFeatures()
 
-    /** Generates the next unique vertex property ID. */
+    /**
+     * Generates the next unique vertex property ID. 
+     */
     internal fun nextVertexPropertyId(): Int = nextVpId++
 
     override fun addVertex(vararg keyValues: Any): Vertex {

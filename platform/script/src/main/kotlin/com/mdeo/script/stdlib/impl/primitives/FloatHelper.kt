@@ -7,6 +7,16 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.round
 import kotlin.math.abs
+import kotlin.math.sqrt
+import kotlin.math.sin
+import kotlin.math.cos
+import kotlin.math.tan
+import kotlin.math.asin
+import kotlin.math.acos
+import kotlin.math.atan
+import kotlin.math.sinh
+import kotlin.math.cosh
+import kotlin.math.tanh
 
 /**
  * Helper methods for the Float type in the script language.
@@ -211,4 +221,94 @@ object FloatHelper {
      */
     @JvmStatic
     fun isInfinite(value: Float): Boolean = value.isInfinite()
+
+    /**
+     * Returns the square root of a float.
+     *
+     * @param value the float value
+     * @return the square root
+     */
+    @JvmStatic
+    fun sqrt(value: Float): Float = kotlin.math.sqrt(value)
+
+    /**
+     * Returns the sine of a float (in radians).
+     *
+     * @param value the angle in radians
+     * @return the sine
+     */
+    @JvmStatic
+    fun sin(value: Float): Float = kotlin.math.sin(value.toDouble()).toFloat()
+
+    /**
+     * Returns the cosine of a float (in radians).
+     *
+     * @param value the angle in radians
+     * @return the cosine
+     */
+    @JvmStatic
+    fun cos(value: Float): Float = kotlin.math.cos(value.toDouble()).toFloat()
+
+    /**
+     * Returns the tangent of a float (in radians).
+     *
+     * @param value the angle in radians
+     * @return the tangent
+     */
+    @JvmStatic
+    fun tan(value: Float): Float = kotlin.math.tan(value.toDouble()).toFloat()
+
+    /**
+     * Returns the arc sine of a float.
+     *
+     * @param value the value (must be between -1 and 1)
+     * @return the arc sine in radians
+     */
+    @JvmStatic
+    fun asin(value: Float): Float = kotlin.math.asin(value.toDouble()).toFloat()
+
+    /**
+     * Returns the arc cosine of a float.
+     *
+     * @param value the value (must be between -1 and 1)
+     * @return the arc cosine in radians
+     */
+    @JvmStatic
+    fun acos(value: Float): Float = kotlin.math.acos(value.toDouble()).toFloat()
+
+    /**
+     * Returns the arc tangent of a float.
+     *
+     * @param value the float value
+     * @return the arc tangent in radians
+     */
+    @JvmStatic
+    fun atan(value: Float): Float = kotlin.math.atan(value.toDouble()).toFloat()
+
+    /**
+     * Returns the hyperbolic sine of a float.
+     *
+     * @param value the float value
+     * @return the hyperbolic sine
+     */
+    @JvmStatic
+    fun sinh(value: Float): Float = kotlin.math.sinh(value.toDouble()).toFloat()
+
+    /**
+     * Returns the hyperbolic cosine of a float.
+     *
+     * @param value the float value
+     * @return the hyperbolic cosine
+     */
+    @JvmStatic
+    fun cosh(value: Float): Float = kotlin.math.cosh(value.toDouble()).toFloat()
+
+    /**
+     * Returns the hyperbolic tangent of a float.
+     *
+     * @param value the float value
+     * @return the hyperbolic tangent
+     */
+    @JvmStatic
+    fun tanh(value: Float): Float = kotlin.math.tanh(value.toDouble()).toFloat()
 }

@@ -16,6 +16,9 @@ export const defaultMonarchTokenProvider: languages.IMonarchLanguage = {
             // strings
             [/"/u, { token: "string.quote", bracket: "@open", switchTo: "@string" }],
 
+            // operators with dots
+            [/\.(\.)+/u, "operator"],
+
             // properties
             [/\./u, { token: "delimiter.dot", switchTo: "expression.after.dot" }],
 

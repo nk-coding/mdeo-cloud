@@ -117,7 +117,9 @@ class MdeoModelGraphTest {
         tinkerGraph.close()
     }
 
-    /** Helper to get the graph key for a property of a given class. */
+    /**
+     * Helper to get the graph key for a property of a given class. 
+     */
     private fun graphKey(className: String, propName: String): String {
         val fieldIndex = metamodel.metadata.classes[className]!!.propertyFields[propName]!!.fieldIndex
         return "prop_$fieldIndex"

@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.stdlib
 
 import com.mdeo.expression.ast.expressions.TypedBinaryExpression
+import com.mdeo.expression.ast.expressions.TypedCallArgument
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedListLiteralExpression
@@ -137,7 +138,7 @@ class LambdaMethodDefinitionsTest {
             evalType = 3,
             expression = list,
             member = methodName,
-            arguments = listOf(lambda),
+            arguments = listOf(TypedCallArgument(value = lambda, parameterType = lambda.evalType)),
             overload = overload,
             isNullChaining = false
         )
@@ -156,7 +157,10 @@ class LambdaMethodDefinitionsTest {
             evalType = 1,
             expression = list,
             member = methodName,
-            arguments = listOf(lambda, TypedIntLiteralExpression(evalType = 0, value = arg.toString())),
+            arguments = listOf(
+                TypedCallArgument(value = lambda, parameterType = lambda.evalType),
+                TypedCallArgument(value = TypedIntLiteralExpression(evalType = 0, value = arg.toString()), parameterType = 0)
+            ),
             overload = "",
             isNullChaining = false
         )

@@ -165,7 +165,9 @@ class LocalMutationEvaluator(
     private fun generateId(): String = "$nodeId-${UUID.randomUUID()}"
 
     companion object {
-        /** Default node identifier used when no [nodeId] is provided. */
+        /**
+         * Default node identifier used when no [nodeId] is provided. 
+         */
         const val DEFAULT_NODE_ID = "local"
     }
 }

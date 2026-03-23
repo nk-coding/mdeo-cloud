@@ -49,9 +49,13 @@ class WorkerClient(
 ) : AutoCloseable {
 
     private companion object {
-        /** Max time to wait for the initial WS handshake to complete. */
+        /**
+         * Max time to wait for the initial WS handshake to complete. 
+         */
         const val SESSION_READY_TIMEOUT_MS = 30_000L
-        /** Default timeout for a full request/response cycle over the WS. */
+        /**
+         * Default timeout for a full request/response cycle over the WS. 
+         */
         const val OPERATION_TIMEOUT_MS = 600_000L
     }
 
@@ -67,16 +71,24 @@ class WorkerClient(
     private val logger = LoggerFactory.getLogger(WorkerClient::class.java)
     private val cbor = Cbor { ignoreUnknownKeys = true }
 
-    /** Pending request correlation: requestId → deferred result. */
+    /**
+     * Pending request correlation: requestId → deferred result. 
+     */
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<WorkerWsMessage>>()
 
-    /** Resolved once when the initial WebSocket handshake completes. */
+    /**
+     * Resolved once when the initial WebSocket handshake completes. 
+     */
     private val wsSessionDeferred = CompletableDeferred<DefaultClientWebSocketSession>()
 
-    /** Background job running the WebSocket read loop. */
+    /**
+     * Background job running the WebSocket read loop. 
+     */
     private var wsJob: Job? = null
 
-    /** `ws://` / `wss://` equivalent of [baseUrl]. */
+    /**
+     * `ws://` / `wss://` equivalent of [baseUrl]. 
+     */
     private val wsBaseUrl = when {
         baseUrl.startsWith("https://") -> baseUrl.replace("https://", "wss://")
         baseUrl.startsWith("http://") -> baseUrl.replace("http://", "ws://")
@@ -219,7 +231,9 @@ class WorkerClient(
         return withTimeout(timeoutMs) { deferred.await() }
     }
 
-    /** Completes all pending request deferreds exceptionally and clears the map. */
+    /**
+     * Completes all pending request deferreds exceptionally and clears the map. 
+     */
     private fun drainPendingRequests(cause: Exception) {
         val keys = pendingRequests.keys.toList()
         for (key in keys) {

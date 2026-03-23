@@ -19,6 +19,7 @@ import type {
     TypedExpressionCallExpression,
     TypedFunctionCallExpression,
     TypedMemberCallExpression,
+    TypedCallArgument,
     TypedMemberAccessExpression,
     TypedIdentifierExpression,
     TypedStringLiteralExpression,
@@ -505,7 +506,7 @@ export abstract class TypedAstMerger {
             kind: "call",
             evalType: mapping.get(expr.evalType)!,
             expression: this.remapExpression(expr.expression, mapping),
-            arguments: expr.arguments.map((arg) => this.remapExpression(arg, mapping))
+            arguments: expr.arguments.map((arg) => this.remapCallArgument(arg, mapping))
         };
     }
 
@@ -525,7 +526,7 @@ export abstract class TypedAstMerger {
             evalType: mapping.get(expr.evalType)!,
             name: expr.name,
             overload: expr.overload,
-            arguments: expr.arguments.map((arg) => this.remapExpression(arg, mapping))
+            arguments: expr.arguments.map((arg) => this.remapCallArgument(arg, mapping))
         };
     }
 
@@ -547,7 +548,21 @@ export abstract class TypedAstMerger {
             member: expr.member,
             isNullChaining: expr.isNullChaining,
             overload: expr.overload,
-            arguments: expr.arguments.map((arg) => this.remapExpression(arg, mapping))
+            arguments: expr.arguments.map((arg) => this.remapCallArgument(arg, mapping))
+        };
+    }
+
+    /**
+     * Remaps a call argument, updating both the expression and parameter type indices.
+     *
+     * @param arg The call argument to remap
+     * @param mapping The index mapping
+     * @returns A new call argument with remapped type indices
+     */
+    protected remapCallArgument(arg: TypedCallArgument, mapping: Map<number, number>): TypedCallArgument {
+        return {
+            value: this.remapExpression(arg.value, mapping),
+            parameterType: mapping.get(arg.parameterType)!
         };
     }
 

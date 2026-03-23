@@ -57,6 +57,46 @@ fun createDoubleType(): TypeDefinition {
             overload("", "(D)J", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.LONG)
         }
 
+        staticMethod("sqrt") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("sin") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("cos") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("tan") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("asin") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("acos") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("atan") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("sinh") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("cosh") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
+        staticMethod("tanh") {
+            overload("", "(D)D", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.DOUBLE)
+        }
+
         staticMethod("toString") {
             overload("", "(D)Ljava/lang/String;", DOUBLE_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }

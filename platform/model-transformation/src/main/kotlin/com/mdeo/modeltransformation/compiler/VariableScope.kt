@@ -38,7 +38,9 @@ sealed interface VariableBinding {
     data class InstanceBinding(
         var vertexRef: VertexRef?
     ) : VariableBinding {
-        /** The current raw vertex ID, or null if this binding is not yet resolved. */
+        /**
+         * The current raw vertex ID, or null if this binding is not yet resolved. 
+         */
         val vertexId: Any? get() = vertexRef?.rawId
     }
     

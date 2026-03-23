@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * @param kind The kind of expression.
  * @param evalType Index into the types array for the type this expression evaluates to.
  * @param expression The expression being called (function or lambda).
- * @param arguments Array of argument expressions.
+ * @param arguments List of arguments with their expected parameter types.
  */
 @Serializable
 data class TypedExpressionCallExpression(
@@ -19,5 +19,5 @@ data class TypedExpressionCallExpression(
     @Contextual
     val expression: TypedExpression,
     @SerialName("arguments")
-    override val arguments: List<@Contextual TypedExpression>
+    override val arguments: List<TypedCallArgument>
 ) : TypedCallExpression

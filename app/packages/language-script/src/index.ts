@@ -12,6 +12,7 @@ export * from "./features/scriptScopeProvider.js";
 export * from "./features/scriptSerializers.js";
 export * from "./features/scriptValidator.js";
 export * from "./grammar/scriptRules.js";
+export * from "./features/scriptTokenBuilder.js";
 export * from "./grammar/scriptTypes.js";
 export * from "./plugin/resolvePlugins.js";
 export * from "./plugin/scriptContributionPlugin.js";

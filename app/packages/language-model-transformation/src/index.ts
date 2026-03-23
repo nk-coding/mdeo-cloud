@@ -69,6 +69,7 @@ export * from "./features/modelTransformationScopeComputation.js";
 export * from "./features/modelTransformationScopeProvider.js";
 export * from "./features/modelTransformationSerializers.js";
 export * from "./grammar/modelTransformationRules.js";
+export * from "./features/modelTransformationTokenBuilder.js";
 export * from "./grammar/modelTransformationTypes.js";
 export * from "./plugin/typedAst.js";
 export * from "./validation/modelTransformationValidator.js";

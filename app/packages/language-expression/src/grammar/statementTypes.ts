@@ -60,7 +60,7 @@ export function generateStatementTypes(config: StatementConfig, expressionTypes:
     const assignmentStatementType = createInterface(config.assignmentStatementTypeName)
         .extends(baseStatementType)
         .attrs({
-            left: expressionTypes.assignableExpressionType,
+            left: baseExpressionType,
             right: baseExpressionType
         });
 

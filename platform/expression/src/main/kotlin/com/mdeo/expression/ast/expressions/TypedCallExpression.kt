@@ -1,6 +1,5 @@
 package com.mdeo.expression.ast.expressions
 
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 
 /**
@@ -8,8 +7,9 @@ import kotlinx.serialization.SerialName
  */
 interface TypedCallExpression : TypedExpression {
     /**
-     * Array of argument expressions.
+     * List of arguments, each wrapping the expression and its expected parameter type
+     * from the resolved function signature.
      */
     @SerialName("arguments")
-    val arguments: List<@Contextual TypedExpression>
+    val arguments: List<TypedCallArgument>
 }

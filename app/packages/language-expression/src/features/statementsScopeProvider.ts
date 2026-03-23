@@ -12,7 +12,7 @@ import type { ExpressionTypirServices } from "../type-system/services.js";
 import type { ForStatementType, StatementsScopeType, StatementTypes } from "../grammar/statementTypes.js";
 import type { AstReflection } from "@mdeo/language-common";
 import type { TypeInferenceCollector } from "typir";
-import type { ExpressionTypes } from "../grammar/expressionTypes.js";
+import type { ExpressionTypes, IdentifierExpressionType } from "../grammar/expressionTypes.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
 
 /**
@@ -219,13 +219,13 @@ export class StatementsScopeProvider<Specifics extends TypirLangiumSpecifics> ex
                         name: statement.name,
                         position: i
                     });
-                } else if (this.reflection.isInstance(statement, this.statementTypes.assignmentStatementType)) {
-                    if (this.reflection.isInstance(statement.left, this.expressionTypes.identifierExpressionType)) {
-                        initializations.push({
-                            name: statement.left.name,
-                            position: i
-                        });
-                    }
+                }
+            } else if (this.reflection.isInstance(statement, this.statementTypes.assignmentStatementType)) {
+                if (this.reflection.isInstance(statement.left, this.expressionTypes.identifierExpressionType)) {
+                    initializations.push({
+                        name: (statement.left as IdentifierExpressionType).name,
+                        position: i
+                    });
                 }
             }
         }

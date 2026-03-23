@@ -22,10 +22,14 @@ data class CompiledProgram(
     val metamodel: Metamodel? = null
 ) {
     companion object {
-        /** JVM binary class name (dot-separated) of the single generated script class. */
+        /**
+         * JVM binary class name (dot-separated) of the single generated script class. 
+         */
         const val SCRIPT_PROGRAM_BINARY_NAME = "com.mdeo.script.generated.ScriptProgram"
 
-        /** JVM internal class name (slash-separated) of the single generated script class. */
+        /**
+         * JVM internal class name (slash-separated) of the single generated script class. 
+         */
         const val SCRIPT_PROGRAM_INTERNAL_NAME = "com/mdeo/script/generated/ScriptProgram"
     }
 }

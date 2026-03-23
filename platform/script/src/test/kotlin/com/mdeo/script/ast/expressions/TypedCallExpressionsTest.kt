@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.script.ast.expressions.TypedExpressionSerializer
 import com.mdeo.script.ast.statements.TypedStatementSerializer
 
+import com.mdeo.expression.ast.expressions.TypedCallArgument
 import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
 import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
 import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
@@ -38,8 +39,8 @@ class TypedCallExpressionsTest {
             "name": "add",
             "overload": "",
             "arguments": [
-                {"kind": "intLiteral", "evalType": 0, "value": "1"},
-                {"kind": "intLiteral", "evalType": 0, "value": "2"}
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "1"}, "parameterType": 0},
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "2"}, "parameterType": 0}
             ]
         }"""
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
@@ -51,8 +52,10 @@ class TypedCallExpressionsTest {
         assertEquals("", result.overload)
         assertEquals(2, result.arguments.size)
         
-        assertIs<TypedIntLiteralExpression>(result.arguments[0])
-        assertIs<TypedIntLiteralExpression>(result.arguments[1])
+        assertIs<TypedCallArgument>(result.arguments[0])
+        assertIs<TypedIntLiteralExpression>(result.arguments[0].value)
+        assertIs<TypedCallArgument>(result.arguments[1])
+        assertIs<TypedIntLiteralExpression>(result.arguments[1].value)
     }
     
     @Test
@@ -63,7 +66,7 @@ class TypedCallExpressionsTest {
             "name": "print",
             "overload": "int",
             "arguments": [
-                {"kind": "intLiteral", "evalType": 0, "value": "42"}
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "42"}, "parameterType": 0}
             ]
         }"""
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
@@ -141,8 +144,8 @@ class TypedCallExpressionsTest {
             "isNullChaining": false,
             "overload": "",
             "arguments": [
-                {"kind": "intLiteral", "evalType": 0, "value": "0"},
-                {"kind": "intLiteral", "evalType": 0, "value": "5"}
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "0"}, "parameterType": 0},
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "5"}, "parameterType": 0}
             ]
         }"""
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
@@ -159,7 +162,7 @@ class TypedCallExpressionsTest {
             "evalType": 0,
             "expression": {"kind": "identifier", "evalType": 1, "name": "callback", "scope": 2},
             "arguments": [
-                {"kind": "intLiteral", "evalType": 0, "value": "42"}
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "42"}, "parameterType": 0}
             ]
         }"""
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)
@@ -191,7 +194,7 @@ class TypedCallExpressionsTest {
                 }
             },
             "arguments": [
-                {"kind": "intLiteral", "evalType": 0, "value": "5"}
+                {"value": {"kind": "intLiteral", "evalType": 0, "value": "5"}, "parameterType": 0}
             ]
         }"""
         val result = json.decodeFromString(TypedExpressionSerializer, jsonString)

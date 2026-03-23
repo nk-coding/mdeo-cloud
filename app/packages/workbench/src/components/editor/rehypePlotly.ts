@@ -5,9 +5,13 @@ import { visit } from "unist-util-visit";
  * Descriptor for a plotly chart embedded in markdown.
  */
 export interface PlotEmbed {
-    /** Unique DOM element ID for the placeholder div. */
+    /**
+     * Unique DOM element ID for the placeholder div.
+     */
     id: string;
-    /** The plotly.js-compatible JSON configuration string. */
+    /**
+     * The plotly.js-compatible JSON configuration string.
+     */
     json: string;
 }
 
@@ -25,20 +29,15 @@ export interface PlotEmbed {
  * @param onPlot Callback invoked for each discovered plot code block.
  * @param idGenerator A function that generates unique IDs for the placeholder divs.
  */
-export function rehypePlotly(
-    onPlot: (plot: PlotEmbed) => void,
-    idGenerator: () => string
-) {
+export function rehypePlotly(onPlot: (plot: PlotEmbed) => void, idGenerator: () => string) {
     return (tree: Root) => {
         visit(tree, "element", (node: Element, index, parent) => {
-            // Code blocks render as <pre><code class="language-plot">...
             if (node.tagName !== "pre" || index == null || parent == null) {
                 return;
             }
 
             const codeElement = node.children.find(
-                (child): child is Element =>
-                    child.type === "element" && child.tagName === "code"
+                (child): child is Element => child.type === "element" && child.tagName === "code"
             );
             if (!codeElement) return;
 
@@ -46,9 +45,10 @@ export function rehypePlotly(
             const classes = Array.isArray(className) ? className : [className];
             if (!classes.includes("language-plot")) return;
 
-            // Extract text content from the code element
             const textNode = codeElement.children.find((child) => child.type === "text");
-            if (!textNode || textNode.type !== "text") return;
+            if (!textNode || textNode.type !== "text") {
+                return;
+            }
 
             const json = textNode.value.trim();
             const plotId = idGenerator();

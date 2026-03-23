@@ -796,8 +796,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
                     ? multiplicityMeta.meta
                     : NodeLayoutMetadataUtil.create(0, 0);
 
-            const multiplicityText =
-                multiplicity != undefined ? this.formatMultiplicity(multiplicity) : "0..1";
+            const multiplicityText = multiplicity != undefined ? this.formatMultiplicity(multiplicity) : "0..1";
             // Only allow editing the multiplicity if the end has a property name.
             // Without a property name, the grammar does not permit explicit multiplicity.
             const multiplicityReadonly = property == undefined;

@@ -1,16 +1,12 @@
 package com.mdeo.script.compiler.expressions
 
-import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedCallArgument
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
-import com.mdeo.expression.ast.types.VoidType
-import com.mdeo.script.compiler.util.ASMUtil
 import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
-import com.mdeo.script.compiler.util.TypeConversionUtil
-import com.mdeo.script.compiler.util.MethodDescriptorUtil
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -18,14 +14,16 @@ import org.objectweb.asm.Opcodes
  * Abstract base class for call expression compilers.
  *
  * This class provides shared functionality for:
- * - Parameter type coercion (boxing primitives, type widening)
+ * - Parameter type coercion (boxing primitives, type widening) based on resolved parameter types
+ *   provided by each [TypedCallArgument]
  * - Return type coercion (unboxing when needed)
- * - Varargs argument packaging
+ * - Varargs argument packaging with proper coercion
  * - Common compile patterns
  *
  * Subclasses implement specific invocation logic for:
  * - Global function calls ([FunctionCallCompiler])
  * - Member method calls ([MemberCallCompiler])
+ * - Expression (lambda) calls ([ExpressionCallCompiler])
  */
 abstract class AbstractCallCompiler : ExpressionCompiler() {
 
@@ -58,61 +56,79 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
     }
 
     /**
-     * Compiles varargs arguments into an Object array.
+     * Compiles call arguments with type coercion, handling both regular and varargs parameters.
      *
-     * For varargs calls, all arguments are packaged into a single Object[]
-     * before the method invocation. Primitive values are boxed automatically.
+     * Each [TypedCallArgument] carries its own expected parameter type (resolved during
+     * type checking, including generic substitution). This method uses that type to apply
+     * correct coercion for each argument.
      *
-     * @param arguments The list of argument expressions.
+     * Coercion is applied in two steps:
+     * 1. Coerce from the argument's actual type to the resolved parameter type from
+     *    [TypedCallArgument.parameterType] (e.g., int → double for generic resolution).
+     * 2. Coerce from the resolved parameter type to the JVM method's expected type from
+     *    [signatureParameterTypes] (e.g., boxing an int to Object when the JVM method
+     *    takes Object). This step is only needed when the JVM type differs from the
+     *    resolved type.
+     *
+     * For varargs, arguments starting at [varArgsStartIndex] are packaged into an Object[]
+     * array. Each varargs element is first coerced to its expected type, then boxed if it is
+     * a primitive (since Object[] can only hold reference types). Arguments before
+     * [varArgsStartIndex] are compiled as regular parameters with coercion.
+     *
+     * @param arguments The list of call arguments with their expected parameter types.
      * @param context The compilation context.
      * @param mv The ASM MethodVisitor for emitting bytecode.
+     * @param signatureParameterTypes The JVM-level parameter types from the function/method
+     *                                 signature. Used for the second coercion step (boxing,
+     *                                 widening to match JVM descriptor). Empty list if not
+     *                                 available (e.g., for expression calls where JVM types
+     *                                 are derived differently).
+     * @param varArgsStartIndex The index at which varargs begin. Arguments before this index
+     *                          are compiled as regular parameters. Null means no varargs
      */
-    protected fun compileVarArgsArray(
-        arguments: List<TypedExpression>,
+    protected fun compileArgumentsWithCoercion(
+        arguments: List<TypedCallArgument>,
         context: CompilationContext,
-        mv: MethodVisitor
+        mv: MethodVisitor,
+        signatureParameterTypes: List<ValueType> = emptyList(),
+        varArgsStartIndex: Int? = null
     ) {
-        val argCount = arguments.size
+        if (varArgsStartIndex == null) {
+            for ((i, arg) in arguments.withIndex()) {
+                val resolvedType = context.getType(arg.parameterType)
+                context.compileExpression(arg.value, mv, resolvedType)
+                if (i < signatureParameterTypes.size) {
+                    CoercionUtil.emitCoercion(resolvedType, signatureParameterTypes[i], mv, context)
+                }
+            }
+            return
+        }
 
-        mv.visitLdcInsn(argCount)
+        for (i in 0 until varArgsStartIndex.coerceAtMost(arguments.size)) {
+            val arg = arguments[i]
+            val resolvedType = context.getType(arg.parameterType)
+            context.compileExpression(arg.value, mv, resolvedType)
+            if (i < signatureParameterTypes.size) {
+                CoercionUtil.emitCoercion(resolvedType, signatureParameterTypes[i], mv, context)
+            }
+        }
+
+        val varArgs = arguments.subList(varArgsStartIndex.coerceAtMost(arguments.size), arguments.size)
+        mv.visitLdcInsn(varArgs.size)
         mv.visitTypeInsn(Opcodes.ANEWARRAY, "java/lang/Object")
 
-        for ((index, arg) in arguments.withIndex()) {
+        for ((index, arg) in varArgs.withIndex()) {
             mv.visitInsn(Opcodes.DUP)
             mv.visitLdcInsn(index)
 
-            val argType = context.getType(arg.evalType)
-            context.compileExpression(arg, mv, argType)
+            val resolvedType = context.getType(arg.parameterType)
+            context.compileExpression(arg.value, mv, resolvedType)
 
-            if (argType is ClassTypeRef && !argType.isNullable && CoercionUtil.isPrimitiveType(argType)) {
-                CoercionUtil.emitBoxing(argType, mv)
+            if (resolvedType is ClassTypeRef && !resolvedType.isNullable && CoercionUtil.isPrimitiveType(resolvedType)) {
+                CoercionUtil.emitBoxing(resolvedType, mv)
             }
 
             mv.visitInsn(Opcodes.AASTORE)
-        }
-    }
-
-    /**
-     * Compiles arguments with type coercion based on parameter types.
-     *
-     * Each argument is compiled and then coerced to match the expected
-     * parameter type from the method signature.
-     *
-     * @param arguments The list of argument expressions.
-     * @param parameterTypes The list of expected parameter types.
-     * @param context The compilation context.
-     * @param mv The ASM MethodVisitor for emitting bytecode.
-     */
-    protected fun compileArgumentsWithCoercion(
-        arguments: List<TypedExpression>,
-        parameterTypes: List<ValueType>,
-        context: CompilationContext,
-        mv: MethodVisitor
-    ) {
-        for ((index, arg) in arguments.withIndex()) {
-            val argType = context.getType(arg.evalType)
-            val expectedType = if (index < parameterTypes.size) parameterTypes[index] else argType
-            context.compileExpression(arg, mv, expectedType)
         }
     }
 

@@ -36,7 +36,9 @@ data class NodeGenerationMetrics(
 class OptimizationMetricsCollector {
     private val _generations = mutableListOf<GenerationMetrics>()
 
-    /** All recorded generations in order. */
+    /**
+     * All recorded generations in order. 
+     */
     val generations: List<GenerationMetrics> get() = _generations
 
     /**

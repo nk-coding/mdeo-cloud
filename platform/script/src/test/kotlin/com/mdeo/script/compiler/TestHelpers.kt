@@ -11,6 +11,7 @@ import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedDoubleLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
+import com.mdeo.expression.ast.expressions.TypedCallArgument
 import com.mdeo.expression.ast.expressions.TypedFloatLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedFunctionCallExpression
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
@@ -534,6 +535,11 @@ fun continueStmt(): TypedContinueStatement {
 
 /**
  * Creates a function call expression.
+ *
+ * Each argument is automatically wrapped in a [TypedCallArgument] with the
+ * parameter type defaulting to the argument's own eval type. For calls where
+ * the expected parameter type differs (e.g., generic functions), use [arg]
+ * to specify explicit parameter types.
  * 
  * @param name The name of the function being called.
  * @param overload The overload string identifying the function signature.
@@ -545,6 +551,33 @@ fun functionCall(
     name: String,
     overload: String,
     arguments: List<TypedExpression>,
+    resultTypeIndex: Int
+): TypedFunctionCallExpression {
+    return TypedFunctionCallExpression(
+        evalType = resultTypeIndex,
+        name = name,
+        overload = overload,
+        arguments = arguments.map { TypedCallArgument(value = it, parameterType = it.evalType) }
+    )
+}
+
+/**
+ * Creates a function call expression with pre-wrapped [TypedCallArgument] arguments.
+ *
+ * Use this when arguments need explicit parameter types that differ from
+ * their expression types (e.g., generic functions like `listOf<double>(1, 2, 3)`
+ * where int arguments should be coerced to double).
+ *
+ * @param name The name of the function being called.
+ * @param overload The overload string identifying the function signature.
+ * @param arguments The pre-wrapped call arguments (created via [arg]).
+ * @param resultTypeIndex The index of the result type in the types array.
+ * @return The function call expression.
+ */
+fun functionCallWithArgs(
+    name: String,
+    overload: String,
+    arguments: List<TypedCallArgument>,
     resultTypeIndex: Int
 ): TypedFunctionCallExpression {
     return TypedFunctionCallExpression(
@@ -580,6 +613,9 @@ fun memberAccess(
 
 /**
  * Creates a member call expression.
+ *
+ * Each argument is automatically wrapped in a [TypedCallArgument] with the
+ * parameter type defaulting to the argument's own eval type.
  * 
  * @param expression The target expression.
  * @param member The name of the member function being called.
@@ -603,7 +639,7 @@ fun memberCall(
         member = member,
         isNullChaining = isNullChaining,
         overload = overload,
-        arguments = arguments
+        arguments = arguments.map { TypedCallArgument(value = it, parameterType = it.evalType) }
     )
 }
 
@@ -680,6 +716,9 @@ fun exprStmt(expression: TypedExpression): TypedExpressionStatement {
  * 
  * This is used when a lambda stored in a variable is called directly,
  * for example: `f(10)` where `f` is a lambda variable.
+ *
+ * Each argument is automatically wrapped in a [TypedCallArgument] with the
+ * parameter type defaulting to the argument's own eval type.
  * 
  * @param expression The expression evaluating to a lambda.
  * @param arguments The argument expressions.
@@ -694,8 +733,32 @@ fun expressionCall(
     return TypedExpressionCallExpression(
         evalType = resultTypeIndex,
         expression = expression,
-        arguments = arguments
+        arguments = arguments.map { TypedCallArgument(value = it, parameterType = it.evalType) }
     )
+}
+
+/**
+ * Wraps an expression as a call argument using the expression's own eval type
+ * as the expected parameter type. This is the common case for non-generic functions.
+ *
+ * @param expr The argument expression.
+ * @return A [TypedCallArgument] with parameterType set to the expression's evalType.
+ */
+fun arg(expr: TypedExpression): TypedCallArgument {
+    return TypedCallArgument(value = expr, parameterType = expr.evalType)
+}
+
+/**
+ * Wraps an expression as a call argument with an explicit expected parameter type.
+ * Use this for generic functions where the resolved parameter type differs from
+ * the argument's expression type (e.g., `listOf<double>(1)` where int → double).
+ *
+ * @param expr The argument expression.
+ * @param parameterType The expected parameter type index from the resolved function signature.
+ * @return A [TypedCallArgument] with the specified parameterType.
+ */
+fun arg(expr: TypedExpression, parameterType: Int): TypedCallArgument {
+    return TypedCallArgument(value = expr, parameterType = parameterType)
 }
 
 /**

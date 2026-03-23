@@ -297,4 +297,273 @@ class DoubleHelperTest {
     fun `isInfinite returns false for NaN`() {
         assertFalse(DoubleHelper.isInfinite(Double.NaN))
     }
+
+    // ==================== sqrt() tests ====================
+    @Test
+    fun `sqrt of 4 returns 2`() {
+        assertEquals(2.0, DoubleHelper.sqrt(4.0), 0.0001)
+    }
+
+    @Test
+    fun `sqrt of 9 returns 3`() {
+        assertEquals(3.0, DoubleHelper.sqrt(9.0), 0.0001)
+    }
+
+    @Test
+    fun `sqrt of 2 returns approximately 1_414`() {
+        assertEquals(1.41421356, DoubleHelper.sqrt(2.0), 0.0001)
+    }
+
+    @Test
+    fun `sqrt of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.sqrt(0.0), 0.0001)
+    }
+
+    @Test
+    fun `sqrt of negative returns NaN`() {
+        assertTrue(DoubleHelper.sqrt(-1.0).isNaN())
+    }
+
+    // ==================== sin() tests ====================
+    @Test
+    fun `sin of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.sin(0.0), 0.0001)
+    }
+
+    @Test
+    fun `sin of pi over 2 returns 1`() {
+        assertEquals(1.0, DoubleHelper.sin(Math.PI / 2), 0.0001)
+    }
+
+    @Test
+    fun `sin of pi returns 0`() {
+        assertEquals(0.0, DoubleHelper.sin(Math.PI), 0.0001)
+    }
+
+    @Test
+    fun `sin of negative pi over 2 returns -1`() {
+        assertEquals(-1.0, DoubleHelper.sin(-Math.PI / 2), 0.0001)
+    }
+
+    @Test
+    fun `sin result is between -1 and 1`() {
+        val result = DoubleHelper.sin(1.0)
+        assertTrue(result >= -1.0 && result <= 1.0)
+    }
+
+    // ==================== cos() tests ====================
+    @Test
+    fun `cos of 0 returns 1`() {
+        assertEquals(1.0, DoubleHelper.cos(0.0), 0.0001)
+    }
+
+    @Test
+    fun `cos of pi over 2 returns 0`() {
+        assertEquals(0.0, DoubleHelper.cos(Math.PI / 2), 0.0001)
+    }
+
+    @Test
+    fun `cos of pi returns -1`() {
+        assertEquals(-1.0, DoubleHelper.cos(Math.PI), 0.0001)
+    }
+
+    @Test
+    fun `cos of 2pi returns 1`() {
+        assertEquals(1.0, DoubleHelper.cos(2 * Math.PI), 0.0001)
+    }
+
+    @Test
+    fun `cos result is between -1 and 1`() {
+        val result = DoubleHelper.cos(1.0)
+        assertTrue(result >= -1.0 && result <= 1.0)
+    }
+
+    // ==================== tan() tests ====================
+    @Test
+    fun `tan of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.tan(0.0), 0.0001)
+    }
+
+    @Test
+    fun `tan of pi over 4 returns 1`() {
+        assertEquals(1.0, DoubleHelper.tan(Math.PI / 4), 0.0001)
+    }
+
+    @Test
+    fun `tan of negative pi over 4 returns -1`() {
+        assertEquals(-1.0, DoubleHelper.tan(-Math.PI / 4), 0.0001)
+    }
+
+    @Test
+    fun `tan of pi returns 0`() {
+        assertEquals(0.0, DoubleHelper.tan(Math.PI), 0.0001)
+    }
+
+    @Test
+    fun `tan is sin over cos`() {
+        val angle = 0.5
+        assertEquals(DoubleHelper.sin(angle) / DoubleHelper.cos(angle), DoubleHelper.tan(angle), 0.0001)
+    }
+
+    // ==================== asin() tests ====================
+    @Test
+    fun `asin of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.asin(0.0), 0.0001)
+    }
+
+    @Test
+    fun `asin of 1 returns pi over 2`() {
+        assertEquals(Math.PI / 2, DoubleHelper.asin(1.0), 0.0001)
+    }
+
+    @Test
+    fun `asin of -1 returns negative pi over 2`() {
+        assertEquals(-Math.PI / 2, DoubleHelper.asin(-1.0), 0.0001)
+    }
+
+    @Test
+    fun `asin inverts sin`() {
+        val value = 0.5
+        assertEquals(value, DoubleHelper.sin(DoubleHelper.asin(value)), 0.0001)
+    }
+
+    @Test
+    fun `asin of value outside range returns NaN`() {
+        assertTrue(DoubleHelper.asin(2.0).isNaN())
+    }
+
+    // ==================== acos() tests ====================
+    @Test
+    fun `acos of 1 returns 0`() {
+        assertEquals(0.0, DoubleHelper.acos(1.0), 0.0001)
+    }
+
+    @Test
+    fun `acos of 0 returns pi over 2`() {
+        assertEquals(Math.PI / 2, DoubleHelper.acos(0.0), 0.0001)
+    }
+
+    @Test
+    fun `acos of -1 returns pi`() {
+        assertEquals(Math.PI, DoubleHelper.acos(-1.0), 0.0001)
+    }
+
+    @Test
+    fun `acos inverts cos`() {
+        val value = 0.5
+        assertEquals(value, DoubleHelper.cos(DoubleHelper.acos(value)), 0.0001)
+    }
+
+    @Test
+    fun `acos of value outside range returns NaN`() {
+        assertTrue(DoubleHelper.acos(2.0).isNaN())
+    }
+
+    // ==================== atan() tests ====================
+    @Test
+    fun `atan of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.atan(0.0), 0.0001)
+    }
+
+    @Test
+    fun `atan of 1 returns pi over 4`() {
+        assertEquals(Math.PI / 4, DoubleHelper.atan(1.0), 0.0001)
+    }
+
+    @Test
+    fun `atan of -1 returns negative pi over 4`() {
+        assertEquals(-Math.PI / 4, DoubleHelper.atan(-1.0), 0.0001)
+    }
+
+    @Test
+    fun `atan result is between negative pi over 2 and pi over 2`() {
+        val result = DoubleHelper.atan(100.0)
+        assertTrue(result > -Math.PI / 2 && result < Math.PI / 2)
+    }
+
+    @Test
+    fun `atan inverts tan`() {
+        val value = 0.5
+        assertEquals(value, DoubleHelper.tan(DoubleHelper.atan(value)), 0.0001)
+    }
+
+    // ==================== sinh() tests ====================
+    @Test
+    fun `sinh of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.sinh(0.0), 0.0001)
+    }
+
+    @Test
+    fun `sinh of 1 is approximately 1_175`() {
+        assertEquals(1.1752012, DoubleHelper.sinh(1.0), 0.0001)
+    }
+
+    @Test
+    fun `sinh is odd function`() {
+        assertEquals(-DoubleHelper.sinh(1.0), DoubleHelper.sinh(-1.0), 0.0001)
+    }
+
+    @Test
+    fun `sinh grows with input`() {
+        assertTrue(DoubleHelper.sinh(2.0) > DoubleHelper.sinh(1.0))
+    }
+
+    @Test
+    fun `sinh of large value is large`() {
+        assertTrue(DoubleHelper.sinh(10.0) > 1000.0)
+    }
+
+    // ==================== cosh() tests ====================
+    @Test
+    fun `cosh of 0 returns 1`() {
+        assertEquals(1.0, DoubleHelper.cosh(0.0), 0.0001)
+    }
+
+    @Test
+    fun `cosh of 1 is approximately 1_543`() {
+        assertEquals(1.5430806, DoubleHelper.cosh(1.0), 0.0001)
+    }
+
+    @Test
+    fun `cosh is even function`() {
+        assertEquals(DoubleHelper.cosh(1.0), DoubleHelper.cosh(-1.0), 0.0001)
+    }
+
+    @Test
+    fun `cosh is always at least 1`() {
+        assertTrue(DoubleHelper.cosh(5.0) >= 1.0)
+    }
+
+    @Test
+    fun `cosh squared minus sinh squared equals 1`() {
+        val x = 2.0
+        assertEquals(1.0, DoubleHelper.cosh(x) * DoubleHelper.cosh(x) - DoubleHelper.sinh(x) * DoubleHelper.sinh(x), 0.0001)
+    }
+
+    // ==================== tanh() tests ====================
+    @Test
+    fun `tanh of 0 returns 0`() {
+        assertEquals(0.0, DoubleHelper.tanh(0.0), 0.0001)
+    }
+
+    @Test
+    fun `tanh approaches 1 for large positive values`() {
+        assertTrue(DoubleHelper.tanh(100.0) > 0.999)
+    }
+
+    @Test
+    fun `tanh approaches -1 for large negative values`() {
+        assertTrue(DoubleHelper.tanh(-100.0) < -0.999)
+    }
+
+    @Test
+    fun `tanh is odd function`() {
+        assertEquals(-DoubleHelper.tanh(1.0), DoubleHelper.tanh(-1.0), 0.0001)
+    }
+
+    @Test
+    fun `tanh result is between -1 and 1`() {
+        val result = DoubleHelper.tanh(2.0)
+        assertTrue(result > -1.0 && result < 1.0)
+    }
 }

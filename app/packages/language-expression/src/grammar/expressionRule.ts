@@ -21,28 +21,28 @@ import type { BaseTypeType } from "./typeTypes.js";
 /**
  * Integer token (32-bit) - returns string to preserve precision
  */
-const INT_LITERAL = createTerminal("INT_LITERAL")
+export const INT_LITERAL = createTerminal("INT_LITERAL")
     .returns(String)
     .as(/[0-9]+/);
 
 /**
  * Long token (64-bit integer, suffixed with L or l) - returns string to preserve precision
  */
-const LONG_LITERAL = createTerminal("LONG_LITERAL")
+export const LONG_LITERAL = createTerminal("LONG_LITERAL")
     .returns(String)
     .as(/[0-9]+[Ll]/);
 
 /**
  * Float token (32-bit floating point, suffixed with F or f) - returns string to preserve precision
  */
-const FLOAT_LITERAL = createTerminal("FLOAT_LITERAL")
+export const FLOAT_LITERAL = createTerminal("FLOAT_LITERAL")
     .returns(String)
     .as(/[0-9]+\.[0-9]+[Ff]/);
 
 /**
  * Double token (64-bit floating point, optionally suffixed with D or d) - returns string to preserve precision
  */
-const DOUBLE_LITERAL = createTerminal("DOUBLE_LITERAL")
+export const DOUBLE_LITERAL = createTerminal("DOUBLE_LITERAL")
     .returns(String)
     .as(/[0-9]+\.[0-9]+[Dd]?/);
 
@@ -136,8 +136,8 @@ export function generateExpressionRules(
                     nullLiteralExpressionRule,
                     identifierExpressionRule,
                     listExpressionRule,
-                    group("(", () => expressionRule, ")"),
-                    ...additionalExpressionRules
+                    ...additionalExpressionRules,
+                    group("(", () => expressionRule, ")")
                 )
             ];
         });
@@ -264,16 +264,15 @@ export function generateExpressionRules(
         .as(() => [binaryExpressionLowerRule]);
 
     const ternaryExpressionRule = createRule(config.ternaryExpressionRuleName)
-        .returns(types.ternaryExpressionType)
+        .returns(types.baseExpressionType)
         .as(() => [
-            or(
-                binaryExpressionRule,
-                action(types.ternaryExpressionType, ({ set }) => [
-                    set("condition", binaryExpressionRule),
+            binaryExpressionRule,
+            many(
+                treeRewriteAction(types.ternaryExpressionType, "condition", "=", ({ set }) => [
                     "?",
-                    set("trueExpression", binaryExpressionRule),
+                    set("trueExpression", () => ternaryExpressionRule),
                     ":",
-                    set("falseExpression", binaryExpressionRule)
+                    set("falseExpression", () => ternaryExpressionRule)
                 ])
             )
         ]);
@@ -282,13 +281,8 @@ export function generateExpressionRules(
         .returns(types.baseExpressionType)
         .as(() => [ternaryExpressionRule]);
 
-    const assignableExpressionRule = createRule(config.assignableExpressionRuleName)
-        .returns(types.assignableExpressionType)
-        .as(() => [or(identifierExpressionRule, postfixExpressionRule)]);
-
     return {
         expressionRule,
-        assignableExpressionRule,
         stringLiteralExpressionRule,
         intLiteralExpressionRule,
         longLiteralExpressionRule,

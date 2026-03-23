@@ -25,7 +25,9 @@ import org.moeaframework.core.operator.Mutation
 class PassThroughVariation : Mutation {
 
     companion object {
-        /** Attribute key storing the parent's [WorkerSolutionRef] on an offspring solution. */
+        /**
+         * Attribute key storing the parent's [WorkerSolutionRef] on an offspring solution. 
+         */
         const val PARENT_REF_KEY = "parentSolutionRef"
     }
 

@@ -17,7 +17,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed class WorkerWsMessage {
 
-    /** Correlation identifier echoed verbatim in the corresponding response. */
+    /**
+     * Correlation identifier echoed verbatim in the corresponding response. 
+     */
     abstract val requestId: String
 }
 

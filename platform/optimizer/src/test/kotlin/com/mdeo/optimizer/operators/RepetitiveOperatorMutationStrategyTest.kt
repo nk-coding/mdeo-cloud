@@ -22,10 +22,14 @@ class RepetitiveOperatorMutationStrategyTest {
 
     private val metamodel = Metamodel.compile(MetamodelData())
 
-    /** A TypedAst with no statements — executes as a successful no-op. */
+    /**
+     * A TypedAst with no statements — executes as a successful no-op. 
+     */
     private val noOpAst = TypedAst(types = emptyList(), metamodelPath = "", statements = emptyList())
 
-    /** A TypedAst whose statement has an unregistered kind, causing a Failure result. */
+    /**
+     * A TypedAst whose statement has an unregistered kind, causing a Failure result. 
+     */
     private val failAst = TypedAst(
         types = emptyList(),
         metamodelPath = "",

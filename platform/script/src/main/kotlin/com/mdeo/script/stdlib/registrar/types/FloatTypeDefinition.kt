@@ -57,6 +57,46 @@ fun createFloatType(): TypeDefinition {
             overload("", "(F)I", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.INT)
         }
 
+        staticMethod("sqrt") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("sin") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("cos") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("tan") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("asin") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("acos") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("atan") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("sinh") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("cosh") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
+        staticMethod("tanh") {
+            overload("", "(F)F", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.FLOAT)
+        }
+
         staticMethod("toString") {
             overload("", "(F)Ljava/lang/String;", FLOAT_HELPER, parameterTypes = emptyList(), returnType = BuiltinTypes.STRING)
         }

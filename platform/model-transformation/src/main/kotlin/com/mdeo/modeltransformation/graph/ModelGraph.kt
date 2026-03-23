@@ -19,10 +19,14 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  */
 interface ModelGraph : AutoCloseable {
 
-    /** The compiled metamodel this graph is based on. */
+    /**
+     * The compiled metamodel this graph is based on. 
+     */
     val metamodel: Metamodel
 
-    /** Registry mapping vertex IDs to instance names. */
+    /**
+     * Registry mapping vertex IDs to instance names. 
+     */
     val nameRegistry: InstanceNameRegistry
 
     /**

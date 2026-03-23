@@ -403,13 +403,37 @@ export interface TypedListExpression extends TypedExpression {
 }
 
 /**
+ * Wraps a call argument with its expected parameter type from the function signature.
+ *
+ * This captures both the actual argument expression and the type that the function
+ * signature expects for this parameter position. For generic functions, the parameter
+ * type is the resolved (substituted) type rather than the raw generic type.
+ *
+ * For example, in `listOf<double>(1, 2, 3)`, each argument would have:
+ * - `value`: the int literal expression (evalType = int)
+ * - `parameterType`: index pointing to `double` (the resolved generic type)
+ */
+export interface TypedCallArgument {
+    /**
+     * The actual argument expression.
+     */
+    value: TypedExpression;
+    /**
+     * Index into the types array for the type the function signature expects
+     * at this parameter position. This is the resolved type after generic substitution.
+     */
+    parameterType: number;
+}
+
+/**
  * Base interface for call expressions.
  */
 export interface TypedCallExpression extends TypedExpression {
     /**
-     * Array of argument expressions.
+     * List of arguments, each wrapping the expression and its expected parameter type
+     * from the resolved function signature.
      */
-    arguments: TypedExpression[];
+    arguments: TypedCallArgument[];
 }
 
 /**

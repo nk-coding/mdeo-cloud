@@ -870,7 +870,7 @@ export class MetamodelValidator {
 
         const compositionCount = this.countCompositionsToClass(oppositeClass, association);
 
-        this.validateOppositeCompositionMultiplicity(compositeEnd, compositionCount, association, accept);
+        this.validateOppositeCompositionMultiplicity(oppositeEnd, compositionCount, association, accept);
     }
 
     /**

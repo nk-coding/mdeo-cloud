@@ -70,8 +70,8 @@ export const MutationsBlockRule = createRule("ConfigMdeoMutationsBlockRule")
         many(
             or(
                 add("usingPaths", UsingPathRule),
-                add("classMutations", ClassMutationRule),
-                add("edgeMutations", EdgeMutationRule)
+                add("edgeMutations", EdgeMutationRule),
+                add("classMutations", ClassMutationRule)
             ),
             many(NEWLINE)
         ),

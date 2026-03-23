@@ -183,16 +183,13 @@ class MemberCallCompiler : AbstractCallCompiler() {
             )
         }
 
-        if (methodDef.isVarArgs) {
-            compileVarArgsArray(memberCall.arguments, context, mv)
-        } else {
-            compileArgumentsWithCoercion(
-                memberCall.arguments,
-                methodDef.parameterTypes,
-                context,
-                mv
-            )
-        }
+        compileArgumentsWithCoercion(
+            memberCall.arguments,
+            context,
+            mv,
+            signatureParameterTypes = methodDef.parameterTypes,
+            varArgsStartIndex = if (methodDef.isVarArgs)  methodDef.parameterTypes.size - 1 else null
+        )
 
         methodDef.emitInvocation(mv)
 

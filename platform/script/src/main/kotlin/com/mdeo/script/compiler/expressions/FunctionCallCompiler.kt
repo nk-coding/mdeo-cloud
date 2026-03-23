@@ -45,6 +45,10 @@ class FunctionCallCompiler : AbstractCallCompiler() {
      * receiver before arguments. For context-aware static functions (stdlib),
      * pushes `this.__ctx` before user arguments.
      *
+     * Argument types are taken from the [TypedCallArgument.parameterType] carried by
+     * each argument, which reflect the resolved parameter types (including generic
+     * substitution) determined during type checking.
+     *
      * @throws IllegalStateException if function is not found in registry
      */
     override fun compileInternal(expression: TypedExpression, context: CompilationContext, mv: MethodVisitor) {
@@ -64,16 +68,13 @@ class FunctionCallCompiler : AbstractCallCompiler() {
             emitContextLoad(context, mv)
         }
 
-        if (signature.isVarArgs) {
-            compileVarArgsArray(functionCall.arguments, context, mv)
-        } else {
-            compileArgumentsWithCoercion(
-                functionCall.arguments,
-                signature.parameterTypes,
-                context,
-                mv
-            )
-        }
+        compileArgumentsWithCoercion(
+            functionCall.arguments,
+            context,
+            mv,
+            signatureParameterTypes = signature.parameterTypes,
+            varArgsStartIndex = if (signature.isVarArgs) signature.parameterTypes.size else null
+        )
         
         signature.emitInvocation(mv)
         

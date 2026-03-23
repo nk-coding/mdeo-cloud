@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * @param member The name of the member function being called.
  * @param isNullChaining Whether this uses null-safe chaining (?.).
  * @param overload Overload identifier for the member function being called.
- * @param arguments Array of argument expressions.
+ * @param arguments List of arguments with their expected parameter types.
  */
 @Serializable
 data class TypedMemberCallExpression(
@@ -25,5 +25,5 @@ data class TypedMemberCallExpression(
     val isNullChaining: Boolean,
     val overload: String,
     @SerialName("arguments")
-    override val arguments: List<@Contextual TypedExpression>
+    override val arguments: List<TypedCallArgument>
 ) : TypedCallExpression

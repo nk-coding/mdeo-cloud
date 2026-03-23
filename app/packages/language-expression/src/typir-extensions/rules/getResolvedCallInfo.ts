@@ -1,6 +1,6 @@
 import type { TypirProblem, TypirSpecifics, ValidationProblem } from "typir";
 import type { CustomFunctionType } from "../kinds/custom-function/custom-function-type.js";
-import type { CustomLambdaType } from "../kinds/custom-lambda/custom-lambda-type.js";
+import type { CustomValueType } from "../kinds/custom-value/custom-value-type.js";
 import type { ExtendedTypirServices } from "../service/extendedTypirServices.js";
 import { CallValidationHelper } from "./callValidationHelper.js";
 import { sharedImport } from "@mdeo/language-shared";
@@ -8,24 +8,51 @@ import { sharedImport } from "@mdeo/language-shared";
 const { ValidationProblem: ValidationProblemConstant } = sharedImport("typir");
 
 /**
- * Gets the chosen overload name for a function call.
+ * Result of resolving a function call, including overload selection and
+ * resolved parameter types after generic substitution.
+ */
+export interface ResolvedCallInfo {
+    /**
+     * The name of the chosen overload.
+     */
+    overloadName: string;
+    /**
+     * The resolved parameter types for each declared parameter position.
+     * For generic functions, these are the types after generic substitution.
+     */
+    resolvedParameterTypes: CustomValueType[];
+    /**
+     * Whether the chosen signature uses varargs.
+     */
+    isVarArgs: boolean;
+    /**
+     * The index at which varargs start (i.e., the number of regular parameters).
+     * Only meaningful when {@link isVarArgs} is true.
+     */
+    varArgsStartIndex: number;
+}
+
+/**
+ * Resolves a function call and returns the overload name along with the resolved parameter types.
+ * For generic functions, parameter types are substituted with the inferred generic types.
  * Returns undefined if the call is to a lambda or if no overload could be determined.
  *
  * @template Specifics Language-specific types extending TypirSpecifics
  * @param languageNode The AST node representing the entire call expression
- * @param functionType The type of the function (must be a function type or lambda type)
+ * @param functionType The type of the function being called
  * @param genericArgumentsNodes AST nodes for explicit generic type arguments
  * @param argumentNodes AST nodes for the call arguments
  * @param services Extended Typir services for type operations
- * @returns The name of the chosen overload, or undefined
+ * @returns The resolved call info including overload name, resolved parameter types, and varargs info;
+ *          or undefined if resolution failed
  */
-export function getCallOverload<Specifics extends TypirSpecifics>(
+export function getResolvedCallInfo<Specifics extends TypirSpecifics>(
     languageNode: Specifics["LanguageType"],
-    functionType: CustomFunctionType | CustomLambdaType,
+    functionType: CustomFunctionType,
     genericArgumentsNodes: Specifics["LanguageType"][],
     argumentNodes: Specifics["LanguageType"][],
     services: ExtendedTypirServices<Specifics>
-): string | undefined {
+): ResolvedCallInfo | undefined {
     const helper = new OverloadCallHelper<Specifics>(
         languageNode,
         functionType,
@@ -34,7 +61,18 @@ export function getCallOverload<Specifics extends TypirSpecifics>(
         services,
         false
     );
-    return helper.chosenOverloadName;
+    if (helper.chosenOverloadName == undefined) {
+        return undefined;
+    }
+    const signature = functionType.details.definition.signatures[helper.chosenOverloadName];
+    const isVarArgs = signature?.isVarArgs === true;
+    const varArgsStartIndex = isVarArgs ? Math.max(0, (signature?.parameters.length ?? 1) - 1) : 0;
+    return {
+        overloadName: helper.chosenOverloadName,
+        resolvedParameterTypes: helper.resolvedParameterTypes,
+        isVarArgs,
+        varArgsStartIndex
+    };
 }
 
 /**

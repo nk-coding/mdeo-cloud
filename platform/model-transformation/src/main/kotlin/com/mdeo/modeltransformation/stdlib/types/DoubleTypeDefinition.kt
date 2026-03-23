@@ -190,5 +190,45 @@ fun createDoubleType(): GremlinTypeDefinition {
             }
             CompilationResult.of(result as GraphTraversal<Any, Any>)
         }
+        .method("sqrt", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("sqrt(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("sin", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("sin(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("cos", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("cos(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("tan", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("tan(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("asin", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("asin(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("acos", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("acos(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("atan", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("atan(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("sinh", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("sinh(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("cosh", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("cosh(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
+        .method("tanh", "", 0) { receiver, _ ->
+            val traversal = (receiver as GraphTraversal<Any, Any>).math("tanh(_)")
+            CompilationResult.of(traversal as GraphTraversal<Any, Any>)
+        }
         .build()
 }

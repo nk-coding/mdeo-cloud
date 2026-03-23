@@ -1,4 +1,4 @@
-import { createInterface, createType, Optional, Union, type ASTType } from "@mdeo/language-common";
+import { createInterface, Optional, Union, type ASTType } from "@mdeo/language-common";
 import type { ExpressionConfig } from "./expressionConfig.js";
 import type { TypeTypes } from "./typeTypes.js";
 
@@ -141,11 +141,6 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
             elements: [baseExpressionType]
         });
 
-    const assignableExpressionType = createType(config.assignableExpressionTypeName).types(
-        identifierExpressionType,
-        memberAccessExpressionType
-    );
-
     return {
         baseExpressionType,
         unaryExpressionType,
@@ -166,7 +161,6 @@ export function generateExpressionTypes(config: ExpressionConfig, typeTypes: Typ
         baseTypeType,
         classTypeType,
         lambdaTypeType,
-        assignableExpressionType,
         assertNonNullExpressionType,
         typeCastExpressionType,
         typeCheckExpressionType,
@@ -258,11 +252,6 @@ export type BooleanLiteralExpressionType = ASTType<ExpressionTypes["booleanLiter
  * Type representing the null literal expression type.
  */
 export type NullLiteralExpressionType = ASTType<ExpressionTypes["nullLiteralExpressionType"]>;
-
-/**
- * Type representing the assignable expression
- */
-export type AssingableExpressionType = ASTType<ExpressionTypes["assignableExpressionType"]>;
 
 /**
  * Type representing the assert non-null expression (!! postfix operator).

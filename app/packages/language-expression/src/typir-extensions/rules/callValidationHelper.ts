@@ -105,6 +105,14 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
     chosenOverloadName: string | undefined = undefined;
 
     /**
+     * The resolved parameter types for each argument position in the chosen signature.
+     * For generic functions, these are the types after generic substitution.
+     * For non-generic functions and lambdas, these are the declared parameter types.
+     * Populated alongside {@link chosenOverloadName}.
+     */
+    resolvedParameterTypes: CustomValueType[] = [];
+
+    /**
      * Creates a new call validation helper.
      * Automatically validates the call during construction.
      *
@@ -173,6 +181,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             if (genericResolver.isFullyDefined(signature.returnType)) {
                 this.inferredReturnType = genericResolver.resolveType(signature.returnType);
                 this.chosenOverloadName = signatureName;
+                this.resolvedParameterTypes = this.resolveSignatureParameterTypes(signature, genericResolver);
                 return true;
             }
         }
@@ -361,6 +370,10 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
         if (validResults.length === 1) {
             this.inferredReturnType = validResults[0]!.returnType;
             this.chosenOverloadName = validResults[0]!.signatureName;
+            this.resolvedParameterTypes = this.resolveSignatureParameterTypes(
+                validResults[0]!.signature,
+                validResults[0]!.genericResolver
+            );
             return;
         }
 
@@ -414,6 +427,10 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
         if (bestScoringResults.length === 1) {
             this.inferredReturnType = bestScoringResults[0]!.returnType;
             this.chosenOverloadName = bestScoringResults[0]!.signatureName;
+            this.resolvedParameterTypes = this.resolveSignatureParameterTypes(
+                bestScoringResults[0]!.signature,
+                bestScoringResults[0]!.genericResolver
+            );
             return;
         }
 
@@ -456,6 +473,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      */
     private validateLambda(type: CustomLambdaType) {
         this.inferredReturnType = type.details.returnType ?? undefined;
+        this.resolvedParameterTypes = type.details.parameterTypes.filter(isCustomValueType);
 
         const args = this.argumentNodes.map((argNode) => this.services.Inference.inferType(argNode));
 
@@ -494,6 +512,21 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
                 )
             );
         }
+    }
+
+    /**
+     * Resolves the parameter types of a function signature using the generic resolver.
+     * For varargs signatures, the last parameter type is used for all extra arguments.
+     *
+     * @param signature The function signature whose parameters to resolve
+     * @param genericResolver The generic resolver with the resolved type mappings
+     * @returns Array of resolved parameter types (one per declared parameter)
+     */
+    private resolveSignatureParameterTypes(
+        signature: FunctionSignature,
+        genericResolver: GenericResolver<Specifics>
+    ): CustomValueType[] {
+        return signature.parameters.map((param) => genericResolver.resolveType(param.type));
     }
 
     /**

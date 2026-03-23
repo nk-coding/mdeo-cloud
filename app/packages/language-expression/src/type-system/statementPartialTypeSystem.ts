@@ -12,7 +12,12 @@ import { isCustomClassType } from "../typir-extensions/kinds/custom-class/custom
 import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { InferenceProblem, TypeInferenceResultWithoutInferringChildren, ValidationProblemAcceptor } from "typir";
-import type { BaseExpressionType, ExpressionTypes } from "../grammar/expressionTypes.js";
+import type {
+    BaseExpressionType,
+    ExpressionTypes,
+    IdentifierExpressionType,
+    MemberAccessExpressionType
+} from "../grammar/expressionTypes.js";
 import type { CustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
 import type { AstNode } from "langium";
@@ -138,6 +143,24 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
      */
     private registerAssignmentRules(): void {
         this.registerValidationRule(this.types.assignmentStatementType, (node, accept) => {
+            const isIdentifier = this.astReflection.isInstance(
+                node.left,
+                this.expressionTypes.identifierExpressionType
+            );
+            const isMemberAccess = this.astReflection.isInstance(
+                node.left,
+                this.expressionTypes.memberAccessExpressionType
+            );
+            if (!isIdentifier && !isMemberAccess) {
+                accept({
+                    $problem: this.validationProblem,
+                    languageNode: node,
+                    message: "Assignment left-hand side must be an identifier or member access expression.",
+                    severity: "error"
+                });
+                return;
+            }
+
             const rightType = this.inference.inferType(node.right);
             const leftType = this.inference.inferType(node.left);
             if (Array.isArray(rightType) || Array.isArray(leftType)) {
@@ -152,16 +175,17 @@ export class StatementPartialTypeSystem<Specifics extends TypirLangiumSpecifics>
                 });
             }
             let isReadonly = false;
-            if (this.astReflection.isInstance(node.left, this.expressionTypes.identifierExpressionType)) {
+            if (isIdentifier) {
                 const scope = this.typir.ScopeProvider.getScope(node);
-                const entry = scope.getEntry(node.left.name);
+                const entry = scope.getEntry((node.left as IdentifierExpressionType).name);
                 if (entry != undefined && entry.readonly === true) {
                     isReadonly = true;
                 }
             } else {
-                const expressionType = this.inference.inferType(node.left.expression);
+                const memberAccessLeft = node.left as MemberAccessExpressionType;
+                const expressionType = this.inference.inferType(memberAccessLeft.expression);
                 if (isCustomValueType(expressionType)) {
-                    const prop = expressionType.getProperty(node.left.member);
+                    const prop = expressionType.getProperty(memberAccessLeft.member);
                     if (prop != undefined && prop.readonly === true) {
                         isReadonly = true;
                     }

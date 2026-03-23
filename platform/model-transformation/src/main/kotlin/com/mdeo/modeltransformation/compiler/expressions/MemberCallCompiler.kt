@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.compiler.expressions
 
+import com.mdeo.expression.ast.expressions.TypedCallArgument
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
@@ -62,17 +63,17 @@ class MemberCallCompiler(
             )
         
         val firstArg = memberCall.arguments.firstOrNull()
-        if (firstArg is TypedLambdaExpression && methodDef is LambdaMethodDefinition) {
+        if (firstArg?.value is TypedLambdaExpression && methodDef is LambdaMethodDefinition) {
             return methodDef.compileWithLambda(
                 receiverResult.traversal as GraphTraversal<Any, Any>,
-                firstArg,
+                firstArg.value as TypedLambdaExpression,
                 context,
                 registry
             )
         }
         
         val argResults = memberCall.arguments.map { arg ->
-            registry.compile(arg, context, null)
+            registry.compile(arg.value, context, null)
         }
         
         return methodDef.compile(
@@ -116,18 +117,18 @@ class MemberCallCompiler(
      * @return The overload key string (empty string for lambdas or untyped arguments)
      */
     private fun getOverloadKey(
-        arguments: List<TypedExpression>,
+        arguments: List<TypedCallArgument>,
         context: CompilationContext
     ): String {
         if (arguments.isEmpty()) return ""
         
         val firstArg = arguments.first()
         
-        if (firstArg is TypedLambdaExpression) {
+        if (firstArg.value is TypedLambdaExpression) {
             return ""
         }
         
-        val argType = context.resolveTypeOrNull(firstArg.evalType)
+        val argType = context.resolveTypeOrNull(firstArg.value.evalType)
         return when (argType) {
             is ClassTypeRef -> if (argType.`package`.isEmpty()) argType.type else "${argType.`package`}.${argType.type}"
             is GenericTypeRef -> ""

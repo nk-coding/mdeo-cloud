@@ -60,7 +60,7 @@ export const RangeMultiplicityRule = createRule("RangeMultiplicityRule")
  */
 export const MultiplicityRule = createRule("MultiplicityRule")
     .returns(Multiplicity)
-    .as(() => ["[", or(SingleMultiplicityRule, RangeMultiplicityRule), "]"]);
+    .as(() => ["[", or(RangeMultiplicityRule, SingleMultiplicityRule), "]"]);
 
 /**
  * Enum type reference rule.

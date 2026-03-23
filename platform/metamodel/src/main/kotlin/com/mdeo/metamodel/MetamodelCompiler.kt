@@ -608,7 +608,9 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mv.visitEnd()
     }
 
-    /** Emits a get-branch for a regular property field (direct value or List). */
+    /**
+     * Emits a get-branch for a regular property field (direct value or List). 
+     */
     private fun emitPropertyGetBranch(
         mv: org.objectweb.asm.MethodVisitor,
         internalName: String,
@@ -627,7 +629,9 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mv.visitLabel(nextLabel)
     }
 
-    /** Emits a set-branch for a regular property field (direct value or List). */
+    /**
+     * Emits a set-branch for a regular property field (direct value or List). 
+     */
     private fun emitPropertySetBranch(
         mv: org.objectweb.asm.MethodVisitor,
         internalName: String,
@@ -654,7 +658,9 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mv.visitLabel(nextLabel)
     }
 
-    /** Emits a get-branch for a link (association end) field — always Set-backed. */
+    /**
+     * Emits a get-branch for a link (association end) field — always Set-backed. 
+     */
     private fun emitLinkGetBranch(
         mv: org.objectweb.asm.MethodVisitor,
         internalName: String,
@@ -682,7 +688,9 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mv.visitLabel(nextLabel)
     }
 
-    /** Emits a set-branch for a link (association end) field — always Set-backed. */
+    /**
+     * Emits a set-branch for a link (association end) field — always Set-backed. 
+     */
     private fun emitLinkSetBranch(
         mv: org.objectweb.asm.MethodVisitor,
         internalName: String,

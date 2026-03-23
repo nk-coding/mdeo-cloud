@@ -22,10 +22,12 @@ import type { ReturnType, ValueType, ClassTypeRef } from "../typir-extensions/co
 import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import { isCustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
 import { isCustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
+import type { CustomLambdaType } from "../typir-extensions/kinds/custom-lambda/custom-lambda-type.js";
 import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
 import type { CustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
 import { isCustomNullType } from "../typir-extensions/kinds/custom-null/custom-null-type.js";
-import { getCallOverload } from "../typir-extensions/rules/getCallOverload.js";
+import { getResolvedCallInfo } from "../typir-extensions/rules/getResolvedCallInfo.js";
+import type { ResolvedCallInfo } from "../typir-extensions/rules/getResolvedCallInfo.js";
 import { DefaultTypeNames } from "../type-system/typeSystemConfig.js";
 import type { AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
@@ -33,6 +35,7 @@ import type { Type } from "typir";
 import type { ExtendedTypirServices } from "../typir-extensions/service/extendedTypirServices.js";
 import {
     type TypedExpression,
+    type TypedCallArgument,
     type TypedUnaryExpression,
     type TypedBinaryExpression,
     type TypedTernaryExpression,
@@ -308,18 +311,18 @@ export abstract class TypedAstConverter {
     protected convertMemberCallExpression(
         expr: MemberCallExpressionType
     ): TypedMemberCallExpression | TypedExpressionCallExpression {
-        const args = expr.arguments.map((arg) => this.convertExpression(arg));
+        const convertedArgs = expr.arguments.map((arg) => this.convertExpression(arg));
         const evalType = this.getTypeIndex(expr);
         const methodType = inferMethodAccess(expr, expr.expression, expr.member, this.typir);
         if (isCustomFunctionType(methodType)) {
-            const overload = getCallOverload(
+            const callInfo = getResolvedCallInfo(
                 expr,
                 methodType,
                 expr.genericArgs?.typeArguments ?? [],
                 expr.arguments,
                 this.typir
             );
-            if (overload == undefined) {
+            if (callInfo == undefined) {
                 throw new Error(`Could not determine overload for member call '${expr.member}'`);
             }
             return {
@@ -328,8 +331,8 @@ export abstract class TypedAstConverter {
                 expression: this.convertExpression(expr.expression),
                 member: expr.member,
                 isNullChaining: expr.isNullChaining ?? false,
-                arguments: args,
-                overload
+                arguments: this.buildCallArguments(convertedArgs, callInfo),
+                overload: callInfo.overloadName
             };
         }
         const propertyType = inferPropertyAccess(expr, expr.expression, expr.member, this.typir);
@@ -347,7 +350,7 @@ export abstract class TypedAstConverter {
             kind: "call",
             evalType,
             expression: memberAccess,
-            arguments: args
+            arguments: this.buildLambdaCallArguments(convertedArgs, propertyType)
         };
     }
 
@@ -365,16 +368,26 @@ export abstract class TypedAstConverter {
         if (Array.isArray(expressionType)) {
             throw new Error("Cannot infer type for call expression");
         }
-        const args = expr.arguments.map((arg) => this.convertExpression(arg));
+        const convertedArgs = expr.arguments.map((arg) => this.convertExpression(arg));
         const evalType = this.getTypeIndex(expr);
         if (isCustomFunctionType(expressionType)) {
-            return this.convertFunctionCallExpression(expr, expressionType, args, evalType);
+            return this.convertFunctionCallExpression(expr, expressionType, convertedArgs, evalType);
+        } else if (isCustomLambdaType(expressionType)) {
+            return {
+                kind: "call",
+                evalType,
+                expression: this.convertExpression(expr.expression),
+                arguments: this.buildLambdaCallArguments(convertedArgs, expressionType)
+            };
         } else {
             return {
                 kind: "call",
                 evalType,
                 expression: this.convertExpression(expr.expression),
-                arguments: args
+                arguments: convertedArgs.map((arg) => ({
+                    value: arg,
+                    parameterType: arg.evalType
+                }))
             };
         }
     }
@@ -384,25 +397,26 @@ export abstract class TypedAstConverter {
      * Only handles calls to named functions and member functions.
      *
      * @param expr The call expression AST node
-     * @param args The converted argument expressions
+     * @param functionType The resolved function type
+     * @param convertedArgs The converted argument expressions
      * @param evalType The evaluated type index of the call expression
      * @returns The TypedFunctionCallExpression or TypedMemberCallExpression representation
      */
     protected convertFunctionCallExpression(
         expr: CallExpressionType,
         functionType: CustomFunctionType,
-        args: TypedExpression[],
+        convertedArgs: TypedExpression[],
         evalType: number
     ): TypedFunctionCallExpression | TypedMemberCallExpression {
         const expression = expr.expression;
-        const overload = getCallOverload(
+        const callInfo = getResolvedCallInfo(
             expr,
             functionType,
             expr.genericArgs?.typeArguments ?? [],
             expr.arguments,
             this.typir
         );
-        if (overload == undefined) {
+        if (callInfo == undefined) {
             throw new Error("Could not determine overload for function call");
         }
         if (this.reflection.isInstance(expression, this.expressionTypes.identifierExpressionType)) {
@@ -410,8 +424,8 @@ export abstract class TypedAstConverter {
                 kind: "functionCall",
                 evalType,
                 name: (expression as IdentifierExpressionType).name,
-                arguments: args,
-                overload
+                arguments: this.buildCallArguments(convertedArgs, callInfo),
+                overload: callInfo.overloadName
             };
         } else {
             throw new Error("Unsupported function call expression type");
@@ -650,5 +664,48 @@ export abstract class TypedAstConverter {
                 returnType: this.eraseGenericTypeParameters(type.returnType) as ValueType
             };
         }
+    }
+
+    /**
+     * Builds {@link TypedCallArgument} wrappers for function/method call arguments
+     * using the resolved parameter types from overload resolution.
+     *
+     * For varargs signatures, arguments beyond the regular parameters use the
+     * last declared parameter type (the varargs element type).
+     *
+     * @param convertedArgs The converted argument expressions
+     * @param callInfo The resolved call info with parameter types and varargs info
+     * @returns Array of TypedCallArgument with resolved parameter types
+     */
+    protected buildCallArguments(convertedArgs: TypedExpression[], callInfo: ResolvedCallInfo): TypedCallArgument[] {
+        return convertedArgs.map((arg, index) => {
+            const paramIndex = callInfo.isVarArgs ? Math.min(index, callInfo.resolvedParameterTypes.length - 1) : index;
+            const paramType =
+                paramIndex >= 0 && paramIndex < callInfo.resolvedParameterTypes.length
+                    ? this.getTypeIndexForType(callInfo.resolvedParameterTypes[paramIndex]!)
+                    : arg.evalType;
+            return { value: arg, parameterType: paramType };
+        });
+    }
+
+    /**
+     * Builds {@link TypedCallArgument} wrappers for lambda call arguments
+     * using the lambda's declared parameter types.
+     *
+     * @param convertedArgs The converted argument expressions
+     * @param lambdaType The lambda type being called
+     * @returns Array of TypedCallArgument with the lambda's parameter types
+     */
+    protected buildLambdaCallArguments(
+        convertedArgs: TypedExpression[],
+        lambdaType: CustomLambdaType
+    ): TypedCallArgument[] {
+        return convertedArgs.map((arg, index) => {
+            const paramType =
+                index < lambdaType.details.parameterTypes.length
+                    ? this.getTypeIndexForType(lambdaType.details.parameterTypes[index]!)
+                    : arg.evalType;
+            return { value: arg, parameterType: paramType };
+        });
     }
 }

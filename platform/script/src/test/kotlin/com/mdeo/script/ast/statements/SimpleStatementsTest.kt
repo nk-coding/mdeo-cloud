@@ -44,7 +44,7 @@ class SimpleStatementsTest {
                 "name": "println",
                 "overload": "",
                 "arguments": [
-                    {"kind": "stringLiteral", "evalType": 1, "value": "Hello"}
+                    {"value": {"kind": "stringLiteral", "evalType": 1, "value": "Hello"}, "parameterType": 1}
                 ]
             }
         }"""

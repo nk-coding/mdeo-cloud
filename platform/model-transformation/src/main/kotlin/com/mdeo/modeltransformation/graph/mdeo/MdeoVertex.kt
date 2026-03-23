@@ -32,10 +32,14 @@ class MdeoVertex(
     @JvmField val classMetadata: ClassMetadata?
 ) : MdeoElement(id, label), Vertex {
 
-    /** Outgoing edges grouped by label. */
+    /**
+     * Outgoing edges grouped by label. 
+     */
     @JvmField var outEdges: MutableMap<String, MutableSet<Edge>>? = null
 
-    /** Incoming edges grouped by label. */
+    /**
+     * Incoming edges grouped by label. 
+     */
     @JvmField var inEdges: MutableMap<String, MutableSet<Edge>>? = null
 
     override fun graph(): Graph = graph

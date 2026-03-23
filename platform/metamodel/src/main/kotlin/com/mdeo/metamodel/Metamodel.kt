@@ -27,10 +27,14 @@ class Metamodel internal constructor(
     private val enumValueClasses: Map<String, Class<*>>,
     private val classContainerClasses: Map<String, Class<*>>
 ) {
-    /** Absolute file-system path of this metamodel, as declared in [MetamodelData.path]. */
+    /**
+     * Absolute file-system path of this metamodel, as declared in [MetamodelData.path]. 
+     */
     val path: String get() = data.path
 
-    /** Reverse lookup from generated JVM class to metamodel class name. */
+    /**
+     * Reverse lookup from generated JVM class to metamodel class name. 
+     */
     private val classNameByClass: Map<Class<*>, String> = instanceClasses.entries.associate { (name, clazz) -> clazz to name }
 
     /**

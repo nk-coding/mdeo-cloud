@@ -74,10 +74,14 @@ import org.junit.jupiter.api.Test
 @Tag("performance")
 abstract class OptimizationPerformanceTestBase {
 
-    /** Human-readable name of the backing graph implementation, used in the log line. */
+    /**
+     * Human-readable name of the backing graph implementation, used in the log line. 
+     */
     protected abstract val backendName: String
 
-    /** Factory for the concrete graph backend under test. */
+    /**
+     * Factory for the concrete graph backend under test. 
+     */
     protected abstract fun createModelGraph(modelData: ModelData, metamodel: Metamodel): ModelGraph
 
     /**

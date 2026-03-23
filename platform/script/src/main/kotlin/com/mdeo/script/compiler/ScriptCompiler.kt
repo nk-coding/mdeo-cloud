@@ -375,13 +375,19 @@ class ScriptCompiler {
     }
 
     companion object {
-        /** The name of the field storing the [ScriptContext] instance. */
+        /**
+         * The name of the field storing the [ScriptContext] instance. 
+         */
         const val CONTEXT_FIELD_NAME = "__ctx"
 
-        /** The JVM descriptor for [ScriptContext]. */
+        /**
+         * The JVM descriptor for [ScriptContext]. 
+         */
         const val CONTEXT_DESCRIPTOR = "Lcom/mdeo/script/runtime/ScriptContext;"
 
-        /** The JVM internal name for [ScriptContext]. */
+        /**
+         * The JVM internal name for [ScriptContext]. 
+         */
         const val CONTEXT_INTERNAL_NAME = "com/mdeo/script/runtime/ScriptContext"
     }
 }
