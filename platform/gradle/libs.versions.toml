@@ -39,6 +39,8 @@ ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref 
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+ktor-serialization-kotlinx-cbor = { module = "io.ktor:ktor-serialization-kotlinx-cbor", version.ref = "ktor" }
 
 # Exposed - JDBC
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
@@ -61,6 +63,7 @@ logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 # Kotlinx
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinx-serialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 
 # Testing

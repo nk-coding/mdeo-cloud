@@ -102,3 +102,15 @@ variable "gateway_annotations" {
   nullable    = true
   default     = null
 }
+
+variable "optimizer_execution_replicas" {
+  type        = number
+  description = "Number of optimizer-execution replicas (StatefulSet pods)"
+  default     = 3
+}
+
+variable "optimizer_worker_threads" {
+  type        = number
+  description = "Number of worker threads per optimizer-execution pod"
+  default     = 1
+}

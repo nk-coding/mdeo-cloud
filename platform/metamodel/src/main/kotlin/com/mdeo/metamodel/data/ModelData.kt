@@ -2,6 +2,8 @@ package com.mdeo.metamodel.data
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -139,47 +141,74 @@ sealed class ModelDataPropertyValue {
 }
 
 /**
+ * Binary-format DTO for [ModelDataPropertyValue] used when serializing to non-JSON formats
+ * such as CBOR. The [t] field is a type tag and the remaining fields carry the payload
+ * for that type (only one is populated at a time).
+ *
+ * Type tags: 0=string, 1=number, 2=boolean, 3=enum, 4=null, 5=list
+ */
+@Serializable
+private data class MdpvDto(
+    val t: Int,
+    val s: String? = null,
+    val n: Double? = null,
+    val b: Boolean? = null,
+    val l: List<MdpvDto>? = null
+) {
+    companion object {
+        const val TYPE_STRING = 0
+        const val TYPE_NUMBER = 1
+        const val TYPE_BOOLEAN = 2
+        const val TYPE_ENUM = 3
+        const val TYPE_NULL = 4
+        const val TYPE_LIST = 5
+    }
+}
+
+private fun ModelDataPropertyValue.toDto(): MdpvDto = when (this) {
+    is ModelDataPropertyValue.StringValue -> MdpvDto(MdpvDto.TYPE_STRING, s = value)
+    is ModelDataPropertyValue.NumberValue -> MdpvDto(MdpvDto.TYPE_NUMBER, n = value)
+    is ModelDataPropertyValue.BooleanValue -> MdpvDto(MdpvDto.TYPE_BOOLEAN, b = value)
+    is ModelDataPropertyValue.EnumValue -> MdpvDto(MdpvDto.TYPE_ENUM, s = enumEntry)
+    is ModelDataPropertyValue.NullValue -> MdpvDto(MdpvDto.TYPE_NULL)
+    is ModelDataPropertyValue.ListValue -> MdpvDto(MdpvDto.TYPE_LIST, l = values.map { it.toDto() })
+}
+
+private fun MdpvDto.toValue(): ModelDataPropertyValue = when (t) {
+    MdpvDto.TYPE_STRING -> ModelDataPropertyValue.StringValue(s ?: error("Missing string value in MdpvDto"))
+    MdpvDto.TYPE_NUMBER -> ModelDataPropertyValue.NumberValue(n ?: error("Missing number value in MdpvDto"))
+    MdpvDto.TYPE_BOOLEAN -> ModelDataPropertyValue.BooleanValue(b ?: error("Missing boolean value in MdpvDto"))
+    MdpvDto.TYPE_ENUM -> ModelDataPropertyValue.EnumValue(s ?: error("Missing enum entry in MdpvDto"))
+    MdpvDto.TYPE_NULL -> ModelDataPropertyValue.NullValue
+    MdpvDto.TYPE_LIST -> ModelDataPropertyValue.ListValue((l ?: emptyList()).map { it.toValue() })
+    else -> error("Unknown ModelDataPropertyValue type tag: $t")
+}
+
+/**
  * Custom serializer for ModelDataPropertyValue that handles the union type.
  *
- * This serializer maps JSON primitives, objects, and arrays to their corresponding
- * ModelDataPropertyValue subtypes:
- * - JSON string -> StringValue
- * - JSON number -> NumberValue
- * - JSON boolean -> BooleanValue
- * - JSON object with "enum" key -> EnumValue
- * - JSON null -> NullValue
- * - JSON array -> ListValue
+ * In JSON, values are represented compactly as native primitives/objects (no type
+ * discriminator). For non-JSON formats such as CBOR the value is encoded as an [MdpvDto]
+ * struct tagged with an integer type discriminator.
  */
 object ModelDataPropertyValueSerializer : KSerializer<ModelDataPropertyValue> {
 
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ModelDataPropertyValue")
 
     override fun serialize(encoder: Encoder, value: ModelDataPropertyValue) {
-        val jsonEncoder = encoder as? JsonEncoder
-            ?: throw IllegalStateException("ModelDataPropertyValue can only be serialized to JSON")
-
-        val jsonElement: JsonElement = when (value) {
-            is ModelDataPropertyValue.StringValue -> JsonPrimitive(value.value)
-            is ModelDataPropertyValue.NumberValue -> JsonPrimitive(value.value)
-            is ModelDataPropertyValue.BooleanValue -> JsonPrimitive(value.value)
-            is ModelDataPropertyValue.EnumValue -> {
-                kotlinx.serialization.json.buildJsonObject {
-                    put("enum", JsonPrimitive(value.enumEntry))
-                }
-            }
-            is ModelDataPropertyValue.NullValue -> JsonNull
-            is ModelDataPropertyValue.ListValue -> {
-                JsonArray(value.values.map { serializeToJsonElement(it) })
-            }
+        if (encoder is JsonEncoder) {
+            encoder.encodeJsonElement(serializeToJsonElement(value))
+        } else {
+            encoder.encodeSerializableValue(MdpvDto.serializer(), value.toDto())
         }
-        jsonEncoder.encodeJsonElement(jsonElement)
     }
 
     override fun deserialize(decoder: Decoder): ModelDataPropertyValue {
-        val jsonDecoder = decoder as? JsonDecoder
-            ?: throw IllegalStateException("ModelDataPropertyValue can only be deserialized from JSON")
-
-        return deserializeFromJsonElement(jsonDecoder.decodeJsonElement())
+        if (decoder is JsonDecoder) {
+            return deserializeFromJsonElement(decoder.decodeJsonElement())
+        } else {
+            return decoder.decodeSerializableValue(MdpvDto.serializer()).toValue()
+        }
     }
 
     private fun serializeToJsonElement(value: ModelDataPropertyValue): JsonElement {
@@ -230,19 +259,21 @@ object ModelDataPropertyValueSerializer : KSerializer<ModelDataPropertyValue> {
 /**
  * Custom serializer for the properties map in ModelDataInstance.
  *
- * This serializer handles the fact that property values can be either:
- * - A single ModelDataPropertyValue
- * - An array of ModelDataPropertyValue (represented as ListValue internally)
- *
- * In JSON, the format is: `{ "propertyName": value or [values] }`
+ * In JSON, the format is: `{ "propertyName": value or [values] }` (compact, no type
+ * discriminator). For non-JSON formats such as CBOR, the map values are encoded as
+ * [MdpvDto] structs so that explicit type tags are preserved.
  */
 object PropertiesMapSerializer : KSerializer<Map<String, ModelDataPropertyValue>> {
 
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("PropertiesMap")
 
+    private val dtoMapSerializer = MapSerializer(String.serializer(), MdpvDto.serializer())
+
     override fun serialize(encoder: Encoder, value: Map<String, ModelDataPropertyValue>) {
-        val jsonEncoder = encoder as? JsonEncoder
-            ?: throw IllegalStateException("Properties map can only be serialized to JSON")
+        if (encoder !is JsonEncoder) {
+            encoder.encodeSerializableValue(dtoMapSerializer, value.mapValues { it.value.toDto() })
+            return
+        }
 
         val jsonObject = kotlinx.serialization.json.buildJsonObject {
             value.forEach { (key, propValue) ->
@@ -254,14 +285,15 @@ object PropertiesMapSerializer : KSerializer<Map<String, ModelDataPropertyValue>
                 })
             }
         }
-        jsonEncoder.encodeJsonElement(jsonObject)
+        encoder.encodeJsonElement(jsonObject)
     }
 
     override fun deserialize(decoder: Decoder): Map<String, ModelDataPropertyValue> {
-        val jsonDecoder = decoder as? JsonDecoder
-            ?: throw IllegalStateException("Properties map can only be deserialized from JSON")
+        if (decoder !is JsonDecoder) {
+            return decoder.decodeSerializableValue(dtoMapSerializer).mapValues { it.value.toValue() }
+        }
 
-        val jsonObject = jsonDecoder.decodeJsonElement().jsonObject
+        val jsonObject = decoder.decodeJsonElement().jsonObject
         val result = mutableMapOf<String, ModelDataPropertyValue>()
 
         jsonObject.forEach { (key, element) ->

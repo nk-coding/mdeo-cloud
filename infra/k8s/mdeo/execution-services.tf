@@ -1,21 +1,15 @@
 locals {
   execution_services = {
     "script-execution" = {
-      port         = 8081
+      port         = 8080
       db_key       = "postgres-script"
       cluster_name = "postgres-script"
     }
 
     "model-transformation-execution" = {
-      port         = 8082
+      port         = 8080
       db_key       = "postgres-model-transformation"
       cluster_name = "postgres-model-transformation"
-    }
-
-    "optimizer-execution" = {
-      port         = 8083
-      db_key       = "postgres-optimizer"
-      cluster_name = "postgres-optimizer"
     }
   }
 }
@@ -136,6 +130,182 @@ resource "kubernetes_deployment_v1" "execution" {
             http_get {
               path = "/health"
               port = each.value.port
+            }
+            initial_delay_seconds = 60
+            period_seconds        = 10
+            failure_threshold     = 10
+            timeout_seconds       = 10
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [kubernetes_manifest.db_cluster]
+}
+
+# ---------------------------------------------------------------------------
+# optimizer-execution — StatefulSet (multi-node)
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_service_v1" "optimizer_execution_headless" {
+  metadata {
+    name      = "optimizer-execution-headless"
+    namespace = local.ns
+    labels = {
+      "app.kubernetes.io/name"    = "optimizer-execution"
+      "app.kubernetes.io/part-of" = "mdeo"
+    }
+  }
+
+  spec {
+    cluster_ip = "None"
+
+    selector = {
+      "app.kubernetes.io/name" = "optimizer-execution"
+    }
+
+    port {
+      name        = "http"
+      port        = 8080
+      target_port = 8080
+      protocol    = "TCP"
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "optimizer_execution" {
+  metadata {
+    name      = "optimizer-execution"
+    namespace = local.ns
+    labels = {
+      "app.kubernetes.io/name"    = "optimizer-execution"
+      "app.kubernetes.io/part-of" = "mdeo"
+    }
+  }
+
+  spec {
+    selector = {
+      "app.kubernetes.io/name" = "optimizer-execution"
+    }
+
+    port {
+      name        = "http"
+      port        = 8080
+      target_port = 8080
+      protocol    = "TCP"
+    }
+  }
+}
+
+resource "kubernetes_stateful_set_v1" "optimizer_execution" {
+  metadata {
+    name      = "optimizer-execution"
+    namespace = local.ns
+    labels = {
+      "app.kubernetes.io/name"    = "optimizer-execution"
+      "app.kubernetes.io/part-of" = "mdeo"
+    }
+  }
+
+  spec {
+    replicas     = var.optimizer_execution_replicas
+    service_name = kubernetes_service_v1.optimizer_execution_headless.metadata[0].name
+
+    selector {
+      match_labels = {
+        "app.kubernetes.io/name" = "optimizer-execution"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          "app.kubernetes.io/name"    = "optimizer-execution"
+          "app.kubernetes.io/part-of" = "mdeo"
+        }
+      }
+
+      spec {
+        container {
+          name              = "optimizer-execution"
+          image             = "${var.image_registry}/${var.image_owner}/mdeo-optimizer-execution:${var.app_version}"
+          image_pull_policy = "Always"
+
+          port {
+            container_port = 8080
+            protocol       = "TCP"
+          }
+
+          env {
+            name  = "SERVER_PORT"
+            value = "8080"
+          }
+
+          env {
+            name  = "DATABASE_URL"
+            value = "jdbc:postgresql://postgres-optimizer-rw:5432/mdeo"
+          }
+
+          env {
+            name  = "DATABASE_USER"
+            value = var.database_user
+          }
+
+          env {
+            name = "DATABASE_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.db_credentials["postgres-optimizer"].metadata[0].name
+                key  = "password"
+              }
+            }
+          }
+
+          env {
+            name  = "BACKEND_API_URL"
+            value = "http://backend:8080"
+          }
+
+          env {
+            name  = "EXECUTION_TIMEOUT_MS"
+            value = tostring(var.execution_timeout_ms)
+          }
+
+          env {
+            name  = "PEERS"
+            value = join(",", [for i in range(var.optimizer_execution_replicas) : "http://optimizer-execution-${i}.optimizer-execution-headless.${local.ns}.svc.cluster.local:8080"])
+          }
+
+          env {
+            name  = "INCLUDE_SELF"
+            value = "true"
+          }
+
+          env {
+            name  = "WORKER_THREADS"
+            value = tostring(var.optimizer_worker_threads)
+          }
+
+          # NODE_ID is derived from the StatefulSet pod ordinal via the entrypoint
+          command = ["/bin/sh", "-c"]
+          args    = ["export NODE_ID=$${HOSTNAME##*-} && exec java --add-opens java.xml/org.xml.sax.helpers=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED -jar /app/optimizer-execution.jar"]
+
+          liveness_probe {
+            http_get {
+              path = "/health"
+              port = 8080
+            }
+            initial_delay_seconds = 90
+            period_seconds        = 10
+            failure_threshold     = 20
+            timeout_seconds       = 10
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/health"
+              port = 8080
             }
             initial_delay_seconds = 60
             period_seconds        = 10

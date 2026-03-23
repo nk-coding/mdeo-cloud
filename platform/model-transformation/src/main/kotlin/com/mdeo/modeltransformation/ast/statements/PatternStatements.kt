@@ -2,6 +2,7 @@ package com.mdeo.modeltransformation.ast.statements
 
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -15,6 +16,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TypedMatchStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "match",
     val pattern: TypedPattern
 ) : TypedTransformationStatement
@@ -32,6 +34,7 @@ data class TypedMatchStatement(
  */
 @Serializable
 data class TypedIfMatchStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "ifMatch",
     val pattern: TypedPattern,
     val thenBlock: List<@Contextual TypedTransformationStatement>,
@@ -50,6 +53,7 @@ data class TypedIfMatchStatement(
  */
 @Serializable
 data class TypedWhileMatchStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "whileMatch",
     val pattern: TypedPattern,
     val doBlock: List<@Contextual TypedTransformationStatement>
@@ -67,6 +71,7 @@ data class TypedWhileMatchStatement(
  */
 @Serializable
 data class TypedUntilMatchStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "untilMatch",
     val pattern: TypedPattern,
     val doBlock: List<@Contextual TypedTransformationStatement>
@@ -83,6 +88,7 @@ data class TypedUntilMatchStatement(
  */
 @Serializable
 data class TypedForMatchStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "forMatch",
     val pattern: TypedPattern,
     val doBlock: List<@Contextual TypedTransformationStatement>

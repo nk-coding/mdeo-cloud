@@ -11,8 +11,8 @@ FROM eclipse-temurin:21-jre-alpine AS optimizer-execution
 WORKDIR /app
 COPY --from=optimizer-execution-builder /build/optimizer-execution/build/libs/optimizer-execution.jar ./optimizer-execution.jar
 
-ENV SERVER_PORT=8083
-EXPOSE 8083
+ENV SERVER_PORT=8080
+EXPOSE 8080
 
 ENTRYPOINT ["java", \
     "--add-opens", "java.xml/org.xml.sax.helpers=ALL-UNNAMED", \

@@ -41,6 +41,12 @@ object MutationStrategyFactory {
         }
     }
 
+    /**
+     * Creates a [MutationStepSizeStrategy] from the given step configuration.
+     *
+     * @param config The step size configuration (fixed or interval).
+     * @return A configured [MutationStepSizeStrategy].
+     */
     private fun createStepSizeStrategy(config: MutationStepConfig): MutationStepSizeStrategy {
         return when (config) {
             is MutationStepConfig.Fixed -> FixedMutationStepSizeStrategy(config.n)

@@ -11,7 +11,7 @@ FROM eclipse-temurin:21-jre-alpine AS script-execution
 WORKDIR /app
 COPY --from=script-execution-builder /build/script-execution/build/libs/script-execution.jar ./script-execution.jar
 
-ENV SERVER_PORT=8081
-EXPOSE 8081
+ENV SERVER_PORT=8080
+EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "script-execution.jar"]

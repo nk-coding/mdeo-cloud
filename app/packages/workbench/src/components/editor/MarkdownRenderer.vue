@@ -1,6 +1,6 @@
 <template>
-    <ScrollArea class="h-full w-full px-8 pt-4">
-        <div class="max-w-none prose prose-slate" v-html="renderedResult.html"></div>
+    <ScrollArea class="h-full w-full pt-4">
+        <div class="max-w-none prose prose-slate px-8 pb-8" v-html="renderedResult.html"></div>
 
         <template v-for="embed in resolvedEmbeds" :key="embed.id">
             <Teleport :to="`#${embed.id}`" v-if="embed.mounted">
@@ -37,6 +37,13 @@
                 </div>
             </Teleport>
         </template>
+        <template v-for="plot in resolvedPlots" :key="plot.id">
+            <Teleport :to="`#${plot.id}`" v-if="plot.mounted">
+                <div class="my-6 rounded-lg border overflow-hidden">
+                    <PlotChart :json="plot.json" />
+                </div>
+            </Teleport>
+        </template>
     </ScrollArea>
 </template>
 <script setup lang="ts">
@@ -47,6 +54,7 @@ import remarkRehype from "remark-rehype";
 import rehypeStringify from "rehype-stringify";
 import { rehypeAddClasses } from "./rehypeTailwindStyles";
 import { rehypeFileEmbed, type FileEmbed } from "./rehypeFileEmbed";
+import { rehypePlotly, type PlotEmbed } from "./rehypePlotly";
 import { showError } from "@/lib/notifications";
 import { Uri } from "vscode";
 import { computedAsync } from "@vueuse/core";
@@ -56,6 +64,7 @@ import { workbenchStateKey } from "../workbench/util";
 import { FileCategory, parseUri } from "@mdeo/language-common";
 import { getFileExtension } from "@/data/filesystem/util";
 import GraphicalEditor from "./GraphicalEditor.vue";
+import PlotChart from "./PlotChart.vue";
 import { AlertCircle, ExternalLink } from "lucide-vue-next";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 
@@ -100,6 +109,18 @@ interface ResolvedEmbed {
     mounted: boolean;
 }
 
+/**
+ * Resolved plot descriptor with information needed to render a plotly chart.
+ */
+interface ResolvedPlot {
+    /** Unique DOM element ID for the Teleport target. */
+    id: string;
+    /** The plotly.js-compatible JSON configuration string. */
+    json: string;
+    /** Whether the Teleport target div has been mounted in the DOM. */
+    mounted: boolean;
+}
+
 const content = computedAsync(async () => {
     const reference = await createModelReference(props.uri);
     const res = reference.object.textEditorModel?.getValue() ?? "";
@@ -124,14 +145,16 @@ const baseId = useId();
  * Produces both the rendered HTML string and a list of file embed descriptors
  * for any image nodes referencing embeddable model files.
  */
-const renderedResult = computed<{ html: string; embeds: FileEmbed[] }>(() => {
+const renderedResult = computed<{ html: string; embeds: FileEmbed[]; plots: PlotEmbed[] }>(() => {
     if (!content.value) {
-        return { html: "", embeds: [] };
+        return { html: "", embeds: [], plots: [] };
     }
 
     try {
         const embeds: FileEmbed[] = [];
         let embedCounter = 0;
+        const plots: PlotEmbed[] = [];
+        let plotCounter = 0;
 
         const result = remark()
             .use(remarkGfm)
@@ -142,14 +165,19 @@ const renderedResult = computed<{ html: string; embeds: FileEmbed[] }>(() => {
                 embeddableExtensions.value,
                 () => `${baseId}-${embedCounter++}`
             )
+            .use(
+                rehypePlotly,
+                (plot) => plots.push(plot),
+                () => `${baseId}-plot-${plotCounter++}`
+            )
             .use(rehypeAddClasses)
             .use(rehypeStringify, { allowDangerousHtml: true })
             .processSync(content.value);
 
-        return { html: String(result), embeds };
+        return { html: String(result), embeds, plots };
     } catch (error) {
         showError("Error rendering markdown content.");
-        return { html: `<pre>${content.value}</pre>`, embeds: [] };
+        return { html: `<pre>${content.value}</pre>`, embeds: [], plots: [] };
     }
 });
 
@@ -193,6 +221,7 @@ async function checkFileExists(uri: Uri): Promise<boolean> {
 }
 
 const resolvedEmbeds = ref<ResolvedEmbed[]>([]);
+const resolvedPlots = ref<ResolvedPlot[]>([]);
 
 watch(
     () => renderedResult.value.embeds,
@@ -232,6 +261,22 @@ watch(
         await nextTick();
         for (const embed of resolvedEmbeds.value) {
             embed.mounted = true;
+        }
+    },
+    { immediate: true }
+);
+
+watch(
+    () => renderedResult.value.plots,
+    async (plots) => {
+        resolvedPlots.value = plots.map((plot) => ({
+            id: plot.id,
+            json: plot.json,
+            mounted: false
+        }));
+        await nextTick();
+        for (const p of resolvedPlots.value) {
+            p.mounted = true;
         }
     },
     { immediate: true }

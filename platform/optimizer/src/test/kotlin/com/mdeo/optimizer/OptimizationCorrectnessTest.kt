@@ -25,7 +25,10 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.optimizer.config.*
+import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
 import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
+import com.mdeo.optimizer.moea.getWorkerRef
+import com.mdeo.optimizer.operators.MutationStrategyFactory
 import com.mdeo.optimizer.operators.TransformationAttemptRunner
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst
@@ -396,12 +399,20 @@ class OptimizationCorrectnessTest {
             )
         )
 
-        val orchestrator = OptimizationOrchestrator(
-            config = config,
+        val mutationStrategy = MutationStrategyFactory.create(
+            config.solver.parameters.mutation, transformations
+        )
+        val evaluator = LocalMutationEvaluator(
+            initialSolutionProvider = initialSolutionProvider,
+            mutationStrategy = mutationStrategy,
             objectives = listOf(objective),
             constraints = emptyList(),
-            transformations = transformations,
-            initialSolutionProvider = initialSolutionProvider
+            metamodel = metamodel
+        )
+
+        val orchestrator = OptimizationOrchestrator(
+            config = config,
+            evaluator = evaluator
         )
 
         val result = runBlocking { orchestrator.run() }
@@ -414,6 +425,8 @@ class OptimizationCorrectnessTest {
             bestObjective == 0.0,
             "Best objective value should be 0.0 (exactly 10 rooms), but got $bestObjective"
         )
+
+        runBlocking { evaluator.cleanup() }
     }
 
     /**
@@ -483,28 +496,38 @@ class OptimizationCorrectnessTest {
             )
         )
 
-        val orchestrator = OptimizationOrchestrator(
-            config = config,
+        val mutationStrategy = MutationStrategyFactory.create(
+            config.solver.parameters.mutation, transformations
+        )
+        val evaluator = LocalMutationEvaluator(
+            initialSolutionProvider = initialSolutionProvider,
+            mutationStrategy = mutationStrategy,
             objectives = listOf(objective),
             constraints = emptyList(),
-            transformations = transformations,
-            initialSolutionProvider = initialSolutionProvider
+            metamodel = metamodel
+        )
+
+        val orchestrator = OptimizationOrchestrator(
+            config = config,
+            evaluator = evaluator
         )
 
         val result = runBlocking { orchestrator.run() }
 
-        val finalSolutionGraphs = result.getFinalSolutionGraphs()
-        assertFalse(finalSolutionGraphs.isEmpty(), "Must have at least one final solution graph")
+        val population = result.getRawPopulation()
+        assertFalse(population.isEmpty, "Must have at least one final solution")
 
         val finalSolutionResults = result.getFinalSolutions()
         assertEquals(
-            finalSolutionResults.size, finalSolutionGraphs.size,
-            "getFinalSolutions() and getFinalSolutionGraphs() must return the same number of entries"
+            finalSolutionResults.size, population.size(),
+            "getFinalSolutions() and getRawPopulation() must return the same number of entries"
         )
 
         // For each solution, re-compute the room count and verify it matches the stored objective
-        for ((solution, solutionResult) in finalSolutionGraphs.zip(finalSolutionResults)) {
-            val rooms = roomCount(solution, modelData.metamodelPath, metamodel)
+        for ((moeaSolution, solutionResult) in population.zip(finalSolutionResults)) {
+            val ref = moeaSolution.getWorkerRef() ?: error("Solution missing WorkerSolutionRef")
+            val solutionData = runBlocking { evaluator.getSolutionData(ref) }
+            val rooms = solutionData.instances.count { it.className == "Room" }
             assertTrue(rooms >= 0, "Room count must be non-negative, got $rooms")
 
             val expectedObjective = kotlin.math.abs(rooms - 10).toDouble()
@@ -516,5 +539,7 @@ class OptimizationCorrectnessTest {
                     "but the optimizer reported $reportedObjective"
             )
         }
+
+        runBlocking { evaluator.cleanup() }
     }
 }

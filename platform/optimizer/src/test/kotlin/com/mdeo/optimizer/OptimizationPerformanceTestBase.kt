@@ -43,7 +43,9 @@ import com.mdeo.optimizer.config.SolverProvider
 import com.mdeo.optimizer.config.TerminationConfig
 import com.mdeo.optimizer.config.VariationType
 import com.mdeo.modeltransformation.graph.ModelGraph
+import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
 import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
+import com.mdeo.optimizer.operators.MutationStrategyFactory
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst
 import com.mdeo.script.ast.TypedFunction
@@ -361,18 +363,27 @@ abstract class OptimizationPerformanceTestBase {
 
         val config = buildOptimizationConfig()
 
-        val orchestrator = OptimizationOrchestrator(
-            config = config,
+        val mutationStrategy = MutationStrategyFactory.create(
+            config.solver.parameters.mutation, transformations
+        )
+        val evaluator = LocalMutationEvaluator(
+            initialSolutionProvider = initialSolutionProvider,
+            mutationStrategy = mutationStrategy,
             objectives = listOf(objective),
             constraints = emptyList(),
-            transformations = transformations,
-            initialSolutionProvider = initialSolutionProvider
+            metamodel = metamodel
+        )
+
+        val orchestrator = OptimizationOrchestrator(
+            config = config,
+            evaluator = evaluator
         )
 
         val startTime = System.currentTimeMillis()
         runBlocking {
             orchestrator.run()
         }
+        runBlocking { evaluator.cleanup() }
         val elapsedMs = System.currentTimeMillis() - startTime
         val elapsedSec = elapsedMs / 1000.0
 

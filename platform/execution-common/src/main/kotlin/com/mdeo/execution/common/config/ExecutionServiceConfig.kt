@@ -52,20 +52,20 @@ data class BaseExecutionConfig(
         /**
          * Loads base configuration from environment variables with fallback defaults.
          *
-         * @param defaultPort Default port if PORT environment variable is not set
+         * @param defaultPort Default port if SERVER_PORT environment variable is not set
          * @param defaultBackendUrl Default backend API URL
          * @param defaultJwtIssuer Default JWT issuer
          * @param defaultTimeoutMs Default execution timeout in milliseconds
          * @return A fully configured BaseExecutionConfig instance
          */
         fun fromEnvironment(
-            defaultPort: Int = 8081,
+            defaultPort: Int = 8080,
             defaultBackendUrl: String = "http://localhost:8080/api",
             defaultJwtIssuer: String = "mdeo-platform",
             defaultTimeoutMs: Long = 30000L
         ): BaseExecutionConfig {
             return BaseExecutionConfig(
-                serverPort = System.getenv("PORT")?.toIntOrNull() ?: defaultPort,
+                serverPort = System.getenv("SERVER_PORT")?.toIntOrNull() ?: defaultPort,
                 database = DatabaseConfig.fromEnvironment(),
                 backendApiUrl = System.getenv("BACKEND_API_URL") ?: defaultBackendUrl,
                 jwtIssuer = System.getenv("JWT_ISSUER") ?: defaultJwtIssuer,

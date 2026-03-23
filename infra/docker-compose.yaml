@@ -115,7 +115,7 @@ services:
         condition: service_healthy
       service-config-mdeo:
         condition: service_healthy
-      optimizer-execution:
+      optimizer-execution-0:
         condition: service_healthy
     restart: unless-stopped
 
@@ -167,7 +167,7 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
-      SCRIPT_EXECUTION_SERVICE_URL: ${SCRIPT_EXECUTION_SERVICE_URL:-http://script-execution:8081}
+      SCRIPT_EXECUTION_SERVICE_URL: ${SCRIPT_EXECUTION_SERVICE_URL:-http://script-execution:8080}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -187,7 +187,7 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
-      MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL: ${MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL:-http://model-transformation-execution:8082}
+      MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL: ${MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL:-http://model-transformation-execution:8080}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -202,7 +202,7 @@ services:
       context: ..
       dockerfile: infra/docker/script-execution/Dockerfile
     environment:
-      SERVER_PORT: "8081"
+      SERVER_PORT: "8080"
       DATABASE_URL: ${SCRIPT_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-script:5432/mdeo}
       DATABASE_USER: ${SCRIPT_DB_USER:-${DATABASE_USER}}
       DATABASE_PASSWORD: ${SCRIPT_DB_PASSWORD:-${DATABASE_PASSWORD}}
@@ -214,7 +214,7 @@ services:
       backend:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -226,7 +226,7 @@ services:
       context: ..
       dockerfile: infra/docker/model-transformation-execution/Dockerfile
     environment:
-      SERVER_PORT: "8082"
+      SERVER_PORT: "8080"
       DATABASE_URL: ${TRANSFORMATION_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-model-transformation:5432/mdeo}
       DATABASE_USER: ${MODEL_TRANSFORMATION_DB_USER:-${DATABASE_USER}}
       DATABASE_PASSWORD: ${MODEL_TRANSFORMATION_DB_PASSWORD:-${DATABASE_PASSWORD}}
@@ -238,7 +238,7 @@ services:
       backend:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -293,7 +293,7 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       BACKEND_API_URL: "http://backend:8080"
-      OPTIMIZER_EXECUTION_SERVICE_URL: ${OPTIMIZER_EXECUTION_SERVICE_URL:-http://optimizer-execution:8083}
+      OPTIMIZER_EXECUTION_SERVICE_URL: ${OPTIMIZER_EXECUTION_SERVICE_URL:-http://optimizer-execution-0:8080}
       MAX_LANGIUM_INSTANCES: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
@@ -303,24 +303,84 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  optimizer-execution:
+  optimizer-execution-0:
     build:
       context: ..
       dockerfile: infra/docker/optimizer-execution/Dockerfile
     environment:
-      SERVER_PORT: "8083"
+      SERVER_PORT: "8080"
       DATABASE_URL: ${OPTIMIZER_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-optimizer:5432/mdeo}
       DATABASE_USER: ${OPTIMIZER_DB_USER:-${DATABASE_USER}}
       DATABASE_PASSWORD: ${OPTIMIZER_DB_PASSWORD:-${DATABASE_PASSWORD}}
       BACKEND_API_URL: ${OPTIMIZER_EXECUTION_BACKEND_URL:-http://backend:8080}
       EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-600000}
+      NODE_ID: "0"
+      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
+      INCLUDE_SELF: "true"
+      WORKER_THREADS: "1"
     depends_on:
       postgres-optimizer:
         condition: service_healthy
       backend:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  optimizer-execution-1:
+    build:
+      context: ..
+      dockerfile: infra/docker/optimizer-execution/Dockerfile
+    environment:
+      SERVER_PORT: "8080"
+      DATABASE_URL: ${OPTIMIZER_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-optimizer:5432/mdeo}
+      DATABASE_USER: ${OPTIMIZER_DB_USER:-${DATABASE_USER}}
+      DATABASE_PASSWORD: ${OPTIMIZER_DB_PASSWORD:-${DATABASE_PASSWORD}}
+      BACKEND_API_URL: ${OPTIMIZER_EXECUTION_BACKEND_URL:-http://backend:8080}
+      EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-600000}
+      NODE_ID: "1"
+      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
+      INCLUDE_SELF: "true"
+      WORKER_THREADS: "1"
+    depends_on:
+      postgres-optimizer:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  optimizer-execution-2:
+    build:
+      context: ..
+      dockerfile: infra/docker/optimizer-execution/Dockerfile
+    environment:
+      SERVER_PORT: "8080"
+      DATABASE_URL: ${OPTIMIZER_EXECUTION_DATABASE_URL:-jdbc:postgresql://postgres-optimizer:5432/mdeo}
+      DATABASE_USER: ${OPTIMIZER_DB_USER:-${DATABASE_USER}}
+      DATABASE_PASSWORD: ${OPTIMIZER_DB_PASSWORD:-${DATABASE_PASSWORD}}
+      BACKEND_API_URL: ${OPTIMIZER_EXECUTION_BACKEND_URL:-http://backend:8080}
+      EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-600000}
+      NODE_ID: "2"
+      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
+      INCLUDE_SELF: "true"
+      WORKER_THREADS: "1"
+    depends_on:
+      postgres-optimizer:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5

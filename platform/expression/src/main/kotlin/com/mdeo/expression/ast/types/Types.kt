@@ -1,5 +1,6 @@
 package com.mdeo.expression.ast.types
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -18,6 +19,7 @@ interface ReturnType
 @Serializable
 @SerialName("void")
 data class VoidType(
+    @EncodeDefault
     val kind: String = "void"
 ) : ReturnType
 

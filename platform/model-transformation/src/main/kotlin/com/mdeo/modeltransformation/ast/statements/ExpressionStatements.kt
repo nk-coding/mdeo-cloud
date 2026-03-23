@@ -2,6 +2,7 @@ package com.mdeo.modeltransformation.ast.statements
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -32,6 +33,7 @@ data class TypedElseIfBranch(
  */
 @Serializable
 data class TypedIfExpressionStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "ifExpression",
     @Contextual val condition: TypedExpression,
     val thenBlock: List<@Contextual TypedTransformationStatement>,
@@ -51,6 +53,7 @@ data class TypedIfExpressionStatement(
  */
 @Serializable
 data class TypedWhileExpressionStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "whileExpression",
     @Contextual val condition: TypedExpression,
     val block: List<@Contextual TypedTransformationStatement>

@@ -4,8 +4,6 @@ import com.mdeo.optimizer.solution.Solution
 
 /**
  * Strategy for selecting which transformation operator to apply next.
- *
- * Ported from OperatorSelectionStrategy.java.
  */
 interface OperatorSelectionStrategy {
     /**
@@ -26,10 +24,9 @@ interface OperatorSelectionStrategy {
 }
 
 /**
- * Random operator selection: shuffles and tries each operator once per step.
+ * Randomly selects operators, trying each at most once per step before declaring exhaustion.
  *
- * Ported from RandomOperatorSelection.java, adapted to use transformation paths
- * instead of Henshin Unit objects.
+ * @param operatorPaths The full list of available transformation operator paths.
  */
 class RandomOperatorSelection(
     private val operatorPaths: List<String>

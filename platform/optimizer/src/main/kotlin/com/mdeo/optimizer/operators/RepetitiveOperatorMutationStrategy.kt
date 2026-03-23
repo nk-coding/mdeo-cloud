@@ -32,16 +32,6 @@ class RepetitiveOperatorMutationStrategy(
     private val logger = LoggerFactory.getLogger(RepetitiveOperatorMutationStrategy::class.java)
     private val attemptRunner = TransformationAttemptRunner(transformations)
 
-    /**
-     * Mutates the given solution by repeatedly applying the same operator until it fails.
-     *
-     * The operator path persists across steps: it is only replaced when the current
-     * operator fails to apply. Each successful application adds the operator to the
-     * recorded transformation step.
-     *
-     * @param solution The candidate solution to mutate.
-     * @return The mutated solution with recorded transformation steps.
-     */
     override fun mutate(solution: Solution): Solution {
         val stepSize = stepSizeStrategy.getNextStepSize(solution)
         var operatorPath: String? = null

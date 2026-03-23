@@ -29,7 +29,7 @@ locals {
         HOST                         = "0.0.0.0"
         BACKEND_API_URL              = "http://backend:8080"
         MAX_LANGIUM_INSTANCES        = tostring(var.max_langium_instances)
-        SCRIPT_EXECUTION_SERVICE_URL = "http://script-execution:8081"
+        SCRIPT_EXECUTION_SERVICE_URL = "http://script-execution:8080"
       }
     }
 
@@ -40,7 +40,7 @@ locals {
         HOST                                       = "0.0.0.0"
         BACKEND_API_URL                            = "http://backend:8080"
         MAX_LANGIUM_INSTANCES                      = tostring(var.max_langium_instances)
-        MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL = "http://model-transformation-execution:8082"
+        MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL = "http://model-transformation-execution:8080"
       }
     }
 
@@ -71,7 +71,7 @@ locals {
         HOST                           = "0.0.0.0"
         BACKEND_API_URL                = "http://backend:8080"
         MAX_LANGIUM_INSTANCES          = tostring(var.max_langium_instances)
-        OPTIMIZER_EXECUTION_SERVICE_URL = "http://optimizer-execution:8083"
+        OPTIMIZER_EXECUTION_SERVICE_URL = "http://optimizer-execution:8080"
       }
     }
 

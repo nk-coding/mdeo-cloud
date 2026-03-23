@@ -5,8 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Top-level optimizer execution payload, normalized from config problem/goal/search/solver sections.
- * This is the single data class that the optimizer-execution service receives.
+ * Top-level optimizer execution payload, normalised from config problem/goal/search/solver sections.
  */
 @Serializable
 data class OptimizationConfig(
@@ -17,7 +16,10 @@ data class OptimizationConfig(
 )
 
 /**
- * Problem section: metamodel + initial model references.
+ * Problem section: metamodel and initial model references.
+ *
+ * @param metamodelPath Path to the metamodel resource.
+ * @param modelPath Path to the initial model resource.
  */
 @Serializable
 data class ProblemConfig(
@@ -26,7 +28,11 @@ data class ProblemConfig(
 )
 
 /**
- * Goal section: objectives, constraints, refinements.
+ * Goal section: objectives, constraints, and optional multiplicty refinements.
+ *
+ * @param objectives Objective functions to optimise.
+ * @param constraints Constraint functions that must be satisfied.
+ * @param refinements Optional metamodel refinements used for rule generation.
  */
 @Serializable
 data class GoalConfig(
@@ -35,6 +41,13 @@ data class GoalConfig(
     val refinements: List<RefinementConfig> = emptyList()
 )
 
+/**
+ * Single objective or constraint function configuration.
+ *
+ * @param type Whether to minimise or maximise the function value.
+ * @param path Path to the script file containing the function.
+ * @param functionName Name of the function within the script.
+ */
 @Serializable
 data class ObjectiveConfig(
     val type: ObjectiveTendency,
@@ -57,6 +70,12 @@ enum class ObjectiveTendency {
     }
 }
 
+/**
+ * Single constraint function configuration.
+ *
+ * @param path Path to the script file containing the function.
+ * @param functionName Name of the function within the script.
+ */
 @Serializable
 data class ConstraintConfig(
     val path: String,
@@ -86,22 +105,22 @@ data class RefinementConfig(
     val upper: Int
 )
 
-/**
- * Search section: mutation transformations.
- */
+/** Search section: mutation transformation configuration. */
 @Serializable
 data class SearchConfig(
     val mutations: MutationsConfig
 )
 
+/**
+ * Mutation operator source configuration.
+ *
+ * @param usingPaths Paths to hand-written transformation files.
+ * @param generate Auto-generation specs; when non-empty, [com.mdeo.optimizer.rulegen.MutationRuleGenerator]
+ *   synthesises additional operators from the metamodel and merges them with [usingPaths].
+ */
 @Serializable
 data class MutationsConfig(
     val usingPaths: List<String> = emptyList(),
-    /**
-     * Auto-generation specs: when non-empty, [MutationRuleGenerator] is invoked at run-time
-     * to synthesise additional mutation operators directly from the metamodel structure.
-     * Generated operators are merged with any hand-written transformations from [usingPaths].
-     */
     val generate: List<MutationRuleSpec> = emptyList()
 )
 
@@ -160,11 +179,21 @@ data class SolverConfig(
     }
 }
 
+/** Supported evolutionary algorithm types. */
 @Serializable
 enum class AlgorithmType {
     NSGAII, IBEA, SPEA2, SMSMOEA, VEGA, PESA2, PAES, RANDOM
 }
 
+/**
+ * Algorithm hyper-parameters.
+ *
+ * @param population Population size.
+ * @param variation Variation operator type.
+ * @param mutation Mutation configuration.
+ * @param bisections Bisections for PESA2/PAES archive grid.
+ * @param archiveSize Archive capacity for PESA2/PAES.
+ */
 @Serializable
 data class AlgorithmParameters(
     val population: Int = 40,
@@ -174,29 +203,49 @@ data class AlgorithmParameters(
     val archiveSize: Int? = null
 )
 
+/** Variation operator type. */
 @Serializable
 enum class VariationType { MUTATION, GENETIC, PROBABILISTIC }
 
+/**
+ * Mutation operator parameters.
+ *
+ * @param step How many mutation steps to apply per offspring.
+ * @param strategy The operator selection strategy.
+ */
 @Serializable
 data class MutationParameters(
     val step: MutationStepConfig = MutationStepConfig.Fixed(1),
     val strategy: MutationStrategy = MutationStrategy.RANDOM
 )
 
+/** Operator selection strategy for mutation. */
 @Serializable
 enum class MutationStrategy { RANDOM, REPETITIVE }
 
+/** Configures the number of mutation steps applied per offspring, either fixed or random in an interval. */
 @Serializable
 sealed class MutationStepConfig {
+    /** Always apply exactly [n] steps. */
     @Serializable
     @SerialName("Fixed")
     data class Fixed(val n: Int) : MutationStepConfig()
 
+    /** Randomly pick a count from [[lower], [upper]). */
     @Serializable
     @SerialName("Interval")
     data class Interval(val lower: Int, val upper: Int) : MutationStepConfig()
 }
 
+/**
+ * Termination conditions for the evolutionary search.
+ * All non-null conditions form a compound OR termination.
+ *
+ * @param evolutions Stop after this many generations (multiplied by population size for evaluations).
+ * @param time Stop after this many seconds.
+ * @param delta Reserved for convergence-based stopping (not yet implemented).
+ * @param iterations Reserved for iteration-based stopping (not yet implemented).
+ */
 @Serializable
 data class TerminationConfig(
     val evolutions: Int? = null,

@@ -22,10 +22,6 @@ data class AppConfig(
     override val executionTimeoutMs: Long
 ) : ExecutionServiceConfig {
     companion object {
-        private const val DEFAULT_PORT = 8082
-        private const val DEFAULT_BACKEND_URL = "http://localhost:8080/api"
-        private const val DEFAULT_JWT_ISSUER = "mdeo-platform"
-        private const val DEFAULT_TIMEOUT_MS = 60000L
 
         /**
          * Loads configuration from environment variables with fallback defaults.
@@ -33,12 +29,7 @@ data class AppConfig(
          * @return Fully configured AppConfig instance
          */
         fun load(): AppConfig {
-            val baseConfig = BaseExecutionConfig.fromEnvironment(
-                defaultPort = DEFAULT_PORT,
-                defaultBackendUrl = DEFAULT_BACKEND_URL,
-                defaultJwtIssuer = DEFAULT_JWT_ISSUER,
-                defaultTimeoutMs = DEFAULT_TIMEOUT_MS
-            )
+            val baseConfig = BaseExecutionConfig.fromEnvironment()
             
             return AppConfig(
                 serverPort = baseConfig.serverPort,

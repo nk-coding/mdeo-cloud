@@ -1,5 +1,6 @@
 package com.mdeo.scriptexecution.config
 
+import com.mdeo.execution.common.config.BaseExecutionConfig
 import com.mdeo.execution.common.config.DatabaseConfig
 import com.mdeo.execution.common.config.ExecutionServiceConfig
 
@@ -27,12 +28,14 @@ data class AppConfig(
          * @return A fully configured AppConfig instance
          */
         fun load(): AppConfig {
+            val baseConfig = BaseExecutionConfig.fromEnvironment()
+
             return AppConfig(
-                serverPort = System.getenv("PORT")?.toIntOrNull() ?: 8081,
-                database = DatabaseConfig.fromEnvironment(),
-                backendApiUrl = System.getenv("BACKEND_API_URL") ?: "http://localhost:8080/api",
-                jwtIssuer = System.getenv("JWT_ISSUER") ?: "mdeo-platform",
-                executionTimeoutMs = System.getenv("EXECUTION_TIMEOUT_MS")?.toLongOrNull() ?: 30000L
+                serverPort = baseConfig.serverPort,
+                database = baseConfig.database,
+                backendApiUrl = baseConfig.backendApiUrl,
+                jwtIssuer = baseConfig.jwtIssuer,
+                executionTimeoutMs = baseConfig.executionTimeoutMs
             )
         }
     }

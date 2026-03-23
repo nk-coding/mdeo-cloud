@@ -5,8 +5,6 @@ import org.slf4j.LoggerFactory
 
 /**
  * Determines how many transformation steps to apply per mutation.
- *
- * Ported from MutationStepSizeStrategy.java.
  */
 interface MutationStepSizeStrategy {
     /**
@@ -16,18 +14,19 @@ interface MutationStepSizeStrategy {
 }
 
 /**
- * Fixed step size: always applies the configured number of steps.
+ * Fixed step size: always applies [step] transformation steps per mutation.
  *
- * Ported from FixedMutationStepSizeStrategy.java.
+ * @param step The fixed number of steps to apply.
  */
 class FixedMutationStepSizeStrategy(private val step: Int) : MutationStepSizeStrategy {
     override fun getNextStepSize(solution: Solution): Int = step
 }
 
 /**
- * Interval step size: randomly chooses a step count from [lower, upper).
+ * Interval step size: randomly picks a step count from [[lower], [upper]).
  *
- * Ported from IntervalMutationStepSizeStrategy.java.
+ * @param lower Minimum number of steps (inclusive).
+ * @param upper Maximum number of steps (exclusive); falls back to [lower] if <= [lower].
  */
 class IntervalMutationStepSizeStrategy(
     private val lower: Int,

@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":model-transformation"))
     implementation(project(":script"))
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.cbor)
     implementation(libs.kotlinx.coroutines.core)
 
     // Apache TinkerPop Gremlin

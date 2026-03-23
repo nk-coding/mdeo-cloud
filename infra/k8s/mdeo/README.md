@@ -11,7 +11,7 @@ This OpenTofu configuration deploys the full **mdeo** application stack on Kuber
 | **Frontend** | `workbench` (nginx, port 80) |
 | **Backend** | `backend` (Spring Boot, port 8080) |
 | **Plugin Services** | `service-metamodel`, `service-model`, `service-script`, `service-model-transformation`, `service-config`, `service-config-optimization`, `service-config-mdeo` (Node.js, port 3000 each) |
-| **Execution Services** | `script-execution` (8081), `model-transformation-execution` (8082), `optimizer-execution` (8083) |
+| **Execution Services** | `script-execution` (8080), `model-transformation-execution` (8080), `optimizer-execution` (8080) |
 | **Databases** | `postgres-backend`, `postgres-script`, `postgres-model-transformation`, `postgres-optimizer` (CloudNativePG clusters) |
 | **Gateway** | Kubernetes Gateway API (`Gateway` + `HTTPRoute`) using the `nginx` GatewayClass installed by `cluster_setup` |
 

@@ -1,5 +1,6 @@
 package com.mdeo.modeltransformation.ast.statements
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -15,6 +16,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TypedStopStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val kind: String = "stop",
     val keyword: String
 ) : TypedTransformationStatement

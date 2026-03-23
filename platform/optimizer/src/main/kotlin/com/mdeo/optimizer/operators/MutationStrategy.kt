@@ -4,8 +4,6 @@ import com.mdeo.optimizer.solution.Solution
 
 /**
  * Strategy for applying mutation operators to a candidate solution.
- *
- * Ported from MutationApplicationStrategy.java.
  */
 interface MutationStrategy {
     /**

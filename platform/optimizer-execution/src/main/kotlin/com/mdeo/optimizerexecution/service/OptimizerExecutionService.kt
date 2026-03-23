@@ -3,24 +3,42 @@ package com.mdeo.optimizerexecution.service
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.execution.common.routes.FileEntry
 import com.mdeo.execution.common.service.ExecutionServiceWithFileTree
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.TypedAst as TransformationTypedAst
 import com.mdeo.metamodel.data.ModelData
+import com.mdeo.modeltransformation.ast.expressions.TypedExpressionSerializer as TransformationExpressionSerializer
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternElementSerializer
+import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
+import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatementSerializer
 import com.mdeo.modeltransformation.graph.ModelGraph
 import com.mdeo.modeltransformation.graph.MdeoModelGraph
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.optimizer.OptimizationOrchestrator
 import com.mdeo.optimizer.config.*
-import com.mdeo.optimizer.rulegen.MutationRuleGenerator
-import com.mdeo.optimizer.guidance.GuidanceFunction
-import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
+import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
+import com.mdeo.optimizer.evaluation.MutationEvaluator
+import com.mdeo.optimizer.evaluation.WorkerSolutionRef
 import com.mdeo.optimizer.moea.SearchResult
+import com.mdeo.optimizer.moea.SolutionResult
+import com.mdeo.optimizer.moea.getWorkerRef
+import com.mdeo.optimizer.metrics.OptimizationMetricsCollector
+import com.mdeo.optimizer.operators.MutationStrategyFactory
+import com.mdeo.optimizer.rulegen.MutationRuleGenerator
+import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
 import com.mdeo.optimizer.solution.Solution
+import com.mdeo.optimizer.worker.WorkerAllocationRequest
+import com.mdeo.optimizerexecution.config.AppConfig
 import com.mdeo.optimizerexecution.database.OptimizerExecutionsTable
 import com.mdeo.optimizerexecution.database.OptimizerResultFilesTable
+import com.mdeo.optimizerexecution.worker.FederatedMutationEvaluator
+import com.mdeo.optimizerexecution.worker.WorkerClient
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst
+import com.mdeo.script.ast.expressions.TypedExpressionSerializer as ScriptExpressionSerializer
+import com.mdeo.script.ast.statements.TypedStatementSerializer
 import com.mdeo.script.compiler.CompilationInput
 import com.mdeo.script.compiler.CompiledProgram
 import com.mdeo.script.compiler.ScriptCompiler
@@ -30,11 +48,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -68,15 +89,38 @@ import kotlin.uuid.toKotlinUuid
  * @param apiClient Client for backend API communication
  * @param timeoutMs Overall execution timeout in milliseconds
  * @param executionScope Scope in which background execution coroutines are launched
+ * @param appConfig Application configuration including multi-node peer settings.
  */
 class OptimizerExecutionService(
     private val apiClient: OptimizerApiClient,
     private val timeoutMs: Long,
-    private val executionScope: CoroutineScope
+    private val executionScope: CoroutineScope,
+    private val appConfig: AppConfig
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(OptimizerExecutionService::class.java)
     private val scriptCompiler = ScriptCompiler()
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+
+    private val transformationJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, TransformationExpressionSerializer)
+            contextual(TypedTransformationStatement::class, TypedTransformationStatementSerializer)
+            contextual(TypedPatternElement::class, TypedPatternElementSerializer)
+        }
+    }
+
+    private val scriptJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+        serializersModule = SerializersModule {
+            contextual(TypedExpression::class, ScriptExpressionSerializer)
+            contextual(TypedStatement::class, TypedStatementSerializer)
+        }
+    }
 
     companion object {
         private const val MAX_PATH_LENGTH = 1000
@@ -86,6 +130,16 @@ class OptimizerExecutionService(
         private const val MIME_TYPE_MARKDOWN = "text/markdown"
     }
 
+    /**
+     * Creates a new execution record and launches the optimization in a background coroutine.
+     *
+     * @param executionId Unique identifier for the new execution.
+     * @param projectId Project that owns the execution.
+     * @param filePath Path to the config file that triggered the execution.
+     * @param data Raw JSON configuration payload.
+     * @param jwtToken Bearer token for backend API authentication.
+     * @return A human-readable description of the started optimization.
+     */
     override suspend fun createAndStartExecution(
         executionId: UUID,
         projectId: UUID,
@@ -106,6 +160,10 @@ class OptimizerExecutionService(
                 }
             } catch (e: TimeoutCancellationException) {
                 handleTimeout(executionId, jwtToken)
+            } catch (e: CancellationException) {
+                // Normal coroutine cancellation (e.g. application shutdown or user cancel).
+                // Don't mark the execution as failed; it was already handled inside runOptimization.
+                logger.info("Optimizer execution $executionId was cancelled")
             } catch (e: Exception) {
                 handleUnexpectedError(executionId, e, jwtToken)
             }
@@ -114,6 +172,11 @@ class OptimizerExecutionService(
         "Optimization: ${config.solver.algorithm} on ${config.problem.modelPath}"
     }
 
+    /**
+     * Marks the execution as cancelled in the database.
+     *
+     * @param executionId The execution to cancel.
+     */
     override suspend fun cancelExecution(executionId: UUID) = withContext(Dispatchers.IO) {
         transaction {
             OptimizerExecutionsTable.update({
@@ -127,6 +190,11 @@ class OptimizerExecutionService(
         logger.info("Cancelled optimizer execution $executionId")
     }
 
+    /**
+     * Deletes the execution record and all associated result files from the database.
+     *
+     * @param executionId The execution to delete.
+     */
     override suspend fun deleteExecution(executionId: UUID) = withContext(Dispatchers.IO) {
         transaction {
             OptimizerResultFilesTable.deleteWhere {
@@ -137,11 +205,24 @@ class OptimizerExecutionService(
         logger.info("Deleted optimizer execution $executionId")
     }
 
+    /**
+     * Returns a markdown summary for the given execution, or `null` if the execution does not exist.
+     *
+     * @param executionId The execution to summarise.
+     * @return A markdown-formatted summary string, or `null` if not found.
+     */
     override suspend fun getSummary(executionId: UUID): String? = withContext(Dispatchers.IO) {
         val execution = findExecution(executionId) ?: return@withContext null
         buildSummary(execution)
     }
 
+    /**
+     * Returns the list of result files for the given execution, optionally filtered by path prefix.
+     *
+     * @param executionId The execution whose result files to list.
+     * @param path Optional path prefix to filter by, or `null` for all files.
+     * @return A list of [FileEntry] instances, or `null` if the execution does not exist.
+     */
     override suspend fun getFileTree(executionId: UUID, path: String?): List<FileEntry>? {
         return withContext(Dispatchers.IO) {
             findExecution(executionId) ?: return@withContext null
@@ -160,6 +241,13 @@ class OptimizerExecutionService(
         }
     }
 
+    /**
+     * Returns the content of a specific result file for the given execution.
+     *
+     * @param executionId The execution that owns the result file.
+     * @param filePath The path of the result file to retrieve.
+     * @return The file content string, or `null` if not found.
+     */
     override suspend fun getFileContents(executionId: UUID, filePath: String): String? {
         return withContext(Dispatchers.IO) {
             transaction {
@@ -192,18 +280,15 @@ class OptimizerExecutionService(
         config: OptimizationConfig,
         jwtToken: String
     ) {
-        // --- Phase 1: Fetch metamodel ---
         updateState(executionId, ExecutionState.INITIALIZING, "Fetching metamodel...", jwtToken)
         val metamodelData = fetchMetamodelData(executionId, projectId, config.problem.metamodelPath, jwtToken)
             ?: return
         val metamodel = Metamodel.compile(metamodelData)
 
-        // --- Phase 2: Fetch model ---
         updateState(executionId, ExecutionState.INITIALIZING, "Fetching model...", jwtToken)
         val modelData = fetchModelData(executionId, projectId, config.problem.modelPath, jwtToken)
             ?: return
 
-        // --- Phase 3: Fetch all transformation typed ASTs ---
         updateState(
             executionId, ExecutionState.INITIALIZING,
             "Fetching ${config.search.mutations.usingPaths.size} transformation(s)...", jwtToken
@@ -212,7 +297,6 @@ class OptimizerExecutionService(
             executionId, projectId, config.search.mutations.usingPaths, jwtToken
         ) ?: return
 
-        // --- Phase 3b: Auto-generate mutation operators from metamodel specs ---
         val transformations: Map<String, TransformationTypedAst> =
             if (config.search.mutations.generate.isNotEmpty()) {
                 val generated = MutationRuleGenerator.generate(
@@ -228,7 +312,6 @@ class OptimizerExecutionService(
                     executionId, ExecutionState.INITIALIZING,
                     "Auto-generated ${generated.size} mutation rule(s)...", jwtToken
                 )
-                // Merge: hand-written transformations take precedence over generated ones
                 val merged = LinkedHashMap<String, TransformationTypedAst>()
                 generated.forEach { m -> merged[m.name] = m.typedAst }
                 merged.putAll(fetchedTransformations)
@@ -237,7 +320,6 @@ class OptimizerExecutionService(
                 fetchedTransformations
             }
 
-        // --- Phase 4: Fetch all script typed ASTs for objectives/constraints ---
         val scriptPaths = collectScriptPaths(config.goal)
         updateState(
             executionId, ExecutionState.INITIALIZING,
@@ -246,7 +328,6 @@ class OptimizerExecutionService(
         val scriptAsts = fetchAllScripts(executionId, projectId, scriptPaths, jwtToken)
             ?: return
 
-        // --- Phase 5: Compile all scripts together ---
         updateState(
             executionId, ExecutionState.INITIALIZING,
             "Compiling ${scriptAsts.size} script file(s)...", jwtToken
@@ -254,7 +335,6 @@ class OptimizerExecutionService(
         val compiledProgram = compileScripts(executionId, scriptAsts, metamodelData, jwtToken)
             ?: return
 
-        // --- Phase 6: Build guidance functions ---
         val environment = ExecutionEnvironment(compiledProgram)
         val clazz = environment.scriptProgramClass
 
@@ -269,49 +349,239 @@ class OptimizerExecutionService(
             ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${con.path}::${con.functionName}")
         }
 
-        // --- Phase 7: Create initial solution provider ---
         val initialSolutionProvider = createInitialSolutionProvider(
             modelData, metamodel
         )
 
-        // --- Phase 8: Run optimizer ---
-        updateState(
-            executionId, ExecutionState.RUNNING,
-            "Running ${config.solver.algorithm} optimizer...", jwtToken
-        )
+        val isFederated = appConfig.peers.size > 1
+        val evaluator: MutationEvaluator
 
-        val orchestrator = OptimizationOrchestrator(
-            config = config,
-            objectives = objectives,
-            constraints = constraints,
-            transformations = transformations,
-            initialSolutionProvider = initialSolutionProvider
-        )
-
-        val result = try {
-            orchestrator.run { generation ->
-                val approxEvaluations = generation * config.solver.parameters.population
-                updateState(
-                    executionId,
-                    ExecutionState.RUNNING,
-                    "Generation $generation (~$approxEvaluations evaluations)",
-                    jwtToken
-                )
-                checkCancelled(executionId)
-            }
-        } catch (e: CancellationException) {
-            logger.info("Optimizer execution $executionId stopped: ${e.message}")
-            return
-        } catch (e: Exception) {
-            logger.error("Optimization failed", e)
-            updateState(executionId, ExecutionState.FAILED, "Optimization failed: ${e.message}", jwtToken)
-            return
+        if (isFederated) {
+            evaluator = createFederatedEvaluator(
+                executionId, config, metamodelData, modelData,
+                transformations, scriptAsts
+            )
+            updateState(
+                executionId, ExecutionState.RUNNING,
+                "Running federated ${config.solver.algorithm} optimizer across ${appConfig.peers.size} nodes...",
+                jwtToken
+            )
+        } else {
+            val mutationStrategy = MutationStrategyFactory.create(
+                config.solver.parameters.mutation, transformations
+            )
+            evaluator = LocalMutationEvaluator(
+                initialSolutionProvider = initialSolutionProvider,
+                mutationStrategy = mutationStrategy,
+                objectives = objectives,
+                constraints = constraints,
+                metamodel = metamodel,
+            )
+            updateState(
+                executionId, ExecutionState.RUNNING,
+                "Running ${config.solver.algorithm} optimizer...", jwtToken
+            )
         }
 
-        // --- Phase 9: Store results ---
-        storeResults(executionId, result)
-        updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
-        logger.info("Optimizer execution $executionId completed")
+        runWithEvaluator(executionId, config, evaluator, jwtToken)
+    }
+
+    // ========================= Unified execution =========================
+
+    /**
+     * Runs the optimization using the supplied [MutationEvaluator].
+     *
+     * Both local and federated modes converge here: the [OptimizationOrchestrator]
+     * drives the MOEA-native delegating algorithms, routing all mutation and evaluation
+     * work through the [evaluator].
+     *
+     * For federated evaluators whose workers hold WebSocket connections, wrap the call
+     * in a [coroutineScope] so that child coroutines (e.g. reading loops) are cancelled
+     * when the algorithm finishes or is cancelled.
+     *
+     * @param executionId The execution record to drive.
+     * @param config Parsed optimization configuration.
+     * @param evaluator The mutation evaluator (local or federated).
+     * @param jwtToken Bearer token for backend API authentication.
+     */
+    private suspend fun runWithEvaluator(
+        executionId: UUID,
+        config: OptimizationConfig,
+        evaluator: MutationEvaluator,
+        jwtToken: String
+    ) {
+        val orchestrator = OptimizationOrchestrator(config = config, evaluator = evaluator)
+
+        // evaluator.cleanup() must run in finally so it always executes, but
+        // storeResults/updateState(COMPLETED) must be called BEFORE cleanup because
+        // storeResults fetches solution model data via the WebSocket connection that
+        // cleanup closes.
+        try {
+            val result = try {
+                orchestrator.run { generation ->
+                    val approxEvaluations = generation * config.solver.parameters.population
+                    updateState(
+                        executionId,
+                        ExecutionState.RUNNING,
+                        "Generation $generation (~$approxEvaluations evaluations)",
+                        jwtToken
+                    )
+                    checkCancelled(executionId)
+                }
+            } catch (e: CancellationException) {
+                logger.info("Optimizer execution $executionId stopped: ${e.message}")
+                return
+            } catch (e: Exception) {
+                logger.error("Optimization failed", e)
+                updateState(executionId, ExecutionState.FAILED, "Optimization failed: ${e.message}", jwtToken)
+                return
+            }
+
+            // These run while the evaluator (and its WebSocket connections) are still alive.
+            storeResults(executionId, result, evaluator)
+            updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
+            logger.info("Optimizer execution $executionId completed")
+        } finally {
+            evaluator.cleanup()
+        }
+    }
+
+    // ========================= Federated evaluator creation =========================
+
+    /**
+     * Creates a [FederatedMutationEvaluator] wrapping WebSocket connections to worker peers.
+     *
+     * Note: the returned evaluator's worker clients are scoped to the current coroutine.
+     * The caller must ensure the coroutineScope outlives the evaluator's usage.
+     *
+     * @param executionId The execution identifier.
+     * @param config Parsed optimization configuration.
+     * @param metamodelData The metamodel data to send to workers.
+     * @param modelData The initial model data to send to workers.
+     * @param transformations Map of transformation path to typed AST.
+     * @param scriptAsts Map of script path to typed AST.
+     * @return A [FederatedMutationEvaluator] ready for use.
+     */
+    private fun createFederatedEvaluator(
+        executionId: UUID,
+        config: OptimizationConfig,
+        metamodelData: MetamodelData,
+        modelData: ModelData,
+        transformations: Map<String, TransformationTypedAst>,
+        scriptAsts: Map<String, ScriptTypedAst>
+    ): FederatedMutationEvaluator {
+        val allocationRequest = buildAllocationRequest(
+            executionId, config, metamodelData, modelData, transformations, scriptAsts
+        )
+        val workers = createWorkerClients(executionScope)
+        return FederatedMutationEvaluator(executionId.toString(), workers, allocationRequest)
+    }
+
+    /**
+     * Builds a [WorkerAllocationRequest] containing all resources workers need to set up
+     * their local evaluation environments.
+     *
+     * Transformation and script typed ASTs are serialized to JSON strings using the
+     * appropriate contextual serializer modules.
+     *
+     * @param executionId The execution identifier.
+     * @param config Parsed optimization configuration.
+     * @param metamodelData The metamodel data.
+     * @param modelData The initial model data.
+     * @param transformations Map of transformation path to typed AST.
+     * @param scriptAsts Map of script path to typed AST.
+     * @return A fully populated [WorkerAllocationRequest].
+     */
+    private fun buildAllocationRequest(
+        executionId: UUID,
+        config: OptimizationConfig,
+        metamodelData: MetamodelData,
+        modelData: ModelData,
+        transformations: Map<String, TransformationTypedAst>,
+        scriptAsts: Map<String, ScriptTypedAst>
+    ): WorkerAllocationRequest {
+        val transformationAstJsons = transformations.mapValues { (_, ast) ->
+            transformationJson.encodeToString(TransformationTypedAst.serializer(), ast)
+        }
+        val scriptAstJsons = scriptAsts.mapValues { (_, ast) ->
+            scriptJson.encodeToString(ScriptTypedAst.serializer(), ast)
+        }
+        return WorkerAllocationRequest(
+            executionId = executionId.toString(),
+            metamodelData = metamodelData,
+            initialModelData = modelData,
+            transformationAstJsons = transformationAstJsons,
+            scriptAstJsons = scriptAstJsons,
+            goalConfig = config.goal,
+            solverConfig = config.solver,
+            initialSolutionCount = config.solver.parameters.population
+        )
+    }
+
+    /**
+     * Creates [WorkerClient] instances for all peers that should act as workers.
+     *
+     * If [AppConfig.includeSelf] is true, the current node is included. All other peers
+     * are always included.  Each client is given [scope] so that its background WebSocket
+     * reading loop is cancelled automatically when the enclosing execution coroutine ends.
+     *
+     * @param scope Coroutine scope that owns the WebSocket reading loops of all returned clients.
+     * @return A list of [WorkerClient] instances, one per worker peer.
+     */
+    private fun createWorkerClients(scope: CoroutineScope): List<WorkerClient> {
+        return appConfig.peers.mapIndexedNotNull { index, url ->
+            if (index == appConfig.nodeId && !appConfig.includeSelf) null
+            else WorkerClient(nodeId = index.toString(), baseUrl = url, scope = scope)
+        }
+    }
+
+
+
+    /**
+     * Fetches solution model data from the evaluator and persists the results.
+     *
+     * For each MOEA solution in the final population, the [WorkerSolutionRef] attribute
+     * is used to retrieve the full model data from the owning evaluator (local or federated).
+     * Results are stored alongside a markdown summary in the result-files table.
+     *
+     * @param executionId The execution whose results are being stored.
+     * @param result The [SearchResult] from the completed algorithm.
+     * @param evaluator The mutation evaluator used to fetch solution model data.
+     */
+    private suspend fun storeResults(
+        executionId: UUID,
+        result: SearchResult,
+        evaluator: MutationEvaluator
+    ) {
+        val solutions = result.getFinalSolutions()
+        val summaryContent = buildResultSummary(solutions, result.getMetrics())
+
+        val moeaSolutions = result.getRawPopulation().toList()
+        val solutionModelJsons = moeaSolutions.mapNotNull { sol ->
+            val ref = sol.getWorkerRef() ?: return@mapNotNull null
+            val modelData = evaluator.getSolutionData(ref)
+            json.encodeToString(modelData)
+        }
+
+        transaction {
+            OptimizerResultFilesTable.insert {
+                it[id] = Uuid.random()
+                it[OptimizerResultFilesTable.executionId] = executionId.toKotlinUuid()
+                it[filePath] = SUMMARY_FILE
+                it[content] = summaryContent
+                it[mimeType] = MIME_TYPE_MARKDOWN
+            }
+
+            solutionModelJsons.forEachIndexed { index, jsonContent ->
+                OptimizerResultFilesTable.insert {
+                    it[id] = Uuid.random()
+                    it[OptimizerResultFilesTable.executionId] = executionId.toKotlinUuid()
+                    it[filePath] = "$RESULTS_DIR/solution_$index.m_gen"
+                    it[content] = jsonContent
+                    it[mimeType] = MIME_TYPE_JSON
+                }
+            }
+        }
     }
 
     // ========================= Data fetching =========================
@@ -467,6 +737,10 @@ class OptimizerExecutionService(
     /**
      * Creates a factory that produces fresh initial [Solution] instances by loading
      * the [modelData] into new [MdeoModelGraph]s.
+     *
+     * @param modelData The seed model data from which to create solutions.
+     * @param metamodel The compiled metamodel governing model structure.
+     * @return A factory function producing new [Solution] instances.
      */
     private fun createInitialSolutionProvider(
         modelData: ModelData,
@@ -474,55 +748,11 @@ class OptimizerExecutionService(
     ): () -> Solution {
         return {
             val modelGraph = MdeoModelGraph.create(modelData, metamodel)
-            //val modelGraph = TinkerModelGraph.create(modelData, metamodel)
             Solution(modelGraph)
         }
     }
 
     // ========================= Result storage =========================
-
-    /**
-     * Serialises all Pareto-front solutions and a markdown summary, then persists them
-     * in the result-files table.
-     *
-     * @param executionId The execution whose results are being stored.
-     * @param result The completed search result containing the final population.
-     */
-    private fun storeResults(
-        executionId: UUID,
-        result: SearchResult
-    ) {
-        val solutions = result.getFinalSolutions()
-        val solutionGraphs = result.getFinalSolutionGraphs()
-        val summaryContent = buildResultSummary(solutions)
-
-        val solutionModelFiles = solutionGraphs.map { solution ->
-            val modelData = solution.modelGraph.toModelData()
-            json.encodeToString(modelData)
-        }
-
-        transaction {
-            // Store summary
-            OptimizerResultFilesTable.insert {
-                it[id] = Uuid.random()
-                it[OptimizerResultFilesTable.executionId] = executionId.toKotlinUuid()
-                it[filePath] = SUMMARY_FILE
-                it[content] = summaryContent
-                it[mimeType] = MIME_TYPE_MARKDOWN
-            }
-
-            // Store each Pareto-front solution as a model file
-            solutionModelFiles.forEachIndexed { index, jsonContent ->
-                OptimizerResultFilesTable.insert {
-                    it[id] = Uuid.random()
-                    it[OptimizerResultFilesTable.executionId] = executionId.toKotlinUuid()
-                    it[filePath] = "$RESULTS_DIR/solution_$index.m_gen"
-                    it[content] = jsonContent
-                    it[mimeType] = MIME_TYPE_JSON
-                }
-            }
-        }
-    }
 
     /**
      * Builds a markdown result summary table for the given Pareto-front solutions.
@@ -531,7 +761,8 @@ class OptimizerExecutionService(
      * @return Markdown-formatted summary string.
      */
     private fun buildResultSummary(
-        solutions: List<com.mdeo.optimizer.moea.SolutionResult>
+        solutions: List<com.mdeo.optimizer.moea.SolutionResult>,
+        metricsCollector: OptimizationMetricsCollector
     ): String {
         return buildString {
             append("## Optimization Results\n\n")
@@ -553,6 +784,93 @@ class OptimizerExecutionService(
                     append("![Solution $index]($RESULTS_DIR/solution_$index.m_gen)\n")
                 }
             }
+
+            val generations = metricsCollector.generations
+            if (generations.isNotEmpty()) {
+                append("\n### Metrics\n\n")
+
+                append("#### Total Models\n\n")
+                append(buildPlotBlock(
+                    xTitle = "Generation",
+                    yTitle = "Models",
+                    traces = listOf(
+                        PlotTrace("Total", generations.map { it.generation }, generations.map { it.totalModels })
+                    )
+                ))
+
+                append("#### Transformations per Generation\n\n")
+                append(buildPlotBlock(
+                    xTitle = "Generation",
+                    yTitle = "Transformations",
+                    traces = listOf(
+                        PlotTrace("Transformations", generations.map { it.generation }, generations.map { it.transformationsInGeneration })
+                    )
+                ))
+
+                append("#### Iteration Time\n\n")
+                append(buildPlotBlock(
+                    xTitle = "Generation",
+                    yTitle = "Time (ms)",
+                    traces = listOf(
+                        PlotTrace("Time", generations.map { it.generation }, generations.map { it.iterationTimeMs })
+                    )
+                ))
+
+                append("#### Rebalanced Solutions per Generation\n\n")
+                append(buildPlotBlock(
+                    xTitle = "Generation",
+                    yTitle = "Solutions transferred",
+                    traces = listOf(
+                        PlotTrace("Rebalanced", generations.map { it.generation }, generations.map { it.rebalancedSolutions })
+                    )
+                ))
+
+                val allNodeIds = generations.flatMap { it.perNode.keys }.toSortedSet()
+                if (allNodeIds.size > 1) {
+                    append("#### Total Models per Node\n\n")
+                    append(buildPlotBlock(
+                        xTitle = "Generation",
+                        yTitle = "Models",
+                        traces = allNodeIds.map { nodeId ->
+                            PlotTrace(
+                                "Node $nodeId",
+                                generations.map { it.generation },
+                                generations.map { it.perNode[nodeId]?.totalModels ?: 0 }
+                            )
+                        }
+                    ))
+
+                    append("#### Transformations per Generation per Node\n\n")
+                    append(buildPlotBlock(
+                        xTitle = "Generation",
+                        yTitle = "Transformations",
+                        traces = allNodeIds.map { nodeId ->
+                            PlotTrace(
+                                "Node $nodeId",
+                                generations.map { it.generation },
+                                generations.map { it.perNode[nodeId]?.transformationsInGeneration ?: 0 }
+                            )
+                        }
+                    ))
+                }
+            }
+        }
+    }
+
+    private data class PlotTrace(val name: String, val x: List<Number>, val y: List<Number>)
+
+    private fun buildPlotBlock(
+        xTitle: String,
+        yTitle: String,
+        traces: List<PlotTrace>
+    ): String {
+        val data = traces.joinToString(",") { trace ->
+            """{"x":${trace.x},"y":${trace.y},"type":"scatter","mode":"lines","name":"${trace.name}"}"""
+        }
+        return buildString {
+            append("```plot\n")
+            append("""{"data":[$data],"layout":{"xaxis":{"title":"$xTitle"},"yaxis":{"title":"$yTitle"},"margin":{"l":50,"r":30,"t":20,"b":40}}}""")
+            append("\n```\n\n")
         }
     }
 
@@ -726,7 +1044,6 @@ class OptimizerExecutionService(
 
         return when (state) {
             ExecutionState.COMPLETED -> {
-                // Return the stored summary markdown
                 val summaryContent = transaction {
                     OptimizerResultFilesTable.selectAll()
                         .where {

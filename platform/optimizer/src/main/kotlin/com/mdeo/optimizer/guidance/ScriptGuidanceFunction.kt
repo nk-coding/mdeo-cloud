@@ -7,6 +7,17 @@ import org.slf4j.LoggerFactory
 import java.io.PrintStream
 import java.lang.reflect.InvocationTargetException
 
+/**
+ * [GuidanceFunction] that evaluates a compiled script method via reflection.
+ *
+ * The script class is instantiated with a [SimpleScriptContext] wrapping the solution's
+ * model graph, then the named method is invoked and its return value is coerced to [Double].
+ *
+ * @param clazz The compiled script class to instantiate.
+ * @param jvmMethodName The no-arg method on [clazz] to call for the fitness value.
+ * @param printStream Output stream made available to scripts via the [ScriptContext].
+ * @param name Human-readable name of this guidance function.
+ */
 class ScriptGuidanceFunction(
     private val clazz: Class<*>,
     private val jvmMethodName: String,
@@ -30,6 +41,13 @@ class ScriptGuidanceFunction(
         return toDouble(result)
     }
 
+    /**
+     * Coerces a script return value to [Double].
+     * Non-numeric types log a warning and return `0.0`.
+     *
+     * @param value The value returned by the script method.
+     * @return The numeric representation.
+     */
     private fun toDouble(value: Any?): Double {
         return when (value) {
             is Double -> value
