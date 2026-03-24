@@ -3,6 +3,7 @@ export * from "./features/metamodel/enumTypeGenerator.js";
 export * from "./features/metamodel/metamodelClassExtractor.js";
 export * from "./features/metamodel/metamodelClassInfo.js";
 export * from "./features/metamodel/metamodelEnumInfo.js";
+export * from "./features/expressionCompletionProvider.js";
 export * from "./features/expressionSerializers.js";
 export * from "./features/inferLambdaType.js";
 export * from "./features/precedenceHelper.js";

@@ -26,7 +26,8 @@ import {
     registerExpressionSerializers,
     registerStatementSerializers,
     registerTypeSerializers,
-    generateExpressionRuleOverride
+    generateExpressionRuleOverride,
+    ExpressionCompletionProvider
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import { ScriptTypeSystem } from "./features/type-system/scriptTypeSystem.js";
@@ -109,6 +110,7 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
                         }
                     ) as ScriptTypirServices,
                 lsp: {
+                    CompletionProvider: (services) => new ExpressionCompletionProvider(services, expressionTypes),
                     Formatter: (services) => new SerializerFormatter(services)
                 },
                 AstSerializer: (services) => new DefaultAstSerializer(services),

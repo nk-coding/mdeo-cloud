@@ -3,7 +3,7 @@ import { sharedImport } from "@mdeo/language-shared";
 import { CustomValueTypeImplementation } from "../custom-value/custom-value-type.js";
 import type { CustomValueType } from "../custom-value/custom-value-type.js";
 import type { CustomLambdaDetails, CustomLambdaKind } from "./custom-lambda-kind.js";
-import type { LambdaType } from "../../config/type.js";
+import type { LambdaType, Method, Property } from "../../config/type.js";
 import { addDependsOnTypeEdge } from "../../service/customTypeGraph.js";
 
 const {
@@ -134,6 +134,14 @@ export class CustomLambdaTypeImplementation
 
     override getLocalMethod(_memberName: string) {
         return undefined;
+    }
+
+    override getLocalProperties(): Property[] {
+        return [];
+    }
+
+    override getLocalMethods(): Method[] {
+        return [];
     }
 
     /**

@@ -21,7 +21,8 @@ import {
     type ExpressionTypirServices,
     registerExpressionSerializers,
     registerTypeSerializers,
-    generateExpressionRuleOverride
+    generateExpressionRuleOverride,
+    ExpressionCompletionProvider
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { AbstractAstReflection } from "langium";
@@ -111,6 +112,7 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
                     }
                 ) as ModelTransformationTypirServices,
             lsp: {
+                CompletionProvider: (services) => new ExpressionCompletionProvider(services, expressionTypes),
                 Formatter: (services) => new SerializerFormatter(services)
             },
             AstSerializer: (services) => new DefaultAstSerializer(services),

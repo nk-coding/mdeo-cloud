@@ -160,6 +160,14 @@ export class CustomClassTypeImplementation
         return this.details.definition.methods[memberName];
     }
 
+    override getLocalProperties(): Property[] {
+        return Object.values(this.details.definition.properties);
+    }
+
+    override getLocalMethods(): Method[] {
+        return Object.values(this.details.definition.methods);
+    }
+
     /**
      * Registers dependency edges for all dependent custom types.
      */

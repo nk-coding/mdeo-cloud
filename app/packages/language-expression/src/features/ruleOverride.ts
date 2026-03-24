@@ -1,6 +1,7 @@
 import type { RuleOverride, RuleResult } from "@mdeo/language-shared";
 import type { ExpressionConfig } from "../grammar/expressionConfig.js";
 import { ID } from "@mdeo/language-common";
+import type { GrammarAST } from "langium";
 
 /**
  * Generates the rule override function for expression rules.
@@ -23,13 +24,19 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
         if (!("elements" in definition) || !Array.isArray(definition.elements)) {
             throw new Error(`${rule.name} definition must be a Group.`);
         }
-        const elements = definition.elements;
+        const elements = (definition as GrammarAST.Group).elements;
         let baseExpressionRule: RuleResult;
         let memberAccessPostfixFragmentRule: RuleResult;
         let callPostfixFragmentRule: RuleResult;
         let memberCallPostfixFragmentRule: RuleResult;
         let assertNonNullPostfixFragmentRule: RuleResult;
 
+        /**
+         * Returns the token at lookahead position `i` from the Chevrotain parser.
+         *
+         * @param i The lookahead distance (1 = next token)
+         * @returns The token at position `i`
+         */
         const lookahead = (i: number) => {
             // @ts-expect-error protected access
             return parser.chevrotainParser.LA(i);
@@ -39,6 +46,9 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
          * Determines if, starting from offset `baseOffset`, the token sequence matches
          * a generic call pattern: optionally `<id...>` then `(`.
          * Returns true if the next tokens look like a generic or regular call.
+         *
+         * @param baseOffset The lookahead offset from which to start scanning
+         * @returns `true` if the upcoming tokens form a valid call expression
          */
         const isCallAhead = (baseOffset: number): boolean => {
             const first = lookahead(baseOffset);
@@ -69,6 +79,7 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
                 }
             }
         };
+        const fragmentRuleCalls = (elements[1] as GrammarAST.Alternatives).elements as GrammarAST.RuleCall[];
 
         return (args) => {
             baseExpressionRule ??= parser.getRule(config.primaryExpressionRuleName)!;
@@ -93,14 +104,12 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
                     parser.alternatives(0, [
                         {
                             ALT: () => {
-                                // @ts-expect-error protected access
-                                parser.chevrotainParser.SUBRULE1(assertNonNullPostfixFragmentRule);
+                                parser.subrule(1, assertNonNullPostfixFragmentRule, true, fragmentRuleCalls[0], args);
                             }
                         },
                         {
                             ALT: () => {
-                                // @ts-expect-error protected access
-                                parser.chevrotainParser.SUBRULE2(memberCallPostfixFragmentRule);
+                                parser.subrule(2, memberCallPostfixFragmentRule, true, fragmentRuleCalls[1], args);
                             },
                             GATE: () => {
                                 const first = lookahead(1);
@@ -116,8 +125,7 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
                         },
                         {
                             ALT: () => {
-                                // @ts-expect-error protected access
-                                parser.chevrotainParser.SUBRULE3(memberAccessPostfixFragmentRule);
+                                parser.subrule(3, memberAccessPostfixFragmentRule, true, fragmentRuleCalls[2], args);
                             },
                             GATE: () => {
                                 const first = lookahead(1);
@@ -133,8 +141,7 @@ export function generateExpressionRuleOverride(config: ExpressionConfig): RuleOv
                         },
                         {
                             ALT: () => {
-                                // @ts-expect-error protected access
-                                parser.chevrotainParser.SUBRULE4(callPostfixFragmentRule);
+                                parser.subrule(4, callPostfixFragmentRule, true, fragmentRuleCalls[3], args);
                             }
                         }
                     ]);

@@ -101,6 +101,20 @@ export interface CustomValueType<
     getMethod(memberName: string): Method | undefined;
 
     /**
+     * Get a property by name, including inherited properties.
+     *
+     * @returns All properties available on this type (own + inherited)
+     */
+    getAllProperties(): Property[];
+
+    /**
+     * Get all methods, including inherited methods.
+     *
+     * @returns All methods available on this type (own + inherited)
+     */
+    getAllMethods(): Method[];
+
+    /**
      * Get a property for a specific member name (without inheritance).
      * Must be implemented by subclasses to provide local property lookup.
      *
@@ -117,6 +131,22 @@ export interface CustomValueType<
      * @returns The method, or undefined if not found
      */
     getLocalMethod(memberName: string): Method | undefined;
+
+    /**
+     * Get all local properties (without inheritance).
+     * Must be implemented by subclasses.
+     *
+     * @return An array of all properties defined directly on this type (excluding inherited ones)
+     */
+    getLocalProperties(): Property[];
+
+    /**
+     * Get all local methods (without inheritance).
+     * Must be implemented by subclasses.
+     *
+     * @return An array of all methods defined directly on this type (excluding inherited ones)
+     */
+    getLocalMethods(): Method[];
 
     /**
      * Register this type as a subtype of its super classes.
@@ -152,8 +182,10 @@ export class CustomValueTypeImplementation<
         return this._allSuperClasses;
     }
 
-    private readonly cachedProperties: Map<string, Property> = new Map();
-    private readonly cachedMethods: Map<string, Method> = new Map();
+    private readonly cachedProperties: Map<string, Property | undefined> = new Map();
+    private readonly cachedMethods: Map<string, Method | undefined> = new Map();
+    private _propertiesCacheInitialized: boolean = false;
+    private _methodsCacheInitialized: boolean = false;
 
     get asNullable(): CustomValueType {
         throw new Error("Method not implemented.");
@@ -208,6 +240,70 @@ export class CustomValueTypeImplementation<
         throw new Error("Method not implemented.");
     }
 
+    getLocalProperties(): Property[] {
+        throw new Error("Method not implemented.");
+    }
+
+    getLocalMethods(): Method[] {
+        throw new Error("Method not implemented.");
+    }
+
+    getAllProperties(): Property[] {
+        if (!this._propertiesCacheInitialized) {
+            const seen = new Set<string>();
+            for (const prop of this.getLocalProperties()) {
+                if (!seen.has(prop.name)) {
+                    seen.add(prop.name);
+                    this.cachedProperties.set(prop.name, prop);
+                }
+            }
+            for (const superClass of this.allSuperClasses) {
+                for (const prop of superClass.getLocalProperties()) {
+                    if (!seen.has(prop.name)) {
+                        seen.add(prop.name);
+                        this.cachedProperties.set(prop.name, prop);
+                    }
+                }
+            }
+            this._propertiesCacheInitialized = true;
+        }
+        const result: Property[] = [];
+        for (const prop of this.cachedProperties.values()) {
+            if (prop !== undefined) {
+                result.push(prop);
+            }
+        }
+        return result;
+    }
+
+    getAllMethods(): Method[] {
+        if (!this._methodsCacheInitialized) {
+            const seen = new Set<string>();
+            for (const method of this.getLocalMethods()) {
+                if (!seen.has(method.name)) {
+                    seen.add(method.name);
+                    this.cachedMethods.set(method.name, method);
+                }
+            }
+            for (const superClass of this.allSuperClasses) {
+                for (const method of superClass.getLocalMethods()) {
+                    if (!seen.has(method.name)) {
+                        seen.add(method.name);
+                        this.cachedMethods.set(method.name, method);
+                    }
+                }
+            }
+            this._methodsCacheInitialized = true;
+        }
+        const result: Method[] = [];
+        for (const method of this.cachedMethods.values()) {
+            if (method !== undefined) {
+                result.push(method);
+            }
+        }
+        return result;
+    }
+
     registerSubtypesAndConversion() {
         for (const superClass of this.superClasses) {
             this.services.Subtype.markAsSubType(this, superClass);
@@ -225,6 +321,9 @@ export class CustomValueTypeImplementation<
         if (this.cachedProperties.has(memberName)) {
             return this.cachedProperties.get(memberName);
         }
+        if (this._propertiesCacheInitialized) {
+            return undefined;
+        }
         const local = this.getLocalProperty(memberName);
         if (local !== undefined) {
             this.cachedProperties.set(memberName, local);
@@ -237,12 +336,16 @@ export class CustomValueTypeImplementation<
                 return found;
             }
         }
+        this.cachedProperties.set(memberName, undefined);
         return undefined;
     }
 
     getMethod(memberName: string): Method | undefined {
         if (this.cachedMethods.has(memberName)) {
             return this.cachedMethods.get(memberName);
+        }
+        if (this._methodsCacheInitialized) {
+            return undefined;
         }
         const local = this.getLocalMethod(memberName);
         if (local !== undefined) {
@@ -256,6 +359,7 @@ export class CustomValueTypeImplementation<
                 return found;
             }
         }
+        this.cachedMethods.set(memberName, undefined);
         return undefined;
     }
 
