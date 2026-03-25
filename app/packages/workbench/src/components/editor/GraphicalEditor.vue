@@ -45,7 +45,7 @@ watch(
             const action: UpdateClientOperation = {
                 kind: "updateClientOperation",
                 isOperation: true
-            }
+            };
             actionDispatcher.value?.dispatch(action);
         }
     }

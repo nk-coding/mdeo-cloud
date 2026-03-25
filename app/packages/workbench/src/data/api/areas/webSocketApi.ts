@@ -157,7 +157,9 @@ export class WebSocketApi {
      * Sets up event handlers for the WebSocket connection
      */
     private setupSocketEventHandlers(): void {
-        if (!this.socket) return;
+        if (!this.socket) {
+            return;
+        }
 
         this.socket.onopen = () => this.handleOpen();
         this.socket.onmessage = (event) => this.handleMessage(event);
@@ -238,10 +240,14 @@ export class WebSocketApi {
      * @param execution The updated execution
      */
     private showStateChangeNotification(execution: Execution): void {
-        if (!this.showNotifications) return;
+        if (!this.showNotifications) {
+            return;
+        }
 
         const message = this.buildNotificationMessage(execution);
-        if (!message) return;
+        if (!message) {
+            return;
+        }
 
         this.displayNotification(execution.state, message, execution.name);
     }
@@ -380,7 +386,9 @@ export class WebSocketApi {
      * @param projectId The project ID to unsubscribe from
      */
     unsubscribeFromProject(projectId: string): void {
-        if (this.connectionState !== "connected") return;
+        if (this.connectionState !== "connected") {
+            return;
+        }
 
         const message: UnsubscribeMessage = {
             messageType: "unsubscribe",

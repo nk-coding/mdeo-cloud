@@ -6,7 +6,7 @@
 /**
  * Parses an instance label in `name : type` format.
  *
- * @param label - The label text to parse
+ * @param label The label text to parse
  * @returns The parsed name and type, or undefined if the format is invalid
  */
 export function parseInstanceLabel(label: string): { name: string; type: string } | undefined {
@@ -23,7 +23,7 @@ export function parseInstanceLabel(label: string): { name: string; type: string 
  * Finds the index of the assignment `=` operator in a string,
  * skipping over `==` comparison operators.
  *
- * @param text - The text to search
+ * @param text The text to search
  * @returns The index of the single `=`, or -1 if not found
  */
 export function findAssignmentIndex(text: string): number {
@@ -45,7 +45,7 @@ export function findAssignmentIndex(text: string): number {
  * The optional type annotation is preserved in the output for round-tripping,
  * but the type itself is not validated or edited beyond being passed through.
  *
- * @param label - The label text to parse
+ * @param label The label text to parse
  * @returns The parsed name and value expression, or undefined if the format is invalid
  */
 export function parseVariableLabel(label: string): { name: string; value: string } | undefined {
@@ -71,7 +71,7 @@ export function parseVariableLabel(label: string): { name: string; value: string
  * Supports both assignment (`=`) and comparison (`==`) operators.
  * The first `=` occurrence determines operator type; `==` takes precedence.
  *
- * @param label - The raw label text to parse
+ * @param label The raw label text to parse
  * @returns The parsed `{ name, operator, value }`, or an error message string if parsing fails
  */
 export function parseModelTransformationPropertyLabel(
@@ -103,7 +103,7 @@ export function parseModelTransformationPropertyLabel(
  * Extracts the expression text from a where clause label.
  * Expected format: `where <expression>`
  *
- * @param label - The full label text
+ * @param label The full label text
  * @returns The expression string, or undefined if the prefix is missing
  */
 export function extractWhereClauseExpression(label: string): string | undefined {

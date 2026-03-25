@@ -94,7 +94,9 @@ const activeTabPath = computed({
         return getTabKey(tab);
     },
     set: (path: string | undefined) => {
-        if (path == undefined) return;
+        if (path == undefined) {
+            return;
+        }
         const tab = tabs.value.find((t) => getTabKey(t) === path);
         if (tab != undefined) {
             activeTab.value = tab;

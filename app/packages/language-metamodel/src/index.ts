@@ -42,6 +42,7 @@ export * from "./features/metamodelNameProvider.js";
 export * from "./features/metamodelScopeComputation.js";
 export * from "./features/metamodelScopeProvider.js";
 export * from "./features/metamodelSerializers.js";
+export * from "./features/metamodelCompletionProvider.js";
 export * from "./features/semanticInformation.js";
 export * from "./grammar/metamodelPartialTypes.js";
 export * from "./grammar/metamodelRules.js";

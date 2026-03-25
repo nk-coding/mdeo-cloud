@@ -78,7 +78,9 @@ const isOpen = computed({
         return treeContext?.expandedItems.value.has(props.data) ?? false;
     },
     set(value: boolean) {
-        if (!treeContext) return;
+        if (!treeContext) {
+            return;
+        }
         if (value) {
             treeContext.expandedItems.value.add(props.data);
         } else {

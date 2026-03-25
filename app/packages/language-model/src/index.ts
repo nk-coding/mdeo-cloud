@@ -38,6 +38,7 @@ export * from "./features/modelDataConverter.js";
 export * from "./features/modelExternalReferenceCollector.js";
 export * from "./features/modelScopeProvider.js";
 export * from "./features/modelSerializers.js";
+export * from "./features/modelCompletionProvider.js";
 export * from "./grammar/generatedModelPartialTypes.js";
 export * from "./grammar/generatedModelRules.js";
 export * from "./grammar/generatedModelTypes.js";

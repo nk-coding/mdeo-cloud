@@ -4,8 +4,8 @@ import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import type { EdgeMetadata, NodeMetadata } from "../metadata.js";
-import type { ContextItemProvider } from "../../features/contextActions/contextItemProvider.js";
-import type { ContextActionRequestContext } from "../../features/contextActions/contextActionRequestContext.js";
+import type { ContextItemProvider } from "../../context-actions/contextItemProvider.js";
+import type { ContextActionRequestContext } from "../../context-actions/contextActionRequestContext.js";
 import type { ContextItem } from "@mdeo/protocol-common";
 import { DeleteNodeEdgeOperation } from "@mdeo/protocol-common";
 

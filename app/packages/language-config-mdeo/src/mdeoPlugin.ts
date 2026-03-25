@@ -32,6 +32,7 @@ import { registerMdeoValidationChecks } from "./validation/mdeoValidator.js";
 import { DefaultMdeoMetamodelResolver } from "./features/defaultMdeoMetamodelResolver.js";
 import type { MdeoMetamodelResolver } from "./features/mdeoMetamodelResolver.js";
 import { RunMdeoConfigActionHandler } from "./action-handlers/runMdeoConfigActionHandler.js";
+import { MdeoCompletionProvider } from "./features/mdeoCompletionProvider.js";
 
 /**
  * Additional services required by the MDEO language plugin.
@@ -87,6 +88,7 @@ const configMdeoPlugin: LangiumLanguagePlugin<MdeoServices> = {
             ExternalReferenceCollector: (services) => new MdeoExternalReferenceCollector(services.MdeoMetamodelResolver)
         },
         lsp: {
+            CompletionProvider: (services) => new MdeoCompletionProvider(services as any),
             Formatter: (services) => new SerializerFormatter(services)
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),

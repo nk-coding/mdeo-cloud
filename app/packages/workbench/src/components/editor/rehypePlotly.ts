@@ -39,11 +39,15 @@ export function rehypePlotly(onPlot: (plot: PlotEmbed) => void, idGenerator: () 
             const codeElement = node.children.find(
                 (child): child is Element => child.type === "element" && child.tagName === "code"
             );
-            if (!codeElement) return;
+            if (!codeElement) {
+                return;
+            }
 
             const className = codeElement.properties?.className;
             const classes = Array.isArray(className) ? className : [className];
-            if (!classes.includes("language-plot")) return;
+            if (!classes.includes("language-plot")) {
+                return;
+            }
 
             const textNode = codeElement.children.find((child) => child.type === "text");
             if (!textNode || textNode.type !== "text") {

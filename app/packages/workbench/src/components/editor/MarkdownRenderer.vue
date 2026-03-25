@@ -114,15 +114,15 @@ interface ResolvedEmbed {
  */
 interface ResolvedPlot {
     /**
-     * Unique DOM element ID for the Teleport target. 
+     * Unique DOM element ID for the Teleport target.
      */
     id: string;
     /**
-     * The plotly.js-compatible JSON configuration string. 
+     * The plotly.js-compatible JSON configuration string.
      */
     json: string;
     /**
-     * Whether the Teleport target div has been mounted in the DOM. 
+     * Whether the Teleport target div has been mounted in the DOM.
      */
     mounted: boolean;
 }

@@ -43,18 +43,18 @@ const plotEl = ref<HTMLElement | null>(null);
 const theme = useColorMode();
 const plotlyTheme = computed(() => {
     const mutedForeground = theme.value === "dark" ? "#6a7282" : "#99a1af";
-    const foreground = theme.value === "dark" ? "#f9fafb" : "#030712"
+    const foreground = theme.value === "dark" ? "#f9fafb" : "#030712";
     return {
         font: {
             color: foreground
         },
         xaxis: {
             gridcolor: mutedForeground,
-            zerolinecolor: foreground,
+            zerolinecolor: foreground
         },
         yaxis: {
             gridcolor: mutedForeground,
-            zerolinecolor: foreground,
+            zerolinecolor: foreground
         }
     };
 });

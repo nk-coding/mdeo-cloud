@@ -44,8 +44,8 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * Entry point for label edit validation.
      * Dispatches to the appropriate sub-validator based on element type.
      *
-     * @param label - The new label text submitted by the user
-     * @param element - The graph model element being edited
+     * @param label The new label text submitted by the user
+     * @param element The graph model element being edited
      * @returns Validation status indicating success or failure
      */
     override validate(label: string, element: GModelElement): ValidationStatusType {
@@ -209,8 +209,8 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * when the class reference is currently unresolved).  Validates that the
      * name is a valid identifier and globally unique in the transformation.
      *
-     * @param label - The label text to validate
-     * @param element - The graph model element (instance node label)
+     * @param label The label text to validate
+     * @param element The graph model element (instance node label)
      * @returns A validation status if invalid, undefined if valid
      */
     private validateInstanceLabel(label: string, element: GModelElement): ValidationStatusType | undefined {
@@ -256,8 +256,8 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * only NONE-modifier and CREATE instances may use `=` (assignment);
      * all other modifiers must use `==` (comparison).
      *
-     * @param label - The label text to validate
-     * @param element - The graph model element (property label)
+     * @param label The label text to validate
+     * @param element The graph model element (property label)
      * @returns A validation status if invalid, undefined if valid
      */
     private validatePropertyLabel(label: string, element: GModelElement): ValidationStatusType | undefined {
@@ -290,7 +290,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * that the expression is non-empty.  The expression itself is not further
      * validated (parsing expressions is out of scope for now).
      *
-     * @param label - The label text to validate
+     * @param label The label text to validate
      * @returns A validation status if invalid, undefined if valid
      */
     private validateWhereClauseLabel(label: string): ValidationStatusType | undefined {
@@ -315,8 +315,8 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * a valid identifier and globally unique within the transformation.  The
      * expression value is not further validated.
      *
-     * @param label - The label text to validate
-     * @param element - The graph model element (variable label)
+     * @param label The label text to validate
+     * @param element The graph model element (variable label)
      * @returns A validation status if invalid, undefined if valid
      */
     private validateVariableLabel(label: string, element: GModelElement): ValidationStatusType | undefined {
@@ -362,8 +362,8 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * PatternObjectInstanceReference nodes (which have no modifier field) also
      * only allow comparisons.
      *
-     * @param operator - The operator string (`=` or `==`)
-     * @param modifier - The modifier kind of the enclosing instance, or 'reference' for references
+     * @param operator The operator string (`=` or `==`)
+     * @param modifier The modifier kind of the enclosing instance, or 'reference' for references
      * @returns A validation status if the operator is not permitted, undefined otherwise
      */
     private validateOperatorForModifier(
@@ -400,7 +400,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * when the property belongs to a `PatternObjectInstanceReference` rather
      * than a full `PatternObjectInstance`.
      *
-     * @param element - The property label graph element
+     * @param element The property label graph element
      * @returns The modifier kind, `'reference'`, or undefined if it cannot be resolved
      */
     private getEnclosingModifier(element: GModelElement): PatternModifierKind | "reference" | undefined {
@@ -428,7 +428,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * Traverses the GModel element tree upward to find the first
      * `GPatternInstanceNode` parent and return its stored modifier.
      *
-     * @param element - The element to start traversal from
+     * @param element The element to start traversal from
      * @returns The modifier kind from the parent node, or undefined if not found
      */
     private getModifierFromParentNode(element: GModelElement): PatternModifierKind | undefined {
@@ -450,8 +450,8 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * Searches all `GPatternInstanceNode` elements for a matching instance name,
      * and all `LABEL_VARIABLE` labels for a matching variable name.
      *
-     * @param name - The name to check for existence
-     * @param currentName - The current name of the element being renamed (excluded from the check)
+     * @param name The name to check for existence
+     * @param currentName The current name of the element being renamed (excluded from the check)
      * @returns `true` if the name is already in use by another element, `false` otherwise
      */
     private nameExistsElsewhere(name: string, currentName: string | undefined): boolean {
@@ -478,7 +478,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
     /**
      * Collects all graph model elements with the specified type from the entire model root.
      *
-     * @param type - The element type to collect
+     * @param type The element type to collect
      * @returns An array of all found elements
      */
     private findAllByType(type: string): GModelElement[] {
@@ -490,9 +490,9 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
     /**
      * Recursively collects all graph model elements with the specified type.
      *
-     * @param element - The root element to start the traversal from
-     * @param type - The element type to collect
-     * @param results - The array to add matching elements to
+     * @param element The root element to start the traversal from
+     * @param type The element type to collect
+     * @param results The array to add matching elements to
      */
     private collectByType(element: GModelElement, type: string, results: GModelElement[]): void {
         if (element.type === type) {
@@ -509,7 +509,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      * Accepts any of: create, delete, forbid, require, or empty (none).
      * The value may be wrapped in « » guillemets, which are stripped before comparison.
      *
-     * @param label - The label text to validate
+     * @param label The label text to validate
      * @returns A validation status if invalid, undefined if valid
      */
     private validateModifierLabel(label: string): ValidationStatusType | undefined {
@@ -550,7 +550,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      *
      * Only checks that the expression is non-empty; no further parsing is performed.
      *
-     * @param label - The label text to validate
+     * @param label The label text to validate
      * @returns A validation status if invalid, undefined if valid
      */
     private validateControlFlowLabel(label: string): ValidationStatusType | undefined {
@@ -564,7 +564,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
 /**
  * Converts a modifier string value from the AST to a {@link PatternModifierKind} enum value.
  *
- * @param modifier - The raw string modifier value (e.g., `"create"`, `"delete"`)
+ * @param modifier The raw string modifier value (e.g., `"create"`, `"delete"`)
  * @returns The corresponding {@link PatternModifierKind}
  */
 function modifierStringToKind(modifier: string | undefined): PatternModifierKind {

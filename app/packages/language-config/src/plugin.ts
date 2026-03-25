@@ -28,6 +28,7 @@ import { ConfigExternalReferenceCollector } from "./features/configExternalRefer
 import { registerConfigValidationChecks } from "./validation/configValidator.js";
 import { ConfigActionProvider } from "./features/configActionProvider.js";
 import { RunConfigActionHandler } from "./action-handlers/runConfigActionHandler.js";
+import { ConfigDelegatingCompletionProvider } from "./features/configDelegatingCompletionProvider.js";
 
 /**
  * Additional services for the Config language.
@@ -64,16 +65,11 @@ export const configPluginProvider: LangiumLanguagePluginProvider<ConfigAdditiona
                     })
                 },
                 references: {
-                    ScopeProvider: (services) =>
-                        new ConfigDelegatingScopeProvider(
-                            services,
-                            services.shared.ServiceRegistry,
-                            configPlugins,
-                            resolvedPlugins
-                        ),
+                    ScopeProvider: (services) => new ConfigDelegatingScopeProvider(services, resolvedPlugins),
                     ExternalReferenceCollector: () => new ConfigExternalReferenceCollector()
                 },
                 lsp: {
+                    CompletionProvider: (services) => new ConfigDelegatingCompletionProvider(services, resolvedPlugins),
                     Formatter: (services) => new SerializerFormatter(services)
                 },
                 AstSerializer: (services) =>

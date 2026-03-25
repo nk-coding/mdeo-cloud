@@ -45,8 +45,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
     /**
      * Dispatches the label edit to the appropriate handler based on the AST node type.
      *
-     * @param node - The AST node being edited
-     * @param operation - The apply label edit operation
+     * @param node The AST node being edited
+     * @param operation The apply label edit operation
      * @returns The workspace edit to apply, or undefined if not applicable
      */
     override async createLabelEdit(
@@ -90,8 +90,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
      * `name`-only formats (the latter applies when the class reference is currently unresolved).
      * The instance name is renamed across all references in the file.
      *
-     * @param node - The PatternObjectInstance AST node
-     * @param text - The new label text in `name : type` or plain `name` format
+     * @param node The PatternObjectInstance AST node
+     * @param text The new label text in `name : type` or plain `name` format
      * @returns The rename workspace edit, or undefined if the label is empty
      */
     private async createInstanceNameEdit(
@@ -136,8 +136,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
      * Updates the property reference, operator keyword, and value expression in the CST.
      * Returns `undefined` (no-op) if any required CST node cannot be located.
      *
-     * @param node - The PatternPropertyAssignment AST node
-     * @param text - The new label text in `propName = expr` or `propName == expr` format
+     * @param node The PatternPropertyAssignment AST node
+     * @param text The new label text in `propName = expr` or `propName == expr` format
      * @returns The workspace edit, or undefined if the text cannot be parsed or CST nodes are missing
      */
     private async createPropertyAssignmentEdit(
@@ -186,8 +186,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
      * The label text must start with `where ` followed by the expression.
      * The expression is replaced as plain text with no further validation.
      *
-     * @param node - The WhereClause AST node
-     * @param text - The new label text starting with `where `
+     * @param node The WhereClause AST node
+     * @param text The new label text starting with `where `
      * @returns The workspace edit, or undefined if the expression cannot be extracted
      */
     private async createWhereClauseEdit(node: WhereClauseType, text: string): Promise<WorkspaceEdit | undefined> {
@@ -217,8 +217,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
      * The variable name is renamed across all references in the file;
      * the value expression is replaced as plain text with no further validation.
      *
-     * @param node - The PatternVariable AST node
-     * @param text - The new label text in `var name[: type] = expr` format
+     * @param node The PatternVariable AST node
+     * @param text The new label text in `var name[: type] = expr` format
      * @returns The workspace edit, or undefined if the text cannot be parsed
      */
     private async createVariableEdit(node: PatternVariableType, text: string): Promise<WorkspaceEdit | undefined> {
@@ -271,8 +271,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
      * When `text` is empty (after stripping guillemets), the modifier is removed from the AST.
      * Returns undefined when the modifier cannot be resolved or needs insertion.
      *
-     * @param node - The PatternLink AST node
-     * @param text - The new label text (may include « » guillemets); empty string removes the modifier
+     * @param node The PatternLink AST node
+     * @param text The new label text (may include « » guillemets); empty string removes the modifier
      * @returns The workspace edit, or undefined if not applicable
      */
     private async createLinkModifierEdit(node: PatternLinkType, text: string): Promise<WorkspaceEdit | undefined> {
@@ -309,8 +309,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
      * When `text` is empty (after stripping guillemets), the modifier is removed from the AST.
      * Otherwise, also auto-updates the modifier on any adjacent connected links within the same pattern.
      *
-     * @param node - The PatternObjectInstance AST node
-     * @param text - The new label text (may include « » guillemets); empty string removes the modifier
+     * @param node The PatternObjectInstance AST node
+     * @param text The new label text (may include « » guillemets); empty string removes the modifier
      * @returns The workspace edit, or undefined if not applicable
      */
     private async createPatternModifierEdit(
@@ -369,8 +369,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
     /**
      * Creates a workspace edit for updating the condition of an if-expression statement.
      *
-     * @param node - The IfExpressionStatement AST node
-     * @param text - The new condition expression text
+     * @param node The IfExpressionStatement AST node
+     * @param text The new condition expression text
      * @returns The workspace edit, or undefined if not applicable
      */
     private async createIfConditionEdit(
@@ -391,8 +391,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
     /**
      * Creates a workspace edit for updating the condition of a while-expression statement.
      *
-     * @param node - The WhileExpressionStatement AST node
-     * @param text - The new condition expression text
+     * @param node The WhileExpressionStatement AST node
+     * @param text The new condition expression text
      * @returns The workspace edit, or undefined if not applicable
      */
     private async createWhileConditionEdit(
@@ -413,8 +413,8 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
     /**
      * Creates a workspace edit for updating the condition of an else-if branch.
      *
-     * @param node - The ElseIfBranch AST node
-     * @param text - The new condition expression text
+     * @param node The ElseIfBranch AST node
+     * @param text The new condition expression text
      * @returns The workspace edit, or undefined if not applicable
      */
     private async createElseIfConditionEdit(node: ElseIfBranchType, text: string): Promise<WorkspaceEdit | undefined> {

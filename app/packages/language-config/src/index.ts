@@ -1,6 +1,7 @@
 export * from "./action-handlers/runConfigActionHandler.js";
 export * from "./features/configActionProvider.js";
 export * from "./features/configAstSerializer.js";
+export * from "./features/configDelegatingCompletionProvider.js";
 export * from "./features/configDelegatingScopeProvider.js";
 export * from "./features/configExternalReferenceCollector.js";
 export * from "./features/configSerializers.js";

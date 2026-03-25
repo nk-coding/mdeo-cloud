@@ -111,9 +111,8 @@ export class OptimizationScopeProvider extends DefaultScopeProvider {
      * @returns Scope with imported functions
      */
     private getFunctionScope(context: ReferenceInfo): Scope {
-        const goalSection = AstUtils.getContainerOfType(
-            context.container,
-            (node): node is GoalSectionType => node.$type === GoalSection.name
+        const goalSection = AstUtils.getContainerOfType(context.container, (node): node is GoalSectionType =>
+            this.astReflection.isInstance(node, GoalSection)
         );
         if (goalSection == undefined) {
             return EMPTY_SCOPE;

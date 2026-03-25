@@ -185,7 +185,9 @@ async function fetchFileActions(): Promise<void> {
 }
 
 function handleFileAction(action: FileAction): void {
-    if (props.entry.type !== FileType.File) return;
+    if (props.entry.type !== FileType.File) {
+        return;
+    }
 
     triggerFileAction(
         pendingAction,
@@ -257,7 +259,9 @@ function handleRename() {
 }
 
 function handleDeleteClick() {
-    if (isRenaming.value) return;
+    if (isRenaming.value) {
+        return;
+    }
 
     if (props.entry.type === FileType.Directory) {
         showDeleteDialog.value = true;

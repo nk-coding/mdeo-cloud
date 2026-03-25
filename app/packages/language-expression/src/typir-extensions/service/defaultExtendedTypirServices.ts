@@ -1,6 +1,7 @@
 import type { DeepPartial, Module } from "typir";
 import type { AdditionalTypirServices, ExtendedTypirLangiumServices } from "./extendedTypirServices.js";
 import { DefaultTypeDefinitionService } from "./typeDefinitionService.js";
+import { NoopDocumentPackageCacheService } from "./documentPackageCacheService.js";
 import { CustomClassKind, CustomClassKindName } from "../kinds/custom-class/custom-class-kind.js";
 import { CustomLambdaKind, CustomLambdaKindName } from "../kinds/custom-lambda/custom-lambda-kind.js";
 import { CustomFunctionKind, CustomFunctionKindName } from "../kinds/custom-function/custom-function-kind.js";
@@ -65,6 +66,7 @@ export function defaultExtendedTypirServices<Specifics extends TypirLangiumSpeci
             Graph: () => new CustomTypeGraph()
         },
         TypeDefinitions: (services) => new DefaultTypeDefinitionService(services),
+        PackageMapCache: () => new NoopDocumentPackageCacheService(),
         ScopeProvider: () => new DefaultScopeProvider<Specifics>()
     };
 }

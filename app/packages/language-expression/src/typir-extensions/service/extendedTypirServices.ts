@@ -6,6 +6,7 @@ import type { CustomValueFactoryService } from "../kinds/custom-value/custom-val
 import type { CustomVoidFactoryService } from "../kinds/custom-void/custom-void-kind.js";
 import type { CustomNullFactoryService } from "../kinds/custom-null/custom-null-kind.js";
 import type { TypeDefinitionService } from "./typeDefinitionService.js";
+import type { DocumentPackageCacheService } from "./documentPackageCacheService.js";
 import type { ScopeProviderCaching } from "../scope/scopeProviderCache.js";
 import type { ScopeProvider } from "../scope/scopeProvider.js";
 import type { TypirLangiumAddedServices, TypirLangiumSpecifics } from "typir-langium";
@@ -66,6 +67,12 @@ export interface AdditionalTypirServices<Specifics extends TypirSpecifics> {
      * Service for managing and resolving type definitions
      */
     readonly TypeDefinitions: TypeDefinitionService;
+
+    /**
+     * Service providing the per-document package map, used by type resolution
+     * and type annotation completion to determine which types are in scope.
+     */
+    readonly PackageMapCache: DocumentPackageCacheService;
 
     /**
      * Scope provider service for resolving scopes of language nodes

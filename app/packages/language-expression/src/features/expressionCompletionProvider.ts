@@ -5,15 +5,25 @@ import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom
 import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
 import type { ExtendedTypirServices } from "../typir-extensions/service/extendedTypirServices.js";
 import { sharedImport } from "@mdeo/language-shared";
-import type { CompletionAcceptor, CompletionContext, CompletionProviderOptions } from "langium/lsp";
+import type { CompletionAcceptor, CompletionContext, CompletionProviderOptions, NextFeature } from "langium/lsp";
 import type { CompletionItemKind as CompletionItemKindType } from "vscode-languageserver-protocol";
-import type { MaybePromise } from "langium";
+import type { MaybePromise, AstUtils as AstUtilsType } from "langium";
 import type { ExpressionTypirServices } from "../type-system/services.js";
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
+import type { TypeTypes } from "../grammar/typeTypes.js";
+import {
+    ClassTypeRef,
+    GenericTypeRef,
+    VoidType,
+    type ClassType,
+    type ValueType,
+    type Method
+} from "../typir-extensions/config/type.js";
 
 const { DefaultCompletionProvider } = sharedImport("langium/lsp");
 const { CompletionItemKind } = sharedImport("vscode-languageserver-protocol");
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Completion provider that extends Langium's default completion provider to support
@@ -27,33 +37,47 @@ const { CompletionItemKind } = sharedImport("vscode-languageserver-protocol");
 export class ExpressionCompletionProvider extends DefaultCompletionProvider {
     private readonly typirScopeProvider: ScopeProvider<TypirLangiumSpecifics>;
     private readonly typirInference: ExtendedTypirServices<TypirLangiumSpecifics>["Inference"];
-    private readonly reflection: AstReflection;
-    override readonly completionOptions: CompletionProviderOptions;
+    protected readonly reflection: AstReflection;
+    private readonly typir: ExpressionTypirServices<TypirLangiumSpecifics>;
+    override readonly completionOptions: CompletionProviderOptions = {
+        triggerCharacters: ["."]
+    };
 
     /**
      * Creates a new ExpressionCompletionProvider.
      *
      * @param services The combined Langium and Typir services
      * @param expressionTypes Grammar-derived AST type descriptors used to identify expression node types
+     * @param typeTypes Optional type types from the grammar, needed to enable type annotation completion
      */
     constructor(
         services: {
             typir: ExpressionTypirServices<TypirLangiumSpecifics>;
         } & ExtendedLangiumServices,
-        private readonly expressionTypes: ExpressionTypes
+        protected readonly expressionTypes: ExpressionTypes,
+        protected readonly typeTypes?: TypeTypes
     ) {
         super(services);
+        this.typir = services.typir;
         this.typirScopeProvider = services.typir.ScopeProvider;
         this.typirInference = services.typir.Inference;
         this.reflection = services.shared.AstReflection;
-        this.completionOptions = {
-            triggerCharacters: ["."]
-        };
     }
 
+    /**
+     * Routes completion to the appropriate handler based on the grammar feature being completed.
+     *
+     * Handles identifier expressions, member access/call expressions, and type annotation
+     * expressions specifically. All other features are delegated to the default provider.
+     *
+     * @param context The current completion context
+     * @param next Describes the grammar feature being completed, including its type and property
+     * @param acceptor The acceptor function to register completion items
+     * @returns A promise or void when completion is complete
+     */
     protected override completionFor(
         context: CompletionContext,
-        next: { feature: any; type?: string; property?: string },
+        next: NextFeature,
         acceptor: CompletionAcceptor
     ): MaybePromise<void> {
         if (next.type === this.expressionTypes.identifierExpressionType.name) {
@@ -65,7 +89,94 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
         ) {
             return this.completionForMemberAccess(context, acceptor);
         }
+        if (this.typeTypes != undefined && next.type === this.typeTypes.classTypeType.name) {
+            return this.completionForTypeAnnotation(context, next, acceptor);
+        }
+
+        if (
+            this.typeTypes != undefined &&
+            next.type === undefined &&
+            next.property === "name" &&
+            context.node != undefined &&
+            this.reflection.isInstance(context.node, this.typeTypes.classTypeType)
+        ) {
+            return this.completionForTypeAnnotation(context, next, acceptor);
+        }
         return super.completionFor(context, next, acceptor);
+    }
+
+    /**
+     * Provides completion items for type annotation expressions.
+     *
+     * Uses the {@link DocumentPackageCacheService} and {@link TypeDefinitionService} to compute
+     * completion candidates directly. When a package name is already typed (e.g., "class."),
+     * only types within that package are suggested. Otherwise all valid package names and
+     * unambiguous type names are suggested.
+     *
+     * @param context The current completion context
+     * @param next Describes the grammar feature being completed
+     * @param acceptor The acceptor function to register completion items
+     * @returns void
+     */
+    private completionForTypeAnnotation(
+        context: CompletionContext,
+        next: NextFeature,
+        acceptor: CompletionAcceptor
+    ): void {
+        const node = context.node;
+        if (node == undefined) {
+            return;
+        }
+        try {
+            const document = (AstUtils as typeof AstUtilsType).getDocument(node);
+            const { packageMap, allInternalPackages } = this.typir.PackageMapCache.getDocumentPackageCache(document);
+            const nodeAsClassType = node as { packageName?: string };
+            const hasPackageName = nodeAsClassType.packageName != undefined && next.property === "name";
+
+            if (hasPackageName) {
+                const packageName = nodeAsClassType.packageName!;
+                const internalPackages = packageMap.get(packageName);
+                if (internalPackages == undefined) {
+                    return;
+                }
+                const internalPackageSet = new Set(internalPackages);
+                const seen = new Set<string>();
+                for (const t of this.typir.TypeDefinitions.getAllClassTypes()) {
+                    if (t.isVirtual !== true && internalPackageSet.has(t.package) && !seen.has(t.name)) {
+                        seen.add(t.name);
+                        acceptor(context, { label: t.name, kind: CompletionItemKind.Class, sortText: "0" });
+                    }
+                }
+            } else {
+                const relevantTypes = this.typir.TypeDefinitions.getAllClassTypes().filter(
+                    (t) => t.isVirtual !== true && allInternalPackages.has(t.package)
+                );
+                const byName = new Map<string, ClassType[]>();
+                for (const t of relevantTypes) {
+                    const list = byName.get(t.name) ?? [];
+                    list.push(t);
+                    byName.set(t.name, list);
+                }
+                for (const pkgName of packageMap.keys()) {
+                    acceptor(context, { label: pkgName, kind: CompletionItemKind.Module, sortText: "1" });
+                }
+                for (const [name, types] of byName.entries()) {
+                    if (types.length === 1) {
+                        acceptor(context, { label: name, kind: CompletionItemKind.Class, sortText: "0" });
+                    } else {
+                        for (const t of types) {
+                            const userPkg = findUserVisiblePackage(t.package, packageMap);
+                            if (userPkg != undefined) {
+                                const qualified = `${userPkg}.${name}`;
+                                acceptor(context, { label: qualified, kind: CompletionItemKind.Class, sortText: "0" });
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Ignore errors during completion on incomplete documents
+        }
     }
 
     /**
@@ -174,10 +285,12 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
         context: CompletionContext,
         acceptor: CompletionAcceptor
     ): void {
+        const typeArgs = valueType.details.typeArgs;
         for (const prop of valueType.getAllProperties()) {
             acceptor(context, {
                 label: prop.name,
                 kind: CompletionItemKind.Property,
+                detail: memberValueTypeToString(prop.type, typeArgs),
                 sortText: "0"
             });
         }
@@ -185,8 +298,58 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
             acceptor(context, {
                 label: method.name,
                 kind: CompletionItemKind.Method,
+                detail: memberMethodDetailString(method, typeArgs),
                 sortText: "0"
             });
         }
     }
+}
+
+/**
+ * Finds the user-visible package name for an internal package string.
+ *
+ * @param internalPackage The internal package identifier
+ * @param packageMap Map from user-visible names to internal packages
+ * @returns The user-visible package name, or undefined if not found
+ */
+function memberValueTypeToString(type: ValueType, typeArgs: Map<string, CustomValueType>): string {
+    if (GenericTypeRef.is(type)) {
+        const resolved = typeArgs.get(type.generic);
+        return resolved != null ? resolved.getName() : type.generic;
+    } else if (ClassTypeRef.is(type)) {
+        const base = type.type;
+        if (type.typeArgs != null && Object.keys(type.typeArgs).length > 0) {
+            const argsStr = Object.values(type.typeArgs)
+                .map((arg) => memberValueTypeToString(arg, typeArgs))
+                .join(", ");
+            return `${base}<${argsStr}>${type.isNullable ? "?" : ""}`;
+        }
+        return `${base}${type.isNullable ? "?" : ""}`;
+    } else {
+        // LambdaType
+        const params = type.parameters.map((p) => memberValueTypeToString(p.type, typeArgs)).join(", ");
+        const ret = VoidType.is(type.returnType)
+            ? "void"
+            : memberValueTypeToString(type.returnType as ValueType, typeArgs);
+        const lambda = `(${params}) => ${ret}`;
+        return type.isNullable ? `(${lambda})?` : lambda;
+    }
+}
+
+function memberMethodDetailString(method: Method, typeArgs: Map<string, CustomValueType>): string {
+    const signatures = Object.values(method.type.signatures);
+    if (signatures.length === 0) return "()";
+    const sig = signatures[0];
+    const params = sig.parameters.map((p) => `${p.name}: ${memberValueTypeToString(p.type, typeArgs)}`).join(", ");
+    const ret = VoidType.is(sig.returnType) ? "void" : memberValueTypeToString(sig.returnType as ValueType, typeArgs);
+    return `(${params}): ${ret}`;
+}
+
+function findUserVisiblePackage(internalPackage: string, packageMap: Map<string, string[]>): string | undefined {
+    for (const [userPkg, internalPkgs] of packageMap.entries()) {
+        if (internalPkgs.includes(internalPackage)) {
+            return userPkg;
+        }
+    }
+    return undefined;
 }

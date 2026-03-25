@@ -22,6 +22,7 @@ import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js"
 import { registerModelSerializers } from "./features/modelSerializers.js";
 import { ModelDiagramModule } from "./features/diagram-server/modelDiagramModule.js";
 import { registerModelValidationChecks } from "./validation/modelValidator.js";
+import { ModelCompletionProvider } from "./features/modelCompletionProvider.js";
 
 export type ModelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
 
@@ -45,6 +46,7 @@ const modelPlugin: LangiumLanguagePlugin<ModelServices> = {
             ExternalReferenceCollector: () => new ModelExternalReferenceCollector()
         },
         lsp: {
+            CompletionProvider: (services) => new ModelCompletionProvider(services as any),
             Formatter: (services) => new SerializerFormatter(services)
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),

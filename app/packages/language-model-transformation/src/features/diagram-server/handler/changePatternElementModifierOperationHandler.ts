@@ -33,7 +33,7 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
      * whether they have an existing modifier or none — are updated to the same modifier value so
      * that the pattern remains consistent.
      *
-     * @param operation - The change-modifier operation containing the element ID and the new modifier
+     * @param operation The change-modifier operation containing the element ID and the new modifier
      * @returns A command applying the workspace edit, or `undefined` when the element or AST node
      *          cannot be resolved
      */
@@ -68,7 +68,7 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
      * For pattern links the action is only offered when both connected instances carry no modifier,
      * since a link that already shares a modifier with an instance should not be changed in isolation.
      *
-     * @param element - The selected element
+     * @param element The selected element
      * @param _context - Additional request context
      * @returns Context actions for this handler, or an empty array if the element is not applicable
      */
@@ -131,8 +131,8 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
      * All adjacent `PatternLink` elements — whether they carry an existing modifier or none at all —
      * are updated to the same modifier value so the pattern stays consistent.
      *
-     * @param node - The PatternObjectInstance AST node
-     * @param modifier - The new modifier kind to apply
+     * @param node The PatternObjectInstance AST node
+     * @param modifier The new modifier kind to apply
      * @returns The workspace edit, or `undefined` when the change is a no-op or CST nodes cannot
      *          be located
      */
@@ -219,8 +219,8 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
      * Otherwise the modifier keyword is replaced in-place (if one already exists) or a new keyword
      * is inserted before the link source (if no modifier is present yet).
      *
-     * @param node - The PatternLink AST node
-     * @param modifier - The new modifier kind to apply
+     * @param node The PatternLink AST node
+     * @param modifier The new modifier kind to apply
      * @returns The workspace edit, or `undefined` when the change is a no-op or CST nodes cannot
      *          be located
      */

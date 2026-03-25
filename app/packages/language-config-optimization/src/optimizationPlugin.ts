@@ -26,6 +26,7 @@ import { createOptimizationContributionPlugin } from "./plugin/optimizationContr
 import { Class, Property } from "@mdeo/language-metamodel";
 import { Function } from "@mdeo/language-script";
 import { registerOptimizationValidationChecks } from "./validation/optimizationValidator.js";
+import { OptimizationCompletionProvider } from "./features/optimizationCompletionProvider.js";
 
 /**
  * Deserialization context for the optimization grammar.
@@ -70,6 +71,7 @@ const configOptimizationPlugin: LangiumLanguagePlugin<ExternalReferenceAdditiona
             ExternalReferenceCollector: () => new OptimizationExternalReferenceCollector()
         },
         lsp: {
+            CompletionProvider: (services) => new OptimizationCompletionProvider(services as any),
             Formatter: (services) => new SerializerFormatter(services)
         },
         AstSerializer: (services) => new DefaultAstSerializer(services)

@@ -27,27 +27,14 @@ export class ConfigDelegatingScopeProvider extends DefaultScopeProvider {
     protected readonly serviceRegistry: ServiceRegistry;
 
     /**
-     * The original plugins for reference.
-     */
-    protected readonly plugins: ConfigContributionPlugin[];
-
-    /**
      * Creates a new ConfigDelegatingScopeProvider.
      *
      * @param services The Langium services
-     * @param serviceRegistry The service registry for getting plugin language services
-     * @param plugins The config contribution plugins
-     * @param resolvedPlugins Optional resolved plugins with wrapper type information
+     * @param resolvedPlugins Resolved plugins with wrapper type information
      */
-    constructor(
-        services: LangiumCoreServices,
-        serviceRegistry: ServiceRegistry,
-        plugins: ConfigContributionPlugin[],
-        resolvedPlugins: ResolvedConfigContributionPlugins
-    ) {
+    constructor(services: LangiumCoreServices, resolvedPlugins: ResolvedConfigContributionPlugins) {
         super(services);
-        this.serviceRegistry = serviceRegistry;
-        this.plugins = plugins;
+        this.serviceRegistry = services.shared.ServiceRegistry;
 
         for (const sectionInfo of resolvedPlugins.sections.values()) {
             this.sectionToPlugin.set(sectionInfo.interface.name, sectionInfo.plugin);

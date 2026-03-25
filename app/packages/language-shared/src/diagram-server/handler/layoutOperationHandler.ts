@@ -1,6 +1,6 @@
 import type { LayoutOperation } from "@mdeo/protocol-common";
-import type { ContextActionRequestContext } from "../../features/contextActions/contextActionRequestContext.js";
-import type { ContextItemProvider } from "../../features/contextActions/contextItemProvider.js";
+import type { ContextActionRequestContext } from "../../context-actions/contextActionRequestContext.js";
+import type { ContextItemProvider } from "../../context-actions/contextItemProvider.js";
 import type { ContextItem } from "@mdeo/protocol-common";
 import { ResetLayoutOperation } from "@mdeo/protocol-common";
 import { sharedImport } from "../../sharedImport.js";

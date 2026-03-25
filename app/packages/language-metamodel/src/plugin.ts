@@ -28,6 +28,7 @@ import { MetamodelScopeComputation } from "./features/metamodelScopeComputation.
 import { MetamodelExternalReferenceCollector } from "./features/metamodelExternalReferenceCollector.js";
 import { ImportFileActionHandler } from "./action-handlers/importFileActionHandler.js";
 import { registerMetamodelValidationChecks } from "./validation/metamodelValidator.js";
+import { MetamodelCompletionProvider } from "./features/metamodelCompletionProvider.js";
 
 /**
  * The additional services for the Metamodel language.
@@ -56,6 +57,7 @@ const metamodelPlugin: LangiumLanguagePlugin<MetamodelServices> = {
             ExternalReferenceCollector: () => new MetamodelExternalReferenceCollector()
         },
         lsp: {
+            CompletionProvider: (services) => new MetamodelCompletionProvider(services as any),
             Formatter: (services) => new SerializerFormatter(services)
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),

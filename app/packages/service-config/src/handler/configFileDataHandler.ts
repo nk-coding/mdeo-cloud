@@ -124,7 +124,9 @@ function sortBySectionDependencies(plugins: ConfigContributionPlugin[]): ConfigC
     const visiting = new Set<string>();
 
     function visit(pluginName: string): void {
-        if (visited.has(pluginName)) return;
+        if (visited.has(pluginName)) {
+            return;
+        }
         if (visiting.has(pluginName)) {
             throw new Error(`Circular sectionDependency detected involving plugin: ${pluginName}`);
         }

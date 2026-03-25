@@ -1,5 +1,4 @@
 import { createInterface, createType, createExternalInterface, Ref, Union, type ASTType } from "@mdeo/language-common";
-import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
 import type { ClassType, PropertyType } from "@mdeo/language-metamodel";
 import type { ModelTransformationType } from "@mdeo/language-model-transformation";
 
@@ -20,31 +19,6 @@ export const Property = createExternalInterface<PropertyType>("Property");
  * Used for referencing model transformation files in the search section.
  */
 export const ModelTransformation = createExternalInterface<ModelTransformationType>("ModelTransformation");
-
-/**
- * Configuration for file-scoped model transformation imports in the MDEO config.
- * Uses the shared file-scoping pattern from language-shared.
- */
-export const configMdeoFileScopingConfig = new FileScopingConfig<ModelTransformationType>(
-    "ConfigMdeoTransformation",
-    ModelTransformation
-);
-
-/**
- * Generated import types for model transformations using the file-scoping pattern.
- */
-export const { importType: TransformationImport, fileImportType: TransformationFileImport } =
-    generateImportTypes(configMdeoFileScopingConfig);
-
-/**
- * Type representing a TransformationImport AST node.
- */
-export type TransformationImportType = ASTType<typeof TransformationImport>;
-
-/**
- * Type representing a TransformationFileImport AST node.
- */
-export type TransformationFileImportType = ASTType<typeof TransformationFileImport>;
 
 /**
  * A "using" path declaration for model transformation files.

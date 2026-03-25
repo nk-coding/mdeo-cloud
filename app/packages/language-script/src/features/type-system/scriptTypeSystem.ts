@@ -33,13 +33,13 @@ import {
     getClassContainerPackage,
     getEnumContainerPackage
 } from "@mdeo/language-expression";
-import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
 import { expressionTypes, statementTypes, typeTypes, Script, type ScriptType } from "../../grammar/scriptTypes.js";
 import { ScriptPartialTypeSystem } from "./scriptPartialTypeSystem.js";
 import type { ResolvedScriptContributionPlugins } from "../../plugin/scriptContributionPlugin.js";
+import type { ScriptTypirServices, ScriptTypirSpecifics } from "../../plugin.js";
 import { stdlibGlobalFunctions } from "../stdlib/globalFunctions.js";
 import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
-import { getExportedEntitiesByPath, getAllMetamodelAbsolutePaths } from "@mdeo/language-metamodel";
+import { getExportedEntitiesByPath } from "@mdeo/language-metamodel";
 import type { LangiumDocument, LangiumDocuments, URI } from "langium";
 
 const { AstUtils } = sharedImport("langium");
@@ -104,45 +104,10 @@ export class ScriptTypeSystem extends ExpressionTypeSystem<ScriptTypirSpecifics>
         );
         statementPartialTypeSystem.registerRules();
 
-        const langiumDocuments = typir.langium.LangiumServices.workspace.LangiumDocuments;
-
-        const computePackageMap = (document: LangiumDocument): Map<string, string[]> => {
-            const map = new Map<string, string[]>();
-            map.set("builtin", ["builtin"]);
-
-            const root = document.parseResult?.value as ScriptType | undefined;
-            const importFile = root?.metamodelImport?.file;
-            if (importFile == undefined) {
-                return map;
-            }
-
-            const metamodelUri = resolveRelativePath(document, importFile);
-            const metamodelDoc = langiumDocuments.getDocument(metamodelUri);
-            if (metamodelDoc == undefined) {
-                return map;
-            }
-
-            const absolutePaths = getAllMetamodelAbsolutePaths(metamodelDoc, langiumDocuments);
-
-            const classPackages: string[] = [];
-            const enumPackages: string[] = [];
-
-            for (const absolutePath of absolutePaths) {
-                classPackages.push(getClassPackage(absolutePath));
-                enumPackages.push(getEnumPackage(absolutePath));
-            }
-
-            map.set("class", classPackages);
-            map.set("enum", enumPackages);
-
-            return map;
-        };
-
         const typePartialTypeSystem = new TypePartialTypeSystem<ScriptTypirSpecifics>(
             typir,
             typeTypes,
-            this.nullablePrimitiveTypes.Any,
-            computePackageMap
+            this.nullablePrimitiveTypes.Any
         );
         typePartialTypeSystem.registerRules();
 

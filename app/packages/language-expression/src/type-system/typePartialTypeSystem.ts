@@ -8,10 +8,9 @@ import type { CustomVoidType } from "../typir-extensions/kinds/custom-void/custo
 import { isCustomVoidType } from "../typir-extensions/kinds/custom-void/custom-void-type.js";
 import type { CustomClassType } from "../typir-extensions/kinds/custom-class/custom-class-type.js";
 import type { ClassType } from "../typir-extensions/config/type.js";
-import type { LangiumDocument, WorkspaceCache as WorkspaceCacheType } from "langium";
 import { sharedImport } from "@mdeo/language-shared";
 
-const { WorkspaceCache, DocumentState, AstUtils } = sharedImport("langium");
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Result of resolving a class type from a type reference.
@@ -21,20 +20,6 @@ type ClassTypeResolutionResult =
     | { kind: "not-found"; typeName: string }
     | { kind: "ambiguous"; typeName: string; matchingPackages: string[] }
     | { kind: "invalid-package"; packageName: string; typeName: string };
-
-/**
- * Cached per-document package map state, computed once per document lifecycle.
- */
-type DocumentPackageCache = {
-    /**
-     * Map from user-visible package names to lists of internal packages.
-     */
-    packageMap: Map<string, string[]>;
-    /**
-     * Set of all internal packages from all values of packageMap.
-     */
-    allInternalPackages: Set<string>;
-};
 
 /**
  * Partial type system implementation for type-related AST nodes.
@@ -48,29 +33,18 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
     TypeTypes
 > {
     /**
-     * Workspace-scoped cache mapping document URI strings to their computed
-     * package map state. Invalidated whenever the workspace is rebuilt.
-     */
-    private readonly packageMapCache: WorkspaceCacheType<string, DocumentPackageCache>;
-
-    /**
      * Creates a new TypePartialTypeSystem.
      *
      * @param typir The Typir services
      * @param types The type types for the grammar
      * @param nullableAny The nullable any type for fallback type arguments
-     * @param computePackageMap Callback invoked once per document to compute the package map.
-     *        The map's keys are the user-visible package names (e.g., "class", "enum", "builtin")
-     *        and the values are lists of the corresponding internal (file-specific) packages.
      */
     constructor(
         typir: ExpressionTypirServices<Specifics>,
         types: TypeTypes,
-        protected readonly nullableAny: CustomClassType,
-        protected readonly computePackageMap: (document: LangiumDocument) => Map<string, string[]>
+        protected readonly nullableAny: CustomClassType
     ) {
         super(typir, types);
-        this.packageMapCache = new WorkspaceCache(typir.langium.LangiumServices, DocumentState.IndexedReferences);
     }
 
     override registerRules(): void {
@@ -79,32 +53,6 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
         this.registerVoidTypeInferenceRule();
         this.registerLambdaTypeInferenceRule();
         this.registerLambdaTypeValidationRule();
-    }
-
-    /**
-     * Retrieves (or computes and caches) the package map state for the document
-     * that contains the given AST node.
-     *
-     * @param node Any AST node whose document should be used as the cache key
-     * @returns The cached DocumentPackageCache for that document
-     */
-    private getDocumentPackageCache(node: ClassTypeType): DocumentPackageCache {
-        const document = AstUtils.getDocument(node);
-        const key = document.uri.toString();
-        const existing = this.packageMapCache.get(key);
-        if (existing != undefined) {
-            return existing;
-        }
-        const packageMap = this.computePackageMap(document);
-        const allInternalPackages = new Set<string>();
-        for (const internalPackages of packageMap.values()) {
-            for (const pkg of internalPackages) {
-                allInternalPackages.add(pkg);
-            }
-        }
-        const entry: DocumentPackageCache = { packageMap, allInternalPackages };
-        this.packageMapCache.set(key, entry);
-        return entry;
     }
 
     /**
@@ -119,7 +67,8 @@ export class TypePartialTypeSystem<Specifics extends TypirLangiumSpecifics> exte
      * @returns The resolution result indicating found type, not found, ambiguous, or invalid package
      */
     private resolveClassType(node: ClassTypeType): ClassTypeResolutionResult {
-        const { packageMap, allInternalPackages } = this.getDocumentPackageCache(node);
+        const document = AstUtils.getDocument(node);
+        const { packageMap, allInternalPackages } = this.typir.PackageMapCache.getDocumentPackageCache(document);
         const typeName = node.name;
         const packageName = node.packageName;
 

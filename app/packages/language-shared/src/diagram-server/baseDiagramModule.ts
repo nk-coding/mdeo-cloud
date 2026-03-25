@@ -29,7 +29,7 @@ import { LayoutOperationHandler } from "./handler/layoutOperationHandler.js";
 import { ResetLayoutOperationHandler } from "./handler/resetLayoutOperationHandler.js";
 import { RequestCreateEdgeSchemaActionHandler } from "./handler/requestCreateEdgeSchemaActionHandler.js";
 import { CreateEdgeSchemaResolver } from "./createEdgeSchemaResolver.js";
-import { DefaultContextActionsProvider } from "../features/contextActions/defaultContextActionsProvider.js";
+import { DefaultContextActionsProvider } from "../context-actions/defaultContextActionsProvider.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =

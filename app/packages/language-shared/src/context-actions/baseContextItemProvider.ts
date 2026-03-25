@@ -1,6 +1,6 @@
 import type { GModelElement } from "@eclipse-glsp/server";
 import type { ContextItem } from "@mdeo/protocol-common";
-import { sharedImport } from "../../sharedImport.js";
+import { sharedImport } from "../sharedImport.js";
 import type { ContextItemProvider } from "./contextItemProvider.js";
 import type { ContextActionRequestContext } from "./contextActionRequestContext.js";
 

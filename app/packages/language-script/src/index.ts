@@ -18,3 +18,5 @@ export * from "./plugin/resolvePlugins.js";
 export * from "./plugin/scriptContributionPlugin.js";
 export * from "./plugin/typedAst.js";
 export * from "./plugin.js";
+
+export * from "./features/scriptCompletionProvider.js";

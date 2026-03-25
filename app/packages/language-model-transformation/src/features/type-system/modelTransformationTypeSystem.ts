@@ -10,14 +10,12 @@ import {
     type ExpressionTypirServices,
     type PrimitiveTypes,
     typeRef,
-    MetamodelPartialTypeSystem,
-    getClassPackage,
-    getEnumPackage
+    MetamodelPartialTypeSystem
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { LangiumDocument, LangiumDocuments, URI } from "langium";
 import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
-import { getExportedEntitiesByPath, getAllMetamodelAbsolutePaths } from "@mdeo/language-metamodel";
+import { getExportedEntitiesByPath } from "@mdeo/language-metamodel";
 import {
     expressionTypes,
     ModelTransformation,
@@ -92,45 +90,10 @@ export class ModelTransformationTypeSystem extends ExpressionTypeSystem<TypirLan
      * @param typir The typir services to initialize with.
      */
     protected override onInitializeExtended(typir: ExpressionTypirServices<TypirLangiumSpecifics>): void {
-        const langiumDocuments = typir.langium.LangiumServices.workspace.LangiumDocuments;
-
-        const computePackageMap = (document: LangiumDocument): Map<string, string[]> => {
-            const map = new Map<string, string[]>();
-            map.set("builtin", ["builtin"]);
-
-            const root = document.parseResult?.value as ModelTransformationType | undefined;
-            const importFile = root?.import?.file;
-            if (importFile == undefined) {
-                return map;
-            }
-
-            const metamodelUri = resolveRelativePath(document, importFile);
-            const metamodelDoc = langiumDocuments.getDocument(metamodelUri);
-            if (metamodelDoc == undefined) {
-                return map;
-            }
-
-            const absolutePaths = getAllMetamodelAbsolutePaths(metamodelDoc, langiumDocuments);
-
-            const classPackages: string[] = [];
-            const enumPackages: string[] = [];
-
-            for (const absolutePath of absolutePaths) {
-                classPackages.push(getClassPackage(absolutePath));
-                enumPackages.push(getEnumPackage(absolutePath));
-            }
-
-            map.set("class", classPackages);
-            map.set("enum", enumPackages);
-
-            return map;
-        };
-
         const typePartialTypeSystem = new TypePartialTypeSystem<TypirLangiumSpecifics>(
             typir,
             typeTypes,
-            this.nullablePrimitiveTypes.Any,
-            computePackageMap
+            this.nullablePrimitiveTypes.Any
         );
         const modelTransformationPartialTypeSystem = new ModelTransformationPartialTypeSystem(
             typir,

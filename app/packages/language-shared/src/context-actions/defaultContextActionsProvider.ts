@@ -1,11 +1,11 @@
 import type { EditorContext, LabeledAction } from "@eclipse-glsp/protocol";
 import type { GModelElement, OperationHandler, OperationHandlerRegistry } from "@eclipse-glsp/server";
 import { ELEMENT_CONTEXT_ACTIONS_ID, type ContextItem, type EdgeAttachmentPosition } from "@mdeo/protocol-common";
-import { sharedImport } from "../../sharedImport.js";
+import { sharedImport } from "../sharedImport.js";
 import type { ContextActionRequestContext } from "./contextActionRequestContext.js";
 import type { ContextItemProvider } from "./contextItemProvider.js";
-import { GEdge } from "../../diagram-server/model/edge.js";
-import { GNode } from "../../diagram-server/model/node.js";
+import { GEdge } from "../diagram-server/model/edge.js";
+import { GNode } from "../diagram-server/model/node.js";
 import type { ContextActionsProvider } from "@eclipse-glsp/server";
 
 const { inject, injectable } = sharedImport("inversify");

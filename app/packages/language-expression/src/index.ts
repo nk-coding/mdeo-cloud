@@ -48,6 +48,7 @@ export * from "./stdlib/primitives/float.js";
 export * from "./stdlib/primitives/int.js";
 export * from "./stdlib/primitives/long.js";
 export * from "./stdlib/primitives/string.js";
+export * from "./typir-extensions/service/documentPackageCacheService.js";
 export * from "./type-system/expressionPartialTypeSystem.js";
 export * from "./type-system/expressionTypeSystem.js";
 export * from "./type-system/metamodelPartialTypeSystem.js";

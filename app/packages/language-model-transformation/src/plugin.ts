@@ -22,13 +22,24 @@ import {
     registerExpressionSerializers,
     registerTypeSerializers,
     generateExpressionRuleOverride,
-    ExpressionCompletionProvider
+    DefaultDocumentPackageCacheService,
+    type DocumentPackageCacheService,
+    getClassPackage,
+    getEnumPackage
 } from "@mdeo/language-expression";
+import { getAllMetamodelAbsolutePaths } from "@mdeo/language-metamodel";
+import { resolveRelativePath } from "@mdeo/language-shared";
 import type { TypirLangiumSpecifics } from "typir-langium";
-import type { AbstractAstReflection } from "langium";
+import type { AbstractAstReflection, LangiumDocument } from "langium";
 import { generateModelTransformationRules, ModelTransformationTerminals } from "./grammar/modelTransformationRules.js";
+import { ModelTransformationCompletionProvider } from "./features/modelTransformationCompletionProvider.js";
 import { ModelTransformationTokenBuilder } from "./features/modelTransformationTokenBuilder.js";
-import { expressionConfig, expressionTypes, typeTypes } from "./grammar/modelTransformationTypes.js";
+import {
+    expressionConfig,
+    expressionTypes,
+    typeTypes,
+    type ModelTransformationType
+} from "./grammar/modelTransformationTypes.js";
 import { ModelTransformationLangiumScopeProvider } from "./features/modelTransformationScopeProvider.js";
 import { ModelTransformationScopeComputation } from "./features/modelTransformationScopeComputation.js";
 import { ModelTransformationTypeSystem } from "./features/type-system/modelTransformationTypeSystem.js";
@@ -95,24 +106,57 @@ function createModelTransformationPlugin(): LangiumLanguagePlugin<ModelTransform
                 ScopeComputation: (services) => new ModelTransformationScopeComputation(services),
                 ExternalReferenceCollector: () => new ModelTransformationExternalReferenceCollector()
             },
-            typir: (services) =>
-                createTypirLangiumServicesWithAdditionalServices<
+            typir: (outerServices) => {
+                const langiumSharedServices = outerServices.shared;
+                const computePackageMap = (document: LangiumDocument): Map<string, string[]> => {
+                    const map = new Map<string, string[]>();
+                    map.set("builtin", ["builtin"]);
+
+                    const root = document.parseResult?.value as ModelTransformationType | undefined;
+                    const importFile = root?.import?.file;
+                    if (importFile == undefined) {
+                        return map;
+                    }
+
+                    const langiumDocuments = langiumSharedServices.workspace.LangiumDocuments;
+                    const metamodelUri = resolveRelativePath(document, importFile);
+                    const metamodelDoc = langiumDocuments.getDocument(metamodelUri);
+                    if (metamodelDoc == undefined) {
+                        return map;
+                    }
+
+                    const absolutePaths = getAllMetamodelAbsolutePaths(metamodelDoc, langiumDocuments);
+                    const classPackages: string[] = [];
+                    const enumPackages: string[] = [];
+                    for (const absolutePath of absolutePaths) {
+                        classPackages.push(getClassPackage(absolutePath));
+                        enumPackages.push(getEnumPackage(absolutePath));
+                    }
+                    map.set("class", classPackages);
+                    map.set("enum", enumPackages);
+                    return map;
+                };
+
+                return createTypirLangiumServicesWithAdditionalServices<
                     ModelTransformationTypirSpecifics,
                     AdditionalModelTransformationTypirServices
                 >(
-                    services.shared,
-                    services.shared.AstReflection as AbstractAstReflection & AstReflection,
+                    langiumSharedServices,
+                    langiumSharedServices.AstReflection as AbstractAstReflection & AstReflection,
                     new ModelTransformationTypeSystem(),
                     {
                         ...defaultExtendedTypirServices<ModelTransformationTypirSpecifics>(),
                         ScopeProvider: (typirServices) =>
                             new ModelTransformationTypirScopeProvider(
                                 typirServices as ExpressionTypirServices<ModelTransformationTypirSpecifics>
-                            )
+                            ),
+                        PackageMapCache: (): DocumentPackageCacheService =>
+                            new DefaultDocumentPackageCacheService(langiumSharedServices, computePackageMap)
                     }
-                ) as ModelTransformationTypirServices,
+                ) as ModelTransformationTypirServices;
+            },
             lsp: {
-                CompletionProvider: (services) => new ExpressionCompletionProvider(services, expressionTypes),
+                CompletionProvider: (services) => new ModelTransformationCompletionProvider(services, expressionTypes),
                 Formatter: (services) => new SerializerFormatter(services)
             },
             AstSerializer: (services) => new DefaultAstSerializer(services),

@@ -27,13 +27,24 @@ import {
     registerStatementSerializers,
     registerTypeSerializers,
     generateExpressionRuleOverride,
-    ExpressionCompletionProvider
+    DefaultDocumentPackageCacheService,
+    getClassPackage,
+    getEnumPackage
 } from "@mdeo/language-expression";
+import { getAllMetamodelAbsolutePaths } from "@mdeo/language-metamodel";
+import { resolveRelativePath } from "@mdeo/language-shared";
 import type { TypirLangiumSpecifics } from "typir-langium";
+import type { LangiumDocument } from "langium";
 import { ScriptTypeSystem } from "./features/type-system/scriptTypeSystem.js";
 import { ScriptScopeProvider } from "./features/type-system/scriptScopeProvider.js";
 import { registerScriptSerializers } from "./features/scriptSerializers.js";
-import { expressionConfig, expressionTypes, statementTypes, typeTypes } from "./grammar/scriptTypes.js";
+import {
+    expressionConfig,
+    expressionTypes,
+    statementTypes,
+    typeTypes,
+    type ScriptType
+} from "./grammar/scriptTypes.js";
 import { ScriptTokenBuilder } from "./features/scriptTokenBuilder.js";
 import { ScriptLangiumScopeProvider } from "./features/scriptScopeProvider.js";
 import { ScriptExternalReferenceCollector } from "./features/scriptExternalReferenceCollector.js";
@@ -44,6 +55,8 @@ import type { AbstractAstReflection } from "langium";
 import { ScriptActionProvider } from "./features/scriptActionProvider.js";
 import { RunScriptActionHandler } from "./action-handlers/runScriptActionHandler.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
+import { ScriptCompletionProvider } from "./features/scriptCompletionProvider.js";
+import type { DocumentPackageCacheService } from "@mdeo/language-expression";
 
 const { createTypirLangiumServicesWithAdditionalServices, initializeLangiumTypirServices } =
     sharedImport("typir-langium");
@@ -95,22 +108,60 @@ export const scriptPluginProvider: LangiumLanguagePluginProvider<ScriptServices>
                     ScopeProvider: (services) => new ScriptLangiumScopeProvider(services),
                     ExternalReferenceCollector: () => new ScriptExternalReferenceCollector()
                 },
-                typir: (services) =>
-                    createTypirLangiumServicesWithAdditionalServices<
+                typir: (outerServices) => {
+                    const langiumSharedServices = outerServices.shared;
+                    const computePackageMap = (document: LangiumDocument): Map<string, string[]> => {
+                        const map = new Map<string, string[]>();
+                        map.set("builtin", ["builtin"]);
+
+                        const root = document.parseResult?.value as ScriptType | undefined;
+                        const importFile = root?.metamodelImport?.file;
+                        if (importFile == undefined) {
+                            return map;
+                        }
+
+                        const langiumDocuments = langiumSharedServices.workspace.LangiumDocuments;
+                        const metamodelUri = resolveRelativePath(document, importFile);
+                        const metamodelDoc = langiumDocuments.getDocument(metamodelUri);
+                        if (metamodelDoc == undefined) {
+                            return map;
+                        }
+
+                        const absolutePaths = getAllMetamodelAbsolutePaths(metamodelDoc, langiumDocuments);
+                        const classPackages: string[] = [];
+                        const enumPackages: string[] = [];
+                        for (const absolutePath of absolutePaths) {
+                            classPackages.push(getClassPackage(absolutePath));
+                            enumPackages.push(getEnumPackage(absolutePath));
+                        }
+                        if (classPackages.length > 0) {
+                            map.set("class", classPackages);
+                        }
+                        if (enumPackages.length > 0) {
+                            map.set("enum", enumPackages);
+                        }
+                        return map;
+                    };
+
+                    return createTypirLangiumServicesWithAdditionalServices<
                         ScriptTypirSpecifics,
                         AdditionalScriptTypirServices
                     >(
-                        services.shared,
-                        services.shared.AstReflection as AbstractAstReflection & AstReflection,
+                        langiumSharedServices,
+                        langiumSharedServices.AstReflection as AbstractAstReflection & AstReflection,
                         new ScriptTypeSystem(resolvedPlugins),
                         {
                             ...defaultExtendedTypirServices<ScriptTypirSpecifics>(),
                             ScopeProvider: (services) => new ScriptScopeProvider(services as ScriptTypirServices),
-                            ResolvedContributionPlugins: () => resolvedPlugins
+                            ResolvedContributionPlugins: () => resolvedPlugins,
+                            PackageMapCache: (): DocumentPackageCacheService =>
+                                new DefaultDocumentPackageCacheService(langiumSharedServices, computePackageMap)
                         }
-                    ) as ScriptTypirServices,
+                    ) as ScriptTypirServices;
+                },
                 lsp: {
-                    CompletionProvider: (services) => new ExpressionCompletionProvider(services, expressionTypes),
+                    CompletionProvider: (services) =>
+                        new ScriptCompletionProvider(services, expressionTypes, typeTypes),
                     Formatter: (services) => new SerializerFormatter(services)
                 },
                 AstSerializer: (services) => new DefaultAstSerializer(services),
