@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import { GRectangularNodeView, sharedImport } from "@mdeo/editor-shared";
 import type { VNode } from "snabbdom";
 import type { GClassNode } from "../model/classNode.js";
@@ -19,7 +19,11 @@ export class GClassNodeView extends GRectangularNodeView {
      * @param args Optional additional arguments
      * @returns An array of VNodes representing the node's children
      */
-    protected renderNodeContent(model: Readonly<GClassNode>, context: RenderingContext): VNode[] {
-        return context.renderChildren(model);
+    protected renderNodeContent(
+        model: Readonly<GClassNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode[] {
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 }

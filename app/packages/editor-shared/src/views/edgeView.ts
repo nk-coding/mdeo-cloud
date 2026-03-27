@@ -6,6 +6,7 @@ import { EdgeRouter, type RouteComputationResult } from "../features/edge-routin
 import type { AnchorSide } from "@mdeo/protocol-common";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 import type { ContextActionRailOrientation } from "../features/context-actions/contextActions.js";
+import { isIssueMarker, ISSUE_MARKER_SIZE } from "../features/decoration/issueMarker.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, Point: PointUtil } = sharedImport("@eclipse-glsp/sprotty");
@@ -195,6 +196,8 @@ export abstract class GEdgeView implements IView {
             children.push(...this.renderCreateEdgeEndpoints(model, route));
         }
 
+        children.push(...this.renderIssueMarkers(model, route, context));
+
         const rootClasses: Record<string, boolean> = {};
         if (!isSelected(model)) {
             rootClasses["cursor-pointer"] = true;
@@ -235,6 +238,46 @@ export abstract class GEdgeView implements IView {
      */
     protected renderTargetMarker(_model: Readonly<GEdge>, _context: RenderingContext): EdgeMarkerData | undefined {
         return undefined;
+    }
+
+    /**
+     * Renders issue marker badges for all GIssueMarker children of the edge.
+     *
+     * The badge is placed at the geometric midpoint of the middle route segment so
+     * it stays visually associated with the edge regardless of its length or orientation.
+     * The badge size remains constant in physical CSS pixels regardless of zoom level.
+     *
+     * @param model   The edge model whose children are searched for GIssueMarker elements.
+     * @param route   The computed route points (must have at least two points).
+     * @param context The current rendering context used to render the marker view.
+     * @returns An array of SVG VNodes for the issue marker badges (empty when there are none).
+     */
+    private renderIssueMarkers(model: Readonly<GEdge>, route: Point[], context: RenderingContext): VNode[] {
+        if (route.length < 2) {
+            return [];
+        }
+
+        const markers = model.children.filter(isIssueMarker);
+        if (markers.length === 0) {
+            return [];
+        }
+
+        const zoom = findViewportZoom(model);
+        const iconSvgSize = ISSUE_MARKER_SIZE / zoom;
+
+        const markerVNode = context.renderElement(markers[0]);
+        if (markerVNode == undefined) {
+            return [];
+        }
+
+        // Place the badge at the midpoint of the middle route segment.
+        const midIndex = Math.floor(route.length / 2);
+        const midPoint = PointUtil.linear(route[midIndex - 1], route[midIndex], 0.5);
+
+        const x = midPoint.x - iconSvgSize / 2;
+        const y = midPoint.y - iconSvgSize / 2;
+
+        return [svg("g", { attrs: { transform: `translate(${x}, ${y})` } }, markerVNode)];
     }
 
     /**

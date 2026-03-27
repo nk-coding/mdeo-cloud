@@ -91,13 +91,3 @@ export class ToolboxGroupKey {
         readonly sortString: string
     ) {}
 }
-
-/**
- * Error state for the toolbox.
- */
-export interface ToolboxErrorState {
-    /**
-     * Error messages to display
-     */
-    messages: string[];
-}

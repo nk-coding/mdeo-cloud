@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import { GRectangularNodeView, sharedImport } from "@mdeo/editor-shared";
 import type { VNode } from "snabbdom";
 import type { GEnumNode } from "../model/enumNode.js";
@@ -18,7 +18,11 @@ export class GEnumNodeView extends GRectangularNodeView {
      * @param context The rendering context
      * @returns An array of VNodes representing the node's children
      */
-    protected renderNodeContent(model: Readonly<GEnumNode>, context: RenderingContext): VNode[] {
-        return context.renderChildren(model);
+    protected renderNodeContent(
+        model: Readonly<GEnumNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode[] {
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 }

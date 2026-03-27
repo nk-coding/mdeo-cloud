@@ -34,50 +34,65 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
                 "pointer-events-auto": true
             }
         },
+        generateDetailsPanelContent(context)
+    );
+}
+
+/**
+ * Renders the inner content of the details panel: search input, palette item list,
+ * and optional item preview.  Returns `undefined` when the panel is collapsed so
+ * that no DOM content is created while the panel is hidden.
+ *
+ * @param context The toolbox context providing visibility state and item data.
+ * @returns The content VNode, or `undefined` when `context.isBottomPanelOpen` is `false`.
+ */
+function generateDetailsPanelContent(context: Toolbox): VNode | undefined {
+    if (!context.isBottomPanelOpen) {
+        return undefined;
+    }
+    return html(
+        "div",
+        {
+            class: {
+                "toolbox-details": true,
+                "rounded-md": true,
+                border: true,
+                "border-border": true,
+                "bg-toolbox": true,
+                flex: true,
+                "flex-col": true,
+                "h-full": true
+            }
+        },
+        ...context.generateDetailsExtension(),
         html(
             "div",
             {
                 class: {
-                    "toolbox-details": true,
-                    "rounded-md": true,
-                    border: true,
-                    "border-border": true,
-                    "bg-toolbox": true,
-                    flex: true,
-                    "flex-col": true,
-                    "h-full": true
+                    "toolbox-search-container": true,
+                    "px-3": true,
+                    "py-2": true,
+                    "border-b": true,
+                    "border-border": true
                 }
             },
-            ...context.generateDetailsExtension(),
-            html(
-                "div",
-                {
-                    class: {
-                        "toolbox-search-container": true,
-                        "px-3": true,
-                        "py-2": true,
-                        "border-b": true,
-                        "border-border": true
-                    }
-                },
-                generateSearchInputView(context)
-            ),
-            html(
-                "div",
-                {
-                    class: {
-                        "overflow-hidden": true
-                    }
-                },
-                generateScrollView(context.detailsScrollState, () => generatePaletteItemsList(context), {
-                    "flex-1": true,
-                    "px-1": true,
-                    "py-2": true,
-                    "h-full": true
-                })
-            ),
-            generatePreviewForCurrentItem(context)
-        )
+            generateSearchInputView(context)
+        ),
+        html(
+            "div",
+            {
+                class: {
+                    "overflow-hidden": true
+                }
+            },
+            generateScrollView(context.detailsScrollState, () => generatePaletteItemsList(context), {
+                "flex-1": true,
+                "px-1": true,
+                "py-2": true,
+                "h-full": true
+            })
+        ),
+        generatePreviewForCurrentItem(context)
     );
 }
 

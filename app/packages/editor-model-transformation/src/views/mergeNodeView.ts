@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 
@@ -26,7 +26,11 @@ export class GMergeNodeView extends GNodeView {
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    protected override renderForeignElement(_model: Readonly<GNode>, _context: RenderingContext): VNode {
+    protected override renderForeignElement(
+        _model: Readonly<GNode>,
+        _context: RenderingContext,
+        _children: readonly GModelElement[]
+    ): VNode {
         const size = GMergeNodeView.SIZE;
         const innerSize = Math.round(size / Math.SQRT2);
         const offset = (size - innerSize) / 2;

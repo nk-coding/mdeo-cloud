@@ -6,6 +6,7 @@ import { LayoutCommand } from "./layoutAction.js";
 const { FeatureModule, configureActionHandler, configureCommand } = sharedImport("@eclipse-glsp/client");
 const { SetModelAction, UpdateModelAction } = sharedImport("@eclipse-glsp/sprotty");
 const { EnableDefaultToolsAction, ToolPalette } = sharedImport("@eclipse-glsp/client");
+const { SetMarkersAction } = sharedImport("@eclipse-glsp/protocol");
 
 /**
  * Feature module that provides the Toolbox UI extension.
@@ -24,6 +25,7 @@ export const toolboxModule = new FeatureModule(
         configureActionHandler(context, EnableDefaultToolsAction.KIND, Toolbox);
         configureActionHandler(context, UpdateModelAction.KIND, Toolbox);
         configureActionHandler(context, SetModelAction.KIND, Toolbox);
+        configureActionHandler(context, SetMarkersAction.KIND, Toolbox);
 
         configureCommand(context, LayoutCommand);
     },

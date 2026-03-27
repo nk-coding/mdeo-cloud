@@ -18,6 +18,7 @@ import { selectModule } from "./select/featureModule.js";
 import { createEdgeToolModule } from "./create-edge-tool/featureModule.js";
 import { createNodeToolModule } from "./create-node-tool/featureModule.js";
 import { iconRegistryModule } from "./icon-registry/featureModule.js";
+import { decorationModule } from "./decoration/featureModule.js";
 
 /**
  * Default modules for the editor shared features.
@@ -43,5 +44,6 @@ export const DEFAULT_MODULES = [
     selectModule,
     createEdgeToolModule,
     createNodeToolModule,
-    iconRegistryModule
+    iconRegistryModule,
+    decorationModule
 ];

@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode, VNodeStyle } from "snabbdom";
 import { sharedImport } from "../sharedImport.js";
 import type { GRectangularNode } from "../model/rectangularNode.js";
@@ -12,7 +12,11 @@ const { html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export abstract class GRectangularNodeView extends GNodeView {
-    protected override renderForeignElement(model: Readonly<GRectangularNode>, context: RenderingContext): VNode {
+    protected override renderForeignElement(
+        model: Readonly<GRectangularNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode {
         const style: VNodeStyle = {};
         if (model.meta?.prefWidth != undefined) {
             style.width = `${model.meta.prefWidth}px`;
@@ -31,7 +35,7 @@ export abstract class GRectangularNodeView extends GNodeView {
                 },
                 style
             },
-            ...this.renderNodeContent(model, context)
+            ...this.renderNodeContent(model, context, children)
         );
     }
 
@@ -62,5 +66,9 @@ export abstract class GRectangularNodeView extends GNodeView {
      * @param context The rendering context
      * @returns An array of VNodes representing the content of the node
      */
-    protected abstract renderNodeContent(model: Readonly<GRectangularNode>, context: RenderingContext): VNode[];
+    protected abstract renderNodeContent(
+        model: Readonly<GRectangularNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode[];
 }

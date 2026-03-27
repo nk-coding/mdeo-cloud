@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import { GRectangularNodeView, sharedImport } from "@mdeo/editor-shared";
 import type { GRectangularNode } from "@mdeo/editor-shared";
 import type { VNode } from "snabbdom";
@@ -52,7 +52,11 @@ export class GPatternInstanceNodeView extends GRectangularNodeView {
      * Renders the content inside the pattern instance node by rendering all child
      * compartments (modifier title, header, properties).
      */
-    protected override renderNodeContent(model: Readonly<GRectangularNode>, context: RenderingContext): VNode[] {
-        return context.renderChildren(model);
+    protected override renderNodeContent(
+        model: Readonly<GRectangularNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode[] {
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 }

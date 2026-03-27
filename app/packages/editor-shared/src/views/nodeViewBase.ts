@@ -1,9 +1,11 @@
-import type { Point } from "@eclipse-glsp/sprotty";
+import type { GModelElement, Point, RenderingContext } from "@eclipse-glsp/sprotty";
 import { sharedImport } from "../sharedImport.js";
 import { EdgeEditHighlightState, type GNode } from "../model/node.js";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 import type { VNode } from "snabbdom";
 import { renderCreateEdgeEndpoint } from "./edgeView.js";
+import { isIssueMarker, ISSUE_MARKER_SIZE } from "../features/decoration/issueMarker.js";
+import type { GIssueMarker } from "../model/issueMarker.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, ShapeView } = sharedImport("@eclipse-glsp/sprotty");
@@ -59,6 +61,27 @@ export abstract class GNodeViewBase extends ShapeView {
      * @param model The model of the element
      * @returns The control elements
      */
+    /**
+     * Splits the node's children into regular children and issue marker children.
+     * Issue markers are excluded from the regular children so they can be rendered
+     * separately as SVG overlay badges via {@link renderIssueMarkers}.
+     *
+     * @param model The node model whose children are partitioned.
+     * @returns An object with `children` (non-marker elements) and `markers` (issue markers).
+     */
+    protected splitChildren(model: Readonly<GNode>): { children: GModelElement[]; markers: GIssueMarker[] } {
+        const children: GModelElement[] = [];
+        const markers: GIssueMarker[] = [];
+        for (const child of model.children) {
+            if (isIssueMarker(child)) {
+                markers.push(child);
+            } else {
+                children.push(child);
+            }
+        }
+        return { children, markers };
+    }
+
     protected renderBackgroundControlElements(model: Readonly<GNode>): VNode[] {
         const result: VNode[] = [];
 
@@ -91,6 +114,44 @@ export abstract class GNodeViewBase extends ShapeView {
         }
 
         return result;
+    }
+
+    /**
+     * Renders issue marker badges for all GIssueMarker children of the node.
+     *
+     * Each badge is placed at the top-right corner of the node, centered on that corner
+     * so it overlaps both the node interior and the surrounding canvas.  The badge size
+     * is kept constant in physical CSS pixels regardless of the current zoom level.
+     *
+     * @param markers The pre-split issue marker children (from {@link splitChildren}).
+     * @param model The node model, used for bounds and zoom positioning.
+     * @param context The rendering context used to render the marker view.
+     * @returns An array of SVG VNodes for the issue marker badges (empty when there are none).
+     */
+    protected renderIssueMarkers(
+        markers: readonly GIssueMarker[],
+        model: Readonly<GNode>,
+        context: RenderingContext
+    ): VNode[] {
+        if (markers.length === 0) {
+            return [];
+        }
+
+        const zoom = findViewportZoom(model);
+        const iconSvgSize = ISSUE_MARKER_SIZE / zoom;
+
+        // Pick the first marker (GLSP guarantees at most one GIssueMarker per element
+        // with the highest-priority severity already resolved inside it).
+        const markerVNode = context.renderElement(markers[0]);
+        if (markerVNode == undefined) {
+            return [];
+        }
+
+        // Position the badge centred on the top-right corner of the node.
+        const x = model.bounds.width - iconSvgSize / 2;
+        const y = -iconSvgSize / 2;
+
+        return [svg("g", { attrs: { transform: `translate(${x}, ${y})` } }, markerVNode)];
     }
 
     /**

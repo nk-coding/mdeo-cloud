@@ -8,8 +8,6 @@ import {
     type PatternObjectInstanceType,
     type PatternLinkType,
     type PatternPropertyAssignmentType,
-    type WhereClauseType,
-    type PatternVariableType,
     type PatternObjectInstanceReferenceType,
     type PatternObjectInstanceDeleteType,
     PatternObjectInstance,
@@ -133,8 +131,6 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         }
     }
 
-    /**
-     * Creates a match node with its pattern elements.
     /**
      * Creates a match node with its pattern elements.
      *
@@ -309,11 +305,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     }
 
     /**
-     * Creates a referenced instance node (instance from previous match).
+     * Creates a referenced instance node (instance from a previous match that is re-used here).
      *
-     * @param parent The parent node (match node)
-     * @param instanceName The name of the referenced instance
-     * @param matchNodeId The ID of the containing match node
+     * @param parent        The parent match node to add the child to.
+     * @param instanceName  The name of the referenced instance.
+     * @param matchName     The name of the match that originally declared the instance.
+     * @param reference     The `PatternObjectInstanceReference` AST node, or `undefined` if unresolved.
+     * @param idRegistry    The model ID registry used to obtain the element's graph ID.
      */
     private createReferencedInstanceNode(
         parent: GMatchNode,
@@ -472,7 +470,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             const valueText = prop.value?.$cstNode?.text ?? "?";
             const propText = `${propName} ${operator} ${valueText}`;
 
-            const label = GPatternPropertyLabel.builder().id(`${propId}#label`).text(propText).build();
+            const label = GPatternPropertyLabel.builder().id(propId).text(propText).build();
 
             compartment.children.push(label);
         }
@@ -505,10 +503,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const whereClauseLabels: GModelElement[] = [];
         for (const element of elements) {
             if (this.reflection.isInstance(element, WhereClause)) {
-                const where = element as WhereClauseType;
-                const whereId = idRegistry.getId(where);
-                const exprText = where.expression?.$cstNode?.text ?? "?";
-                const label = GWhereClauseLabel.builder().id(`${whereId}#label`).text(`where ${exprText}`).build();
+                const whereId = idRegistry.getId(element);
+                const exprText = element.expression?.$cstNode?.text ?? "?";
+                const label = GWhereClauseLabel.builder().id(whereId).text(`where ${exprText}`).build();
                 whereClauseLabels.push(label);
             }
         }
@@ -516,22 +513,21 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const variableLabels: GModelElement[] = [];
         for (const element of elements) {
             if (this.reflection.isInstance(element, PatternVariable)) {
-                const variable = element as PatternVariableType;
-                const varId = idRegistry.getId(variable);
-                const name = variable.name ?? "?";
+                const varId = idRegistry.getId(element);
+                const name = element.name ?? "?";
                 const serializedName = this.modelState.languageServices.AstSerializer.serializePrimitive(
                     { value: name },
                     ID
                 );
-                const typeText = variable.type?.$cstNode?.text;
-                const valueText = variable.value?.$cstNode?.text ?? "?";
+                const typeText = element.type?.$cstNode?.text;
+                const valueText = element.value?.$cstNode?.text ?? "?";
                 let varText = `var ${serializedName}`;
                 if (typeText != undefined) {
                     varText += `: ${typeText}`;
                 }
                 varText += ` = ${valueText}`;
 
-                const label = GVariableLabel.builder().id(`${varId}#label`).text(varText).build();
+                const label = GVariableLabel.builder().id(varId).text(varText).build();
                 variableLabels.push(label);
             }
         }
@@ -682,8 +678,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * Resolves the node ID for a pattern instance from its AST node reference.
      *
      * @param instanceRef The pattern object instance AST node
-     * @param matchNodeId The current match node ID
-     * @param idRegistry The model ID registry
+     * @param idRegistry  The model ID registry
      * @returns The resolved node ID or undefined
      */
     private resolveInstanceNodeId(

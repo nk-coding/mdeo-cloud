@@ -51,7 +51,7 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 "flex-col": true,
                 "gap-2": true,
                 "w-[calc(var(--editor-spacing)*68-2px)]": context.isOpen,
-                "h-[50vh]": context.isOpen,
+                "h-[50vh]": context.isOpen && context.isBottomPanelOpen,
                 "w-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
                 "h-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
                 "mb-2": !context.isOpen,

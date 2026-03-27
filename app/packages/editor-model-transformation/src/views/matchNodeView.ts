@@ -20,7 +20,21 @@ export class GMatchNodeView extends GNodeViewBase {
      */
     static readonly MIN_CONTENT_SIZE = 80;
 
+    /**
+     * Renders the match node as an SVG group containing:
+     * - Background control elements (selection rect, resize handles)
+     * - Double-border outlines (single or double, for `multiple` patterns)
+     * - Pattern instance children translated into the inner area
+     * - The container compartment area below the pattern area
+     * - Foreground control elements and issue-marker badges
+     *
+     * @param model   The match-node model element to render.
+     * @param context The current rendering context.
+     * @returns An SVG `<g>` VNode for the complete match-node visual, or `undefined`
+     *   if the element should not be rendered.
+     */
     override render(model: Readonly<GMatchNode>, context: RenderingContext): VNode | undefined {
+        const { markers } = this.splitChildren(model);
         const { innerChildren, containerNode, innerChildrenBounds, innerChildrenTranslation } = model.getRenderInfo();
 
         const patternContentRight = innerChildrenBounds.width + GMatchNodeView.INNER_PADDING * 2;
@@ -60,10 +74,20 @@ export class GMatchNodeView extends GNodeViewBase {
             ...outlines,
             innerGroup,
             ...bottomVNodes,
-            ...this.renderForegroundControlElements(model)
+            ...this.renderForegroundControlElements(model),
+            ...this.renderIssueMarkers(markers, model, context)
         );
     }
 
+    /**
+     * Renders a single rounded-border outline rectangle as an HTML `<div>` inside a
+     * foreignObject, used as the visual frame of the match node (or one of its
+     * shadow copies for `multiple` patterns).
+     *
+     * @param width  Width of the outline in CSS pixels.
+     * @param height Height of the outline in CSS pixels.
+     * @returns A VNode representing the styled outline `<div>`.
+     */
     private renderOutlineDiv(width: number, height: number): VNode {
         return html("div", {
             class: {
@@ -80,6 +104,16 @@ export class GMatchNodeView extends GNodeViewBase {
         });
     }
 
+    /**
+     * Builds the SVG `<foreignObject>` nodes that form the visible border(s) of the
+     * match node.  When `isMultiple` is `true`, a second shadow outline is rendered
+     * offset by {@link SHADOW_OFFSET} pixels to indicate a multi-match pattern.
+     *
+     * @param width      Total width of the node content area in CSS pixels.
+     * @param height     Total height of the node content area in CSS pixels.
+     * @param isMultiple Whether to render a shadow duplicate outline.
+     * @returns An array of SVG foreignObject VNodes (one or two).
+     */
     private renderOutlines(width: number, height: number, isMultiple: boolean): VNode[] {
         const SHADOW_OFFSET = 8;
 
@@ -139,6 +173,19 @@ export class GMatchNodeView extends GNodeViewBase {
         ];
     }
 
+    /**
+     * Renders the container compartment area below the pattern content area.
+     *
+     * The compartment is wrapped in an absolutely positioned `<foreignObject>` so
+     * that its HTML content can overflow outside the node's 0-baseline if its bounds
+     * are not yet known.  Returns an empty array when `containerNode` is `undefined`.
+     *
+     * @param containerNode The compartment model element, or `undefined` when absent.
+     * @param context       The current rendering context.
+     * @param totalWidth    Full pixel width of the node (for the foreignObject).
+     * @param yOffset       Y-coordinate at which the container area begins (= end of pattern area).
+     * @returns An array of SVG `<foreignObject>` VNodes (zero or one element).
+     */
     private renderContainerArea(
         containerNode: GMatchNodeCompartments | undefined,
         context: RenderingContext,

@@ -214,7 +214,7 @@ export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
         const propName = this.modelState.languageServices.AstSerializer.serializePrimitive({ value: rawPropName }, ID);
         const valueStr = this.formatPropertyValue(prop);
 
-        return GPropertyLabel.builder().id(`${propId}#label`).text(`${propName} = ${valueStr}`).build();
+        return GPropertyLabel.builder().id(propId).text(`${propName} = ${valueStr}`).build();
     }
 
     /**

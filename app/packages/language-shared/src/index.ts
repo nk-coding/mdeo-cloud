@@ -28,6 +28,7 @@ export * from "./diagram-server/model/node.js";
 export * from "./diagram-server/model/rectangularNode.js";
 export * from "./diagram-server/model/verticalDivider.js";
 export * from "./diagram-server/baseDiagramModule.js";
+export * from "./diagram-server/langiumModelValidator.js";
 export * from "./diagram-server/baseGModelFactory.js";
 export * from "./diagram-server/baseLabelEditValidator.js";
 export * from "./diagram-server/baseToolPaletteItemProvider.js";

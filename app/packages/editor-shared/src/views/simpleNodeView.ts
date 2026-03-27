@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode, VNodeStyle } from "snabbdom";
 import { sharedImport } from "../sharedImport.js";
 import type { GNode } from "../model/node.js";
@@ -13,7 +13,11 @@ const { html, ATTR_BBOX_ELEMENT } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export abstract class GSimpleNodeView extends GNodeView {
-    protected override renderForeignElement(model: Readonly<GNode>, context: RenderingContext): VNode {
+    protected override renderForeignElement(
+        model: Readonly<GNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode {
         const style: VNodeStyle = {};
         if (model.meta?.prefWidth != undefined) {
             style["max-width"] = `${model.meta.prefWidth}px`;
@@ -29,7 +33,7 @@ export abstract class GSimpleNodeView extends GNodeView {
                 },
                 style
             },
-            ...this.renderNodeContent(model, context)
+            ...this.renderNodeContent(model, context, children)
         );
     }
 
@@ -57,7 +61,11 @@ export abstract class GSimpleNodeView extends GNodeView {
      * @param context The rendering context
      * @returns An array of VNodes representing the content of the node
      */
-    protected renderNodeContent(model: Readonly<GNode>, context: RenderingContext): VNode[] {
-        return context.renderChildren(model);
+    protected renderNodeContent(
+        model: Readonly<GNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode[] {
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 }

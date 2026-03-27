@@ -467,11 +467,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const entryId = readonly ? idRegistry.getIdOrUnresolved(entry) : idRegistry.getId(entry);
             const entryName = entry.name ?? "unnamed";
 
-            const entryLabel = GEnumEntryLabel.builder()
-                .id(`${entryId}#label`)
-                .text(entryName)
-                .readonly(readonly)
-                .build();
+            const entryLabel = GEnumEntryLabel.builder().id(entryId).text(entryName).readonly(readonly).build();
             entriesCompartment.children.push(entryLabel);
         }
 
@@ -549,7 +545,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const typeName = this.getPropertyTypeName(prop.type);
             const propText = `${propName}: ${typeName}${multiplicityStr}`;
 
-            const propLabel = GPropertyLabel.builder().id(`${propId}#label`).text(propText).readonly(readonly).build();
+            const propLabel = GPropertyLabel.builder().id(propId).text(propText).readonly(readonly).build();
             propertiesCompartment.children.push(propLabel);
         }
 

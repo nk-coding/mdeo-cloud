@@ -7,15 +7,10 @@ import type {
     SetContextActions,
     Args
 } from "@eclipse-glsp/sprotty";
+import type { Marker } from "@eclipse-glsp/protocol";
 import type MiniSearch from "minisearch";
 import { sharedImport } from "../../sharedImport.js";
-import {
-    ToolType,
-    ToolboxGroupKey,
-    type ToolDefinition,
-    type ToolboxEditEntry,
-    type ToolboxErrorState
-} from "./toolboxTypes.js";
+import { ToolType, ToolboxGroupKey, type ToolDefinition, type ToolboxEditEntry } from "./toolboxTypes.js";
 import { generateToolboxView } from "./views/toolboxView.js";
 import { enableTool } from "./tools.js";
 import { ScrollViewState } from "./views/scrollView.js";
@@ -31,6 +26,7 @@ const { ToolPalette, EnableDefaultToolsAction, EnableToolsAction, MarqueeMouseTo
     sharedImport("@eclipse-glsp/client");
 const { init, classModule, propsModule, styleModule, eventListenersModule, attributesModule } =
     sharedImport("snabbdom");
+const { SetMarkersAction } = sharedImport("@eclipse-glsp/protocol");
 const MiniSearchLib = sharedImport("minisearch");
 
 const patcher = init([classModule, propsModule, styleModule, eventListenersModule, attributesModule]);
@@ -61,7 +57,7 @@ export class Toolbox extends ToolPalette {
     public toolType: ToolType = ToolType.POINTER;
     public showPreviewFor?: string;
     public searchString: string = "";
-    public errorState?: ToolboxErrorState = undefined;
+    public markers: Marker[] = [];
     public selectedItemIndex: number = 0;
     public searchDebounceTimeout?: number;
 
@@ -72,10 +68,20 @@ export class Toolbox extends ToolPalette {
         return this.editorContext.editMode === "layoutable";
     }
 
+    /**
+     * Returns the unique DOM ID used by the GLSP framework to locate this UI extension.
+     *
+     * @returns The toolbox element ID string.
+     */
     override id(): string {
         return Toolbox.ID;
     }
 
+    /**
+     * Returns the CSS class name applied to the toolbox container element.
+     *
+     * @returns The container CSS class string.
+     */
     override containerClass(): string {
         return "toolbox-wrapper";
     }
@@ -113,10 +119,21 @@ export class Toolbox extends ToolPalette {
         // Rendering is handled by Snabbdom
     }
 
+    /**
+     * No-op override — the toolbox remains available in all edit modes, including
+     * read-only and layout-only modes.
+     *
+     * @param _newValue The new edit mode value (unused).
+     * @param _oldValue The previous edit mode value (unused).
+     */
     override editModeChanged(_newValue: string, _oldValue: string): void {
         // no action needed, toolbox available even in readonly mode
     }
 
+    /**
+     * Loads palette items from the server and shows the toolbox.
+     * Called automatically by the GLSP framework after the model is loaded.
+     */
     override async postRequestModel(): Promise<void> {
         await this.setPaletteItems();
         this.show(this.editorContext.modelRoot);
@@ -394,5 +411,30 @@ export class Toolbox extends ToolPalette {
         }
 
         this.actionDispatcher.dispatchAll(item.paletteItem.actions);
+    }
+
+    /**
+     * Routes incoming actions to the appropriate handler.
+     * Intercepts {@link SetMarkersAction} to update the error panel; all other
+     * actions are delegated to the parent implementation.
+     *
+     * @param action The action dispatched by the GLSP framework.
+     */
+    override handle(action: Action): void {
+        if (SetMarkersAction.is(action)) {
+            this.handleSetMarkers(action);
+            return;
+        }
+        super.handle(action);
+    }
+
+    /**
+     * Handles incoming marker updates by replacing the current markers and refreshing the UI.
+     *
+     * @param action The SetMarkersAction containing the new markers
+     */
+    protected handleSetMarkers(action: { markers: Marker[] }): void {
+        this.markers = action.markers;
+        this.update();
     }
 }

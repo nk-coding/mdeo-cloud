@@ -174,7 +174,7 @@ export class GeneratedModelGModelFactory extends BaseGModelFactory<PartialGenera
         propValue: ModelDataPropertyValue | ModelDataPropertyValue[]
     ): GPropertyLabel {
         const valueStr = this.formatPropertyValue(propValue);
-        return GPropertyLabel.builder().id(`${propId}#label`).text(`${propName} = ${valueStr}`).build();
+        return GPropertyLabel.builder().id(propId).text(`${propName} = ${valueStr}`).build();
     }
 
     /**
@@ -310,7 +310,14 @@ export class GeneratedModelGModelFactory extends BaseGModelFactory<PartialGenera
     }
 
     /**
-     * Creates nodes for a link endpoint with property name.
+     * Creates the GModel nodes that represent a link endpoint (source or target side)
+     * with its associated property-name label.
+     *
+     * @param edgeId            ID of the parent edge element.
+     * @param property          The property name to display on the endpoint label.
+     * @param end               Whether this is the `"source"` or `"target"` end.
+     * @param validatedMetadata Current validated layout metadata for position lookup.
+     * @returns An array of GModel elements representing the endpoint node and its label.
      */
     private createLinkEndNodes(
         edgeId: string,

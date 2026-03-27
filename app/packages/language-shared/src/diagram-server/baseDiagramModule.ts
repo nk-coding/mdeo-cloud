@@ -6,7 +6,8 @@ import type {
     InstanceMultiBinding,
     MultiBinding,
     OperationHandlerConstructor,
-    ActionHandlerConstructor
+    ActionHandlerConstructor,
+    ModelValidator as ModelValidatorType
 } from "@eclipse-glsp/server";
 import { sharedImport } from "../sharedImport.js";
 import { ModelState } from "./modelState.js";
@@ -30,6 +31,7 @@ import { ResetLayoutOperationHandler } from "./handler/resetLayoutOperationHandl
 import { RequestCreateEdgeSchemaActionHandler } from "./handler/requestCreateEdgeSchemaActionHandler.js";
 import { CreateEdgeSchemaResolver } from "./createEdgeSchemaResolver.js";
 import { DefaultContextActionsProvider } from "../context-actions/defaultContextActionsProvider.js";
+import { LangiumModelValidator } from "./langiumModelValidator.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =
@@ -54,6 +56,17 @@ export abstract class BaseDiagramModule extends DiagramModule {
         super();
     }
 
+    /**
+     * Extends the base GLSP container configuration with Langium-specific bindings:
+     * language services, AST reflection, model ID provider, metadata manager,
+     * layout engine, create-edge schema resolver, and any additional bindings
+     * supplied by {@link configureAdditional}.
+     *
+     * @param bind   Inversify `bind` function.
+     * @param unbind Inversify `unbind` function.
+     * @param isBound Inversify `isBound` function.
+     * @param rebind Inversify `rebind` function.
+     */
     protected override configure(
         bind: interfaces.Bind,
         unbind: interfaces.Unbind,
@@ -71,11 +84,23 @@ export abstract class BaseDiagramModule extends DiagramModule {
         this.configureAdditional(context);
     }
 
+    /**
+     * Registers {@link DefaultContextActionsProvider} in addition to the providers
+     * configured by the base class.
+     *
+     * @param binding The multi-binding used to register context-action providers.
+     */
     protected override configureContextActionProviders(binding: MultiBinding<ContextActionsProvider>): void {
         super.configureContextActionProviders(binding);
         binding.add(DefaultContextActionsProvider);
     }
 
+    /**
+     * Registers {@link RequestCreateEdgeSchemaActionHandler} in addition to the
+     * handlers configured by the base class.
+     *
+     * @param binding The instance multi-binding used to register action handlers.
+     */
     protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
         super.configureActionHandlers(binding);
         binding.add(RequestCreateEdgeSchemaActionHandler);
@@ -88,26 +113,67 @@ export abstract class BaseDiagramModule extends DiagramModule {
      */
     protected configureAdditional(_context: BindingContext): void {}
 
+    /**
+     * Binds {@link ModelState} as the GLSP model state implementation.
+     *
+     * @returns The binding target for {@link ModelState}.
+     */
     protected override bindModelState(): BindingTarget<ModelState> {
         return ModelState;
     }
 
+    /**
+     * Binds {@link GModelIndex} as the GLSP GModel index implementation.
+     *
+     * @returns The binding target for {@link GModelIndex}.
+     */
     protected override bindGModelIndex(): BindingTarget<GModelIndex> {
         return GModelIndex;
     }
 
+    /**
+     * Binds {@link SourceModelStorage} as the GLSP source model storage implementation.
+     *
+     * @returns The binding target for {@link SourceModelStorage}.
+     */
     protected override bindSourceModelStorage(): BindingTarget<SourceModelStorage> {
         return SourceModelStorage;
     }
 
+    /**
+     * Binds {@link ExtendedContextEditValidatorRegistry} as the context-edit validator registry.
+     *
+     * @returns The binding target for the {@link ContextEditValidatorRegistry}.
+     */
     protected override bindContextEditValidatorRegistry(): BindingTarget<ContextEditValidatorRegistry> {
         return ExtendedContextEditValidatorRegistry;
     }
 
+    /**
+     * Binds {@link LangiumModelValidator} as the GLSP model validator implementation.
+     *
+     * @returns The binding target for the {@link ModelValidatorType}.
+     */
+    protected override bindModelValidator(): BindingTarget<ModelValidatorType> {
+        return LangiumModelValidator;
+    }
+
+    /**
+     * Binds {@link ModelSubmissionHandler} as the GLSP model submission handler.
+     *
+     * @returns The binding target for the {@link ModelSubmissionHandler}.
+     */
     protected override bindModelSubmissionHandler(): BindingTarget<ModelSubmissionHandler> {
         return ModelSubmissionHandler;
     }
 
+    /**
+     * Registers the standard set of operation handlers: layout, reset-layout,
+     * change-bounds, partial change-bounds, trigger-action, and
+     * update-routing-information handlers.
+     *
+     * @param binding The instance multi-binding used to register operation handlers.
+     */
     protected override configureOperationHandlers(binding: InstanceMultiBinding<OperationHandlerConstructor>): void {
         binding.add(CompoundOperationHandler);
         binding.add(UpdateClientOperationHandler);
@@ -141,7 +207,10 @@ export abstract class BaseDiagramModule extends DiagramModule {
     protected abstract bindCustomLayoutEngine(): BindingTarget<BaseLayoutEngine>;
 
     /**
-     * Binds the backend create-edge schema resolver.
+     * Binds the backend create-edge schema resolver used to supply edge type
+     * options to the client.
+     *
+     * @returns The binding target for the {@link CreateEdgeSchemaResolver}.
      */
     protected abstract bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver>;
 }

@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 import type { GEndNode } from "../model/endNode.js";
@@ -33,7 +33,11 @@ export class GEndNodeView extends GNodeView {
      * @param _context The rendering context
      * @returns The rendered VNode
      */
-    protected override renderForeignElement(model: Readonly<GNode>, _context: RenderingContext): VNode {
+    protected override renderForeignElement(
+        model: Readonly<GNode>,
+        _context: RenderingContext,
+        _children: readonly GModelElement[]
+    ): VNode {
         const endModel = model as GEndNode;
         return endModel.kind === EndNodeKind.KILL ? this.renderKillNode() : this.renderStopNode();
     }
