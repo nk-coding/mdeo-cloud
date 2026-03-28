@@ -12,7 +12,7 @@ interface WebSocketMessage {
  * Message to subscribe to a project's events
  */
 interface SubscribeMessage extends WebSocketMessage {
-    messageType: "subscribe";
+    messageType: "event/subscribe";
     projectId: string;
 }
 
@@ -20,7 +20,7 @@ interface SubscribeMessage extends WebSocketMessage {
  * Message to unsubscribe from a project's events
  */
 interface UnsubscribeMessage extends WebSocketMessage {
-    messageType: "unsubscribe";
+    messageType: "event/unsubscribe";
     projectId: string;
 }
 
@@ -28,8 +28,83 @@ interface UnsubscribeMessage extends WebSocketMessage {
  * Notification when an execution state changes
  */
 interface ExecutionStateChangedMessage extends WebSocketMessage {
-    messageType: "executionStateChanged";
+    messageType: "event/executionStateChanged";
     execution: Execution;
+}
+
+/**
+ * Request to authorize file operations for a project via WebSocket.
+ */
+interface SubscribeFilesMessage extends WebSocketMessage {
+    messageType: "file/subscribeFiles";
+    requestId: string;
+    projectId: string;
+}
+
+/**
+ * Request to load a full project (directory structure, file data, metadata).
+ */
+interface LoadProjectMessage extends WebSocketMessage {
+    messageType: "file/loadProject";
+    requestId: string;
+    projectId: string;
+}
+
+/**
+ * Success response for a file system request.
+ */
+interface FileResponseMessage extends WebSocketMessage {
+    messageType: "file/response";
+    requestId: string;
+    data?: unknown;
+}
+
+/**
+ * Error response for a file system request.
+ */
+interface FileErrorMessage extends WebSocketMessage {
+    messageType: "file/error";
+    requestId: string;
+    code: string;
+    message: string;
+}
+
+/**
+ * Streaming message: full directory structure of a project.
+ */
+export interface ProjectLoadDirectoryStructureMessage extends WebSocketMessage {
+    messageType: "file/projectLoadDirectoryStructure";
+    requestId: string;
+    entries: Array<{ path: string; type: number }>;
+}
+
+/**
+ * Streaming message: single file's content and version.
+ */
+export interface ProjectLoadFileDataMessage extends WebSocketMessage {
+    messageType: "file/projectLoadFileData";
+    requestId: string;
+    path: string;
+    content: string;
+    version: number;
+}
+
+/**
+ * Streaming message: single file's metadata.
+ */
+export interface ProjectLoadFileMetadataMessage extends WebSocketMessage {
+    messageType: "file/projectLoadFileMetadata";
+    requestId: string;
+    path: string;
+    metadata: object;
+}
+
+/**
+ * Marker message: project load stream is complete.
+ */
+interface ProjectLoadCompleteMessage extends WebSocketMessage {
+    messageType: "file/projectLoadComplete";
+    requestId: string;
 }
 
 /**
@@ -41,6 +116,26 @@ export type ConnectionState = "disconnected" | "connecting" | "connected";
  * Callback function for execution state changes
  */
 export type ExecutionStateChangeCallback = (execution: Execution) => void;
+
+/**
+ * Callback for streaming project load events
+ */
+export interface ProjectLoadCallbacks {
+    /** Called once with the full directory structure */
+    onDirectoryStructure: (entries: Array<{ path: string; type: number }>) => void;
+    /** Called once per file with its content and version */
+    onFileData: (path: string, content: string, version: number) => void;
+    /** Called once per file with its metadata */
+    onFileMetadata: (path: string, metadata: object) => void;
+}
+
+/**
+ * Pending request awaiting a response
+ */
+interface PendingRequest {
+    resolve: (data: unknown) => void;
+    reject: (error: { code: string; message: string }) => void;
+}
 
 /**
  * Configuration options for WebSocketApi
@@ -65,8 +160,10 @@ export interface WebSocketApiOptions {
 }
 
 /**
- * API for managing WebSocket connections for real-time notifications.
- * Handles connection establishment, automatic reconnection, and project subscriptions.
+ * API for managing WebSocket connections for real-time notifications
+ * and file system operations.
+ * Handles connection establishment, automatic reconnection, project subscriptions,
+ * and request/response-based file operations.
  */
 export class WebSocketApi {
     private socket: WebSocket | null = null;
@@ -80,6 +177,12 @@ export class WebSocketApi {
     private readonly showNotifications: boolean;
     private readonly wsUrl: string;
     private readonly executionStates: Map<string, string> = new Map();
+    private readonly pendingRequests: Map<string, PendingRequest> = new Map();
+    private readonly pendingProjectLoads: Map<string, ProjectLoadCallbacks> = new Map();
+    private requestIdCounter = 0;
+    /** Resolves once the socket is open; replaced on each connect(). */
+    private connectedPromise: Promise<void> = Promise.resolve();
+    private connectedResolve: (() => void) | null = null;
 
     /**
      * Creates a new WebSocketApi instance
@@ -148,6 +251,9 @@ export class WebSocketApi {
 
         this.connectionState = "connecting";
         this.currentProjectId = projectId ?? null;
+        this.connectedPromise = new Promise<void>((resolve) => {
+            this.connectedResolve = resolve;
+        });
 
         this.socket = new WebSocket(this.wsUrl);
         this.setupSocketEventHandlers();
@@ -168,11 +274,17 @@ export class WebSocketApi {
     }
 
     /**
-     * Handles successful WebSocket connection
+     * Handles successful WebSocket connection.
+     * Resolves the connected promise and subscribes to the current project if set.
      */
     private handleOpen(): void {
         this.connectionState = "connected";
         this.reconnectAttempts = 0;
+
+        if (this.connectedResolve) {
+            this.connectedResolve();
+            this.connectedResolve = null;
+        }
 
         if (this.currentProjectId) {
             this.subscribeToProject(this.currentProjectId);
@@ -196,8 +308,26 @@ export class WebSocketApi {
      */
     private routeMessage(message: WebSocketMessage): void {
         switch (message.messageType) {
-            case "executionStateChanged":
+            case "event/executionStateChanged":
                 this.handleExecutionStateChanged(message as ExecutionStateChangedMessage);
+                break;
+            case "file/response":
+                this.handleFileResponse(message as FileResponseMessage);
+                break;
+            case "file/error":
+                this.handleFileError(message as FileErrorMessage);
+                break;
+            case "file/projectLoadDirectoryStructure":
+                this.handleProjectLoadDirectoryStructure(message as ProjectLoadDirectoryStructureMessage);
+                break;
+            case "file/projectLoadFileData":
+                this.handleProjectLoadFileData(message as ProjectLoadFileDataMessage);
+                break;
+            case "file/projectLoadFileMetadata":
+                this.handleProjectLoadFileMetadata(message as ProjectLoadFileMetadataMessage);
+                break;
+            case "file/projectLoadComplete":
+                this.handleProjectLoadComplete(message as ProjectLoadCompleteMessage);
                 break;
             default:
                 throw new Error(`Unknown WebSocket message type: ${message.messageType}`);
@@ -298,13 +428,21 @@ export class WebSocketApi {
     }
 
     /**
-     * Handles WebSocket connection close
+     * Handles WebSocket connection close.
+     * Rejects all pending requests and schedules reconnect if appropriate.
      *
      * @param event The close event
      */
     private handleClose(event: CloseEvent): void {
         this.connectionState = "disconnected";
         this.socket = null;
+
+        // Reject all pending requests
+        for (const [, pending] of this.pendingRequests) {
+            pending.reject({ code: "Unavailable", message: "WebSocket connection closed" });
+        }
+        this.pendingRequests.clear();
+        this.pendingProjectLoads.clear();
 
         if (!event.wasClean && this.currentProjectId) {
             this.scheduleReconnect();
@@ -374,7 +512,7 @@ export class WebSocketApi {
      */
     private sendSubscribeMessage(projectId: string): void {
         const message: SubscribeMessage = {
-            messageType: "subscribe",
+            messageType: "event/subscribe",
             projectId
         };
         this.sendMessage(message);
@@ -391,7 +529,7 @@ export class WebSocketApi {
         }
 
         const message: UnsubscribeMessage = {
-            messageType: "unsubscribe",
+            messageType: "event/unsubscribe",
             projectId
         };
         this.sendMessage(message);
@@ -415,7 +553,354 @@ export class WebSocketApi {
     }
 
     /**
-     * Disconnects the WebSocket connection
+     * Handles a success response for a file system request.
+     *
+     * @param message The file response message
+     */
+    private handleFileResponse(message: FileResponseMessage): void {
+        const pending = this.pendingRequests.get(message.requestId);
+        if (pending) {
+            this.pendingRequests.delete(message.requestId);
+            pending.resolve(message.data);
+        }
+    }
+
+    /**
+     * Handles an error response for a file system request.
+     *
+     * @param message The file error message
+     */
+    private handleFileError(message: FileErrorMessage): void {
+        const pending = this.pendingRequests.get(message.requestId);
+        if (pending) {
+            this.pendingRequests.delete(message.requestId);
+            pending.reject({ code: message.code, message: message.message });
+        }
+    }
+
+    /**
+     * Handles the directory structure part of a project load stream.
+     *
+     * @param message The directory structure message
+     */
+    private handleProjectLoadDirectoryStructure(message: ProjectLoadDirectoryStructureMessage): void {
+        const callbacks = this.pendingProjectLoads.get(message.requestId);
+        if (callbacks) {
+            callbacks.onDirectoryStructure(message.entries);
+        }
+    }
+
+    /**
+     * Handles a file data part of a project load stream.
+     *
+     * @param message The file data message
+     */
+    private handleProjectLoadFileData(message: ProjectLoadFileDataMessage): void {
+        const callbacks = this.pendingProjectLoads.get(message.requestId);
+        if (callbacks) {
+            callbacks.onFileData(message.path, message.content, message.version);
+        }
+    }
+
+    /**
+     * Handles a file metadata part of a project load stream.
+     *
+     * @param message The file metadata message
+     */
+    private handleProjectLoadFileMetadata(message: ProjectLoadFileMetadataMessage): void {
+        const callbacks = this.pendingProjectLoads.get(message.requestId);
+        if (callbacks) {
+            callbacks.onFileMetadata(message.path, message.metadata);
+        }
+    }
+
+    /**
+     * Handles the completion marker of a project load stream.
+     * Resolves the associated pending request.
+     *
+     * @param message The project load complete message
+     */
+    private handleProjectLoadComplete(message: ProjectLoadCompleteMessage): void {
+        this.pendingProjectLoads.delete(message.requestId);
+        const pending = this.pendingRequests.get(message.requestId);
+        if (pending) {
+            this.pendingRequests.delete(message.requestId);
+            pending.resolve(undefined);
+        }
+    }
+
+    // ─── Request / Response Helpers ────────────────────────────────────
+
+    /**
+     * Generates a unique request ID for correlating requests and responses.
+     *
+     * @returns A unique request ID string
+     */
+    private nextRequestId(): string {
+        return `req-${++this.requestIdCounter}-${Date.now()}`;
+    }
+
+    /**
+     * Sends a request message and returns a promise that resolves with the response data.
+     * Waits for the WebSocket to be connected before sending.
+     *
+     * @param message The request message to send (must include messageType and requestId)
+     * @returns A promise that resolves with the response data or rejects with an error
+     */
+    private async sendRequest(message: {
+        requestId: string;
+        messageType: string;
+        [key: string]: unknown;
+    }): Promise<unknown> {
+        await this.ensureConnected();
+
+        return new Promise<unknown>((resolve, reject) => {
+            this.pendingRequests.set(message.requestId, { resolve, reject });
+            if (!this.socket || this.connectionState !== "connected") {
+                reject({ code: "Unavailable", message: "WebSocket is not connected" });
+                this.pendingRequests.delete(message.requestId);
+                return;
+            }
+            this.socket.send(JSON.stringify(message));
+        });
+    }
+
+    /**
+     * Ensures the WebSocket is connected, connecting if necessary.
+     * Returns a promise that resolves once the connection is established.
+     *
+     * @returns A promise that resolves when the WebSocket is connected
+     */
+    async ensureConnected(): Promise<void> {
+        if (this.connectionState === "connected") {
+            return;
+        }
+        if (this.connectionState !== "connecting") {
+            this.connect(this.currentProjectId ?? undefined);
+        }
+        return this.connectedPromise;
+    }
+
+    /**
+     * Authorizes file operations for a project on this WebSocket connection.
+     * The server caches the permission for approximately 5 minutes.
+     *
+     * @param projectId The project ID to authorize
+     * @returns A promise that resolves when authorization is complete
+     */
+    async subscribeFiles(projectId: string): Promise<void> {
+        const requestId = this.nextRequestId();
+        const message: SubscribeFilesMessage = {
+            messageType: "file/subscribeFiles",
+            requestId,
+            projectId
+        };
+        await this.sendRequest({ ...message });
+    }
+
+    /**
+     * Loads the full project by streaming directory structure, file data, and metadata.
+     * Invokes the provided callbacks as streaming messages arrive.
+     *
+     * @param projectId The project ID to load
+     * @param callbacks Callbacks invoked for each part of the project load stream
+     * @returns A promise that resolves when the project load is complete
+     */
+    async loadProject(projectId: string, callbacks: ProjectLoadCallbacks): Promise<void> {
+        const requestId = this.nextRequestId();
+        const message: LoadProjectMessage = {
+            messageType: "file/loadProject",
+            requestId,
+            projectId
+        };
+
+        this.pendingProjectLoads.set(requestId, callbacks);
+        await this.sendRequest({ ...message });
+    }
+
+    /**
+     * Reads a file's content and version over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The file path
+     * @returns The file content (as text) and version
+     */
+    async readFile(projectId: string, path: string): Promise<{ content: string; version: number }> {
+        const requestId = this.nextRequestId();
+        return (await this.sendRequest({
+            messageType: "file/readFile",
+            requestId,
+            projectId,
+            path
+        })) as { content: string; version: number };
+    }
+
+    /**
+     * Writes content to a file over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The file path
+     * @param contentBase64 The file content encoded as Base64
+     * @param create Whether to create the file if it doesn't exist
+     * @param overwrite Whether to overwrite if the file exists
+     */
+    async writeFile(
+        projectId: string,
+        path: string,
+        contentBase64: string,
+        create: boolean,
+        overwrite: boolean
+    ): Promise<void> {
+        const requestId = this.nextRequestId();
+        await this.sendRequest({
+            messageType: "file/writeFile",
+            requestId,
+            projectId,
+            path,
+            content: contentBase64,
+            create,
+            overwrite
+        });
+    }
+
+    /**
+     * Creates a directory over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The directory path to create
+     */
+    async mkdirWs(projectId: string, path: string): Promise<void> {
+        const requestId = this.nextRequestId();
+        await this.sendRequest({ messageType: "file/mkdir", requestId, projectId, path });
+    }
+
+    /**
+     * Reads directory contents over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The directory path
+     * @returns Array of directory entries (name, type)
+     */
+    async readdirWs(projectId: string, path: string): Promise<Array<{ name: string; type: number }>> {
+        const requestId = this.nextRequestId();
+        return (await this.sendRequest({
+            messageType: "file/readdir",
+            requestId,
+            projectId,
+            path
+        })) as Array<{ name: string; type: number }>;
+    }
+
+    /**
+     * Gets the file type (file/directory) of a path over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The path to stat
+     * @returns The FileType constant or null
+     */
+    async statWs(projectId: string, path: string): Promise<number | null> {
+        const requestId = this.nextRequestId();
+        return (await this.sendRequest({
+            messageType: "file/stat",
+            requestId,
+            projectId,
+            path
+        })) as number | null;
+    }
+
+    /**
+     * Deletes a file or directory over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The path to delete
+     * @param recursive Whether to delete recursively
+     */
+    async deleteFileWs(projectId: string, path: string, recursive: boolean): Promise<void> {
+        const requestId = this.nextRequestId();
+        await this.sendRequest({
+            messageType: "file/deleteFile",
+            requestId,
+            projectId,
+            path,
+            recursive
+        });
+    }
+
+    /**
+     * Renames/moves a file or directory over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param from The source path
+     * @param to The destination path
+     * @param overwrite Whether to overwrite the destination
+     */
+    async renameWs(projectId: string, from: string, to: string, overwrite: boolean): Promise<void> {
+        const requestId = this.nextRequestId();
+        await this.sendRequest({
+            messageType: "file/rename",
+            requestId,
+            projectId,
+            from,
+            to,
+            overwrite
+        });
+    }
+
+    /**
+     * Gets the version of a file over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The file path
+     * @returns The file version number
+     */
+    async getFileVersionWs(projectId: string, path: string): Promise<number> {
+        const requestId = this.nextRequestId();
+        return (await this.sendRequest({
+            messageType: "file/getFileVersion",
+            requestId,
+            projectId,
+            path
+        })) as number;
+    }
+
+    /**
+     * Reads metadata for a file over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The file path
+     * @returns The metadata object
+     */
+    async readMetadataWs(projectId: string, path: string): Promise<object> {
+        const requestId = this.nextRequestId();
+        return (await this.sendRequest({
+            messageType: "file/readMetadata",
+            requestId,
+            projectId,
+            path
+        })) as object;
+    }
+
+    /**
+     * Writes metadata for a file over WebSocket.
+     *
+     * @param projectId The project ID
+     * @param path The file path
+     * @param metadata The metadata object to write
+     */
+    async writeMetadataWs(projectId: string, path: string, metadata: object): Promise<void> {
+        const requestId = this.nextRequestId();
+        await this.sendRequest({
+            messageType: "file/writeMetadata",
+            requestId,
+            projectId,
+            path,
+            metadata
+        });
+    }
+
+    /**
+     * Disconnects the WebSocket connection.
+     * Cancels pending reconnect, rejects pending requests, and closes the socket.
      */
     disconnect(): void {
         if (this.reconnectTimeoutId) {
@@ -424,6 +909,12 @@ export class WebSocketApi {
         }
 
         this.currentProjectId = null;
+
+        for (const [, pending] of this.pendingRequests) {
+            pending.reject({ code: "Unavailable", message: "WebSocket disconnected" });
+        }
+        this.pendingRequests.clear();
+        this.pendingProjectLoads.clear();
 
         if (this.socket) {
             this.socket.close();

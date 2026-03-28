@@ -110,7 +110,12 @@ fun Application.module(appConfig: AppConfig) {
         }
         
         authenticate(AUTH_SESSION) {
-            webSocketRoutes(services.webSocketNotificationService, services.projectService)
+            webSocketRoutes(
+                services.webSocketNotificationService,
+                services.projectService,
+                services.fileService,
+                services.metadataService
+            )
             projectRoutes(services.projectService)
             metadataRoutes(services.metadataService, services.projectService)
             pluginRoutes(services.pluginService, services.projectService)

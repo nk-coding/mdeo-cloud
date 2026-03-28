@@ -2,11 +2,7 @@ package com.mdeo.backend.routes
 
 import com.mdeo.backend.plugins.getUserSession
 import com.mdeo.backend.plugins.isAdmin
-import com.mdeo.backend.service.ProjectPermission
-import com.mdeo.backend.service.ProjectService
-import com.mdeo.backend.service.SubscribeMessage
-import com.mdeo.backend.service.UnsubscribeMessage
-import com.mdeo.backend.service.WebSocketNotificationService
+import com.mdeo.backend.service.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -17,15 +13,19 @@ import java.util.*
 private val logger = LoggerFactory.getLogger("WebSocketRoutes")
 
 /**
- * Configures WebSocket routes for real-time notifications.
+ * Configures WebSocket routes for real-time notifications and file system operations.
  * Requires session authentication to establish a connection.
  *
  * @param webSocketService Service for managing WebSocket connections
  * @param projectService Service for validating project access
+ * @param fileService Service for file CRUD operations
+ * @param metadataService Service for file metadata operations
  */
 fun Route.webSocketRoutes(
     webSocketService: WebSocketNotificationService,
-    projectService: ProjectService
+    projectService: ProjectService,
+    fileService: FileService,
+    metadataService: MetadataService
 ) {
     webSocket("/api/ws") {
         val session = call.getUserSession()
@@ -41,6 +41,8 @@ fun Route.webSocketRoutes(
             isGlobalAdmin = call.isAdmin(),
             webSocketService = webSocketService,
             projectService = projectService,
+            fileService = fileService,
+            metadataService = metadataService,
             session = this
         )
         
@@ -50,13 +52,16 @@ fun Route.webSocketRoutes(
 
 /**
  * Handler for processing WebSocket messages for a single connection.
- * Manages the connection lifecycle and message processing.
+ * Manages the connection lifecycle, message processing, and delegates
+ * file system operations to [WebSocketFileHandler].
  *
  * @property connectionId Unique identifier for this connection
  * @property userId The authenticated user's ID
  * @property isGlobalAdmin Whether the user has global admin permission
  * @property webSocketService Service for managing subscriptions
  * @property projectService Service for validating project access
+ * @property fileService Service for file CRUD operations
+ * @property metadataService Service for file metadata operations
  * @property session The WebSocket session
  */
 private class WebSocketMessageHandler(
@@ -65,9 +70,20 @@ private class WebSocketMessageHandler(
     private val isGlobalAdmin: Boolean,
     private val webSocketService: WebSocketNotificationService,
     private val projectService: ProjectService,
+    private val fileService: FileService,
+    private val metadataService: MetadataService,
     private val session: DefaultWebSocketServerSession
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val fileHandler = WebSocketFileHandler(
+        connectionId = connectionId,
+        userId = userId,
+        isGlobalAdmin = isGlobalAdmin,
+        fileService = fileService,
+        metadataService = metadataService,
+        projectService = projectService,
+        webSocketService = webSocketService
+    )
     
     /**
      * Main connection handler loop.
@@ -120,8 +136,20 @@ private class WebSocketMessageHandler(
         val type = jsonElement.jsonObject["messageType"]?.jsonPrimitive?.content
         
         when (type) {
-            "subscribe" -> handleSubscribe(jsonElement)
-            "unsubscribe" -> handleUnsubscribe(jsonElement)
+            "event/subscribe" -> handleSubscribe(jsonElement)
+            "event/unsubscribe" -> handleUnsubscribe(jsonElement)
+            "file/subscribeFiles" -> fileHandler.handleSubscribeFiles(json.decodeFromJsonElement(jsonElement))
+            "file/loadProject" -> fileHandler.handleLoadProject(json.decodeFromJsonElement(jsonElement))
+            "file/readFile" -> fileHandler.handleReadFile(json.decodeFromJsonElement(jsonElement))
+            "file/writeFile" -> fileHandler.handleWriteFile(json.decodeFromJsonElement(jsonElement))
+            "file/mkdir" -> fileHandler.handleMkdir(json.decodeFromJsonElement(jsonElement))
+            "file/readdir" -> fileHandler.handleReaddir(json.decodeFromJsonElement(jsonElement))
+            "file/stat" -> fileHandler.handleStat(json.decodeFromJsonElement(jsonElement))
+            "file/deleteFile" -> fileHandler.handleDelete(json.decodeFromJsonElement(jsonElement))
+            "file/rename" -> fileHandler.handleRename(json.decodeFromJsonElement(jsonElement))
+            "file/getFileVersion" -> fileHandler.handleGetFileVersion(json.decodeFromJsonElement(jsonElement))
+            "file/readMetadata" -> fileHandler.handleReadMetadata(json.decodeFromJsonElement(jsonElement))
+            "file/writeMetadata" -> fileHandler.handleWriteMetadata(json.decodeFromJsonElement(jsonElement))
             else -> logger.warn("Unknown message type: $type")
         }
     }

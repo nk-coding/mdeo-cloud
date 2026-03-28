@@ -2,7 +2,7 @@ import { ApiResult, CommonErrorCode } from "./apiResult";
 import { AuthApi } from "./areas/authApi";
 import { UsersApi } from "./areas/usersApi";
 import { ProjectsApi } from "./areas/rojectsApi";
-import { FilesApi } from "./areas/filesApi";
+import { WsFilesApi } from "./areas/wsFilesApi";
 import { PluginsApi } from "./areas/pluginsApi";
 import { ExecutionsApi } from "./areas/executionsApi";
 import { FileDataApi } from "./areas/fileDataApi";
@@ -10,7 +10,7 @@ import { WebSocketApi } from "./areas/webSocketApi";
 
 export type { User } from "./areas/authApi";
 export type { ProjectUserInfo, UserProjectMembership } from "./areas/rojectsApi";
-export type { FileReadResult } from "./areas/filesApi";
+export type { FileReadResult } from "./areas/wsFilesApi";
 
 /**
  * Interface for the core backend API functionality shared with area APIs.
@@ -71,9 +71,9 @@ export class BackendApi implements BackendApiCore {
     readonly projects: ProjectsApi;
 
     /**
-     * File system operations (read, write, delete, rename, etc.)
+     * File system operations (read, write, delete, rename, etc.) via WebSocket
      */
-    readonly files: FilesApi;
+    readonly files: WsFilesApi;
 
     /**
      * Plugin management operations (create, delete, refresh, project association)
@@ -104,11 +104,11 @@ export class BackendApi implements BackendApiCore {
         this.auth = new AuthApi(this);
         this.users = new UsersApi(this);
         this.projects = new ProjectsApi(this);
-        this.files = new FilesApi(this);
+        this.websocket = new WebSocketApi({ baseUrl });
+        this.files = new WsFilesApi(this.websocket);
         this.plugins = new PluginsApi(this);
         this.executions = new ExecutionsApi(this);
         this.fileData = new FileDataApi(this);
-        this.websocket = new WebSocketApi({ baseUrl });
     }
 
     /**

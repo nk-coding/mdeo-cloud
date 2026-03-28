@@ -279,6 +279,22 @@ class FileService(services: InjectedServices) : BaseService(), InjectedServices 
             success(row[FilesTable.version])
         }
     }
+
+    /**
+     * Returns all file and directory entries for a project as a flat list of (path, type) pairs.
+     * Used for the bulk project load over WebSocket.
+     *
+     * @param projectId The UUID of the project
+     * @return List of (path, fileType) pairs for every entry in the project
+     */
+    fun getAllEntries(projectId: UUID): List<Pair<String, Int>> {
+        return transaction {
+            FilesTable
+                .select(FilesTable.path, FilesTable.fileType)
+                .where { FilesTable.projectId eq projectId.toKotlinUuid() }
+                .map { row -> row[FilesTable.path] to row[FilesTable.fileType] }
+        }
+    }
     
     /**
      * Deletes a file or directory.
