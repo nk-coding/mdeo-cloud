@@ -1,6 +1,6 @@
 package com.mdeo.optimizer.worker
 
-import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.SerializedModel
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -84,15 +84,35 @@ data class SolutionFetchRequest(
 ) : WorkerWsMessage()
 
 /**
- * Worker → Orchestrator: model data for the requested solution.
+ * Orchestrator → Worker: retrieve model data for multiple solutions in one request.
  *
- * @param requestId Matches [SolutionFetchRequest.requestId].
- * @param modelData Serialized model graph for the solution.
+ * Batches several solution IDs into a single message to reduce round-trip overhead
+ * during rebalancing. The worker responds with one [SolutionFetchResponse] per
+ * requested solution, all sharing the same [requestId].
+ *
+ * @param requestId Correlation identifier echoed in each [SolutionFetchResponse].
+ * @param solutionIds Identifiers of the solutions whose model data is requested.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+@SerialName("solution_batch_fetch_request")
+data class SolutionBatchFetchRequest(
+    override val requestId: String,
+    val solutionIds: List<String>
+) : WorkerWsMessage()
+
+/**
+ * Worker → Orchestrator: serialized model for a requested solution.
+ *
+ * @param requestId Matches [SolutionFetchRequest.requestId] or [SolutionBatchFetchRequest.requestId].
+ * @param solutionId The solution this response carries data for.
+ * @param serializedModel Serialized model graph for the solution.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @SerialName("solution_fetch_response")
 data class SolutionFetchResponse(
     override val requestId: String,
-    val modelData: ModelData
+    val solutionId: String,
+    val serializedModel: SerializedModel
 ) : WorkerWsMessage()

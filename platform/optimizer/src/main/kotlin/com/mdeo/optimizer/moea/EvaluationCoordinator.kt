@@ -225,8 +225,12 @@ class EvaluationCoordinator(
     }
 
     /**
-     * Pre-fetches model data for all solutions in the rebalance plan and organises the
+     * Pre-fetches serialized models for all solutions in the rebalance plan and organises the
      * results into per-destination import lists and per-source discard lists.
+     *
+     * Solutions are fetched using [MutationEvaluator.getSolutionDataBatch], which groups them
+     * by source node and issues one batched request per worker — reducing the number of
+     * round trips compared to individual fetches.
      *
      * @param rebalancePlan The transfers planned by [PopulationRebalancer].
      * @return Pair of (importsByDestNode, rebalanceDiscardsByNode).
@@ -239,20 +243,20 @@ class EvaluationCoordinator(
         val importsByDestNode = mutableMapOf<String, MutableList<SolutionImportData>>()
         val rebalanceDiscardsByNode = mutableMapOf<String, MutableList<String>>()
 
-        val fetchedData = runBlocking {
-            rebalancePlan.flatMap { transfer ->
-                transfer.solutionIds.map { solutionId ->
-                    val ref = WorkerSolutionRef(transfer.sourceNodeId, solutionId)
-                    val modelData = evaluator.getSolutionData(ref)
-                    Triple(transfer.destinationNodeId, solutionId, modelData)
-                }
+        val allRefs = rebalancePlan.flatMap { transfer ->
+            transfer.solutionIds.map { solutionId ->
+                WorkerSolutionRef(transfer.sourceNodeId, solutionId)
             }
         }
-        for ((destNodeId, solutionId, modelData) in fetchedData) {
-            importsByDestNode.getOrPut(destNodeId) { mutableListOf() }
-                .add(SolutionImportData(solutionId, modelData))
-        }
+        val fetchedModels = runBlocking { evaluator.getSolutionDataBatch(allRefs) }
+
         for (transfer in rebalancePlan) {
+            for (solutionId in transfer.solutionIds) {
+                val serializedModel = fetchedModels[solutionId]
+                    ?: error("Missing fetched model for solution $solutionId")
+                importsByDestNode.getOrPut(transfer.destinationNodeId) { mutableListOf() }
+                    .add(SolutionImportData(solutionId, serializedModel))
+            }
             rebalanceDiscardsByNode.getOrPut(transfer.sourceNodeId) { mutableListOf() }
                 .addAll(transfer.solutionIds)
         }

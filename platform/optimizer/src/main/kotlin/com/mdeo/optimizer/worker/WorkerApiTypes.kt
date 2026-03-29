@@ -1,5 +1,6 @@
 package com.mdeo.optimizer.worker
 
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.GoalConfig
@@ -93,14 +94,14 @@ data class BatchResult(
 )
 
 /**
- * A single solution with its full model data, used for rebalancing imports
+ * A single solution with its serialized model, used for rebalancing imports
  * embedded inline in a [com.mdeo.optimizer.worker.NodeWorkBatchRequest].
  *
  * @param solutionId Identifier of the solution being transferred.
- * @param modelData Serialized model graph data for reconstitution on the receiving worker.
+ * @param serializedModel Serialized model graph for reconstitution on the receiving worker.
  */
 @Serializable
 data class SolutionTransferItem(
     val solutionId: String,
-    val modelData: ModelData
+    val serializedModel: SerializedModel
 )

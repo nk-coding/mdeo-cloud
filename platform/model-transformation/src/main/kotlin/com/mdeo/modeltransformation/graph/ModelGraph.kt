@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.graph
 
 import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -93,4 +94,17 @@ interface ModelGraph : AutoCloseable {
      * @return A [com.mdeo.metamodel.Model] reflecting the current state of this graph.
      */
     fun toModel(): com.mdeo.metamodel.Model
+
+    /**
+     * Converts the current graph state to a [SerializedModel] using the most efficient
+     * backing format available for this implementation.
+     *
+     * [MdeoModelGraph] returns a [SerializedModel.AsBinary] produced by
+     * [com.mdeo.metamodel.ModelBinarySerializer] for maximum speed.
+     * [TinkerModelGraph] returns a [SerializedModel.AsModelData] wrapping
+     * the result of [toModelData].
+     *
+     * @return A [SerializedModel] representing the current graph state.
+     */
+    fun toSerializedModel(): SerializedModel
 }

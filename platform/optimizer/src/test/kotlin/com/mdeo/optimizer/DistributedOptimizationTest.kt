@@ -5,6 +5,7 @@ import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.*
 import com.mdeo.modeltransformation.ast.TypedAst as TransformationTypedAst
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
@@ -113,7 +114,7 @@ class DistributedOptimizationTest {
             }
         }
 
-        override suspend fun getSolutionData(ref: WorkerSolutionRef): ModelData {
+        override suspend fun getSolutionData(ref: WorkerSolutionRef): SerializedModel {
             val evaluator = evaluatorByNodeId[ref.nodeId]
                 ?: error("No evaluator for nodeId: ${ref.nodeId}")
             return evaluator.getSolutionData(ref)

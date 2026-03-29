@@ -2,11 +2,15 @@ package com.mdeo.modeltransformation.graph
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.Model
+import com.mdeo.metamodel.ModelBinarySerializer
+import com.mdeo.metamodel.ModelInstance
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.graph.mdeo.MdeoGraph
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import java.lang.ref.WeakReference
+import java.util.IdentityHashMap
 
 /**
  * Thin [ModelGraph] wrapper over [MdeoGraph].
@@ -71,6 +75,21 @@ class MdeoModelGraph private constructor(
         return toModel().toModelData()
     }
 
+    /**
+     * Returns a [SerializedModel.AsBinary] by serializing the backing model instances
+     * directly via [ModelBinarySerializer], avoiding the overhead of constructing
+     * intermediate [ModelData] objects.
+     */
+    override fun toSerializedModel(): SerializedModel {
+        val model = toModel()
+        val serializer = ModelBinarySerializer(metamodel)
+        val nameByInstance = IdentityHashMap<ModelInstance, String>(model.instancesByName.size)
+        for ((name, instance) in model.instancesByName) {
+            nameByInstance[instance] = name
+        }
+        return SerializedModel.AsBinary(serializer.serialize(model, nameByInstance))
+    }
+
     override fun toModel(): Model = graph.toModel(instanceNameRegistry)
 
     override fun close() {
@@ -80,12 +99,43 @@ class MdeoModelGraph private constructor(
     companion object {
         /**
          * Creates an [MdeoModelGraph] by loading [ModelData] into a fresh [MdeoGraph].
+         *
+         * @param modelData The model data to load.
+         * @param metamodel The compiled metamodel governing model structure.
+         * @return A new [MdeoModelGraph] containing the loaded model.
          */
         fun create(modelData: ModelData, metamodel: Metamodel): MdeoModelGraph {
             val model = metamodel.loadModel(modelData)
             val registry = InstanceNameRegistry()
             val graph = MdeoGraph.open(metamodel, model, registry)
             return MdeoModelGraph(graph, registry)
+        }
+
+        /**
+         * Creates an [MdeoModelGraph] from a [SerializedModel], choosing the fastest
+         * deserialization path for the backing format.
+         *
+         * For [SerializedModel.AsBinary], uses [ModelBinarySerializer] to reconstruct
+         * instances directly without going through [ModelData].
+         * For [SerializedModel.AsModelData], falls back to the standard [create] path.
+         *
+         * @param serializedModel The serialized model to load.
+         * @param metamodel The compiled metamodel governing model structure.
+         * @return A new [MdeoModelGraph] containing the deserialized model.
+         */
+        fun create(serializedModel: SerializedModel, metamodel: Metamodel): MdeoModelGraph {
+            return when (serializedModel) {
+                is SerializedModel.AsBinary -> {
+                    val serializer = ModelBinarySerializer(metamodel)
+                    val (model, nameByInstance) = serializer.deserialize(serializedModel.data)
+                    val registry = InstanceNameRegistry()
+                    val graph = MdeoGraph.open(metamodel, model, registry)
+                    MdeoModelGraph(graph, registry)
+                }
+                is SerializedModel.AsModelData -> {
+                    create(serializedModel.modelData, metamodel)
+                }
+            }
         }
     }
 }

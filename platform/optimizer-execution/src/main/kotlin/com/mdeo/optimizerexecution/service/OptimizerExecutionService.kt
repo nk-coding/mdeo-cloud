@@ -383,7 +383,7 @@ class OptimizerExecutionService(
             )
         }
 
-        runWithEvaluator(executionId, config, evaluator, jwtToken)
+        runWithEvaluator(executionId, config, metamodel, evaluator, jwtToken)
     }
 
     // ========================= Unified execution =========================
@@ -407,6 +407,7 @@ class OptimizerExecutionService(
     private suspend fun runWithEvaluator(
         executionId: UUID,
         config: OptimizationConfig,
+        metamodel: Metamodel,
         evaluator: MutationEvaluator,
         jwtToken: String
     ) {
@@ -438,7 +439,7 @@ class OptimizerExecutionService(
             }
 
             // These run while the evaluator (and its WebSocket connections) are still alive.
-            storeResults(executionId, result, evaluator)
+            storeResults(executionId, result, metamodel, evaluator)
             updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
             logger.info("Optimizer execution $executionId completed")
         } finally {
@@ -551,6 +552,7 @@ class OptimizerExecutionService(
     private suspend fun storeResults(
         executionId: UUID,
         result: SearchResult,
+        metamodel: Metamodel,
         evaluator: MutationEvaluator
     ) {
         val solutions = result.getFinalSolutions()
@@ -559,7 +561,7 @@ class OptimizerExecutionService(
         val moeaSolutions = result.getRawPopulation().toList()
         val solutionModelJsons = moeaSolutions.mapNotNull { sol ->
             val ref = sol.getWorkerRef() ?: return@mapNotNull null
-            val modelData = evaluator.getSolutionData(ref)
+            val modelData = evaluator.getSolutionData(ref).toModelData(metamodel)
             json.encodeToString(modelData)
         }
 

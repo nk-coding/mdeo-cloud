@@ -1,6 +1,7 @@
 package com.mdeo.modeltransformation.graph
 
 import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
@@ -88,6 +89,13 @@ class TinkerModelGraph private constructor(
         val converter = GraphToModelDataConverter(metamodel)
         return converter.convert(traversal(), metamodelPath, nameRegistry)
     }
+
+    /**
+     * Returns a [SerializedModel.AsModelData] wrapping the [ModelData] produced
+     * by [toModelData], since TinkerGraph-backed models do not benefit from the
+     * binary serialization path.
+     */
+    override fun toSerializedModel(): SerializedModel = SerializedModel.AsModelData(toModelData())
 
     override fun toModel(): com.mdeo.metamodel.Model = metamodel.loadModel(toModelData())
 

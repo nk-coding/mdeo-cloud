@@ -3,6 +3,7 @@ package com.mdeo.optimizerexecution.worker
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.ast.TypedAst as TransformationTypedAst
 import com.mdeo.modeltransformation.ast.expressions.TypedExpressionSerializer as TransformationExpressionSerializer
@@ -148,14 +149,14 @@ class WorkerService(private val workerThreads: Int) {
     }
 
     /**
-     * Retrieves the serialized model data for a specific solution.
+     * Retrieves the serialized model for a specific solution.
      *
      * @param executionId The execution identifier.
      * @param solutionId The solution identifier to retrieve.
-     * @return The serialized [ModelData] for the solution.
+     * @return The [SerializedModel] for the solution.
      * @throws IllegalArgumentException if the execution or solution does not exist.
      */
-    suspend fun getSolutionData(executionId: String, solutionId: String): ModelData {
+    suspend fun getSolutionData(executionId: String, solutionId: String): SerializedModel {
         val state = requireExecution(executionId)
         val ref = WorkerSolutionRef(nodeId = "local", solutionId = solutionId)
         return state.evaluator.getSolutionData(ref)
@@ -340,8 +341,8 @@ class WorkerService(private val workerThreads: Int) {
                         continue
                     }
                     launch {
-                        val response = handleOrchestratorMessage(executionId, msg)
-                        if (response != null) {
+                        val responses = handleOrchestratorMessage(executionId, msg)
+                        for (response in responses) {
                             session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(response)))
                         }
                     }
@@ -357,19 +358,20 @@ class WorkerService(private val workerThreads: Int) {
      *
      * @param executionId The execution context.
      * @param msg The decoded message to process.
-     * @return The response to send back, or `null` if no reply is required.
+     * @return The response messages to send back (may be empty for unrecognised messages).
      */
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun handleOrchestratorMessage(executionId: String, msg: WorkerWsMessage): WorkerWsMessage? =
+    private suspend fun handleOrchestratorMessage(executionId: String, msg: WorkerWsMessage): List<WorkerWsMessage> =
         when (msg) {
-            is NodeWorkBatchRequest -> handleNodeWorkBatch(executionId, msg)
+            is NodeWorkBatchRequest -> listOf(handleNodeWorkBatch(executionId, msg))
             is SolutionFetchRequest -> {
-                val modelData = getSolutionData(executionId, msg.solutionId)
-                SolutionFetchResponse(msg.requestId, modelData)
+                val serializedModel = getSolutionData(executionId, msg.solutionId)
+                listOf(SolutionFetchResponse(msg.requestId, msg.solutionId, serializedModel))
             }
+            is SolutionBatchFetchRequest -> handleBatchFetch(executionId, msg)
             else -> {
                 logger.warn("Unexpected WS message type '{}' for execution {}", msg::class.simpleName, executionId)
-                null
+                emptyList()
             }
         }
 
@@ -386,7 +388,7 @@ class WorkerService(private val workerThreads: Int) {
         val nodeId = state.evaluator.getNodeIds().first()
         val batch = NodeBatch(
             nodeId = nodeId,
-            imports = msg.imports.map { SolutionImportData(it.solutionId, it.modelData) },
+            imports = msg.imports.map { SolutionImportData(it.solutionId, it.serializedModel) },
             tasks = msg.tasks.map { MutationTask(it.solutionId, nodeId) },
             discards = msg.discards
         )
@@ -405,6 +407,26 @@ class WorkerService(private val workerThreads: Int) {
                 )
             }
         )
+    }
+
+    /**
+     * Handles a batch fetch request by serializing each requested solution individually.
+     *
+     * Each solution is serialized independently so that responses can be sent back
+     * as individual frames, allowing the orchestrator to process them as they arrive.
+     *
+     * @param executionId The execution context.
+     * @param msg The batch fetch request.
+     * @return One [SolutionFetchResponse] per requested solution.
+     */
+    private suspend fun handleBatchFetch(
+        executionId: String,
+        msg: SolutionBatchFetchRequest
+    ): List<SolutionFetchResponse> {
+        return msg.solutionIds.map { solutionId ->
+            val serializedModel = getSolutionData(executionId, solutionId)
+            SolutionFetchResponse(msg.requestId, solutionId, serializedModel)
+        }
     }
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────────

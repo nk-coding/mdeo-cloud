@@ -496,6 +496,10 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         generateCopyConstructor(cw, internalName, superInternalName, layout.ownFields)
         generateCopy(cw, internalName, classData.isAbstract)
         generateCopyReferences(cw, internalName, allLinkMappings)
+        generateWriteProperties(cw, internalName, allPropertyMappings)
+        generateReadProperties(cw, internalName, allPropertyMappings, classData.isAbstract)
+        generateWriteLinkFields(cw, internalName, allLinkMappings)
+        generateReadLinkFields(cw, internalName, allLinkMappings)
 
         cw.visitEnd()
         allBytecodes[internalName] = cw.toByteArray()
@@ -1041,6 +1045,605 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
 
                 mv.visitLabel(skipLabel)
             }
+        }
+
+        mv.visitInsn(Opcodes.RETURN)
+        mv.visitMaxs(0, 0)
+        mv.visitEnd()
+    }
+
+    /**
+     * Generates `writeProperties(DataOutput)` which serializes all scalar and list
+     * property field values to a [java.io.DataOutput] in field-index order.
+     *
+     * Link (Set) fields are skipped — they are handled by [generateWriteLinkFields].
+     * For each property field the method writes a one-byte null marker (0 = null, 1 = present)
+     * followed by the raw value if present, using the JVM type to select the encoding:
+     *
+     * - `Integer` → `writeInt`
+     * - `Long` → `writeLong`
+     * - `Float` → `writeFloat`
+     * - `Double` → `writeDouble`
+     * - `Boolean` → `writeByte` (0 or 1)
+     * - `String` → `writeUTF`
+     * - Enum value → `writeUTF(entry)` via the generated `getEntry()` method
+     * - `List` → `writeInt(size)` then each element with the same null-marker + value scheme
+     *
+     * @param cw The [ClassWriter] to emit into.
+     * @param internalName The JVM internal name of the instance class.
+     * @param allPropertyMappings All property mappings (own + inherited).
+     */
+    private fun generateWriteProperties(
+        cw: ClassWriter,
+        internalName: String,
+        allPropertyMappings: Map<String, PropertyFieldMapping>
+    ) {
+        val mv = cw.visitMethod(
+            Opcodes.ACC_PUBLIC, "writeProperties",
+            "(Ljava/io/DataOutput;)V", null, null
+        )
+        mv.visitCode()
+
+        val sortedMappings = allPropertyMappings.values.sortedBy { it.fieldIndex }
+        for (mapping in sortedMappings) {
+            val fieldName = "prop_${mapping.fieldIndex}"
+
+            if (mapping.isCollection) {
+                emitWriteListField(mv, internalName, fieldName, mapping)
+            } else {
+                emitWriteScalarField(mv, internalName, fieldName, mapping)
+            }
+        }
+
+        mv.visitInsn(Opcodes.RETURN)
+        mv.visitMaxs(0, 0)
+        mv.visitEnd()
+    }
+
+    /**
+     * Emits bytecode to write a single nullable scalar property field to [java.io.DataOutput].
+     *
+     * @param mv The method visitor.
+     * @param internalName The JVM internal name of the class owning the field.
+     * @param fieldName The field name (`prop_X`).
+     * @param mapping The property field mapping with type information.
+     */
+    private fun emitWriteScalarField(
+        mv: org.objectweb.asm.MethodVisitor,
+        internalName: String,
+        fieldName: String,
+        mapping: PropertyFieldMapping
+    ) {
+        val descriptor = mapping.fieldDescriptor
+        val nullLabel = Label()
+        val endLabel = Label()
+
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+        mv.visitFieldInsn(Opcodes.GETFIELD, internalName, fieldName, descriptor)
+        mv.visitVarInsn(Opcodes.ASTORE, 2)
+        mv.visitVarInsn(Opcodes.ALOAD, 2)
+        mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitInsn(Opcodes.ICONST_1)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+
+        emitWriteValueFromLocal(mv, 2, mapping.elementDescriptor)
+
+        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+
+        mv.visitLabel(nullLabel)
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitInsn(Opcodes.ICONST_0)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+
+        mv.visitLabel(endLabel)
+    }
+
+    /**
+     * Emits bytecode to write a List property field to [java.io.DataOutput].
+     *
+     * Writes the list size as an int, then for each element writes a null marker
+     * and the element value using the element descriptor.
+     *
+     * @param mv The method visitor.
+     * @param internalName The JVM internal name of the class owning the field.
+     * @param fieldName The field name (`prop_X`).
+     * @param mapping The property field mapping with element type information.
+     */
+    private fun emitWriteListField(
+        mv: org.objectweb.asm.MethodVisitor,
+        internalName: String,
+        fieldName: String,
+        mapping: PropertyFieldMapping
+    ) {
+        val nullLabel = Label()
+        val endLabel = Label()
+        val loopLabel = Label()
+        val loopEndLabel = Label()
+        val elemNullLabel = Label()
+        val elemEndLabel = Label()
+
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+        mv.visitFieldInsn(Opcodes.GETFIELD, internalName, fieldName, "Ljava/util/List;")
+        mv.visitVarInsn(Opcodes.ASTORE, 2)
+        mv.visitVarInsn(Opcodes.ALOAD, 2)
+        mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitVarInsn(Opcodes.ALOAD, 2)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "size", "()I", true)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt", "(I)V", true)
+
+        mv.visitInsn(Opcodes.ICONST_0)
+        mv.visitVarInsn(Opcodes.ISTORE, 3)
+        mv.visitVarInsn(Opcodes.ALOAD, 2)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "size", "()I", true)
+        mv.visitVarInsn(Opcodes.ISTORE, 4)
+
+        mv.visitLabel(loopLabel)
+        mv.visitVarInsn(Opcodes.ILOAD, 3)
+        mv.visitVarInsn(Opcodes.ILOAD, 4)
+        mv.visitJumpInsn(Opcodes.IF_ICMPGE, loopEndLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 2)
+        mv.visitVarInsn(Opcodes.ILOAD, 3)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "get", "(I)Ljava/lang/Object;", true)
+        mv.visitVarInsn(Opcodes.ASTORE, 5)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 5)
+        mv.visitJumpInsn(Opcodes.IFNULL, elemNullLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitInsn(Opcodes.ICONST_1)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+        emitWriteValueFromLocal(mv, 5, mapping.elementDescriptor)
+        mv.visitJumpInsn(Opcodes.GOTO, elemEndLabel)
+
+        mv.visitLabel(elemNullLabel)
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitInsn(Opcodes.ICONST_0)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+
+        mv.visitLabel(elemEndLabel)
+        mv.visitIincInsn(3, 1)
+        mv.visitJumpInsn(Opcodes.GOTO, loopLabel)
+
+        mv.visitLabel(loopEndLabel)
+        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+
+        mv.visitLabel(nullLabel)
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitInsn(Opcodes.ICONST_M1)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt", "(I)V", true)
+
+        mv.visitLabel(endLabel)
+    }
+
+    /**
+     * Emits bytecode that writes a single non-null value from local variable [localIndex]
+     * to the [java.io.DataOutput] in local 1, based on the element descriptor.
+     *
+     * @param mv The method visitor.
+     * @param localIndex Local variable index holding the object reference.
+     * @param elementDescriptor The JVM element type descriptor (e.g. `Ljava/lang/Integer;`).
+     */
+    private fun emitWriteValueFromLocal(
+        mv: org.objectweb.asm.MethodVisitor,
+        localIndex: Int,
+        elementDescriptor: String
+    ) {
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        when (elementDescriptor) {
+            "Ljava/lang/Integer;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt", "(I)V", true)
+            }
+            "Ljava/lang/Long;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeLong", "(J)V", true)
+            }
+            "Ljava/lang/Float;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeFloat", "(F)V", true)
+            }
+            "Ljava/lang/Double;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeDouble", "(D)V", true)
+            }
+            "Ljava/lang/Boolean;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+            }
+            "Ljava/lang/String;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String")
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeUTF", "(Ljava/lang/String;)V", true)
+            }
+            else -> {
+                mv.visitVarInsn(Opcodes.ALOAD, localIndex)
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeUTF", "(Ljava/lang/String;)V", true)
+            }
+        }
+    }
+
+    /**
+     * Generates `readProperties(DataInput, Metamodel)` which deserializes all scalar and
+     * list property field values from a [java.io.DataInput] in field-index order, setting
+     * each field on this instance.
+     *
+     * Link (Set) fields are skipped — they are handled by [generateReadLinkFields].
+     * For abstract classes a no-op implementation is emitted (the concrete subclass
+     * will handle all fields including inherited ones).
+     *
+     * @param cw The [ClassWriter] to emit into.
+     * @param internalName The JVM internal name of the instance class.
+     * @param allPropertyMappings All property mappings (own + inherited).
+     * @param isAbstract Whether this class is abstract; abstract classes emit a no-op.
+     */
+    private fun generateReadProperties(
+        cw: ClassWriter,
+        internalName: String,
+        allPropertyMappings: Map<String, PropertyFieldMapping>,
+        isAbstract: Boolean
+    ) {
+        val mv = cw.visitMethod(
+            Opcodes.ACC_PUBLIC, "readProperties",
+            "(Ljava/io/DataInput;L$METAMODEL_CLASS;)V", null, null
+        )
+        mv.visitCode()
+
+        if (!isAbstract) {
+            val sortedMappings = allPropertyMappings.values.sortedBy { it.fieldIndex }
+            for (mapping in sortedMappings) {
+                val fieldName = "prop_${mapping.fieldIndex}"
+                if (mapping.isCollection) {
+                    emitReadListField(mv, internalName, fieldName, mapping)
+                } else {
+                    emitReadScalarField(mv, internalName, fieldName, mapping)
+                }
+            }
+        }
+
+        mv.visitInsn(Opcodes.RETURN)
+        mv.visitMaxs(0, 0)
+        mv.visitEnd()
+    }
+
+    /**
+     * Emits bytecode to read a single nullable scalar property field from [java.io.DataInput].
+     *
+     * @param mv The method visitor.
+     * @param internalName The JVM internal name of the class owning the field.
+     * @param fieldName The field name (`prop_X`).
+     * @param mapping The property field mapping with type information.
+     */
+    private fun emitReadScalarField(
+        mv: org.objectweb.asm.MethodVisitor,
+        internalName: String,
+        fieldName: String,
+        mapping: PropertyFieldMapping
+    ) {
+        val descriptor = mapping.fieldDescriptor
+        val nullLabel = Label()
+        val endLabel = Label()
+
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte", "()B", true)
+        mv.visitJumpInsn(Opcodes.IFEQ, nullLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+        emitReadValue(mv, mapping.elementDescriptor, mapping.enumType)
+        if (mapping.enumType != null) {
+            val enumInternalName = descriptor.removePrefix("L").removeSuffix(";")
+            mv.visitTypeInsn(Opcodes.CHECKCAST, enumInternalName)
+        }
+        mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, fieldName, descriptor)
+
+        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+        mv.visitLabel(nullLabel)
+        mv.visitLabel(endLabel)
+    }
+
+    /**
+     * Emits bytecode to read a List property field from [java.io.DataInput].
+     *
+     * Reads the list size (-1 means null list), then for each element reads a null marker
+     * and the element value using the element descriptor.
+     *
+     * @param mv The method visitor.
+     * @param internalName The JVM internal name of the class owning the field.
+     * @param fieldName The field name (`prop_X`).
+     * @param mapping The property field mapping with element type information.
+     */
+    private fun emitReadListField(
+        mv: org.objectweb.asm.MethodVisitor,
+        internalName: String,
+        fieldName: String,
+        mapping: PropertyFieldMapping
+    ) {
+        val nullLabel = Label()
+        val endLabel = Label()
+        val loopLabel = Label()
+        val loopEndLabel = Label()
+        val elemNullLabel = Label()
+        val elemEndLabel = Label()
+
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readInt", "()I", true)
+        mv.visitVarInsn(Opcodes.ISTORE, 3)
+        mv.visitVarInsn(Opcodes.ILOAD, 3)
+        mv.visitInsn(Opcodes.ICONST_M1)
+        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, nullLabel)
+
+        mv.visitTypeInsn(Opcodes.NEW, "java/util/ArrayList")
+        mv.visitInsn(Opcodes.DUP)
+        mv.visitVarInsn(Opcodes.ILOAD, 3)
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/util/ArrayList", "<init>", "(I)V", false)
+        mv.visitVarInsn(Opcodes.ASTORE, 4)
+
+        mv.visitInsn(Opcodes.ICONST_0)
+        mv.visitVarInsn(Opcodes.ISTORE, 5)
+
+        mv.visitLabel(loopLabel)
+        mv.visitVarInsn(Opcodes.ILOAD, 5)
+        mv.visitVarInsn(Opcodes.ILOAD, 3)
+        mv.visitJumpInsn(Opcodes.IF_ICMPGE, loopEndLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 1)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte", "()B", true)
+        mv.visitJumpInsn(Opcodes.IFEQ, elemNullLabel)
+
+        mv.visitVarInsn(Opcodes.ALOAD, 4)
+        emitReadValue(mv, mapping.elementDescriptor, mapping.enumType)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "add", "(Ljava/lang/Object;)Z", true)
+        mv.visitInsn(Opcodes.POP)
+        mv.visitJumpInsn(Opcodes.GOTO, elemEndLabel)
+
+        mv.visitLabel(elemNullLabel)
+        mv.visitVarInsn(Opcodes.ALOAD, 4)
+        mv.visitInsn(Opcodes.ACONST_NULL)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "add", "(Ljava/lang/Object;)Z", true)
+        mv.visitInsn(Opcodes.POP)
+
+        mv.visitLabel(elemEndLabel)
+        mv.visitIincInsn(5, 1)
+        mv.visitJumpInsn(Opcodes.GOTO, loopLabel)
+
+        mv.visitLabel(loopEndLabel)
+        mv.visitVarInsn(Opcodes.ALOAD, 0)
+        mv.visitVarInsn(Opcodes.ALOAD, 4)
+        mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, fieldName, "Ljava/util/List;")
+
+        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+        mv.visitLabel(nullLabel)
+        mv.visitLabel(endLabel)
+    }
+
+    /**
+     * Emits bytecode that reads a single value from `DataInput` (local 1) and pushes
+     * it onto the operand stack as a boxed object reference.
+     *
+     * For enum types, calls `metamodel.resolveEnumValue(enumName, entry)` using the
+     * [Metamodel] in local 2.
+     *
+     * @param mv The method visitor.
+     * @param elementDescriptor The JVM element type descriptor.
+     * @param enumType The metamodel enum name, or null if not an enum.
+     */
+    private fun emitReadValue(
+        mv: org.objectweb.asm.MethodVisitor,
+        elementDescriptor: String,
+        enumType: String?
+    ) {
+        when (elementDescriptor) {
+            "Ljava/lang/Integer;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readInt", "()I", true)
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false)
+            }
+            "Ljava/lang/Long;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readLong", "()J", true)
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false)
+            }
+            "Ljava/lang/Float;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readFloat", "()F", true)
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false)
+            }
+            "Ljava/lang/Double;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readDouble", "()D", true)
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false)
+            }
+            "Ljava/lang/Boolean;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte", "()B", true)
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false)
+            }
+            "Ljava/lang/String;" -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readUTF", "()Ljava/lang/String;", true)
+            }
+            else -> {
+                if (enumType != null) {
+                    mv.visitVarInsn(Opcodes.ALOAD, 2)
+                    mv.visitLdcInsn(enumType)
+                    mv.visitVarInsn(Opcodes.ALOAD, 1)
+                    mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readUTF", "()Ljava/lang/String;", true)
+                    mv.visitMethodInsn(
+                        Opcodes.INVOKEVIRTUAL, METAMODEL_CLASS, "resolveEnumValue",
+                        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;", false
+                    )
+                } else {
+                    mv.visitVarInsn(Opcodes.ALOAD, 1)
+                    mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readUTF", "()Ljava/lang/String;", true)
+                }
+            }
+        }
+    }
+
+    /**
+     * Generates `writeLinkFields(DataOutput, Map)` which serializes all link (association)
+     * Set fields to a [java.io.DataOutput] in field-index order.
+     *
+     * For each Set field, writes the count of elements followed by one int per element,
+     * where the int is the element's sequential index looked up from [instanceIndex].
+     *
+     * @param cw The [ClassWriter] to emit into.
+     * @param internalName The JVM internal name of the instance class.
+     * @param allLinkMappings All link mappings (own + inherited).
+     */
+    private fun generateWriteLinkFields(
+        cw: ClassWriter,
+        internalName: String,
+        allLinkMappings: Map<String, LinkFieldMapping>
+    ) {
+        val mv = cw.visitMethod(
+            Opcodes.ACC_PUBLIC, "writeLinkFields",
+            "(Ljava/io/DataOutput;Ljava/util/Map;)V", null, null
+        )
+        mv.visitCode()
+
+        val sortedMappings = allLinkMappings.values.sortedBy { it.fieldIndex }
+        for (mapping in sortedMappings) {
+            val fieldName = "prop_${mapping.fieldIndex}"
+            val nullLabel = Label()
+            val endLabel = Label()
+            val loopLabel = Label()
+            val loopEndLabel = Label()
+
+            mv.visitVarInsn(Opcodes.ALOAD, 0)
+            mv.visitFieldInsn(Opcodes.GETFIELD, internalName, fieldName, "Ljava/util/Set;")
+            mv.visitVarInsn(Opcodes.ASTORE, 3)
+            mv.visitVarInsn(Opcodes.ALOAD, 3)
+            mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+
+            mv.visitVarInsn(Opcodes.ALOAD, 1)
+            mv.visitVarInsn(Opcodes.ALOAD, 3)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Set", "size", "()I", true)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt", "(I)V", true)
+
+            mv.visitVarInsn(Opcodes.ALOAD, 3)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Set", "iterator", "()Ljava/util/Iterator;", true)
+            mv.visitVarInsn(Opcodes.ASTORE, 4)
+
+            mv.visitLabel(loopLabel)
+            mv.visitVarInsn(Opcodes.ALOAD, 4)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Iterator", "hasNext", "()Z", true)
+            mv.visitJumpInsn(Opcodes.IFEQ, loopEndLabel)
+
+            mv.visitVarInsn(Opcodes.ALOAD, 1)
+            mv.visitVarInsn(Opcodes.ALOAD, 2)
+            mv.visitVarInsn(Opcodes.ALOAD, 4)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Iterator", "next", "()Ljava/lang/Object;", true)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Map", "get", "(Ljava/lang/Object;)Ljava/lang/Object;", true)
+            mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt", "(I)V", true)
+            mv.visitJumpInsn(Opcodes.GOTO, loopLabel)
+
+            mv.visitLabel(loopEndLabel)
+            mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+
+            mv.visitLabel(nullLabel)
+            mv.visitVarInsn(Opcodes.ALOAD, 1)
+            mv.visitInsn(Opcodes.ICONST_0)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt", "(I)V", true)
+
+            mv.visitLabel(endLabel)
+        }
+
+        mv.visitInsn(Opcodes.RETURN)
+        mv.visitMaxs(0, 0)
+        mv.visitEnd()
+    }
+
+    /**
+     * Generates `readLinkFields(DataInput, ModelInstance[])` which deserializes all link
+     * (association) Set fields from a [java.io.DataInput] in field-index order.
+     *
+     * For each Set field, reads the count then creates a presized [java.util.HashSet]
+     * and populates it by looking up each index in the [instances] array.
+     *
+     * @param cw The [ClassWriter] to emit into.
+     * @param internalName The JVM internal name of the instance class.
+     * @param allLinkMappings All link mappings (own + inherited).
+     */
+    private fun generateReadLinkFields(
+        cw: ClassWriter,
+        internalName: String,
+        allLinkMappings: Map<String, LinkFieldMapping>
+    ) {
+        val mv = cw.visitMethod(
+            Opcodes.ACC_PUBLIC, "readLinkFields",
+            "(Ljava/io/DataInput;[L$MODEL_INSTANCE_CLASS;)V", null, null
+        )
+        mv.visitCode()
+
+        val sortedMappings = allLinkMappings.values.sortedBy { it.fieldIndex }
+        for (mapping in sortedMappings) {
+            val fieldName = "prop_${mapping.fieldIndex}"
+            val endLabel = Label()
+            val loopLabel = Label()
+            val loopEndLabel = Label()
+
+            mv.visitVarInsn(Opcodes.ALOAD, 1)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readInt", "()I", true)
+            mv.visitVarInsn(Opcodes.ISTORE, 3)
+
+            mv.visitVarInsn(Opcodes.ILOAD, 3)
+            mv.visitJumpInsn(Opcodes.IFEQ, endLabel)
+
+            mv.visitTypeInsn(Opcodes.NEW, "java/util/HashSet")
+            mv.visitInsn(Opcodes.DUP)
+            mv.visitVarInsn(Opcodes.ILOAD, 3)
+            mv.visitInsn(Opcodes.DUP)
+            mv.visitInsn(Opcodes.ICONST_1)
+            mv.visitInsn(Opcodes.ISHR)
+            mv.visitInsn(Opcodes.IADD)
+            mv.visitInsn(Opcodes.ICONST_1)
+            mv.visitInsn(Opcodes.IADD)
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/util/HashSet", "<init>", "(I)V", false)
+            mv.visitVarInsn(Opcodes.ASTORE, 4)
+
+            mv.visitInsn(Opcodes.ICONST_0)
+            mv.visitVarInsn(Opcodes.ISTORE, 5)
+
+            mv.visitLabel(loopLabel)
+            mv.visitVarInsn(Opcodes.ILOAD, 5)
+            mv.visitVarInsn(Opcodes.ILOAD, 3)
+            mv.visitJumpInsn(Opcodes.IF_ICMPGE, loopEndLabel)
+
+            mv.visitVarInsn(Opcodes.ALOAD, 4)
+            mv.visitVarInsn(Opcodes.ALOAD, 2)
+            mv.visitVarInsn(Opcodes.ALOAD, 1)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readInt", "()I", true)
+            mv.visitInsn(Opcodes.AALOAD)
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Set", "add", "(Ljava/lang/Object;)Z", true)
+            mv.visitInsn(Opcodes.POP)
+
+            mv.visitIincInsn(5, 1)
+            mv.visitJumpInsn(Opcodes.GOTO, loopLabel)
+
+            mv.visitLabel(loopEndLabel)
+            mv.visitVarInsn(Opcodes.ALOAD, 0)
+            mv.visitVarInsn(Opcodes.ALOAD, 4)
+            mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, fieldName, "Ljava/util/Set;")
+
+            mv.visitLabel(endLabel)
         }
 
         mv.visitInsn(Opcodes.RETURN)

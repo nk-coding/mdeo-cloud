@@ -1,6 +1,6 @@
 package com.mdeo.optimizerexecution.worker
 
-import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.optimizer.worker.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -77,6 +77,11 @@ class WorkerClient(
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<WorkerWsMessage>>()
 
     /**
+     * Pending multi-response correlation: requestId → collector aggregating individual responses.
+     */
+    private val pendingMultiRequests = ConcurrentHashMap<String, MultiResponseCollector>()
+
+    /**
      * Resolved once when the initial WebSocket handshake completes. 
      */
     private val wsSessionDeferred = CompletableDeferred<DefaultClientWebSocketSession>()
@@ -142,16 +147,41 @@ class WorkerClient(
     }
 
     /**
-     * Retrieves the full model data for a specific solution from the worker.
+     * Retrieves the serialized model for a specific solution from the worker.
      *
      * @param executionId The execution identifier on the worker.
-     * @param solutionId The identifier of the solution whose model data is requested.
-     * @return The deserialized model data for the solution.
+     * @param solutionId The identifier of the solution whose model is requested.
+     * @return The serialized model for the solution.
      */
-    suspend fun getSolutionData(executionId: String, solutionId: String): ModelData {
+    suspend fun getSolutionData(executionId: String, solutionId: String): SerializedModel {
         val requestId = newRequestId()
         val response = sendAndReceive(SolutionFetchRequest(requestId, solutionId)) as SolutionFetchResponse
-        return response.modelData
+        return response.serializedModel
+    }
+
+    /**
+     * Retrieves serialized models for multiple solutions in a single batched request.
+     *
+     * Sends one [SolutionBatchFetchRequest] and collects individual [SolutionFetchResponse]
+     * messages until all requested solutions have been received.
+     *
+     * @param executionId The execution identifier on the worker.
+     * @param solutionIds The solution identifiers to fetch.
+     * @return A map from solution ID to its [SerializedModel].
+     */
+    suspend fun getSolutionDataBatch(
+        executionId: String,
+        solutionIds: List<String>
+    ): Map<String, SerializedModel> {
+        if (solutionIds.isEmpty()) return emptyMap()
+        val requestId = newRequestId()
+        val responses = sendAndReceiveMultiple(
+            SolutionBatchFetchRequest(requestId, solutionIds),
+            expectedCount = solutionIds.size
+        )
+        return responses
+            .filterIsInstance<SolutionFetchResponse>()
+            .associate { it.solutionId to it.serializedModel }
     }
 
 
@@ -197,7 +227,13 @@ class WorkerClient(
                     for (frame in incoming) {
                         if (frame !is Frame.Binary) continue
                         val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
-                        pendingRequests.remove(msg.requestId)?.complete(msg)
+                        val multi = pendingMultiRequests[msg.requestId]
+                        if (multi != null) {
+                            multi.add(msg)
+                            if (multi.deferred.isCompleted) pendingMultiRequests.remove(msg.requestId)
+                        } else {
+                            pendingRequests.remove(msg.requestId)?.complete(msg)
+                        }
                     }
                     logger.info("Worker WS disconnected from {} (execution {})", baseUrl, executionId)
                 }
@@ -232,6 +268,33 @@ class WorkerClient(
     }
 
     /**
+     * Sends a [WorkerWsMessage] and collects [expectedCount] individual responses sharing the same request ID.
+     *
+     * Used for batch requests where the worker replies with multiple messages (one per solution).
+     *
+     * @param msg The batch request message to send.
+     * @param expectedCount Number of individual response messages expected.
+     * @param timeoutMs Maximum time to wait for all responses (default [OPERATION_TIMEOUT_MS]).
+     * @return The collected response messages.
+     */
+    private suspend fun sendAndReceiveMultiple(
+        msg: WorkerWsMessage,
+        expectedCount: Int,
+        timeoutMs: Long = OPERATION_TIMEOUT_MS
+    ): List<WorkerWsMessage> {
+        val session = withTimeout(SESSION_READY_TIMEOUT_MS) { wsSessionDeferred.await() }
+        val collector = MultiResponseCollector(expectedCount)
+        pendingMultiRequests[msg.requestId] = collector
+        try {
+            session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(msg)))
+        } catch (e: Exception) {
+            pendingMultiRequests.remove(msg.requestId)
+            throw e
+        }
+        return withTimeout(timeoutMs) { collector.deferred.await() }
+    }
+
+    /**
      * Completes all pending request deferreds exceptionally and clears the map. 
      */
     private fun drainPendingRequests(cause: Exception) {
@@ -239,8 +302,32 @@ class WorkerClient(
         for (key in keys) {
             pendingRequests.remove(key)?.completeExceptionally(cause)
         }
+        val multiKeys = pendingMultiRequests.keys.toList()
+        for (key in multiKeys) {
+            pendingMultiRequests.remove(key)?.deferred?.completeExceptionally(cause)
+        }
     }
 
     private fun newRequestId() = UUID.randomUUID().toString()
+
+    /**
+     * Aggregates multiple response messages sharing the same request ID.
+     *
+     * Thread-safe: the WS read loop may call [add] from any coroutine context.
+     *
+     * @param expectedCount The number of individual responses to collect before completing.
+     */
+    private class MultiResponseCollector(private val expectedCount: Int) {
+        val deferred = CompletableDeferred<List<WorkerWsMessage>>()
+        private val responses = mutableListOf<WorkerWsMessage>()
+
+        @Synchronized
+        fun add(msg: WorkerWsMessage) {
+            responses.add(msg)
+            if (responses.size >= expectedCount) {
+                deferred.complete(responses.toList())
+            }
+        }
+    }
 }
 

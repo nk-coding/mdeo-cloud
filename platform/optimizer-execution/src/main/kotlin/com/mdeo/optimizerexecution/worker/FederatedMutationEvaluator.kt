@@ -1,6 +1,6 @@
 package com.mdeo.optimizerexecution.worker
 
-import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.optimizer.evaluation.*
 import com.mdeo.optimizer.worker.*
 import kotlinx.coroutines.async
@@ -66,11 +66,29 @@ class FederatedMutationEvaluator(
     }
 
     /**
-     * Fetches the full model data for a solution stored on a remote worker node.
+     * Fetches the serialized model for a solution stored on a remote worker node.
      */
-    override suspend fun getSolutionData(ref: WorkerSolutionRef): ModelData {
+    override suspend fun getSolutionData(ref: WorkerSolutionRef): SerializedModel {
         val worker = requireWorker(ref.nodeId)
         return worker.getSolutionData(executionId, ref.solutionId)
+    }
+
+    /**
+     * Fetches serialized models for multiple solutions using batched requests grouped by worker node.
+     *
+     * All solutions on the same worker are requested in a single [SolutionBatchFetchRequest].
+     * Workers for different nodes are contacted in parallel.
+     */
+    override suspend fun getSolutionDataBatch(refs: List<WorkerSolutionRef>): Map<String, SerializedModel> {
+        val byNode = refs.groupBy { it.nodeId }
+        return coroutineScope {
+            byNode.map { (nodeId, nodeRefs) ->
+                async {
+                    val worker = requireWorker(nodeId)
+                    worker.getSolutionDataBatch(executionId, nodeRefs.map { it.solutionId })
+                }
+            }.awaitAll()
+        }.fold(mutableMapOf()) { acc, map -> acc.apply { putAll(map) } }
     }
 
     /**
@@ -105,7 +123,7 @@ class FederatedMutationEvaluator(
         return try {
             val response = worker.executeNodeBatch(
                 executionId,
-                imports = batch.imports.map { SolutionTransferItem(it.solutionId, it.modelData) },
+                imports = batch.imports.map { SolutionTransferItem(it.solutionId, it.serializedModel) },
                 tasks = batch.tasks.map { BatchTask(it.solutionId) },
                 discards = batch.discards
             )

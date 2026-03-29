@@ -1,7 +1,7 @@
 package com.mdeo.optimizer.evaluation
 
 import com.mdeo.metamodel.Metamodel
-import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.SerializedModel
 import com.mdeo.modeltransformation.graph.MdeoModelGraph
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy
@@ -59,7 +59,7 @@ class LocalMutationEvaluator(
         val batch = batches.firstOrNull { it.nodeId == nodeId } ?: return emptyList()
 
         for (import in batch.imports) {
-            receiveSolution(import.solutionId, import.modelData)
+            receiveSolution(import.solutionId, import.serializedModel)
         }
 
         val results = batch.tasks.map { task -> evaluateSingle(task) }
@@ -71,9 +71,9 @@ class LocalMutationEvaluator(
         return results
     }
 
-    override suspend fun getSolutionData(ref: WorkerSolutionRef): ModelData {
+    override suspend fun getSolutionData(ref: WorkerSolutionRef): SerializedModel {
         val solution = requireSolution(ref.solutionId)
-        return solution.modelGraph.toModelData()
+        return solution.modelGraph.toSerializedModel()
     }
 
     override suspend fun cleanup() {
@@ -84,13 +84,13 @@ class LocalMutationEvaluator(
     }
 
     /**
-     * Reconstitutes a solution from [ModelData] and stores it under [solutionId].
+     * Reconstitutes a solution from a [SerializedModel] and stores it under [solutionId].
      *
      * Requires that a non-null [metamodel] was provided at construction time.
      */
-    fun receiveSolution(solutionId: String, modelData: ModelData) {
+    fun receiveSolution(solutionId: String, serializedModel: SerializedModel) {
         val mm = checkNotNull(metamodel) { "Cannot receive solutions without a metamodel" }
-        val modelGraph = MdeoModelGraph.create(modelData, mm)
+        val modelGraph = MdeoModelGraph.create(serializedModel, mm)
         solutions[solutionId] = Solution(modelGraph)
     }
 

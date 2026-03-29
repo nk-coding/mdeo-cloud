@@ -526,7 +526,7 @@ class OptimizationCorrectnessTest {
         // For each solution, re-compute the room count and verify it matches the stored objective
         for ((moeaSolution, solutionResult) in population.zip(finalSolutionResults)) {
             val ref = moeaSolution.getWorkerRef() ?: error("Solution missing WorkerSolutionRef")
-            val solutionData = runBlocking { evaluator.getSolutionData(ref) }
+            val solutionData = runBlocking { evaluator.getSolutionData(ref) }.toModelData(metamodel)
             val rooms = solutionData.instances.count { it.className == "Room" }
             assertTrue(rooms >= 0, "Room count must be non-negative, got $rooms")
 
