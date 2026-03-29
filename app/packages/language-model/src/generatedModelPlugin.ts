@@ -8,11 +8,12 @@ import {
 import { GeneratedModelRule } from "./grammar/generatedModelRules.js";
 import {
     type ActionHandlerRegistryAdditionalServices,
-    DefaultActionProvider,
     ActionHandlerRegistry,
     DefaultWorkspaceEditService
 } from "@mdeo/language-shared";
 import { GeneratedModelDiagramModule } from "./features/diagram-server/generated/generatedModelDiagramModule.js";
+import { GeneratedModelActionProvider } from "./features/generatedModelActionProvider.js";
+import { SaveGeneratedModelActionHandler } from "./action-handlers/saveGeneratedModelActionHandler.js";
 import type { LangiumDocument, URI } from "langium";
 
 export type GeneratedModelServices = ExternalReferenceAdditionalServices & ActionHandlerRegistryAdditionalServices;
@@ -40,8 +41,12 @@ const generatedModelPlugin: LangiumLanguagePlugin<GeneratedModelServices> = {
             ExternalReferenceCollector: () => new EmptyExternalReferenceCollector()
         },
         action: {
-            ActionHandlerRegistry: () => new ActionHandlerRegistry(),
-            ActionProvider: () => new DefaultActionProvider()
+            ActionHandlerRegistry: (services) => {
+                const registry = new ActionHandlerRegistry();
+                registry.register("save-as-model", new SaveGeneratedModelActionHandler(services.shared));
+                return registry;
+            },
+            ActionProvider: () => new GeneratedModelActionProvider()
         },
         workspace: {
             WorkspaceEdit: (services) => new DefaultWorkspaceEditService(services)

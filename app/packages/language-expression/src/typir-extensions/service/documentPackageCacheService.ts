@@ -1,5 +1,8 @@
 import type { LangiumDocument, WorkspaceCache as WorkspaceCacheType } from "langium";
-import { sharedImport } from "@mdeo/language-shared";
+import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
+import { getAllMetamodelAbsolutePaths } from "@mdeo/language-metamodel";
+import { getClassPackage, getEnumPackage } from "../../features/metamodel/metamodelClassExtractor.js";
+import type { ExtendedLangiumSharedServices } from "@mdeo/language-common";
 
 const { WorkspaceCache, DocumentState } = sharedImport("langium");
 
@@ -36,21 +39,15 @@ export interface DocumentPackageCacheService {
  * Default implementation of {@link DocumentPackageCacheService} that uses Langium's
  * {@link WorkspaceCache} to cache results per document, invalidating at
  * {@link DocumentState.IndexedReferences}.
+ *
+ * Subclasses can override {@link getMetamodelImportFile} to provide the metamodel
+ * import file path from the document root, enabling class/enum package resolution.
  */
 export class DefaultDocumentPackageCacheService implements DocumentPackageCacheService {
     private readonly cache: WorkspaceCacheType<string, DocumentPackageCache>;
 
-    /**
-     * Creates a new DocumentPackageCacheService.
-     *
-     * @param langiumServices The Langium shared services, used for workspace cache invalidation
-     * @param computePackageMap Language-specific callback that computes the package map for a document
-     */
-    constructor(
-        langiumServices: { workspace: unknown },
-        private readonly computePackageMap: (document: LangiumDocument) => Map<string, string[]>
-    ) {
-        this.cache = new WorkspaceCache(langiumServices as any, DocumentState.IndexedReferences);
+    constructor(protected readonly langiumSharedServices: ExtendedLangiumSharedServices) {
+        this.cache = new WorkspaceCache(langiumSharedServices as any, DocumentState.IndexedReferences);
     }
 
     getDocumentPackageCache(document: LangiumDocument): DocumentPackageCache {
@@ -69,6 +66,55 @@ export class DefaultDocumentPackageCacheService implements DocumentPackageCacheS
         const entry: DocumentPackageCache = { packageMap, allInternalPackages };
         this.cache.set(key, entry);
         return entry;
+    }
+
+    /**
+     * Computes the package map for a document.
+     * Always includes the "builtin" package, and resolves class/enum packages
+     * from the metamodel import if {@link getMetamodelImportFile} returns a path.
+     *
+     * Can be overridden for fully custom package map computation.
+     */
+    protected computePackageMap(document: LangiumDocument): Map<string, string[]> {
+        const map = new Map<string, string[]>();
+        map.set("builtin", ["builtin"]);
+
+        const importFile = this.getMetamodelImportFile(document);
+        if (importFile == undefined) {
+            return map;
+        }
+
+        const langiumDocuments = this.langiumSharedServices.workspace.LangiumDocuments;
+        const metamodelUri = resolveRelativePath(document, importFile);
+        const metamodelDoc = langiumDocuments.getDocument(metamodelUri);
+        if (metamodelDoc == undefined) {
+            return map;
+        }
+
+        const absolutePaths = getAllMetamodelAbsolutePaths(metamodelDoc, langiumDocuments);
+        const classPackages: string[] = [];
+        const enumPackages: string[] = [];
+        for (const absolutePath of absolutePaths) {
+            classPackages.push(getClassPackage(absolutePath));
+            enumPackages.push(getEnumPackage(absolutePath));
+        }
+        if (classPackages.length > 0) {
+            map.set("class", classPackages);
+        }
+        if (enumPackages.length > 0) {
+            map.set("enum", enumPackages);
+        }
+        return map;
+    }
+
+    /**
+     * Returns the metamodel import file path from the document root, or `undefined`
+     * if this document has no metamodel import.
+     *
+     * Override this in language-specific subclasses to provide the correct property access.
+     */
+    protected getMetamodelImportFile(_document: LangiumDocument): string | undefined {
+        return undefined;
     }
 }
 
