@@ -56,6 +56,47 @@ export interface ActionSchemaEnumForm {
 }
 
 /**
+ * A node in the file selection tree hierarchy.
+ * The full path of any node can be reconstructed by traversing its ancestors.
+ */
+export interface ActionSchemaFileSelectNode {
+    /**
+     * Display name of this node (single path segment, no separators)
+     */
+    name: string;
+    /**
+     * Child nodes for folder/directory nodes
+     */
+    children?: ActionSchemaFileSelectNode[];
+}
+
+/**
+ * Schema form representing a file or directory selection with tree view.
+ */
+export interface ActionSchemaFileSelectForm {
+    /**
+     * Hierarchical tree of available files/directories to select from.
+     * Tree nodes contain only the path segments after the common prefix.
+     * Combine with `rootPath` to reconstruct absolute paths.
+     */
+    fileSelect: ActionSchemaFileSelectNode[];
+    /**
+     * The common path prefix that was stripped from all entries.
+     * Concatenate this with a node's parent-chain path to get the absolute path.
+     * Always ends without a trailing slash.
+     */
+    rootPath: string;
+    /**
+     * If true, only directories can be selected; if false, only files can be selected.
+     */
+    selectDirectory?: boolean;
+    /**
+     * Optional placeholder text for the trigger button
+     */
+    placeholder?: string;
+}
+
+/**
  * Schema form representing an array of elements.
  */
 export interface ActionSchemaElementsForm {
@@ -97,6 +138,7 @@ export interface ActionSchemaOptionalForm {
 export type ActionSchema =
     | ActionSchemaTypeForm
     | ActionSchemaEnumForm
+    | ActionSchemaFileSelectForm
     | ActionSchemaElementsForm
     | ActionSchemaPropertiesForm
     | ActionSchemaOptionalForm;

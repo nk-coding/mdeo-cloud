@@ -16,6 +16,14 @@
             :path="path"
             :label="label"
         />
+        <ActionFileSelectForm
+            v-else-if="isFileSelectFormSchema"
+            :schema="<ActionSchemaFileSelectForm>schema"
+            v-model="<string>modelValue"
+            :errors="filteredErrors"
+            :path="path"
+            :label="label"
+        />
         <ActionElementsForm
             v-else-if="isElementsFormSchema"
             :schema="<ActionSchemaElementsForm>schema"
@@ -53,6 +61,7 @@ import type {
     ActionSchema,
     ActionSchemaTypeForm,
     ActionSchemaEnumForm,
+    ActionSchemaFileSelectForm,
     ActionSchemaElementsForm,
     ActionSchemaPropertiesForm,
     ActionSchemaOptionalForm,
@@ -60,12 +69,14 @@ import type {
 } from "@mdeo/language-common";
 import ActionTypeForm from "./ActionTypeForm.vue";
 import ActionEnumForm from "./ActionEnumForm.vue";
+import ActionFileSelectForm from "./ActionFileSelectForm.vue";
 import ActionElementsForm from "./ActionElementsForm.vue";
 import ActionOptionalForm from "./ActionOptionalForm.vue";
 import ActionPropertiesForm from "./ActionPropertiesForm.vue";
 import {
     isTypeForm,
     isEnumForm,
+    isFileSelectForm,
     isElementsForm,
     isOptionalForm,
     isPropertiesForm,
@@ -91,6 +102,8 @@ const modelValue = defineModel<unknown>();
 const isTypeFormSchema = computed(() => isTypeForm(props.schema));
 
 const isEnumFormSchema = computed(() => isEnumForm(props.schema));
+
+const isFileSelectFormSchema = computed(() => isFileSelectForm(props.schema));
 
 const isElementsFormSchema = computed(() => isElementsForm(props.schema));
 

@@ -4,18 +4,19 @@ import {
     type ActionSubmitParams,
     type ActionSubmitResponse,
     type ActionSchema,
+    type ActionSchemaFileSelectNode,
     type ActionExecutionRequest,
     type FileMenuActionData,
     parseUri,
     FileCategory
 } from "@mdeo/language-common";
-import { sharedImport, type ActionHandler, resolveRelativePath, calculateRelativePath } from "@mdeo/language-shared";
+import { sharedImport, type ActionHandler, resolveRelativePath, buildFileSelectTree } from "@mdeo/language-shared";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { ModelTransformationType } from "../grammar/modelTransformationTypes.js";
 import type { ModelType } from "@mdeo/language-model";
 
-const { URI, UriUtils } = sharedImport("langium");
+const { URI } = sharedImport("langium");
 
 /**
  * Input data collected from the model selection dialog.
@@ -89,7 +90,8 @@ export class RunModelTransformationActionHandler implements ActionHandler {
             );
         }
 
-        return this.createSelectionPage(compatibleModels);
+        const { nodes, rootPath } = buildFileSelectTree(compatibleModels);
+        return this.createSelectionPage(nodes, rootPath);
     }
 
     /**
@@ -181,7 +183,6 @@ export class RunModelTransformationActionHandler implements ActionHandler {
         const documents = langiumDocuments.all.toArray();
         const modelDocuments = documents.filter((doc) => doc.textDocument.languageId === "model");
         const compatibleModels: string[] = [];
-        const transformationPath = URI.parse(transformationUri).path;
 
         const metamodelDoc = langiumDocuments.getDocument(URI.parse(metamodelUri));
         if (!metamodelDoc) {
@@ -196,8 +197,7 @@ export class RunModelTransformationActionHandler implements ActionHandler {
             if (!modelMetamodelDoc) continue;
 
             if (isMetamodelCompatible(modelMetamodelDoc, metamodelDoc, langiumDocuments)) {
-                const relativePath = calculateRelativePath(transformationPath, doc.uri.path);
-                compatibleModels.push(relativePath);
+                compatibleModels.push(doc.uri.path);
             }
         }
 
@@ -210,11 +210,12 @@ export class RunModelTransformationActionHandler implements ActionHandler {
      * @param models The list of available compatible model files
      * @returns The dialog page response
      */
-    private createSelectionPage(models: string[]): ActionStartResponse {
+    private createSelectionPage(tree: ActionSchemaFileSelectNode[], rootPath: string): ActionStartResponse {
         const schema: ActionSchema = {
             properties: {
                 modelPath: {
-                    enum: models,
+                    fileSelect: tree,
+                    rootPath,
                     placeholder: "Select a model file to transform"
                 }
             },
@@ -262,14 +263,12 @@ export class RunModelTransformationActionHandler implements ActionHandler {
      * @param modelPath The relative path to the model file
      * @returns The execution request
      */
-    private createExecutionRequest(transformationUri: string, modelPath: string): ActionExecutionRequest {
+    private createExecutionRequest(transformationUri: string, absoluteModelPath: string): ActionExecutionRequest {
         const parsedUri = parseUri(URI.parse(transformationUri));
         if (parsedUri.category !== FileCategory.RegularFile) {
             throw new Error("Invalid file category for transformation execution");
         }
         const filePath = parsedUri.path;
-
-        const absoluteModelPath = this.resolveModelPath(transformationUri, modelPath);
 
         return {
             filePath,
@@ -281,30 +280,10 @@ export class RunModelTransformationActionHandler implements ActionHandler {
     }
 
     /**
-     * Resolves a relative model path to an absolute path.
-     *
-     * @param transformationUri URI of the transformation file
-     * @param relativeModelPath Relative path to the model file
-     * @returns Absolute path to the model file
-     */
-    private resolveModelPath(transformationUri: string, relativeModelPath: string): string {
-        const transformationParsedUri = URI.parse(transformationUri);
-        const dirname = UriUtils.dirname(transformationParsedUri);
-        const absoluteUri = UriUtils.joinPath(dirname, relativeModelPath);
-
-        const parsedUri = parseUri(absoluteUri);
-        if (parsedUri.category !== FileCategory.RegularFile) {
-            throw new Error("Invalid model file path");
-        }
-
-        return parsedUri.path;
-    }
-
-    /**
      * Creates an execution completion response for submitAction.
      *
      * @param transformationUri The URI of the transformation file
-     * @param modelPath The relative path to the model file
+     * @param modelPath The absolute path to the model file
      * @returns The submit completion response with execution request
      */
     private createExecutionSubmit(transformationUri: string, modelPath: string): ActionSubmitResponse {

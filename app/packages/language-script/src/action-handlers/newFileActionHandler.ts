@@ -1,13 +1,13 @@
 import type {
     ActionDialogPage,
     ActionSchema,
-    ActionStartParams,
+    ActionSchemaFileSelectNode,
     ActionStartResponse,
     ActionSubmitParams,
     ActionSubmitResponse,
     NewFileActionData
 } from "@mdeo/language-common";
-import { calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
+import { buildFileSelectTree, calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 
@@ -59,16 +59,13 @@ export class NewFileActionHandler implements ActionHandler {
      *  - Computes their relative paths to the new file
      *  - Presents those paths in a combobox
      *
-     * @param params The action start parameters with file path data
      * @returns The dialog page with metamodel selection
      */
-    async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
-        const data = params.data as NewFileActionData;
-
+    async startAction(): Promise<ActionStartResponse> {
         const metamodelFiles = await this.findMetamodelFiles();
-        const options = this.buildFileOptions(data.uri, metamodelFiles);
+        const { nodes, rootPath } = buildFileSelectTree(metamodelFiles);
 
-        return this.createSelectionPage(options);
+        return this.createSelectionPage(nodes, rootPath);
     }
 
     /**
@@ -87,13 +84,15 @@ export class NewFileActionHandler implements ActionHandler {
             return { kind: "completion" };
         }
 
-        const metamodelPath = rawInputs.metamodel;
+        const metamodelAbsolutePath = rawInputs.metamodel;
 
-        if (!metamodelPath) {
+        if (!metamodelAbsolutePath) {
             return { kind: "completion" };
         }
 
-        const workspaceEdit = this.createUsingStatementEdit(data.uri, metamodelPath);
+        const fromPath = URI.parse(data.uri).path;
+        const relativePath = calculateRelativePath(fromPath, metamodelAbsolutePath);
+        const workspaceEdit = this.createUsingStatementEdit(data.uri, relativePath);
         const connection = this.sharedServices.lsp.Connection;
         await connection?.workspace.applyEdit(workspaceEdit);
 
@@ -111,30 +110,19 @@ export class NewFileActionHandler implements ActionHandler {
     }
 
     /**
-     * Builds the list of file options as relative paths.
-     *
-     * @param uri The URI of the new file
-     * @param metamodelFiles The list of metamodel file paths
-     * @returns Array of relative paths for the selection dropdown
-     */
-    private buildFileOptions(uri: string, metamodelFiles: string[]): string[] {
-        const basePath = URI.parse(uri).path;
-        return metamodelFiles.map((absolutePath) => calculateRelativePath(basePath, absolutePath));
-    }
-
-    /**
      * Creates the metamodel selection dialog page.
      *
-     * @param options The list of file options
+     * @param tree The file tree nodes
+     * @param basePath The absolute path of the new file
      * @returns The dialog page response
      */
-    private createSelectionPage(options: string[]): ActionStartResponse {
+    private createSelectionPage(tree: ActionSchemaFileSelectNode[], rootPath: string): ActionStartResponse {
         const schema: ActionSchema = {
             properties: {
                 metamodel: {
-                    enum: options,
-                    combobox: true,
-                    placeholder: "Select or enter a metamodel file path"
+                    fileSelect: tree,
+                    rootPath,
+                    placeholder: "Select a metamodel file"
                 }
             },
             propertyLabels: {

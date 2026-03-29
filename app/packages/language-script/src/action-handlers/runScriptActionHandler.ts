@@ -9,13 +9,13 @@ import {
     parseUri,
     FileCategory
 } from "@mdeo/language-common";
-import { sharedImport, type ActionHandler, resolveRelativePath, calculateRelativePath } from "@mdeo/language-shared";
+import { sharedImport, type ActionHandler, resolveRelativePath, buildFileSelectTree } from "@mdeo/language-shared";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import type { LangiumSharedServices } from "langium/lsp";
 import { type ScriptType } from "../grammar/scriptTypes.js";
 import type { ModelType } from "@mdeo/language-model";
 
-const { URI, UriUtils } = sharedImport("langium");
+const { URI } = sharedImport("langium");
 
 /**
  * Input data collected from the dialog.
@@ -233,7 +233,6 @@ export class RunScriptActionHandler implements ActionHandler {
         const documents = langiumDocuments.all.toArray();
         const modelDocuments = documents.filter((doc) => doc.textDocument.languageId === "model");
         const compatibleModels: string[] = [];
-        const scriptPath = URI.parse(scriptUri).path;
 
         const metamodelDoc = langiumDocuments.getDocument(URI.parse(metamodelUri));
         if (!metamodelDoc) {
@@ -248,8 +247,7 @@ export class RunScriptActionHandler implements ActionHandler {
             if (!modelMetamodelDoc) continue;
 
             if (isMetamodelCompatible(modelMetamodelDoc, metamodelDoc, langiumDocuments)) {
-                const relativePath = calculateRelativePath(scriptPath, doc.uri.path);
-                compatibleModels.push(relativePath);
+                compatibleModels.push(doc.uri.path);
             }
         }
 
@@ -294,7 +292,8 @@ export class RunScriptActionHandler implements ActionHandler {
      * @param models The list of compatible model file paths
      * @returns The dialog page response
      */
-    private createCombinedSelectionPage(methods: string[], models: string[]): ActionStartResponse {
+    private createCombinedSelectionPage(methods: string[], modelAbsolutePaths: string[]): ActionStartResponse {
+        const { nodes, rootPath } = buildFileSelectTree(modelAbsolutePaths);
         const schema: ActionSchema = {
             properties: {
                 methodName: {
@@ -302,8 +301,9 @@ export class RunScriptActionHandler implements ActionHandler {
                     placeholder: "Select a method to execute"
                 },
                 modelPath: {
-                    enum: models,
-                    placeholder: models.length > 0 ? "Select a model file" : "No compatible models found"
+                    fileSelect: nodes,
+                    rootPath,
+                    placeholder: modelAbsolutePaths.length > 0 ? "Select a model file" : "No compatible models found"
                 }
             },
             propertyLabels: {
@@ -332,14 +332,16 @@ export class RunScriptActionHandler implements ActionHandler {
      * @param modelPath Optional relative path to the model file
      * @returns The execution request
      */
-    private createExecutionRequest(uri: string, methodName: string, modelPath?: string): ActionExecutionRequest {
+    private createExecutionRequest(
+        uri: string,
+        methodName: string,
+        absoluteModelPath?: string
+    ): ActionExecutionRequest {
         const parsedUri = parseUri(URI.parse(uri));
         if (parsedUri.category !== FileCategory.RegularFile) {
             throw new Error("Invalid file category for script execution");
         }
         const filePath = parsedUri.path;
-
-        const absoluteModelPath = modelPath ? this.resolveModelPath(uri, modelPath) : undefined;
 
         return {
             filePath,
@@ -349,26 +351,6 @@ export class RunScriptActionHandler implements ActionHandler {
                 ...(absoluteModelPath !== undefined ? { modelPath: absoluteModelPath } : {})
             }
         };
-    }
-
-    /**
-     * Resolves a relative model path to an absolute path.
-     *
-     * @param scriptUri URI of the script file
-     * @param relativeModelPath Relative path to the model file
-     * @returns Absolute path to the model file
-     */
-    private resolveModelPath(scriptUri: string, relativeModelPath: string): string {
-        const scriptParsedUri = URI.parse(scriptUri);
-        const dirname = UriUtils.dirname(scriptParsedUri);
-        const absoluteUri = UriUtils.joinPath(dirname, relativeModelPath);
-
-        const parsedUri = parseUri(absoluteUri);
-        if (parsedUri.category !== FileCategory.RegularFile) {
-            throw new Error("Invalid model file path");
-        }
-
-        return parsedUri.path;
     }
 
     /**

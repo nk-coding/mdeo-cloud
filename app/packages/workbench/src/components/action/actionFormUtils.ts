@@ -2,6 +2,7 @@ import type {
     ActionSchema,
     ActionSchemaTypeForm,
     ActionSchemaEnumForm,
+    ActionSchemaFileSelectForm,
     ActionSchemaElementsForm,
     ActionSchemaPropertiesForm,
     ActionSchemaOptionalForm,
@@ -26,6 +27,16 @@ export function isTypeForm(schema: ActionSchema): schema is ActionSchemaTypeForm
  */
 export function isEnumForm(schema: ActionSchema): schema is ActionSchemaEnumForm {
     return "enum" in schema && Array.isArray((schema as ActionSchemaEnumForm).enum);
+}
+
+/**
+ * Type guard to check if schema is a file select form (has fileSelect array)
+ *
+ * @param schema The schema to check
+ * @returns True if schema is a file select form
+ */
+export function isFileSelectForm(schema: ActionSchema): schema is ActionSchemaFileSelectForm {
+    return "fileSelect" in schema && Array.isArray((schema as ActionSchemaFileSelectForm).fileSelect);
 }
 
 /**
@@ -105,6 +116,10 @@ export function generateDefaultValue(schema: ActionSchema): unknown {
         return undefined;
     }
 
+    if (isFileSelectForm(schema)) {
+        return undefined;
+    }
+
     return undefined;
 }
 
@@ -153,6 +168,10 @@ export function deepCloneWithSchema(value: unknown, schema: ActionSchema): unkno
     }
 
     if (isEnumForm(schema)) {
+        return value;
+    }
+
+    if (isFileSelectForm(schema)) {
         return value;
     }
 
@@ -250,6 +269,13 @@ export function verifyAndFix(value: unknown, schema: ActionSchema): unknown {
             return value;
         }
         return schema.enum.length > 0 ? schema.enum[0] : undefined;
+    }
+
+    if (isFileSelectForm(schema)) {
+        if (schema.fileSelect.includes(value as never)) {
+            return value;
+        }
+        return undefined;
     }
 
     return generateDefaultValue(schema);

@@ -1,6 +1,7 @@
 import type {
     ActionDialogPage,
     ActionSchema,
+    ActionSchemaFileSelectNode,
     ActionStartParams,
     ActionStartResponse,
     ActionSubmitParams,
@@ -11,7 +12,7 @@ import type {
     AstReflection,
     ExtendedLangiumServices
 } from "@mdeo/language-common";
-import { calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
+import { buildFileSelectTree, calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumDocument } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { FileImport, type MetaModelType, type FileImportType } from "../grammar/metamodelTypes.js";
@@ -87,9 +88,9 @@ export class ImportFileActionHandler implements ActionHandler {
         const data = params.data as FileMenuActionData;
         const currentFilePath = URI.parse(data.uri).path;
         const metamodelFiles = await this.findMetamodelFiles(currentFilePath);
-        const options = this.buildFileOptions(currentFilePath, metamodelFiles);
+        const { nodes, rootPath } = buildFileSelectTree(metamodelFiles);
 
-        return this.createFileSelectionPage(options);
+        return this.createFileSelectionPage(nodes, rootPath);
     }
 
     /**
@@ -110,14 +111,17 @@ export class ImportFileActionHandler implements ActionHandler {
             };
         }
 
-        const selectedFile = rawInputs.metamodelFile;
+        const selectedAbsolutePath = rawInputs.metamodelFile;
 
-        if (!selectedFile) {
+        if (!selectedAbsolutePath) {
             return {
                 kind: "validation",
                 errors: [{ path: "/metamodelFile", message: "Please select a metamodel file" }]
             };
         }
+
+        const currentFilePath = URI.parse(data.uri).path;
+        const selectedFile = calculateRelativePath(currentFilePath, selectedAbsolutePath);
 
         const conflict = this.checkDuplicateImport(data.uri, selectedFile);
         if (conflict !== null) {
@@ -279,29 +283,12 @@ export class ImportFileActionHandler implements ActionHandler {
             .map((doc: LangiumDocument) => doc.uri.path);
     }
 
-    /**
-     * Builds the list of file options as relative paths.
-     *
-     * @param currentFilePath The path of the current file
-     * @param metamodelFiles The list of metamodel file paths
-     * @returns Array of relative paths for the file selection dropdown
-     */
-    private buildFileOptions(currentFilePath: string, metamodelFiles: string[]): string[] {
-        return metamodelFiles.map((absolutePath) => calculateRelativePath(currentFilePath, absolutePath));
-    }
-
-    /**
-     * Creates the file selection dialog page.
-     *
-     * @param options The list of file options
-     * @returns The dialog page response
-     */
-    private createFileSelectionPage(options: string[]): ActionStartResponse {
+    private createFileSelectionPage(tree: ActionSchemaFileSelectNode[], rootPath: string): ActionStartResponse {
         const schema: ActionSchema = {
             properties: {
                 metamodelFile: {
-                    enum: options,
-                    combobox: true,
+                    fileSelect: tree,
+                    rootPath,
                     placeholder: "Select a metamodel file"
                 }
             },
