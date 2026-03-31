@@ -252,14 +252,17 @@ class TransformationExecutionService(
 
         val subprocess = subprocessPool.acquire() ?: SubprocessRunner(
             mainClass = TransformationSubprocessMain::class.java.name,
-            cancellationCheck = { isExecutionCancelled(executionId) },
+            cancellationCheck = { id -> isExecutionCancelled(UUID.fromString(id)) },
             cancellationCheckIntervalMs = CANCELLATION_CHECK_INTERVAL_MS
         ).also { runner ->
             if (!runner.start()) {
-                updateState(executionId, ExecutionState.FAILED, "Failed to start subprocess", jwtToken)
+                val msg = "Failed to start subprocess"
+                storeError(executionId, msg)
+                updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
                 return
             }
         }
+        subprocess.executionId = executionId.toString()
 
         val payload = TransformationSubprocessMain.serializeInput(typedAst, metamodelData, modelData, timeoutMs)
         val result = subprocess.sendCommand(payload)
@@ -278,7 +281,9 @@ class TransformationExecutionService(
                 } else {
                     logger.error("Unexpected subprocess response format for execution $executionId")
                     subprocess.destroy()
-                    updateState(executionId, ExecutionState.FAILED, "Internal error: unexpected subprocess response", jwtToken)
+                    val msg = "Internal error: unexpected subprocess response"
+                    storeError(executionId, msg)
+                    updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
                 }
             }
             is SubprocessResult.Timeout -> {
@@ -291,7 +296,9 @@ class TransformationExecutionService(
             }
             is SubprocessResult.Failed -> {
                 subprocess.destroy()
-                updateState(executionId, ExecutionState.FAILED, "Transformation failed: ${result.message}", jwtToken)
+                val msg = "Transformation failed: ${result.message}"
+                storeError(executionId, msg)
+                updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
             }
         }
     }
@@ -319,12 +326,9 @@ class TransformationExecutionService(
         )
         
         if (typedAst == null) {
-            updateState(
-                executionId,
-                ExecutionState.FAILED,
-                "Failed to fetch transformation typed AST",
-                jwtToken
-            )
+            val msg = "Failed to fetch transformation typed AST"
+            storeError(executionId, msg)
+            updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
         }
         return typedAst
     }
@@ -352,12 +356,9 @@ class TransformationExecutionService(
         )
         
         if (metamodelData == null) {
-            updateState(
-                executionId,
-                ExecutionState.FAILED,
-                "Failed to fetch metamodel data for $metamodelPath",
-                jwtToken
-            )
+            val msg = "Failed to fetch metamodel data for $metamodelPath"
+            storeError(executionId, msg)
+            updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
         }
         return metamodelData
     }
@@ -381,12 +382,9 @@ class TransformationExecutionService(
         val modelData = apiClient.getModelData(projectId.toString(), modelPath, jwtToken)
         
         if (modelData == null) {
-            updateState(
-                executionId,
-                ExecutionState.FAILED,
-                "Failed to fetch model data",
-                jwtToken
-            )
+            val msg = "Failed to fetch model data"
+            storeError(executionId, msg)
+            updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
         }
         return modelData
     }
@@ -457,12 +455,9 @@ class TransformationExecutionService(
      */
     private suspend fun handleTimeout(executionId: UUID, jwtToken: String) {
         logger.error("Execution timeout after ${timeoutMs}ms")
-        updateState(
-            executionId,
-            ExecutionState.FAILED,
-            "Execution timeout: Transformation exceeded maximum time of ${timeoutMs}ms",
-            jwtToken
-        )
+        val msg = "Execution timeout: Transformation exceeded maximum time of ${timeoutMs}ms"
+        storeError(executionId, msg)
+        updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
     }
     
     /**
@@ -505,6 +500,16 @@ class TransformationExecutionService(
                 ?.get(TransformationExecutionsTable.state)
         }
         return state == null || state == ExecutionState.CANCELLED
+    }
+
+    private fun storeError(executionId: UUID, message: String?) {
+        transaction {
+            TransformationExecutionsTable.update({
+                TransformationExecutionsTable.id eq executionId.toKotlinUuid()
+            }) {
+                it[error] = message
+            }
+        }
     }
 
     /**

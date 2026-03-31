@@ -47,6 +47,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.notInList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -85,9 +86,18 @@ class OptimizerExecutionService(
     private val appConfig: AppConfig,
     private val orchestratorRegistry: OrchestratorRegistry = OrchestratorRegistry()
 ) : ExecutionServiceWithFileTree {
+    /**
+     * Logger instance for this service. 
+     */
     private val logger = LoggerFactory.getLogger(OptimizerExecutionService::class.java)
+    /**
+     * Pretty-printing JSON codec for general serialisation. 
+     */
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
+    /**
+     * JSON codec for transformation typed ASTs with contextual serializers. 
+     */
     private val transformationJson = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -99,6 +109,9 @@ class OptimizerExecutionService(
         }
     }
 
+    /**
+     * JSON codec for script typed ASTs with contextual serializers. 
+     */
     private val scriptJson = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -110,10 +123,25 @@ class OptimizerExecutionService(
     }
 
     companion object {
+        /**
+         * Maximum length of a config file path accepted by this service. 
+         */
         private const val MAX_PATH_LENGTH = 1000
+        /**
+         * Directory prefix for result files stored under an execution. 
+         */
         private const val RESULTS_DIR = "results"
+        /**
+         * File path for the markdown summary stored alongside solution files. 
+         */
         private const val SUMMARY_FILE = "summary.md"
+        /**
+         * MIME type used for JSON result files. 
+         */
         private const val MIME_TYPE_JSON = "application/json"
+        /**
+         * MIME type used for Markdown result files. 
+         */
         private const val MIME_TYPE_MARKDOWN = "text/markdown"
     }
 
@@ -243,8 +271,6 @@ class OptimizerExecutionService(
         }
     }
 
-    // ========================= Execution pipeline =========================
-
     /**
      * Full optimization pipeline: fetches metamodel, model, transformation ASTs, script ASTs,
      * and runs the optimizer in federated mode (always via worker subprocess nodes).
@@ -252,6 +278,11 @@ class OptimizerExecutionService(
      *
      * Script compilation happens inside each worker subprocess — the orchestrator only
      * fetches and forwards the typed ASTs.
+     *
+     * @param executionId The execution record to drive.
+     * @param projectId Project that owns the execution.
+     * @param config Parsed optimization configuration.
+     * @param jwtToken Bearer token for backend API authentication.
      */
     private suspend fun runOptimization(
         executionId: UUID,
@@ -319,8 +350,6 @@ class OptimizerExecutionService(
         runWithEvaluator(executionId, config, metamodel, federated, jwtToken)
     }
 
-    // ========================= Unified execution =========================
-
     /**
      * Runs the optimization using the supplied [MutationEvaluator].
      *
@@ -346,17 +375,12 @@ class OptimizerExecutionService(
     ) {
         val orchestrator = OptimizationOrchestrator(config = config, evaluator = evaluator)
 
-        // evaluator.cleanup() must run in finally so it always executes, but
-        // storeResults/updateState(COMPLETED) must be called BEFORE cleanup because
-        // storeResults fetches solution model data via the WebSocket connection that
-        // cleanup closes.
         try {
             val result = try {
                 orchestrator.run { generation ->
                     val approxEvaluations = generation * config.solver.parameters.population
-                    updateState(
+                    updateProgress(
                         executionId,
-                        ExecutionState.RUNNING,
                         "Generation $generation (~$approxEvaluations evaluations)",
                         jwtToken
                     )
@@ -367,11 +391,11 @@ class OptimizerExecutionService(
                 return
             } catch (e: Exception) {
                 logger.error("Optimization failed", e)
+                storeError(executionId, e.message)
                 updateState(executionId, ExecutionState.FAILED, "Optimization failed: ${e.message}", jwtToken)
                 return
             }
 
-            // These run while the evaluator (and its WebSocket connections) are still alive.
             storeResults(executionId, config, result, metamodel, evaluator)
             updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
             logger.info("Optimizer execution $executionId completed")
@@ -380,7 +404,6 @@ class OptimizerExecutionService(
         }
     }
 
-    // ========================= Federated evaluator creation =========================
 
     /**
      * Creates a [FederatedMutationEvaluator] wrapping WebSocket connections to worker peers.
@@ -408,12 +431,13 @@ class OptimizerExecutionService(
         scriptAsts: Map<String, ScriptTypedAst>
     ): FederatedMutationEvaluator {
         val resources = config.runtime.resources
-        val workers = createWorkerClients(executionScope, resources)
+        val workerAndBudgets = createWorkerClients(executionScope, resources)
+        val workers = workerAndBudgets.map { it.first }
+        val workerThreadBudgets = workerAndBudgets.associate { (client, budget) -> client.nodeId to budget }
         val allocationRequest = buildAllocationRequest(
             executionId, config, metamodelData, modelData, transformations, scriptAsts,
-            threadsPerNode = resources?.threadsPerNode
         )
-        return FederatedMutationEvaluator(executionId.toString(), workers, allocationRequest)
+        return FederatedMutationEvaluator(executionId.toString(), workers, allocationRequest, workerThreadBudgets)
     }
 
     /**
@@ -429,7 +453,6 @@ class OptimizerExecutionService(
      * @param modelData The initial model data.
      * @param transformations Map of transformation path to typed AST.
      * @param scriptAsts Map of script path to typed AST.
-     * @param threadsPerNode Maximum threads per worker node, or `null` for no limit.
      * @return A fully populated [WorkerAllocationRequest].
      */
     private fun buildAllocationRequest(
@@ -439,7 +462,6 @@ class OptimizerExecutionService(
         modelData: ModelData,
         transformations: Map<String, TransformationTypedAst>,
         scriptAsts: Map<String, ScriptTypedAst>,
-        threadsPerNode: Int? = null
     ): WorkerAllocationRequest {
         val transformationAstJsons = transformations.mapValues { (_, ast) ->
             transformationJson.encodeToString(TransformationTypedAst.serializer(), ast)
@@ -456,7 +478,7 @@ class OptimizerExecutionService(
             goalConfig = config.goal,
             solverConfig = config.solver,
             initialSolutionCount = config.solver.parameters.population,
-            threadsPerNode = threadsPerNode
+            threadsPerNode = -1
         )
     }
 
@@ -475,13 +497,16 @@ class OptimizerExecutionService(
      *
      * @param scope Coroutine scope that owns the WebSocket reading loops of all returned clients.
      * @param resources Optional resource constraints from the optimization config.
-     * @return A list of [WorkerClient] instances, one per participating node.
+     * @return A list of (WorkerClient, allocatedThreadBudget) pairs, one per participating node.
+     *         The integer is the exact number of threads allocated to that node after applying
+     *         the global [ResourcesConfig.threads] cap, the per-node [ResourcesConfig.threadsPerNode]
+     *         limit, and the node's own capacity.
      */
     private suspend fun createWorkerClients(
         scope: CoroutineScope,
         resources: RuntimeConfig.ResourcesConfig? = null
-    ): List<WorkerClient> {
-        val clients = mutableListOf<WorkerClient>()
+    ): List<Pair<WorkerClient, Int>> {
+        val clients = mutableListOf<Pair<WorkerClient, Int>>()
         var nextId = 0
         val maxNodes = resources?.nodes ?: Int.MAX_VALUE
         val maxTotalThreads = resources?.threads ?: Int.MAX_VALUE
@@ -491,28 +516,31 @@ class OptimizerExecutionService(
             .replace("http://", "ws://")
 
         if (appConfig.workerThreads > 0 && clients.size < maxNodes) {
-            // Threads the local node will actually use (capped by threadsPerNode and budget).
             val localThreads = minOf(
                 appConfig.workerThreads,
                 resources?.threadsPerNode ?: Int.MAX_VALUE,
                 remainingThreads
             )
             if (localThreads > 0) {
-                clients.add(WorkerClient(
-                    nodeId = nextId.toString(),
-                    baseUrl = appConfig.nodeUrl,
-                    scope = scope,
-                    orchestratorRegistry = orchestratorRegistry,
-                    orchestratorWsBaseUrl = orchestratorWsBase,
-                    useLocalChannel = true
-                ))
+                clients.add(
+                    WorkerClient(
+                        nodeId = nextId.toString(),
+                        baseUrl = appConfig.nodeUrl,
+                        scope = scope,
+                        orchestratorRegistry = orchestratorRegistry,
+                        orchestratorWsBaseUrl = orchestratorWsBase,
+                        useLocalChannel = true
+                    ) to localThreads
+                )
                 nextId++
                 remainingThreads -= localThreads
             }
         }
 
         for (url in appConfig.peers) {
-            if (clients.size >= maxNodes) break
+            if (clients.size >= maxNodes) {
+                break
+            }
             val peerClient = WorkerClient(
                 nodeId = nextId.toString(),
                 baseUrl = url,
@@ -520,7 +548,6 @@ class OptimizerExecutionService(
                 orchestratorRegistry = orchestratorRegistry,
                 orchestratorWsBaseUrl = orchestratorWsBase
             )
-            // Fetch actual thread count from the peer; fall back to local config on failure.
             val peerThreads = try {
                 val metadata = peerClient.getMetadata()
                 resources?.threadsPerNode?.let { minOf(it, metadata.threadCount) } ?: metadata.threadCount
@@ -535,9 +562,11 @@ class OptimizerExecutionService(
                 peerClient.close()
                 break
             }
-            clients.add(peerClient)
+            clients.add(peerClient to peerThreads)
             nextId++
-            if (peerThreads > 0) remainingThreads -= peerThreads
+            if (peerThreads > 0) {
+                remainingThreads -= peerThreads
+            }
         }
 
         return clients
@@ -598,7 +627,6 @@ class OptimizerExecutionService(
         }
     }
 
-    // ========================= Data fetching =========================
 
     /**
      * Fetches metamodel data from the backend API.
@@ -615,7 +643,9 @@ class OptimizerExecutionService(
     ): MetamodelData? {
         val data = apiClient.getMetamodelData(projectId.toString(), metamodelPath, jwtToken)
         if (data == null) {
-            updateState(executionId, ExecutionState.FAILED, "Failed to fetch metamodel: $metamodelPath", jwtToken)
+            val msg = "Failed to fetch metamodel: $metamodelPath"
+            storeError(executionId, msg)
+            updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
         }
         return data
     }
@@ -635,7 +665,9 @@ class OptimizerExecutionService(
     ): ModelData? {
         val data = apiClient.getModelData(projectId.toString(), modelPath, jwtToken)
         if (data == null) {
-            updateState(executionId, ExecutionState.FAILED, "Failed to fetch model: $modelPath", jwtToken)
+            val msg = "Failed to fetch model: $modelPath"
+            storeError(executionId, msg)
+            updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
         }
         return data
     }
@@ -660,10 +692,9 @@ class OptimizerExecutionService(
         for (path in usingPaths) {
             val ast = apiClient.getTransformationTypedAst(projectId.toString(), path, jwtToken)
             if (ast == null) {
-                updateState(
-                    executionId, ExecutionState.FAILED,
-                    "Failed to fetch transformation: $path", jwtToken
-                )
+                val msg = "Failed to fetch transformation: $path"
+                storeError(executionId, msg)
+                updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
                 return null
             }
             result[path] = ast
@@ -691,10 +722,9 @@ class OptimizerExecutionService(
         for (path in scriptPaths) {
             val ast = apiClient.getScriptTypedAst(projectId.toString(), path, jwtToken)
             if (ast == null) {
-                updateState(
-                    executionId, ExecutionState.FAILED,
-                    "Failed to fetch script: $path", jwtToken
-                )
+                val msg = "Failed to fetch script: $path"
+                storeError(executionId, msg)
+                updateState(executionId, ExecutionState.FAILED, msg, jwtToken)
                 return null
             }
             result[path] = ast
@@ -714,10 +744,6 @@ class OptimizerExecutionService(
         goal.constraints.forEach { paths.add(it.path) }
         return paths
     }
-
-    // ========================= Script compilation =========================
-
-    // ========================= Result storage =========================
 
     /**
      * Builds a markdown result summary for the given Pareto-front solutions.
@@ -747,8 +773,11 @@ class OptimizerExecutionService(
                 append("|----------|-----------|-------------|\n")
                 solutions.forEachIndexed { index, sol ->
                     val objStr = sol.objectives.joinToString(", ") { "%.4f".format(it) }
-                    val conStr = if (sol.constraints.isEmpty()) "—"
-                    else sol.constraints.joinToString(", ") { "%.4f".format(it) }
+                    val conStr = if (sol.constraints.isEmpty()) {
+                        "—"
+                    } else {
+                        sol.constraints.joinToString(", ") { "%.4f".format(it) }
+                    }
                     append("| $index | $objStr | $conStr |\n")
                 }
 
@@ -763,7 +792,7 @@ class OptimizerExecutionService(
             nodeThreadCounts.entries
                 .sortedBy { it.key }
                 .forEach { (nodeId, threads) ->
-                    append("- **Node $nodeId:** $threads thread${if (threads == 1) "" else "s"}\n")
+                    append("- **Node $nodeId:** $threads thread${if (threads == 1) { "" } else { "s" }}\n")
                 }
             append("\n")
 
@@ -839,8 +868,23 @@ class OptimizerExecutionService(
         }
     }
 
+    /**
+     * Data holder for a single plot trace in a generated chart.
+     *
+     * @param name Display name shown in the chart legend.
+     * @param x X-axis data points.
+     * @param y Y-axis data points.
+     */
     private data class PlotTrace(val name: String, val x: List<Number>, val y: List<Number>)
 
+    /**
+     * Builds a fenced code block containing chart JSON in the custom `plot` format.
+     *
+     * @param xTitle Label for the x axis.
+     * @param yTitle Label for the y axis.
+     * @param traces Ordered list of traces to render in the chart.
+     * @return The rendered ` ```plot ``` ` code block string.
+     */
     private fun buildPlotBlock(
         xTitle: String,
         yTitle: String,
@@ -856,7 +900,6 @@ class OptimizerExecutionService(
         }
     }
 
-    // ========================= Config parsing =========================
 
     /**
      * Deserialises the raw JSON request payload into an [OptimizationConfig].
@@ -884,7 +927,6 @@ class OptimizerExecutionService(
         require(!config.problem.modelPath.contains("..")) { "Path traversal not allowed" }
     }
 
-    // ========================= State management =========================
 
     /**
      * Inserts a new execution record in the database with state [ExecutionState.SUBMITTED].
@@ -926,21 +968,52 @@ class OptimizerExecutionService(
         executionId: UUID, state: String, progressText: String?, jwtToken: String
     ) {
         val now = Instant.now()
-        transaction {
+        val terminalStates = listOf(ExecutionState.COMPLETED, ExecutionState.FAILED, ExecutionState.CANCELLED)
+        val updated = transaction {
             OptimizerExecutionsTable.update({
-                OptimizerExecutionsTable.id eq executionId.toKotlinUuid()
+                (OptimizerExecutionsTable.id eq executionId.toKotlinUuid()) and
+                    (OptimizerExecutionsTable.state notInList terminalStates)
             }) {
                 it[OptimizerExecutionsTable.state] = state
                 it[progress] = progressText
                 when (state) {
-                    ExecutionState.INITIALIZING, ExecutionState.RUNNING ->
+                    ExecutionState.INITIALIZING, ExecutionState.RUNNING -> {
                         it[startedAt] = now
-                    ExecutionState.COMPLETED, ExecutionState.FAILED, ExecutionState.CANCELLED ->
+                    }
+                    ExecutionState.COMPLETED, ExecutionState.FAILED, ExecutionState.CANCELLED -> {
                         it[completedAt] = now
+                    }
                 }
             }
         }
-        apiClient.updateExecutionState(executionId.toString(), state, progressText, jwtToken)
+        if (updated > 0) {
+            apiClient.updateExecutionState(executionId.toString(), state, progressText, jwtToken)
+        }
+    }
+
+    /**
+     * Updates only the progress text for a running execution, without changing the state.
+     * Skips the update if the execution is already in a terminal state.
+     *
+     * @param executionId The execution to update.
+     * @param progressText Human-readable progress message.
+     * @param jwtToken Authentication token for the backend API call.
+     */
+    private suspend fun updateProgress(
+        executionId: UUID, progressText: String, jwtToken: String
+    ) {
+        val terminalStates = listOf(ExecutionState.COMPLETED, ExecutionState.FAILED, ExecutionState.CANCELLED)
+        val updated = transaction {
+            OptimizerExecutionsTable.update({
+                (OptimizerExecutionsTable.id eq executionId.toKotlinUuid()) and
+                    (OptimizerExecutionsTable.state notInList terminalStates)
+            }) {
+                it[progress] = progressText
+            }
+        }
+        if (updated > 0) {
+            apiClient.updateExecutionState(executionId.toString(), ExecutionState.RUNNING, progressText, jwtToken)
+        }
     }
 
     /**
@@ -1000,6 +1073,30 @@ class OptimizerExecutionService(
     }
 
     /**
+     * Persists an error message for the given execution, using a first-write-wins strategy.
+     *
+     * The update is conditional: it only applies when the execution row is still in a
+     * non-terminal state (i.e. not yet [ExecutionState.COMPLETED], [ExecutionState.FAILED],
+     * or [ExecutionState.CANCELLED]).  This guarantees that the first error recorded
+     * wins — subsequent failures (e.g. workers failing after the root cause was already
+     * captured) cannot overwrite the original, more meaningful message.
+     *
+     * @param executionId The UUID of the execution to update.
+     * @param message The error message to store, or `null` to clear it.
+     */
+    private fun storeError(executionId: UUID, message: String?) {
+        val terminalStates = listOf(ExecutionState.COMPLETED, ExecutionState.FAILED, ExecutionState.CANCELLED)
+        transaction {
+            OptimizerExecutionsTable.update({
+                (OptimizerExecutionsTable.id eq executionId.toKotlinUuid()) and
+                    (OptimizerExecutionsTable.state notInList terminalStates)
+            }) {
+                it[error] = message
+            }
+        }
+    }
+
+    /**
      * Builds a markdown summary for the given execution record.
      * Returns stored summary markdown for completed executions, or a short failure/state string.
      *
@@ -1030,7 +1127,9 @@ class OptimizerExecutionService(
                     append(error ?: "Unknown error")
                 }
             }
-            else -> "Execution is in state: $state"
+            else -> {
+                "Execution is in state: $state"
+            }
         }
     }
 }

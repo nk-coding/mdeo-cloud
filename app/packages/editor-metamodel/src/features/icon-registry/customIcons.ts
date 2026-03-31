@@ -50,4 +50,3 @@ export const ExtendsIcon: IconNode = [
     ["path", { d: "M1.5 22.5L14.5 9.5" }],
     ["path", { d: "M22.5 1.5L9 6L18 15Z" }]
 ];
-

@@ -88,24 +88,17 @@ export function findSuperTypeWithTypeArgs<Specifics extends TypirSpecifics>(
 
         visited.add(currentIdentifier);
 
-        const superTypes = current.type.details.definition.superTypes;
-        if (superTypes) {
-            for (const superTypeRef of superTypes) {
-                const superType = services.TypeDefinitions.resolveCustomClassOrLambdaType({
-                    ...superTypeRef,
-                    isNullable: false
-                } as ValueType);
+        for (const superType of current.type.superClasses) {
+            const nonNullableSuperType = superType.asNonNullable;
+            if (isCustomClassType(nonNullableSuperType)) {
+                const superIdentifier = getClassTypeIdentifier(nonNullableSuperType.details.definition);
+                const newDistance = current.distance + 1;
 
-                if (isCustomClassType(superType)) {
-                    const superIdentifier = getClassTypeIdentifier(superType.details.definition);
-                    const newDistance = current.distance + 1;
-
-                    if (!visited.has(superIdentifier)) {
-                        queue.push({
-                            type: superType,
-                            distance: newDistance
-                        });
-                    }
+                if (!visited.has(superIdentifier)) {
+                    queue.push({
+                        type: nonNullableSuperType,
+                        distance: newDistance
+                    });
                 }
             }
         }

@@ -30,7 +30,7 @@ interface SaveAsModelInputs {
 /**
  * Type guard to check if a value is {@link SaveAsModelInputs}.
  *
- * @param value - The value to check.
+ * @param value The value to check.
  * @returns `true` if `value` is a valid {@link SaveAsModelInputs} object.
  */
 function isSaveAsModelInputs(value: unknown): value is SaveAsModelInputs {
@@ -60,7 +60,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
     private readonly sharedServices: LangiumSharedServices;
 
     /**
-     * @param sharedServices - The shared Langium services.
+     * @param sharedServices The shared Langium services.
      */
     constructor(sharedServices: LangiumSharedServices) {
         this.sharedServices = sharedServices;
@@ -71,7 +71,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
      * Parses the source generated model and collects workspace file paths to
      * populate the directory tree.
      *
-     * @param params - The action start parameters, including the source file URI.
+     * @param params The action start parameters, including the source file URI.
      * @returns A dialog page for the user to choose a directory and filename, or
      *          an error response if the model could not be parsed.
      */
@@ -107,7 +107,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
      * {@link performModelSave}. When no directory is selected, the file is
      * saved to the project's root files directory.
      *
-     * @param params - The action submit parameters, including dialog inputs.
+     * @param params The action submit parameters, including dialog inputs.
      * @returns A completion response on success, or a validation/error response
      *          if the inputs are invalid.
      */
@@ -149,10 +149,10 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
      * builds and serializes a Model AST, and applies a workspace edit to create
      * the new file.
      *
-     * @param data - The file menu action data containing the source URI.
-     * @param directory - The absolute target directory path, or an empty string
+     * @param data The file menu action data containing the source URI.
+     * @param directory The absolute target directory path, or an empty string
      *                    to save into the project's root files directory.
-     * @param normalizedFilename - The (already normalized) target filename, ending in `.m`.
+     * @param normalizedFilename The (already normalized) target filename, ending in `.m`.
      * @returns A completion response on success, or a validation/error response
      *          if the save could not be performed.
      */
@@ -215,7 +215,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
     /**
      * Parses the JSON content from a generated model document.
      *
-     * @param uri - The URI string of the generated model document.
+     * @param uri The URI string of the generated model document.
      * @returns The parsed {@link ModelData}, or `undefined` if the document
      *          could not be found or its content could not be parsed.
      */
@@ -274,7 +274,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
      * Resolves the metamodel path from {@link ModelData} to an absolute project path.
      * Searches metamodel documents by filename match.
      *
-     * @param metamodelPathFromData - The metamodel path as recorded in the model data.
+     * @param metamodelPathFromData The metamodel path as recorded in the model data.
      * @returns The absolute project-relative path to the metamodel file, or `undefined`
      *          if no matching metamodel document was found.
      */
@@ -300,7 +300,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
     /**
      * Serializes the synthetic Model AST using the model language's AstSerializer.
      *
-     * @param modelAst - The model AST to serialize.
+     * @param modelAst The model AST to serialize.
      * @returns The serialized text content of the model file.
      */
     private async serializeModelAst(modelAst: unknown): Promise<string> {
@@ -320,8 +320,8 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
     /**
      * Creates the dialog page with directory select and filename input.
      *
-     * @param tree - The file-select tree nodes representing the directory structure.
-     * @param rootPath - The root path of the file-select tree.
+     * @param tree The file-select tree nodes representing the directory structure.
+     * @param rootPath The root path of the file-select tree.
      * @returns An {@link ActionStartResponse} containing the dialog page definition.
      */
     private createDialogPage(tree: ActionSchemaFileSelectNode[], rootPath: string): ActionStartResponse {
@@ -360,8 +360,8 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
      * Uses `documentChanges` with a {@link CreateFile} operation followed by a
      * {@link TextDocumentEdit} to insert the initial content.
      *
-     * @param uri - The URI string of the file to create.
-     * @param content - The initial text content to write into the new file.
+     * @param uri The URI string of the file to create.
+     * @param content The initial text content to write into the new file.
      * @returns A {@link WorkspaceEdit} that creates the file and inserts content.
      */
     private createFileWorkspaceEdit(uri: string, content: string): WorkspaceEdit {

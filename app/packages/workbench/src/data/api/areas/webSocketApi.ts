@@ -144,11 +144,17 @@ export type ExecutionStateChangeCallback = (execution: Execution) => void;
  * Callback for streaming project load events
  */
 export interface ProjectLoadCallbacks {
-    /** Called once with the full directory structure */
+    /**
+     * Called once with the full directory structure
+     */
     onDirectoryStructure: (entries: Array<{ path: string; type: number }>) => void;
-    /** Called once per file with its content and version */
+    /**
+     * Called once per file with its content and version
+     */
     onFileData: (path: string, content: string, version: number) => void;
-    /** Called once per file with its metadata */
+    /**
+     * Called once per file with its metadata
+     */
     onFileMetadata: (path: string, metadata: object) => void;
 }
 
@@ -203,7 +209,9 @@ export class WebSocketApi {
     private readonly pendingRequests: Map<string, PendingRequest> = new Map();
     private readonly pendingProjectLoads: Map<string, ProjectLoadCallbacks> = new Map();
     private requestIdCounter = 0;
-    /** Resolves once the socket is open; replaced on each connect(). */
+    /**
+     * Resolves once the socket is open; replaced on each connect().
+     */
     private connectedPromise: Promise<void> = Promise.resolve();
     private connectedResolve: (() => void) | null = null;
 

@@ -32,10 +32,10 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
                 "opacity-100": isVisible,
                 "transition-all": isVisible,
                 "duration-300": isVisible,
-                "pointer-events-auto": true,
+                "pointer-events-auto": true
             }
         },
-        generateDetailsPanelContent(context),
+        generateDetailsPanelContent(context)
     );
 }
 

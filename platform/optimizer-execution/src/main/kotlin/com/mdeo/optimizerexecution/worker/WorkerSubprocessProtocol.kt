@@ -99,7 +99,9 @@ sealed class WorkerSubprocessResponse {
         val solutions: List<WorkerInitialSolution>
     ) : WorkerSubprocessResponse()
 
-    /** Reset acknowledged; the subprocess is ready for a new [WorkerSubprocessRequest.Setup]. */
+    /**
+     * Reset acknowledged; the subprocess is ready for a new [WorkerSubprocessRequest.Setup]. 
+     */
     @Serializable
     @SerialName("reset_ok")
     data object ResetOk : WorkerSubprocessResponse()
@@ -123,8 +125,6 @@ data class WorkerInitialSolution(
         other is WorkerInitialSolution && solutionId == other.solutionId && modelBytes.contentEquals(other.modelBytes)
     override fun hashCode() = 31 * solutionId.hashCode() + modelBytes.contentHashCode()
 }
-
-// ─── Channel messages (subprocess ↔ parent, for control and model byte sync) ───
 
 /**
  * Channel messages sent by the subprocess to the parent process while the subprocess
@@ -169,8 +169,6 @@ sealed class SubprocessChannelMessage {
         val solutionIds: List<String>
     ) : SubprocessChannelMessage()
 
-    // ── Local-channel orchestrator I/O ────────────────────────────────────────
-
     /**
      * Parent → Subprocess (local-channel mode): a CBOR-encoded [WorkerWsMessage] request
      * forwarded from the orchestrator via the stdin/stdout pipe instead of a WebSocket.
@@ -199,4 +197,24 @@ sealed class SubprocessChannelMessage {
     @Serializable
     @SerialName("orchestrator_responses")
     data class OrchestratorResponses(val payloads: List<ByteArray>) : SubprocessChannelMessage()
+
+    /**
+     * Subprocess → Parent (local-channel mode): an unsolicited CBOR-encoded
+     * [com.mdeo.optimizer.worker.WorkerWsMessage] that the subprocess wants to push to the
+     * orchestrator without an associated incoming request.
+     *
+     * Used for graceful-shutdown handshakes where the subprocess sends a
+     * [com.mdeo.optimizer.worker.WorkerShutdownNotice] before halting its JVM.
+     * The parent forwards the message to the orchestrator WebSocket session and
+     * delivers any reply back as an [OrchestratorRequest].
+     *
+     * @param payload CBOR-encoded [com.mdeo.optimizer.worker.WorkerWsMessage].
+     */
+    @Serializable
+    @SerialName("orchestrator_notice")
+    data class OrchestratorNotice(val payload: ByteArray) : SubprocessChannelMessage() {
+        override fun equals(other: Any?) =
+            other is OrchestratorNotice && payload.contentEquals(other.payload)
+        override fun hashCode() = payload.contentHashCode()
+    }
 }

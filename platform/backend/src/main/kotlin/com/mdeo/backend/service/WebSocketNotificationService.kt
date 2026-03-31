@@ -452,7 +452,9 @@ data class ProjectPermissionCache(
     val expiresAt: Instant
 ) {
     companion object {
-        /** Default time-to-live for cached permission grants. */
+        /**
+         * Default time-to-live for cached permission grants. 
+         */
         val TTL: java.time.Duration = java.time.Duration.ofMinutes(5)
     }
 

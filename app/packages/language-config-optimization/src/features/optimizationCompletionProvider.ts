@@ -9,7 +9,7 @@ import {
     type AstFileImportItem
 } from "@mdeo/language-shared";
 import type { CompletionAcceptor, CompletionContext, CompletionProviderOptions, NextFeature } from "langium/lsp";
-import type { AstNode, LangiumDocument, LangiumDocuments } from "langium";
+import type { AstNode, CompositeCstNode, LangiumDocument, LangiumDocuments } from "langium";
 import {
     ConstraintReference,
     FunctionFileImport,
@@ -180,8 +180,11 @@ export class OptimizationCompletionProvider extends DefaultCompletionProvider {
                     if (goalSection.imports.length > 0) {
                         return goalSection.imports[goalSection.imports.length - 1].$cstNode;
                     }
-                    return goalSection.$cstNode;
-                }
+                    const sectionCst = goalSection.$cstNode as CompositeCstNode | undefined;
+                    return sectionCst?.content.find((c) => c.text.trim() === "{");
+                },
+                undefined,
+                1
             );
         } catch {
             // Ignore errors during completion on incomplete documents
@@ -206,7 +209,7 @@ export class OptimizationCompletionProvider extends DefaultCompletionProvider {
         if (this.reflection.isInstance(context.node, ProblemSection) && next.property === "metamodel") {
             extensions = [".mm"];
         } else if (this.reflection.isInstance(context.node, ProblemSection) && next.property === "model") {
-            extensions = [".model"];
+            extensions = [".m"];
         } else if (this.reflection.isInstance(node, FunctionFileImport) && next.property === "file") {
             extensions = [".script"];
         }

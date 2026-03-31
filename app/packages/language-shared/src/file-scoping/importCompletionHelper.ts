@@ -47,6 +47,14 @@ export interface AstFileImportItem {
  * @template E The entity type whose instances are searched in the workspace index.
  */
 export abstract class FileImportCompletionHelper<E extends AstNode> {
+    /**
+     * @param entityType The AST node type whose instances are searched in the workspace index.
+     * @param fileImportTypeName The `$type` name for file-import statement nodes.
+     * @param importTypeName The `$type` name for single-entity import nodes.
+     * @param astSerializer Serializer used to produce formatted import text.
+     * @param indexManager Workspace index manager for enumerating exported entities.
+     * @param langiumDocuments Document registry for resolving target documents.
+     */
     constructor(
         protected readonly entityType: BaseType<E>,
         protected readonly fileImportTypeName: string,
@@ -62,8 +70,9 @@ export abstract class FileImportCompletionHelper<E extends AstNode> {
      * Override this for language-specific compatibility checks (e.g. metamodel compatibility).
      * The default implementation includes all documents.
      *
-     * @param _targetDoc The document that would be imported from
-     * @param _currentDoc The document currently being edited
+     * @param _targetDoc The document that would be imported from.
+     * @param _currentDoc The document currently being edited.
+     * @returns `true` if completions from `_targetDoc` should be offered; `false` to skip it.
      */
     protected shouldIncludeDocument(_targetDoc: LangiumDocument, _currentDoc: LangiumDocument): boolean {
         return true;
@@ -75,8 +84,9 @@ export abstract class FileImportCompletionHelper<E extends AstNode> {
      * Do NOT include `additionalTextEdits`; those are appended automatically.
      * Return `undefined` to skip this entity.
      *
-     * @param entityName The name of the entity being suggested
-     * @param relativePath The relative file path from the current document to the target document
+     * @param entityName The name of the entity being suggested.
+     * @param relativePath The relative file path from the current document to the target document.
+     * @returns The completion item, or `undefined` to skip this entity.
      */
     protected abstract buildCompletionItem(entityName: string, relativePath: string): CompletionValueItem | undefined;
 
@@ -97,6 +107,9 @@ export abstract class FileImportCompletionHelper<E extends AstNode> {
      *        returning `undefined` inserts at the start of the document
      * @param isEntityAlreadyAvailable Optional predicate: return `true` if the entity is already
      *        in scope by means other than the import from the target file
+     * @param indentationLevel Number of additional indent levels to prepend to the inserted import
+     *        line (default: 0). Use `1` when inserting inside a block at depth 1.
+     * @returns A promise that resolves once all completion items have been passed to `acceptor`.
      */
     async computeCompletions(
         context: CompletionContext,
@@ -104,11 +117,11 @@ export abstract class FileImportCompletionHelper<E extends AstNode> {
         document: LangiumDocument,
         fileImports: ReadonlyArray<AstFileImportItem>,
         getInsertAnchorCstNode: () => CstNode | undefined,
-        isEntityAlreadyAvailable?: (entityName: string) => boolean
+        isEntityAlreadyAvailable?: (entityName: string) => boolean,
+        indentationLevel?: number
     ): Promise<void> {
         const allDescriptions = this.indexManager.allElements(this.entityType.name).toArray();
 
-        // Group by document URI so we load and filter each target document only once.
         const byDocument = new Map<string, typeof allDescriptions>();
         for (const desc of allDescriptions) {
             const key = desc.documentUri.toString();
@@ -150,7 +163,8 @@ export abstract class FileImportCompletionHelper<E extends AstNode> {
                         formattingOptions,
                         relativePath,
                         entityName,
-                        docUriStr
+                        docUriStr,
+                        indentationLevel
                     );
                     acceptor(context, {
                         ...item,
@@ -167,9 +181,10 @@ export abstract class FileImportCompletionHelper<E extends AstNode> {
 /**
  * Returns the set of entity names already imported from a specific target file.
  *
- * @param fileImports The import statements from the current document's container node
- * @param document The current document (used to resolve relative paths)
- * @param targetDocUriString The string form of the target document's URI
+ * @param fileImports The import statements from the current document's container node.
+ * @param document The current document (used to resolve relative paths).
+ * @param targetDocUriString The string form of the target document's URI.
+ * @returns A set of entity names that are already imported from the specified file.
  */
 export function getAlreadyImportedFromFile(
     fileImports: ReadonlyArray<AstFileImportItem>,
@@ -197,6 +212,18 @@ export function getAlreadyImportedFromFile(
  * - Otherwise a new import node is serialized and inserted after `getInsertAnchorCstNode()`.
  *
  * Uses the `AstSerializer` to produce consistently formatted text.
+ *
+ * @param document The document currently being edited.
+ * @param fileImports The current import statements in the container node (for deduplication).
+ * @param getInsertAnchorCstNode Returns the CST node to insert a new import after;
+ *        returning `undefined` inserts at the start of the document.
+ * @param fileImportTypeName The `$type` name for file-import statement nodes.
+ * @param importTypeName The `$type` name for single-entity import nodes.
+ * @param astSerializer Serializer used to produce formatted import text.
+ * @param relativePath The relative file path from the current document to the target document.
+ * @param entityName The name of the entity to import.
+ * @param targetDocUriString The string form of the target document's URI.
+ * @returns A `TextEdit` that inserts or updates the import, or `undefined` if it cannot be built.
  */
 export async function buildFileImportTextEdit(
     document: LangiumDocument,
@@ -224,7 +251,24 @@ export async function buildFileImportTextEdit(
     );
 }
 
-/** Internal implementation reusing a pre-computed formattingOptions instance. */
+/**
+ * Internal implementation of {@link buildFileImportTextEdit} reusing a pre-computed
+ * `formattingOptions` instance to avoid redundant guessing when batching multiple completions.
+ *
+ * @param document The document currently being edited.
+ * @param fileImports The current import statements in the container node (for deduplication).
+ * @param getInsertAnchorCstNode Returns the CST node to insert a new import after;
+ *        returning `undefined` inserts at the start of the document.
+ * @param fileImportTypeName The `$type` name for file-import statement nodes.
+ * @param importTypeName The `$type` name for single-entity import nodes.
+ * @param astSerializer Serializer used to produce formatted import text.
+ * @param formattingOptions Pre-computed formatting options for the document.
+ * @param relativePath The relative file path from the current document to the target document.
+ * @param entityName The name of the entity to import.
+ * @param targetDocUriString The string form of the target document's URI.
+ * @param indentationLevel Number of indent levels to prepend to a newly inserted import line.
+ * @returns A `TextEdit` that inserts or updates the import, or `undefined` if it cannot be built.
+ */
 async function _buildFileImportTextEdit(
     document: LangiumDocument,
     fileImports: ReadonlyArray<AstFileImportItem>,
@@ -235,7 +279,8 @@ async function _buildFileImportTextEdit(
     formattingOptions: ReturnType<AstSerializer["guessFormattingOptions"]>,
     relativePath: string,
     entityName: string,
-    targetDocUriString: string
+    targetDocUriString: string,
+    indentationLevel?: number
 ): Promise<TextEdit | undefined> {
     const existingImport = fileImports.find(
         (imp) => resolveRelativePath(document, imp.file).toString() === targetDocUriString
@@ -260,7 +305,8 @@ async function _buildFileImportTextEdit(
             formattingOptions,
             document,
             relativePath,
-            entityName
+            entityName,
+            indentationLevel
         );
     }
 }
@@ -268,6 +314,15 @@ async function _buildFileImportTextEdit(
 /**
  * Builds a TextEdit that replaces an existing file-import CST node with a new serialized
  * version that includes all existing imports plus the new entity appended at the end.
+ *
+ * @param existingImport The existing file-import AST node to update.
+ * @param fileImportTypeName The `$type` name for file-import statement nodes.
+ * @param importTypeName The `$type` name for single-entity import nodes.
+ * @param astSerializer Serializer used to produce formatted import text.
+ * @param formattingOptions Pre-computed formatting options for the document.
+ * @param document The document currently being edited.
+ * @param entityName The name of the entity to append to the existing import.
+ * @returns A `TextEdit` replacing the existing import node, or `undefined` if it has no CST node.
  */
 async function buildUpdateImportEdit(
     existingImport: AstFileImportItem,
@@ -306,6 +361,18 @@ async function buildUpdateImportEdit(
 /**
  * Builds a TextEdit that inserts a new file-import statement after the anchor CST node.
  * If no anchor is given, the statement is inserted at the very beginning of the document.
+ *
+ * @param anchorCstNode The CST node after which the import is inserted;
+ *        `undefined` inserts at position 0:0.
+ * @param fileImportTypeName The `$type` name for file-import statement nodes.
+ * @param importTypeName The `$type` name for single-entity import nodes.
+ * @param astSerializer Serializer used to produce formatted import text.
+ * @param formattingOptions Pre-computed formatting options for the document.
+ * @param document The document currently being edited.
+ * @param relativePath The relative file path from the current document to the target document.
+ * @param entityName The name of the entity to import.
+ * @param indentationLevel Number of indent levels to prepend to the inserted import line (default: 0).
+ * @returns A `TextEdit` inserting the new import, or `undefined` if serialization fails.
  */
 async function buildNewImportEdit(
     anchorCstNode: CstNode | undefined,
@@ -315,7 +382,8 @@ async function buildNewImportEdit(
     formattingOptions: ReturnType<AstSerializer["guessFormattingOptions"]>,
     document: LangiumDocument,
     relativePath: string,
-    entityName: string
+    entityName: string,
+    indentationLevel?: number
 ): Promise<TextEdit | undefined> {
     const syntheticNode = {
         $type: fileImportTypeName,
@@ -331,8 +399,17 @@ async function buildNewImportEdit(
 
     const insertPosition = anchorCstNode != undefined ? anchorCstNode.range.end : { line: 0, character: 0 };
 
+    const indentUnit = formattingOptions.insertSpaces ? " ".repeat(formattingOptions.tabSize ?? 4) : "\t";
+    const indentation = indentUnit.repeat(indentationLevel ?? 0);
+
+    const serializedIndented = serialized
+        .trimEnd()
+        .split("\n")
+        .map((line, index) => (index === 0 ? line : indentation + line))
+        .join("\n");
+
     return {
         range: { start: insertPosition, end: insertPosition },
-        newText: "\n" + serialized
+        newText: "\n" + indentation + serializedIndented
     };
 }

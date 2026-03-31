@@ -39,10 +39,12 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Subprocess entry point for per-execution mutation and evaluation work.
@@ -73,8 +75,14 @@ import java.util.concurrent.atomic.AtomicInteger
 @OptIn(ExperimentalSerializationApi::class)
 class WorkerSubprocessMain : SubprocessMain() {
 
+    /**
+     * CBOR codec for encoding/decoding subprocess and WebSocket messages. 
+     */
     private val cbor = Cbor { ignoreUnknownKeys = true }
 
+    /**
+     * JSON codec for transformation typed ASTs with contextual serializers. 
+     */
     private val transformationJson = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -85,6 +93,9 @@ class WorkerSubprocessMain : SubprocessMain() {
         }
     }
 
+    /**
+     * JSON codec for script typed ASTs with contextual serializers. 
+     */
     private val scriptJson = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -93,8 +104,6 @@ class WorkerSubprocessMain : SubprocessMain() {
             contextual(TypedStatement::class, TypedStatementSerializer)
         }
     }
-
-    // ─── OrchestratorChannel abstraction ──────────────────────────────────────────
 
     /**
      * Abstraction over the transport used to exchange [WorkerWsMessage] frames with
@@ -116,7 +125,18 @@ class WorkerSubprocessMain : SubprocessMain() {
          */
         fun runLoop(handler: (WorkerWsMessage) -> List<WorkerWsMessage>)
 
-        /** Signals the loop to stop and releases any held resources. */
+        /**
+         * Sends an unsolicited [WorkerWsMessage] to the orchestrator outside of the
+         * normal request-response loop.
+         *
+         * Used for graceful-shutdown handshakes where the subprocess needs to push a
+         * [WorkerShutdownNotice] before halting. Thread-safe.
+         */
+        fun sendNotice(msg: WorkerWsMessage)
+
+        /**
+         * Signals the loop to stop and releases any held resources. 
+         */
         fun close()
     }
 
@@ -126,16 +146,32 @@ class WorkerSubprocessMain : SubprocessMain() {
      * Opens the connection eagerly in [runLoop] and processes one frame at a time.
      * [close] tears down the underlying [HttpClient], which cancels the pending coroutine
      * and causes [runLoop] to return.
+     *
+     * The active WebSocket session reference is stored in [activeSession] so that
+     * [sendNotice] can push unsolicited frames from the watchdog thread.
      */
     private inner class WebSocketOrchestratorChannel(private val wsUrl: String) : OrchestratorChannel {
+        /**
+         * Ktor HTTP client used to open the WebSocket connection to the orchestrator. 
+         */
         private val client = HttpClient(CIO) { install(WebSockets) }
+
+        /**
+         * Reference to the active WebSocket session, set once the connection is established.
+         * Used by [sendNotice] to push unsolicited frames from outside the dispatch loop.
+         */
+        @Volatile
+        private var activeSession: DefaultWebSocketSession? = null
 
         override fun runLoop(handler: (WorkerWsMessage) -> List<WorkerWsMessage>) {
             runBlocking {
                 try {
                     client.webSocket(wsUrl) {
+                        activeSession = this
                         for (frame in incoming) {
-                            if (frame !is Frame.Binary) continue
+                            if (frame !is Frame.Binary) {
+                                continue
+                            }
                             val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
                             val responses = handler(msg)
                             for (response in responses) {
@@ -145,7 +181,19 @@ class WorkerSubprocessMain : SubprocessMain() {
                     }
                 } catch (_: CancellationException) {
                     // Normal shutdown triggered by close()
+                } finally {
+                    activeSession = null
                 }
+            }
+        }
+
+        override fun sendNotice(msg: WorkerWsMessage) {
+            val session = activeSession ?: return
+            val bytes = cbor.encodeToByteArray<WorkerWsMessage>(msg)
+            try {
+                runBlocking { session.send(Frame.Binary(true, bytes)) }
+            } catch (_: Exception) {
+                // Session may have already closed — nothing we can do on the watchdog thread
             }
         }
 
@@ -162,14 +210,26 @@ class WorkerSubprocessMain : SubprocessMain() {
      * enqueues them via [enqueue] (called from [handleChannelMessage]) and dispatches
      * them to the handler in [runLoop]. Responses are sent back as
      * [SubprocessChannelMessage.OrchestratorResponses] using [sendChannelMessage].
+     *
+     * Unsolicited outgoing notices (e.g. [WorkerShutdownNotice]) are sent via
+     * [sendNotice], which uses [SubprocessChannelMessage.OrchestratorNotice] so that the
+     * parent can forward them without a matching pending request.
      */
     private inner class StdioOrchestratorChannel : OrchestratorChannel {
+        /**
+         * Queue of raw CBOR payloads forwarded from the parent via [enqueue], consumed by [runLoop]. 
+         */
         private val queue = LinkedBlockingQueue<ByteArray>()
 
+        /**
+         * Set to `true` by [close] to stop the [runLoop] poll loop. 
+         */
         @Volatile
         private var closed = false
 
-        /** Delivers an incoming orchestrator request payload to the dispatch loop. */
+        /**
+         * Delivers an incoming orchestrator request payload to the dispatch loop. 
+         */
         fun enqueue(payload: ByteArray) {
             if (!closed) queue.offer(payload)
         }
@@ -188,13 +248,26 @@ class WorkerSubprocessMain : SubprocessMain() {
             }
         }
 
+        override fun sendNotice(msg: WorkerWsMessage) {
+            try {
+                sendChannelMessage(
+                    cbor.encodeToByteArray<SubprocessChannelMessage>(
+                        SubprocessChannelMessage.OrchestratorNotice(cbor.encodeToByteArray<WorkerWsMessage>(msg))
+                    )
+                )
+            } catch (_: Exception) {
+                // Pipe may be broken — nothing we can do on the watchdog thread
+            }
+        }
+
         override fun close() {
             closed = true
         }
     }
 
-    // ─── State ────────────────────────────────────────────────────────────────────
-
+    /**
+     * The active [LocalMutationEvaluator] for this subprocess, or `null` before [handleSetup] runs. 
+     */
     @Volatile
     private var evaluator: LocalMutationEvaluator? = null
 
@@ -204,6 +277,13 @@ class WorkerSubprocessMain : SubprocessMain() {
      */
     @Volatile
     private var activeOrchestratorChannel: OrchestratorChannel? = null
+
+    /**
+     * Completed with `true` when a [WorkerShutdownAck] is received from the orchestrator.
+     * Used by [notifyShutdownAndWait] to block until the orchestrator has recorded the
+     * shutdown reason before this subprocess halts.
+     */
+    private val shutdownAckDeferred = AtomicReference<kotlinx.coroutines.CompletableDeferred<Boolean>?>(null)
 
     /**
      * Background thread running the orchestrator channel dispatch loop.
@@ -221,19 +301,38 @@ class WorkerSubprocessMain : SubprocessMain() {
     @Volatile
     private var taskDispatcher: ExecutorCoroutineDispatcher? = null
 
+    /**
+     * Monotonically increasing counter used to correlate watchdog timeout registrations. 
+     */
     private val evalIdCounter = AtomicInteger(0)
 
+    /**
+     * Per-script evaluation timeout budget in milliseconds (0 means no timeout). 
+     */
     private var scriptTimeoutMs: Long = 0L
+    /**
+     * Per-transformation execution timeout budget in milliseconds (0 means no timeout). 
+     */
     private var transformationTimeoutMs: Long = 0L
+    /**
+     * Total number of guidance functions (objectives + constraints) used to compute composite timeout. 
+     */
     private var numGuidanceFunctions: Int = 0
 
     override fun handleCommand(payload: ByteArray): ByteArray {
         return when (val request = cbor.decodeFromByteArray<WorkerSubprocessRequest>(payload)) {
-            is WorkerSubprocessRequest.Setup -> handleSetup(request)
-            is WorkerSubprocessRequest.Reset -> handleReset()
+            is WorkerSubprocessRequest.Setup -> { handleSetup(request) }
+            is WorkerSubprocessRequest.Reset -> { handleReset() }
         }
     }
 
+    /**
+     * Handles a [WorkerSubprocessRequest.Setup] command: compiles resources, generates the
+     * initial population, and starts the orchestrator channel loop if required.
+     *
+     * @param request The setup request containing all compilation inputs and configuration.
+     * @return CBOR-encoded [WorkerSubprocessResponse.SetupOk] with the initial solutions.
+     */
     private fun handleSetup(request: WorkerSubprocessRequest.Setup): ByteArray {
         scriptTimeoutMs = request.scriptTimeoutMs
         transformationTimeoutMs = request.transformationTimeoutMs
@@ -246,10 +345,15 @@ class WorkerSubprocessMain : SubprocessMain() {
         evaluator = localEvaluator
 
         val channel: OrchestratorChannel? = when {
-            request.useLocalChannel && !request.skipInitialization -> StdioOrchestratorChannel()
-            request.orchestratorWsUrl != null && !request.skipInitialization ->
+            request.useLocalChannel && !request.skipInitialization -> {
+                StdioOrchestratorChannel()
+            }
+            request.orchestratorWsUrl != null && !request.skipInitialization -> {
                 WebSocketOrchestratorChannel(request.orchestratorWsUrl)
-            else -> null
+            }
+            else -> {
+                null
+            }
         }
 
         if (channel != null) {
@@ -325,8 +429,6 @@ class WorkerSubprocessMain : SubprocessMain() {
         return Pair(localEvaluator, initialSolutions)
     }
 
-    // ─── Orchestrator channel ─────────────────────────────────────────────────────
-
     /**
      * Starts the [channel]'s message-dispatch loop in a background daemon thread.
      *
@@ -363,15 +465,62 @@ class WorkerSubprocessMain : SubprocessMain() {
     }
 
     /**
+     * Intercepts the watchdog timeout before the subprocess halts its JVM.
+     *
+     * Sends a [WorkerShutdownNotice] to the orchestrator via the active channel and
+     * waits up to [SHUTDOWN_NOTICE_TIMEOUT_MS] for a [WorkerShutdownAck]. This ensures
+     * the orchestrator records the correct shutdown reason before the WebSocket connection
+     * is torn down, preventing an unhelpful "worker no longer reachable" error message.
+     *
+     * @param timeoutId The identifier of the expired watchdog timeout.
+     */
+    override fun onWatchdogTimeout(timeoutId: Int) {
+        val chan = activeOrchestratorChannel ?: return
+        val reason = "Worker timed out during script or transformation evaluation (timeout id $timeoutId)"
+        notifyShutdownAndWait(chan, reason)
+    }
+
+    /**
+     * Sends a [WorkerShutdownNotice] over [channel] and blocks until [WorkerShutdownAck]
+     * is received or [SHUTDOWN_NOTICE_TIMEOUT_MS] elapses.
+     *
+     * Registers a [CompletableDeferred] in [shutdownAckDeferred] so that the dispatch
+     * loop can complete it when the ack arrives.
+     *
+     * @param channel The active orchestrator channel to send the notice on.
+     * @param reason Human-readable reason for the shutdown.
+     */
+    private fun notifyShutdownAndWait(channel: OrchestratorChannel, reason: String) {
+        val ackDeferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        shutdownAckDeferred.set(ackDeferred)
+        val requestId = UUID.randomUUID().toString()
+        try {
+            channel.sendNotice(WorkerShutdownNotice(requestId = requestId, reason = reason))
+            runBlocking {
+                withTimeoutOrNull(SHUTDOWN_NOTICE_TIMEOUT_MS) { ackDeferred.await() }
+            }
+        } catch (_: Exception) {
+            // Best-effort: if sending or waiting fails, proceed to halt anyway
+        } finally {
+            shutdownAckDeferred.set(null)
+        }
+    }
+
+    /**
      * Handles a WebSocket message from the orchestrator, performing all mutation
      * and evaluation work in-process.
      */
     private fun handleWsMessage(msg: WorkerWsMessage): List<WorkerWsMessage> {
         return when (msg) {
-            is NodeWorkBatchRequest -> listOf(handleWsNodeWorkBatch(msg))
-            is SolutionFetchRequest -> listOf(handleWsSolutionFetch(msg))
-            is SolutionBatchFetchRequest -> handleWsBatchFetch(msg)
-            else -> emptyList()
+            is NodeWorkBatchRequest -> { listOf(handleWsNodeWorkBatch(msg)) }
+            is SolutionFetchRequest -> { listOf(handleWsSolutionFetch(msg)) }
+            is SolutionBatchFetchRequest -> { handleWsBatchFetch(msg) }
+            is WorkerShutdownAck -> {
+                // Complete the pending deferred so notifyShutdownAndWait can unblock
+                shutdownAckDeferred.get()?.complete(true)
+                emptyList()
+            }
+            else -> { emptyList() }
         }
     }
 
@@ -459,7 +608,9 @@ class WorkerSubprocessMain : SubprocessMain() {
     ): BatchResult {
         val evalId = evalIdCounter.incrementAndGet()
         val mutationTimeoutMs = numGuidanceFunctions.toLong() * scriptTimeoutMs + transformationTimeoutMs
-        if (mutationTimeoutMs > 0) registerTimeout(evalId, mutationTimeoutMs)
+        if (mutationTimeoutMs > 0) {
+            registerTimeout(evalId, mutationTimeoutMs)
+        }
         return try {
             val batch = NodeBatch(
                 nodeId = nodeId,
@@ -515,7 +666,9 @@ class WorkerSubprocessMain : SubprocessMain() {
     ): BatchResult {
         val evalId = evalIdCounter.incrementAndGet()
         val evaluationTimeoutMs = numGuidanceFunctions.toLong() * scriptTimeoutMs
-        if (evaluationTimeoutMs > 0) registerTimeout(evalId, evaluationTimeoutMs)
+        if (evaluationTimeoutMs > 0) {
+            registerTimeout(evalId, evaluationTimeoutMs)
+        }
         return try {
             val batch = NodeBatch(
                 nodeId = nodeId,
@@ -545,6 +698,12 @@ class WorkerSubprocessMain : SubprocessMain() {
         }
     }
 
+    /**
+     * Handles a [SolutionFetchRequest] by retrieving the serialized model from the evaluator.
+     *
+     * @param msg The fetch request identifying the solution to retrieve.
+     * @return A [SolutionFetchResponse] containing the serialized model.
+     */
     private fun handleWsSolutionFetch(msg: SolutionFetchRequest): SolutionFetchResponse {
         val ev = requireEvaluator()
         val ref = WorkerSolutionRef(LocalMutationEvaluator.DEFAULT_NODE_ID, msg.solutionId)
@@ -552,6 +711,12 @@ class WorkerSubprocessMain : SubprocessMain() {
         return SolutionFetchResponse(msg.requestId, msg.solutionId, serializedModel)
     }
 
+    /**
+     * Handles a [SolutionBatchFetchRequest] by retrieving each solution's serialized model.
+     *
+     * @param msg The batch fetch request identifying all solutions to retrieve.
+     * @return A list of [SolutionFetchResponse] instances, one per requested solution.
+     */
     private fun handleWsBatchFetch(msg: SolutionBatchFetchRequest): List<SolutionFetchResponse> {
         val ev = requireEvaluator()
         return msg.solutionIds.map { solutionId ->
@@ -561,6 +726,12 @@ class WorkerSubprocessMain : SubprocessMain() {
         }
     }
 
+    /**
+     * Constructs a failed [BatchResult] for [parentSolutionId] with empty objectives and constraints.
+     *
+     * @param parentSolutionId The ID of the solution whose mutation or evaluation failed.
+     * @return A [BatchResult] with [BatchResult.succeeded] set to `false`.
+     */
     private fun failedResult(parentSolutionId: String) = BatchResult(
         parentSolutionId = parentSolutionId,
         newSolutionId = "",
@@ -569,7 +740,6 @@ class WorkerSubprocessMain : SubprocessMain() {
         succeeded = false
     )
 
-    // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
     /**
      * Resets all mutable state so the subprocess can be reused for a new execution.
@@ -590,6 +760,11 @@ class WorkerSubprocessMain : SubprocessMain() {
         return cbor.encodeToByteArray<WorkerSubprocessResponse>(WorkerSubprocessResponse.ResetOk)
     }
 
+    /**
+     * Returns the active [LocalMutationEvaluator], throwing if not yet initialised.
+     *
+     * @return The active evaluator.
+     */
     private fun requireEvaluator(): LocalMutationEvaluator =
         evaluator ?: throw IllegalStateException("Evaluator not initialised — send Setup first")
 
@@ -606,9 +781,7 @@ class WorkerSubprocessMain : SubprocessMain() {
         activeOrchestratorChannel = null
         val t = wsThread
         wsThread = null
-        // Wait up to 30 s for any in-progress mutation to complete before the evaluator
-        // is torn down.  In practice this returns in milliseconds.
-        t?.join(30_000L)
+        t?.join(1000L)
     }
 
     override fun cleanup() {
@@ -619,7 +792,24 @@ class WorkerSubprocessMain : SubprocessMain() {
         evaluator = null
     }
 
+    /**
+     * Subprocess JVM entry point. 
+     */
     companion object {
+        /**
+         * Maximum time to wait for a [WorkerShutdownAck] from the orchestrator before
+         * proceeding to halt the JVM regardless.
+         *
+         * Five seconds is generous enough to survive a slow network round-trip while still
+         * ensuring the subprocess does not block indefinitely on the watchdog thread.
+         */
+        private const val SHUTDOWN_NOTICE_TIMEOUT_MS = 5_000L
+
+        /**
+         * JVM entry point for the worker subprocess.
+         *
+         * @param args Command-line arguments passed by the parent process launcher.
+         */
         @JvmStatic
         fun main(args: Array<String>) {
             WorkerSubprocessMain().run(args)

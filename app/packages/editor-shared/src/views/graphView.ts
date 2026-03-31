@@ -2,6 +2,7 @@ import type { IView, RenderingContext, ViewerOptions } from "@eclipse-glsp/sprot
 import { sharedImport } from "../sharedImport.js";
 import type { VNode } from "snabbdom";
 import type { GGraph } from "@eclipse-glsp/client";
+import { isIssueMarker } from "../features/decoration/issueMarker.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, TYPES } = sharedImport("@eclipse-glsp/sprotty");
@@ -29,7 +30,12 @@ export class GGraphView implements IView {
                               transform
                           }
                       },
-                      ...context.renderChildren(model)
+                      ...model.children
+                          .filter((c) => !isIssueMarker(c))
+                          .flatMap((c) => {
+                              const v = context.renderElement(c);
+                              return v !== undefined ? [v] : [];
+                          })
                   )
               ]
             : [];

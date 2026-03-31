@@ -501,6 +501,10 @@ export class ModelTransformationValidator extends BaseModelValidator {
             return;
         }
 
+        if (endpointModifier === "delete" && (linkModifier === "require" || linkModifier === "forbid")) {
+            return;
+        }
+
         const linkModifierLabel = linkModifier ?? "no modifier";
         accept(
             "error",
@@ -541,6 +545,13 @@ export class ModelTransformationValidator extends BaseModelValidator {
         const connectedLinks = this.collectConnectedLinks(pattern, obj);
         for (const link of connectedLinks) {
             if (link.modifier?.modifier === instanceModifier) {
+                continue;
+            }
+
+            if (
+                instanceModifier === "delete" &&
+                (link.modifier?.modifier === "require" || link.modifier?.modifier === "forbid")
+            ) {
                 continue;
             }
 

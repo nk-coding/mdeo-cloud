@@ -36,7 +36,9 @@ class SubprocessPool(
     private val available = LinkedBlockingDeque<SubprocessRunner>()
 
     companion object {
-        /** Default pool capacity. Kept low to limit idle memory footprint. */
+        /**
+         * Default pool capacity. Kept low to limit idle memory footprint. 
+         */
         const val DEFAULT_POOL_SIZE = 3
     }
 
@@ -56,6 +58,7 @@ class SubprocessPool(
             return acquire()
         }
         runner.onChannelMessage = null
+        runner.executionId = null
         logger.debug("Acquired subprocess from pool ({} remaining)", available.size)
         return runner
     }
@@ -76,6 +79,7 @@ class SubprocessPool(
         }
 
         runner.onChannelMessage = null
+        runner.executionId = null
 
         val succeeded = try {
             performReset(runner)

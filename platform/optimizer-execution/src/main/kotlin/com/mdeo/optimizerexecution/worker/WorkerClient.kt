@@ -66,6 +66,9 @@ class WorkerClient(
     private val useLocalChannel: Boolean = false
 ) : AutoCloseable {
 
+    /**
+     * Timeout constants for WebSocket session management. 
+     */
     private companion object {
         /**
          * Max time to wait for the subprocess to connect back via the registry.
@@ -77,6 +80,9 @@ class WorkerClient(
         const val OPERATION_TIMEOUT_MS = 600_000L
     }
 
+    /**
+     * HTTP client used for REST allocation, metadata, cleanup, and (in legacy mode) WebSocket upgrade. 
+     */
     private val httpClient: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         install(HttpTimeout) {
@@ -86,13 +92,31 @@ class WorkerClient(
         install(WebSockets)
     }
 
+    /**
+     * Logger instance for this client. 
+     */
     private val logger = LoggerFactory.getLogger(WorkerClient::class.java)
+    /**
+     * CBOR codec for encoding/decoding [WorkerWsMessage] frames. 
+     */
     private val cbor = Cbor { ignoreUnknownKeys = true }
 
     /**
      * Pending request correlation: requestId → deferred result.
      */
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<WorkerWsMessage>>()
+
+    /**
+     * The reason provided in a [WorkerShutdownNotice] received from the subprocess, or
+     * `null` if no notice has been received.
+     *
+     * Set atomically when the orchestrator dispatch loop processes a
+     * [WorkerShutdownNotice]; callers can inspect this to report a precise error instead
+     * of a generic "worker not reachable" message.
+     */
+    @Volatile
+    var shutdownReason: String? = null
+        private set
 
     /**
      * Pending multi-response correlation: requestId → collector aggregating individual responses.
@@ -125,12 +149,16 @@ class WorkerClient(
      * `ws://` / `wss://` equivalent of [baseUrl].
      */
     private val wsBaseUrl = when {
-        baseUrl.startsWith("https://") -> baseUrl.replace("https://", "wss://")
-        baseUrl.startsWith("http://") -> baseUrl.replace("http://", "ws://")
-        else -> baseUrl
+        baseUrl.startsWith("https://") -> {
+            baseUrl.replace("https://", "wss://")
+        }
+        baseUrl.startsWith("http://") -> {
+            baseUrl.replace("http://", "ws://")
+        }
+        else -> {
+            baseUrl
+        }
     }
-
-    // ─── Public API ───────────────────────────────────────────────────────────
 
     /**
      * Allocates resources on the worker for a new optimization execution.
@@ -152,7 +180,6 @@ class WorkerClient(
      */
     suspend fun allocate(request: WorkerAllocationRequest): WorkerAllocationResponse {
         return if (useLocalChannel) {
-            // Local-channel: tell the subprocess to use stdio; we connect to the legacy WS endpoint.
             val response = httpClient.post("$baseUrl/api/worker/executions") {
                 contentType(ContentType.Application.Json)
                 setBody(request.copy(useLocalChannel = true, orchestratorWsUrl = null))
@@ -167,6 +194,9 @@ class WorkerClient(
     /**
      * Registry-mode (or legacy) allocation: the orchestrator WS URL is embedded in the
      * HTTP request for subprocess reverse-connection, or omitted for legacy mode.
+     *
+     * @param request The allocation request containing all resources and configuration.
+     * @return The allocation response with initial solution fitness data.
      */
     private suspend fun allocateRegistry(request: WorkerAllocationRequest): WorkerAllocationResponse {
         val registryKey = orchestratorRegistry?.let { OrchestratorRegistry.key(request.executionId, nodeId) }
@@ -175,11 +205,6 @@ class WorkerClient(
             "$orchestratorWsBaseUrl/ws/subprocess/executions/${request.executionId}/$nodeId"
         } else null
 
-        // Register the slot BEFORE sending the HTTP request. The subprocess starts its
-        // WebSocket connect-back thread during handleSetup(), which can complete before
-        // the HTTP response even reaches this client. If we registered after the POST,
-        // the subprocess would arrive to "No pending registration" and the orchestrator
-        // would then wait 30 s for a connection that already came and went.
         val wsDeferred = if (orchestratorRegistry != null && registryKey != null) {
             logger.info(
                 "Registering subprocess WS slot for node {} execution {} (key={})",
@@ -194,7 +219,7 @@ class WorkerClient(
                 setBody(request.copy(orchestratorWsUrl = orchestratorWsUrl))
             }.body<WorkerAllocationResponse>()
         } catch (e: Exception) {
-            if (registryKey != null) orchestratorRegistry?.remove(registryKey)
+            if (registryKey != null) orchestratorRegistry.remove(registryKey)
             throw e
         }
 
@@ -208,7 +233,7 @@ class WorkerClient(
                 logger.info("Subprocess WS session established for node {} execution {}", nodeId, request.executionId)
                 startRegistryWsReadLoop(request.executionId, session)
             } catch (e: Exception) {
-                orchestratorRegistry?.remove(registryKey)
+                orchestratorRegistry.remove(registryKey)
                 throw e
             }
         } else {
@@ -330,7 +355,6 @@ class WorkerClient(
         httpClient.close()
     }
 
-    // ─── Internal WebSocket machinery ─────────────────────────────────────────
 
     /**
      * Launches the background coroutine that establishes the WebSocket connection to the worker.
@@ -346,12 +370,17 @@ class WorkerClient(
                     logger.info("Worker WS connected to {} for execution {}", baseUrl, executionId)
                     wsSessionDeferred.complete(this)
                     for (frame in incoming) {
-                        if (frame !is Frame.Binary) continue
+                        if (frame !is Frame.Binary) {
+                            continue
+                        }
                         val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
+                        if (handleUnsolicitedMessage(msg, this)) continue
                         val multi = pendingMultiRequests[msg.requestId]
                         if (multi != null) {
                             multi.add(msg)
-                            if (multi.deferred.isCompleted) pendingMultiRequests.remove(msg.requestId)
+                            if (multi.deferred.isCompleted) {
+                                pendingMultiRequests.remove(msg.requestId)
+                            }
                         } else {
                             pendingRequests.remove(msg.requestId)?.complete(msg)
                         }
@@ -384,12 +413,17 @@ class WorkerClient(
             try {
                 logger.info("Subprocess WS connected for node {} (execution {})", nodeId, executionId)
                 for (frame in session.incoming) {
-                    if (frame !is Frame.Binary) continue
+                    if (frame !is Frame.Binary) {
+                        continue
+                    }
                     val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
+                    if (handleUnsolicitedMessage(msg, session)) continue
                     val multi = pendingMultiRequests[msg.requestId]
                     if (multi != null) {
                         multi.add(msg)
-                        if (multi.deferred.isCompleted) pendingMultiRequests.remove(msg.requestId)
+                        if (multi.deferred.isCompleted) {
+                            pendingMultiRequests.remove(msg.requestId)
+                        }
                     } else {
                         pendingRequests.remove(msg.requestId)?.complete(msg)
                     }
@@ -403,6 +437,37 @@ class WorkerClient(
                 drainPendingRequests(e)
             }
         }
+    }
+
+    /**
+     * Handles unsolicited messages sent by the worker outside of normal request-response
+     * cycles (e.g. [WorkerShutdownNotice]).
+     *
+     * @param msg The incoming message.
+     * @param session The WebSocket session used to send back an acknowledgement.
+     * @return `true` if the message was consumed here and must not be dispatched to pending
+     *   request deferreds; `false` if it should be passed to the regular dispatch logic.
+     */
+    private suspend fun handleUnsolicitedMessage(
+        msg: WorkerWsMessage,
+        session: DefaultWebSocketSession
+    ): Boolean {
+        if (msg is WorkerShutdownNotice) {
+            logger.warn(
+                "[node={}] Received WorkerShutdownNotice: {}",
+                nodeId, msg.reason
+            )
+            shutdownReason = msg.reason
+            drainPendingRequests(WorkerShutdownException(msg.reason))
+            val ack = WorkerShutdownAck(requestId = msg.requestId)
+            try {
+                session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(ack)))
+            } catch (e: Exception) {
+                logger.warn("[node={}] Failed to send WorkerShutdownAck: {}", nodeId, e.message)
+            }
+            return true
+        }
+        return false
     }
 
     /**
@@ -481,6 +546,11 @@ class WorkerClient(
         }
     }
 
+    /**
+     * Generates a unique random request correlation identifier.
+     *
+     * @return A new random UUID string.
+     */
     private fun newRequestId() = UUID.randomUUID().toString()
 
     /**
@@ -491,9 +561,20 @@ class WorkerClient(
      * @param expectedCount The number of individual responses to collect before completing.
      */
     private class MultiResponseCollector(private val expectedCount: Int) {
+        /**
+         * Deferred completed when all [expectedCount] responses have been collected. 
+         */
         val deferred = CompletableDeferred<List<WorkerWsMessage>>()
+        /**
+         * Accumulator for received response messages. 
+         */
         private val responses = mutableListOf<WorkerWsMessage>()
 
+        /**
+         * Adds a response message and completes [deferred] once all expected responses arrive.
+         *
+         * @param msg The incoming response message.
+         */
         @Synchronized
         fun add(msg: WorkerWsMessage) {
             responses.add(msg)

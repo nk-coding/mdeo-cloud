@@ -26,7 +26,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * @param mainClass The fully qualified class name of the subprocess entry point.
  *        Must have a `main(args: Array<String>)` method.
  * @param jvmArgs Additional JVM arguments for the subprocess.
- * @param cancellationCheck Returns `true` if the execution has been externally cancelled.
+ * @param cancellationCheck Called with the current [executionId] to determine whether the
+ *        execution has been externally cancelled.  Receives the execution identifier so that
+ *        the same function can be reused across pool cycles without reassignment.
  * @param cancellationCheckIntervalMs Interval between cancellation checks in milliseconds.
  * @param onChannelMessage Callback for channel messages received from the subprocess.
  *        The callback receives the message payload and a function to send a response back.
@@ -35,12 +37,31 @@ import java.util.concurrent.atomic.AtomicInteger
 class SubprocessRunner(
     private val mainClass: String,
     private val jvmArgs: List<String> = emptyList(),
-    private val cancellationCheck: () -> Boolean = { false },
+    cancellationCheck: (String) -> Boolean = { _ -> false },
     private val cancellationCheckIntervalMs: Long = 5000L,
     onChannelMessage: ((ByteArray, (ByteArray) -> Unit) -> Unit)? = null,
     private val classPath: String = System.getProperty("java.class.path")
 ) {
     private val logger = LoggerFactory.getLogger(SubprocessRunner::class.java)
+
+    /**
+     * Identifier of the execution this subprocess is currently serving.
+     *
+     * Passed to [cancellationCheck] on each poll.  When `null` the cancellation thread
+     * skips polling entirely — this is the normal state for idle / pooled subprocesses.
+     * Callers must set this before (or immediately after) [start] to enable cancellation.
+     */
+    @Volatile
+    var executionId: String? = null
+
+    /**
+     * Called with the current [executionId] to determine whether the execution has been
+     * externally cancelled.  The function is intentionally parameterised so that it can
+     * be set once per service and reused across subprocess-pool cycles — only [executionId]
+     * needs to be updated when the subprocess is assigned to a new execution.
+     */
+    @Volatile
+    var cancellationCheck: (String) -> Boolean = cancellationCheck
 
     /**
      * Callback invoked when a [SubprocessMessage.Channel] message is received from
@@ -170,14 +191,19 @@ class SubprocessRunner(
 
         Thread {
             while (!destroyed.get()) {
-                if (cancellationCheck()) {
-                    if (destroyed.compareAndSet(false, true)) {
-                        logger.info("Execution cancelled, destroying subprocess")
-                        proc.destroyForcibly()
-                        resultHolder.offer(SubprocessResult.Cancelled)
-                        completionLatch.countDown()
+                val id = executionId
+                if (id != null) {
+                    val cancelled = cancellationCheck(id)
+                    logger.debug("Cancellation check for execution {}: cancelled={}", id, cancelled)
+                    if (cancelled) {
+                        if (destroyed.compareAndSet(false, true)) {
+                            logger.info("Execution {} cancelled, destroying subprocess", id)
+                            proc.destroyForcibly()
+                            resultHolder.offer(SubprocessResult.Cancelled)
+                            completionLatch.countDown()
+                        }
+                        break
                     }
-                    break
                 }
                 try {
                     Thread.sleep(cancellationCheckIntervalMs)

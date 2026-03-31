@@ -38,6 +38,9 @@ import kotlinx.serialization.modules.contextual
  */
 class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
 
+    /**
+     * HTTP client configured with transformation AST contextual serializers. 
+     */
     private val transformationClient: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json {
@@ -52,6 +55,9 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
         }
     }
 
+    /**
+     * HTTP client configured with script AST contextual serializers. 
+     */
     private val scriptClient: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json {
@@ -67,6 +73,11 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
 
     /**
      * Fetches the typed AST for a model transformation file.
+     *
+     * @param projectId The project that owns the transformation file.
+     * @param filePath Path to the transformation file within the project.
+     * @param jwtToken Bearer token for backend API authentication.
+     * @return The [TransformationTypedAst], or `null` if unavailable or the fetch fails.
      */
     suspend fun getTransformationTypedAst(
         projectId: String, filePath: String, jwtToken: String
@@ -92,6 +103,11 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
 
     /**
      * Fetches the typed AST for a script file.
+     *
+     * @param projectId The project that owns the script file.
+     * @param filePath Path to the script file within the project.
+     * @param jwtToken Bearer token for backend API authentication.
+     * @return The [ScriptTypedAst], or `null` if unavailable or the fetch fails.
      */
     suspend fun getScriptTypedAst(
         projectId: String, filePath: String, jwtToken: String
@@ -117,6 +133,11 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
 
     /**
      * Fetches model data for a model file.
+     *
+     * @param projectId The project that owns the model file.
+     * @param filePath Path to the model file within the project.
+     * @param jwtToken Bearer token for backend API authentication.
+     * @return The [ModelData], or `null` if unavailable or the fetch fails.
      */
     suspend fun getModelData(
         projectId: String, filePath: String, jwtToken: String
@@ -142,6 +163,11 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
 
     /**
      * Fetches metamodel data for a metamodel file.
+     *
+     * @param projectId The project that owns the metamodel file.
+     * @param filePath Path to the metamodel file within the project.
+     * @param jwtToken Bearer token for backend API authentication.
+     * @return The [MetamodelData], or `null` if unavailable or the fetch fails.
      */
     suspend fun getMetamodelData(
         projectId: String, filePath: String, jwtToken: String
@@ -175,24 +201,48 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
     }
 }
 
+/**
+ * API response wrapper for a transformation typed AST.
+ *
+ * @param data The typed AST, or null if unavailable.
+ * @param version Optional schema version for cache invalidation.
+ */
 @Serializable
 internal data class TransformationTypedAstResponse(
     val data: TransformationTypedAst?,
     val version: Int? = null
 )
 
+/**
+ * API response wrapper for a script typed AST.
+ *
+ * @param data The typed AST, or null if unavailable.
+ * @param version Optional schema version for cache invalidation.
+ */
 @Serializable
 internal data class ScriptTypedAstResponse(
     val data: ScriptTypedAst?,
     val version: Int? = null
 )
 
+/**
+ * API response wrapper for model data.
+ *
+ * @param data The model data, or null if unavailable.
+ * @param version Optional schema version for cache invalidation.
+ */
 @Serializable
 internal data class ModelDataResponse(
     val data: ModelData?,
     val version: Int? = null
 )
 
+/**
+ * API response wrapper for metamodel data.
+ *
+ * @param data The metamodel data, or null if unavailable.
+ * @param version Optional schema version for cache invalidation.
+ */
 @Serializable
 internal data class MetamodelDataResponse(
     val data: MetamodelData?,

@@ -83,11 +83,16 @@ export class LangiumInstance<T> {
         const documents = this.services.shared.workspace.LangiumDocuments;
         const externalReferenceResolver = this.services.shared.references
             .ExternalReferenceResolver as BackendExternalReferencesResolver;
+        const serviceRegistry = this.services.shared.ServiceRegistry;
         while (hasLoadedDocuments) {
             const tokenSource = new CancellationTokenSource();
             externalReferenceResolver.setCancellationTokenSource(tokenSource);
             try {
-                await builder.build(documents.all.toArray(), { validation: true }, tokenSource.token);
+                await builder.build(
+                    documents.all.toArray().filter((doc) => serviceRegistry.hasServices(doc.uri)),
+                    { validation: true },
+                    tokenSource.token
+                );
             } catch (e) {
                 if (!isOperationCancelled(e)) {
                     throw e;

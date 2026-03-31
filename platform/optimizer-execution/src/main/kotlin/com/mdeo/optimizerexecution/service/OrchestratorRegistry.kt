@@ -19,8 +19,14 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class OrchestratorRegistry {
 
+    /**
+     * Logger instance for this registry. 
+     */
     private val logger = LoggerFactory.getLogger(OrchestratorRegistry::class.java)
 
+    /**
+     * Map of pending connection deferreds keyed by their registry key. 
+     */
     private val pending = ConcurrentHashMap<String, CompletableDeferred<DefaultWebSocketSession>>()
 
     /**

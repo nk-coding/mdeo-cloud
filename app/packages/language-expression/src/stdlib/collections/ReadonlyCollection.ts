@@ -392,4 +392,29 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
                 )
         )
     )
+    .method("flatMap", (m) =>
+        m.signature((s) =>
+            s
+                .generics("U")
+                .param(
+                    "iterator",
+                    lambdaType()
+                        .param("it", genericTypeRef("T"))
+                        .returns(
+                            typeRef("builtin", "Collection")
+                                .withTypeArgs({ T: genericTypeRef("U") })
+                                .build()
+                        )
+                )
+                .returns(
+                    typeRef("builtin", "Collection")
+                        .withTypeArgs({ T: genericTypeRef("U") })
+                        .build()
+                )
+        )
+    )
+    .method("first", (m) => m.signature((s) => s.returns(genericTypeRef("T"))))
+    .method("firstOrNull", (m) =>
+        m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Any).build()))
+    )
     .build();

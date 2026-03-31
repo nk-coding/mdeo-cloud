@@ -58,7 +58,6 @@ class WorkerSubprocessLocalChannelTest {
         }
     }
 
-    // ─── AST helpers ─────────────────────────────────────────────────────────────
 
     private fun constantDoubleAst(functionName: String): TypedAst {
         val doubleTypeIdx = 0
@@ -83,8 +82,6 @@ class WorkerSubprocessLocalChannelTest {
         )
     }
 
-    // ─── Helper: build a WorkerSubprocessRequest.Setup with useLocalChannel = true ─
-
     private fun buildSetup(
         scriptAstJsons: Map<String, String> = emptyMap(),
         goalConfig: GoalConfig = GoalConfig(emptyList(), emptyList()),
@@ -100,8 +97,6 @@ class WorkerSubprocessLocalChannelTest {
         useLocalChannel = true
     )
 
-    // ─── Helper: send an OrchestratorRequest channel message and await the response ─
-
     private fun sendOrchestratorRequest(
         runner: SubprocessRunner,
         msg: WorkerWsMessage,
@@ -113,7 +108,6 @@ class WorkerSubprocessLocalChannelTest {
         runner.sendChannelMessage(cbor.encodeToByteArray<SubprocessChannelMessage>(channelMsg))
     }
 
-    // ─── Tests ───────────────────────────────────────────────────────────────────
 
     /**
      * Verifies that the subprocess can receive a [NodeWorkBatchRequest] via the local
@@ -160,7 +154,6 @@ class WorkerSubprocessLocalChannelTest {
         try {
             assertTrue(runner.start(startupTimeoutMs = 30_000L), "Subprocess failed to start")
 
-            // Send Setup with useLocalChannel = true
             val setup = buildSetup(scriptAstJsons = scriptAstJsons, goalConfig = goalConfig)
             val setupResult = runner.sendCommand(cbor.encodeToByteArray<WorkerSubprocessRequest>(setup))
             val setupOk = cbor.decodeFromByteArray<WorkerSubprocessResponse>(
@@ -171,7 +164,6 @@ class WorkerSubprocessLocalChannelTest {
 
             val initialSolutionId = setupOk.solutions[0].solutionId
 
-            // Send a NodeWorkBatchRequest via the local stdio channel
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "test-req-1",
                 imports = emptyList(),
@@ -185,7 +177,6 @@ class WorkerSubprocessLocalChannelTest {
                 )
             )
 
-            // Wait for the OrchestratorResponses reply
             assertTrue(
                 responseLatch.await(30, TimeUnit.SECONDS),
                 "Timed out waiting for OrchestratorResponses from subprocess"

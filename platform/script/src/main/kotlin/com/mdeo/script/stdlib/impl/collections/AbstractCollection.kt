@@ -351,6 +351,20 @@ abstract class AbstractCollection<T, C : MutableCollection<T>>(
         return ListImpl(sorted)
     }
 
+    override fun <U> flatMap(mapper: Func1<T, ReadonlyCollection<U>>): Collection<U> {
+        val result = ArrayList<U>()
+        for (element in backing) {
+            for (mapped in mapper.call(element)) {
+                result.add(mapped)
+            }
+        }
+        return ListImpl(result)
+    }
+
+    override fun first(): T = backing.iterator().next()
+
+    override fun firstOrNull(): T? = backing.firstOrNull()
+
     override fun add(item: T): Boolean = backing.add(item)
 
     override fun addAll(col: ReadonlyCollection<T>): Boolean {

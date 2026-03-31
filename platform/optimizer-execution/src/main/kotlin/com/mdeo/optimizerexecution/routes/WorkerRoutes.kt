@@ -14,8 +14,10 @@ import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.encodeToByteArray
 import org.slf4j.LoggerFactory
 
+/** Logger instance for worker HTTP and WebSocket route handlers. */
 private val logger = LoggerFactory.getLogger("WorkerRoutes")
 
+/** CBOR codec used to decode/encode [WorkerWsMessage] frames. */
 @OptIn(ExperimentalSerializationApi::class)
 private val cbor = Cbor { ignoreUnknownKeys = true }
 
@@ -33,7 +35,6 @@ private val cbor = Cbor { ignoreUnknownKeys = true }
  */
 @OptIn(ExperimentalSerializationApi::class)
 fun Route.workerRoutes(workerService: WorkerService, orchestratorRegistry: OrchestratorRegistry) {
-    // HTTP routes (allocation + solution retrieval + cleanup)
     route("/api/worker/executions") {
         allocateRoute(workerService)
 
@@ -43,15 +44,12 @@ fun Route.workerRoutes(workerService: WorkerService, orchestratorRegistry: Orche
         }
     }
 
-    // HTTP metadata route
     metadataRoute(workerService)
 
-    // WebSocket route (orchestrator ↔ worker ongoing communication — legacy mode)
     route("/ws/worker/executions/{id}") {
         orchestratorWsRoute(workerService)
     }
 
-    // WebSocket route (subprocess → orchestrator reverse connection)
     route("/ws/subprocess/executions/{executionId}/{nodeId}") {
         subprocessWsRoute(orchestratorRegistry)
     }
@@ -140,8 +138,6 @@ private fun Route.cleanupRoute(workerService: WorkerService) {
     }
 }
 
-// ─── WebSocket routes ───────────────────────────────────────────────────────────
-
 /**
  * WebSocket `/ws/worker/executions/{id}` — long-lived orchestrator session.
  *
@@ -163,7 +159,6 @@ private fun Route.orchestratorWsRoute(workerService: WorkerService) {
     }
 }
 
-// ─── Subprocess reverse-connect route ───────────────────────────────────────────
 
 /**
  * WebSocket `/ws/subprocess/executions/{executionId}/{nodeId}` — subprocess reverse connection.
@@ -192,9 +187,6 @@ private fun Route.subprocessWsRoute(orchestratorRegistry: OrchestratorRegistry) 
             return@webSocket
         }
         logger.info("Subprocess connected: {}", key)
-        // The orchestrator-side WorkerClient reads from this session's incoming channel.
-        // We must keep the Ktor handler alive until the connection closes. Suspending on
-        // closeReason achieves this without consuming frames that the WorkerClient needs.
         try {
             closeReason.await()
         } finally {

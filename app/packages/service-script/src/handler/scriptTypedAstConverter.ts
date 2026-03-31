@@ -74,17 +74,19 @@ export class ScriptTypedAstConverter extends StatementTypedAstConverter {
      * @returns The TypedAst representation
      */
     convertScript(script: ScriptType, document: LangiumDocument): TypedAst {
-        const imports: TypedImport[] = script.imports.map((imp: any) => ({
-            name: imp.name,
-            ref: imp.ref?.$refText ?? "",
-            uri: imp.uri
-        }));
+        const imports: TypedImport[] = script.imports.flatMap((imp) =>
+            imp.imports.map((fun) => ({
+                name: fun.name ?? fun.entity.$refText,
+                ref: fun.entity.$refText,
+                uri: resolveRelativePath(document, imp.file).path
+            }))
+        );
 
         const functions: TypedFunction[] = script.functions.map((func: FunctionType) => this.convertFunction(func));
 
         const metamodelPath =
             script.metamodelImport?.file != null
-                ? resolveRelativePath(document, script.metamodelImport.file).fsPath
+                ? resolveRelativePath(document, script.metamodelImport.file).path
                 : undefined;
 
         return {

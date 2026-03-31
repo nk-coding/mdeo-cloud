@@ -9,7 +9,9 @@ import com.mdeo.metamodel.data.ModelData
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.scriptexecution.database.ExecutionsTable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -71,6 +73,7 @@ private data class ModelContext(
 class ExecutionService(
     private val backendApiService: BackendApiService,
     private val timeoutMs: Long,
+    private val executionScope: CoroutineScope,
     private val subprocessPool: SubprocessPool = buildDefaultPool()
 ) : CommonExecutionService {
     private val logger = LoggerFactory.getLogger(ExecutionService::class.java)
@@ -135,11 +138,12 @@ class ExecutionService(
 
         logger.info("Created execution $executionId for project $projectId")
 
-        withContext(Dispatchers.Default) {
+        executionScope.launch(Dispatchers.Default) {
             try {
                 executeScript(executionId, projectId, filePath, requestData, jwtToken)
             } catch (e: IllegalArgumentException) {
                 logger.error("Input validation failed", e)
+                storeError(executionId, "Invalid input: ${e.message}")
                 updateExecutionState(
                     executionId,
                     ExecutionState.FAILED,
@@ -148,6 +152,7 @@ class ExecutionService(
                 )
             } catch (e: Exception) {
                 logger.error("Unexpected error during execution", e)
+                storeError(executionId, e.message)
                 updateExecutionState(
                     executionId,
                     ExecutionState.FAILED,
@@ -238,14 +243,17 @@ class ExecutionService(
 
         val subprocess = subprocessPool.acquire() ?: SubprocessRunner(
             mainClass = ScriptSubprocessMain::class.java.name,
-            cancellationCheck = { isExecutionCancelled(executionId) },
+            cancellationCheck = { id -> isExecutionCancelled(UUID.fromString(id)) },
             cancellationCheckIntervalMs = CANCELLATION_CHECK_INTERVAL_MS
         ).also { runner ->
             if (!runner.start()) {
-                updateExecutionState(executionId, ExecutionState.FAILED, "Failed to start subprocess", jwtToken)
+                val msg = "Failed to start subprocess"
+                storeError(executionId, msg)
+                updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
                 return
             }
         }
+        subprocess.executionId = executionId.toString()
 
         val payload = ScriptSubprocessMain.serializeInput(
             resolvedAsts.typedAsts,
@@ -276,18 +284,17 @@ class ExecutionService(
                 } else {
                     logger.error("Unexpected subprocess response format for execution $executionId")
                     subprocess.destroy()
-                    updateExecutionState(executionId, ExecutionState.FAILED, "Internal error: unexpected subprocess response", jwtToken)
+                    val msg = "Internal error: unexpected subprocess response"
+                    storeError(executionId, msg)
+                    updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
                 }
             }
             is SubprocessResult.Timeout -> {
                 logger.error("Execution timeout after ${timeoutMs}ms")
                 subprocess.destroy()
-                updateExecutionState(
-                    executionId,
-                    ExecutionState.FAILED,
-                    "Execution timeout: Script exceeded maximum execution time of ${timeoutMs}ms",
-                    jwtToken
-                )
+                val msg = "Execution timeout: Script exceeded maximum execution time of ${timeoutMs}ms"
+                storeError(executionId, msg)
+                updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             }
             is SubprocessResult.Cancelled -> {
                 logger.info("Execution $executionId cancelled")
@@ -326,37 +333,32 @@ class ExecutionService(
             projectId.toString(), filePath, jwtToken
         )
         if (typedAsts == null) {
-            updateExecutionState(
-                executionId, ExecutionState.FAILED,
-                "Failed to fetch typed AST or its dependencies from backend", jwtToken
-            )
+            val msg = "Failed to fetch typed AST or its dependencies from backend"
+            storeError(executionId, msg)
+            updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             return null
         }
 
         val mainTypedAst = typedAsts[filePath]
         if (mainTypedAst == null) {
-            updateExecutionState(
-                executionId, ExecutionState.FAILED,
-                "Main file typed AST not found in resolved dependencies", jwtToken
-            )
+            val msg = "Main file typed AST not found in resolved dependencies"
+            storeError(executionId, msg)
+            updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             return null
         }
 
         val targetFunction = mainTypedAst.functions.find { it.name == methodName }
         if (targetFunction == null) {
-            updateExecutionState(
-                executionId, ExecutionState.FAILED,
-                "Method '$methodName' not found in file", jwtToken
-            )
+            val msg = "Method '$methodName' not found in file"
+            storeError(executionId, msg)
+            updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             return null
         }
 
         if (targetFunction.parameters.isNotEmpty()) {
-            updateExecutionState(
-                executionId, ExecutionState.FAILED,
-                "Method '$methodName' has parameters. Only methods with no parameters are supported.",
-                jwtToken
-            )
+            val msg = "Method '$methodName' has parameters. Only methods with no parameters are supported."
+            storeError(executionId, msg)
+            updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             return null
         }
 
@@ -385,19 +387,17 @@ class ExecutionService(
 
         val metamodelData = backendApiService.getMetamodelData(projectId.toString(), metamodelPath, jwtToken)
         if (metamodelData == null) {
-            updateExecutionState(
-                executionId, ExecutionState.FAILED,
-                "Failed to fetch metamodel data from '$metamodelPath'", jwtToken
-            )
+            val msg = "Failed to fetch metamodel data from '$metamodelPath'"
+            storeError(executionId, msg)
+            updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             return null
         }
 
         val modelData = backendApiService.getModelData(projectId.toString(), modelPath, jwtToken)
         if (modelData == null) {
-            updateExecutionState(
-                executionId, ExecutionState.FAILED,
-                "Failed to fetch model data from '$modelPath'", jwtToken
-            )
+            val msg = "Failed to fetch model data from '$modelPath'"
+            storeError(executionId, msg)
+            updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
             return null
         }
 
@@ -470,6 +470,14 @@ class ExecutionService(
                 }
             } catch (e: Exception) {
                 logger.error("Error while updating execution state on backend for $executionId", e)
+            }
+        }
+    }
+
+    private fun storeError(executionId: UUID, message: String?) {
+        transaction {
+            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                it[error] = message
             }
         }
     }

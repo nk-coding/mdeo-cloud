@@ -17,13 +17,6 @@ interface ReadonlyOrderedCollection<out T> : ReadonlyCollection<T> {
     fun at(index: Int): T
 
     /**
-     * Returns the first element of this collection.
-     *
-     * @throws NoSuchElementException if the collection is empty
-     */
-    fun first(): T
-
-    /**
      * Returns the last element of this collection.
      *
      * @throws NoSuchElementException if the collection is empty

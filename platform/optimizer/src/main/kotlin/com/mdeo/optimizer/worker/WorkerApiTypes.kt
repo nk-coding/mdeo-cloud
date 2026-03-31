@@ -46,7 +46,7 @@ data class WorkerAllocationRequest(
     val goalConfig: GoalConfig,
     val solverConfig: SolverConfig,
     val initialSolutionCount: Int,
-    val threadsPerNode: Int? = null,
+    val threadsPerNode: Int,
     val orchestratorWsUrl: String? = null,
     val useLocalChannel: Boolean = false
 )

@@ -196,7 +196,7 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
         if (relPath == undefined) {
             return [];
         }
-        return [resolveRelativePath(document, relPath).fsPath];
+        return [resolveRelativePath(document, relPath).path];
     });
 
     const classes: ClassData[] = [];
@@ -248,7 +248,7 @@ export const metamodelAstDataHandler: FileDataHandler<MetamodelAstData | null, M
     }
 
     return {
-        data: { path: fileInfo.uri.fsPath, classes, enums, associations, importedMetamodelPaths },
+        data: { path: fileInfo.uri.path, classes, enums, associations, importedMetamodelPaths },
         ...serverApi.getTrackedRequests()
     };
 };

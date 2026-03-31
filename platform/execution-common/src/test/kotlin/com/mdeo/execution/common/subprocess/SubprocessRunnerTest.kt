@@ -44,12 +44,13 @@ class SubprocessRunnerTest {
         var checkCount = 0
         val runner = SubprocessRunner(
             mainClass = SlowSubprocess::class.java.name,
-            cancellationCheck = {
+            cancellationCheck = { _ ->
                 checkCount++
                 checkCount >= 2
             },
             cancellationCheckIntervalMs = 200
         )
+        runner.executionId = "test-cancellation"
 
         assertTrue(runner.start(), "Subprocess should start")
         val result = runner.sendCommand("work".toByteArray())

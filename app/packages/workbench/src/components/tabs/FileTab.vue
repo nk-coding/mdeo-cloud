@@ -19,7 +19,15 @@
                         :model-value="languagePluginByExtension.get(getFileExtension(tab.fileUri.path))"
                         class="size-4"
                     />
-                    <span class="truncate max-w-64" :class="{ italic: tab.temporary }">{{ fileName }}</span>
+                    <span
+                        class="truncate max-w-64"
+                        :class="{ italic: tab.temporary, 'text-destructive': errorCount > 0 }"
+                    >
+                        {{ fileName }}
+                    </span>
+                    <span v-if="errorCount > 0" class="shrink-0 text-xs font-medium text-destructive">
+                        {{ errorCount > 9 ? "9+" : errorCount }}
+                    </span>
                     <span
                         @click.stop="handleClose"
                         class="shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 transition-opacity flex items-center justify-center size-4 invisible group-hover/tab:visible group-data-[state=active]/tab:visible"
@@ -75,6 +83,11 @@ const emit = defineEmits<{
 
 const fileName = computed(() => {
     return props.tab.fileUri.path.split("/").pop() ?? props.tab.fileUri.path;
+});
+
+const { diagnosticStore } = inject(workbenchStateKey)!;
+const errorCount = computed(() => {
+    return diagnosticStore.fileDiagnostics.value.get(props.tab.fileUri.toString())?.errors ?? 0;
 });
 
 function handleClose() {

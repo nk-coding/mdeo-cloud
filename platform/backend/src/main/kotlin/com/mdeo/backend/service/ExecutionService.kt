@@ -209,6 +209,19 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
             )
         } catch (e: Exception) {
             logger.error("Failed to create execution via plugin", e)
+            val failedAt = Instant.now()
+            transaction {
+                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                    it[state] = ExecutionState.FAILED
+                    it[progressText] = "Failed to create execution: ${e.message}"
+                    it[updatedAt] = failedAt
+                    it[finishedAt] = failedAt
+                }
+            }
+            val failedExecution = getExecution(projectId, executionId)
+            if (failedExecution is ApiResult.Success) {
+                notifyExecutionStateChange(failedExecution.value)
+            }
             return executionFailure(
                 ErrorCodes.EXECUTION_PLUGIN_ERROR,
                 "Failed to create execution: ${e.message}"
@@ -582,14 +595,20 @@ class ExecutionService(services: InjectedServices) : BaseService(), InjectedServ
         return try {
             callPluginCancel(pluginUrl, execution.languageId, executionId, projectId, execution.metadata)
 
-            transaction {
+            val updatedExecution = transaction {
                 val now = Instant.now()
                 ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
                     it[state] = ExecutionState.CANCELLED
                     it[updatedAt] = now
                     it[finishedAt] = now
                 }
+                val row = ExecutionsTable.selectAll()
+                    .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
+                    .first()
+                rowToExecution(row)
             }
+
+            notifyExecutionStateChange(updatedExecution)
 
             success(Unit)
         } catch (e: Exception) {

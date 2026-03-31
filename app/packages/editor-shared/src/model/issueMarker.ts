@@ -26,7 +26,7 @@ export class GIssueMarker extends SIssueMarkerImpl {
  * Returns the first {@link GIssueMarker} child of `modelElement`, or
  * `undefined` if none exists.
  *
- * @param modelElement - The parent element whose children are searched.
+ * @param modelElement The parent element whose children are searched.
  * @returns The first {@link GIssueMarker} child, or `undefined`.
  */
 export function getIssueMarker(modelElement: GParentElement): GIssueMarker | undefined {
@@ -42,7 +42,7 @@ export function getIssueMarker(modelElement: GParentElement): GIssueMarker | und
  * Returns the existing {@link GIssueMarker} child of `modelElement`, creating
  * and appending a new one if none exists.
  *
- * @param modelElement - The parent element to search or add a marker to.
+ * @param modelElement The parent element to search or add a marker to.
  * @returns The existing or newly created {@link GIssueMarker}.
  */
 export function getOrCreateIssueMarker(modelElement: GParentElement): GIssueMarker {
@@ -61,7 +61,7 @@ export function getOrCreateIssueMarker(modelElement: GParentElement): GIssueMark
  *
  * Severity priority (highest to lowest): `error` > `warning` > `info`.
  *
- * @param marker - The issue marker whose issues are inspected.
+ * @param marker The issue marker whose issues are inspected.
  * @returns The maximum severity found, defaulting to `"info"`.
  */
 function getMaxSeverity(marker: GIssueMarker): GIssueSeverity {
@@ -84,7 +84,7 @@ function getMaxSeverity(marker: GIssueMarker): GIssueSeverity {
  *
  * Any existing severity class is removed before the new one is added.
  *
- * @param modelElement - The element whose `cssClasses` array is updated.
+ * @param modelElement The element whose `cssClasses` array is updated.
  * @param marker       - The issue marker that determines the severity class.
  */
 export function addSeverityCssClass(modelElement: GParentElement, marker: GIssueMarker): void {

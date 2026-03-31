@@ -47,7 +47,7 @@ import type { ServiceMdeoMetamodelResolver } from "../serviceMdeoMetamodelResolv
  */
 function extractUsingPath(usingPath: UsingPathType, document: LangiumDocument): string {
     const relativePath = usingPath.path ?? "";
-    return resolveRelativePath(document, relativePath).fsPath;
+    return resolveRelativePath(document, relativePath).path;
 }
 
 /**

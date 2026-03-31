@@ -1,5 +1,7 @@
 package com.mdeo.script.compiler.stdlib
 
+import com.mdeo.expression.ast.types.BuiltinTypes.function
+import com.mdeo.expression.ast.types.BuiltinTypes.predicate
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.LambdaType
 import com.mdeo.expression.ast.types.Parameter
@@ -1081,6 +1083,198 @@ class CollectionMethodsIntegrationTest {
             }
             val result = helper.compileAndInvoke(ast)
             assertEquals(2, result)
+        }
+    }
+
+    // ==================================================================================
+    // FLATMAP METHOD
+    // ==================================================================================
+
+    @Nested
+    inner class FlatMapMethod {
+
+        @Test
+        fun `flatMap flattens nested collections`() {
+            // listOf(1, 2, 3).flatMap { it -> listOf(it, it) }.size() == 6
+            val ast = buildTypedAst {
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val collectionType = addType(ClassTypeRef("builtin", "Collection", false))
+                val intType = intType()
+                val funcLambdaType = addType(function(ClassTypeRef("builtin", "int", false), ClassTypeRef("builtin", "Collection", false)))
+
+                function(
+                    name = "testFunction",
+                    returnType = intType,
+                    body = listOf(
+                        returnStmt(
+                            memberCall(
+                                expression = memberCall(
+                                    expression = functionCall(
+                                        name = "listOf",
+                                        overload = "",
+                                        arguments = listOf(
+                                            intLiteral(1, intType),
+                                            intLiteral(2, intType),
+                                            intLiteral(3, intType)
+                                        ),
+                                        resultTypeIndex = listType
+                                    ),
+                                    member = "flatMap",
+                                    overload = "",
+                                    arguments = listOf(
+                                        lambdaExpr(
+                                            parameters = listOf("it"),
+                                            body = listOf(
+                                                returnStmt(
+                                                    functionCall(
+                                                        name = "listOf",
+                                                        overload = "",
+                                                        arguments = listOf(
+                                                            identifier("it", intType, 4),
+                                                            identifier("it", intType, 4)
+                                                        ),
+                                                        resultTypeIndex = listType
+                                                    )
+                                                )
+                                            ),
+                                            lambdaTypeIndex = funcLambdaType
+                                        )
+                                    ),
+                                    resultTypeIndex = collectionType
+                                ),
+                                member = "size",
+                                overload = "",
+                                arguments = emptyList(),
+                                resultTypeIndex = intType
+                            )
+                        )
+                    )
+                )
+            }
+            val result = helper.compileAndInvoke(ast)
+            assertEquals(6, result)
+        }
+    }
+
+    // ==================================================================================
+    // FIRST METHOD
+    // ==================================================================================
+
+    @Nested
+    inner class FirstMethod {
+
+        @Test
+        fun `first returns first element of non-empty list`() {
+            // listOf(42, 2, 3).first() == 42
+            val ast = buildTypedAst {
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val intType = intType()
+                val nullableAny = anyNullableType()
+
+                function(
+                    name = "testFunction",
+                    returnType = nullableAny,
+                    body = listOf(
+                        returnStmt(
+                            memberCall(
+                                expression = functionCall(
+                                    name = "listOf",
+                                    overload = "",
+                                    arguments = listOf(
+                                        intLiteral(42, intType),
+                                        intLiteral(2, intType),
+                                        intLiteral(3, intType)
+                                    ),
+                                    resultTypeIndex = listType
+                                ),
+                                member = "first",
+                                overload = "",
+                                arguments = emptyList(),
+                                resultTypeIndex = nullableAny
+                            )
+                        )
+                    )
+                )
+            }
+            val result = helper.compileAndInvoke(ast)
+            assertEquals(42, result)
+        }
+    }
+
+    // ==================================================================================
+    // FIRSTORNULL METHOD
+    // ==================================================================================
+
+    @Nested
+    inner class FirstOrNullMethod {
+
+        @Test
+        fun `firstOrNull returns first element of non-empty list`() {
+            // listOf(99, 2, 3).firstOrNull() == 99
+            val ast = buildTypedAst {
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val intType = intType()
+                val nullableAny = anyNullableType()
+
+                function(
+                    name = "testFunction",
+                    returnType = nullableAny,
+                    body = listOf(
+                        returnStmt(
+                            memberCall(
+                                expression = functionCall(
+                                    name = "listOf",
+                                    overload = "",
+                                    arguments = listOf(
+                                        intLiteral(99, intType),
+                                        intLiteral(2, intType),
+                                        intLiteral(3, intType)
+                                    ),
+                                    resultTypeIndex = listType
+                                ),
+                                member = "firstOrNull",
+                                overload = "",
+                                arguments = emptyList(),
+                                resultTypeIndex = nullableAny
+                            )
+                        )
+                    )
+                )
+            }
+            val result = helper.compileAndInvoke(ast)
+            assertEquals(99, result)
+        }
+
+        @Test
+        fun `firstOrNull returns null for empty list`() {
+            // listOf().firstOrNull() == null
+            val ast = buildTypedAst {
+                val listType = addType(ClassTypeRef("builtin", "List", false))
+                val nullableAny = anyNullableType()
+
+                function(
+                    name = "testFunction",
+                    returnType = nullableAny,
+                    body = listOf(
+                        returnStmt(
+                            memberCall(
+                                expression = functionCall(
+                                    name = "listOf",
+                                    overload = "",
+                                    arguments = emptyList(),
+                                    resultTypeIndex = listType
+                                ),
+                                member = "firstOrNull",
+                                overload = "",
+                                arguments = emptyList(),
+                                resultTypeIndex = nullableAny
+                            )
+                        )
+                    )
+                )
+            }
+            val result = helper.compileAndInvoke(ast)
+            assertEquals(null, result)
         }
     }
 }

@@ -298,10 +298,7 @@ export const RuntimeTimeoutBlockRule = createRule("ConfigMdeoRuntimeTimeoutBlock
         "{",
         many(NEWLINE),
         many(
-            or(
-                group("script", "=", add("script", INT)),
-                group("transformation", "=", add("transformation", INT))
-            ),
+            or(group("script", "=", add("script", INT)), group("transformation", "=", add("transformation", INT))),
             many(NEWLINE)
         ),
         "}"

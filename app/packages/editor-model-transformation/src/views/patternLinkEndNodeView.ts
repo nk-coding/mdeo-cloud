@@ -9,7 +9,11 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class GPatternLinkEndNodeView extends GSimpleNodeView {
-    protected override renderNodeContent(model: Readonly<GNode>, context: RenderingContext, children: readonly GModelElement[]): VNode[] {
+    protected override renderNodeContent(
+        model: Readonly<GNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode[] {
         return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 

@@ -43,7 +43,9 @@ export function calculateRelativePath(fromPath: string, toPath: string): string 
  * Result of building a file selection tree.
  */
 export interface FileSelectTreeResult {
-    /** Hierarchical nodes with the common prefix stripped */
+    /**
+     * Hierarchical nodes with the common prefix stripped
+     */
     nodes: ActionSchemaFileSelectNode[];
     /**
      * The common path prefix that was removed from all entries (no trailing slash).

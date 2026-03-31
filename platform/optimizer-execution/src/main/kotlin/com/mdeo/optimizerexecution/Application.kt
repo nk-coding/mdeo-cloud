@@ -23,8 +23,12 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
+/** Logger instance for application-level lifecycle events. */
 private val logger = LoggerFactory.getLogger("Application")
 
+/**
+ * Application entry point: loads configuration and starts the embedded Netty server.
+ */
 fun main() {
     val config = AppConfig.load()
     embeddedServer(Netty, port = config.serverPort, host = "0.0.0.0") {
@@ -32,6 +36,12 @@ fun main() {
     }.start(wait = true)
 }
 
+/**
+ * Configures the Ktor application module: initialises the database, installs plugins,
+ * and wires all HTTP and WebSocket routes.
+ *
+ * @param appConfig The application configuration.
+ */
 fun Application.module(appConfig: AppConfig) {
     val databaseFactory = DatabaseFactory()
     databaseFactory.init(appConfig.database)

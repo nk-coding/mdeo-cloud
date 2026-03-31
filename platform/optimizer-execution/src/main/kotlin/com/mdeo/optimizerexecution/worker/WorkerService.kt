@@ -1,10 +1,12 @@
 package com.mdeo.optimizerexecution.worker
 
+import com.mdeo.common.model.ExecutionState
 import com.mdeo.execution.common.subprocess.SubprocessPool
 import com.mdeo.execution.common.subprocess.SubprocessResult
 import com.mdeo.execution.common.subprocess.SubprocessRunner
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.optimizer.worker.*
+import com.mdeo.optimizerexecution.database.OptimizerExecutionsTable
 import io.ktor.websocket.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
@@ -17,9 +19,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import kotlin.uuid.toKotlinUuid
 
 /**
  * Service that manages worker-side execution state for multi-node optimization.
@@ -61,7 +68,13 @@ class WorkerService(
     private val subprocessPool: SubprocessPool = buildDefaultPool()
 ) {
 
+    /**
+     * Logger instance for this service. 
+     */
     private val logger = LoggerFactory.getLogger(WorkerService::class.java)
+    /**
+     * Map of active execution states keyed by execution ID string. 
+     */
     private val executions = ConcurrentHashMap<String, WorkerExecutionState>()
 
     /**
@@ -75,8 +88,6 @@ class WorkerService(
     private val localChannelPending =
         ConcurrentHashMap<String, CompletableDeferred<List<WorkerWsMessage>>>()
 
-    // ─── Metadata ─────────────────────────────────────────────────────────────────
-
     /**
      * Returns metadata describing this worker node's local thread capacity and
      * the algorithm backends it supports.
@@ -88,9 +99,10 @@ class WorkerService(
         supportedBackends = SUPPORTED_BACKENDS
     )
 
+    /**
+     * CBOR codec used to encode/decode subprocess and WebSocket messages. 
+     */
     private val cbor = Cbor { ignoreUnknownKeys = true }
-
-    // ─── Allocation ───────────────────────────────────────────────────────────────
 
     /**
      * Allocates resources for a new optimization execution on this worker.
@@ -113,7 +125,7 @@ class WorkerService(
         request: WorkerAllocationRequest,
         orchestratorWsUrl: String? = null
     ): WorkerAllocationResponse {
-        val effectiveThreads = request.threadsPerNode?.let { minOf(it, workerThreads) } ?: workerThreads
+        val effectiveThreads = minOf(request.threadsPerNode, workerThreads)
         val useLocalChannel = request.useLocalChannel
         logger.info(
             "Allocating execution {} with {} initial solutions ({} threads, cap {}, wsMode={}, localChannel={})",
@@ -171,6 +183,7 @@ class WorkerService(
         }
 
         executions[request.executionId] = WorkerExecutionState(
+            executionId = request.executionId,
             runner = runner,
             solutions = solutions,
             dispatcher = dispatcher
@@ -188,7 +201,6 @@ class WorkerService(
         )
     }
 
-    // ─── Solution data ────────────────────────────────────────────────────────────
 
     /**
      * Retrieves the serialised model for a specific solution from the parent's byte store.
@@ -204,7 +216,6 @@ class WorkerService(
         return cbor.decodeFromByteArray<SerializedModel>(bytes)
     }
 
-    // ─── Cleanup ──────────────────────────────────────────────────────────────────
 
     /**
      * Stops the subprocess and releases all resources for the specified execution.
@@ -227,7 +238,6 @@ class WorkerService(
         logger.info("Execution {} cleaned up", executionId)
     }
 
-    // ─── WebSocket session handling (legacy and local-channel modes) ──────────────
 
     /**
      * Services a long-lived WebSocket connection from the orchestrator.
@@ -248,10 +258,13 @@ class WorkerService(
     suspend fun handleOrchestratorSession(executionId: String, session: DefaultWebSocketSession) {
         logger.info("Orchestrator WebSocket connected for execution {}", executionId)
         val state = executions[executionId]
+        state?.orchestratorSession = session
         try {
             supervisorScope {
                 for (frame in session.incoming) {
-                    if (frame !is Frame.Binary) continue
+                    if (frame !is Frame.Binary) {
+                        continue
+                    }
                     val bytes = frame.readBytes()
                     val msg = try {
                         cbor.decodeFromByteArray<WorkerWsMessage>(bytes)
@@ -260,6 +273,12 @@ class WorkerService(
                         continue
                     }
                     launch {
+                        // WorkerShutdownAck is a one-way forward: the subprocess will halt
+                        // immediately after processing it, so no response is expected.
+                        if (msg is WorkerShutdownAck && state != null) {
+                            forwardAckToSubprocess(state, bytes)
+                            return@launch
+                        }
                         val responses = if (state != null) {
                             sendViaLocalChannel(state, msg)
                         } else {
@@ -272,11 +291,46 @@ class WorkerService(
                 }
             }
         } finally {
+            state?.orchestratorSession = null
             logger.info("Orchestrator WebSocket disconnected for execution {}", executionId)
         }
     }
 
-    // ─── Local-channel forwarding ─────────────────────────────────────────────────
+    /**
+     * Forwards a raw WS frame to the subprocess as a [SubprocessChannelMessage.OrchestratorRequest]
+     * without registering a response deferred.
+     *
+     * Used for one-way acknowledgements such as [WorkerShutdownAck] where the subprocess
+     * will halt immediately after receiving the message and no response should be expected.
+     *
+     * @param state The execution state providing the subprocess runner.
+     * @param rawPayload The raw CBOR bytes of the [WorkerWsMessage] to forward.
+     */
+    private fun forwardAckToSubprocess(state: WorkerExecutionState, rawPayload: ByteArray) {
+        try {
+            state.runner.sendChannelMessage(
+                cbor.encodeToByteArray<SubprocessChannelMessage>(
+                    SubprocessChannelMessage.OrchestratorRequest(rawPayload)
+                )
+            )
+        } catch (e: Exception) {
+            logger.warn(
+                "Failed to forward ack to subprocess for execution {}: {}",
+                state.executionId, e.message
+            )
+        }
+    }
+
+    /**
+     * Dispatches [msg] to the subprocess for [executionId] via the local channel and returns
+     * the responses. Returns an empty list if the subprocess has died. Used by tests.
+     *
+     * @param executionId The execution identifier to look up.
+     * @param msg The [WorkerWsMessage] to forward.
+     * @return The list of response messages from the subprocess, or empty on subprocess death.
+     */
+    internal suspend fun dispatchToSubprocess(executionId: String, msg: WorkerWsMessage): List<WorkerWsMessage> =
+        sendViaLocalChannel(requireExecution(executionId), msg)
 
     /**
      * Sends [msg] to the subprocess via the local-channel mechanism and awaits all
@@ -285,20 +339,13 @@ class WorkerService(
      *
      * Encodes [msg] into a [SubprocessChannelMessage.OrchestratorRequest], registers a
      * pending [CompletableDeferred] in [localChannelPending] keyed by [msg.requestId], and
-     * sends the channel message to the subprocess.  The channel handler completes the
+     * sends the channel message to the subprocess. The channel handler completes the
      * deferred when the matching [SubprocessChannelMessage.OrchestratorResponses] arrives.
      *
      * @param state The execution state (provides the [SubprocessRunner]).
      * @param msg The [WorkerWsMessage] to forward.
      * @return The list of response messages from the subprocess, or empty on subprocess death.
      */
-    /**
-     * Dispatches [msg] to the subprocess for [executionId] via the local channel and returns
-     * the responses. Returns an empty list if the subprocess has died. Used by tests.
-     */
-    internal suspend fun dispatchToSubprocess(executionId: String, msg: WorkerWsMessage): List<WorkerWsMessage> =
-        sendViaLocalChannel(requireExecution(executionId), msg)
-
     private suspend fun sendViaLocalChannel(
         state: WorkerExecutionState,
         msg: WorkerWsMessage
@@ -320,13 +367,14 @@ class WorkerService(
         }
     }
 
-    // ─── Subprocess management ────────────────────────────────────────────────────
 
     /**
      * Builds the channel message callback for a subprocess in WS or local-channel mode.
      *
-     * Synchronises the parent's solution byte store and routes [OrchestratorResponses] back
-     * to the pending [CompletableDeferred] registered by [sendViaLocalChannel].
+     * Synchronises the parent's solution byte store, routes [OrchestratorResponses] back
+     * to the pending [CompletableDeferred] registered by [sendViaLocalChannel], and
+     * forwards unsolicited [OrchestratorNotice] messages to the current orchestrator
+     * WebSocket session (if one is open).
      *
      * @param solutions The parent-side solution byte store.
      * @param executionId Execution identifier for logging.
@@ -348,11 +396,31 @@ class WorkerService(
                         }
                     }
                     is SubprocessChannelMessage.OrchestratorResponses -> {
-                        // Decode all response payloads and complete the pending deferred.
                         val responses = msg.payloads.map { cbor.decodeFromByteArray<WorkerWsMessage>(it) }
                         val requestId = responses.firstOrNull()?.requestId
                         if (requestId != null) {
                             localChannelPending.remove(requestId)?.complete(responses)
+                        }
+                    }
+                    is SubprocessChannelMessage.OrchestratorNotice -> {
+                        val state = executions[executionId]
+                        val session = state?.orchestratorSession
+                        if (session != null) {
+                            kotlinx.coroutines.runBlocking {
+                                try {
+                                    session.send(Frame.Binary(true, msg.payload))
+                                } catch (e: Exception) {
+                                    logger.warn(
+                                        "Failed to forward OrchestratorNotice for execution {}: {}",
+                                        executionId, e.message
+                                    )
+                                }
+                            }
+                        } else {
+                            logger.warn(
+                                "Received OrchestratorNotice for execution {} but no active session",
+                                executionId
+                            )
                         }
                     }
                     is SubprocessChannelMessage.OrchestratorRequest -> {
@@ -369,6 +437,11 @@ class WorkerService(
      * Configures the channel message handler and process-exit callback on an existing [SubprocessRunner].
      *
      * Used when reusing a pooled subprocess for a new execution.
+     *
+     * @param runner The subprocess runner to configure.
+     * @param solutions The parent-side solution byte store to keep in sync.
+     * @param executionId Execution identifier for logging.
+     * @param wsMode Whether the subprocess operates in WebSocket or local-channel mode.
      */
     private fun configureChannelHandler(
         runner: SubprocessRunner,
@@ -376,6 +449,8 @@ class WorkerService(
         executionId: String,
         wsMode: Boolean
     ) {
+        logger.info("Configuring pooled subprocess for execution {} (cancellation check already set)", executionId)
+        runner.executionId = executionId
         runner.onChannelMessage = if (wsMode) buildChannelHandler(solutions, executionId) else null
         runner.onProcessExited = {
             localChannelPending.values.forEach { it.completeExceptionally(RuntimeException("Subprocess exited")) }
@@ -390,28 +465,34 @@ class WorkerService(
      * @param wsMode Whether the subprocess operates in WebSocket or local-channel mode.
      */
     private fun createSubprocessRunner(
-        solutions: ConcurrentHashMap<String, ByteArray> = ConcurrentHashMap(),
-        executionId: String = "",
-        wsMode: Boolean = false
+        solutions: ConcurrentHashMap<String, ByteArray>,
+        executionId: String,
+        wsMode: Boolean
     ): SubprocessRunner {
+        logger.info("Creating subprocess runner for execution {} with cancellation check (interval={}ms)", executionId, CANCELLATION_CHECK_INTERVAL_MS)
         val runner = SubprocessRunner(
             mainClass = WorkerSubprocessMain::class.java.name,
+            cancellationCheck = { id -> isExecutionCancelled(id) },
+            cancellationCheckIntervalMs = CANCELLATION_CHECK_INTERVAL_MS,
             onChannelMessage = if (wsMode) buildChannelHandler(solutions, executionId) else null
         )
+        runner.executionId = executionId
         runner.onProcessExited = {
             localChannelPending.values.forEach { it.completeExceptionally(RuntimeException("Subprocess exited")) }
         }
         return runner
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────────
-
+    /**
+     * Looks up the execution state for [executionId], throwing if not found.
+     *
+     * @param executionId The execution identifier to look up.
+     * @return The [WorkerExecutionState] for the execution.
+     */
     private fun requireExecution(executionId: String): WorkerExecutionState {
         return executions[executionId]
             ?: throw IllegalArgumentException("Execution not found: $executionId")
     }
-
-    // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
     /**
      * Releases all active executions, their associated resources, and any pooled subprocesses.
@@ -430,24 +511,72 @@ class WorkerService(
         subprocessPool.close()
     }
 
-    // ─── Internal state ───────────────────────────────────────────────────────────
-
     /**
      * Per-execution runtime state held in the parent process.
      *
+     * @param executionId The execution identifier.
      * @param runner The subprocess runner.
      * @param solutions Map from solution ID to CBOR-encoded [SerializedModel] bytes.
      * @param dispatcher Thread pool used for blocking subprocess I/O.
      */
     inner class WorkerExecutionState(
+        val executionId: String,
         @Volatile var runner: SubprocessRunner,
         val solutions: ConcurrentHashMap<String, ByteArray>,
         val dispatcher: ExecutorCoroutineDispatcher
     ) {
-        /** Stops subprocess and releases thread pool. */
+        /**
+         * The currently active orchestrator WebSocket session, or `null` when no session
+         * is open (e.g. in WebSocket-subprocess mode where the subprocess connects directly
+         * to the remote orchestrator and [WorkerService] is not involved).
+         *
+         * Set by [handleOrchestratorSession] when the orchestrator connects and cleared
+         * when it disconnects. Used by the channel message handler to forward unsolicited
+         * messages (e.g. [SubprocessChannelMessage.OrchestratorNotice]) back to the
+         * orchestrator without going through the normal request-response path.
+         */
+        @Volatile
+        var orchestratorSession: DefaultWebSocketSession? = null
+
+        /**
+         * Stops subprocess and releases thread pool. 
+         */
         suspend fun suspendClose() {
             runner.stop()
             dispatcher.close()
+        }
+    }
+
+
+    /**
+     * Checks whether the execution has been cancelled or deleted in the database.
+     *
+     * This is called from the [SubprocessRunner] cancellation polling thread (not a coroutine),
+     * so it uses a blocking [transaction] call.
+     *
+     * @param executionId The execution identifier (string form).
+     * @return `true` if the execution record is missing or its state is [ExecutionState.CANCELLED].
+     */
+    private fun isExecutionCancelled(executionId: String): Boolean {
+        return try {
+            val uuid = UUID.fromString(executionId)
+            val state = transaction {
+                OptimizerExecutionsTable.selectAll()
+                    .where { OptimizerExecutionsTable.id eq uuid.toKotlinUuid() }
+                    .firstOrNull()
+                    ?.get(OptimizerExecutionsTable.state)
+            }
+            val cancelled = state == null || state == ExecutionState.CANCELLED
+            logger.warn("Cancellation check for execution {}: {} (dbState={})", executionId, if (cancelled) { "CANCELLED" } else { "not cancelled" }, state)
+            if (cancelled) {
+                logger.info("Cancellation check for execution {}: CANCELLED (dbState={})", executionId, state)
+            } else {
+                logger.debug("Cancellation check for execution {}: not cancelled (dbState={})", executionId, state)
+            }
+            cancelled
+        } catch (e: Exception) {
+            logger.warn("Cancellation check for execution {} failed: {}", executionId, e.message)
+            false
         }
     }
 
@@ -461,6 +590,11 @@ class WorkerService(
         )
 
         /**
+         * Interval between cancellation checks in the subprocess runner's polling thread.
+         */
+        private const val CANCELLATION_CHECK_INTERVAL_MS = 5000L
+
+        /**
          * Timeout for local-channel request/response round-trips.
          * Matches the WebSocket operation timeout in [WorkerClient].
          */
@@ -471,6 +605,9 @@ class WorkerService(
          *
          * Uses the CBOR-encoded [WorkerSubprocessRequest.Reset] / [WorkerSubprocessResponse.ResetOk]
          * protocol to reset subprocesses before returning them to the pool.
+         *
+         * @param maxSize Maximum number of idle subprocesses the pool will hold.
+         * @return A configured [SubprocessPool] with the CBOR reset protocol.
          */
         @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
         fun buildDefaultPool(maxSize: Int = SubprocessPool.DEFAULT_POOL_SIZE): SubprocessPool {

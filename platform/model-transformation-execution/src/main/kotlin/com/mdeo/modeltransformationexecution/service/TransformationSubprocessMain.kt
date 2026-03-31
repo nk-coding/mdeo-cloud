@@ -139,12 +139,16 @@ sealed class TransformationCommand {
  */
 @Serializable
 sealed class TransformationResponse {
-    /** Successful transformation result. */
+    /**
+     * Successful transformation result. 
+     */
     @Serializable
     @SerialName("execute_ok")
     data class ExecuteOk(val modelData: ModelData) : TransformationResponse()
 
-    /** Acknowledgement of a [TransformationCommand.Reset]. */
+    /**
+     * Acknowledgement of a [TransformationCommand.Reset]. 
+     */
     @Serializable
     @SerialName("reset_ok")
     data object ResetOk : TransformationResponse()

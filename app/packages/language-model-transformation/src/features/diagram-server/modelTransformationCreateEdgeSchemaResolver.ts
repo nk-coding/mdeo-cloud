@@ -314,6 +314,16 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             return sourceModifier;
         } else if (sourceModifier === targetModifier) {
             return sourceModifier;
+        } else if (
+            sourceModifier === PatternModifierKind.DELETE &&
+            (targetModifier === PatternModifierKind.REQUIRE || targetModifier === PatternModifierKind.FORBID)
+        ) {
+            return targetModifier;
+        } else if (
+            (sourceModifier === PatternModifierKind.REQUIRE || sourceModifier === PatternModifierKind.FORBID) &&
+            targetModifier === PatternModifierKind.DELETE
+        ) {
+            return sourceModifier;
         } else {
             return undefined;
         }

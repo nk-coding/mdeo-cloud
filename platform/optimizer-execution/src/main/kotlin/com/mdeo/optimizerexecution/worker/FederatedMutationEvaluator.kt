@@ -9,6 +9,20 @@ import kotlinx.coroutines.coroutineScope
 import java.util.concurrent.ConcurrentHashMap
 
 /**
+ * Thrown when a worker subprocess shuts down unexpectedly and can no longer serve
+ * evaluation requests.
+ *
+ * The [message] is sourced from the [WorkerShutdownNotice] sent by the subprocess
+ * before it halted (if one was received), providing a precise, human-readable reason.
+ * Falls back to a generic "not reachable" description when no notice was received
+ * (e.g. the subprocess crashed without warning).
+ *
+ * @param message Human-readable reason for the worker shutdown.
+ * @param cause The underlying exception that triggered the worker death detection.
+ */
+class WorkerShutdownException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/**
  * Federated implementation of [MutationEvaluator] that distributes mutation and
  * evaluation work across multiple remote worker nodes.
  *
@@ -20,12 +34,18 @@ import java.util.concurrent.ConcurrentHashMap
  * @param executionId Unique identifier of the optimization execution being coordinated.
  * @param workers The list of worker clients that this evaluator distributes work across.
  * @param allocationRequest Template allocation request; [WorkerAllocationRequest.initialSolutionCount]
- *        is overridden per worker when distributing initial solution generation.
+ *        and [WorkerAllocationRequest.threadsPerNode] are overridden per worker when distributing
+ *        initial solution generation.
+ * @param workerThreadBudgets Optional map from node ID to the exact thread budget allocated for
+ *        that node (computed from the global threads cap, per-node limit, and node capacity).
+ *        When present, overrides [WorkerAllocationRequest.threadsPerNode] per worker so that
+ *        the global [ResourcesConfig.threads] cap is honoured correctly.
  */
 class FederatedMutationEvaluator(
     private val executionId: String,
     private val workers: List<WorkerClient>,
-    private val allocationRequest: WorkerAllocationRequest
+    private val allocationRequest: WorkerAllocationRequest,
+    private val workerThreadBudgets: Map<String, Int> = emptyMap()
 ) : MutationEvaluator {
 
     /**
@@ -33,7 +53,9 @@ class FederatedMutationEvaluator(
      */
     private val workerByNodeId: Map<String, WorkerClient> = workers.associateBy { it.nodeId }
 
-    /** Number of worker nodes this evaluator distributes work across. */
+    /**
+     * Number of worker nodes this evaluator distributes work across. 
+     */
     val workerCount: Int = workers.size
 
     /**
@@ -145,8 +167,19 @@ class FederatedMutationEvaluator(
         }.filterNotNull().toMap()
     }
 
+    /**
+     * Allocates a worker for the given [count] of initial solutions and records its thread count.
+     *
+     * @param worker The worker client to allocate.
+     * @param count The number of initial solutions this worker should generate.
+     * @return The list of initial solution results returned by the worker.
+     */
     private suspend fun allocateWorker(worker: WorkerClient, count: Int): List<InitialSolutionResult> {
-        val request = allocationRequest.copy(initialSolutionCount = count)
+        val threadBudget = workerThreadBudgets[worker.nodeId]
+        val request = allocationRequest.copy(
+            initialSolutionCount = count,
+            threadsPerNode = threadBudget ?: allocationRequest.threadsPerNode
+        )
         val response = worker.allocate(request)
         workerThreadCounts[worker.nodeId] = response.threadCount
         return response.initialSolutions.map { solution ->
@@ -157,6 +190,19 @@ class FederatedMutationEvaluator(
         }
     }
 
+    /**
+     * Sends a [NodeWorkBatchRequest] to the worker responsible for [batch.nodeId] and
+     * maps the results to [EvaluationResult] instances.
+     *
+     * If the worker dies during or before the request (i.e. [WorkerClient.isAlive] is
+     * `false`), a [WorkerShutdownException] is thrown carrying the shutdown reason
+     * provided via [WorkerShutdownNotice] (if one was received) or a generic fallback.
+     * This ensures callers receive a precise error message rather than a generic
+     * "worker no longer reachable" message.
+     *
+     * @param batch The node batch to execute.
+     * @return The list of evaluation results for all tasks in the batch.
+     */
     private suspend fun executeOnWorker(batch: NodeBatch): List<EvaluationResult> {
         val worker = requireWorker(batch.nodeId)
         return try {
@@ -178,11 +224,10 @@ class FederatedMutationEvaluator(
                 )
             }
         } catch (e: Exception) {
-            // If the worker's WS connection is dead (e.g. subprocess crashed or timed out),
-            // propagate the error to terminate the optimization instead of looping forever
-            // with all-failed batches.
-            if (!worker.isAlive) {
-                throw RuntimeException("Worker ${batch.nodeId} is no longer reachable (subprocess may have timed out or crashed)", e)
+            if (!worker.isAlive || worker.shutdownReason != null) {
+                val reason = worker.shutdownReason
+                    ?: "Worker ${batch.nodeId} is no longer reachable (subprocess may have timed out or crashed)"
+                throw WorkerShutdownException(reason, e)
             }
             val mutationFailures = batch.tasks.map { task ->
                 EvaluationResult(
@@ -208,6 +253,12 @@ class FederatedMutationEvaluator(
         }
     }
 
+    /**
+     * Returns the [WorkerClient] for [nodeId], throwing if not found.
+     *
+     * @param nodeId The node identifier to look up.
+     * @return The [WorkerClient] for that node.
+     */
     private fun requireWorker(nodeId: String): WorkerClient =
         workerByNodeId[nodeId]
             ?: throw IllegalArgumentException("No worker found with nodeId '$nodeId'")
@@ -222,7 +273,7 @@ class FederatedMutationEvaluator(
         fun distributeCount(total: Int, buckets: Int): List<Int> {
             val base = total / buckets
             val remainder = total % buckets
-            return List(buckets) { i -> if (i < remainder) base + 1 else base }
+            return List(buckets) { i -> if (i < remainder) { base + 1 } else { base } }
         }
     }
 }

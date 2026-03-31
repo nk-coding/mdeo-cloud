@@ -42,7 +42,8 @@ fun Application.module(appConfig: AppConfig) {
     val backendApiService = BackendApiService(appConfig.backendApiUrl)
     val executionService = ExecutionService(
         backendApiService,
-        appConfig.executionTimeoutMs
+        appConfig.executionTimeoutMs,
+        this
     )
     
     monitor.subscribe(ApplicationStopped) {

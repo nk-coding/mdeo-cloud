@@ -293,60 +293,6 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
     }
 
     /**
-     * Determines the modifier for a new edge given the effective modifiers of its endpoints.
-     *
-     * Rules:
-     * - If one endpoint has FORBID or REQUIRE, the other must be FORBID, REQUIRE, or NONE (persist);
-     *   the edge takes the modifier of the non-persist endpoint. Mixed FORBID+REQUIRE is invalid.
-     * - If one endpoint has CREATE or DELETE, the other must be CREATE, DELETE, or NONE (persist);
-     *   the edge takes the modifier of the non-persist endpoint.
-     * - Mixing FORBID/REQUIRE with CREATE/DELETE is always invalid.
-     * - If both endpoints are NONE (persist), the context modifier is used as-is.
-     *
-     * @param sourceModifier The effective modifier of the source node
-     * @param targetModifier The effective modifier of the target node
-     * @param contextModifier The user-supplied modifier (relevant only for persist-persist edges)
-     * @returns The inferred edge modifier, or undefined when the combination is invalid
-     */
-    private determineEdgeModifier(
-        sourceModifier: PatternModifierKind,
-        targetModifier: PatternModifierKind,
-        contextModifier: PatternModifierKind
-    ): PatternModifierKind | undefined {
-        const isForbidRequire = (m: PatternModifierKind): boolean =>
-            m === PatternModifierKind.FORBID || m === PatternModifierKind.REQUIRE;
-        const isCreateDelete = (m: PatternModifierKind): boolean =>
-            m === PatternModifierKind.CREATE || m === PatternModifierKind.DELETE;
-        const isPersist = (m: PatternModifierKind): boolean => m === PatternModifierKind.NONE;
-
-        // Incompatible cross-group combinations.
-        if (isForbidRequire(sourceModifier) && isCreateDelete(targetModifier)) return undefined;
-        if (isCreateDelete(sourceModifier) && isForbidRequire(targetModifier)) return undefined;
-
-        // Both persist → use the user-supplied context modifier.
-        if (isPersist(sourceModifier) && isPersist(targetModifier)) {
-            return contextModifier;
-        }
-
-        // At least one endpoint is CREATE or DELETE.
-        if (isCreateDelete(sourceModifier) || isCreateDelete(targetModifier)) {
-            // Use the non-persist (create/delete) modifier.
-            return isCreateDelete(sourceModifier) ? sourceModifier : targetModifier;
-        }
-
-        // At least one endpoint is FORBID or REQUIRE (and neither is create/delete).
-        if (isForbidRequire(sourceModifier) && isForbidRequire(targetModifier)) {
-            // Both forbid/require: they must agree.
-            if (sourceModifier !== targetModifier) return undefined;
-            return sourceModifier;
-        }
-        if (isForbidRequire(sourceModifier)) return sourceModifier;
-        if (isForbidRequire(targetModifier)) return targetModifier;
-
-        return undefined;
-    }
-
-    /**
      * Converts a modifier string from operation args or schema params to a {@link PatternModifierKind}.
      * Unknown or absent strings default to {@link PatternModifierKind.NONE}.
      *

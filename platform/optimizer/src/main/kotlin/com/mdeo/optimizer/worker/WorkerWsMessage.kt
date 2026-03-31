@@ -23,7 +23,6 @@ sealed class WorkerWsMessage {
     abstract val requestId: String
 }
 
-// ─── Unified generation batch ────────────────────────────────────────────────
 
 /**
  * Orchestrator → Worker: execute one generation of work atomically.
@@ -66,7 +65,6 @@ data class NodeWorkBatchResponse(
     val results: List<BatchResult>
 ) : WorkerWsMessage()
 
-// ─── Solution data retrieval ───────────────────────────────────────────────────
 
 /**
  * Orchestrator → Worker: retrieve the full model data for a specific solution.
@@ -118,4 +116,46 @@ data class SolutionFetchResponse(
     override val requestId: String,
     val solutionId: String,
     val serializedModel: SerializedModel
+) : WorkerWsMessage()
+
+
+/**
+ * Worker → Orchestrator: the worker subprocess is about to shut down.
+ *
+ * Sent by a worker subprocess when it needs to terminate for an internal reason
+ * (e.g. a script-evaluation or transformation timeout fired by [ChildProcessWatchdog]).
+ * The orchestrator must record the [reason] as the execution error, set the execution
+ * state to FAILED, and reply with [WorkerShutdownAck] before the worker halts its JVM.
+ *
+ * Waiting for the acknowledgement ensures that:
+ * - The orchestrator learns the real cause of the shutdown **before** the websocket
+ *   is torn down, preventing a confusing "worker no longer reachable" message.
+ * - At most one error message is recorded per execution, because [WorkerShutdownAck]
+ *   is only sent once the orchestrator has gated on the execution already being in a
+ *   terminal state.
+ *
+ * @param requestId Correlation identifier echoed in [WorkerShutdownAck].
+ * @param reason Human-readable description of why the worker is shutting down.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+@SerialName("worker_shutdown_notice")
+data class WorkerShutdownNotice(
+    override val requestId: String,
+    val reason: String
+) : WorkerWsMessage()
+
+/**
+ * Orchestrator → Worker: acknowledgement of a [WorkerShutdownNotice].
+ *
+ * Sent after the orchestrator has recorded the shutdown reason and set the execution
+ * state to FAILED.  Upon receiving this the worker subprocess may safely halt its JVM.
+ *
+ * @param requestId Matches [WorkerShutdownNotice.requestId].
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+@SerialName("worker_shutdown_ack")
+data class WorkerShutdownAck(
+    override val requestId: String
 ) : WorkerWsMessage()

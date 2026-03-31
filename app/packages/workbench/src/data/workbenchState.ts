@@ -39,6 +39,7 @@ import { parseUri, FileCategory } from "@mdeo/language-common";
 import type { Execution } from "./execution/execution";
 import { buildExecutionFileTree } from "./execution/execution";
 import { showApiError } from "@/lib/notifications";
+import { useDiagnostics, type DiagnosticStore } from "./diagnostics/useDiagnostics";
 
 /**
  * Represents an execution with its loaded file tree data.
@@ -126,6 +127,11 @@ export class WorkbenchState {
      * Only one action can be active at a time; setting a new action discards the current one.
      */
     readonly pendingAction = shallowRef<ActionStartParams>();
+
+    /**
+     * Reactive diagnostic store tracking validation errors published by the language server.
+     */
+    readonly diagnosticStore: DiagnosticStore = useDiagnostics();
 
     /**
      * File type plugins provided by any plugin
@@ -586,6 +592,8 @@ export class WorkbenchState {
      * @param project The project to initialize the client for
      */
     private createLanguageClient(reader: BrowserMessageReader, writer: BrowserMessageWriter, project: Project) {
+        this.diagnosticStore.clear();
+
         const languageClient = new MonacoLanguageClient({
             name: "Extensible Language Client",
             clientOptions: {
@@ -598,6 +606,12 @@ export class WorkbenchState {
                     uri: Uri.file(`/${project.id}/files`),
                     name: project.name,
                     index: 0
+                },
+                middleware: {
+                    handleDiagnostics: (uri, diagnostics, next) => {
+                        this.diagnosticStore.set(uri, diagnostics);
+                        next(uri, diagnostics);
+                    }
                 }
             },
             messageTransports: { reader, writer }

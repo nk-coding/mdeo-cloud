@@ -36,6 +36,11 @@ abstract class SubprocessMain {
 
         watchdog = ChildProcessWatchdog { timeoutId ->
             try {
+                onWatchdogTimeout(timeoutId)
+            } catch (_: Exception) {
+                // Ignore errors in the timeout hook — we are about to halt anyway
+            }
+            try {
                 synchronized(output) {
                     SubprocessMessage.write(output, SubprocessMessage.Timeout(timeoutId))
                 }
@@ -67,6 +72,19 @@ abstract class SubprocessMain {
             cleanup()
         }
     }
+
+    /**
+     * Called on the watchdog thread when a registered timeout expires, **before** the
+     * subprocess sends [SubprocessMessage.Timeout] to the parent and halts the JVM.
+     *
+     * Subclasses may override this to perform a graceful-shutdown handshake (e.g.
+     * notifying the orchestrator via an out-of-band channel) before the JVM terminates.
+     * Any exception thrown from this method is silently swallowed; the halt proceeds
+     * unconditionally afterwards.
+     *
+     * @param timeoutId The identifier of the expired timeout, as supplied to [registerTimeout].
+     */
+    protected open fun onWatchdogTimeout(timeoutId: Int) {}
 
     /**
      * Called once before the subprocess signals readiness.

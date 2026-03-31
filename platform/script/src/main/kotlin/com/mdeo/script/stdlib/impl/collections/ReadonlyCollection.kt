@@ -267,4 +267,23 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
      * @param keyExtractor the function to extract the sort key
      */
     fun <U : Comparable<U>> sortedBy(keyExtractor: Func1<@UnsafeVariance T, U>): ReadonlyOrderedCollection<@UnsafeVariance T>
+
+    /**
+     * Maps each element to a collection and flattens the results into a single collection.
+     *
+     * @param mapper the function that maps each element to a collection
+     */
+    fun <U> flatMap(mapper: Func1<@UnsafeVariance T, ReadonlyCollection<U>>): Collection<U>
+
+    /**
+     * Returns the first element in this collection.
+     *
+     * @throws NoSuchElementException if the collection is empty
+     */
+    fun first(): T
+
+    /**
+     * Returns the first element in this collection, or null if the collection is empty.
+     */
+    fun firstOrNull(): T?
 }

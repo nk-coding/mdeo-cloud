@@ -111,7 +111,7 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
 
         return {
             types: this.types,
-            metamodelPath: resolveRelativePath(document, transformation.import.file).fsPath,
+            metamodelPath: resolveRelativePath(document, transformation.import.file).path,
             statements
         };
     }

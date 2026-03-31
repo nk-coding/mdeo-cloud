@@ -1,5 +1,6 @@
 package com.mdeo.optimizerexecution.worker
 
+import com.mdeo.execution.common.config.configureSerialization
 import com.mdeo.expression.ast.TypedCallableBody
 import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedDoubleLiteralExpression
@@ -16,11 +17,23 @@ import com.mdeo.optimizer.worker.BatchTask
 import com.mdeo.optimizer.worker.NodeWorkBatchRequest
 import com.mdeo.optimizer.worker.NodeWorkBatchResponse
 import com.mdeo.optimizer.worker.SolutionTransferItem
+import com.mdeo.optimizer.worker.WorkerAllocationRequest
+import com.mdeo.optimizerexecution.routes.workerRoutes
+import com.mdeo.optimizerexecution.service.OrchestratorRegistry
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.ast.TypedFunction
 import com.mdeo.script.ast.TypedImport
 import com.mdeo.script.ast.expressions.TypedExpressionSerializer as ScriptExpressionSerializer
 import com.mdeo.script.ast.statements.TypedStatementSerializer
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
@@ -29,6 +42,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
+import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -41,13 +55,9 @@ import kotlin.test.assertTrue
  */
 class WorkerServiceTest {
 
-    // ─── Script JSON serialiser (must match WorkerSubprocessMain) ─────────────────
-
     private val scriptJson = Json {
         ignoreUnknownKeys = true
         isLenient = true
-        // encodeDefaults = true is required so that 'kind' discriminator fields
-        // (which have default values) are always included in serialised JSON.
         encodeDefaults = true
         serializersModule = SerializersModule {
             contextual(TypedExpression::class, ScriptExpressionSerializer)
@@ -55,7 +65,6 @@ class WorkerServiceTest {
         }
     }
 
-    // ─── AST helpers ──────────────────────────────────────────────────────────────
 
     /**
      * Builds a script AST with a single function that always returns 1.0.
@@ -108,7 +117,6 @@ class WorkerServiceTest {
                                 condition = TypedBooleanLiteralExpression(evalType = boolTypeIdx, value = true),
                                 body = emptyList()
                             ),
-                            // Unreachable — satisfies the compiler's return-type requirement
                             TypedReturnStatement(
                                 value = TypedDoubleLiteralExpression(evalType = doubleTypeIdx, value = "0.0")
                             )
@@ -119,7 +127,6 @@ class WorkerServiceTest {
         )
     }
 
-    // ─── Request builder ──────────────────────────────────────────────────────────
 
     private fun buildRequest(
         executionId: String = "test-exec",
@@ -135,10 +142,10 @@ class WorkerServiceTest {
         goalConfig = goalConfig,
         solverConfig = SolverConfig(),
         initialSolutionCount = initialSolutionCount,
-        useLocalChannel = true
+        useLocalChannel = true,
+        threadsPerNode = 1
     )
 
-    // ─── Tests ────────────────────────────────────────────────────────────────────
 
     /**
      * Verifies that allocation starts a subprocess, generates initial solutions,
@@ -212,7 +219,6 @@ class WorkerServiceTest {
             constraints = listOf(ConstraintConfig(conPath, conFn))
         )
 
-        // Short timeout so the test does not take long
         val service = WorkerService(workerThreads = 1, scriptTimeoutMs = 500L, transformationTimeoutMs = 500L)
         try {
             val allocResponse = service.allocate(
@@ -224,7 +230,6 @@ class WorkerServiceTest {
             )
             assertEquals(0, allocResponse.initialSolutions.size)
 
-            // Import a seed solution so the subprocess has something to mutate.
             val seedModel = SerializedModel.AsModelData(
                 ModelData(metamodelPath = "", instances = emptyList(), links = emptyList())
             )
@@ -237,8 +242,6 @@ class WorkerServiceTest {
             )
             service.dispatchToSubprocess("test-exec", importBatch)
 
-            // Mutate — the constraint spins forever, so the watchdog kills the subprocess.
-            // dispatchToSubprocess returns empty when the process-exit callback fires.
             val mutateBatch = NodeWorkBatchRequest(
                 requestId = "mutate-req",
                 imports = emptyList(),
@@ -247,15 +250,108 @@ class WorkerServiceTest {
             )
             val responses = service.dispatchToSubprocess("test-exec", mutateBatch)
 
-            // Subprocess died: no valid NodeWorkBatchResponse is returned.
             assertTrue(responses.isEmpty(), "Expected empty response when subprocess times out, got: $responses")
         } finally {
-            // Subprocess is already dead after the timeout; cleanup is best-effort.
             try {
                 service.cleanup("test-exec")
             } catch (_: Exception) {
                 service.close()
             }
+        }
+    }
+
+    /**
+     * Regression test for the "execution stays RUNNING forever after timeout" bug.
+     *
+     * Verifies that when a subprocess times out during mutation in local-channel mode and
+     * sends a [com.mdeo.optimizer.worker.WorkerShutdownNotice] over the WebSocket,
+     * [WorkerClient.executeNodeBatch] throws [WorkerShutdownException] promptly — not after
+     * the 600-second [WorkerClient.OPERATION_TIMEOUT_MS].
+     *
+     * The @Timeout(30) guard catches any regression where pending requests are not drained
+     * on [WorkerShutdownNotice], forcing callers to wait for the full operation timeout.
+     *
+     * Flow:
+     * 1. Start a real embedded Ktor/Netty server with the [WorkerService].
+     * 2. Allocate a subprocess with an infinite-loop constraint and 0 initial solutions.
+     * 3. Trigger mutation via [WorkerClient] (WS path) — the infinite-loop script fires.
+     * 4. Assert that [WorkerShutdownException] is thrown before the 30-second test timeout.
+     */
+    @Test
+    @Timeout(30)
+    @OptIn(ExperimentalSerializationApi::class)
+    fun `subprocess timeout propagates WorkerShutdownException via WorkerClient`() = runBlocking {
+        val port = java.net.ServerSocket(0).use { it.localPort }
+        val executionId = "timeout-ws-test"
+        val workerService = WorkerService(
+            workerThreads = 1,
+            scriptTimeoutMs = 500L,
+            transformationTimeoutMs = 500L,
+            serverPort = port
+        )
+        val orchestratorRegistry = OrchestratorRegistry()
+        val server = embeddedServer(Netty, port = port) {
+            install(WebSockets)
+            configureSerialization()
+            routing {
+                workerRoutes(workerService, orchestratorRegistry)
+            }
+        }
+        server.start()
+
+        val scope = CoroutineScope(Dispatchers.Default + Job())
+        val client = WorkerClient(
+            nodeId = "0",
+            baseUrl = "http://localhost:$port",
+            scope = scope,
+            orchestratorRegistry = null,
+            orchestratorWsBaseUrl = null,
+            useLocalChannel = true
+        )
+        try {
+            val conPath = "test://con.fn"
+            val conFn = "constraint"
+            val scriptAstJsons = mapOf(conPath to scriptJson.encodeToString(infiniteLoopAst(conFn)))
+            val goalConfig = GoalConfig(
+                objectives = emptyList(),
+                constraints = listOf(ConstraintConfig(conPath, conFn))
+            )
+            val allocRequest = WorkerAllocationRequest(
+                executionId = executionId,
+                metamodelData = MetamodelData(),
+                initialModelData = ModelData(metamodelPath = "", instances = emptyList(), links = emptyList()),
+                transformationAstJsons = emptyMap(),
+                scriptAstJsons = scriptAstJsons,
+                goalConfig = goalConfig,
+                solverConfig = SolverConfig(),
+                initialSolutionCount = 0,
+                useLocalChannel = true,
+                threadsPerNode = 1
+            )
+            client.allocate(allocRequest)
+
+            val seedId = "seed-1"
+            val seedModel = SerializedModel.AsModelData(
+                ModelData(metamodelPath = "", instances = emptyList(), links = emptyList())
+            )
+
+            val exception = assertThrows<WorkerShutdownException> {
+                runBlocking {
+                    client.executeNodeBatch(
+                        executionId,
+                        imports = listOf(SolutionTransferItem(seedId, seedModel)),
+                        tasks = listOf(BatchTask(seedId)),
+                        evaluationTasks = emptyList(),
+                        discards = emptyList()
+                    )
+                }
+            }
+            assertTrue(exception.message != null, "WorkerShutdownException should carry a reason message")
+        } finally {
+            scope.cancel()
+            runCatching { workerService.cleanup(executionId) }
+            runCatching { workerService.close() }
+            server.stop(gracePeriodMillis = 0, timeoutMillis = 0)
         }
     }
 }

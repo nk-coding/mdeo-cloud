@@ -25,8 +25,8 @@ function extractProblemData(section: ProblemSectionType, document: LangiumDocume
     const metamodel = section.metamodel[0];
     const model = section.model[0];
     return {
-        metamodelPath: metamodel ? resolveRelativePath(document, metamodel).fsPath : "",
-        modelPath: model ? resolveRelativePath(document, model).fsPath : ""
+        metamodelPath: metamodel ? resolveRelativePath(document, metamodel).path : "",
+        modelPath: model ? resolveRelativePath(document, model).path : ""
     };
 }
 
@@ -60,7 +60,7 @@ function buildFunctionLookup(
     const lookup = new Map<string, { path: string; functionName: string }>();
     for (const fileImport of (section.imports ?? []) as any[]) {
         const relativePath: string = fileImport.file ?? "";
-        const absolutePath = resolveRelativePath(document, relativePath).fsPath;
+        const absolutePath = resolveRelativePath(document, relativePath).path;
         for (const imp of (fileImport.imports ?? []) as any[]) {
             const originalName: string = imp.entity?.$refText ?? "";
             const refName: string = imp.name != undefined ? imp.name : originalName;

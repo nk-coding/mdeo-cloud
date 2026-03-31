@@ -149,7 +149,9 @@ sealed class ScriptCommand {
  */
 @Serializable
 sealed class ScriptResponse {
-    /** Successful execution result. */
+    /**
+     * Successful execution result. 
+     */
     @Serializable
     @SerialName("execute_ok")
     data class ExecuteOk(
@@ -157,7 +159,9 @@ sealed class ScriptResponse {
         val output: String?
     ) : ScriptResponse()
 
-    /** Acknowledgement of a [ScriptCommand.Reset]. */
+    /**
+     * Acknowledgement of a [ScriptCommand.Reset]. 
+     */
     @Serializable
     @SerialName("reset_ok")
     data object ResetOk : ScriptResponse()

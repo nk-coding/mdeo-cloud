@@ -220,5 +220,21 @@ fun createReadonlyCollectionType(): TypeDefinition {
             overload("lambda", "(Lcom/mdeo/script/runtime/interfaces/Predicate1;)I", READONLY_COLLECTION, isInterface = true,
                 parameterTypes = listOf(BuiltinTypes.predicate()), returnType = BuiltinTypes.INT)
         }
+
+        instanceMethod("flatMap") {
+            overload("", "(Lcom/mdeo/script/runtime/interfaces/Func1;)Lcom/mdeo/script/stdlib/impl/collections/Collection;",
+                READONLY_COLLECTION, isInterface = true,
+                parameterTypes = listOf(BuiltinTypes.function()), returnType = BuiltinTypes.COLLECTION)
+        }
+
+        instanceMethod("first") {
+            overload("", "()Ljava/lang/Object;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.NULLABLE_ANY)
+        }
+
+        instanceMethod("firstOrNull") {
+            overload("", "()Ljava/lang/Object;", READONLY_COLLECTION, isInterface = true,
+                parameterTypes = emptyList(), returnType = BuiltinTypes.NULLABLE_ANY)
+        }
     }
 }

@@ -1,7 +1,7 @@
 import type { Doc } from "prettier";
 import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
-import { ID } from "@mdeo/language-common";
+import { ID, STRING } from "@mdeo/language-common";
 import {
     serializeNewlineSep,
     printDanglingComments,
@@ -17,7 +17,8 @@ import type {
     FunctionType,
     ScriptType,
     FunctionParameterType,
-    ExtensionExpressionType
+    ExtensionExpressionType,
+    MetamodelFileImportType
 } from "../grammar/scriptTypes.js";
 import {
     ReturnStatement,
@@ -30,7 +31,8 @@ import {
     FunctionImport,
     FunctionFileImport,
     Script,
-    ExtensionExpression
+    ExtensionExpression,
+    MetamodelFileImport
 } from "../grammar/scriptTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -51,6 +53,7 @@ export function registerScriptSerializers(services: LangiumCoreServices & AstSer
     AstSerializer.registerNodeSerializer(FunctionParameter, (ctx) => printFunctionParameter(ctx));
     AstSerializer.registerNodeSerializer(FunctionParameters, (ctx) => printFunctionParameters(ctx));
     AstSerializer.registerNodeSerializer(Function, (ctx) => printFunction(ctx));
+    AstSerializer.registerNodeSerializer(MetamodelFileImport, (ctx) => printMetamodelFileImport(ctx));
     AstSerializer.registerNodeSerializer(Script, (ctx) => printScript(ctx));
     AstSerializer.registerNodeSerializer(ExtensionExpression, (ctx) => printExtensionExpression(ctx));
     registerImportSerializers(services, doc.builders, FunctionImport, FunctionFileImport);
@@ -187,13 +190,32 @@ function printFunction(context: PrintContext<FunctionType>): Doc {
 }
 
 /**
+ * Prints a metamodel file import node.
+ *
+ * @param context The print context
+ * @returns The formatted metamodel file import
+ */
+function printMetamodelFileImport(context: PrintContext<MetamodelFileImportType>): Doc {
+    const { ctx, printPrimitive, getPrimitive } = context;
+    return ["using ", printPrimitive(getPrimitive(ctx, "file"), STRING)];
+}
+
+/**
  * Prints the root script node.
  *
  * @param context The print context
  * @returns The formatted script
  */
 function printScript(context: PrintContext<ScriptType>): Doc {
-    return serializeNewlineSep(context, ["imports", "functions"], doc.builders);
+    const { ctx, path, print } = context;
+    const { hardline } = doc.builders;
+
+    const metamodelDoc: Doc[] =
+        ctx.metamodelImport != undefined ? [path.call(print, "metamodelImport"), hardline] : [];
+
+    const rest = serializeNewlineSep(context, ["imports", "functions"], doc.builders);
+
+    return [...metamodelDoc, ...rest];
 }
 
 /**

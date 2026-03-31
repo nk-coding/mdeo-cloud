@@ -45,7 +45,7 @@ export function generateImportRules<T extends AstNode>(
             "{",
             ...newlineTokens,
             add("imports", importRule),
-            many(...newlineTokens, ",", add("imports", importRule)),
+            many(...newlineTokens, ",", ...newlineTokens, add("imports", importRule)),
             ...newlineTokens,
             "}",
             "from",

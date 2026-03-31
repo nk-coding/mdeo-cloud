@@ -14,8 +14,14 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.slf4j.LoggerFactory
 
+/** Logger instance for optimizer HTTP route handlers. */
 private val logger = LoggerFactory.getLogger("OptimizerRoutes")
 
+/**
+ * Registers common execution routes and the optimizer-specific POST creation route.
+ *
+ * @param executionService The service that handles optimization execution lifecycle.
+ */
 fun Route.optimizerRoutes(executionService: OptimizerExecutionService) {
     executionRoutesWithFileTree(executionService = executionService)
     authenticate(AUTH_JWT) {
@@ -25,6 +31,11 @@ fun Route.optimizerRoutes(executionService: OptimizerExecutionService) {
     }
 }
 
+/**
+ * Registers POST `/api/executions` — creates and starts a new optimization execution.
+ *
+ * @param executionService The service that creates and launches the execution.
+ */
 private fun Route.createOptimizationExecutionRoute(executionService: OptimizerExecutionService) {
     post {
         val authResult = call.requireScope(ExecutionScopes.EXECUTION_WRITE)

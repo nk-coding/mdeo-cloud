@@ -888,4 +888,62 @@ class ReadonlyCollectionMethodsTest {
         assertEquals(1, result.at(0))
         assertEquals(5, result.at(4))
     }
+
+    // ==================== flatMap() tests ====================
+
+    @Test
+    fun `flatMap flattens elements into a single collection`() {
+        val list = ListImpl.of(1, 2, 3)
+        val result = list.flatMap(Func1 { ListImpl.of(it, it * 10) })
+        assertEquals(6, result.size())
+    }
+
+    @Test
+    fun `flatMap handles empty collection`() {
+        val list = ListImpl.of<Int>()
+        val result = list.flatMap(Func1 { ListImpl.of(it) })
+        assertEquals(0, result.size())
+    }
+
+    @Test
+    fun `flatMap preserves order`() {
+        val list = ListImpl.of(1, 2, 3)
+        val result = list.flatMap(Func1 { ListImpl.of(it) }) as ReadonlyList<Int>
+        assertEquals(1, result.at(0))
+        assertEquals(2, result.at(1))
+        assertEquals(3, result.at(2))
+    }
+
+    // ==================== first() tests ====================
+
+    @Test
+    fun `first returns first element`() {
+        val list = ListImpl.of(10, 20, 30)
+        assertEquals(10, list.first())
+    }
+
+    @Test
+    fun `first throws when empty`() {
+        val list = ListImpl.of<Int>()
+        try {
+            list.first()
+            error("Expected NoSuchElementException")
+        } catch (e: NoSuchElementException) {
+            // expected
+        }
+    }
+
+    // ==================== firstOrNull() tests ====================
+
+    @Test
+    fun `firstOrNull returns first element of non-empty collection`() {
+        val list = ListImpl.of(42, 2, 3)
+        assertEquals(42, list.firstOrNull())
+    }
+
+    @Test
+    fun `firstOrNull returns null for empty collection`() {
+        val list = ListImpl.of<Int>()
+        assertEquals(null, list.firstOrNull())
+    }
 }

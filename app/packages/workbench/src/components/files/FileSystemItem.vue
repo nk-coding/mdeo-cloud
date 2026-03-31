@@ -25,7 +25,10 @@
                             @cancel="handleRenameCancel"
                         />{{ getFileExtension(entry.name) }}
                     </span>
-                    <span v-else>{{ entry.name }}</span>
+                    <span v-else :class="{ 'text-destructive': entryErrorCount > 0 }">{{ entry.name }}</span>
+                    <span v-if="entryErrorCount > 0" class="ml-auto shrink-0 text-xs font-medium text-destructive">
+                        {{ entryErrorCount > 9 ? "9+" : entryErrorCount }}
+                    </span>
                 </template>
                 <template v-if="entry.type === FileType.Directory" #items>
                     <FileSystemItemList
@@ -138,8 +141,15 @@ const props = defineProps<{
 }>();
 
 const workbenchState = inject(workbenchStateKey)!;
-const { monacoApi, languagePlugins, activeTab, languagePluginByExtension, languageClient, pendingAction } =
-    workbenchState;
+const {
+    monacoApi,
+    languagePlugins,
+    activeTab,
+    languagePluginByExtension,
+    languageClient,
+    pendingAction,
+    diagnosticStore
+} = workbenchState;
 const treeContext = inject(treeContextKey)!;
 
 const emit = defineEmits<{
@@ -161,6 +171,21 @@ const fileActions = ref<FileAction[]>([]);
 const contextMenuActions = computed(() =>
     fileActions.value.filter((action) => action.displayLocations.includes(ActionDisplayLocation.CONTEXT_MENU))
 );
+
+const entryErrorCount = computed(() => {
+    if (props.entry.type === FileType.File) {
+        return diagnosticStore.fileDiagnostics.value.get(props.entry.uri.toString())?.errors ?? 0;
+    }
+    // For folders, aggregate error counts from all descendant files
+    const prefix = props.entry.uri.toString() + "/";
+    let total = 0;
+    for (const [uri, summary] of diagnosticStore.fileDiagnostics.value) {
+        if (uri.startsWith(prefix)) {
+            total += summary.errors;
+        }
+    }
+    return total;
+});
 
 async function handleContextMenuOpen(open: boolean): Promise<void> {
     if (open && props.entry.type === FileType.File) {
