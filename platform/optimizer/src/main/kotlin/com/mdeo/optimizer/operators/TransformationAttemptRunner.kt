@@ -47,7 +47,7 @@ class TransformationAttemptRunner(
                 is TransformationExecutionResult.Success -> true
                 is TransformationExecutionResult.Stopped -> result.isNormalStop
                 is TransformationExecutionResult.Failure -> {
-                    logger.debug("Transformation $transformationPath failed: ${result.reason}")
+                    logger.warn("Transformation $transformationPath failed: ${result.reason}")
                     false
                 }
             }

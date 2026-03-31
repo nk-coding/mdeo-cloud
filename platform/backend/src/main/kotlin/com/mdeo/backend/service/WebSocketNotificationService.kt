@@ -2,6 +2,7 @@ package com.mdeo.backend.service
 
 import com.mdeo.common.model.Execution
 import com.mdeo.common.model.FileEntry
+import com.mdeo.common.model.Project
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.sync.Mutex
@@ -62,6 +63,46 @@ data class ExecutionStateChangedMessage(
 ) : WebSocketMessage {
     @SerialName("messageType")
     override val type: String = "event/executionStateChanged"
+}
+
+// ─── Initialization Messages ──────────────────────────────────────────────────
+
+/**
+ * Request to initialize a project session over WebSocket.
+ * The server validates the user's access, caches file-operation permissions,
+ * subscribes the connection to execution-state events, and replies with
+ * [InitReplyMessage] containing project settings.
+ *
+ * @property requestId Unique ID for correlating the response
+ * @property projectId The UUID of the project to initialize
+ */
+@Serializable
+data class InitRequestMessage(
+    val requestId: String,
+    val projectId: String
+) : WebSocketMessage {
+    @SerialName("messageType")
+    override val type: String = "init/request"
+}
+
+/**
+ * Reply sent by the server after a successful [InitRequestMessage].
+ * Contains project metadata and the current user's effective permissions.
+ *
+ * @property requestId The ID of the originating init request
+ * @property project The project data
+ * @property canWrite Whether the authenticated user has write permission
+ * @property canExecute Whether the authenticated user has execute permission
+ */
+@Serializable
+data class InitReplyMessage(
+    val requestId: String,
+    val project: Project,
+    val canWrite: Boolean,
+    val canExecute: Boolean
+) : WebSocketMessage {
+    @SerialName("messageType")
+    override val type: String = "init/reply"
 }
 
 
@@ -492,7 +533,7 @@ class WebSocketNotificationService {
         return connectionMutex.withLock {
             val connection = connections[connectionId] ?: return@withLock false
             connection.subscribedProjects.add(projectId)
-            logger.debug("Connection $connectionId subscribed to project $projectId")
+            logger.info("Connection $connectionId subscribed to project $projectId")
             true
         }
     }
@@ -508,7 +549,7 @@ class WebSocketNotificationService {
         return connectionMutex.withLock {
             val connection = connections[connectionId] ?: return@withLock false
             connection.subscribedProjects.remove(projectId)
-            logger.debug("Connection $connectionId unsubscribed from project $projectId")
+            logger.info("Connection $connectionId unsubscribed from project $projectId")
             true
         }
     }

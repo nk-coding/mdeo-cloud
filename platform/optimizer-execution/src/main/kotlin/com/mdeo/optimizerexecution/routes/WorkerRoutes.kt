@@ -1,6 +1,7 @@
 package com.mdeo.optimizerexecution.routes
 
 import com.mdeo.optimizer.worker.*
+import com.mdeo.optimizerexecution.service.OrchestratorRegistry
 import com.mdeo.optimizerexecution.worker.WorkerService
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -19,19 +20,19 @@ private val logger = LoggerFactory.getLogger("WorkerRoutes")
 private val cbor = Cbor { ignoreUnknownKeys = true }
 
 /**
- * Registers worker API routes under `/api/worker` and `/ws/worker`.
+ * Registers worker API routes under `/api/worker`, `/ws/worker`, and `/ws/subprocess`.
  *
- * HTTP routes are used for the initial allocation handshake, solution data retrieval,
- * and cleanup. All ongoing per-generation traffic (imports + mutations + discards) is
- * served over a persistent binary-CBOR WebSocket connection opened by the orchestrator
- * after successful allocation.
- *
- * No authentication is required between worker nodes.
+ * HTTP routes handle the initial allocation handshake, solution data retrieval, and cleanup.
+ * The legacy `/ws/worker` route supports orchestrator-initiated WebSocket connections.
+ * The `/ws/subprocess` route accepts reverse connections from worker subprocesses,
+ * completing the [OrchestratorRegistry] deferred so the orchestrator-side [WorkerClient]
+ * can start communicating with the subprocess directly.
  *
  * @param workerService The service managing worker-side execution state.
+ * @param orchestratorRegistry The global registry for routing subprocess connections.
  */
 @OptIn(ExperimentalSerializationApi::class)
-fun Route.workerRoutes(workerService: WorkerService) {
+fun Route.workerRoutes(workerService: WorkerService, orchestratorRegistry: OrchestratorRegistry) {
     // HTTP routes (allocation + solution retrieval + cleanup)
     route("/api/worker/executions") {
         allocateRoute(workerService)
@@ -42,14 +43,40 @@ fun Route.workerRoutes(workerService: WorkerService) {
         }
     }
 
-    // WebSocket route (orchestrator ↔ worker ongoing communication)
+    // HTTP metadata route
+    metadataRoute(workerService)
+
+    // WebSocket route (orchestrator ↔ worker ongoing communication — legacy mode)
     route("/ws/worker/executions/{id}") {
         orchestratorWsRoute(workerService)
+    }
+
+    // WebSocket route (subprocess → orchestrator reverse connection)
+    route("/ws/subprocess/executions/{executionId}/{nodeId}") {
+        subprocessWsRoute(orchestratorRegistry)
+    }
+}
+
+/**
+ * GET `/api/worker/metadata` — returns thread count and supported algorithm backends.
+ *
+ * Orchestrators call this endpoint before or during node selection to determine the
+ * actual resource capacity of each worker, avoiding reliance on configuration estimates.
+ *
+ * @param workerService The worker service from which metadata is derived.
+ */
+private fun Route.metadataRoute(workerService: WorkerService) {
+    get("/api/worker/metadata") {
+        val metadata = workerService.getMetadata()
+        call.respond(HttpStatusCode.OK, metadata)
     }
 }
 
 /**
  * POST `/api/worker/executions` — allocates resources for a new optimization execution.
+ *
+ * If the request contains an `orchestratorWsUrl`, the subprocess will connect back
+ * to the orchestrator via WebSocket (new mode). Otherwise, legacy mode is used.
  *
  * @param workerService The worker service to delegate allocation to.
  */
@@ -57,7 +84,7 @@ private fun Route.allocateRoute(workerService: WorkerService) {
     post {
         val request = call.receive<WorkerAllocationRequest>()
         try {
-            val response = workerService.allocate(request)
+            val response = workerService.allocate(request, orchestratorWsUrl = request.orchestratorWsUrl)
             call.respond(HttpStatusCode.Created, response)
         } catch (e: Exception) {
             logger.error("Allocation failed for execution {}", request.executionId, e)
@@ -133,5 +160,45 @@ private fun Route.orchestratorWsRoute(workerService: WorkerService) {
             return@webSocket
         }
         workerService.handleOrchestratorSession(executionId, this)
+    }
+}
+
+// ─── Subprocess reverse-connect route ───────────────────────────────────────────
+
+/**
+ * WebSocket `/ws/subprocess/executions/{executionId}/{nodeId}` — subprocess reverse connection.
+ *
+ * Worker subprocesses connect here after receiving an orchestrator WS URL during their
+ * [Setup][com.mdeo.optimizerexecution.worker.WorkerSubprocessRequest.Setup] command.
+ * The route completes the [OrchestratorRegistry] deferred for the matching key, making
+ * the session available to the orchestrator-side [WorkerClient].
+ *
+ * The WebSocket is kept alive until the remote side disconnects or an error occurs.
+ *
+ * @param orchestratorRegistry The registry to complete the pending deferred on.
+ */
+private fun Route.subprocessWsRoute(orchestratorRegistry: OrchestratorRegistry) {
+    webSocket {
+        val executionId = call.parameters["executionId"]
+        val nodeId = call.parameters["nodeId"]
+        if (executionId == null || nodeId == null) {
+            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Missing executionId or nodeId"))
+            return@webSocket
+        }
+        val key = OrchestratorRegistry.key(executionId, nodeId)
+        if (!orchestratorRegistry.complete(key, this)) {
+            logger.warn("No pending orchestrator for subprocess connection: {}", key)
+            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "No matching orchestrator"))
+            return@webSocket
+        }
+        logger.info("Subprocess connected: {}", key)
+        // The orchestrator-side WorkerClient reads from this session's incoming channel.
+        // We must keep the Ktor handler alive until the connection closes. Suspending on
+        // closeReason achieves this without consuming frames that the WorkerClient needs.
+        try {
+            closeReason.await()
+        } finally {
+            logger.info("Subprocess disconnected: {}", key)
+        }
     }
 }

@@ -3,20 +3,16 @@ package com.mdeo.modeltransformationexecution.service
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.execution.common.routes.FileEntry
 import com.mdeo.execution.common.service.ExecutionServiceWithFileTree
+import com.mdeo.execution.common.subprocess.SubprocessPool
+import com.mdeo.execution.common.subprocess.SubprocessResult
+import com.mdeo.execution.common.subprocess.SubprocessRunner
 import com.mdeo.metamodel.data.ModelData
-import com.mdeo.metamodel.Metamodel
-import com.mdeo.modeltransformation.runtime.TransformationEngine
-import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
 import com.mdeo.modeltransformationexecution.database.TransformationExecutionsTable
 import com.mdeo.modeltransformationexecution.database.TransformationResultFilesTable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -40,25 +36,47 @@ import kotlin.uuid.toKotlinUuid
  * Implements ExecutionServiceWithFileTree to support result file trees.
  *
  * Execution is asynchronous: [createAndStartExecution] returns as soon as the config is
- * parsed and the execution record is created.  The transformation itself runs in a background
- * coroutine bound to [executionScope].
+ * parsed and the execution record is created.  The transformation itself runs in a
+ * subprocess with a watchdog that monitors for timeouts and external cancellation.
  *
  * @param apiClient Client for backend API communication
  * @param timeoutMs Execution timeout in milliseconds
  * @param executionScope Scope in which background execution coroutines are launched
+ * @param subprocessPool Pool of reusable subprocess JVMs; avoids JVM startup overhead for
+ *        frequent executions. Each pooled process is reset between executions.
  */
 class TransformationExecutionService(
     private val apiClient: TransformationApiClient,
     private val timeoutMs: Long,
-    private val executionScope: CoroutineScope
+    private val executionScope: CoroutineScope,
+    private val subprocessPool: SubprocessPool = buildDefaultPool()
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(TransformationExecutionService::class.java)
     private val json = Json { prettyPrint = true }
-    
+
     companion object {
         private const val MAX_PATH_LENGTH = 1000
         private const val RESULT_FILE_NAME = "result.m_gen"
         private const val MIME_TYPE_JSON = "application/json"
+        private const val CANCELLATION_CHECK_INTERVAL_MS = 5000L
+
+        /**
+         * Builds the default [SubprocessPool] using the [TransformationCommand.Reset] /
+         * [TransformationResponse.ResetOk] JSON protocol.
+         */
+        fun buildDefaultPool(maxSize: Int = SubprocessPool.DEFAULT_POOL_SIZE): SubprocessPool =
+            SubprocessPool(maxSize = maxSize) { runner ->
+                val payload = Json.encodeToString(
+                    TransformationCommand.serializer(), TransformationCommand.Reset
+                ).toByteArray()
+                val result = runner.sendCommand(payload)
+                if (result !is SubprocessResult.Success) return@SubprocessPool false
+                runCatching {
+                    Json.decodeFromString(
+                        TransformationResponse.serializer(), result.data.decodeToString()
+                    ) is TransformationResponse.ResetOk
+                }.getOrDefault(false)
+            }
     }
 
     override suspend fun createAndStartExecution(
@@ -77,11 +95,7 @@ class TransformationExecutionService(
 
         executionScope.launch(Dispatchers.Default) {
             try {
-                withTimeout(timeoutMs) {
-                    executeTransformation(executionId, projectId, filePath, modelPath, jwtToken)
-                }
-            } catch (e: TimeoutCancellationException) {
-                handleTimeout(executionId, jwtToken)
+                executeTransformation(executionId, projectId, filePath, modelPath, jwtToken)
             } catch (e: Exception) {
                 handleUnexpectedError(executionId, e, jwtToken)
             }
@@ -207,8 +221,8 @@ class TransformationExecutionService(
     }
     
     /**
-     * Fetches all required data, runs the transformation engine, and stores the result.
-     * Updates execution state at each phase. On error the state is set to FAILED.
+     * Fetches all required data, runs the transformation in a subprocess with watchdog
+     * monitoring, and stores the result. Updates execution state at each phase.
      *
      * @param executionId The execution to drive.
      * @param projectId Project context for API calls.
@@ -233,17 +247,53 @@ class TransformationExecutionService(
 
         val metamodelData = fetchMetamodelData(executionId, projectId, typedAst.metamodelPath, jwtToken)
             ?: return
-        val metamodel = Metamodel.compile(metamodelData)
 
         updateState(executionId, ExecutionState.RUNNING, "Executing transformation...", jwtToken)
 
-        val resultModel = runTransformation(executionId, typedAst, metamodel, modelData, jwtToken)
-            ?: return
+        val subprocess = subprocessPool.acquire() ?: SubprocessRunner(
+            mainClass = TransformationSubprocessMain::class.java.name,
+            cancellationCheck = { isExecutionCancelled(executionId) },
+            cancellationCheckIntervalMs = CANCELLATION_CHECK_INTERVAL_MS
+        ).also { runner ->
+            if (!runner.start()) {
+                updateState(executionId, ExecutionState.FAILED, "Failed to start subprocess", jwtToken)
+                return
+            }
+        }
 
-        storeResult(executionId, resultModel)
-        
-        updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
-        logger.info("Execution $executionId completed successfully")
+        val payload = TransformationSubprocessMain.serializeInput(typedAst, metamodelData, modelData, timeoutMs)
+        val result = subprocess.sendCommand(payload)
+
+        when (result) {
+            is SubprocessResult.Success -> {
+                val response = runCatching {
+                    Json.decodeFromString(TransformationResponse.serializer(), result.data.decodeToString())
+                }.getOrNull()
+                val executeOk = response as? TransformationResponse.ExecuteOk
+                if (executeOk != null) {
+                    storeResult(executionId, executeOk.modelData)
+                    updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
+                    logger.info("Execution $executionId completed successfully")
+                    subprocessPool.resetAndRelease(subprocess)
+                } else {
+                    logger.error("Unexpected subprocess response format for execution $executionId")
+                    subprocess.destroy()
+                    updateState(executionId, ExecutionState.FAILED, "Internal error: unexpected subprocess response", jwtToken)
+                }
+            }
+            is SubprocessResult.Timeout -> {
+                subprocess.destroy()
+                handleTimeout(executionId, jwtToken)
+            }
+            is SubprocessResult.Cancelled -> {
+                logger.info("Execution $executionId cancelled")
+                subprocess.destroy()
+            }
+            is SubprocessResult.Failed -> {
+                subprocess.destroy()
+                updateState(executionId, ExecutionState.FAILED, "Transformation failed: ${result.message}", jwtToken)
+            }
+        }
     }
     
     /**
@@ -339,105 +389,6 @@ class TransformationExecutionService(
             )
         }
         return modelData
-    }
-    
-    /**
-     * Executes the transformation engine over a graph loaded from [modelData].
-     * Converts the resulting graph back to [ModelData] on success, or updates the execution
-     * state to FAILED and returns null on failure or explicit kill.
-     *
-     * @param executionId Execution to update on error.
-     * @param typedAst Compiled transformation program.
-     * @param metamodelData Metamodel for the transformation.
-     * @param modelData Initial model to transform.
-     * @param jwtToken Authentication token used to report errors.
-     * @return The transformed model, or `null` on failure.
-     */
-    private fun runTransformation(
-        executionId: UUID,
-        typedAst: com.mdeo.modeltransformation.ast.TypedAst,
-        metamodel: Metamodel,
-        modelData: ModelData,
-        jwtToken: String
-    ): ModelData? {
-        val modelGraph = MdeoModelGraph.create(modelData, metamodel)
-        
-        return try {
-            val engine = TransformationEngine.create(
-                modelGraph, typedAst, deterministic = false
-            )
-            
-            val result = engine.execute()
-            
-            when (result) {
-                is TransformationExecutionResult.Success -> {
-                    modelGraph.toModelData()
-                }
-                is TransformationExecutionResult.Failure -> {
-                    handleTransformationFailure(executionId, result, jwtToken)
-                    null
-                }
-                is TransformationExecutionResult.Stopped -> {
-                    if (result.isNormalStop) {
-                        modelGraph.toModelData()
-                    } else {
-                        handleTransformationKilled(executionId, jwtToken)
-                        null
-                    }
-                }
-            }
-        } finally {
-            modelGraph.close()
-        }
-    }
-    
-    /**
-     * Persists the failure reason and sets the execution state to FAILED.
-     *
-     * @param executionId The failed execution.
-     * @param failure The failure result from the transformation engine.
-     * @param jwtToken Authentication token for the state update API call.
-     */
-    private fun handleTransformationFailure(
-        executionId: UUID,
-        failure: TransformationExecutionResult.Failure,
-        jwtToken: String
-    ) {
-        val errorMessage = "Transformation failed: ${failure.reason}"
-        
-        transaction {
-            TransformationExecutionsTable.update({
-                TransformationExecutionsTable.id eq executionId.toKotlinUuid()
-            }) {
-                it[error] = errorMessage
-            }
-        }
-        
-        kotlinx.coroutines.runBlocking {
-            updateState(executionId, ExecutionState.FAILED, errorMessage, jwtToken)
-        }
-    }
-    
-    /**
-     * Sets the execution state to FAILED when the transformation was explicitly killed.
-     *
-     * @param executionId The execution that was killed.
-     * @param jwtToken Authentication token for the state update API call.
-     */
-    private fun handleTransformationKilled(executionId: UUID, jwtToken: String) {
-        val errorMessage = "Transformation killed explicitly."
-        
-        transaction {
-            TransformationExecutionsTable.update({
-                TransformationExecutionsTable.id eq executionId.toKotlinUuid()
-            }) {
-                it[error] = errorMessage
-            }
-        }
-        
-        kotlinx.coroutines.runBlocking {
-            updateState(executionId, ExecutionState.FAILED, errorMessage, jwtToken)
-        }
     }
     
     /**
@@ -540,6 +491,22 @@ class TransformationExecutionService(
         )
     }
     
+    /**
+     * Checks whether the execution has been cancelled in the database.
+     *
+     * @param executionId The execution to check.
+     * @return `true` if cancelled or deleted.
+     */
+    private fun isExecutionCancelled(executionId: UUID): Boolean {
+        val state = transaction {
+            TransformationExecutionsTable.selectAll()
+                .where { TransformationExecutionsTable.id eq executionId.toKotlinUuid() }
+                .firstOrNull()
+                ?.get(TransformationExecutionsTable.state)
+        }
+        return state == null || state == ExecutionState.CANCELLED
+    }
+
     /**
      * Looks up an execution record by its ID.
      *

@@ -1,46 +1,22 @@
 package com.mdeo.optimizerexecution.worker
 
-import com.mdeo.expression.ast.expressions.TypedExpression
-import com.mdeo.expression.ast.statements.TypedStatement
-import com.mdeo.metamodel.Metamodel
+import com.mdeo.execution.common.subprocess.SubprocessPool
+import com.mdeo.execution.common.subprocess.SubprocessResult
+import com.mdeo.execution.common.subprocess.SubprocessRunner
 import com.mdeo.metamodel.SerializedModel
-import com.mdeo.metamodel.data.ModelData
-import com.mdeo.modeltransformation.ast.TypedAst as TransformationTypedAst
-import com.mdeo.modeltransformation.ast.expressions.TypedExpressionSerializer as TransformationExpressionSerializer
-import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement
-import com.mdeo.modeltransformation.ast.patterns.TypedPatternElementSerializer
-import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
-import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatementSerializer
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
-import com.mdeo.optimizer.config.GoalConfig
-import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
-import com.mdeo.optimizer.evaluation.MutationTask
-import com.mdeo.optimizer.evaluation.NodeBatch
-import com.mdeo.optimizer.evaluation.SolutionImportData
-import com.mdeo.optimizer.evaluation.WorkerSolutionRef
-import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
-import com.mdeo.optimizer.operators.MutationStrategyFactory
-import com.mdeo.optimizer.solution.Solution
 import com.mdeo.optimizer.worker.*
-import com.mdeo.script.ast.TypedAst as ScriptTypedAst
-import com.mdeo.script.ast.expressions.TypedExpressionSerializer as ScriptExpressionSerializer
-import com.mdeo.script.ast.statements.TypedStatementSerializer
-import com.mdeo.script.compiler.CompilationInput
-import com.mdeo.script.compiler.ScriptCompiler
-import com.mdeo.script.runtime.ExecutionEnvironment
 import io.ktor.websocket.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.contextual
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -48,287 +24,230 @@ import java.util.concurrent.Executors
 /**
  * Service that manages worker-side execution state for multi-node optimization.
  *
- * Each optimization execution is tracked as a [WorkerExecutionState] keyed by execution
- * identifier. The service handles the full worker lifecycle: allocation (resource setup
- * and initial solution generation), per-generation work batches (imports + mutations +
- * discards in one message), solution data retrieval, and cleanup.
+ * Each optimization execution runs its mutations and evaluations in a dedicated child JVM
+ * ([WorkerSubprocessMain]) started via [SubprocessRunner].
  *
- * @param workerThreads Number of threads to allocate per execution for parallel evaluation.
+ * **WebSocket mode** (default for federated / remote nodes): The subprocess opens a WebSocket
+ * connection directly back to the orchestrator and handles all generation traffic
+ * (imports, mutations, discards) in-process. The parent stores solution bytes for crash
+ * recovery and keeps discards in sync via [SubprocessChannelMessage]s.
+ *
+ * **Local-channel mode** (for the local node in a federated run): The subprocess receives
+ * orchestrator requests through the subprocess stdin/stdout pipe as
+ * [SubprocessChannelMessage.OrchestratorRequest] channel messages and replies via
+ * [SubprocessChannelMessage.OrchestratorResponses]. This service acts as a forwarder:
+ * it accepts the orchestrator's WebSocket connection, serialises each incoming [WorkerWsMessage]
+ * into an [OrchestratorRequest], forwards it to the subprocess, collects the
+ * [OrchestratorResponses] reply, and echoes each response frame back to the orchestrator.
+ * This avoids a second network connection (even to localhost).
+ *
+ * In both modes, solutions are stored as raw CBOR bytes in the parent process for model
+ * fetch requests and crash diagnostics.
+ *
+ * @param workerThreads Number of blocking I/O threads per execution for subprocess communication.
+ * @param scriptTimeoutMs Per-script-invocation timeout budget in milliseconds.
+ * @param transformationTimeoutMs Transformation-step timeout budget in milliseconds.
+ * @param serverPort The local HTTP/WS server port, used to build the subprocess WS URL.
+ * @param subprocessPool Pool of reusable subprocess runners. Completed executions return
+ *        their subprocesses to the pool (after a protocol-level reset) instead of destroying
+ *        them, amortising JVM startup and class-loading costs across executions.
  */
-class WorkerService(private val workerThreads: Int) {
+@OptIn(ExperimentalSerializationApi::class)
+class WorkerService(
+    private val workerThreads: Int,
+    private val scriptTimeoutMs: Long,
+    private val transformationTimeoutMs: Long,
+    private val serverPort: Int = 0,
+    private val subprocessPool: SubprocessPool = buildDefaultPool()
+) {
 
     private val logger = LoggerFactory.getLogger(WorkerService::class.java)
     private val executions = ConcurrentHashMap<String, WorkerExecutionState>()
-    private val scriptCompiler = ScriptCompiler()
 
-    @OptIn(ExperimentalSerializationApi::class)
+    /**
+     * Pending local-channel response deferreds, keyed by [WorkerWsMessage.requestId].
+     *
+     * When [WorkerService] acts as a forwarder in local-channel mode it registers a
+     * [CompletableDeferred] here before sending an [OrchestratorRequest] to the subprocess.
+     * The channel message handler completes it when the matching [OrchestratorResponses]
+     * arrives, unblocking [sendViaLocalChannel].
+     */
+    private val localChannelPending =
+        ConcurrentHashMap<String, CompletableDeferred<List<WorkerWsMessage>>>()
+
+    // ─── Metadata ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns metadata describing this worker node's local thread capacity and
+     * the algorithm backends it supports.
+     *
+     * @return A [WorkerMetadata] instance with current configuration values.
+     */
+    fun getMetadata(): WorkerMetadata = WorkerMetadata(
+        threadCount = workerThreads,
+        supportedBackends = SUPPORTED_BACKENDS
+    )
+
     private val cbor = Cbor { ignoreUnknownKeys = true }
 
-    private val transformationJson = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        serializersModule = SerializersModule {
-            contextual(TypedExpression::class, TransformationExpressionSerializer)
-            contextual(TypedTransformationStatement::class, TypedTransformationStatementSerializer)
-            contextual(TypedPatternElement::class, TypedPatternElementSerializer)
-        }
-    }
-
-    private val scriptJson = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        serializersModule = SerializersModule {
-            contextual(TypedExpression::class, ScriptExpressionSerializer)
-            contextual(TypedStatement::class, TypedStatementSerializer)
-        }
-    }
+    // ─── Allocation ───────────────────────────────────────────────────────────────
 
     /**
      * Allocates resources for a new optimization execution on this worker.
      *
-     * Deserializes the metamodel, transformation ASTs, and script ASTs from the request,
-     * compiles scripts into guidance functions, creates the mutation strategy and local
-     * evaluator, generates initial solutions, and stores the execution state.
+     * Starts a [WorkerSubprocessMain] subprocess, sends the [WorkerSubprocessRequest.Setup]
+     * command carrying all compilation inputs, and stores the returned initial solutions.
      *
-     * @param request The allocation request containing all resources and configuration.
-     * @return The allocation response containing initial solution fitness data.
+     * When [orchestratorWsUrl] is provided, the subprocess will connect back to the
+     * orchestrator via WebSocket and handle all generation traffic directly.
+     *
+     * When [request.useLocalChannel] is `true`, the subprocess uses the stdin/stdout pipe
+     * for orchestrator communication and this service acts as a forwarder via
+     * [WorkerService.handleOrchestratorSession].
+     *
+     * @param request Allocation request from the orchestrator.
+     * @param orchestratorWsUrl WebSocket URL for the subprocess to connect back to, or `null`.
+     * @return Allocation response with initial solution fitness data.
      */
-    suspend fun allocate(request: WorkerAllocationRequest): WorkerAllocationResponse {
-        logger.info("Allocating execution {} with {} initial solutions", request.executionId, request.initialSolutionCount)
-
-        val metamodel = Metamodel.compile(request.metamodelData)
-
-        val transformations = try {
-            deserializeTransformations(request.transformationAstJsons)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Failed to deserialize transformation ASTs: ${e.message}", e)
-        }
-
-        val scriptAsts = try {
-            deserializeScripts(request.scriptAstJsons)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Failed to deserialize script ASTs: ${e.message}", e)
-        }
-
-        val compiledProgram = try {
-            compileScripts(scriptAsts, request.metamodelData)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Failed to compile scripts: ${e.message}", e)
-        }
-
-        val environment = ExecutionEnvironment(compiledProgram)
-
-        val objectives = buildObjectiveFunctions(environment, compiledProgram, request.goalConfig)
-        val constraints = buildConstraintFunctions(environment, compiledProgram, request.goalConfig)
-        val mutationStrategy = MutationStrategyFactory.create(request.solverConfig.parameters.mutation, transformations)
-        val initialSolutionProvider = createInitialSolutionProvider(request.initialModelData, metamodel)
-
-        val evaluator = LocalMutationEvaluator(
-            initialSolutionProvider = initialSolutionProvider,
-            mutationStrategy = mutationStrategy,
-            objectives = objectives,
-            constraints = constraints,
-            metamodel = metamodel
+    suspend fun allocate(
+        request: WorkerAllocationRequest,
+        orchestratorWsUrl: String? = null
+    ): WorkerAllocationResponse {
+        val effectiveThreads = request.threadsPerNode?.let { minOf(it, workerThreads) } ?: workerThreads
+        val useLocalChannel = request.useLocalChannel
+        logger.info(
+            "Allocating execution {} with {} initial solutions ({} threads, cap {}, wsMode={}, localChannel={})",
+            request.executionId, request.initialSolutionCount, effectiveThreads,
+            request.threadsPerNode, orchestratorWsUrl != null, useLocalChannel
         )
 
-        val initialResults = evaluator.initialize(request.initialSolutionCount)
-        val dispatcher = Executors.newFixedThreadPool(workerThreads).asCoroutineDispatcher()
-        executions[request.executionId] = WorkerExecutionState(evaluator, dispatcher)
+        val solutions = ConcurrentHashMap<String, ByteArray>()
+        val dispatcher = Executors.newFixedThreadPool(effectiveThreads).asCoroutineDispatcher()
+        val needsChannelHandler = orchestratorWsUrl != null || useLocalChannel
+        val pooledRunner = subprocessPool.acquire()
+        val runner: SubprocessRunner
+        if (pooledRunner != null) {
+            runner = pooledRunner
+            configureChannelHandler(runner, solutions, request.executionId, needsChannelHandler)
+        } else {
+            runner = createSubprocessRunner(solutions, request.executionId, needsChannelHandler)
+            if (!runner.start()) {
+                dispatcher.close()
+                throw IllegalStateException("Failed to start worker subprocess for execution ${request.executionId}")
+            }
+        }
 
-        logger.info("Execution {} allocated with {} initial solutions", request.executionId, initialResults.size)
+        val setupRequest = WorkerSubprocessRequest.Setup(
+            metamodelData = request.metamodelData,
+            initialModelData = request.initialModelData,
+            transformationAstJsons = request.transformationAstJsons,
+            scriptAstJsons = request.scriptAstJsons,
+            goalConfig = request.goalConfig,
+            solverConfig = request.solverConfig,
+            initialSolutionCount = request.initialSolutionCount,
+            skipInitialization = false,
+            orchestratorWsUrl = orchestratorWsUrl,
+            useLocalChannel = useLocalChannel,
+            scriptTimeoutMs = scriptTimeoutMs,
+            transformationTimeoutMs = transformationTimeoutMs,
+            workerThreads = effectiveThreads
+        )
+
+        val setupResult = withContext(dispatcher) {
+            runner.sendCommand(cbor.encodeToByteArray<WorkerSubprocessRequest>(setupRequest))
+        }
+
+        if (setupResult !is SubprocessResult.Success) {
+            runner.destroy()
+            dispatcher.close()
+            throw IllegalStateException("Worker subprocess Setup failed for execution ${request.executionId}: $setupResult")
+        }
+
+        val setupOk = cbor.decodeFromByteArray<WorkerSubprocessResponse>(setupResult.data) as? WorkerSubprocessResponse.SetupOk
+            ?: throw IllegalStateException("Unexpected subprocess response type for execution ${request.executionId}")
+
+        for (initial in setupOk.solutions) {
+            solutions[initial.solutionId] = initial.modelBytes
+        }
+
+        executions[request.executionId] = WorkerExecutionState(
+            runner = runner,
+            solutions = solutions,
+            dispatcher = dispatcher
+        )
+
+        logger.info("Execution {} allocated with {} initial solutions", request.executionId, setupOk.solutions.size)
 
         return WorkerAllocationResponse(
-            initialSolutions = initialResults.map { result ->
+            initialSolutions = setupOk.solutions.map { s ->
                 InitialSolutionData(
-                    solutionId = result.solutionId,
-                    objectives = result.objectives,
-                    constraints = result.constraints
+                    solutionId = s.solutionId
                 )
-            }
+            },
+            threadCount = effectiveThreads
         )
     }
 
+    // ─── Solution data ────────────────────────────────────────────────────────────
+
     /**
-     * Retrieves the serialized model for a specific solution.
+     * Retrieves the serialised model for a specific solution from the parent's byte store.
      *
      * @param executionId The execution identifier.
      * @param solutionId The solution identifier to retrieve.
      * @return The [SerializedModel] for the solution.
-     * @throws IllegalArgumentException if the execution or solution does not exist.
      */
     suspend fun getSolutionData(executionId: String, solutionId: String): SerializedModel {
         val state = requireExecution(executionId)
-        val ref = WorkerSolutionRef(nodeId = "local", solutionId = solutionId)
-        return state.evaluator.getSolutionData(ref)
+        val bytes = state.solutions[solutionId]
+            ?: throw IllegalArgumentException("Solution not found: $solutionId (execution $executionId)")
+        return cbor.decodeFromByteArray<SerializedModel>(bytes)
     }
 
+    // ─── Cleanup ──────────────────────────────────────────────────────────────────
+
     /**
-     * Cleans up all resources for the specified execution and removes it from the map.
+     * Stops the subprocess and releases all resources for the specified execution.
+     *
+     * If a [SubprocessPool] is configured and the subprocess is still healthy,
+     * it is reset and returned to the pool for reuse. Otherwise, it is destroyed.
      *
      * @param executionId The execution identifier to clean up.
-     * @throws IllegalArgumentException if the execution does not exist.
      */
     suspend fun cleanup(executionId: String) {
         val state = executions.remove(executionId)
             ?: throw IllegalArgumentException("Execution not found: $executionId")
-        state.suspendClose()
+
+        if (state.runner.isRunning) {
+            subprocessPool.resetAndRelease(state.runner)
+        } else {
+            state.runner.destroy()
+        }
+        state.dispatcher.close()
         logger.info("Execution {} cleaned up", executionId)
     }
 
-    /**
-     * Deserializes transformation AST JSON strings into typed AST objects.
-     *
-     * @param astJsons Map of transformation path to JSON-serialized typed AST.
-     * @return Map of transformation path to deserialized [TransformationTypedAst].
-     */
-    private fun deserializeTransformations(astJsons: Map<String, String>): Map<String, TransformationTypedAst> {
-        return astJsons.mapValues { (_, json) ->
-            transformationJson.decodeFromString<TransformationTypedAst>(json)
-        }
-    }
-
-    /**
-     * Deserializes script AST JSON strings into typed AST objects.
-     *
-     * @param astJsons Map of script path to JSON-serialized typed AST.
-     * @return Map of script path to deserialized [ScriptTypedAst].
-     */
-    private fun deserializeScripts(astJsons: Map<String, String>): Map<String, ScriptTypedAst> {
-        return astJsons.mapValues { (_, json) ->
-            scriptJson.decodeFromString<ScriptTypedAst>(json)
-        }
-    }
-
-    /**
-     * Compiles all script ASTs into a single program using the script compiler.
-     *
-     * @param scriptAsts Map of file path to typed AST.
-     * @param metamodelData The metamodel data for type-safe model access during compilation.
-     * @return The compiled program containing generated bytecode.
-     */
-    private fun compileScripts(
-        scriptAsts: Map<String, ScriptTypedAst>,
-        metamodelData: com.mdeo.metamodel.data.MetamodelData
-    ): com.mdeo.script.compiler.CompiledProgram {
-        val input = CompilationInput(scriptAsts)
-        return scriptCompiler.compile(input, metamodelData)
-    }
-
-    /**
-     * Builds objective guidance functions from the compiled program and goal config.
-     *
-     * @param environment The script execution environment with the compiled class.
-     * @param compiledProgram The compiled program containing function lookup tables.
-     * @param goalConfig The goal configuration specifying objectives.
-     * @return A list of [ScriptGuidanceFunction] instances for each objective.
-     */
-    private fun buildObjectiveFunctions(
-        environment: ExecutionEnvironment,
-        compiledProgram: com.mdeo.script.compiler.CompiledProgram,
-        goalConfig: GoalConfig
-    ): List<ScriptGuidanceFunction> {
-        val clazz = environment.scriptProgramClass
-        return goalConfig.objectives.map { obj ->
-            val jvmMethodName = compiledProgram.functionLookup[obj.path]?.get(obj.functionName)
-                ?: error("Function '${obj.functionName}' not found in '${obj.path}'")
-            ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${obj.path}::${obj.functionName}")
-        }
-    }
-
-    /**
-     * Builds constraint guidance functions from the compiled program and goal config.
-     *
-     * @param environment The script execution environment with the compiled class.
-     * @param compiledProgram The compiled program containing function lookup tables.
-     * @param goalConfig The goal configuration specifying constraints.
-     * @return A list of [ScriptGuidanceFunction] instances for each constraint.
-     */
-    private fun buildConstraintFunctions(
-        environment: ExecutionEnvironment,
-        compiledProgram: com.mdeo.script.compiler.CompiledProgram,
-        goalConfig: GoalConfig
-    ): List<ScriptGuidanceFunction> {
-        val clazz = environment.scriptProgramClass
-        return goalConfig.constraints.map { con ->
-            val jvmMethodName = compiledProgram.functionLookup[con.path]?.get(con.functionName)
-                ?: error("Function '${con.functionName}' not found in '${con.path}'")
-            ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${con.path}::${con.functionName}")
-        }
-    }
-
-    /**
-     * Creates a factory that produces fresh initial [Solution] instances from model data.
-     *
-     * @param modelData The seed model data from which to create solutions.
-     * @param metamodel The compiled metamodel governing model structure.
-     * @return A factory function producing new [Solution] instances.
-     */
-    private fun createInitialSolutionProvider(
-        modelData: ModelData,
-        metamodel: Metamodel
-    ): () -> Solution {
-        return {
-            val modelGraph = MdeoModelGraph.create(modelData, metamodel)
-            Solution(modelGraph)
-        }
-    }
-
-    /**
-     * Retrieves the execution state for the given identifier or throws.
-     *
-     * @param executionId The execution identifier to look up.
-     * @return The [WorkerExecutionState] for the execution.
-     * @throws IllegalArgumentException if no execution exists for the given identifier.
-     */
-    private fun requireExecution(executionId: String): WorkerExecutionState {
-        return executions[executionId]
-            ?: throw IllegalArgumentException("Execution not found: $executionId")
-    }
-
-    /**
-     * Internal state for a single worker-side optimization execution.
-     *
-     * Holds the local evaluator and the dedicated thread pool dispatcher for
-     * parallel mutation+evaluation work.
-     *
-     * @param evaluator The local mutation evaluator managing solutions.
-     * @param dispatcher The coroutine dispatcher backed by a dedicated thread pool.
-     */
-    private class WorkerExecutionState(
-        val evaluator: LocalMutationEvaluator,
-        val dispatcher: ExecutorCoroutineDispatcher
-    ) : AutoCloseable {
-
-        /**
-         * Releases the evaluator and shuts down the thread pool dispatcher.
-         */
-        suspend fun suspendClose() {
-            evaluator.cleanup()
-            dispatcher.close()
-        }
-
-        override fun close() {
-            dispatcher.close()
-        }
-    }
-
-    // ─── WebSocket session handling ───────────────────────────────────────────────
+    // ─── WebSocket session handling (legacy and local-channel modes) ──────────────
 
     /**
      * Services a long-lived WebSocket connection from the orchestrator.
      *
-     * The session remains open for the full duration of the execution. Incoming binary
-     * frames are decoded as CBOR [WorkerWsMessage] values and dispatched concurrently;
-     * each handler sends its response back on the same session before returning.
-     * A [supervisorScope] ensures that one failing message handler does not tear down
-     * handling for subsequent messages.
+     * **Legacy mode**: Each incoming [WorkerWsMessage] is dispatched via
+     * [handleOrchestratorMessage], which drives the subprocess through stdin/stdout commands.
+     *
+     * **Local-channel mode**: Each message is forwarded to the subprocess as a
+     * [SubprocessChannelMessage.OrchestratorRequest] and the matching
+     * [SubprocessChannelMessage.OrchestratorResponses] is awaited and echoed back.
+     *
+     * In WebSocket subprocess mode the subprocess connects directly to the orchestrator
+     * and this method is not used.
      *
      * @param executionId The execution this session is associated with.
      * @param session The Ktor WebSocket session opened by the orchestrator.
      */
-    @OptIn(ExperimentalSerializationApi::class)
     suspend fun handleOrchestratorSession(executionId: String, session: DefaultWebSocketSession) {
         logger.info("Orchestrator WebSocket connected for execution {}", executionId)
+        val state = executions[executionId]
         try {
             supervisorScope {
                 for (frame in session.incoming) {
@@ -341,7 +260,11 @@ class WorkerService(private val workerThreads: Int) {
                         continue
                     }
                     launch {
-                        val responses = handleOrchestratorMessage(executionId, msg)
+                        val responses = if (state != null) {
+                            sendViaLocalChannel(state, msg)
+                        } else {
+                            emptyList()
+                        }
                         for (response in responses) {
                             session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(response)))
                         }
@@ -353,89 +276,147 @@ class WorkerService(private val workerThreads: Int) {
         }
     }
 
-    /**
-     * Handles a single message received from the orchestrator WebSocket session.
-     *
-     * @param executionId The execution context.
-     * @param msg The decoded message to process.
-     * @return The response messages to send back (may be empty for unrecognised messages).
-     */
-    @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun handleOrchestratorMessage(executionId: String, msg: WorkerWsMessage): List<WorkerWsMessage> =
-        when (msg) {
-            is NodeWorkBatchRequest -> listOf(handleNodeWorkBatch(executionId, msg))
-            is SolutionFetchRequest -> {
-                val serializedModel = getSolutionData(executionId, msg.solutionId)
-                listOf(SolutionFetchResponse(msg.requestId, msg.solutionId, serializedModel))
-            }
-            is SolutionBatchFetchRequest -> handleBatchFetch(executionId, msg)
-            else -> {
-                logger.warn("Unexpected WS message type '{}' for execution {}", msg::class.simpleName, executionId)
-                emptyList()
-            }
-        }
+    // ─── Local-channel forwarding ─────────────────────────────────────────────────
 
     /**
-     * Processes a unified work batch from the orchestrator: imports solutions (rebalancing),
-     * runs mutation+evaluation tasks, then discards no-longer-needed solutions — all in one call.
+     * Sends [msg] to the subprocess via the local-channel mechanism and awaits all
+     * response messages. Returns an empty list if the subprocess has died before
+     * or during the operation (e.g. due to an internal timeout).
      *
-     * @param executionId The execution context.
-     * @param msg The unified batch request from the orchestrator.
-     * @return The batch response with evaluation results for each task.
+     * Encodes [msg] into a [SubprocessChannelMessage.OrchestratorRequest], registers a
+     * pending [CompletableDeferred] in [localChannelPending] keyed by [msg.requestId], and
+     * sends the channel message to the subprocess.  The channel handler completes the
+     * deferred when the matching [SubprocessChannelMessage.OrchestratorResponses] arrives.
+     *
+     * @param state The execution state (provides the [SubprocessRunner]).
+     * @param msg The [WorkerWsMessage] to forward.
+     * @return The list of response messages from the subprocess, or empty on subprocess death.
      */
-    private suspend fun handleNodeWorkBatch(executionId: String, msg: NodeWorkBatchRequest): NodeWorkBatchResponse {
-        val state = requireExecution(executionId)
-        val nodeId = state.evaluator.getNodeIds().first()
-        val batch = NodeBatch(
-            nodeId = nodeId,
-            imports = msg.imports.map { SolutionImportData(it.solutionId, it.serializedModel) },
-            tasks = msg.tasks.map { MutationTask(it.solutionId, nodeId) },
-            discards = msg.discards
+    /**
+     * Dispatches [msg] to the subprocess for [executionId] via the local channel and returns
+     * the responses. Returns an empty list if the subprocess has died. Used by tests.
+     */
+    internal suspend fun dispatchToSubprocess(executionId: String, msg: WorkerWsMessage): List<WorkerWsMessage> =
+        sendViaLocalChannel(requireExecution(executionId), msg)
+
+    private suspend fun sendViaLocalChannel(
+        state: WorkerExecutionState,
+        msg: WorkerWsMessage
+    ): List<WorkerWsMessage> {
+        val requestPayload = cbor.encodeToByteArray<WorkerWsMessage>(msg)
+        val channelMsgBytes = cbor.encodeToByteArray<SubprocessChannelMessage>(
+            SubprocessChannelMessage.OrchestratorRequest(requestPayload)
         )
-        val results = withContext(state.dispatcher) {
-            state.evaluator.executeNodeBatches(listOf(batch))
+        val deferred = CompletableDeferred<List<WorkerWsMessage>>()
+        localChannelPending[msg.requestId] = deferred
+        state.runner.sendChannelMessage(channelMsgBytes)
+        return try {
+            withTimeout(LOCAL_CHANNEL_TIMEOUT_MS) { deferred.await() }
+        } catch (_: Exception) {
+            logger.warn("Local-channel request {} for execution did not complete (subprocess may have died)", msg.requestId)
+            emptyList()
+        } finally {
+            localChannelPending.remove(msg.requestId)
         }
-        return NodeWorkBatchResponse(
-            requestId = msg.requestId,
-            results = results.map { result ->
-                BatchResult(
-                    parentSolutionId = result.parentSolutionId,
-                    newSolutionId = result.newSolutionId,
-                    objectives = result.objectives,
-                    constraints = result.constraints,
-                    succeeded = result.succeeded
-                )
+    }
+
+    // ─── Subprocess management ────────────────────────────────────────────────────
+
+    /**
+     * Builds the channel message callback for a subprocess in WS or local-channel mode.
+     *
+     * Synchronises the parent's solution byte store and routes [OrchestratorResponses] back
+     * to the pending [CompletableDeferred] registered by [sendViaLocalChannel].
+     *
+     * @param solutions The parent-side solution byte store.
+     * @param executionId Execution identifier for logging.
+     * @return The channel message callback.
+     */
+    private fun buildChannelHandler(
+        solutions: ConcurrentHashMap<String, ByteArray>,
+        executionId: String
+    ): (ByteArray, (ByteArray) -> Unit) -> Unit {
+        return { payload, _ ->
+            try {
+                when (val msg = cbor.decodeFromByteArray<SubprocessChannelMessage>(payload)) {
+                    is SubprocessChannelMessage.SolutionStored -> {
+                        solutions[msg.solutionId] = msg.modelBytes
+                    }
+                    is SubprocessChannelMessage.SolutionsDiscarded -> {
+                        for (id in msg.solutionIds) {
+                            solutions.remove(id)
+                        }
+                    }
+                    is SubprocessChannelMessage.OrchestratorResponses -> {
+                        // Decode all response payloads and complete the pending deferred.
+                        val responses = msg.payloads.map { cbor.decodeFromByteArray<WorkerWsMessage>(it) }
+                        val requestId = responses.firstOrNull()?.requestId
+                        if (requestId != null) {
+                            localChannelPending.remove(requestId)?.complete(responses)
+                        }
+                    }
+                    is SubprocessChannelMessage.OrchestratorRequest -> {
+                        // Direction: parent→subprocess. Silently ignore if going the wrong way.
+                    }
+                }
+            } catch (e: Exception) {
+                logger.warn("Error processing channel message for execution {}: {}", executionId, e.message)
             }
-        )
+        }
     }
 
     /**
-     * Handles a batch fetch request by serializing each requested solution individually.
+     * Configures the channel message handler and process-exit callback on an existing [SubprocessRunner].
      *
-     * Each solution is serialized independently so that responses can be sent back
-     * as individual frames, allowing the orchestrator to process them as they arrive.
-     *
-     * @param executionId The execution context.
-     * @param msg The batch fetch request.
-     * @return One [SolutionFetchResponse] per requested solution.
+     * Used when reusing a pooled subprocess for a new execution.
      */
-    private suspend fun handleBatchFetch(
+    private fun configureChannelHandler(
+        runner: SubprocessRunner,
+        solutions: ConcurrentHashMap<String, ByteArray>,
         executionId: String,
-        msg: SolutionBatchFetchRequest
-    ): List<SolutionFetchResponse> {
-        return msg.solutionIds.map { solutionId ->
-            val serializedModel = getSolutionData(executionId, solutionId)
-            SolutionFetchResponse(msg.requestId, solutionId, serializedModel)
+        wsMode: Boolean
+    ) {
+        runner.onChannelMessage = if (wsMode) buildChannelHandler(solutions, executionId) else null
+        runner.onProcessExited = {
+            localChannelPending.values.forEach { it.completeExceptionally(RuntimeException("Subprocess exited")) }
         }
+    }
+
+    /**
+     * Creates a new [SubprocessRunner] with channel message handling configured.
+     *
+     * @param solutions The parent-side solution byte store to keep in sync.
+     * @param executionId Execution identifier for logging.
+     * @param wsMode Whether the subprocess operates in WebSocket or local-channel mode.
+     */
+    private fun createSubprocessRunner(
+        solutions: ConcurrentHashMap<String, ByteArray> = ConcurrentHashMap(),
+        executionId: String = "",
+        wsMode: Boolean = false
+    ): SubprocessRunner {
+        val runner = SubprocessRunner(
+            mainClass = WorkerSubprocessMain::class.java.name,
+            onChannelMessage = if (wsMode) buildChannelHandler(solutions, executionId) else null
+        )
+        runner.onProcessExited = {
+            localChannelPending.values.forEach { it.completeExceptionally(RuntimeException("Subprocess exited")) }
+        }
+        return runner
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+    private fun requireExecution(executionId: String): WorkerExecutionState {
+        return executions[executionId]
+            ?: throw IllegalArgumentException("Execution not found: $executionId")
     }
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
     /**
-     * Releases all active executions and their associated resources.
+     * Releases all active executions, their associated resources, and any pooled subprocesses.
      *
-     * Should be called when the application is shutting down to ensure
-     * thread pools and solutions are properly cleaned up.
+     * Should be called when the application is shutting down.
      */
     suspend fun close() {
         for ((id, state) in executions) {
@@ -446,5 +427,63 @@ class WorkerService(private val workerThreads: Int) {
             }
         }
         executions.clear()
+        subprocessPool.close()
+    }
+
+    // ─── Internal state ───────────────────────────────────────────────────────────
+
+    /**
+     * Per-execution runtime state held in the parent process.
+     *
+     * @param runner The subprocess runner.
+     * @param solutions Map from solution ID to CBOR-encoded [SerializedModel] bytes.
+     * @param dispatcher Thread pool used for blocking subprocess I/O.
+     */
+    inner class WorkerExecutionState(
+        @Volatile var runner: SubprocessRunner,
+        val solutions: ConcurrentHashMap<String, ByteArray>,
+        val dispatcher: ExecutorCoroutineDispatcher
+    ) {
+        /** Stops subprocess and releases thread pool. */
+        suspend fun suspendClose() {
+            runner.stop()
+            dispatcher.close()
+        }
+    }
+
+    companion object {
+        /**
+         * Algorithm backend identifiers supported by this worker.
+         * Must stay in sync with [com.mdeo.optimizer.moea.DelegatingAlgorithmProvider].
+         */
+        val SUPPORTED_BACKENDS: List<String> = listOf(
+            "NSGAII", "SPEA2", "IBEA", "SMSEMOA", "VEGA", "PESA2", "PAES", "RANDOM"
+        )
+
+        /**
+         * Timeout for local-channel request/response round-trips.
+         * Matches the WebSocket operation timeout in [WorkerClient].
+         */
+        const val LOCAL_CHANNEL_TIMEOUT_MS = 600_000L
+
+        /**
+         * Builds the default [SubprocessPool] for worker executions.
+         *
+         * Uses the CBOR-encoded [WorkerSubprocessRequest.Reset] / [WorkerSubprocessResponse.ResetOk]
+         * protocol to reset subprocesses before returning them to the pool.
+         */
+        @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+        fun buildDefaultPool(maxSize: Int = SubprocessPool.DEFAULT_POOL_SIZE): SubprocessPool {
+            val cbor = Cbor { ignoreUnknownKeys = true }
+            return SubprocessPool(maxSize = maxSize) { runner ->
+                val result = runner.sendCommand(
+                    cbor.encodeToByteArray<WorkerSubprocessRequest>(WorkerSubprocessRequest.Reset)
+                )
+                if (result !is SubprocessResult.Success) return@SubprocessPool false
+                runCatching {
+                    cbor.decodeFromByteArray<WorkerSubprocessResponse>(result.data) is WorkerSubprocessResponse.ResetOk
+                }.getOrDefault(false)
+            }
+        }
     }
 }

@@ -42,7 +42,7 @@ class DelegatingAlgorithmProvider(
 
     override fun getAlgorithm(name: String, properties: TypedProperties, problem: Problem): Algorithm {
         val populationSize = properties.getInt("populationSize", 40)
-        val variation = PassThroughVariation()
+        val variation = DelegatingVariation()
         val initialization = RandomInitialization(problem)
 
         return when (name) {

@@ -272,6 +272,8 @@ class WebSocketFileHandler(
 
     /**
      * Parses a project ID string and verifies cached read permission.
+     * If the cache entry is missing or has expired, permissions are reloaded
+     * from the database and re-cached before the check is performed.
      *
      * @param projectIdStr The project ID as a string
      * @param requestId The request ID for error responses
@@ -284,14 +286,19 @@ class WebSocketFileHandler(
             return null
         }
         if (!webSocketService.hasCachedReadPermission(connectionId, projectId)) {
-            sendError(requestId, "Forbidden", "No cached read permission for project $projectId. Send subscribeFiles first.")
-            return null
+            // Cache miss or expired — reload from the database before failing
+            if (!reloadAndCachePermissions(projectId)) {
+                sendError(requestId, "Forbidden", "Access denied to project $projectId")
+                return null
+            }
         }
         return projectId
     }
 
     /**
      * Parses a project ID string and verifies cached write permission.
+     * If the cache entry is missing or has expired, permissions are reloaded
+     * from the database and re-cached before the check is performed.
      *
      * @param projectIdStr The project ID as a string
      * @param requestId The request ID for error responses
@@ -304,10 +311,31 @@ class WebSocketFileHandler(
             return null
         }
         if (!webSocketService.hasCachedWritePermission(connectionId, projectId)) {
-            sendError(requestId, "Forbidden", "No cached write permission for project $projectId. Send subscribeFiles first.")
-            return null
+            // Cache miss or expired — reload from the database before failing
+            val reloaded = reloadAndCachePermissions(projectId)
+            if (!reloaded || !webSocketService.hasCachedWritePermission(connectionId, projectId)) {
+                sendError(requestId, "Forbidden", "Access denied to project $projectId")
+                return null
+            }
         }
         return projectId
+    }
+
+    /**
+     * Reloads project permissions from the database and refreshes the permission cache.
+     * Called when the cached permission entry is missing or has expired.
+     *
+     * @param projectId The project UUID to reload permissions for
+     * @return true if the user has at least read permission, false otherwise
+     */
+    private suspend fun reloadAndCachePermissions(projectId: UUID): Boolean {
+        val userUuid = parseUserId() ?: return false
+        val hasRead = projectService.hasProjectPermission(projectId, userUuid, isGlobalAdmin, ProjectPermission.READ)
+        if (!hasRead) return false
+        val hasWrite = projectService.hasProjectPermission(projectId, userUuid, isGlobalAdmin, ProjectPermission.WRITE)
+        webSocketService.cachePermission(connectionId, projectId, hasRead, hasWrite)
+        logger.debug("Reloaded permissions for connection $connectionId project $projectId: read=$hasRead write=$hasWrite")
+        return true
     }
 
     /**

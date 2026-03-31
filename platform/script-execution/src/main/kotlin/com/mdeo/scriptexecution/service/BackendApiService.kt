@@ -53,7 +53,7 @@ class BackendApiService(private val baseUrl: String) {
      */
     suspend fun getTypedAst(projectId: String, filePath: String, jwtToken: String): TypedAst? {
         return try {
-            logger.debug("Fetching typed AST for $filePath in project $projectId")
+            logger.info("Fetching typed AST for $filePath in project $projectId")
 
             val response = client.get("$baseUrl/projects/$projectId/file-data/typed-ast") {
                 parameter("path", filePath)
@@ -93,7 +93,7 @@ class BackendApiService(private val baseUrl: String) {
         data class UpdateExecutionStateRequest(val state: String, val progressText: String?)
 
         return try {
-            logger.debug("Updating backend state for execution $executionId to $state")
+            logger.info("Updating backend state for execution $executionId to $state")
 
             val response = client.patch("$baseUrl/executions/$executionId/state") {
                 contentType(ContentType.Application.Json)
@@ -123,7 +123,7 @@ class BackendApiService(private val baseUrl: String) {
      */
     suspend fun getMetamodelData(projectId: String, filePath: String, jwtToken: String): MetamodelData? {
         return try {
-            logger.debug("Fetching metamodel data for $filePath in project $projectId")
+            logger.info("Fetching metamodel data for $filePath in project $projectId")
 
             val response = client.get("$baseUrl/projects/$projectId/file-data/metamodel") {
                 parameter("path", filePath)
@@ -154,7 +154,7 @@ class BackendApiService(private val baseUrl: String) {
      */
     suspend fun getModelData(projectId: String, filePath: String, jwtToken: String): ModelData? {
         return try {
-            logger.debug("Fetching model data for $filePath in project $projectId")
+            logger.info("Fetching model data for $filePath in project $projectId")
 
             val response = client.get("$baseUrl/projects/$projectId/file-data/model-data") {
                 parameter("path", filePath)

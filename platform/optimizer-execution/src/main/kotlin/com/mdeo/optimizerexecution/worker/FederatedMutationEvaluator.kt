@@ -6,6 +6,7 @@ import com.mdeo.optimizer.worker.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Federated implementation of [MutationEvaluator] that distributes mutation and
@@ -32,7 +33,23 @@ class FederatedMutationEvaluator(
      */
     private val workerByNodeId: Map<String, WorkerClient> = workers.associateBy { it.nodeId }
 
+    /** Number of worker nodes this evaluator distributes work across. */
+    val workerCount: Int = workers.size
+
+    /**
+     * Thread counts reported by each worker during allocation, keyed by node ID.
+     * Populated after [initialize] completes.
+     */
+    private val workerThreadCounts = ConcurrentHashMap<String, Int>()
+
     override fun getNodeIds(): Set<String> = workerByNodeId.keys
+
+    /**
+     * Returns the number of threads allocated on each worker node, keyed by node ID.
+     *
+     * Only populated after [initialize] has been called.
+     */
+    fun getWorkerThreadCounts(): Map<String, Int> = workerThreadCounts.toMap()
 
     /**
      * Distributes initial solution creation across all workers and collects the results.
@@ -105,15 +122,37 @@ class FederatedMutationEvaluator(
         workers.forEach { it.close() }
     }
 
+    /**
+     * Fetches [WorkerMetadata] from all worker nodes in parallel.
+     *
+     * Useful for orchestrators that need to inspect actual thread capacities or
+     * supported backends across the full worker pool after the evaluator is created.
+     *
+     * @return A map from node ID to the [WorkerMetadata] reported by that node.
+     *         Nodes that fail to respond are omitted from the result.
+     */
+    suspend fun fetchMetadata(): Map<String, WorkerMetadata> {
+        return coroutineScope {
+            workers.map { worker ->
+                async {
+                    try {
+                        worker.nodeId to worker.getMetadata()
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }.awaitAll()
+        }.filterNotNull().toMap()
+    }
+
     private suspend fun allocateWorker(worker: WorkerClient, count: Int): List<InitialSolutionResult> {
         val request = allocationRequest.copy(initialSolutionCount = count)
         val response = worker.allocate(request)
+        workerThreadCounts[worker.nodeId] = response.threadCount
         return response.initialSolutions.map { solution ->
             InitialSolutionResult(
                 solutionId = solution.solutionId,
-                workerNodeId = worker.nodeId,
-                objectives = solution.objectives,
-                constraints = solution.constraints
+                workerNodeId = worker.nodeId
             )
         }
     }
@@ -125,6 +164,7 @@ class FederatedMutationEvaluator(
                 executionId,
                 imports = batch.imports.map { SolutionTransferItem(it.solutionId, it.serializedModel) },
                 tasks = batch.tasks.map { BatchTask(it.solutionId) },
+                evaluationTasks = batch.evaluationTasks.map { BatchEvaluationTask(it.solutionId) },
                 discards = batch.discards
             )
             response.results.map { result ->
@@ -137,8 +177,14 @@ class FederatedMutationEvaluator(
                     succeeded = result.succeeded
                 )
             }
-        } catch (_: Exception) {
-            batch.tasks.map { task ->
+        } catch (e: Exception) {
+            // If the worker's WS connection is dead (e.g. subprocess crashed or timed out),
+            // propagate the error to terminate the optimization instead of looping forever
+            // with all-failed batches.
+            if (!worker.isAlive) {
+                throw RuntimeException("Worker ${batch.nodeId} is no longer reachable (subprocess may have timed out or crashed)", e)
+            }
+            val mutationFailures = batch.tasks.map { task ->
                 EvaluationResult(
                     parentSolutionId = task.solutionId,
                     newSolutionId = "",
@@ -148,6 +194,17 @@ class FederatedMutationEvaluator(
                     succeeded = false
                 )
             }
+            val evaluationFailures = batch.evaluationTasks.map { task ->
+                EvaluationResult(
+                    parentSolutionId = task.solutionId,
+                    newSolutionId = "",
+                    workerNodeId = batch.nodeId,
+                    objectives = emptyList(),
+                    constraints = emptyList(),
+                    succeeded = false
+                )
+            }
+            mutationFailures + evaluationFailures
         }
     }
 

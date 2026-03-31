@@ -5,14 +5,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Top-level optimizer execution payload, normalised from config problem/goal/search/solver sections.
+ * Top-level optimizer execution payload, normalised from config problem/goal/search/solver/runtime sections.
  */
 @Serializable
 data class OptimizationConfig(
     val problem: ProblemConfig,
     val goal: GoalConfig,
     val search: SearchConfig,
-    val solver: SolverConfig
+    val solver: SolverConfig,
+    val runtime: RuntimeConfig = RuntimeConfig()
 )
 
 /**
@@ -139,11 +140,6 @@ enum class SolverProvider { MOEA }
  * @property parameters Algorithm hyper-parameters.
  * @property termination Termination conditions for the search.
  * @property batches Number of independent optimization runs.
- * @property scriptTimeout Per-evaluation timeout for constraint and objective scripts, in seconds
- *   (same unit as [TerminationConfig.time]).  Optional; defaults to
- *   [DEFAULT_SCRIPT_TIMEOUT_SECONDS] when `null`.  Capped at [MAX_SCRIPT_TIMEOUT_SECONDS] to
- *   prevent accidental denial-of-service.  The combined timeout for a single solution evaluation
- *   is `scriptTimeout × (objectives + constraints)`.
  */
 @Serializable
 data class SolverConfig(
@@ -151,33 +147,8 @@ data class SolverConfig(
     val algorithm: AlgorithmType = AlgorithmType.NSGAII,
     val parameters: AlgorithmParameters = AlgorithmParameters(),
     val termination: TerminationConfig = TerminationConfig(),
-    val batches: Int = 1,
-    val scriptTimeout: Int? = null
-) {
-    companion object {
-        /**
-         * Default per-script timeout when none is configured: 30 seconds. 
-         */
-        const val DEFAULT_SCRIPT_TIMEOUT_SECONDS: Int = 30
-
-        /**
-         * Maximum allowed per-script timeout: 10 minutes (600 seconds). 
-         */
-        const val MAX_SCRIPT_TIMEOUT_SECONDS: Int = 600
-    }
-
-    /**
-     * Returns the effective per-script evaluation timeout in milliseconds.
-     * Applies the default when [scriptTimeout] is `null` and enforces the maximum cap.
-     *
-     * @return Timeout in milliseconds.
-     */
-    fun effectiveScriptTimeoutMs(): Long {
-        val seconds = (scriptTimeout ?: DEFAULT_SCRIPT_TIMEOUT_SECONDS)
-            .coerceIn(1, MAX_SCRIPT_TIMEOUT_SECONDS)
-        return seconds.toLong() * 1000L
-    }
-}
+    val batches: Int = 1
+)
 
 /** Supported evolutionary algorithm types. */
 @Serializable
@@ -271,4 +242,76 @@ enum class ModelConversionStrategy {
      * Convert model data lazily on first access. 
      */
     LAZY
+}
+
+/**
+ * Runtime configuration for the optimization execution.
+ *
+ * @property timeout Timeout configuration for script and transformation evaluation.
+ * @property backend The graph backend to use. Defaults to MDEO when absent.
+ * @property resources Resource constraints for distributed execution.
+ */
+@Serializable
+data class RuntimeConfig(
+    val timeout: TimeoutConfig? = null,
+    val backend: GraphBackendType? = null,
+    val resources: ResourcesConfig? = null
+) {
+    /**
+     * Timeout configuration for per-evaluation operations.
+     * Values arrive from the config DSL in seconds and are converted to milliseconds
+     * at the platform boundary.
+     *
+     * @property script Per-script evaluation timeout in seconds. Null means use env var default.
+     * @property transformation Per-transformation execution timeout in seconds. Null means use env var default.
+     */
+    @Serializable
+    data class TimeoutConfig(
+        val script: Int? = null,
+        val transformation: Int? = null
+    ) {
+        /**
+         * Returns the effective script timeout in milliseconds, converting from seconds.
+         * Falls back to [fallbackMs] when no value is configured.
+         *
+         * @param fallbackMs Fallback timeout in milliseconds from environment configuration.
+         * @return The effective timeout in milliseconds.
+         */
+        fun effectiveScriptTimeoutMs(fallbackMs: Long): Long =
+            script?.let { it.toLong() * 1000L } ?: fallbackMs
+
+        /**
+         * Returns the effective transformation timeout in milliseconds, converting from seconds.
+         * Falls back to [fallbackMs] when no value is configured.
+         *
+         * @param fallbackMs Fallback timeout in milliseconds from environment configuration.
+         * @return The effective timeout in milliseconds.
+         */
+        fun effectiveTransformationTimeoutMs(fallbackMs: Long): Long =
+            transformation?.let { it.toLong() * 1000L } ?: fallbackMs
+    }
+
+    /**
+     * Resource constraints for distributed optimization.
+     * All values are upper bounds; null means unbound.
+     *
+     * @property threads Maximum total threads across all nodes.
+     * @property nodes Maximum number of worker nodes to use.
+     * @property threadsPerNode Maximum threads per individual node.
+     */
+    @Serializable
+    data class ResourcesConfig(
+        val threads: Int? = null,
+        val nodes: Int? = null,
+        val threadsPerNode: Int? = null
+    )
+}
+
+/**
+ * Supported graph backend implementations.
+ */
+@Serializable
+enum class GraphBackendType {
+    MDEO,
+    Tinker
 }

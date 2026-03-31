@@ -68,7 +68,7 @@ open class BackendApiClient(
         jwtToken: String
     ): Boolean {
         return try {
-            logger.debug("Updating backend state for execution $executionId to $state")
+            logger.info("Updating backend state for execution $executionId to $state")
 
             val response = client.patch("$baseUrl/executions/$executionId/state") {
                 contentType(ContentType.Application.Json)
@@ -97,7 +97,7 @@ open class BackendApiClient(
         jwtToken: String
     ): Boolean {
         return try {
-            logger.debug("Updating backend metadata for execution $executionId")
+            logger.info("Updating backend metadata for execution $executionId")
 
             val response = client.patch("$baseUrl/executions/$executionId/metadata") {
                 contentType(ContentType.Application.Json)

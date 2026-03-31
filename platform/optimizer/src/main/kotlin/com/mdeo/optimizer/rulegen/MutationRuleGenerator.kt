@@ -67,7 +67,7 @@ object MutationRuleGenerator {
         refinements: List<RefinementConfig> = emptyList()
     ): List<GeneratedMutation> {
         if (specs.isEmpty()) {
-            logger.debug("MutationRuleGenerator: no specs provided, returning empty list")
+            logger.info("MutationRuleGenerator: no specs provided, returning empty list")
             return emptyList()
         }
 
@@ -109,9 +109,6 @@ object MutationRuleGenerator {
         seen: LinkedHashMap<String, GeneratedMutation>
     ) {
         for (spec in specs) {
-            logger.debug("Processing MutationRuleSpec [prefix={}]: node={}, edge={}, action={}",
-                namePrefix, spec.node, spec.edge, spec.action)
-
             if (!metamodelInfo.hasClass(spec.node)) {
                 logger.warn("Class '{}' not found in metamodel — skipping spec", spec.node)
                 continue
@@ -124,7 +121,7 @@ object MutationRuleGenerator {
                     val ruleName = MutationRuleNameGenerator.fromRepairSpec(repairSpec, prefix = namePrefix)
 
                     if (seen.containsKey(ruleName)) {
-                        logger.debug("Skipping duplicate rule: {}", ruleName)
+                        logger.info("Skipping duplicate rule: {}", ruleName)
                         continue
                     }
 
@@ -132,7 +129,6 @@ object MutationRuleGenerator {
                     for ((name, typedAst) in asts) {
                         if (!seen.containsKey(name)) {
                             seen[name] = GeneratedMutation(name = name, typedAst = typedAst)
-                            logger.debug("Generated mutation rule: {}", name)
                         }
                     }
                 }

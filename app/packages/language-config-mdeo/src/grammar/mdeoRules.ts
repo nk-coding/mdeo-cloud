@@ -16,7 +16,10 @@ import {
     MutationBlock,
     ArchiveBlock,
     AlgorithmParameters,
-    TerminationBlock
+    TerminationBlock,
+    RuntimeSection,
+    RuntimeTimeoutBlock,
+    RuntimeResourcesBlock
 } from "./mdeoTypes.js";
 
 /**
@@ -257,7 +260,6 @@ export const TerminationBlockRule = createRule("ConfigMdeoTerminationBlockRule")
  *           evolutions = 500
  *       }
  *       batches = 1
- *       scriptTimeout = 30
  *   }
  */
 export const SolverSectionContentRule = createRule("SolverSectionContentRule")
@@ -274,8 +276,91 @@ export const SolverSectionContentRule = createRule("SolverSectionContentRule")
                 ),
                 add("parameters", AlgorithmParametersBlockRule),
                 add("termination", TerminationBlockRule),
-                group("batches", "=", add("batches", INT)),
-                group("scriptTimeout", "=", add("scriptTimeout", INT))
+                group("batches", "=", add("batches", INT))
+            ),
+            many(NEWLINE)
+        ),
+        "}"
+    ]);
+
+/**
+ * Runtime timeout block rule.
+ * Syntax:
+ *   timeout {
+ *       script = 1000
+ *       transformation = 1000
+ *   }
+ */
+export const RuntimeTimeoutBlockRule = createRule("ConfigMdeoRuntimeTimeoutBlockRule")
+    .returns(RuntimeTimeoutBlock)
+    .as(({ add }) => [
+        "timeout",
+        "{",
+        many(NEWLINE),
+        many(
+            or(
+                group("script", "=", add("script", INT)),
+                group("transformation", "=", add("transformation", INT))
+            ),
+            many(NEWLINE)
+        ),
+        "}"
+    ]);
+
+/**
+ * Runtime resources block rule.
+ * All fields are optional and represent upper bounds.
+ * Syntax:
+ *   resources {
+ *       threads = 10
+ *       nodes = 10
+ *       threadsPerNode = 3
+ *   }
+ */
+export const RuntimeResourcesBlockRule = createRule("ConfigMdeoRuntimeResourcesBlockRule")
+    .returns(RuntimeResourcesBlock)
+    .as(({ add }) => [
+        "resources",
+        "{",
+        many(NEWLINE),
+        many(
+            or(
+                group("threads", "=", add("threads", INT)),
+                group("nodes", "=", add("nodes", INT)),
+                group("threadsPerNode", "=", add("threadsPerNode", INT))
+            ),
+            many(NEWLINE)
+        ),
+        "}"
+    ]);
+
+/**
+ * Runtime section content rule (without keyword).
+ * Models the runtime configuration block.
+ * Syntax:
+ *   {
+ *       timeout {
+ *           script = 1000
+ *           transformation = 1000
+ *       }
+ *       backend = Tinker
+ *       resources {
+ *           threads = 10
+ *           nodes = 10
+ *           threadsPerNode = 3
+ *       }
+ *   }
+ */
+export const RuntimeSectionContentRule = createRule("RuntimeSectionContentRule")
+    .returns(RuntimeSection)
+    .as(({ add }) => [
+        "{",
+        many(NEWLINE),
+        many(
+            or(
+                add("timeout", RuntimeTimeoutBlockRule),
+                group("backend", "=", add("backend", "MDEO", "Tinker")),
+                add("resources", RuntimeResourcesBlockRule)
             ),
             many(NEWLINE)
         ),

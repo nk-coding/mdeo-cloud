@@ -108,6 +108,29 @@ interface ProjectLoadCompleteMessage extends WebSocketMessage {
 }
 
 /**
+ * Request to initialize a project session on connect.
+ * The server validates access, caches file-operation permissions, subscribes
+ * the connection to execution-state events, and replies with [InitReplyMessage].
+ */
+interface InitRequestMessage extends WebSocketMessage {
+    messageType: "init/request";
+    requestId: string;
+    projectId: string;
+}
+
+/**
+ * Reply from the server after a successful init/request.
+ * Contains project metadata and the current user's effective permissions.
+ */
+export interface InitReplyMessage extends WebSocketMessage {
+    messageType: "init/reply";
+    requestId: string;
+    project: { id: string; name: string };
+    canWrite: boolean;
+    canExecute: boolean;
+}
+
+/**
  * Connection state for the WebSocket
  */
 export type ConnectionState = "disconnected" | "connecting" | "connected";
@@ -275,7 +298,8 @@ export class WebSocketApi {
 
     /**
      * Handles successful WebSocket connection.
-     * Resolves the connected promise and subscribes to the current project if set.
+     * Sends an init/request to initialize permissions and subscribe to execution
+     * events in a single round-trip, replacing the separate event/subscribe flow.
      */
     private handleOpen(): void {
         this.connectionState = "connected";
@@ -287,7 +311,7 @@ export class WebSocketApi {
         }
 
         if (this.currentProjectId) {
-            this.subscribeToProject(this.currentProjectId);
+            this.sendInitRequest(this.currentProjectId);
         }
     }
 
@@ -328,6 +352,9 @@ export class WebSocketApi {
                 break;
             case "file/projectLoadComplete":
                 this.handleProjectLoadComplete(message as ProjectLoadCompleteMessage);
+                break;
+            case "init/reply":
+                this.handleInitReply(message as InitReplyMessage);
                 break;
             default:
                 throw new Error(`Unknown WebSocket message type: ${message.messageType}`);
@@ -627,6 +654,59 @@ export class WebSocketApi {
             this.pendingRequests.delete(message.requestId);
             pending.resolve(undefined);
         }
+    }
+
+    /**
+     * Handles an init/reply from the server.
+     * Resolves the pending init request (if tracked) with the full reply so that
+     * callers of [initProject] can inspect project settings and permissions.
+     * Fire-and-forget inits from [handleOpen] are silently ignored.
+     *
+     * @param message The init reply message
+     */
+    private handleInitReply(message: InitReplyMessage): void {
+        const pending = this.pendingRequests.get(message.requestId);
+        if (pending) {
+            this.pendingRequests.delete(message.requestId);
+            pending.resolve(message);
+        }
+    }
+
+    /**
+     * Sends an init/request on connection open to initialize the project session.
+     * Caches file-operation permissions and subscribes to execution events in one
+     * round-trip. Fire-and-forget: replies are handled by [handleInitReply].
+     *
+     * @param projectId The project ID to initialize
+     */
+    private sendInitRequest(projectId: string): void {
+        const requestId = this.nextRequestId();
+        const message: InitRequestMessage = {
+            messageType: "init/request",
+            requestId,
+            projectId
+        };
+        this.sendMessage(message);
+    }
+
+    /**
+     * Initializes a project session and awaits the server's reply with project settings.
+     * Use this when you need the project metadata or permission flags from the server.
+     * For the automatic on-connect initialization, [handleOpen] uses [sendInitRequest].
+     *
+     * @param projectId The project ID to initialize
+     * @returns The init reply containing project metadata and user permissions
+     */
+    async initProject(projectId: string): Promise<InitReplyMessage> {
+        if (this.currentProjectId !== projectId) {
+            this.currentProjectId = projectId;
+        }
+        const requestId = this.nextRequestId();
+        return (await this.sendRequest({
+            messageType: "init/request",
+            requestId,
+            projectId
+        })) as InitReplyMessage;
     }
 
     // ─── Request / Response Helpers ────────────────────────────────────

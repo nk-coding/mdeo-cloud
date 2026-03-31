@@ -15,21 +15,15 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternElementSerializer
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatementSerializer
-import com.mdeo.modeltransformation.graph.ModelGraph
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
 import com.mdeo.optimizer.OptimizationOrchestrator
 import com.mdeo.optimizer.config.*
-import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
 import com.mdeo.optimizer.evaluation.MutationEvaluator
 import com.mdeo.optimizer.evaluation.WorkerSolutionRef
 import com.mdeo.optimizer.moea.SearchResult
 import com.mdeo.optimizer.moea.SolutionResult
 import com.mdeo.optimizer.moea.getWorkerRef
 import com.mdeo.optimizer.metrics.OptimizationMetricsCollector
-import com.mdeo.optimizer.operators.MutationStrategyFactory
 import com.mdeo.optimizer.rulegen.MutationRuleGenerator
-import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
-import com.mdeo.optimizer.solution.Solution
 import com.mdeo.optimizer.worker.WorkerAllocationRequest
 import com.mdeo.optimizerexecution.config.AppConfig
 import com.mdeo.optimizerexecution.database.OptimizerExecutionsTable
@@ -39,19 +33,14 @@ import com.mdeo.optimizerexecution.worker.WorkerClient
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst
 import com.mdeo.script.ast.expressions.TypedExpressionSerializer as ScriptExpressionSerializer
 import com.mdeo.script.ast.statements.TypedStatementSerializer
-import com.mdeo.script.compiler.CompilationInput
-import com.mdeo.script.compiler.CompiledProgram
-import com.mdeo.script.compiler.ScriptCompiler
-import com.mdeo.script.runtime.ExecutionEnvironment
+
 import com.mdeo.metamodel.Model
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
@@ -87,18 +76,16 @@ import kotlin.uuid.toKotlinUuid
  * coroutine bound to [executionScope].
  *
  * @param apiClient Client for backend API communication
- * @param timeoutMs Overall execution timeout in milliseconds
  * @param executionScope Scope in which background execution coroutines are launched
- * @param appConfig Application configuration including multi-node peer settings.
+ * @param appConfig Application configuration including multi-node peer settings and default timeouts.
  */
 class OptimizerExecutionService(
     private val apiClient: OptimizerApiClient,
-    private val timeoutMs: Long,
     private val executionScope: CoroutineScope,
-    private val appConfig: AppConfig
+    private val appConfig: AppConfig,
+    private val orchestratorRegistry: OrchestratorRegistry = OrchestratorRegistry()
 ) : ExecutionServiceWithFileTree {
     private val logger = LoggerFactory.getLogger(OptimizerExecutionService::class.java)
-    private val scriptCompiler = ScriptCompiler()
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     private val transformationJson = Json {
@@ -155,14 +142,8 @@ class OptimizerExecutionService(
 
         executionScope.launch(Dispatchers.Default) {
             try {
-                withTimeout(timeoutMs) {
-                    runOptimization(executionId, projectId, config, jwtToken)
-                }
-            } catch (e: TimeoutCancellationException) {
-                handleTimeout(executionId, jwtToken)
+                runOptimization(executionId, projectId, config, jwtToken)
             } catch (e: CancellationException) {
-                // Normal coroutine cancellation (e.g. application shutdown or user cancel).
-                // Don't mark the execution as failed; it was already handled inside runOptimization.
                 logger.info("Optimizer execution $executionId was cancelled")
             } catch (e: Exception) {
                 handleUnexpectedError(executionId, e, jwtToken)
@@ -266,13 +247,11 @@ class OptimizerExecutionService(
 
     /**
      * Full optimization pipeline: fetches metamodel, model, transformation ASTs, script ASTs,
-     * compiles scripts, wires guidance functions, and runs the optimizer.
+     * and runs the optimizer in federated mode (always via worker subprocess nodes).
      * Updates execution state at each phase; sets state to FAILED on any error.
      *
-     * @param executionId The execution record to drive.
-     * @param projectId Project context for all API calls.
-     * @param config Parsed optimization configuration.
-     * @param jwtToken Bearer token for backend API authentication.
+     * Script compilation happens inside each worker subprocess — the orchestrator only
+     * fetches and forwards the typed ASTs.
      */
     private suspend fun runOptimization(
         executionId: UUID,
@@ -328,62 +307,16 @@ class OptimizerExecutionService(
         val scriptAsts = fetchAllScripts(executionId, projectId, scriptPaths, jwtToken)
             ?: return
 
+        val federated = createFederatedEvaluator(
+            executionId, config, metamodelData, modelData,
+            transformations, scriptAsts
+        )
         updateState(
-            executionId, ExecutionState.INITIALIZING,
-            "Compiling ${scriptAsts.size} script file(s)...", jwtToken
+            executionId, ExecutionState.RUNNING,
+            "Running federated ${config.solver.algorithm} optimizer across ${federated.workerCount} nodes...",
+            jwtToken
         )
-        val compiledProgram = compileScripts(executionId, scriptAsts, metamodelData, jwtToken)
-            ?: return
-
-        val environment = ExecutionEnvironment(compiledProgram)
-        val clazz = environment.scriptProgramClass
-
-        val objectives = config.goal.objectives.map { obj ->
-            val jvmMethodName = compiledProgram.functionLookup[obj.path]?.get(obj.functionName)
-                ?: error("Function '${obj.functionName}' not found in '${obj.path}'")
-            ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${obj.path}::${obj.functionName}")
-        }
-        val constraints = config.goal.constraints.map { con ->
-            val jvmMethodName = compiledProgram.functionLookup[con.path]?.get(con.functionName)
-                ?: error("Function '${con.functionName}' not found in '${con.path}'")
-            ScriptGuidanceFunction(clazz, jvmMethodName, System.out, "${con.path}::${con.functionName}")
-        }
-
-        val initialSolutionProvider = createInitialSolutionProvider(
-            modelData, metamodel
-        )
-
-        val isFederated = appConfig.peers.size > 1
-        val evaluator: MutationEvaluator
-
-        if (isFederated) {
-            evaluator = createFederatedEvaluator(
-                executionId, config, metamodelData, modelData,
-                transformations, scriptAsts
-            )
-            updateState(
-                executionId, ExecutionState.RUNNING,
-                "Running federated ${config.solver.algorithm} optimizer across ${appConfig.peers.size} nodes...",
-                jwtToken
-            )
-        } else {
-            val mutationStrategy = MutationStrategyFactory.create(
-                config.solver.parameters.mutation, transformations
-            )
-            evaluator = LocalMutationEvaluator(
-                initialSolutionProvider = initialSolutionProvider,
-                mutationStrategy = mutationStrategy,
-                objectives = objectives,
-                constraints = constraints,
-                metamodel = metamodel,
-            )
-            updateState(
-                executionId, ExecutionState.RUNNING,
-                "Running ${config.solver.algorithm} optimizer...", jwtToken
-            )
-        }
-
-        runWithEvaluator(executionId, config, metamodel, evaluator, jwtToken)
+        runWithEvaluator(executionId, config, metamodel, federated, jwtToken)
     }
 
     // ========================= Unified execution =========================
@@ -439,7 +372,7 @@ class OptimizerExecutionService(
             }
 
             // These run while the evaluator (and its WebSocket connections) are still alive.
-            storeResults(executionId, result, metamodel, evaluator)
+            storeResults(executionId, config, result, metamodel, evaluator)
             updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
             logger.info("Optimizer execution $executionId completed")
         } finally {
@@ -452,6 +385,9 @@ class OptimizerExecutionService(
     /**
      * Creates a [FederatedMutationEvaluator] wrapping WebSocket connections to worker peers.
      *
+     * Worker node count and per-node thread allocation are constrained by
+     * [RuntimeConfig.ResourcesConfig] from the optimization config.
+     *
      * Note: the returned evaluator's worker clients are scoped to the current coroutine.
      * The caller must ensure the coroutineScope outlives the evaluator's usage.
      *
@@ -463,7 +399,7 @@ class OptimizerExecutionService(
      * @param scriptAsts Map of script path to typed AST.
      * @return A [FederatedMutationEvaluator] ready for use.
      */
-    private fun createFederatedEvaluator(
+    private suspend fun createFederatedEvaluator(
         executionId: UUID,
         config: OptimizationConfig,
         metamodelData: MetamodelData,
@@ -471,10 +407,12 @@ class OptimizerExecutionService(
         transformations: Map<String, TransformationTypedAst>,
         scriptAsts: Map<String, ScriptTypedAst>
     ): FederatedMutationEvaluator {
+        val resources = config.runtime.resources
+        val workers = createWorkerClients(executionScope, resources)
         val allocationRequest = buildAllocationRequest(
-            executionId, config, metamodelData, modelData, transformations, scriptAsts
+            executionId, config, metamodelData, modelData, transformations, scriptAsts,
+            threadsPerNode = resources?.threadsPerNode
         )
-        val workers = createWorkerClients(executionScope)
         return FederatedMutationEvaluator(executionId.toString(), workers, allocationRequest)
     }
 
@@ -491,6 +429,7 @@ class OptimizerExecutionService(
      * @param modelData The initial model data.
      * @param transformations Map of transformation path to typed AST.
      * @param scriptAsts Map of script path to typed AST.
+     * @param threadsPerNode Maximum threads per worker node, or `null` for no limit.
      * @return A fully populated [WorkerAllocationRequest].
      */
     private fun buildAllocationRequest(
@@ -499,7 +438,8 @@ class OptimizerExecutionService(
         metamodelData: MetamodelData,
         modelData: ModelData,
         transformations: Map<String, TransformationTypedAst>,
-        scriptAsts: Map<String, ScriptTypedAst>
+        scriptAsts: Map<String, ScriptTypedAst>,
+        threadsPerNode: Int? = null
     ): WorkerAllocationRequest {
         val transformationAstJsons = transformations.mapValues { (_, ast) ->
             transformationJson.encodeToString(TransformationTypedAst.serializer(), ast)
@@ -515,25 +455,92 @@ class OptimizerExecutionService(
             scriptAstJsons = scriptAstJsons,
             goalConfig = config.goal,
             solverConfig = config.solver,
-            initialSolutionCount = config.solver.parameters.population
+            initialSolutionCount = config.solver.parameters.population,
+            threadsPerNode = threadsPerNode
         )
     }
 
     /**
-     * Creates [WorkerClient] instances for all peers that should act as workers.
+     * Creates [WorkerClient] instances constrained by the given [RuntimeConfig.ResourcesConfig].
      *
-     * If [AppConfig.includeSelf] is true, the current node is included. All other peers
-     * are always included.  Each client is given [scope] so that its background WebSocket
-     * reading loop is cancelled automatically when the enclosing execution coroutine ends.
+     * Node selection order: the local node (if it has threads) is added first, followed by
+     * configured peers, up to the [ResourcesConfig.nodes] cap. For peer nodes the actual thread
+     * count is fetched via `GET /api/worker/metadata` so that node selection uses real capacity
+     * instead of local config estimates. The global [ResourcesConfig.threads] cap limits the
+     * total number of threads allocated across all nodes; once exhausted, no further nodes are
+     * added. Peers that cannot be reached for metadata are skipped with a warning.
+     *
+     * When [resources] is `null`, all available nodes are used without any thread caps
+     * (backward-compatible behaviour).
      *
      * @param scope Coroutine scope that owns the WebSocket reading loops of all returned clients.
-     * @return A list of [WorkerClient] instances, one per worker peer.
+     * @param resources Optional resource constraints from the optimization config.
+     * @return A list of [WorkerClient] instances, one per participating node.
      */
-    private fun createWorkerClients(scope: CoroutineScope): List<WorkerClient> {
-        return appConfig.peers.mapIndexedNotNull { index, url ->
-            if (index == appConfig.nodeId && !appConfig.includeSelf) null
-            else WorkerClient(nodeId = index.toString(), baseUrl = url, scope = scope)
+    private suspend fun createWorkerClients(
+        scope: CoroutineScope,
+        resources: RuntimeConfig.ResourcesConfig? = null
+    ): List<WorkerClient> {
+        val clients = mutableListOf<WorkerClient>()
+        var nextId = 0
+        val maxNodes = resources?.nodes ?: Int.MAX_VALUE
+        val maxTotalThreads = resources?.threads ?: Int.MAX_VALUE
+        var remainingThreads = maxTotalThreads
+        val orchestratorWsBase = appConfig.nodeUrl
+            .replace("https://", "wss://")
+            .replace("http://", "ws://")
+
+        if (appConfig.workerThreads > 0 && clients.size < maxNodes) {
+            // Threads the local node will actually use (capped by threadsPerNode and budget).
+            val localThreads = minOf(
+                appConfig.workerThreads,
+                resources?.threadsPerNode ?: Int.MAX_VALUE,
+                remainingThreads
+            )
+            if (localThreads > 0) {
+                clients.add(WorkerClient(
+                    nodeId = nextId.toString(),
+                    baseUrl = appConfig.nodeUrl,
+                    scope = scope,
+                    orchestratorRegistry = orchestratorRegistry,
+                    orchestratorWsBaseUrl = orchestratorWsBase,
+                    useLocalChannel = true
+                ))
+                nextId++
+                remainingThreads -= localThreads
+            }
         }
+
+        for (url in appConfig.peers) {
+            if (clients.size >= maxNodes) break
+            val peerClient = WorkerClient(
+                nodeId = nextId.toString(),
+                baseUrl = url,
+                scope = scope,
+                orchestratorRegistry = orchestratorRegistry,
+                orchestratorWsBaseUrl = orchestratorWsBase
+            )
+            // Fetch actual thread count from the peer; fall back to local config on failure.
+            val peerThreads = try {
+                val metadata = peerClient.getMetadata()
+                resources?.threadsPerNode?.let { minOf(it, metadata.threadCount) } ?: metadata.threadCount
+            } catch (e: Exception) {
+                logger.warn(
+                    "Could not fetch metadata from peer {} ({}); using local workerThreads as estimate: {}",
+                    nextId, url, e.message
+                )
+                resources?.threadsPerNode ?: appConfig.workerThreads
+            }
+            if (peerThreads > 0 && peerThreads > remainingThreads) {
+                peerClient.close()
+                break
+            }
+            clients.add(peerClient)
+            nextId++
+            if (peerThreads > 0) remainingThreads -= peerThreads
+        }
+
+        return clients
     }
 
 
@@ -546,17 +553,22 @@ class OptimizerExecutionService(
      * Results are stored alongside a markdown summary in the result-files table.
      *
      * @param executionId The execution whose results are being stored.
+     * @param config The optimization configuration (used to resolve backend and resources).
      * @param result The [SearchResult] from the completed algorithm.
+     * @param metamodel The metamodel used to reconstruct solution model data.
      * @param evaluator The mutation evaluator used to fetch solution model data.
      */
     private suspend fun storeResults(
         executionId: UUID,
+        config: OptimizationConfig,
         result: SearchResult,
         metamodel: Metamodel,
         evaluator: MutationEvaluator
     ) {
         val solutions = result.getFinalSolutions()
-        val summaryContent = buildResultSummary(solutions, result.getMetrics())
+        val backend = config.runtime.backend ?: GraphBackendType.MDEO
+        val nodeThreadCounts = (evaluator as FederatedMutationEvaluator).getWorkerThreadCounts()
+        val summaryContent = buildResultSummary(solutions, result.getMetrics(), nodeThreadCounts, backend)
 
         val moeaSolutions = result.getRawPopulation().toList()
         val solutionModelJsons = moeaSolutions.mapNotNull { sol ->
@@ -705,66 +717,25 @@ class OptimizerExecutionService(
 
     // ========================= Script compilation =========================
 
-    /**
-     * Compiles all fetched script ASTs together with the metamodel.
-     * Sets execution state to FAILED and returns null if compilation throws.
-     *
-     * @param executionId Execution to update on failure.
-     * @param scriptAsts Map of path → typed AST for all scripts.
-     * @param metamodelData Metamodel used during compilation.
-     * @param jwtToken Authentication token for error reporting.
-     * @return The compiled program, or `null` on compile error.
-     */
-    private suspend fun compileScripts(
-        executionId: UUID,
-        scriptAsts: Map<String, ScriptTypedAst>,
-        metamodelData: MetamodelData,
-        jwtToken: String
-    ): CompiledProgram? {
-        return try {
-            val input = CompilationInput(scriptAsts)
-            scriptCompiler.compile(input, metamodelData)
-        } catch (e: Exception) {
-            logger.error("Script compilation failed", e)
-            updateState(
-                executionId, ExecutionState.FAILED,
-                "Script compilation error: ${e.message}", jwtToken
-            )
-            null
-        }
-    }
-
-    // ========================= Solution bootstrapping =========================
-
-    /**
-     * Creates a factory that produces fresh initial [Solution] instances by loading
-     * the [modelData] into new [MdeoModelGraph]s.
-     *
-     * @param modelData The seed model data from which to create solutions.
-     * @param metamodel The compiled metamodel governing model structure.
-     * @return A factory function producing new [Solution] instances.
-     */
-    private fun createInitialSolutionProvider(
-        modelData: ModelData,
-        metamodel: Metamodel
-    ): () -> Solution {
-        return {
-            val modelGraph = MdeoModelGraph.create(modelData, metamodel)
-            Solution(modelGraph)
-        }
-    }
-
     // ========================= Result storage =========================
 
     /**
-     * Builds a markdown result summary table for the given Pareto-front solutions.
+     * Builds a markdown result summary for the given Pareto-front solutions.
+     *
+     * The summary includes a node allocation section (backend and per-node thread counts)
+     * followed by the Pareto front table, solution model links, and performance metrics.
      *
      * @param solutions List of solution results from the final population.
+     * @param metricsCollector Collected per-generation performance metrics.
+     * @param nodeThreadCounts Map from node ID to the number of threads allocated on that node.
+     * @param backend The graph backend used during optimization.
      * @return Markdown-formatted summary string.
      */
     private fun buildResultSummary(
         solutions: List<com.mdeo.optimizer.moea.SolutionResult>,
-        metricsCollector: OptimizationMetricsCollector
+        metricsCollector: OptimizationMetricsCollector,
+        nodeThreadCounts: Map<String, Int>,
+        backend: GraphBackendType
     ): String {
         return buildString {
             append("## Optimization Results\n\n")
@@ -786,6 +757,15 @@ class OptimizerExecutionService(
                     append("![Solution $index]($RESULTS_DIR/solution_$index.m_gen)\n")
                 }
             }
+
+            append("\n### Execution Resources\n\n")
+            append("- **Backend:** ${backend.name}\n")
+            nodeThreadCounts.entries
+                .sortedBy { it.key }
+                .forEach { (nodeId, threads) ->
+                    append("- **Node $nodeId:** $threads thread${if (threads == 1) "" else "s"}\n")
+                }
+            append("\n")
 
             val generations = metricsCollector.generations
             if (generations.isNotEmpty()) {
@@ -961,20 +941,6 @@ class OptimizerExecutionService(
             }
         }
         apiClient.updateExecutionState(executionId.toString(), state, progressText, jwtToken)
-    }
-
-    /**
-     * Sets the execution state to FAILED with a timeout message.
-     *
-     * @param executionId The timed-out execution.
-     * @param jwtToken Authentication token for the state update API call.
-     */
-    private suspend fun handleTimeout(executionId: UUID, jwtToken: String) {
-        logger.error("Optimizer execution timeout after ${timeoutMs}ms")
-        updateState(
-            executionId, ExecutionState.FAILED,
-            "Execution timeout: Optimization exceeded maximum time of ${timeoutMs}ms", jwtToken
-        )
     }
 
     /**

@@ -27,6 +27,14 @@ import kotlinx.serialization.Serializable
  * @param solverConfig Solver parameters (algorithm, population size, etc.).
  * @param initialSolutionCount Number of initial solutions the worker should generate
  *        and evaluate during allocation.
+ * @param threadsPerNode Maximum threads this worker node should use, or `null` for no limit
+ *        (falls back to the worker's own [com.mdeo.optimizerexecution.config.AppConfig.workerThreads]).
+ * @param orchestratorWsUrl WebSocket URL for the worker's subprocess to connect back to the
+ *        orchestrator. Mutually exclusive with [useLocalChannel].
+ * @param useLocalChannel When `true`, the subprocess uses the existing stdin/stdout pipe to
+ *        communicate with the orchestrator instead of opening a WebSocket connection.
+ *        More efficient for the local node where subprocess and orchestrator share a host.
+ *        Mutually exclusive with [orchestratorWsUrl].
  */
 @Serializable
 data class WorkerAllocationRequest(
@@ -37,32 +45,36 @@ data class WorkerAllocationRequest(
     val scriptAstJsons: Map<String, String>,
     val goalConfig: GoalConfig,
     val solverConfig: SolverConfig,
-    val initialSolutionCount: Int
+    val initialSolutionCount: Int,
+    val threadsPerNode: Int? = null,
+    val orchestratorWsUrl: String? = null,
+    val useLocalChannel: Boolean = false
 )
 
 /**
  * Response returned by a worker after successful allocation.
  *
  * @param initialSolutions Evaluated initial solutions produced by the worker.
+ * @param threadCount Number of threads the worker has allocated for this execution.
  */
 @Serializable
 data class WorkerAllocationResponse(
-    val initialSolutions: List<InitialSolutionData>
+    val initialSolutions: List<InitialSolutionData>,
+    val threadCount: Int
 )
 
 /**
- * Compact representation of an evaluated solution, carrying only objective and
- * constraint values (not the full model graph).
+ * Compact representation of a solution created during initialization.
+ *
+ * Fitness evaluation is performed separately via evaluation tasks dispatched
+ * through the same batch mechanism as mutation tasks, providing consistent
+ * timeout protection for all evaluation work.
  *
  * @param solutionId Unique identifier for this solution within the execution.
- * @param objectives Objective function values (one per goal, in declaration order).
- * @param constraints Constraint violation values (zero means satisfied).
  */
 @Serializable
 data class InitialSolutionData(
-    val solutionId: String,
-    val objectives: List<Double>,
-    val constraints: List<Double>
+    val solutionId: String
 )
 
 /**
@@ -72,6 +84,19 @@ data class InitialSolutionData(
  */
 @Serializable
 data class BatchTask(
+    val solutionId: String
+)
+
+/**
+ * A single evaluation-only task within a [com.mdeo.optimizer.worker.NodeWorkBatchRequest].
+ *
+ * Unlike [BatchTask], this evaluates an existing solution without mutating it first.
+ * Used for initial population fitness evaluation.
+ *
+ * @param solutionId Identifier of the solution to evaluate.
+ */
+@Serializable
+data class BatchEvaluationTask(
     val solutionId: String
 )
 
@@ -104,4 +129,21 @@ data class BatchResult(
 data class SolutionTransferItem(
     val solutionId: String,
     val serializedModel: SerializedModel
+)
+
+/**
+ * Metadata describing a worker node's capabilities and resource availability.
+ *
+ * Returned by the `GET /api/worker/metadata` endpoint so that orchestrators can make
+ * informed decisions about node selection and thread-budget allocation without relying
+ * on local configuration estimates.
+ *
+ * @param threadCount Number of worker threads available on this node for evaluation.
+ * @param supportedBackends Algorithm backend identifiers supported by this node
+ *        (e.g. `["NSGAII", "SPEA2", "IBEA"]`).
+ */
+@Serializable
+data class WorkerMetadata(
+    val threadCount: Int,
+    val supportedBackends: List<String>
 )

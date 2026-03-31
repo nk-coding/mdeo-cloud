@@ -24,6 +24,7 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
             class: {
                 flex: true,
                 "flex-col": true,
+                "mt-2": true,
                 "overflow-hidden": true,
                 "shadow-[0_8px_16px_rgba(0,0,0,0.12)]": true,
                 "rounded-md": true,
@@ -31,10 +32,10 @@ export function generateDetailsPanelView(context: Toolbox): VNode {
                 "opacity-100": isVisible,
                 "transition-all": isVisible,
                 "duration-300": isVisible,
-                "pointer-events-auto": true
+                "pointer-events-auto": true,
             }
         },
-        generateDetailsPanelContent(context)
+        generateDetailsPanelContent(context),
     );
 }
 

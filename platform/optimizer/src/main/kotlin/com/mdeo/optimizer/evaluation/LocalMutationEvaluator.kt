@@ -44,9 +44,7 @@ class LocalMutationEvaluator(
                 solutions[id] = mutated
                 InitialSolutionResult(
                     solutionId = id,
-                    workerNodeId = nodeId,
-                    objectives = evaluateObjectives(mutated),
-                    constraints = evaluateConstraints(mutated)
+                    workerNodeId = nodeId
                 )
             } catch (e: Exception) {
                 mutated.close()
@@ -62,13 +60,15 @@ class LocalMutationEvaluator(
             receiveSolution(import.solutionId, import.serializedModel)
         }
 
-        val results = batch.tasks.map { task -> evaluateSingle(task) }
+        val mutationResults = batch.tasks.map { task -> evaluateSingle(task) }
+
+        val evaluationResults = batch.evaluationTasks.map { task -> evaluateExisting(task) }
 
         for (solutionId in batch.discards) {
             solutions.remove(solutionId)?.close()
         }
 
-        return results
+        return mutationResults + evaluationResults
     }
 
     override suspend fun getSolutionData(ref: WorkerSolutionRef): SerializedModel {
@@ -118,6 +118,38 @@ class LocalMutationEvaluator(
             )
         } catch (e: Exception) {
             copy.close()
+            EvaluationResult(
+                parentSolutionId = task.solutionId,
+                newSolutionId = "",
+                workerNodeId = nodeId,
+                objectives = emptyList(),
+                constraints = emptyList(),
+                succeeded = false
+            )
+        }
+    }
+
+    /**
+     * Evaluates an existing solution without mutation, returning fitness values.
+     *
+     * Used for initial population evaluation where solutions have already been created
+     * and stored but need their objective and constraint values computed.
+     *
+     * @param task The evaluation task identifying the solution to evaluate.
+     * @return An [EvaluationResult] with the same solution ID for both parent and new.
+     */
+    private fun evaluateExisting(task: EvaluationTask): EvaluationResult {
+        return try {
+            val solution = requireSolution(task.solutionId)
+            EvaluationResult(
+                parentSolutionId = task.solutionId,
+                newSolutionId = task.solutionId,
+                workerNodeId = nodeId,
+                objectives = evaluateObjectives(solution),
+                constraints = evaluateConstraints(solution),
+                succeeded = true
+            )
+        } catch (e: Exception) {
             EvaluationResult(
                 parentSolutionId = task.solutionId,
                 newSolutionId = "",

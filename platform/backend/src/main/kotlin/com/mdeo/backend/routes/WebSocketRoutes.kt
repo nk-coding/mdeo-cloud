@@ -138,6 +138,7 @@ private class WebSocketMessageHandler(
         when (type) {
             "event/subscribe" -> handleSubscribe(jsonElement)
             "event/unsubscribe" -> handleUnsubscribe(jsonElement)
+            "init/request" -> handleInitRequest(jsonElement)
             "file/subscribeFiles" -> fileHandler.handleSubscribeFiles(json.decodeFromJsonElement(jsonElement))
             "file/loadProject" -> fileHandler.handleLoadProject(json.decodeFromJsonElement(jsonElement))
             "file/readFile" -> fileHandler.handleReadFile(json.decodeFromJsonElement(jsonElement))
@@ -179,10 +180,56 @@ private class WebSocketMessageHandler(
     private suspend fun handleUnsubscribe(jsonElement: JsonElement) {
         val message = json.decodeFromJsonElement<UnsubscribeMessage>(jsonElement)
         val projectId = parseProjectId(message.projectId) ?: return
-        
+
         webSocketService.unsubscribe(connectionId, projectId)
     }
-    
+
+    /**
+     * Handles an init request: validates project access, caches file-operation permissions,
+     * subscribes the connection to execution-state events, and sends an [InitReplyMessage]
+     * with project settings. Sends [FileErrorMessage] on failure.
+     *
+     * @param jsonElement The parsed init request message
+     */
+    private suspend fun handleInitRequest(jsonElement: JsonElement) {
+        val message = json.decodeFromJsonElement<InitRequestMessage>(jsonElement)
+        val projectId = parseProjectId(message.projectId) ?: run {
+            logger.warn("Invalid project ID in init/request: ${message.projectId}")
+            return
+        }
+        val userUuid = try { UUID.fromString(userId) } catch (_: Exception) { null } ?: run {
+            logger.warn("Invalid user ID in init/request: $userId")
+            return
+        }
+
+        val hasRead = projectService.hasProjectPermission(projectId, userUuid, isGlobalAdmin, ProjectPermission.READ)
+        if (!hasRead) {
+            logger.warn("User $userId denied access to project $projectId in init/request")
+            webSocketService.sendMessage(
+                connectionId,
+                FileErrorMessage(message.requestId, "Forbidden", "Access denied to project $projectId")
+            )
+            return
+        }
+
+        val hasWrite = projectService.hasProjectPermission(projectId, userUuid, isGlobalAdmin, ProjectPermission.WRITE)
+        val hasExecute = projectService.hasProjectPermission(projectId, userUuid, isGlobalAdmin, ProjectPermission.EXECUTE)
+
+        webSocketService.cachePermission(connectionId, projectId, hasRead, hasWrite)
+        webSocketService.subscribe(connectionId, projectId)
+
+        val project = projectService.getProject(projectId) ?: run {
+            logger.warn("Project $projectId not found in init/request")
+            webSocketService.sendMessage(
+                connectionId,
+                FileErrorMessage(message.requestId, "NotFound", "Project $projectId not found")
+            )
+            return
+        }
+
+        webSocketService.sendMessage(connectionId, InitReplyMessage(message.requestId, project, hasWrite, hasExecute))
+    }
+
     /**
      * Parses a project ID string to UUID.
      *

@@ -146,9 +146,8 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
         const targetClassName = this.resolveClassName(node.target?.class);
         const startProperty = node.source?.name ?? "";
         const targetProperty = node.target?.name ?? "";
-        const operator = node.operator ?? "--";
 
-        return `${startClassName}_${startProperty}_${operator}_${targetClassName}_${targetProperty}`;
+        return `${startClassName}_${startProperty}_${targetClassName}_${targetProperty}`;
     }
 
     /**

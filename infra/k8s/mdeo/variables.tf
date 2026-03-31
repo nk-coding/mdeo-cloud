@@ -114,3 +114,15 @@ variable "optimizer_worker_threads" {
   description = "Number of worker threads per optimizer-execution pod"
   default     = 1
 }
+
+variable "optimizer_script_timeout_ms" {
+  type        = number
+  description = "Default per-script evaluation timeout in milliseconds for optimizer-execution pods"
+  default     = 1000
+}
+
+variable "optimizer_transformation_timeout_ms" {
+  type        = number
+  description = "Default per-transformation timeout in milliseconds for optimizer-execution pods"
+  default     = 1000
+}

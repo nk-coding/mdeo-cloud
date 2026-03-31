@@ -1,4 +1,4 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import type { GNode } from "@mdeo/editor-shared";
 import { sharedImport, GSimpleNodeView } from "@mdeo/editor-shared";
@@ -13,9 +13,10 @@ const { injectable } = sharedImport("inversify");
 export class GAssociationMultiplicityNodeView extends GSimpleNodeView {
     protected override renderNodeContent(
         model: Readonly<GAssociationMultiplicityNode>,
-        context: RenderingContext
+        context: RenderingContext,
+        children: readonly GModelElement[]
     ): VNode[] {
-        return context.renderChildren(model);
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 
     protected override getClasses(_model: Readonly<GNode>): Record<string, boolean> {

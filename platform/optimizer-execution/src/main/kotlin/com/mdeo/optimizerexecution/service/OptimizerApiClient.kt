@@ -72,7 +72,7 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
         projectId: String, filePath: String, jwtToken: String
     ): TransformationTypedAst? {
         return try {
-            logger.debug("Fetching transformation typed AST for $filePath")
+            logger.info("Fetching transformation typed AST for $filePath")
             val response = transformationClient.get("$baseUrl/projects/$projectId/file-data/typed-ast") {
                 parameter("path", filePath)
                 contentType(ContentType.Application.Json)
@@ -97,7 +97,7 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
         projectId: String, filePath: String, jwtToken: String
     ): ScriptTypedAst? {
         return try {
-            logger.debug("Fetching script typed AST for $filePath")
+            logger.info("Fetching script typed AST for $filePath")
             val response = scriptClient.get("$baseUrl/projects/$projectId/file-data/typed-ast") {
                 parameter("path", filePath)
                 contentType(ContentType.Application.Json)
@@ -122,7 +122,7 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
         projectId: String, filePath: String, jwtToken: String
     ): ModelData? {
         return try {
-            logger.debug("Fetching model data for $filePath")
+            logger.info("Fetching model data for $filePath")
             val response = client.get("$baseUrl/projects/$projectId/file-data/model-data") {
                 parameter("path", filePath)
                 contentType(ContentType.Application.Json)
@@ -147,7 +147,7 @@ class OptimizerApiClient(baseUrl: String) : BackendApiClient(baseUrl) {
         projectId: String, filePath: String, jwtToken: String
     ): MetamodelData? {
         return try {
-            logger.debug("Fetching metamodel data for $filePath")
+            logger.info("Fetching metamodel data for $filePath")
             val response = client.get("$baseUrl/projects/$projectId/file-data/metamodel") {
                 parameter("path", filePath)
                 contentType(ContentType.Application.Json)

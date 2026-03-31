@@ -137,6 +137,20 @@ function convertNode(node: ActionSchemaFileSelectNode, parent: FileSelectTreeNod
     return treeNode;
 }
 
+/**
+ * Strips the /{projectId}/files prefix from a URI path, returning just the
+ * project-relative file path (e.g. "/models/foo.m" instead of
+ * "/my-proj/files/models/foo.m").
+ */
+function stripFilesPrefix(absolutePath: string): string {
+    const parts = absolutePath.split("/").filter(Boolean);
+    if (parts.length >= 2 && parts[1] === "files") {
+        const remaining = parts.slice(2).join("/");
+        return remaining ? "/" + remaining : "";
+    }
+    return absolutePath;
+}
+
 function getAbsolutePath(node: FileSelectTreeNode): string {
     const parts: string[] = [];
     let current: FileSelectTreeNode | undefined = node;
@@ -144,15 +158,17 @@ function getAbsolutePath(node: FileSelectTreeNode): string {
         parts.unshift(current.name);
         current = current.parent;
     }
-    return props.schema.rootPath + "/" + parts.join("/");
+    return stripFilesPrefix(props.schema.rootPath + "/" + parts.join("/"));
 }
 
 const displayValue = computed(() => {
     if (model.value == undefined) {
         return "";
     }
-    const rootPath = props.schema.rootPath;
-    const relative = model.value.startsWith(rootPath + "/") ? model.value.slice(rootPath.length + 1) : model.value;
+    const strippedRootPath = stripFilesPrefix(props.schema.rootPath);
+    const relative = model.value.startsWith(strippedRootPath + "/")
+        ? model.value.slice(strippedRootPath.length + 1)
+        : model.value;
     return relative || model.value;
 });
 

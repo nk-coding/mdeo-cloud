@@ -196,14 +196,55 @@ export type TerminationBlockType = ASTType<typeof TerminationBlock>;
  * - `parameters`    — algorithm parameters block
  * - `termination`   — termination condition block
  * - `batches`       — number of independent runs
- * - `scriptTimeout` — per-script evaluation timeout in seconds (same unit as `termination.time`);
- *                     optional, defaults to 30 s, maximum 600 s (10 minutes)
  */
 export const SolverSection = createInterface("ConfigMdeoSolverSection").attrs({
     algorithm: [Union("NSGAII", "IBEA", "SPEA2", "SMSMOEA", "VEGA", "PESA2", "PAES", "RANDOM")],
     parameters: [AlgorithmParameters],
     termination: [TerminationBlock],
-    batches: [Number],
-    scriptTimeout: [Number]
+    batches: [Number]
 });
 export type SolverSectionType = ASTType<typeof SolverSection>;
+
+/**
+ * The `timeout { }` block in the runtime section.
+ *
+ * - `script`         — per-script evaluation timeout in seconds; optional,
+ *                      defaults to 30 s on the backend
+ * - `transformation` — per-transformation execution timeout in seconds; optional,
+ *                      unbound by default
+ */
+export const RuntimeTimeoutBlock = createInterface("ConfigMdeoRuntimeTimeoutBlock").attrs({
+    script: [Number],
+    transformation: [Number]
+});
+export type RuntimeTimeoutBlockType = ASTType<typeof RuntimeTimeoutBlock>;
+
+/**
+ * The `resources { }` block in the runtime section.
+ *
+ * All fields are optional and represent upper bounds rather than exact values.
+ *
+ * - `threads`        — maximum total threads across all nodes; unbound when absent
+ * - `nodes`          — maximum number of worker nodes to use; unbound when absent
+ * - `threadsPerNode` — maximum threads per individual node; unbound when absent
+ */
+export const RuntimeResourcesBlock = createInterface("ConfigMdeoRuntimeResourcesBlock").attrs({
+    threads: [Number],
+    nodes: [Number],
+    threadsPerNode: [Number]
+});
+export type RuntimeResourcesBlockType = ASTType<typeof RuntimeResourcesBlock>;
+
+/**
+ * The runtime `{ }` section content.
+ *
+ * - `timeout`   — script and transformation execution timeout configuration
+ * - `backend`   — the graph backend to use (`MDEO` or `Tinker`); defaults to `MDEO`
+ * - `resources` — resource constraints for the distributed execution
+ */
+export const RuntimeSection = createInterface("ConfigMdeoRuntimeSection").attrs({
+    timeout: [RuntimeTimeoutBlock],
+    backend: [Union("MDEO", "Tinker")],
+    resources: [RuntimeResourcesBlock]
+});
+export type RuntimeSectionType = ASTType<typeof RuntimeSection>;

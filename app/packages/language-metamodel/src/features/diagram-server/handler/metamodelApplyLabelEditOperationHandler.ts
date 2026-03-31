@@ -10,7 +10,11 @@ import {
     AssociationEnd,
     type AssociationEndType,
     PrimitiveType,
-    EnumTypeReference
+    EnumTypeReference,
+    RangeMultiplicity,
+    type MultiplicityType,
+    type RangeMultiplicityType,
+    type SingleMultiplicityType
 } from "../../../grammar/metamodelTypes.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
@@ -250,26 +254,34 @@ export class MetamodelApplyLabelEditOperationHandler extends BaseApplyLabelEditO
             }
             return await this.replaceCstNode(multiplicityNode, multiplicityAst);
         } else {
-            const serializedMultiplicity = await this.serializeNode(multiplicityAst);
-            const insertPosition = node.$cstNode?.end;
-            if (insertPosition == undefined) {
-                throw new Error("Cannot determine insert position for multiplicity.");
+            const nameNode = GrammarUtils.findNodeForProperty(node.$cstNode, "name");
+            if (nameNode == undefined) {
+                throw new Error("Name CST node not found for association end.");
             }
-            return {
-                changes: {
-                    [node.$document!.uri.toString()]: [
-                        {
-                            range: {
-                                start: node.$document!.textDocument.positionAt(insertPosition),
-                                end: node.$document!.textDocument.positionAt(insertPosition)
-                            },
-                            newText: ` ${serializedMultiplicity}`
-                        }
-                    ]
-                }
-            };
+            const formattedMultiplicity = this.formatMultiplicityAst(multiplicityAst);
+            return this.createInsertAfterNodeEdit(nameNode, formattedMultiplicity, false);
         }
+    }
 
-        return undefined;
+    /**
+     * Formats a multiplicity AST node as a bracketed text string.
+     *
+     * Produces strings of the form `[lower..upper]`, `[lower..*]`, or `[value]`
+     * without relying on the AST serializer, so it works correctly for synthetic
+     * (non-parsed) multiplicity nodes that have no associated CST node.
+     *
+     * @param multiplicity the multiplicity AST node
+     * @returns the formatted multiplicity string, e.g. `[0..1]` or `[*]`
+     */
+    private formatMultiplicityAst(multiplicity: MultiplicityType): string {
+        if (multiplicity.$type === RangeMultiplicity.name) {
+            const range = multiplicity as RangeMultiplicityType;
+            const upper = range.upper !== undefined ? range.upper : String(range.upperNumeric ?? 1);
+            return `[${range.lower}..${upper}]`;
+        } else {
+            const single = multiplicity as SingleMultiplicityType;
+            const value = single.value !== undefined ? single.value : String(single.numericValue ?? 1);
+            return `[${value}]`;
+        }
     }
 }

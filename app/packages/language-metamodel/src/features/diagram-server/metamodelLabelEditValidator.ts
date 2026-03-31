@@ -361,11 +361,13 @@ export class MetamodelLabelEditValidator extends BaseLabelEditValidator {
      * - Single: *, +, ?, or a number
      * - Range: number..*, or number..number
      *
+     * Optional whitespace is allowed around the `..` separator.
+     *
      * @param multiplicity the multiplicity content to validate (without brackets)
      * @returns a validation status if the multiplicity is invalid, undefined otherwise
      */
     private validateMultiplicity(multiplicity: string): ValidationStatusType | undefined {
-        const multiplicityRegex = /^(\*|\+|\?|\d+|\d+\.\.\*|\d+\.\.\d+)$/;
+        const multiplicityRegex = /^\s*(\*|\+|\?|\d+|\d+\s*\.\.\s*\*|\d+\s*\.\.\s*\d+)\s*$/;
 
         if (!multiplicityRegex.test(multiplicity)) {
             return this.error(

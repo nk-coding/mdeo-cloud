@@ -28,7 +28,7 @@ import org.moeaframework.problem.Problem
  *
  * @param problem The problem definition (typically [DelegatingProblem]).
  * @param populationSize The population size.
- * @param variation The variation operator (typically [PassThroughVariation]).
+ * @param variation The variation operator (typically [DelegatingVariation]).
  * @param initialization The initialization strategy.
  * @param coordinator The evaluation coordinator managing solution lifecycle.
  */
@@ -68,7 +68,7 @@ class DelegatingNSGAII(
  * @param problem The problem definition (typically [DelegatingProblem]).
  * @param populationSize The population size.
  * @param initialization The initialization strategy.
- * @param variation The variation operator (typically [PassThroughVariation]).
+ * @param variation The variation operator (typically [DelegatingVariation]).
  * @param numberOfOffspring The number of offspring generated each iteration.
  * @param k The niching parameter for crowding distance (typically `1`).
  * @param coordinator The evaluation coordinator managing solution lifecycle.
@@ -104,7 +104,7 @@ class DelegatingSPEA2(
  * @param problem The problem definition (typically [DelegatingProblem]).
  * @param populationSize The population size.
  * @param initialization The initialization strategy.
- * @param variation The variation operator (typically [PassThroughVariation]).
+ * @param variation The variation operator (typically [DelegatingVariation]).
  * @param fitnessEvaluator The indicator-based fitness evaluator.
  * @param coordinator The evaluation coordinator managing solution lifecycle.
  */
@@ -141,7 +141,7 @@ class DelegatingIBEA(
  * @param problem The problem definition (typically [DelegatingProblem]).
  * @param populationSize The population size.
  * @param initialization The initialization strategy.
- * @param variation The variation operator (typically [PassThroughVariation]).
+ * @param variation The variation operator (typically [DelegatingVariation]).
  * @param fitnessEvaluator The fitness evaluator for SMS-EMOA selection.
  * @param coordinator The evaluation coordinator managing solution lifecycle.
  */
@@ -175,7 +175,7 @@ class DelegatingSMSEMOA(
  * @param problem The problem definition (typically [DelegatingProblem]).
  * @param populationSize The population size.
  * @param initialization The initialization strategy.
- * @param variation The variation operator (typically [PassThroughVariation]).
+ * @param variation The variation operator (typically [DelegatingVariation]).
  * @param coordinator The evaluation coordinator managing solution lifecycle.
  */
 class DelegatingVEGA(
@@ -209,7 +209,7 @@ class DelegatingVEGA(
  *
  * @param problem The problem definition (typically [DelegatingProblem]).
  * @param populationSize The population size.
- * @param variation The variation operator (typically [PassThroughVariation]).
+ * @param variation The variation operator (typically [DelegatingVariation]).
  * @param initialization The initialization strategy.
  * @param bisections The number of bisections for the adaptive grid archive.
  * @param archiveSize The capacity of the adaptive grid archive.
@@ -248,7 +248,7 @@ class DelegatingPESA2(
  * lifecycle tracking covers the combined set.
  *
  * @param problem The problem definition (typically [DelegatingProblem]).
- * @param mutation The mutation operator (typically [PassThroughVariation]).
+ * @param mutation The mutation operator (typically [DelegatingVariation]).
  * @param bisections The number of bisections for the adaptive grid archive.
  * @param archiveSize The capacity of the adaptive grid archive.
  * @param coordinator The evaluation coordinator managing solution lifecycle.

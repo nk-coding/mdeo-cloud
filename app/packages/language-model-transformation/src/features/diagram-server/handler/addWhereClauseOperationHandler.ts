@@ -85,7 +85,7 @@ export class AddWhereClauseOperationHandler extends BaseOperationHandler impleme
             {
                 id: `add-where-clause-${element.id}`,
                 label: "Add Where Clause",
-                icon: "plus",
+                icon: "funnel-plus",
                 sortString: "d",
                 action: this.buildInsertWhereClauseAction(element)
             }

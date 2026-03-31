@@ -85,7 +85,7 @@ export class AddVariableOperationHandler extends BaseOperationHandler implements
             {
                 id: `add-variable-${element.id}`,
                 label: "Add Variable",
-                icon: "plus",
+                icon: "variable-plus",
                 sortString: "c",
                 action: this.buildInsertVariableAction(element)
             }

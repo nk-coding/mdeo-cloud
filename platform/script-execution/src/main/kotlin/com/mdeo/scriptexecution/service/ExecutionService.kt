@@ -1,22 +1,16 @@
 package com.mdeo.scriptexecution.service
 
 import com.mdeo.execution.common.service.ExecutionService as CommonExecutionService
+import com.mdeo.execution.common.subprocess.SubprocessPool
+import com.mdeo.execution.common.subprocess.SubprocessResult
+import com.mdeo.execution.common.subprocess.SubprocessRunner
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.script.ast.TypedAst
-import com.mdeo.script.compiler.CompilationInput
-import com.mdeo.script.compiler.CompiledProgram
-import com.mdeo.script.compiler.ScriptCompiler
-import com.mdeo.script.runtime.ExecutionEnvironment
-import com.mdeo.script.runtime.SimpleScriptContext
-import com.mdeo.metamodel.Model
 import com.mdeo.common.model.ExecutionState
 import com.mdeo.scriptexecution.database.ExecutionsTable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -28,8 +22,6 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
 import java.time.Instant
 import java.util.*
 import kotlin.uuid.Uuid
@@ -73,18 +65,35 @@ private data class ModelContext(
  *
  * @param backendApiService Service for backend API communication
  * @param timeoutMs Execution timeout in milliseconds
+ * @param subprocessPool Pool of reusable subprocess JVMs; avoids JVM startup overhead for
+ *        frequent executions. Each pooled process is reset between executions.
  */
 class ExecutionService(
     private val backendApiService: BackendApiService,
-    private val timeoutMs: Long
+    private val timeoutMs: Long,
+    private val subprocessPool: SubprocessPool = buildDefaultPool()
 ) : CommonExecutionService {
     private val logger = LoggerFactory.getLogger(ExecutionService::class.java)
-    private val compiler = ScriptCompiler()
     private val dependencyResolver = TypedAstDependencyResolver(backendApiService)
 
     companion object {
         private const val MAX_PATH_LENGTH = 1000
         private const val MAX_METHOD_NAME_LENGTH = 200
+        private const val CANCELLATION_CHECK_INTERVAL_MS = 5000L
+
+        /**
+         * Builds the default [SubprocessPool] using the [ScriptCommand.Reset] /
+         * [ScriptResponse.ResetOk] JSON protocol.
+         */
+        fun buildDefaultPool(maxSize: Int = SubprocessPool.DEFAULT_POOL_SIZE): SubprocessPool =
+            SubprocessPool(maxSize = maxSize) { runner ->
+                val payload = Json.encodeToString(ScriptCommand.serializer(), ScriptCommand.Reset).toByteArray()
+                val result = runner.sendCommand(payload)
+                if (result !is SubprocessResult.Success) return@SubprocessPool false
+                runCatching {
+                    Json.decodeFromString(ScriptResponse.serializer(), result.data.decodeToString()) is ScriptResponse.ResetOk
+                }.getOrDefault(false)
+            }
     }
 
     /**
@@ -128,17 +137,7 @@ class ExecutionService(
 
         withContext(Dispatchers.Default) {
             try {
-                withTimeout(timeoutMs) {
-                    executeScript(executionId, projectId, filePath, requestData, jwtToken)
-                }
-            } catch (e: TimeoutCancellationException) {
-                logger.error("Execution timeout after ${timeoutMs}ms", e)
-                updateExecutionState(
-                    executionId,
-                    ExecutionState.FAILED,
-                    "Execution timeout: Script exceeded maximum execution time of ${timeoutMs}ms",
-                    jwtToken
-                )
+                executeScript(executionId, projectId, filePath, requestData, jwtToken)
             } catch (e: IllegalArgumentException) {
                 logger.error("Input validation failed", e)
                 updateExecutionState(
@@ -205,7 +204,8 @@ class ExecutionService(
     }
 
     /**
-     * Executes a script method. Delegates to focused sub-steps for clarity.
+     * Executes a script method. Fetches data in the parent process, then runs compilation
+     * and execution in a subprocess with watchdog monitoring.
      *
      * @param executionId UUID of the execution
      * @param projectId UUID of the project
@@ -234,13 +234,75 @@ class ExecutionService(
             null
         }
 
-        val compiledProgram = compileScriptFiles(
-            executionId, resolvedAsts.typedAsts, modelContext?.metamodelData, jwtToken
-        ) ?: return
+        updateExecutionState(executionId, ExecutionState.RUNNING, "Executing...", jwtToken)
 
-        runCompiledScript(
-            executionId, compiledProgram, modelContext, filePath, requestData.methodName, jwtToken
+        val subprocess = subprocessPool.acquire() ?: SubprocessRunner(
+            mainClass = ScriptSubprocessMain::class.java.name,
+            cancellationCheck = { isExecutionCancelled(executionId) },
+            cancellationCheckIntervalMs = CANCELLATION_CHECK_INTERVAL_MS
+        ).also { runner ->
+            if (!runner.start()) {
+                updateExecutionState(executionId, ExecutionState.FAILED, "Failed to start subprocess", jwtToken)
+                return
+            }
+        }
+
+        val payload = ScriptSubprocessMain.serializeInput(
+            resolvedAsts.typedAsts,
+            modelContext?.metamodelData,
+            modelContext?.modelData,
+            filePath,
+            requestData.methodName,
+            timeoutMs
         )
+        val result = subprocess.sendCommand(payload)
+
+        when (result) {
+            is SubprocessResult.Success -> {
+                val response = runCatching {
+                    Json.decodeFromString(ScriptResponse.serializer(), result.data.decodeToString())
+                }.getOrNull()
+                val executeOk = response as? ScriptResponse.ExecuteOk
+                if (executeOk != null) {
+                    transaction {
+                        ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                            it[ExecutionsTable.result] = executeOk.result ?: "null"
+                            it[ExecutionsTable.output] = executeOk.output
+                        }
+                    }
+                    updateExecutionState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
+                    logger.info("Execution $executionId completed successfully")
+                    subprocessPool.resetAndRelease(subprocess)
+                } else {
+                    logger.error("Unexpected subprocess response format for execution $executionId")
+                    subprocess.destroy()
+                    updateExecutionState(executionId, ExecutionState.FAILED, "Internal error: unexpected subprocess response", jwtToken)
+                }
+            }
+            is SubprocessResult.Timeout -> {
+                logger.error("Execution timeout after ${timeoutMs}ms")
+                subprocess.destroy()
+                updateExecutionState(
+                    executionId,
+                    ExecutionState.FAILED,
+                    "Execution timeout: Script exceeded maximum execution time of ${timeoutMs}ms",
+                    jwtToken
+                )
+            }
+            is SubprocessResult.Cancelled -> {
+                logger.info("Execution $executionId cancelled")
+                subprocess.destroy()
+            }
+            is SubprocessResult.Failed -> {
+                transaction {
+                    ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                        it[ExecutionsTable.error] = result.message
+                    }
+                }
+                subprocess.destroy()
+                updateExecutionState(executionId, ExecutionState.FAILED, "Runtime error: ${result.message}", jwtToken)
+            }
+        }
     }
 
     /**
@@ -343,99 +405,19 @@ class ExecutionService(
     }
 
     /**
-     * Compiles all [typedAsts] into a [CompiledProgram], treating [metamodelData] as optional.
-     * When provided, the metamodel path is read from [MetamodelData.path].
+     * Checks whether the execution has been cancelled in the database.
      *
-     * Updates execution state to [ExecutionState.FAILED] and returns `null` on compilation error.
-     *
-     * @return [CompiledProgram] on success, `null` on failure.
+     * @param executionId The execution to check.
+     * @return `true` if cancelled or deleted.
      */
-    private suspend fun compileScriptFiles(
-        executionId: UUID,
-        typedAsts: Map<String, TypedAst>,
-        metamodelData: MetamodelData?,
-        jwtToken: String
-    ): CompiledProgram? {
-        updateExecutionState(
-            executionId, ExecutionState.INITIALIZING,
-            "Compiling ${typedAsts.size} file(s)...", jwtToken
-        )
-
-        return try {
-            compiler.compile(CompilationInput(typedAsts), metamodelData)
-        } catch (e: Exception) {
-            logger.error("Compilation failed", e)
-            val errorMessage = "Compilation error: ${e.message}"
-            transaction {
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
-                    it[ExecutionsTable.error] = errorMessage
-                }
-            }
-            updateExecutionState(executionId, ExecutionState.FAILED, errorMessage, jwtToken)
-            null
+    private fun isExecutionCancelled(executionId: UUID): Boolean {
+        val state = transaction {
+            ExecutionsTable.selectAll()
+                .where { ExecutionsTable.id eq executionId.toKotlinUuid() }
+                .firstOrNull()
+                ?.get(ExecutionsTable.state)
         }
-    }
-
-    /**
-     * Runs the compiled program and persists the result and output to the database.
-     *
-     * @param modelContext Optional model/metamodel context; when present a
-     *   [Model] is injected into the execution environment.
-     */
-    private suspend fun runCompiledScript(
-        executionId: UUID,
-        compiledProgram: CompiledProgram,
-        modelContext: ModelContext?,
-        filePath: String,
-        methodName: String,
-        jwtToken: String
-    ) {
-        updateExecutionState(executionId, ExecutionState.RUNNING, "Executing...", jwtToken)
-
-        val outputStream = ByteArrayOutputStream()
-        val printStream = PrintStream(outputStream, true, Charsets.UTF_8)
-
-        try {
-            val env = ExecutionEnvironment(compiledProgram)
-
-            val model = if (modelContext != null && compiledProgram.metamodel != null) {
-                compiledProgram.metamodel!!.loadModel(modelContext.modelData)
-            } else {
-                null
-            }
-
-            val context = SimpleScriptContext(printStream, model)
-            val result = env.invoke(filePath, methodName, context)
-
-            val capturedOutput = outputStream.toString(Charsets.UTF_8)
-            val resultString = result?.toString() ?: "null"
-
-            transaction {
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
-                    it[ExecutionsTable.result] = resultString
-                    it[ExecutionsTable.output] = capturedOutput
-                }
-            }
-
-            updateExecutionState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
-            logger.info("Execution $executionId completed successfully")
-        } catch (e: Exception) {
-            logger.error("Runtime error during execution", e)
-
-            val capturedOutput = outputStream.toString(Charsets.UTF_8)
-            val errorMessage = "${e.javaClass.simpleName}: ${e.message}"
-
-            transaction {
-                ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
-                    it[ExecutionsTable.output] = capturedOutput
-                    it[ExecutionsTable.error] = errorMessage
-                }
-            }
-
-            updateExecutionState(executionId, ExecutionState.FAILED, "Runtime error: ${e.message}", jwtToken)
-        } finally {
-            printStream.close()
-        }
+        return state == null || state == ExecutionState.CANCELLED
     }
 
     /**
@@ -479,7 +461,7 @@ class ExecutionService(
             }
         }
 
-        logger.debug("Updated execution $executionId to state $state")
+        logger.info("Updated execution $executionId to state $state")
         if (jwtToken != null) {
             try {
                 val ok = backendApiService.updateExecutionState(executionId.toString(), state, progressText, jwtToken)

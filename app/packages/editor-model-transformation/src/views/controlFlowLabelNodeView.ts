@@ -1,9 +1,8 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import { sharedImport, GSimpleNodeView, type GNode } from "@mdeo/editor-shared";
 
 const { injectable } = sharedImport("inversify");
-const { selectFeature } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering control flow label nodes.
@@ -11,16 +10,9 @@ const { selectFeature } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export class GControlFlowLabelNodeView extends GSimpleNodeView {
-    /**
-     * Renders the content inside the control flow label node.
-     * Renders children without selection feature enabled.
-     *
-     * @param model The control flow label node model
-     * @param context The rendering context
-     * @returns An array of VNodes representing the node's children
-     */
-    protected override renderNodeContent(model: Readonly<GNode>, context: RenderingContext): VNode[] {
-        return context.renderChildren(model, { [selectFeature]: false });
+    
+    protected override renderNodeContent(model: Readonly<GNode>, context: RenderingContext, children: readonly GModelElement[]): VNode[] {
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 
     /**

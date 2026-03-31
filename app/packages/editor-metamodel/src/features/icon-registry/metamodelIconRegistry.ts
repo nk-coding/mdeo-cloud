@@ -1,6 +1,6 @@
 import type { IconNode } from "lucide";
 import { sharedImport, DefaultIconRegistry } from "@mdeo/editor-shared";
-import { PlainLineIcon, UnidirectionalAssociationIcon, CompositionIcon } from "../toolbox/edgeTypeIcons.js";
+import { PlainLineIcon, UnidirectionalAssociationIcon, CompositionIcon } from "./customIcons.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -19,6 +19,7 @@ const { injectable } = sharedImport("inversify");
  * - `"none-association"` — plain diagonal line, no decorator.
  * - `"unidirectional-association"` — diagonal line with a single arrowhead.
  * - `"composition"` — diagonal line with a filled diamond at the target end.
+ * - `"variable-plus"` — plus sign, used to indicate a variable that can hold multiple values (e.g., a collection).
  */
 @injectable()
 export class MetamodelIconRegistry extends DefaultIconRegistry {

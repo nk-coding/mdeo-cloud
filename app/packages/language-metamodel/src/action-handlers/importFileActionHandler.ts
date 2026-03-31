@@ -12,6 +12,7 @@ import type {
     AstReflection,
     ExtendedLangiumServices
 } from "@mdeo/language-common";
+import { FileCategory, parseUri } from "@mdeo/language-common";
 import { buildFileSelectTree, calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumDocument } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
@@ -120,7 +121,11 @@ export class ImportFileActionHandler implements ActionHandler {
             };
         }
 
-        const currentFilePath = URI.parse(data.uri).path;
+        const parsedCurrentUri = parseUri(URI.parse(data.uri));
+        if (parsedCurrentUri.category !== FileCategory.RegularFile) {
+            throw new Error("ImportFileActionHandler can only be invoked on regular files");
+        }
+        const currentFilePath = parsedCurrentUri.path;
         const selectedFile = calculateRelativePath(currentFilePath, selectedAbsolutePath);
 
         const conflict = this.checkDuplicateImport(data.uri, selectedFile);

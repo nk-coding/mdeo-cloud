@@ -65,7 +65,7 @@ private fun validateJwtCredential(credential: JWTCredential): JWTPrincipal? {
         val projectId = credential.payload.getClaim("projectId")?.asString()
         val executionId = credential.payload.getClaim("executionId")?.asString()
         
-        logger.debug("JWT validated for projectId: $projectId, executionId: $executionId")
+        logger.info("JWT validated for projectId: $projectId, executionId: $executionId")
         JWTPrincipal(credential.payload)
     } catch (e: Exception) {
         logger.error("Token validation failed", e)

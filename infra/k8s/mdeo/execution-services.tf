@@ -268,28 +268,24 @@ resource "kubernetes_stateful_set_v1" "optimizer_execution" {
           }
 
           env {
-            name  = "EXECUTION_TIMEOUT_MS"
-            value = tostring(var.execution_timeout_ms)
-          }
-
-          env {
-            name  = "PEERS"
-            value = join(",", [for i in range(var.optimizer_execution_replicas) : "http://optimizer-execution-${i}.optimizer-execution-headless.${local.ns}.svc.cluster.local:8080"])
-          }
-
-          env {
-            name  = "INCLUDE_SELF"
-            value = "true"
-          }
-
-          env {
             name  = "WORKER_THREADS"
             value = tostring(var.optimizer_worker_threads)
           }
 
-          # NODE_ID is derived from the StatefulSet pod ordinal via the entrypoint
+          env {
+            name  = "SCRIPT_TIMEOUT_MS"
+            value = tostring(var.optimizer_script_timeout_ms)
+          }
+
+          env {
+            name  = "TRANSFORMATION_TIMEOUT_MS"
+            value = tostring(var.optimizer_transformation_timeout_ms)
+          }
+
+          # NODE_ID is derived from the StatefulSet pod ordinal via the entrypoint.
+          # PEERS and NODE_URL are computed dynamically at startup, excluding the local node.
           command = ["/bin/sh", "-c"]
-          args    = ["export NODE_ID=$${HOSTNAME##*-} && exec java --add-opens java.xml/org.xml.sax.helpers=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED -jar /app/optimizer-execution.jar"]
+          args    = ["export NODE_ID=$${HOSTNAME##*-}; PEERS=''; for i in $(seq 0 $((${var.optimizer_execution_replicas} - 1))); do if [ \"$i\" != \"$NODE_ID\" ]; then [ -n \"$PEERS\" ] && PEERS=\"$PEERS,\"; PEERS=\"$${PEERS}http://optimizer-execution-$${i}.optimizer-execution-headless.${local.ns}.svc.cluster.local:8080\"; fi; done; export PEERS; export NODE_URL=\"http://optimizer-execution-$${NODE_ID}.optimizer-execution-headless.${local.ns}.svc.cluster.local:8080\"; exec java --add-opens java.xml/org.xml.sax.helpers=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED -jar /app/optimizer-execution.jar"]
 
           liveness_probe {
             http_get {

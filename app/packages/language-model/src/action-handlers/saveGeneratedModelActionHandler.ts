@@ -163,8 +163,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
     ): Promise<ActionSubmitResponse> {
         const sourceUri = URI.parse(data.uri);
         const projectId = sourceUri.path.substring(1).split("/")[0];
-        const effectiveDirectory = directory || `/${projectId}/files`;
-        const newFileUri = URI.file(`${effectiveDirectory}/${normalizedFilename}`);
+        const newFileUri = URI.file(`/${projectId}/files${directory}/${normalizedFilename}`);
 
         if (this.sharedServices.workspace.LangiumDocuments.hasDocument(newFileUri)) {
             return {
@@ -199,11 +198,7 @@ export class SaveGeneratedModelActionHandler implements ActionHandler {
         const metamodelDocs = this.findMetamodelDocuments();
         const enumEntryMap = buildEnumEntryMap(metamodelDocs);
 
-        const filesPrefix = `/${projectId}/files`;
-        const withinFilesDir = effectiveDirectory.startsWith(filesPrefix)
-            ? effectiveDirectory.slice(filesPrefix.length)
-            : effectiveDirectory;
-        const withinFilesTargetPath = withinFilesDir + "/" + normalizedFilename;
+        const withinFilesTargetPath = directory + "/" + normalizedFilename;
 
         const metamodelRelativePath = calculateRelativePath(withinFilesTargetPath, metamodelAbsolutePath);
 

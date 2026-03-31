@@ -3,6 +3,7 @@ import { modelTransformationDiagramModule } from "./module.js";
 import { DEFAULT_MODULES } from "@mdeo/editor-shared";
 import { modelTransformationBoundsModule } from "./features/bounds/featureModule.js";
 import { modelTransformationToolboxModule } from "./features/toolbox/featureModule.js";
+import { modelTransformationIconRegistryModule } from "./features/icon-registry/featureModule.js";
 
 /**
  * Editor plugin for the model transformation editor.
@@ -15,5 +16,6 @@ export const modelTransformationEditorPlugin: ContainerConfiguration = [
     ...DEFAULT_MODULES,
     modelTransformationBoundsModule,
     modelTransformationDiagramModule,
-    modelTransformationToolboxModule
+    modelTransformationToolboxModule,
+    modelTransformationIconRegistryModule
 ];

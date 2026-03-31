@@ -4,6 +4,7 @@ import { GrammarSerializer, type SerializedGrammar } from "@mdeo/language-common
 import {
     SearchSectionContentRule,
     SolverSectionContentRule,
+    RuntimeSectionContentRule,
     MutationsBlockRule,
     UsingPathRule,
     ClassMutationRule,
@@ -16,9 +17,11 @@ import {
     MutationBlockRule,
     ArchiveBlockRule,
     AlgorithmParametersBlockRule,
-    TerminationBlockRule
+    TerminationBlockRule,
+    RuntimeTimeoutBlockRule,
+    RuntimeResourcesBlockRule
 } from "../grammar/mdeoRules.js";
-import { SearchSection, SolverSection } from "../grammar/mdeoTypes.js";
+import { SearchSection, SolverSection, RuntimeSection } from "../grammar/mdeoTypes.js";
 
 /**
  * The unique name for the MDEO contribution plugin.
@@ -46,6 +49,7 @@ function createMdeoGrammar(): SerializedGrammar {
         rules: [
             SearchSectionContentRule,
             SolverSectionContentRule,
+            RuntimeSectionContentRule,
             MutationsBlockRule,
             UsingPathRule,
             ClassMutationRule,
@@ -58,7 +62,9 @@ function createMdeoGrammar(): SerializedGrammar {
             MutationBlockRule,
             ArchiveBlockRule,
             AlgorithmParametersBlockRule,
-            TerminationBlockRule
+            TerminationBlockRule,
+            RuntimeTimeoutBlockRule,
+            RuntimeResourcesBlockRule
         ],
         additionalTerminals: []
     });
@@ -89,6 +95,11 @@ export function createMdeoContributionPlugin(): ConfigContributionPlugin {
                 ruleName: SolverSectionContentRule.name,
                 interfaceName: SolverSection.name,
                 executable: true
+            },
+            {
+                name: "runtime",
+                ruleName: RuntimeSectionContentRule.name,
+                interfaceName: RuntimeSection.name
             }
         ],
         dependencies: ["config-optimization"],

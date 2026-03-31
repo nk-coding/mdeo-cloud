@@ -6,22 +6,23 @@ import com.mdeo.execution.common.config.ExecutionServiceConfig
 
 /**
  * Application configuration for the model transformation execution service.
- * Extends the base execution config with transformation-specific settings.
+ * Extends the base execution config with transformation-specific timeout settings.
  *
  * @property serverPort The port number on which the server will listen
  * @property database Database connection configuration
  * @property backendApiUrl Base URL for the backend API
  * @property jwtIssuer JWT issuer identifier
- * @property executionTimeoutMs Timeout for execution in milliseconds
+ * @property executionTimeoutMs Timeout for transformation execution in milliseconds
  */
 data class AppConfig(
     override val serverPort: Int,
     override val database: DatabaseConfig,
     override val backendApiUrl: String,
     override val jwtIssuer: String,
-    override val executionTimeoutMs: Long
+    val executionTimeoutMs: Long
 ) : ExecutionServiceConfig {
     companion object {
+        private const val DEFAULT_EXECUTION_TIMEOUT_MS = 30000L
 
         /**
          * Loads configuration from environment variables with fallback defaults.
@@ -36,7 +37,8 @@ data class AppConfig(
                 database = baseConfig.database,
                 backendApiUrl = baseConfig.backendApiUrl,
                 jwtIssuer = baseConfig.jwtIssuer,
-                executionTimeoutMs = baseConfig.executionTimeoutMs
+                executionTimeoutMs = System.getenv("EXECUTION_TIMEOUT_MS")?.toLongOrNull()
+                    ?: DEFAULT_EXECUTION_TIMEOUT_MS
             )
         }
     }

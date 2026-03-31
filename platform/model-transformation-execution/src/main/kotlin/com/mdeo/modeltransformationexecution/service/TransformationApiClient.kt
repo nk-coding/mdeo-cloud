@@ -42,7 +42,7 @@ class TransformationApiClient(baseUrl: String) : BackendApiClient(
         jwtToken: String
     ): TypedAst? {
         return try {
-            logger.debug("Fetching typed AST for transformation $filePath")
+            logger.info("Fetching typed AST for transformation $filePath")
             
             val response = client.get("$baseUrl/projects/$projectId/file-data/typed-ast") {
                 parameter("path", filePath)
@@ -77,7 +77,7 @@ class TransformationApiClient(baseUrl: String) : BackendApiClient(
         jwtToken: String
     ): ModelData? {
         return try {
-            logger.debug("Fetching model data for $filePath")
+            logger.info("Fetching model data for $filePath")
             
             val response = client.get("$baseUrl/projects/$projectId/file-data/model-data") {
                 parameter("path", filePath)
@@ -112,7 +112,7 @@ class TransformationApiClient(baseUrl: String) : BackendApiClient(
         jwtToken: String
     ): MetamodelData? {
         return try {
-            logger.debug("Fetching metamodel data for $filePath")
+            logger.info("Fetching metamodel data for $filePath")
             
             val response = client.get("$baseUrl/projects/$projectId/file-data/metamodel") {
                 parameter("path", filePath)

@@ -84,7 +84,15 @@ const configMdeoServicePlugin: ServicePluginDefinition = {
                 "parameters",
                 "termination",
                 "batches",
-                "scriptTimeout"
+                "runtime",
+                "timeout",
+                "script",
+                "transformation",
+                "backend",
+                "resources",
+                "threads",
+                "nodes",
+                "threadsPerNode"
             ],
             serverContributionPlugins: [createMdeoContributionPlugin()]
         }

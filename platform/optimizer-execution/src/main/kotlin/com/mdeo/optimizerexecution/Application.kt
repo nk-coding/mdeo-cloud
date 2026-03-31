@@ -9,6 +9,7 @@ import com.mdeo.optimizerexecution.config.AppConfig
 import com.mdeo.optimizerexecution.database.OptimizerTables
 import com.mdeo.optimizerexecution.routes.optimizerRoutes
 import com.mdeo.optimizerexecution.routes.workerRoutes
+import com.mdeo.optimizerexecution.service.OrchestratorRegistry
 import com.mdeo.optimizerexecution.service.OptimizerApiClient
 import com.mdeo.optimizerexecution.service.OptimizerExecutionService
 import com.mdeo.optimizerexecution.worker.WorkerService
@@ -37,8 +38,9 @@ fun Application.module(appConfig: AppConfig) {
     OptimizerTables.createTables()
 
     val apiClient = OptimizerApiClient(appConfig.backendApiUrl)
-    val executionService = OptimizerExecutionService(apiClient, appConfig.executionTimeoutMs, this, appConfig)
-    val workerService = WorkerService(appConfig.workerThreads)
+    val orchestratorRegistry = OrchestratorRegistry()
+    val executionService = OptimizerExecutionService(apiClient, this, appConfig, orchestratorRegistry)
+    val workerService = WorkerService(appConfig.workerThreads, appConfig.scriptTimeoutMs, appConfig.transformationTimeoutMs, appConfig.serverPort)
 
     monitor.subscribe(ApplicationStopped) {
         runBlocking { workerService.close() }
@@ -58,7 +60,7 @@ fun Application.module(appConfig: AppConfig) {
     routing {
         healthRoutes { databaseFactory.checkConnection() }
         optimizerRoutes(executionService)
-        workerRoutes(workerService)
+        workerRoutes(workerService, orchestratorRegistry)
     }
 
     logger.info("Optimizer execution service started on port ${appConfig.serverPort}")

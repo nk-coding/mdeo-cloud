@@ -49,7 +49,6 @@ class TypedAstDependencyResolver(
             }
             
             visited.add(currentPath)
-            logger.debug("Fetching typed-ast for: $currentPath")
             
             val typedAst = backendApiService.getTypedAst(projectId, currentPath, jwtToken)
             if (typedAst == null) {
@@ -62,7 +61,7 @@ class TypedAstDependencyResolver(
             val dependencies = typedAst.imports.map { it.uri }.distinct()
             
             if (dependencies.isNotEmpty()) {
-                logger.debug("Found ${dependencies.size} dependencies for $currentPath: $dependencies")
+                logger.info("Found ${dependencies.size} dependencies for $currentPath: $dependencies")
             }
             
             for (depUri in dependencies) {

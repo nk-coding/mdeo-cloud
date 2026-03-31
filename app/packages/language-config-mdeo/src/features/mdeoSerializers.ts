@@ -18,6 +18,9 @@ import {
     ArchiveBlock,
     AlgorithmParameters,
     TerminationBlock,
+    RuntimeSection,
+    RuntimeTimeoutBlock,
+    RuntimeResourcesBlock,
     type SearchSectionType,
     type SolverSectionType,
     type MutationsBlockType,
@@ -30,7 +33,10 @@ import {
     type MutationBlockType,
     type ArchiveBlockType,
     type AlgorithmParametersType,
-    type TerminationBlockType
+    type TerminationBlockType,
+    type RuntimeSectionType,
+    type RuntimeTimeoutBlockType,
+    type RuntimeResourcesBlockType
 } from "../grammar/mdeoTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -58,6 +64,9 @@ export function registerMdeoSerializers(services: LangiumCoreServices & AstSeria
     AstSerializer.registerNodeSerializer(MutationStepFixed, () => "fixed");
     AstSerializer.registerNodeSerializer(MutationStepFixedN, (ctx) => printMutationStepFixedN(ctx));
     AstSerializer.registerNodeSerializer(MutationStepInterval, (ctx) => printMutationStepInterval(ctx));
+    AstSerializer.registerNodeSerializer(RuntimeSection, (ctx) => printRuntimeSection(ctx));
+    AstSerializer.registerNodeSerializer(RuntimeTimeoutBlock, (ctx) => printRuntimeTimeoutBlock(ctx));
+    AstSerializer.registerNodeSerializer(RuntimeResourcesBlock, (ctx) => printRuntimeResourcesBlock(ctx));
 }
 
 /**
@@ -105,9 +114,6 @@ function printSolverSection(context: PrintContext<SolverSectionType>): Doc {
     }
     if (ctx.batches.length > 0) {
         contentDocs.push(["batches = ", printPrimitive({ value: ctx.batches[0] }, INT)]);
-    }
-    if (ctx.scriptTimeout.length > 0) {
-        contentDocs.push(["scriptTimeout = ", printPrimitive({ value: ctx.scriptTimeout[0] }, INT)]);
     }
 
     if (contentDocs.length > 0) {
@@ -320,4 +326,91 @@ function printEdgeMutation(context: PrintContext<EdgeMutationType>): Doc {
         ".",
         path.call((ref) => printReference(ref, ID), "edge")
     ];
+}
+
+/**
+ * Prints a runtime section content.
+ *
+ * @param context The print context
+ * @returns The formatted runtime section content
+ */
+function printRuntimeSection(context: PrintContext<RuntimeSectionType>): Doc {
+    const { ctx, path, print } = context;
+    const docs: Doc[] = [];
+    docs.push("{");
+
+    const contentDocs: Doc[] = [];
+    if (ctx.timeout.length > 0) {
+        contentDocs.push(path.call(print, "timeout", 0));
+    }
+    if (ctx.backend.length > 0) {
+        contentDocs.push(["backend = ", ctx.backend[0]]);
+    }
+    if (ctx.resources.length > 0) {
+        contentDocs.push(path.call(print, "resources", 0));
+    }
+
+    if (contentDocs.length > 0) {
+        docs.push(indent([hardline, doc.builders.join(hardline, contentDocs)]));
+        docs.push(hardline);
+    }
+    docs.push("}");
+    return group(docs);
+}
+
+/**
+ * Prints a runtime timeout block.
+ *
+ * @param context The print context
+ * @returns The formatted timeout block
+ */
+function printRuntimeTimeoutBlock(context: PrintContext<RuntimeTimeoutBlockType>): Doc {
+    const { ctx, printPrimitive } = context;
+    const docs: Doc[] = [];
+    docs.push("timeout {");
+
+    const contentDocs: Doc[] = [];
+    if (ctx.script.length > 0) {
+        contentDocs.push(["script = ", printPrimitive({ value: ctx.script[0] }, INT)]);
+    }
+    if (ctx.transformation.length > 0) {
+        contentDocs.push(["transformation = ", printPrimitive({ value: ctx.transformation[0] }, INT)]);
+    }
+
+    if (contentDocs.length > 0) {
+        docs.push(indent([hardline, doc.builders.join(hardline, contentDocs)]));
+        docs.push(hardline);
+    }
+    docs.push("}");
+    return group(docs);
+}
+
+/**
+ * Prints a runtime resources block.
+ *
+ * @param context The print context
+ * @returns The formatted resources block
+ */
+function printRuntimeResourcesBlock(context: PrintContext<RuntimeResourcesBlockType>): Doc {
+    const { ctx, printPrimitive } = context;
+    const docs: Doc[] = [];
+    docs.push("resources {");
+
+    const contentDocs: Doc[] = [];
+    if (ctx.threads.length > 0) {
+        contentDocs.push(["threads = ", printPrimitive({ value: ctx.threads[0] }, INT)]);
+    }
+    if (ctx.nodes.length > 0) {
+        contentDocs.push(["nodes = ", printPrimitive({ value: ctx.nodes[0] }, INT)]);
+    }
+    if (ctx.threadsPerNode.length > 0) {
+        contentDocs.push(["threadsPerNode = ", printPrimitive({ value: ctx.threadsPerNode[0] }, INT)]);
+    }
+
+    if (contentDocs.length > 0) {
+        docs.push(indent([hardline, doc.builders.join(hardline, contentDocs)]));
+        docs.push(hardline);
+    }
+    docs.push("}");
+    return group(docs);
 }

@@ -2,6 +2,7 @@ package com.mdeo.optimizerexecution.worker
 
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.optimizer.worker.*
+import com.mdeo.optimizerexecution.service.OrchestratorRegistry
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -25,36 +26,53 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Client that communicates with a single worker node in a multi-node optimization setup.
  *
- * **Initial allocation** uses an HTTP POST to transfer the full metamodel, model, and
- * compiled ASTs to the worker (the payload is too large for a WebSocket frame and must
- * be delivered reliably before any ongoing traffic begins).  Once allocation succeeds
- * the client establishes a persistent binary-CBOR WebSocket connection and uses it for
- * all subsequent requests: per-node work batches (imports + mutations + discards) and solution data retrieval.
+ * **WebSocket mode** (default): After HTTP allocation, the worker's subprocess opens a
+ * WebSocket connection back to the orchestrator. This client registers with the
+ * [OrchestratorRegistry] and waits for the subprocess to connect. All ongoing traffic
+ * (work batches, solution fetches) flows over this reverse-connected session.
  *
- * The WebSocket reading loop is launched as a child coroutine of [scope].  When that
- * scope is cancelled (e.g. because the execution finished or was aborted), the loop
- * terminates automatically and the connection is closed cleanly.  Any unexpected
- * disconnect fails all in-flight requests immediately; callers are expected to handle
- * the resulting exceptions.
+ * **Local-channel mode** ([useLocalChannel] = `true`): The subprocess uses the subprocess
+ * stdin/stdout pipe for orchestrator communication instead of a WebSocket. In this mode
+ * the client does not register with the [OrchestratorRegistry] and instead opens a
+ * WebSocket directly to the worker's legacy `/ws/worker/executions/{id}` endpoint so that
+ * [WorkerService] can act as the forwarder between the session and the subprocess channel.
+ * This eliminates the extra network connection for the local node in federated setups.
+ *
+ * **Legacy mode**: When no [OrchestratorRegistry] is provided and [useLocalChannel] is
+ * `false`, the client opens a WebSocket connection to the worker (the old approach) after
+ * HTTP allocation.
+ *
+ * In all modes, the WebSocket reading loop is launched as a child coroutine of [scope].
+ * When that scope is cancelled, the loop terminates and the connection is closed cleanly.
  *
  * @param nodeId Unique identifier for the worker node (used as a key in solution refs).
  * @param baseUrl Base URL of the worker node (e.g. `http://worker-1:8080`).
  * @param scope Coroutine scope that owns the background WebSocket reading loop.
+ * @param orchestratorRegistry Optional registry for reverse-connected subprocess WebSockets.
+ * @param orchestratorWsBaseUrl The base WS URL that subprocesses should connect back to
+ *        (e.g. `ws://orchestrator-host:8080`). Required when [orchestratorRegistry] is set.
+ * @param useLocalChannel When `true`, the subprocess communicates with the orchestrator
+ *        via the subprocess stdio pipe rather than a WebSocket. The client opens a WS to
+ *        the worker's legacy endpoint so [WorkerService] acts as forwarder. This is more
+ *        efficient for the local node in a federated setup.
  */
 @OptIn(ExperimentalSerializationApi::class)
 class WorkerClient(
     val nodeId: String,
     val baseUrl: String,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val orchestratorRegistry: OrchestratorRegistry? = null,
+    private val orchestratorWsBaseUrl: String? = null,
+    private val useLocalChannel: Boolean = false
 ) : AutoCloseable {
 
     private companion object {
         /**
-         * Max time to wait for the initial WS handshake to complete. 
+         * Max time to wait for the subprocess to connect back via the registry.
          */
         const val SESSION_READY_TIMEOUT_MS = 30_000L
         /**
-         * Default timeout for a full request/response cycle over the WS. 
+         * Default timeout for a full request/response cycle over the WS.
          */
         const val OPERATION_TIMEOUT_MS = 600_000L
     }
@@ -72,7 +90,7 @@ class WorkerClient(
     private val cbor = Cbor { ignoreUnknownKeys = true }
 
     /**
-     * Pending request correlation: requestId → deferred result. 
+     * Pending request correlation: requestId → deferred result.
      */
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<WorkerWsMessage>>()
 
@@ -82,17 +100,29 @@ class WorkerClient(
     private val pendingMultiRequests = ConcurrentHashMap<String, MultiResponseCollector>()
 
     /**
-     * Resolved once when the initial WebSocket handshake completes. 
+     * The active WebSocket session (resolved once the connection is established).
+     *
+     * In registry mode this is a [DefaultWebSocketSession] from the server side;
+     * in legacy mode it is a [DefaultClientWebSocketSession].
      */
-    private val wsSessionDeferred = CompletableDeferred<DefaultClientWebSocketSession>()
+    private val wsSessionDeferred = CompletableDeferred<DefaultWebSocketSession>()
 
     /**
-     * Background job running the WebSocket read loop. 
+     * Background job running the WebSocket read loop.
      */
     private var wsJob: Job? = null
 
     /**
-     * `ws://` / `wss://` equivalent of [baseUrl]. 
+     * Whether the WebSocket connection to the worker is still active.
+     *
+     * Returns `false` after the WS session closes (e.g. subprocess crash or timeout).
+     * Used by the evaluator to distinguish transient evaluation failures from
+     * permanent worker death.
+     */
+    val isAlive: Boolean get() = wsJob?.isActive ?: false
+
+    /**
+     * `ws://` / `wss://` equivalent of [baseUrl].
      */
     private val wsBaseUrl = when {
         baseUrl.startsWith("https://") -> baseUrl.replace("https://", "wss://")
@@ -105,34 +135,101 @@ class WorkerClient(
     /**
      * Allocates resources on the worker for a new optimization execution.
      *
-     * Sends the metamodel, initial model, transformation/script ASTs, and configuration
-     * to the worker over HTTP.  After a successful response the client opens a persistent
-     * WebSocket connection that is used for all subsequent operations.
+     * In **registry mode** ([orchestratorRegistry] set and [useLocalChannel] = `false`): the
+     * orchestrator WS URL is passed in the HTTP request so the worker can forward it to its
+     * subprocess. After the HTTP response, the client registers with the [OrchestratorRegistry]
+     * and waits for the subprocess to connect back, then starts the WS read loop on that session.
+     *
+     * In **local-channel mode** ([useLocalChannel] = `true`): the allocation request carries
+     * `useLocalChannel = true` instead of an orchestratorWsUrl, signalling the subprocess to
+     * use the stdio pipe. After the HTTP response, the client opens a WebSocket to the worker's
+     * legacy endpoint so [WorkerService] can act as the forwarder.
+     *
+     * In **legacy mode**: behaves as before — opens a WS connection to the worker.
      *
      * @param request The allocation request containing all resources and configuration.
      * @return The allocation response with initial solution fitness data.
      */
     suspend fun allocate(request: WorkerAllocationRequest): WorkerAllocationResponse {
-        val response = httpClient.post("$baseUrl/api/worker/executions") {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body<WorkerAllocationResponse>()
+        return if (useLocalChannel) {
+            // Local-channel: tell the subprocess to use stdio; we connect to the legacy WS endpoint.
+            val response = httpClient.post("$baseUrl/api/worker/executions") {
+                contentType(ContentType.Application.Json)
+                setBody(request.copy(useLocalChannel = true, orchestratorWsUrl = null))
+            }.body<WorkerAllocationResponse>()
+            startWsSession(request.executionId)
+            response
+        } else {
+            allocateRegistry(request)
+        }
+    }
 
-        startWsSession(request.executionId)
+    /**
+     * Registry-mode (or legacy) allocation: the orchestrator WS URL is embedded in the
+     * HTTP request for subprocess reverse-connection, or omitted for legacy mode.
+     */
+    private suspend fun allocateRegistry(request: WorkerAllocationRequest): WorkerAllocationResponse {
+        val registryKey = orchestratorRegistry?.let { OrchestratorRegistry.key(request.executionId, nodeId) }
+
+        val orchestratorWsUrl = if (orchestratorRegistry != null && orchestratorWsBaseUrl != null) {
+            "$orchestratorWsBaseUrl/ws/subprocess/executions/${request.executionId}/$nodeId"
+        } else null
+
+        // Register the slot BEFORE sending the HTTP request. The subprocess starts its
+        // WebSocket connect-back thread during handleSetup(), which can complete before
+        // the HTTP response even reaches this client. If we registered after the POST,
+        // the subprocess would arrive to "No pending registration" and the orchestrator
+        // would then wait 30 s for a connection that already came and went.
+        val wsDeferred = if (orchestratorRegistry != null && registryKey != null) {
+            logger.info(
+                "Registering subprocess WS slot for node {} execution {} (key={})",
+                nodeId, request.executionId, registryKey
+            )
+            orchestratorRegistry.register(registryKey)
+        } else null
+
+        val response = try {
+            httpClient.post("$baseUrl/api/worker/executions") {
+                contentType(ContentType.Application.Json)
+                setBody(request.copy(orchestratorWsUrl = orchestratorWsUrl))
+            }.body<WorkerAllocationResponse>()
+        } catch (e: Exception) {
+            if (registryKey != null) orchestratorRegistry?.remove(registryKey)
+            throw e
+        }
+
+        if (wsDeferred != null && registryKey != null) {
+            try {
+                logger.info(
+                    "Waiting up to {}ms for subprocess WS connect-back (node {} execution {})",
+                    SESSION_READY_TIMEOUT_MS, nodeId, request.executionId
+                )
+                val session = withTimeout(SESSION_READY_TIMEOUT_MS) { wsDeferred.await() }
+                logger.info("Subprocess WS session established for node {} execution {}", nodeId, request.executionId)
+                startRegistryWsReadLoop(request.executionId, session)
+            } catch (e: Exception) {
+                orchestratorRegistry?.remove(registryKey)
+                throw e
+            }
+        } else {
+            startWsSession(request.executionId)
+        }
+
         return response
     }
 
     /**
      * Sends a unified work batch to the worker: solution imports (rebalancing), mutation tasks,
-     * and solution discards, all in a single [NodeWorkBatchRequest] message.
+     * evaluation-only tasks, and solution discards, all in a single [NodeWorkBatchRequest] message.
      *
-     * The worker processes the three phases atomically — imports first, then mutations, then discards —
-     * and returns a [NodeWorkBatchResponse] with evaluation results for each task.
+     * The worker processes the phases atomically — imports first, then mutations, then evaluations,
+     * then discards — and returns a [NodeWorkBatchResponse] with evaluation results for each task.
      *
      * @param executionId The execution identifier on the worker (used for logging/tracing only; the
      *        WebSocket session is already scoped to this execution).
      * @param imports Solutions to import onto this worker (inline model data from the orchestrator).
      * @param tasks Mutation tasks referencing existing (or just-imported) solutions.
+     * @param evaluationTasks Evaluation-only tasks for solutions that need fitness computation without mutation.
      * @param discards Solution IDs to discard after processing the batch.
      * @return The batch response with evaluation results for each task.
      */
@@ -140,10 +237,17 @@ class WorkerClient(
         executionId: String,
         imports: List<SolutionTransferItem>,
         tasks: List<BatchTask>,
+        evaluationTasks: List<BatchEvaluationTask> = emptyList(),
         discards: List<String>
     ): NodeWorkBatchResponse {
         val requestId = newRequestId()
-        return sendAndReceive(NodeWorkBatchRequest(requestId, imports, tasks, discards)) as NodeWorkBatchResponse
+        if (imports.isNotEmpty()) {
+            logger.info(
+                "[node={}] Sending NodeWorkBatch with {} model import(s), {} task(s), {} eval task(s), {} discard(s) (execution {})",
+                nodeId, imports.size, tasks.size, evaluationTasks.size, discards.size, executionId
+            )
+        }
+        return sendAndReceive(NodeWorkBatchRequest(requestId, imports, tasks, evaluationTasks, discards)) as NodeWorkBatchResponse
     }
 
     /**
@@ -154,6 +258,7 @@ class WorkerClient(
      * @return The serialized model for the solution.
      */
     suspend fun getSolutionData(executionId: String, solutionId: String): SerializedModel {
+        logger.info("[node={}] Fetching model for solution {} (execution {})", nodeId, solutionId, executionId)
         val requestId = newRequestId()
         val response = sendAndReceive(SolutionFetchRequest(requestId, solutionId)) as SolutionFetchResponse
         return response.serializedModel
@@ -174,6 +279,10 @@ class WorkerClient(
         solutionIds: List<String>
     ): Map<String, SerializedModel> {
         if (solutionIds.isEmpty()) return emptyMap()
+        logger.info(
+            "[node={}] Fetching models for {} solution(s) in batch (execution {})",
+            nodeId, solutionIds.size, executionId
+        )
         val requestId = newRequestId()
         val responses = sendAndReceiveMultiple(
             SolutionBatchFetchRequest(requestId, solutionIds),
@@ -184,17 +293,31 @@ class WorkerClient(
             .associate { it.solutionId to it.serializedModel }
     }
 
+    /**
+     * Fetches metadata describing the worker node's thread capacity and supported algorithm backends.
+     *
+     * Performs an HTTP GET to `GET /api/worker/metadata` on this node. Useful for orchestrators
+     * that need to know actual worker capabilities before committing thread budgets.
+     *
+     * @return The [WorkerMetadata] reported by the remote worker.
+     */
+    suspend fun getMetadata(): WorkerMetadata {
+        return httpClient.get("$baseUrl/api/worker/metadata").body<WorkerMetadata>()
+    }
+
 
     /**
      * Cleans up the execution on the worker and closes the WebSocket connection.
      *
      * An HTTP DELETE is sent first so the worker can release its local state.
-     * The background WebSocket job is then cancelled.
+     * The background WebSocket job is then cancelled and any registry entry removed.
      *
      * @param executionId The execution identifier to clean up.
      */
     suspend fun cleanup(executionId: String) {
         httpClient.delete("$baseUrl/api/worker/executions/$executionId")
+        val registryKey = OrchestratorRegistry.key(executionId, nodeId)
+        orchestratorRegistry?.remove(registryKey)
         wsJob?.cancel()
         wsJob = null
     }
@@ -212,9 +335,7 @@ class WorkerClient(
     /**
      * Launches the background coroutine that establishes the WebSocket connection to the worker.
      *
-     * The session deferred is resolved once on successful handshake, unblocking [sendAndReceive]
-     * callers. On any disconnect or error, all in-flight requests are failed immediately and
-     * the deferred is completed exceptionally so that subsequent callers also fail fast.
+     * Used in legacy mode where the orchestrator opens the connection to the worker.
      *
      * @param executionId The execution to connect to (`/ws/worker/executions/{id}`).
      */
@@ -236,12 +357,49 @@ class WorkerClient(
                         }
                     }
                     logger.info("Worker WS disconnected from {} (execution {})", baseUrl, executionId)
+                    drainPendingRequests(IllegalStateException("WS session closed (node $nodeId, execution $executionId)"))
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 logger.warn("Worker WS to {} failed for execution {}: {}", baseUrl, executionId, e.message)
                 if (!wsSessionDeferred.isCompleted) wsSessionDeferred.completeExceptionally(e)
+                drainPendingRequests(e)
+            }
+        }
+    }
+
+    /**
+     * Starts the WS read loop on a server-side session obtained via [OrchestratorRegistry].
+     *
+     * Unlike [startWsSession] this does not establish a new connection — the session was
+     * already opened by the subprocess connecting back to the orchestrator.
+     *
+     * @param executionId The execution identifier for logging.
+     * @param session The WebSocket session to read from.
+     */
+    private fun startRegistryWsReadLoop(executionId: String, session: DefaultWebSocketSession) {
+        wsSessionDeferred.complete(session)
+        wsJob = scope.launch {
+            try {
+                logger.info("Subprocess WS connected for node {} (execution {})", nodeId, executionId)
+                for (frame in session.incoming) {
+                    if (frame !is Frame.Binary) continue
+                    val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
+                    val multi = pendingMultiRequests[msg.requestId]
+                    if (multi != null) {
+                        multi.add(msg)
+                        if (multi.deferred.isCompleted) pendingMultiRequests.remove(msg.requestId)
+                    } else {
+                        pendingRequests.remove(msg.requestId)?.complete(msg)
+                    }
+                }
+                logger.info("Subprocess WS disconnected for node {} (execution {})", nodeId, executionId)
+                drainPendingRequests(IllegalStateException("WS session closed (node $nodeId, execution $executionId)"))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warn("Subprocess WS read loop failed for node {} (execution {}): {}", nodeId, executionId, e.message)
                 drainPendingRequests(e)
             }
         }
@@ -295,14 +453,29 @@ class WorkerClient(
     }
 
     /**
-     * Completes all pending request deferreds exceptionally and clears the map. 
+     * Completes all pending request deferreds exceptionally and clears the map.
+     *
+     * Called both on error paths and on normal WS close so that callers never
+     * wait for the full [OPERATION_TIMEOUT_MS] when the connection has already dropped.
      */
     private fun drainPendingRequests(cause: Exception) {
         val keys = pendingRequests.keys.toList()
+        if (keys.isNotEmpty()) {
+            logger.warn(
+                "[node={}] Draining {} pending request(s) due to WS close: {}",
+                nodeId, keys.size, cause.message
+            )
+        }
         for (key in keys) {
             pendingRequests.remove(key)?.completeExceptionally(cause)
         }
         val multiKeys = pendingMultiRequests.keys.toList()
+        if (multiKeys.isNotEmpty()) {
+            logger.warn(
+                "[node={}] Draining {} pending multi-request(s) due to WS close: {}",
+                nodeId, multiKeys.size, cause.message
+            )
+        }
         for (key in multiKeys) {
             pendingMultiRequests.remove(key)?.deferred?.completeExceptionally(cause)
         }

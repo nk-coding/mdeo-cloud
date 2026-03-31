@@ -1,11 +1,10 @@
-import type { RenderingContext } from "@eclipse-glsp/sprotty";
+import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import type { GNode } from "@mdeo/editor-shared";
 import { sharedImport, GSimpleNodeView } from "@mdeo/editor-shared";
 import type { GAssociationPropertyNode } from "../model/associationPropertyNode.js";
 
 const { injectable } = sharedImport("inversify");
-const { selectFeature } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
  * View for rendering association property nodes.
@@ -14,9 +13,10 @@ const { selectFeature } = sharedImport("@eclipse-glsp/sprotty");
 export class GAssociationPropertyNodeView extends GSimpleNodeView {
     protected override renderNodeContent(
         model: Readonly<GAssociationPropertyNode>,
-        context: RenderingContext
+        context: RenderingContext,
+        children: readonly GModelElement[]
     ): VNode[] {
-        return context.renderChildren(model, { [selectFeature]: false });
+        return children.map((child) => context.renderElement(child)).filter((v): v is VNode => v !== undefined);
     }
 
     protected override getClasses(_model: Readonly<GNode>): Record<string, boolean> {

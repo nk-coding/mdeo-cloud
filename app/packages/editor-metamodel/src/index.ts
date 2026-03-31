@@ -3,7 +3,7 @@ export * from "./features/icon-registry/metamodelIconRegistry.js";
 export * from "./features/toolbox/createEdgeContextProvider.js";
 export * from "./features/toolbox/edgeCreationType.js";
 export * from "./features/toolbox/edgeTypeExtensionView.js";
-export * from "./features/toolbox/edgeTypeIcons.js";
+export * from "./features/icon-registry/customIcons.js";
 export * from "./features/toolbox/featureModule.js";
 export * from "./features/toolbox/metamodelToolbox.js";
 export * from "./model/associationEdge.js";

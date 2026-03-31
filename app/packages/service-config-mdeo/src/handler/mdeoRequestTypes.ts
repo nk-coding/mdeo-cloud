@@ -89,19 +89,46 @@ export interface SolverSectionData {
     parameters?: AlgorithmParametersData;
     termination?: TerminationBlockData;
     batches?: number;
-    /**
-     * Per-evaluation timeout for constraint and objective scripts, in seconds.
-     * Same unit as `termination.time`. Optional; defaults to 30 s on the backend.
-     */
-    scriptTimeout?: number;
+}
+
+/**
+ * Timeout configuration block inside the runtime section.
+ * Maps to Kotlin RuntimeConfig.TimeoutConfig.
+ * Values are in seconds.
+ */
+export interface RuntimeTimeoutData {
+    script?: number;
+    transformation?: number;
+}
+
+/**
+ * Resource constraints block inside the runtime section.
+ * Maps to Kotlin RuntimeConfig.ResourcesConfig.
+ * All values are upper bounds; absent means unbound.
+ */
+export interface RuntimeResourcesData {
+    threads?: number;
+    nodes?: number;
+    threadsPerNode?: number;
+}
+
+/**
+ * Runtime section data.
+ * Maps to Kotlin RuntimeConfig.
+ */
+export interface RuntimeSectionData {
+    timeout?: RuntimeTimeoutData;
+    backend?: "MDEO" | "Tinker";
+    resources?: RuntimeResourcesData;
 }
 
 /**
  * Combined response from the MDEO request handler.
- * Keys match Kotlin SearchConfig / SolverConfig directly so no conversion
+ * Keys match Kotlin config classes directly so no conversion
  * is needed in the execution handler.
  */
 export interface MdeoRequestResponse {
     search?: SearchSectionData;
     solver?: SolverSectionData;
+    runtime?: RuntimeSectionData;
 }

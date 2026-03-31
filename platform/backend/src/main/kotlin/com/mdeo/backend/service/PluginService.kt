@@ -553,7 +553,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 
                 logger.info("Successfully initialized default plugin: ${manifest.name}")
             } else {
-                logger.debug("Plugin already exists: $normalizedUrl")
+                logger.info("Plugin already exists: $normalizedUrl")
             }
         }
     }

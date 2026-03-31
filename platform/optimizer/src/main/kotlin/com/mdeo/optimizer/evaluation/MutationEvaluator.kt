@@ -6,20 +6,23 @@ import com.mdeo.metamodel.SerializedModel
  * Work to be executed on a single worker node in one generation.
  *
  * Combines imports (solutions arriving from other nodes due to rebalancing),
- * mutation tasks, and discards into a single per-node request so that the
- * orchestrator can communicate with every worker using exactly one message
+ * mutation tasks, evaluation-only tasks, and discards into a single per-node request
+ * so that the orchestrator can communicate with every worker using exactly one message
  * per generation.
  *
  * @param nodeId The worker node that should process this batch.
  * @param imports Solutions being transferred to this node from other nodes;
  *   the orchestrator pre-fetches their serialized models and embeds them inline.
  * @param tasks Parent solutions on this node to mutate and evaluate.
+ * @param evaluationTasks Solutions on this node to evaluate without mutation
+ *   (e.g. newly initialized solutions that only need fitness computation).
  * @param discards Solution IDs on this node to drop after evaluation.
  */
 data class NodeBatch(
     val nodeId: String,
     val imports: List<SolutionImportData>,
     val tasks: List<MutationTask>,
+    val evaluationTasks: List<EvaluationTask> = emptyList(),
     val discards: List<String>
 )
 

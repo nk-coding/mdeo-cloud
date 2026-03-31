@@ -14,7 +14,10 @@ import {
     type MutationsBlockType,
     type UsingPathType,
     type MutationBlockType,
-    type ArchiveBlockType
+    type ArchiveBlockType,
+    type RuntimeSectionType,
+    type RuntimeTimeoutBlockType,
+    type RuntimeResourcesBlockType
 } from "../grammar/mdeoTypes.js";
 import { ModelTransformation, type ModelTransformationType } from "@mdeo/language-model-transformation";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
@@ -54,6 +57,7 @@ const PESA2_PAES_ALGORITHMS = new Set(["PESA2", "PAES"]);
 interface MdeoAstTypes {
     ConfigMdeoSearchSection: SearchSectionType;
     ConfigMdeoSolverSection: SolverSectionType;
+    ConfigMdeoRuntimeSection: RuntimeSectionType;
 }
 
 /**
@@ -69,7 +73,8 @@ export function registerMdeoValidationChecks(
 
     const checks: ValidationChecks<MdeoAstTypes> = {
         ConfigMdeoSearchSection: validator.validateSearchSection.bind(validator),
-        ConfigMdeoSolverSection: validator.validateSolverSection.bind(validator)
+        ConfigMdeoSolverSection: validator.validateSolverSection.bind(validator),
+        ConfigMdeoRuntimeSection: validator.validateRuntimeSection.bind(validator)
     };
 
     registry.register(checks, validator);
@@ -274,6 +279,95 @@ export class MdeoValidator {
         this.validateAlgorithm(solver, accept);
         this.validateParameters(solver, accept);
         this.validateTermination(solver, accept);
+    }
+
+    /**
+     * Validates a runtime section.
+     * Checks for duplicate blocks and validates timeout / resources values.
+     *
+     * @param runtime The runtime section node to validate
+     * @param accept The validation acceptor for reporting diagnostics
+     */
+    validateRuntimeSection(runtime: RuntimeSectionType, accept: ValidationAcceptor): void {
+        this.checkNoDuplicateNodes(runtime.timeout, "timeout", accept);
+        this.checkNoDuplicateKeys(runtime, "backend", accept);
+        this.checkNoDuplicateNodes(runtime.resources, "resources", accept);
+
+        const timeout = runtime.timeout[0];
+        if (timeout != undefined) {
+            this.validateRuntimeTimeoutBlock(timeout, accept);
+        }
+        const resources = runtime.resources[0];
+        if (resources != undefined) {
+            this.validateRuntimeResourcesBlock(resources, accept);
+        }
+    }
+
+    /**
+     * Validates the timeout sub-block of the runtime section.
+     * Ensures no duplicate keys and that values are positive.
+     *
+     * @param timeout The timeout block to validate
+     * @param accept The validation acceptor
+     */
+    private validateRuntimeTimeoutBlock(timeout: RuntimeTimeoutBlockType, accept: ValidationAcceptor): void {
+        this.checkNoDuplicateKeys(timeout, "script", accept);
+        this.checkNoDuplicateKeys(timeout, "transformation", accept);
+
+        const script = timeout.script[0];
+        if (script != undefined && script <= 0) {
+            accept("error", "Script timeout must be a positive integer (in seconds).", {
+                node: timeout,
+                property: "script",
+                index: 0
+            });
+        }
+        const transformation = timeout.transformation[0];
+        if (transformation != undefined && transformation <= 0) {
+            accept("error", "Transformation timeout must be a positive integer (in seconds).", {
+                node: timeout,
+                property: "transformation",
+                index: 0
+            });
+        }
+    }
+
+    /**
+     * Validates the resources sub-block of the runtime section.
+     * Ensures no duplicate keys and that values are positive.
+     *
+     * @param resources The resources block to validate
+     * @param accept The validation acceptor
+     */
+    private validateRuntimeResourcesBlock(resources: RuntimeResourcesBlockType, accept: ValidationAcceptor): void {
+        this.checkNoDuplicateKeys(resources, "threads", accept);
+        this.checkNoDuplicateKeys(resources, "nodes", accept);
+        this.checkNoDuplicateKeys(resources, "threadsPerNode", accept);
+
+        const threads = resources.threads[0];
+        if (threads != undefined && threads <= 0) {
+            accept("error", "Thread count must be a positive integer.", {
+                node: resources,
+                property: "threads",
+                index: 0
+            });
+        }
+        const nodes = resources.nodes[0];
+        if (nodes != undefined && nodes <= 0) {
+            accept("error", "Node count must be a positive integer.", {
+                node: resources,
+                property: "nodes",
+                index: 0
+            });
+        }
+        const threadsPerNode = resources.threadsPerNode[0];
+        if (threadsPerNode != undefined && threadsPerNode <= 0) {
+            accept("error", "Threads per node must be a positive integer.", {
+                node: resources,
+                property: "threadsPerNode",
+                index: 0
+            });
+        }
     }
 
     /**

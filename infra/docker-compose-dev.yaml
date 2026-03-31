@@ -341,10 +341,11 @@ services:
       DATABASE_USER: "mdeo"
       DATABASE_PASSWORD: "mdeo"
       BACKEND_API_URL: "http://backend:8080/api"
-      EXECUTION_TIMEOUT_MS: "600000"
+      SCRIPT_TIMEOUT_MS: "1000"
+      TRANSFORMATION_TIMEOUT_MS: "1000"
       NODE_ID: "0"
-      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
-      INCLUDE_SELF: "true"
+      PEERS: "http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
+      NODE_URL: "http://optimizer-execution-0:8080"
       WORKER_THREADS: "1"
     depends_on:
       postgres-optimizer:
@@ -369,10 +370,11 @@ services:
       DATABASE_USER: "mdeo"
       DATABASE_PASSWORD: "mdeo"
       BACKEND_API_URL: "http://backend:8080/api"
-      EXECUTION_TIMEOUT_MS: "600000"
+      SCRIPT_TIMEOUT_MS: "1000"
+      TRANSFORMATION_TIMEOUT_MS: "1000"
       NODE_ID: "1"
-      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
-      INCLUDE_SELF: "true"
+      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-2:8080"
+      NODE_URL: "http://optimizer-execution-1:8080"
       WORKER_THREADS: "1"
     depends_on:
       postgres-optimizer:
@@ -397,10 +399,11 @@ services:
       DATABASE_USER: "mdeo"
       DATABASE_PASSWORD: "mdeo"
       BACKEND_API_URL: "http://backend:8080/api"
-      EXECUTION_TIMEOUT_MS: "600000"
+      SCRIPT_TIMEOUT_MS: "1000"
+      TRANSFORMATION_TIMEOUT_MS: "1000"
       NODE_ID: "2"
-      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080,http://optimizer-execution-2:8080"
-      INCLUDE_SELF: "true"
+      PEERS: "http://optimizer-execution-0:8080,http://optimizer-execution-1:8080"
+      NODE_URL: "http://optimizer-execution-2:8080"
       WORKER_THREADS: "1"
     depends_on:
       postgres-optimizer:

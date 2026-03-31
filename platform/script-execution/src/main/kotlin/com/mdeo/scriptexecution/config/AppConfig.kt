@@ -19,9 +19,11 @@ data class AppConfig(
     override val database: DatabaseConfig,
     override val backendApiUrl: String,
     override val jwtIssuer: String,
-    override val executionTimeoutMs: Long
+    val executionTimeoutMs: Long
 ) : ExecutionServiceConfig {
     companion object {
+        private const val DEFAULT_EXECUTION_TIMEOUT_MS = 30000L
+
         /**
          * Loads application configuration from environment variables with fallback defaults.
          *
@@ -35,9 +37,9 @@ data class AppConfig(
                 database = baseConfig.database,
                 backendApiUrl = baseConfig.backendApiUrl,
                 jwtIssuer = baseConfig.jwtIssuer,
-                executionTimeoutMs = baseConfig.executionTimeoutMs
+                executionTimeoutMs = System.getenv("EXECUTION_TIMEOUT_MS")?.toLongOrNull()
+                    ?: DEFAULT_EXECUTION_TIMEOUT_MS
             )
         }
     }
 }
-

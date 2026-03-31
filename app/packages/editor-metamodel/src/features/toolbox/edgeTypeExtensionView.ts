@@ -7,7 +7,7 @@ import {
     CompositionIcon,
     NavigableCompositionIcon,
     ExtendsIcon
-} from "./edgeTypeIcons.js";
+} from "../icon-registry/customIcons.js";
 import type { IconNode } from "lucide";
 import { EdgeCreationType } from "./edgeCreationType.js";
 

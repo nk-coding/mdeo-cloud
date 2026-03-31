@@ -81,7 +81,8 @@ export const mdeoExecutionRequestHandler: RequestHandler<ExecuteResponse, MdeoSe
             problem: optimizationData.problem,
             goal: optimizationData.goal,
             search: mdeoData.search,
-            solver: mdeoData.solver
+            solver: mdeoData.solver,
+            runtime: mdeoData.runtime
         }
     };
 

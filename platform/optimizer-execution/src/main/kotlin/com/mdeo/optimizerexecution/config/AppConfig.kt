@@ -14,27 +14,34 @@ import com.mdeo.execution.common.config.ExecutionServiceConfig
  * @param database JDBC database connection settings.
  * @param backendApiUrl Base URL for the platform backend API.
  * @param jwtIssuer Expected JWT issuer for authentication.
- * @param executionTimeoutMs Maximum wall-clock time for a single optimization run in milliseconds.
+ * @param scriptTimeoutMs Default per-script evaluation timeout in milliseconds.
+ * @param transformationTimeoutMs Default per-transformation execution timeout in milliseconds.
  * @param nodeId Zero-based identifier of this node in a multi-node deployment.
  * @param peers Base URLs of peer optimizer-execution instances (excluding self).
- * @param includeSelf Whether this node should also act as a local worker.
  * @param workerThreads Number of concurrent worker threads for local evaluation.
+ * @param nodeUrl The publicly reachable base URL of this node (e.g. `http://node-0:8080`).
+ *        Used as the `baseUrl` when creating a [com.mdeo.optimizerexecution.worker.WorkerClient]
+ *        for the local node so that peer nodes can contact this instance directly in
+ *        container/federated deployments where `localhost` is not routable.
  */
 data class AppConfig(
     override val serverPort: Int,
     override val database: DatabaseConfig,
     override val backendApiUrl: String,
     override val jwtIssuer: String,
-    override val executionTimeoutMs: Long,
+    val scriptTimeoutMs: Long,
+    val transformationTimeoutMs: Long,
     val nodeId: Int,
     val peers: List<String>,
-    val includeSelf: Boolean,
-    val workerThreads: Int
+    val workerThreads: Int,
+    val nodeUrl: String
 ) : ExecutionServiceConfig {
     companion object {
         private const val DEFAULT_NODE_ID = 0
-        private const val DEFAULT_INCLUDE_SELF = true
         private const val DEFAULT_WORKER_THREADS = 1
+        private const val DEFAULT_SCRIPT_TIMEOUT_MS = 1000L
+        private const val DEFAULT_TRANSFORMATION_TIMEOUT_MS = 1000L
+        private const val DEFAULT_NODE_URL = "http://localhost:8080"
 
         /**
          * Load application configuration from environment variables.
@@ -42,8 +49,10 @@ data class AppConfig(
          * Multi-node settings are read from:
          * - `NODE_ID` – integer node identifier (default [DEFAULT_NODE_ID])
          * - `PEERS` – comma-separated list of peer base URLs (default empty)
-         * - `INCLUDE_SELF` – whether this node evaluates locally (default [DEFAULT_INCLUDE_SELF])
          * - `WORKER_THREADS` – local worker thread count (default [DEFAULT_WORKER_THREADS])
+         * - `NODE_URL` – publicly reachable base URL of this node (default [DEFAULT_NODE_URL])
+         * - `SCRIPT_TIMEOUT_MS` – default per-script timeout in milliseconds
+         * - `TRANSFORMATION_TIMEOUT_MS` – default per-transformation timeout in milliseconds
          *
          * @return A fully populated [AppConfig].
          */
@@ -56,19 +65,22 @@ data class AppConfig(
                 ?.map { it.trim() }
                 ?.filter { it.isNotEmpty() }
                 ?: emptyList()
-            val includeSelf = System.getenv("INCLUDE_SELF")?.toBooleanStrictOrNull() ?: DEFAULT_INCLUDE_SELF
             val workerThreads = System.getenv("WORKER_THREADS")?.toIntOrNull() ?: DEFAULT_WORKER_THREADS
+            val nodeUrl = System.getenv("NODE_URL") ?: DEFAULT_NODE_URL
 
             return AppConfig(
                 serverPort = baseConfig.serverPort,
                 database = baseConfig.database,
                 backendApiUrl = baseConfig.backendApiUrl,
                 jwtIssuer = baseConfig.jwtIssuer,
-                executionTimeoutMs = baseConfig.executionTimeoutMs,
+                scriptTimeoutMs = System.getenv("SCRIPT_TIMEOUT_MS")?.toLongOrNull()
+                    ?: DEFAULT_SCRIPT_TIMEOUT_MS,
+                transformationTimeoutMs = System.getenv("TRANSFORMATION_TIMEOUT_MS")?.toLongOrNull()
+                    ?: DEFAULT_TRANSFORMATION_TIMEOUT_MS,
                 nodeId = nodeId,
                 peers = peers,
-                includeSelf = includeSelf,
-                workerThreads = workerThreads
+                workerThreads = workerThreads,
+                nodeUrl = nodeUrl
             )
         }
     }

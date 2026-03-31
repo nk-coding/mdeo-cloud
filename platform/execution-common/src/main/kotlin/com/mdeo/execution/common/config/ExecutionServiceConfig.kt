@@ -3,6 +3,7 @@ package com.mdeo.execution.common.config
 /**
  * Base configuration interface for execution services.
  * Defines the common configuration properties required by all execution services.
+ * Service-specific timeout settings are managed by each service individually.
  */
 interface ExecutionServiceConfig {
     /**
@@ -24,11 +25,6 @@ interface ExecutionServiceConfig {
      * JWT issuer identifier for token validation.
      */
     val jwtIssuer: String
-
-    /**
-     * Timeout for execution operations in milliseconds.
-     */
-    val executionTimeoutMs: Long
 }
 
 /**
@@ -39,14 +35,12 @@ interface ExecutionServiceConfig {
  * @property database Database connection configuration
  * @property backendApiUrl Base URL for the backend API
  * @property jwtIssuer JWT issuer identifier
- * @property executionTimeoutMs Timeout for execution in milliseconds
  */
 data class BaseExecutionConfig(
     override val serverPort: Int,
     override val database: DatabaseConfig,
     override val backendApiUrl: String,
-    override val jwtIssuer: String,
-    override val executionTimeoutMs: Long
+    override val jwtIssuer: String
 ) : ExecutionServiceConfig {
     companion object {
         /**
@@ -55,21 +49,18 @@ data class BaseExecutionConfig(
          * @param defaultPort Default port if SERVER_PORT environment variable is not set
          * @param defaultBackendUrl Default backend API URL
          * @param defaultJwtIssuer Default JWT issuer
-         * @param defaultTimeoutMs Default execution timeout in milliseconds
          * @return A fully configured BaseExecutionConfig instance
          */
         fun fromEnvironment(
             defaultPort: Int = 8080,
             defaultBackendUrl: String = "http://localhost:8080/api",
-            defaultJwtIssuer: String = "mdeo-platform",
-            defaultTimeoutMs: Long = 30000L
+            defaultJwtIssuer: String = "mdeo-platform"
         ): BaseExecutionConfig {
             return BaseExecutionConfig(
                 serverPort = System.getenv("SERVER_PORT")?.toIntOrNull() ?: defaultPort,
                 database = DatabaseConfig.fromEnvironment(),
                 backendApiUrl = System.getenv("BACKEND_API_URL") ?: defaultBackendUrl,
-                jwtIssuer = System.getenv("JWT_ISSUER") ?: defaultJwtIssuer,
-                executionTimeoutMs = System.getenv("EXECUTION_TIMEOUT_MS")?.toLongOrNull() ?: defaultTimeoutMs
+                jwtIssuer = System.getenv("JWT_ISSUER") ?: defaultJwtIssuer
             )
         }
     }

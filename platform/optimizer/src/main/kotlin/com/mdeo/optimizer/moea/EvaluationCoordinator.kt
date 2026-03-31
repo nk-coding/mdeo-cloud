@@ -1,6 +1,7 @@
 package com.mdeo.optimizer.moea
 
 import com.mdeo.optimizer.evaluation.EvaluationResult
+import com.mdeo.optimizer.evaluation.EvaluationTask
 import com.mdeo.optimizer.evaluation.MutationEvaluator
 import com.mdeo.optimizer.evaluation.MutationTask
 import com.mdeo.optimizer.evaluation.NodeBatch
@@ -15,11 +16,14 @@ import org.slf4j.LoggerFactory
  * Bridges MOEA Framework's synchronous evaluation callbacks into the asynchronous
  * [MutationEvaluator] contract, managing solution references and lifecycle.
  *
- * Detects initialization phase (no [WorkerSolutionRef] on solutions) versus generation
- * phase (parent ref present) and dispatches accordingly. Per-generation work bundles
- * rebalancing imports, mutation tasks, and discards into a single [NodeBatch] per
- * worker via [MutationEvaluator.executeNodeBatches]. Coroutine calls are bridged with
- * [runBlocking] because MOEA Framework invokes callbacks synchronously.
+ * Each evaluation batch is handled uniformly: solutions marked with
+ * [DelegatingVariation.NEEDS_MUTATION_KEY] produce [MutationTask]s, while
+ * uninitialized solutions (no [WorkerSolutionRef]) are created via
+ * [MutationEvaluator.initialize] and then evaluated via [EvaluationTask]s.
+ * Both task types are bundled into [NodeBatch]es per worker so that all
+ * fitness evaluation—including initial population—benefits from the same
+ * timeout protection and lifecycle mechanisms. Coroutine calls are bridged
+ * with [runBlocking] because MOEA Framework invokes callbacks synchronously.
  *
  * @param evaluator The mutation evaluator that performs the actual work (local or federated).
  */
@@ -32,11 +36,11 @@ class EvaluationCoordinator(
     private var pendingDiscards = mutableListOf<WorkerSolutionRef>()
     private var pendingRebalancePlan: List<RebalanceTransfer> = emptyList()
     /**
-     * The population passed to [prepareIteration], cached so that [handleGeneration] can update
-     * [WorkerSolutionRef] attributes on surviving parent solutions after rebalancing.
+     * The population passed to [prepareIteration], cached so that [handleEvaluation] can
+     * update [WorkerSolutionRef] attributes on surviving parent solutions after rebalancing.
      *
      * Valid because [prepareIteration] is called before `super.iterate()`, and
-     * [handleGeneration] runs inside that same `super.iterate()` call before MOEA merges
+     * [handleEvaluation] runs inside that same `super.iterate()` call before MOEA merges
      * offspring back into the population.
      */
     private var iterationPopulation: Population? = null
@@ -58,7 +62,7 @@ class EvaluationCoordinator(
         val liveRefs = currentPopulation.mapNotNull { it.getWorkerRef() }.toSet()
         val discarded = allKnownRefs - liveRefs
         if (discarded.isNotEmpty()) {
-            logger.debug("Queuing {} solutions for deferred discard", discarded.size)
+            logger.info("Queuing {} solutions for deferred discard", discarded.size)
             pendingDiscards.addAll(discarded)
             allKnownRefs.removeAll(discarded)
         }
@@ -81,8 +85,16 @@ class EvaluationCoordinator(
      * Evaluates a batch of solutions by dispatching unified per-node work batches
      * to the underlying [MutationEvaluator].
      *
-     * Detects initialization phase (no [WorkerSolutionRef]) versus generation phase
-     * (parent ref present) and delegates to [handleInitialization] or [handleGeneration].
+     * Each solution is inspected individually:
+     * - Solutions with [DelegatingVariation.NEEDS_MUTATION_KEY] set to `true` are treated
+     *   as generation offspring: a [MutationTask] is created from the parent ref.
+     * - Solutions without that flag (and without a [WorkerSolutionRef]) are treated as
+     *   uninitialized: new solutions are created via [MutationEvaluator.initialize] and
+     *   then [EvaluationTask]s are dispatched for fitness evaluation.
+     *
+     * Both task types are bundled into [NodeBatch]es and dispatched in a single call to
+     * [MutationEvaluator.executeNodeBatches], so all evaluation work benefits from the
+     * same timeout and lifecycle mechanisms.
      *
      * @param solutions The solutions to evaluate.
      * @return The number of solutions processed.
@@ -93,14 +105,7 @@ class EvaluationCoordinator(
             return 0
         }
 
-        val first = solutionList[0]
-        val isGeneration = first.getWorkerRef() != null
-            || first.getAttribute(PassThroughVariation.PARENT_REF_KEY) != null
-        if (isGeneration) {
-            handleGeneration(solutionList)
-        } else {
-            handleInitialization(solutionList)
-        }
+        handleEvaluation(solutionList)
         return solutionList.size
     }
 
@@ -145,47 +150,65 @@ class EvaluationCoordinator(
     fun getLastRebalancedCount(): Int = lastRebalancedCount
 
     /**
-     * Handles the initialization phase: flushes any pending discards, calls
-     * [MutationEvaluator.initialize], and maps results onto the provided MOEA solutions.
+     * Unified evaluation handler that processes both initialization and generation
+     * solutions in a single dispatch to [MutationEvaluator.executeNodeBatches].
      *
-     * @param solutions Empty MOEA solutions awaiting initial worker refs and fitness values.
+     * Solutions are partitioned into two groups:
+     * - **Mutation solutions**: offspring from [DelegatingVariation] with
+     *   [DelegatingVariation.NEEDS_MUTATION_KEY] set — these produce [MutationTask]s.
+     * - **Uninitialized solutions**: solutions without a [WorkerSolutionRef] — these are
+     *   created via [MutationEvaluator.initialize] and then evaluated via [EvaluationTask]s.
+     *
+     * Both task types are dispatched together, ensuring that all fitness evaluation
+     * (including initial population) benefits from the same timeout protection and
+     * lifecycle mechanisms as generation mutations.
+     *
+     * @param solutions All MOEA solutions to evaluate in this batch.
      */
-    private fun handleInitialization(solutions: List<Solution>) {
-        if (pendingDiscards.isNotEmpty()) {
-            val discards = pendingDiscards.toList()
-            pendingDiscards.clear()
-            runBlocking {
-                val emptyBatches = evaluator.getNodeIds().map { nodeId ->
-                    NodeBatch(nodeId, emptyList(), emptyList(), discards.filter { it.nodeId == nodeId }.map { it.solutionId })
-                }
-                evaluator.executeNodeBatches(emptyBatches)
+    private fun handleEvaluation(solutions: List<Solution>) {
+        val uninitializedSolutions = mutableListOf<Solution>()
+        val mutationSolutions = mutableListOf<Solution>()
+
+        for (solution in solutions) {
+            val needsMutation = solution.getAttribute(DelegatingVariation.NEEDS_MUTATION_KEY) == true
+            if (needsMutation) {
+                mutationSolutions.add(solution)
+            } else {
+                uninitializedSolutions.add(solution)
             }
         }
 
-        val results = runBlocking { evaluator.initialize(solutions.size) }
+        // ── Initialize uninitialized solutions on workers ─────────────────────────
+        val evaluationTasks = mutableListOf<EvaluationTask>()
+        if (uninitializedSolutions.isNotEmpty()) {
+            // Flush pending discards before initialization (same as former handleInitialization)
+            if (pendingDiscards.isNotEmpty()) {
+                val discards = pendingDiscards.toList()
+                pendingDiscards.clear()
+                runBlocking {
+                    val emptyBatches = evaluator.getNodeIds().map { nodeId ->
+                        NodeBatch(nodeId, emptyList(), emptyList(), emptyList(),
+                            discards.filter { it.nodeId == nodeId }.map { it.solutionId })
+                    }
+                    evaluator.executeNodeBatches(emptyBatches)
+                }
+            }
 
-        for ((index, solution) in solutions.withIndex()) {
-            if (index >= results.size) break
-            val result = results[index]
-            val ref = WorkerSolutionRef(nodeId = result.workerNodeId, solutionId = result.solutionId)
-            applyFitness(solution, result.objectives, result.constraints)
-            solution.setAttribute(WorkerSolutionRef.ATTRIBUTE_KEY, ref)
-            allKnownRefs.add(ref)
+            val initResults = runBlocking { evaluator.initialize(uninitializedSolutions.size) }
+            for ((index, solution) in uninitializedSolutions.withIndex()) {
+                if (index >= initResults.size) break
+                val result = initResults[index]
+                val ref = WorkerSolutionRef(nodeId = result.workerNodeId, solutionId = result.solutionId)
+                solution.setAttribute(WorkerSolutionRef.ATTRIBUTE_KEY, ref)
+                allKnownRefs.add(ref)
+                evaluationTasks.add(EvaluationTask(solutionId = ref.solutionId, workerNodeId = ref.nodeId))
+            }
         }
 
-        lastBatchSize = results.size
-        lastBatchPerNode = results.groupBy { it.workerNodeId }.mapValues { it.value.size }
-    }
+        // ── Build mutation tasks from offspring parent refs ────────────────────────
+        val mutationTasks = buildMutationTasks(mutationSolutions)
 
-    /**
-     * Dispatches a generation evaluation: builds mutation tasks, fetches rebalance data,
-     * assembles per-node batches, executes them, and applies results back to the solutions.
-     *
-     * @param solutions Offspring solutions carrying parent [WorkerSolutionRef] attributes.
-     */
-    private fun handleGeneration(solutions: List<Solution>) {
-        val mutationTasks = buildMutationTasks(solutions)
-
+        // ── Rebalancing and discards ──────────────────────────────────────────────
         val rebalancePlan = pendingRebalancePlan
         pendingRebalancePlan = emptyList()
         val (importsByDestNode, rebalanceDiscardsByNode) = fetchRebalanceData(rebalancePlan)
@@ -193,12 +216,55 @@ class EvaluationCoordinator(
         val discards = pendingDiscards.toList()
         pendingDiscards.clear()
 
-        val batches = buildNodeBatches(mutationTasks, importsByDestNode, rebalanceDiscardsByNode, discards)
+        // ── Build and dispatch batches ────────────────────────────────────────────
+        val batches = buildNodeBatches(mutationTasks, evaluationTasks, importsByDestNode, rebalanceDiscardsByNode, discards)
         val results = runBlocking { evaluator.executeNodeBatches(batches) }
 
+        // ── Apply rebalance updates ───────────────────────────────────────────────
         val populationBySolutionId = buildPopulationLookup()
         applyRebalanceUpdates(rebalancePlan, populationBySolutionId)
-        applyMutationResults(solutions, results)
+
+        // ── Apply results ─────────────────────────────────────────────────────────
+        // Index-based matching for mutation results: results for mutation tasks come
+        // first in the flat result list (per-node: mutations before evaluations).
+        // Within each node the order matches the task order.
+        val mutationResultsByParent = mutableMapOf<String, MutableList<EvaluationResult>>()
+        val evalResultsBySolution = mutableMapOf<String, EvaluationResult>()
+        for (result in results) {
+            if (result.parentSolutionId == result.newSolutionId) {
+                // Evaluation-only result (no new solution created)
+                evalResultsBySolution[result.parentSolutionId] = result
+            } else {
+                // Mutation result
+                mutationResultsByParent.getOrPut(result.parentSolutionId) { mutableListOf() }.add(result)
+            }
+        }
+
+        // Apply evaluation results to uninitialized solutions
+        for (solution in uninitializedSolutions) {
+            val ref = solution.getWorkerRef() ?: continue
+            val result = evalResultsBySolution[ref.solutionId]
+            if (result != null && result.succeeded) {
+                applyFitness(solution, result.objectives, result.constraints)
+            } else {
+                applyPenaltyFitness(solution)
+            }
+        }
+
+        // Apply mutation results to generation solutions (consume from per-parent queues)
+        for (solution in mutationSolutions) {
+            val parentRef = solution.getAttribute(DelegatingVariation.PARENT_REF_KEY) as? WorkerSolutionRef
+            val resultQueue = parentRef?.let { mutationResultsByParent[it.solutionId] }
+            val result = resultQueue?.removeFirstOrNull()
+            if (result != null && result.succeeded) {
+                val newRef = WorkerSolutionRef(nodeId = result.workerNodeId, solutionId = result.newSolutionId)
+                applyFitness(solution, result.objectives, result.constraints)
+                solution.setAttribute(WorkerSolutionRef.ATTRIBUTE_KEY, newRef)
+                allKnownRefs.add(newRef)
+            } else {
+                applyPenaltyFitness(solution)
+            }
+        }
 
         lastBatchSize = results.size
         lastBatchPerNode = results.filter { it.succeeded }.groupBy { it.workerNodeId }.mapValues { it.value.size }
@@ -214,7 +280,7 @@ class EvaluationCoordinator(
      */
     private fun buildMutationTasks(solutions: List<Solution>): List<MutationTask> {
         return solutions.mapNotNull { solution ->
-            val parentRef = solution.getAttribute(PassThroughVariation.PARENT_REF_KEY) as? WorkerSolutionRef
+            val parentRef = solution.getAttribute(DelegatingVariation.PARENT_REF_KEY) as? WorkerSolutionRef
             if (parentRef != null) {
                 MutationTask(solutionId = parentRef.solutionId, workerNodeId = parentRef.nodeId)
             } else {
@@ -264,10 +330,11 @@ class EvaluationCoordinator(
     }
 
     /**
-     * Assembles one [NodeBatch] per worker node, combining mutation tasks, rebalance imports,
-     * and all pending discards (regular + rebalance-source).
+     * Assembles one [NodeBatch] per worker node, combining mutation tasks, evaluation tasks,
+     * rebalance imports, and all pending discards (regular + rebalance-source).
      *
      * @param mutationTasks Tasks to dispatch this generation.
+     * @param evaluationTasks Evaluation-only tasks (e.g. initial population fitness evaluation).
      * @param importsByDestNode Inline model data keyed by destination node.
      * @param rebalanceDiscardsByNode Solution IDs to drop from source nodes after transfer.
      * @param discards Regular discards (solutions removed from the population).
@@ -275,6 +342,7 @@ class EvaluationCoordinator(
      */
     private fun buildNodeBatches(
         mutationTasks: List<MutationTask>,
+        evaluationTasks: List<EvaluationTask>,
         importsByDestNode: Map<String, List<SolutionImportData>>,
         rebalanceDiscardsByNode: Map<String, List<String>>,
         discards: List<WorkerSolutionRef>
@@ -285,6 +353,7 @@ class EvaluationCoordinator(
                 nodeId = nodeId,
                 imports = importsByDestNode[nodeId] ?: emptyList(),
                 tasks = mutationTasks.filter { it.workerNodeId == nodeId },
+                evaluationTasks = evaluationTasks.filter { it.workerNodeId == nodeId },
                 discards = (discardsByNode[nodeId] ?: emptyList()) +
                     (rebalanceDiscardsByNode[nodeId] ?: emptyList())
             )
@@ -321,31 +390,6 @@ class EvaluationCoordinator(
                 allKnownRefs.remove(oldRef)
                 allKnownRefs.add(newRef)
                 populationBySolutionId[solutionId]?.setAttribute(WorkerSolutionRef.ATTRIBUTE_KEY, newRef)
-            }
-            logger.debug(
-                "Rebalanced {} solutions: {} → {}",
-                transfer.solutionIds.size, transfer.sourceNodeId, transfer.destinationNodeId
-            )
-        }
-    }
-
-    /**
-     * Applies fitness values and new [WorkerSolutionRef]s from worker results back onto
-     * the MOEA offspring solutions. Penalty fitness is applied for failed evaluations.
-     *
-     * @param solutions The offspring solutions in the same order as the original task list.
-     * @param results Evaluation results returned by the workers.
-     */
-    private fun applyMutationResults(solutions: List<Solution>, results: List<EvaluationResult>) {
-        for ((index, solution) in solutions.withIndex()) {
-            val result = results.getOrNull(index)
-            if (result != null && result.succeeded) {
-                val newRef = WorkerSolutionRef(nodeId = result.workerNodeId, solutionId = result.newSolutionId)
-                applyFitness(solution, result.objectives, result.constraints)
-                solution.setAttribute(WorkerSolutionRef.ATTRIBUTE_KEY, newRef)
-                allKnownRefs.add(newRef)
-            } else {
-                applyPenaltyFitness(solution)
             }
         }
     }

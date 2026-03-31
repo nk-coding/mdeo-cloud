@@ -7,6 +7,7 @@ import type {
     ActionSubmitResponse,
     NewFileActionData
 } from "@mdeo/language-common";
+import { FileCategory, parseUri } from "@mdeo/language-common";
 import { buildFileSelectTree, calculateRelativePath, sharedImport, type ActionHandler } from "@mdeo/language-shared";
 import type { LangiumSharedServices } from "langium/lsp";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
@@ -90,8 +91,11 @@ export class NewFileActionHandler implements ActionHandler {
             return { kind: "completion" };
         }
 
-        const fromPath = URI.parse(data.uri).path;
-        const relativePath = calculateRelativePath(fromPath, metamodelAbsolutePath);
+        const parsedCurrentUri = parseUri(URI.parse(data.uri));
+        if (parsedCurrentUri.category !== FileCategory.RegularFile) {
+            throw new Error("NewFileActionHandler can only be invoked on regular files");
+        }
+        const relativePath = calculateRelativePath(parsedCurrentUri.path, metamodelAbsolutePath);
         const workspaceEdit = this.createUsingStatementEdit(data.uri, relativePath);
         const connection = this.sharedServices.lsp.Connection;
         await connection?.workspace.applyEdit(workspaceEdit);

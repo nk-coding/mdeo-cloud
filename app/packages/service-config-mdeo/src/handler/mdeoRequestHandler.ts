@@ -12,7 +12,10 @@ import type {
     MutationStepValueType,
     MutationBlockType,
     AlgorithmParametersType,
-    TerminationBlockType
+    TerminationBlockType,
+    RuntimeSectionType,
+    RuntimeTimeoutBlockType,
+    RuntimeResourcesBlockType
 } from "@mdeo/language-config-mdeo";
 import { URI } from "langium";
 import type { LangiumDocument } from "langium";
@@ -27,7 +30,10 @@ import type {
     MutationStepConfig,
     MutationBlockData,
     AlgorithmParametersData,
-    TerminationBlockData
+    TerminationBlockData,
+    RuntimeSectionData,
+    RuntimeTimeoutData,
+    RuntimeResourcesData
 } from "./mdeoRequestTypes.js";
 import type { MdeoServices } from "@mdeo/language-config-mdeo";
 import type { ServiceMdeoMetamodelResolver } from "../serviceMdeoMetamodelResolver.js";
@@ -176,7 +182,7 @@ function extractTerminationBlock(termination: TerminationBlockType): Termination
  * Extracts solver section data.
  *
  * @param section The solver section AST node.
- * @returns The extracted solver section data, including the optional scriptTimeout.
+ * @returns The extracted solver section data.
  */
 function extractSolverData(section: SolverSectionType): SolverSectionData {
     const parameters = section.parameters[0];
@@ -185,8 +191,50 @@ function extractSolverData(section: SolverSectionType): SolverSectionData {
         algorithm: section.algorithm[0] as SolverSectionData["algorithm"],
         parameters: parameters ? extractAlgorithmParameters(parameters as AlgorithmParametersType) : undefined,
         termination: termination ? extractTerminationBlock(termination as TerminationBlockType) : undefined,
-        batches: section.batches[0],
-        scriptTimeout: section.scriptTimeout[0]
+        batches: section.batches[0]
+    };
+}
+
+/**
+ * Extracts runtime timeout block data.
+ *
+ * @param timeout The runtime timeout block AST node.
+ * @returns The extracted timeout data.
+ */
+function extractRuntimeTimeoutBlock(timeout: RuntimeTimeoutBlockType): RuntimeTimeoutData {
+    return {
+        script: timeout.script[0],
+        transformation: timeout.transformation[0]
+    };
+}
+
+/**
+ * Extracts runtime resources block data.
+ *
+ * @param resources The runtime resources block AST node.
+ * @returns The extracted resources data.
+ */
+function extractRuntimeResourcesBlock(resources: RuntimeResourcesBlockType): RuntimeResourcesData {
+    return {
+        threads: resources.threads[0],
+        nodes: resources.nodes[0],
+        threadsPerNode: resources.threadsPerNode[0]
+    };
+}
+
+/**
+ * Extracts runtime section data.
+ *
+ * @param section The runtime section AST node.
+ * @returns The extracted runtime section data.
+ */
+function extractRuntimeData(section: RuntimeSectionType): RuntimeSectionData {
+    const timeout = section.timeout[0];
+    const resources = section.resources[0];
+    return {
+        timeout: timeout ? extractRuntimeTimeoutBlock(timeout as RuntimeTimeoutBlockType) : undefined,
+        backend: section.backend[0] as RuntimeSectionData["backend"],
+        resources: resources ? extractRuntimeResourcesBlock(resources as RuntimeResourcesBlockType) : undefined
     };
 }
 
@@ -231,12 +279,15 @@ export const mdeoRequestHandler: RequestHandler<
 
     const searchWrapperType = getWrapperInterfaceName("search", MDEO_PLUGIN_NAME);
     const solverWrapperType = getWrapperInterfaceName("solver", MDEO_PLUGIN_NAME);
+    const runtimeWrapperType = getWrapperInterfaceName("runtime", MDEO_PLUGIN_NAME);
 
     for (const section of sections) {
         if (section.$type === searchWrapperType) {
             response.search = extractSearchData(section.content as SearchSectionType, document);
         } else if (section.$type === solverWrapperType) {
             response.solver = extractSolverData(section.content as SolverSectionType);
+        } else if (section.$type === runtimeWrapperType) {
+            response.runtime = extractRuntimeData(section.content as RuntimeSectionType);
         }
     }
 

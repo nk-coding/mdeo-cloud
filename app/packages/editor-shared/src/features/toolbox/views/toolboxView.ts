@@ -29,8 +29,7 @@ export function generateToolboxView(context: Toolbox): VNode {
                 "pointer-events-none": true
             }
         },
-        generateToolboxInternal(context),
-        generateErrorView(context)
+        generateToolboxInternal(context)
     );
 }
 
@@ -54,7 +53,6 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 "h-[50vh]": context.isOpen && context.isBottomPanelOpen,
                 "w-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
                 "h-[calc(var(--editor-spacing)*10+2px)]": !context.isOpen,
-                "mb-2": !context.isOpen,
                 "transition-all": true,
                 "duration-300": true,
                 "ease-in-out": true,
@@ -68,9 +66,21 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 }
             }
         },
-        generateToolbarView(context),
-        hasItems && context.toolType !== ToolType.HAND && context.toolType !== ToolType.MARQUEE
-            ? generateDetailsPanelView(context)
-            : undefined
+        html(
+            "div",
+            {
+                class: {
+                    "min-h-0": true,
+                    flex: true,
+                    "flex-col": true,
+                    relative: true
+                }
+            },
+            generateToolbarView(context),
+            hasItems && context.toolType !== ToolType.HAND && context.toolType !== ToolType.MARQUEE
+                ? generateDetailsPanelView(context)
+                : undefined,
+            generateErrorView(context)
+        )
     );
 }

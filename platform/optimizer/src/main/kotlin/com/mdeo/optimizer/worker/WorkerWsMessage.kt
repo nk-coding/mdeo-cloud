@@ -28,15 +28,17 @@ sealed class WorkerWsMessage {
 /**
  * Orchestrator → Worker: execute one generation of work atomically.
  *
- * Combines solution imports (from rebalancing), mutation tasks, and discards into
- * a single message so that the orchestrator requires exactly one round trip per
- * worker per generation. The worker processes these in order: store imports, execute
- * mutations, drop discards.
+ * Combines solution imports (from rebalancing), mutation tasks, evaluation-only tasks,
+ * and discards into a single message so that the orchestrator requires exactly one
+ * round trip per worker per generation. The worker processes these in order: store
+ * imports, execute mutations, execute evaluations, drop discards.
  *
  * @param requestId Correlation identifier echoed in [NodeWorkBatchResponse].
  * @param imports Solutions being transferred to this node from other nodes;
  *   model data is pre-fetched by the orchestrator and embedded inline.
  * @param tasks Existing solutions on this node to mutate and evaluate.
+ * @param evaluationTasks Solutions on this node to evaluate without mutation
+ *   (e.g. newly initialized solutions needing fitness computation).
  * @param discards Solution IDs on this node to release after evaluation.
  */
 @OptIn(ExperimentalSerializationApi::class)
@@ -46,6 +48,7 @@ data class NodeWorkBatchRequest(
     override val requestId: String,
     val imports: List<SolutionTransferItem>,
     val tasks: List<BatchTask>,
+    val evaluationTasks: List<BatchEvaluationTask> = emptyList(),
     val discards: List<String>
 ) : WorkerWsMessage()
 
