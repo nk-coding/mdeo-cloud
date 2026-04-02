@@ -13,6 +13,9 @@ package com.mdeo.optimizer.evaluation
  * @param objectives The computed objective function values for the new solution.
  * @param constraints The computed constraint function values for the new solution.
  * @param succeeded Whether the mutation and evaluation completed successfully.
+ * @param errorMessage When non-null, indicates that a guidance function (objective or constraint)
+ *   threw an exception. Distinct from a mutation failure ([succeeded] = false, [errorMessage] = null),
+ *   an evaluation failure must terminate the entire optimization run.
  */
 data class EvaluationResult(
     val parentSolutionId: String,
@@ -20,5 +23,6 @@ data class EvaluationResult(
     val workerNodeId: String,
     val objectives: List<Double>,
     val constraints: List<Double>,
-    val succeeded: Boolean
+    val succeeded: Boolean,
+    val errorMessage: String? = null
 )

@@ -703,14 +703,19 @@ class OptimizerExecutionService(
     }
 
     /**
-     * Fetches all script typed ASTs for the given paths from the backend API.
+     * Fetches all script typed ASTs for the given paths from the backend API,
+     * including transitive dependencies discovered via each AST's [imports] field.
+     * Uses BFS traversal to handle arbitrarily deep import chains while avoiding
+     * duplicate fetches and infinite loops from circular imports.
+     *
      * Fails fast: returns null and sets execution state to FAILED if any path cannot be resolved.
      *
      * @param executionId Execution to update on failure.
      * @param projectId Project context.
-     * @param scriptPaths Set of script file paths to fetch.
+     * @param scriptPaths Set of root script file paths to fetch.
      * @param jwtToken Authentication token.
-     * @return Map from path to typed AST, or `null` if any fetch failed.
+     * @return Map from path to typed AST (including all transitive dependencies),
+     *         or `null` if any fetch failed.
      */
     private suspend fun fetchAllScripts(
         executionId: UUID,
@@ -719,7 +724,13 @@ class OptimizerExecutionService(
         jwtToken: String
     ): Map<String, ScriptTypedAst>? {
         val result = mutableMapOf<String, ScriptTypedAst>()
-        for (path in scriptPaths) {
+        val visited = mutableSetOf<String>()
+        val pending = mutableSetOf<String>().also { it.addAll(scriptPaths) }
+        while (pending.isNotEmpty()) {
+            val path = pending.first()
+            pending.remove(path)
+            if (visited.contains(path)) continue
+            visited.add(path)
             val ast = apiClient.getScriptTypedAst(projectId.toString(), path, jwtToken)
             if (ast == null) {
                 val msg = "Failed to fetch script: $path"
@@ -728,6 +739,11 @@ class OptimizerExecutionService(
                 return null
             }
             result[path] = ast
+            for (import in ast.imports) {
+                if (!visited.contains(import.uri) && !pending.contains(import.uri)) {
+                    pending.add(import.uri)
+                }
+            }
         }
         return result
     }

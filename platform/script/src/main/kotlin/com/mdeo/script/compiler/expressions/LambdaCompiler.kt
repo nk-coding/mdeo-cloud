@@ -137,7 +137,7 @@ class LambdaCompiler : ExpressionCompiler() {
         val capturedPairs = lambdaBodyScope.collectCapturedVariables(lambdaParamsLevel)
 
         return capturedPairs.mapNotNull { (name, declarationLevel) ->
-            val variable = context.currentScope?.lookupVariable(name, declarationLevel)
+            val variable = context.currentScope?.lookupVariableNearestUpTo(name, declarationLevel)
 
             if (variable != null) {
                 CapturedVariable(

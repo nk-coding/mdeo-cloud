@@ -104,21 +104,11 @@ class LocalMutationEvaluator(
     private fun evaluateSingle(task: MutationTask): EvaluationResult {
         val parent = requireSolution(task.solutionId)
         val copy = parent.deepCopy()
-        return try {
-            val mutated = mutationStrategy.mutate(copy)
-            val newId = generateId()
-            solutions[newId] = mutated
-            EvaluationResult(
-                parentSolutionId = task.solutionId,
-                newSolutionId = newId,
-                workerNodeId = nodeId,
-                objectives = evaluateObjectives(mutated),
-                constraints = evaluateConstraints(mutated),
-                succeeded = true
-            )
+        val mutated = try {
+            mutationStrategy.mutate(copy)
         } catch (e: Exception) {
             copy.close()
-            EvaluationResult(
+            return EvaluationResult(
                 parentSolutionId = task.solutionId,
                 newSolutionId = "",
                 workerNodeId = nodeId,
@@ -127,6 +117,33 @@ class LocalMutationEvaluator(
                 succeeded = false
             )
         }
+        val newId = generateId()
+        solutions[newId] = mutated
+        val objectives: List<Double>
+        val constraints: List<Double>
+        try {
+            objectives = evaluateObjectives(mutated)
+            constraints = evaluateConstraints(mutated)
+        } catch (e: Exception) {
+            solutions.remove(newId)?.close()
+            return EvaluationResult(
+                parentSolutionId = task.solutionId,
+                newSolutionId = "",
+                workerNodeId = nodeId,
+                objectives = emptyList(),
+                constraints = emptyList(),
+                succeeded = false,
+                errorMessage = "Guidance function evaluation failed: ${e.message}"
+            )
+        }
+        return EvaluationResult(
+            parentSolutionId = task.solutionId,
+            newSolutionId = newId,
+            workerNodeId = nodeId,
+            objectives = objectives,
+            constraints = constraints,
+            succeeded = true
+        )
     }
 
     /**
@@ -139,26 +156,31 @@ class LocalMutationEvaluator(
      * @return An [EvaluationResult] with the same solution ID for both parent and new.
      */
     private fun evaluateExisting(task: EvaluationTask): EvaluationResult {
-        return try {
-            val solution = requireSolution(task.solutionId)
-            EvaluationResult(
-                parentSolutionId = task.solutionId,
-                newSolutionId = task.solutionId,
-                workerNodeId = nodeId,
-                objectives = evaluateObjectives(solution),
-                constraints = evaluateConstraints(solution),
-                succeeded = true
-            )
+        val solution = requireSolution(task.solutionId)
+        val objectives: List<Double>
+        val constraints: List<Double>
+        try {
+            objectives = evaluateObjectives(solution)
+            constraints = evaluateConstraints(solution)
         } catch (e: Exception) {
-            EvaluationResult(
+            return EvaluationResult(
                 parentSolutionId = task.solutionId,
                 newSolutionId = "",
                 workerNodeId = nodeId,
                 objectives = emptyList(),
                 constraints = emptyList(),
-                succeeded = false
+                succeeded = false,
+                errorMessage = "Guidance function evaluation failed: ${e.message}"
             )
         }
+        return EvaluationResult(
+            parentSolutionId = task.solutionId,
+            newSolutionId = task.solutionId,
+            workerNodeId = nodeId,
+            objectives = objectives,
+            constraints = constraints,
+            succeeded = true
+        )
     }
 
     /**

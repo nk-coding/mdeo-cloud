@@ -177,7 +177,7 @@ abstract class SubprocessMain {
                             synchronized(output) {
                                 SubprocessMessage.write(output, SubprocessMessage.Result(commandId, result))
                             }
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             synchronized(output) {
                                 SubprocessMessage.write(
                                     output, SubprocessMessage.Error(

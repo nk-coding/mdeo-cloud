@@ -234,9 +234,15 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
     /**
      * Returns the JVM type descriptor for the element type of a property.
      *
-     * For single-valued properties this is also the field descriptor (e.g. `Ljava/lang/Integer;`).
+     * For mandatory single-valued properties (`lower >= 1 && upper == 1`) with a numeric or
+     * boolean primitive type, returns the corresponding JVM primitive descriptor (`I`, `J`,
+     * `F`, `D`, `Z`).  All other primitive properties (optional or multi-valued) continue to
+     * use the boxed reference type so that `null` can represent "absent".
+     *
      * For multi-valued properties the field uses `Ljava/util/List;` but the element type is
-     * still needed for conversions.
+     * still needed for conversions; list elements are always stored as boxed objects, so this
+     * method only returns a primitive descriptor when `upper == 1` (the field holds the value
+     * directly).
      *
      * @param property The property definition.
      * @return The JVM element type descriptor string.
@@ -244,16 +250,17 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
     private fun getPropertyElementDescriptor(property: PropertyData): String {
         val primitiveType = property.primitiveType
         val enumType = property.enumType
+        val usePrimitive = property.multiplicity.lower >= 1 && property.multiplicity.upper == 1
 
         return when {
             primitiveType != null -> when (primitiveType.lowercase()) {
-                "int" -> "Ljava/lang/Integer;"
-                "long" -> "Ljava/lang/Long;"
-                "float" -> "Ljava/lang/Float;"
-                "double" -> "Ljava/lang/Double;"
-                "boolean" -> "Ljava/lang/Boolean;"
-                "string" -> "Ljava/lang/String;"
-                else -> "Ljava/lang/Object;"
+                "int"     -> if (usePrimitive) "I"  else "Ljava/lang/Integer;"
+                "long"    -> if (usePrimitive) "J"  else "Ljava/lang/Long;"
+                "float"   -> if (usePrimitive) "F"  else "Ljava/lang/Float;"
+                "double"  -> if (usePrimitive) "D"  else "Ljava/lang/Double;"
+                "boolean" -> if (usePrimitive) "Z"  else "Ljava/lang/Boolean;"
+                "string"  -> "Ljava/lang/String;"
+                else      -> "Ljava/lang/Object;"
             }
             enumType != null -> {
                 val enumValueInternalName = Metamodel.getEnumValueClassName(enumType)
@@ -613,7 +620,10 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
     }
 
     /**
-     * Emits a get-branch for a regular property field (direct value or List). 
+     * Emits a get-branch for a regular property field (direct value or List).
+     *
+     * If the field stores a JVM primitive (`I`, `J`, `F`, `D`, `Z`), boxes it before
+     * the `ARETURN` so that the `getPropertyByKey(String): Any?` signature is satisfied.
      */
     private fun emitPropertyGetBranch(
         mv: org.objectweb.asm.MethodVisitor,
@@ -629,12 +639,22 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mv.visitJumpInsn(Opcodes.IFEQ, nextLabel)
         mv.visitVarInsn(Opcodes.ALOAD, 0)
         mv.visitFieldInsn(Opcodes.GETFIELD, internalName, "prop_$fieldIndex", fieldDescriptor)
+        when (fieldDescriptor) {
+            "I" -> mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false)
+            "J" -> mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long",    "valueOf", "(J)Ljava/lang/Long;",    false)
+            "F" -> mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Float",   "valueOf", "(F)Ljava/lang/Float;",   false)
+            "D" -> mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double",  "valueOf", "(D)Ljava/lang/Double;",  false)
+            "Z" -> mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false)
+        }
         mv.visitInsn(Opcodes.ARETURN)
         mv.visitLabel(nextLabel)
     }
 
     /**
-     * Emits a set-branch for a regular property field (direct value or List). 
+     * Emits a set-branch for a regular property field (direct value or List).
+     *
+     * `setPropertyByKey` receives an `Object` in local 2.  For primitive fields the
+     * Object is a boxed wrapper; it must be cast and unboxed before the `PUTFIELD`.
      */
     private fun emitPropertySetBranch(
         mv: org.objectweb.asm.MethodVisitor,
@@ -653,9 +673,32 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mv.visitVarInsn(Opcodes.ALOAD, 2)
         if (isCollection) {
             mv.visitTypeInsn(Opcodes.CHECKCAST, "java/util/List")
-        } else if (fieldDescriptor != "Ljava/lang/Object;") {
-            val targetType = fieldDescriptor.removePrefix("L").removeSuffix(";")
-            mv.visitTypeInsn(Opcodes.CHECKCAST, targetType)
+        } else when (fieldDescriptor) {
+            "I" -> {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Integer")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Integer", "intValue",     "()I", false)
+            }
+            "J" -> {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long",    "longValue",    "()J", false)
+            }
+            "F" -> {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Float")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Float",   "floatValue",   "()F", false)
+            }
+            "D" -> {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Double")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Double",  "doubleValue",  "()D", false)
+            }
+            "Z" -> {
+                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Boolean")
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false)
+            }
+            "Ljava/lang/Object;" -> { /* no cast needed */ }
+            else -> {
+                val targetType = fieldDescriptor.removePrefix("L").removeSuffix(";")
+                mv.visitTypeInsn(Opcodes.CHECKCAST, targetType)
+            }
         }
         mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, "prop_$fieldIndex", fieldDescriptor)
         mv.visitInsn(Opcodes.RETURN)
@@ -1101,7 +1144,14 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
     }
 
     /**
-     * Emits bytecode to write a single nullable scalar property field to [java.io.DataOutput].
+     * Emits bytecode to write a single scalar property field to [java.io.DataOutput].
+     *
+     * For JVM primitive fields (`I`, `J`, `F`, `D`, `Z`) the value is always present, so a
+     * fixed present-marker byte (`1`) is written followed immediately by the raw primitive
+     * value, without loading the value into an object local first.
+     *
+     * For nullable reference fields the original null-check path is used: a marker byte
+     * (`0` = null, `1` = present) followed by the value when present.
      *
      * @param mv The method visitor.
      * @param internalName The JVM internal name of the class owning the field.
@@ -1115,29 +1165,51 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mapping: PropertyFieldMapping
     ) {
         val descriptor = mapping.fieldDescriptor
-        val nullLabel = Label()
-        val endLabel = Label()
 
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, internalName, fieldName, descriptor)
-        mv.visitVarInsn(Opcodes.ASTORE, 2)
-        mv.visitVarInsn(Opcodes.ALOAD, 2)
-        mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
+        when (descriptor) {
+            "I", "J", "F", "D", "Z" -> {
+                // Mandatory primitive field: always present — write marker=1 then raw value.
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitInsn(Opcodes.ICONST_1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitVarInsn(Opcodes.ALOAD, 0)
+                mv.visitFieldInsn(Opcodes.GETFIELD, internalName, fieldName, descriptor)
+                when (descriptor) {
+                    "I" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeInt",    "(I)V", true)
+                    "J" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeLong",   "(J)V", true)
+                    "F" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeFloat",  "(F)V", true)
+                    "D" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeDouble", "(D)V", true)
+                    "Z" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte",   "(I)V", true)
+                }
+            }
+            else -> {
+                // Nullable reference field: null-check path.
+                val nullLabel = Label()
+                val endLabel = Label()
 
-        mv.visitVarInsn(Opcodes.ALOAD, 1)
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+                mv.visitVarInsn(Opcodes.ALOAD, 0)
+                mv.visitFieldInsn(Opcodes.GETFIELD, internalName, fieldName, descriptor)
+                mv.visitVarInsn(Opcodes.ASTORE, 2)
+                mv.visitVarInsn(Opcodes.ALOAD, 2)
+                mv.visitJumpInsn(Opcodes.IFNULL, nullLabel)
 
-        emitWriteValueFromLocal(mv, 2, mapping.elementDescriptor)
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitInsn(Opcodes.ICONST_1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
 
-        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+                emitWriteValueFromLocal(mv, 2, mapping.elementDescriptor)
 
-        mv.visitLabel(nullLabel)
-        mv.visitVarInsn(Opcodes.ALOAD, 1)
-        mv.visitInsn(Opcodes.ICONST_0)
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+                mv.visitJumpInsn(Opcodes.GOTO, endLabel)
 
-        mv.visitLabel(endLabel)
+                mv.visitLabel(nullLabel)
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitInsn(Opcodes.ICONST_0)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataOutput", "writeByte", "(I)V", true)
+
+                mv.visitLabel(endLabel)
+            }
+        }
     }
 
     /**
@@ -1322,7 +1394,14 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
     }
 
     /**
-     * Emits bytecode to read a single nullable scalar property field from [java.io.DataInput].
+     * Emits bytecode to read a single scalar property field from [java.io.DataInput].
+     *
+     * For JVM primitive fields (`I`, `J`, `F`, `D`, `Z`) the wire format has a one-byte
+     * present-marker (always written as `1` by [emitWriteScalarField]) followed by the raw
+     * primitive value.  If the marker is `0` (defensive; should not occur for mandatory
+     * primitives) the field is left at its JVM default (`0` / `false`).
+     *
+     * For nullable reference fields the original null-check path is used.
      *
      * @param mv The method visitor.
      * @param internalName The JVM internal name of the class owning the field.
@@ -1336,24 +1415,46 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
         mapping: PropertyFieldMapping
     ) {
         val descriptor = mapping.fieldDescriptor
-        val nullLabel = Label()
-        val endLabel = Label()
 
-        mv.visitVarInsn(Opcodes.ALOAD, 1)
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte", "()B", true)
-        mv.visitJumpInsn(Opcodes.IFEQ, nullLabel)
+        when (descriptor) {
+            "I", "J", "F", "D", "Z" -> {
+                val endLabel = Label()
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte", "()B", true)
+                mv.visitJumpInsn(Opcodes.IFEQ, endLabel) 
+                mv.visitVarInsn(Opcodes.ALOAD, 0)
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                when (descriptor) {
+                    "I" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readInt",    "()I", true)
+                    "J" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readLong",   "()J", true)
+                    "F" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readFloat",  "()F", true)
+                    "D" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readDouble", "()D", true)
+                    "Z" -> mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte",   "()B", true)
+                }
+                mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, fieldName, descriptor)
+                mv.visitLabel(endLabel)
+            }
+            else -> {
+                val nullLabel = Label()
+                val endLabel = Label()
 
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        emitReadValue(mv, mapping.elementDescriptor, mapping.enumType)
-        if (mapping.enumType != null) {
-            val enumInternalName = descriptor.removePrefix("L").removeSuffix(";")
-            mv.visitTypeInsn(Opcodes.CHECKCAST, enumInternalName)
+                mv.visitVarInsn(Opcodes.ALOAD, 1)
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/io/DataInput", "readByte", "()B", true)
+                mv.visitJumpInsn(Opcodes.IFEQ, nullLabel)
+
+                mv.visitVarInsn(Opcodes.ALOAD, 0)
+                emitReadValue(mv, mapping.elementDescriptor, mapping.enumType)
+                if (mapping.enumType != null) {
+                    val enumInternalName = descriptor.removePrefix("L").removeSuffix(";")
+                    mv.visitTypeInsn(Opcodes.CHECKCAST, enumInternalName)
+                }
+                mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, fieldName, descriptor)
+
+                mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+                mv.visitLabel(nullLabel)
+                mv.visitLabel(endLabel)
+            }
         }
-        mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, fieldName, descriptor)
-
-        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
-        mv.visitLabel(nullLabel)
-        mv.visitLabel(endLabel)
     }
 
     /**

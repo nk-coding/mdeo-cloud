@@ -203,6 +203,10 @@ function printMetamodelFileImport(context: PrintContext<MetamodelFileImportType>
 /**
  * Prints the root script node.
  *
+ * All import-related elements (metamodel import and function file imports) are written as a
+ * single block at the top of the file. If there are any function definitions after the imports,
+ * they are separated from the import block by one empty line.
+ *
  * @param context The print context
  * @returns The formatted script
  */
@@ -210,12 +214,26 @@ function printScript(context: PrintContext<ScriptType>): Doc {
     const { ctx, path, print } = context;
     const { hardline } = doc.builders;
 
-    const metamodelDoc: Doc[] =
-        ctx.metamodelImport != undefined ? [path.call(print, "metamodelImport"), hardline] : [];
+    const importDocs: Doc[] = [];
+    if (ctx.metamodelImport != undefined) {
+        importDocs.push(path.call(print, "metamodelImport"));
+    }
+    for (const fi of path.map(print, "imports")) {
+        if (importDocs.length > 0) importDocs.push(hardline);
+        importDocs.push(fi);
+    }
 
-    const rest = serializeNewlineSep(context, ["imports", "functions"], doc.builders);
+    const functionDocs = serializeNewlineSep(context, ["functions"], doc.builders);
 
-    return [...metamodelDoc, ...rest];
+    if (importDocs.length === 0 && functionDocs.length === 0) {
+        return printDanglingComments(context, doc.builders);
+    }
+
+    if (importDocs.length > 0 && functionDocs.length > 0) {
+        return [...importDocs, hardline, hardline, ...functionDocs];
+    }
+
+    return [...importDocs, ...functionDocs];
 }
 
 /**

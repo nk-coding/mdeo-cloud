@@ -65,7 +65,7 @@ class IdentifierCompiler : ExpressionCompiler() {
             return
         }
 
-        val variable = context.currentScope?.lookupVariable(identifier.name, identifier.scope)
+        val variable = context.currentScope?.lookupVariableRespectingLambdaBoundary(identifier.name, identifier.scope)
             ?: throw IllegalStateException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
 
         compileVariableLoad(variable, variable.type, mv)

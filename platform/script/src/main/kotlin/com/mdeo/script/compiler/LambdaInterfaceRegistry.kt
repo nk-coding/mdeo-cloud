@@ -178,6 +178,18 @@ class LambdaInterfaceRegistry {
         )
     }
 
+    /**
+     * Checks whether the given lambda type maps to a predefined runtime interface
+     * without registering a new interface as a side effect.
+     *
+     * @param lambdaType The lambda type to check.
+     * @return true if the normalized key maps to one of the predefined interfaces.
+     */
+    fun isPredefined(lambdaType: LambdaType): Boolean {
+        val key = createKey(lambdaType)
+        return interfaceMap[key]?.startsWith(RUNTIME_PACKAGE) == true
+    }
+
     companion object {
         /**
          * The package path for predefined runtime interfaces.

@@ -63,11 +63,10 @@ export interface FileSelectTreeResult {
  * @returns Tree nodes and the common root path prefix
  */
 export function buildFileSelectTree(absolutePaths: string[]): FileSelectTreeResult {
-    if (absolutePaths.length === 0) return { nodes: [], rootPath: "" };
+    if (absolutePaths.length === 0) {return { nodes: [], rootPath: "" };}
 
     const splitPaths = absolutePaths.map((p) => p.split("/").filter(Boolean));
 
-    // Find the common prefix shared by all paths (stopping one level before the leaf)
     let commonLen = 0;
     const first = splitPaths[0];
     if (first) {

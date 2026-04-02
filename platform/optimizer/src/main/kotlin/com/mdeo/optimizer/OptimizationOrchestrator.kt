@@ -2,6 +2,7 @@ package com.mdeo.optimizer
 
 import com.mdeo.optimizer.config.OptimizationConfig
 import com.mdeo.optimizer.config.SolverConfig
+import com.mdeo.optimizer.evaluation.EvaluationFailedException
 import com.mdeo.optimizer.evaluation.MutationEvaluator
 import com.mdeo.optimizer.metrics.OptimizationMetricsCollector
 import com.mdeo.optimizer.moea.DelegatingAlgorithmProvider
@@ -85,6 +86,8 @@ class OptimizationOrchestrator(
                 try {
                     instrumentedAlgorithm.run(terminationCondition)
                 } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: EvaluationFailedException) {
                     throw e
                 } catch (e: Exception) {
                     val msg = "Unable to run search. Encountered exception: ${e.message}"

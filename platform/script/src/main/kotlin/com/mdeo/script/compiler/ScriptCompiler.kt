@@ -220,6 +220,9 @@ class ScriptCompiler {
         emitContextField(cw)
         emitConstructor(cw, CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME)
 
+        val sharedLambdaCounter = LambdaCounter()
+        val sharedLambdaInterfaceRegistry = LambdaInterfaceRegistry()
+
         for ((filePath, ast) in input.files) {
             val functionRegistry = fileRegistries[filePath] ?: GlobalFunctionRegistry.GLOBAL
             val fileLookup = functionLookup[filePath] ?: emptyMap()
@@ -231,7 +234,8 @@ class ScriptCompiler {
                     CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME,
                     cw, generatedInterfaces,
                     functionRegistry, typeRegistries.typeRegistry,
-                    typeRegistries.fileScopePropertyRegistry
+                    typeRegistries.fileScopePropertyRegistry,
+                    sharedLambdaCounter, sharedLambdaInterfaceRegistry
                 )
             }
         }
@@ -295,6 +299,13 @@ class ScriptCompiler {
      * @param typeRegistry The type registry for type lookups.
      * @param fileScopePropertyRegistry Registry for file-scope (level 1) identifiers such as
      *   class/enum containers.
+     * @param lambdaCounter Shared counter for generating unique lambda method names across functions.
+     *   Must be the same instance for all functions compiled into the same class to prevent
+     *   duplicate `lambda$script$N` method names.
+     * @param lambdaInterfaceRegistry Shared registry for lambda functional interfaces. Must be
+     *   the same instance for all functions compiled into the same class to prevent two functions
+     *   from independently generating `Lambda$0` with different signatures, which would corrupt
+     *   the shared [generatedInterfaces] map.
      */
     private fun compileFunction(
         function: TypedFunction,
@@ -305,7 +316,9 @@ class ScriptCompiler {
         generatedInterfaces: MutableMap<String, ByteArray>,
         functionRegistry: FunctionRegistry,
         typeRegistry: TypeRegistry = TypeRegistry.GLOBAL,
-        fileScopePropertyRegistry: GlobalPropertyRegistry = GlobalPropertyRegistry()
+        fileScopePropertyRegistry: GlobalPropertyRegistry = GlobalPropertyRegistry(),
+        lambdaCounter: LambdaCounter = LambdaCounter(),
+        lambdaInterfaceRegistry: LambdaInterfaceRegistry = LambdaInterfaceRegistry()
     ) {
         val returnType = ast.types[function.returnType]
         val descriptor = functionRegistry.lookupFunction(function.name)!!.getOverload("")!!.descriptor
@@ -328,6 +341,7 @@ class ScriptCompiler {
         val tempContext = CompilationContext(
             ast, className, expressionCompilers, statementCompilers, function.returnType,
             paramsScope, classWriter = cw, generatedInterfaces = generatedInterfaces,
+            lambdaCounter = lambdaCounter, lambdaInterfaceRegistry = lambdaInterfaceRegistry,
             functionRegistry = functionRegistry, typeRegistry = typeRegistry,
             fileScopePropertyRegistry = fileScopePropertyRegistry
         )
@@ -341,7 +355,9 @@ class ScriptCompiler {
         val context = CompilationContext(
             ast, className, expressionCompilers, statementCompilers, function.returnType,
             paramsScope, scopeBuilder.statementScopes, classWriter = cw,
-            generatedInterfaces = generatedInterfaces, functionRegistry = functionRegistry,
+            generatedInterfaces = generatedInterfaces,
+            lambdaCounter = lambdaCounter, lambdaInterfaceRegistry = lambdaInterfaceRegistry,
+            functionRegistry = functionRegistry,
             typeRegistry = typeRegistry, fileScopePropertyRegistry = fileScopePropertyRegistry
         )
         context.enterScope(bodyScope)

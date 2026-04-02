@@ -2,14 +2,9 @@ package com.mdeo.script.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedExpressionCallExpression
-import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.LambdaType
-import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
-import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.script.compiler.CompilationContext
-import com.mdeo.script.compiler.LambdaInterfaceRegistry
-import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.util.MethodDescriptorUtil
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
@@ -70,9 +65,8 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
         
         val lookupResult = registry.getInterfaceForLambdaType(calleeType)
         val functionalInterface = lookupResult.interfaceName
-        val isPredefined = functionalInterface.startsWith("com/mdeo/script/runtime")
         
-        compileArguments(exprCall, calleeType, isPredefined, context, mv)
+        compileArguments(exprCall, calleeType, context, mv)
         
         val methodDescriptor = buildMethodDescriptor(calleeType, context)
         
@@ -88,74 +82,43 @@ class ExpressionCallCompiler : AbstractCallCompiler() {
     /**
      * Compiles all arguments for the expression call.
      *
-     * Uses the resolved parameter types from each [TypedCallArgument] for coercion.
-     * For predefined generic interfaces (Func0-3, Action0-3), all JVM parameters are Object,
-     * so primitives must be boxed. For generated interfaces, the JVM parameters match the
-     * lambda's actual parameter types.
+     * Uses the normalized key parameter types for coercion. For predefined interfaces
+     * (Func0-3, Action0-3, Predicate1), the key has Any? for erased generic type parameters,
+     * which ensures primitives are boxed. For generated interfaces the key matches the
+     * actual lambda type.
      *
      * @param exprCall The expression call containing the arguments.
      * @param lambdaType The lambda type of the callee.
-     * @param isPredefined Whether the functional interface is a predefined generic one.
      * @param context The compilation context.
      * @param mv The method visitor for emitting bytecode.
      */
     private fun compileArguments(
         exprCall: TypedExpressionCallExpression,
         lambdaType: LambdaType,
-        isPredefined: Boolean,
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        val jvmParamTypes: List<ValueType> = if (isPredefined) {
-            // Predefined interfaces use Object for all parameters
-            lambdaType.parameters.map { ClassTypeRef("builtin", "Any", true) }
-        } else {
-            // Generated interfaces use the actual types from the lambda
-            lambdaType.parameters.map { it.type }
-        }
+        val registry = context.getLambdaInterfaceRegistry()
+        val key = registry.createKey(lambdaType)
+        val jvmParamTypes: List<ValueType> = key.parameters.map { it.type }
         compileArgumentsWithCoercion(exprCall.arguments, context, mv, signatureParameterTypes = jvmParamTypes)
     }
     
     /**
      * Builds the method descriptor for the call method.
      *
-     * This must match the descriptor of the generated interface's call method.
-     * Generated interfaces use the actual types (with boxed wrappers for nullables),
-     * while predefined interfaces (Func0-3, Action0-3) use erased Object types.
+     * Uses the normalized key types to build the descriptor. For predefined interfaces
+     * (Func0-3, Action0-3, Predicate1), the key has Any? for erased generics and concrete
+     * types for non-generic positions (e.g. boolean return for Predicate1). For generated
+     * interfaces the key matches the actual lambda type.
      *
-     * @param lambdaType The lambda type (normalized key).
+     * @param lambdaType The lambda type.
      * @param context The compilation context.
      * @return The method descriptor.
      */
     private fun buildMethodDescriptor(lambdaType: LambdaType, context: CompilationContext): String {
         val registry = context.getLambdaInterfaceRegistry()
-        val lookupResult = registry.getInterfaceForLambdaType(lambdaType)
-        
-        val isPredefined = lookupResult.interfaceName.startsWith("com/mdeo/script/runtime")
-        
-        return if (isPredefined) {
-            buildErasedMethodDescriptor(lambdaType)
-        } else {
-            val parameterTypes = lambdaType.parameters.map { it.type }
-            MethodDescriptorUtil.buildDescriptor(parameterTypes, lambdaType.returnType)
-        }
-    }
-
-    /**
-     * Builds the erased method descriptor for generic interfaces.
-     * 
-     * All type parameters become Object, void stays void.
-     * 
-     * @param lambdaType The lambda type.
-     * @return The erased method descriptor (e.g., "(Ljava/lang/Object;)Ljava/lang/Object;").
-     */
-    private fun buildErasedMethodDescriptor(lambdaType: LambdaType): String {
-        val params = lambdaType.parameters.joinToString("") { "Ljava/lang/Object;" }
-        val returnDesc = if (lambdaType.returnType is VoidType) {
-            "V"
-        } else {
-            "Ljava/lang/Object;"
-        }
-        return "($params)$returnDesc"
+        val key = registry.createKey(lambdaType)
+        return MethodDescriptorUtil.buildDescriptor(key.parameters.map { it.type }, key.returnType)
     }
 }

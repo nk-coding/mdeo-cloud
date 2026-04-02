@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import type {
     ActionSchemaFileSelectForm,
     ActionSchemaFileSelectNode,
@@ -89,6 +89,9 @@ import { PopoverRoot, PopoverTrigger, PopoverContent, PopoverPortal } from "reka
 import { ChevronDown } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 import { getErrorsForPath } from "./actionFormUtils";
+import { workbenchStateKey } from "@/components/workbench/util";
+import type { Folder, FileSystemNode } from "@/data/filesystem/file";
+import { FileType } from "@codingame/monaco-vscode-files-service-override";
 
 export interface FileSelectTreeNode {
     id: string;
@@ -115,7 +118,20 @@ const open = ref(false);
 const pendingNode = ref<FileSelectTreeNode | undefined>();
 const expandedItems = ref<Set<FileSelectTreeNode>>(new Set());
 
-const treeData = computed(() => convertNodes(props.schema.fileSelect, undefined));
+const workbenchState = inject(workbenchStateKey);
+
+const treeData = computed(() => {
+    const projectId = workbenchState?.project.value?.id;
+    const nodes = convertNodes(props.schema.fileSelect, undefined);
+    const filtered = projectId ? filterNodesToProject(nodes, props.schema.rootPath, projectId) : nodes;
+    if (!props.schema.selectDirectory) return filtered;
+    const wbTree = workbenchState?.fileTree;
+    if (!wbTree) return filtered;
+    const rootFolder = findWorkbenchFolderByPath(wbTree, props.schema.rootPath);
+    if (!rootFolder) return filtered;
+    addMissingFolders(filtered, rootFolder.children, undefined);
+    return filtered;
+});
 
 function convertNodes(
     nodes: ActionSchemaFileSelectNode[],
@@ -135,6 +151,46 @@ function convertNode(node: ActionSchemaFileSelectNode, parent: FileSelectTreeNod
     };
     treeNode.children = node.children ? convertNodes(node.children, treeNode) : [];
     return treeNode;
+}
+
+function filterNodesToProject(
+    nodes: FileSelectTreeNode[],
+    rootPath: string,
+    projectId: string
+): FileSelectTreeNode[] {
+    if (rootPath === `/${projectId}` || rootPath.startsWith(`/${projectId}/`)) {
+        return nodes;
+    }
+    return nodes.filter((n) => n.name === projectId);
+}
+
+function findWorkbenchFolderByPath(folder: Folder, targetPath: string): Folder | null {
+    if (folder.uri.path === targetPath) return folder;
+    for (const child of folder.children) {
+        if (child.type === FileType.Directory) {
+            const found = findWorkbenchFolderByPath(child as Folder, targetPath);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function addMissingFolders(
+    nodes: FileSelectTreeNode[],
+    wbChildren: FileSystemNode[],
+    parent: FileSelectTreeNode | undefined
+): void {
+    for (const wbChild of wbChildren) {
+        if (wbChild.type !== FileType.Directory) continue;
+        const wbFolder = wbChild as Folder;
+        let existing = nodes.find((n) => n.isFolder && n.name === wbFolder.name);
+        if (!existing) {
+            const id = parent ? `${parent.id}/${wbFolder.name}` : wbFolder.name;
+            existing = { id, name: wbFolder.name, isFolder: true, children: [], parent };
+            nodes.push(existing);
+        }
+        addMissingFolders(existing.children, wbFolder.children, existing);
+    }
 }
 
 /**
@@ -176,6 +232,9 @@ watch(open, (isOpen) => {
     if (isOpen) {
         pendingNode.value = model.value != undefined ? findNodeByPath(treeData.value, model.value) : undefined;
         expandedItems.value = new Set();
+        if (countAllNodes(treeData.value) < 5) {
+            expandAll(treeData.value);
+        }
         if (pendingNode.value != undefined) {
             expandParentsOf(pendingNode.value);
         }
@@ -202,6 +261,19 @@ function expandParentsOf(node: FileSelectTreeNode): void {
     while (current != undefined) {
         expandedItems.value.add(current);
         current = current.parent;
+    }
+}
+
+function countAllNodes(nodes: FileSelectTreeNode[]): number {
+    return nodes.reduce((sum, n) => sum + 1 + countAllNodes(n.children), 0);
+}
+
+function expandAll(nodes: FileSelectTreeNode[]): void {
+    for (const node of nodes) {
+        if (node.isFolder) {
+            expandedItems.value.add(node);
+            expandAll(node.children);
+        }
     }
 }
 

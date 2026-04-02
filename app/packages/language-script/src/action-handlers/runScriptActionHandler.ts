@@ -110,6 +110,9 @@ export class RunScriptActionHandler implements ActionHandler {
         const metamodelUri = await this.getScriptMetamodelUri(data.uri);
         if (metamodelUri) {
             const compatibleModels = await this.findCompatibleModels(data.uri, metamodelUri);
+            if (methods.length === 1) {
+                return this.createModelOnlySelectionPage(compatibleModels);
+            }
             return this.createCombinedSelectionPage(methods, compatibleModels);
         }
 
@@ -131,6 +134,11 @@ export class RunScriptActionHandler implements ActionHandler {
         const rawInputs = params.inputs[0];
 
         if (!isMethodSelectionInputs(rawInputs)) {
+            const methods = await this.findParameterlessMethods(data.uri);
+            if (methods.length === 1 && typeof rawInputs === "object" && rawInputs !== null) {
+                const modelPath = (rawInputs as unknown as MethodAndModelSelectionInputs).modelPath;
+                return this.createExecutionSubmit(data.uri, methods[0], modelPath);
+            }
             return {
                 kind: "validation",
                 errors: [{ path: "/methodName", message: "Invalid input structure" }]
@@ -278,6 +286,33 @@ export class RunScriptActionHandler implements ActionHandler {
             page: {
                 title: "Run Script Method",
                 description: "Select a method to execute. Only methods with no parameters are shown.",
+                schema,
+                isLastPage: true,
+                submitButtonLabel: "Run"
+            }
+        };
+    }
+
+    private createModelOnlySelectionPage(modelAbsolutePaths: string[]): ActionStartResponse {
+        const { nodes, rootPath } = buildFileSelectTree(modelAbsolutePaths);
+        const schema: ActionSchema = {
+            properties: {
+                modelPath: {
+                    fileSelect: nodes,
+                    rootPath,
+                    placeholder: modelAbsolutePaths.length > 0 ? "Select a model file" : "No compatible models found"
+                }
+            },
+            propertyLabels: {
+                modelPath: "Model File"
+            }
+        };
+
+        return {
+            kind: "page",
+            page: {
+                title: "Run Script Method",
+                description: "Select a model file to execute.",
                 schema,
                 isLastPage: true,
                 submitButtonLabel: "Run"

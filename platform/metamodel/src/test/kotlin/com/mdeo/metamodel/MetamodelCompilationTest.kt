@@ -82,8 +82,8 @@ class MetamodelCompilationTest {
         ))
         val mm = assertDoesNotThrow { Metamodel.compile(data) }
         val instance = mm.createInstance("Thing")
-        // Single-valued field defaults to null when not set
-        assertNull(instance.getPropertyByKey("count"))
+        // Mandatory single-valued primitive field has JVM default value (0) when not set
+        assertEquals(0, instance.getPropertyByKey("count"))
     }
 
     @Test
@@ -111,12 +111,13 @@ class MetamodelCompilationTest {
         val mm = assertDoesNotThrow { Metamodel.compile(data) }
         val instance = mm.createInstance("Thing")
 
-        // All single-valued fields default to null when unset
-        assertNull(instance.getPropertyByKey("intProp"))
-        assertNull(instance.getPropertyByKey("longProp"))
-        assertNull(instance.getPropertyByKey("floatProp"))
-        assertNull(instance.getPropertyByKey("doubleProp"))
-        assertNull(instance.getPropertyByKey("boolProp"))
+        // Mandatory single-valued primitive fields default to JVM zero values when unset;
+        // optional string is still a reference type and defaults to null.
+        assertEquals(0,     instance.getPropertyByKey("intProp"))
+        assertEquals(0L,    instance.getPropertyByKey("longProp"))
+        assertEquals(0.0f,  instance.getPropertyByKey("floatProp"))
+        assertEquals(0.0,   instance.getPropertyByKey("doubleProp"))
+        assertEquals(false, instance.getPropertyByKey("boolProp"))
         assertNull(instance.getPropertyByKey("strProp"))
     }
 
@@ -232,8 +233,8 @@ class MetamodelCompilationTest {
         val mm = assertDoesNotThrow { Metamodel.compile(data) }
         val instance = mm.createInstance("Child")
 
-        // Inherited property accessible (null when not set)
-        assertNull(instance.getPropertyByKey("id"))
+        // Inherited mandatory primitive field has JVM default (0); own optional string is null
+        assertEquals(0, instance.getPropertyByKey("id"))
         // Own property accessible
         assertNull(instance.getPropertyByKey("label"))
     }

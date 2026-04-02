@@ -1808,4 +1808,68 @@ class LambdaCompilerTest {
         val result = helper.compileAndInvoke(ast)
         assertEquals(42, result)
     }
+    
+    @Test
+    fun `lambda coercion to predicate interface - boolean return with Any parameter`() {
+        // Reproduces the Predicate1 AbstractMethodError bug:
+        // A lambda (int) -> boolean is coerced to (Any?) -> boolean (Predicate1 interface).
+        // The erased SAM method type must use primitive Z (boolean) return, not Object.
+        // val source: (int) -> boolean = (x) => x > 5
+        // val target: (Any?) -> boolean = source  // triggers coercion to Predicate1
+        // return target(10)  // should call source(10) => true => return 1
+        val ast = buildTypedAst {
+            val intType = intType()
+            val boolType = booleanType()
+            // Source lambda type: (int) -> boolean
+            val sourceLambdaType = lambdaType(
+                ClassTypeRef("builtin", "boolean", false),
+                "x" to ClassTypeRef("builtin", "int", false)
+            )
+            // Target lambda type: (Any?) -> boolean — maps to Predicate1
+            val targetLambdaType = lambdaType(
+                ClassTypeRef("builtin", "boolean", false),
+                "a" to ClassTypeRef("builtin", "Any", true)
+            )
+            function(
+                name = "testFunction",
+                returnType = intType,
+                body = listOf(
+                    // val source: (int) -> boolean = (x) => x > 5
+                    varDecl("source", sourceLambdaType, lambdaExpr(
+                        parameters = listOf("x"),
+                        body = listOf(
+                            returnStmt(
+                                binaryExpr(
+                                    identifier("x", intType, 4),
+                                    ">",
+                                    intLiteral(5, intType),
+                                    boolType
+                                )
+                            )
+                        ),
+                        lambdaTypeIndex = sourceLambdaType
+                    )),
+                    // val target: (Any?) -> boolean = source
+                    // This triggers lambda coercion via CoercionUtil.emitLambdaCoercion
+                    // which must correctly set the SAM method type for Predicate1
+                    varDecl("target", targetLambdaType,
+                        identifier("source", sourceLambdaType, 3)
+                    ),
+                    // return if target(10) then 1 else 0
+                    // target(10) should return true (10 > 5)
+                    returnStmt(
+                        expressionCall(
+                            expression = identifier("target", targetLambdaType, 3),
+                            arguments = listOf(intLiteral(10, intType)),
+                            resultTypeIndex = boolType
+                        )
+                    )
+                )
+            )
+        }
+        
+        val result = helper.compileAndInvoke(ast)
+        // boolean true is returned as int 1 through the int-returning function
+        assertEquals(1, result)
+    }
 }

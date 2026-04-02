@@ -108,6 +108,8 @@ data class BatchEvaluationTask(
  * @param objectives Objective values of the new solution.
  * @param constraints Constraint values of the new solution.
  * @param succeeded Whether the mutation and evaluation completed without error.
+ * @param errorMessage When non-null, indicates that a guidance function (objective or constraint)
+ *   threw an exception. The orchestrator must treat this as a fatal evaluation failure.
  */
 @Serializable
 data class BatchResult(
@@ -115,7 +117,8 @@ data class BatchResult(
     val newSolutionId: String,
     val objectives: List<Double>,
     val constraints: List<Double>,
-    val succeeded: Boolean
+    val succeeded: Boolean,
+    val errorMessage: String? = null
 )
 
 /**

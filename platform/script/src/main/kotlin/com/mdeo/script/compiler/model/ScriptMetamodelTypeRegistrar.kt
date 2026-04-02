@@ -201,11 +201,9 @@ object ScriptMetamodelTypeRegistrar {
         for (property in classData.properties) {
             val fieldMapping = classMeta?.propertyFields?.get(property.name)
             if (fieldMapping != null) {
-                val isMultiple = property.multiplicity.isMultiple()
-                val scriptDescriptor = getScriptPropertyDescriptor(property, isMultiple)
                 typeDef.addProperty(DirectFieldPropertyDefinition(
                     name = property.name,
-                    descriptor = scriptDescriptor,
+                    descriptor = fieldMapping.fieldDescriptor,
                     ownerClass = instanceClassName,
                     fieldName = "prop_${fieldMapping.fieldIndex}",
                     fieldDescriptor = fieldMapping.fieldDescriptor,
@@ -237,30 +235,6 @@ object ScriptMetamodelTypeRegistrar {
         }
 
         registry.register(typeDef)
-    }
-
-    private fun getScriptPropertyDescriptor(
-        property: PropertyData,
-        isMultiple: Boolean
-    ): String {
-        if (isMultiple) return "Ljava/util/List;"
-
-        return when {
-            property.primitiveType != null -> when (property.primitiveType?.lowercase()) {
-                "string" -> "Ljava/lang/String;"
-                "int" -> "Ljava/lang/Integer;"
-                "long" -> "Ljava/lang/Long;"
-                "float" -> "Ljava/lang/Float;"
-                "double" -> "Ljava/lang/Double;"
-                "boolean" -> "Ljava/lang/Boolean;"
-                else -> "Ljava/lang/Object;"
-            }
-            property.enumType != null -> {
-                val enumValueClass = Metamodel.getEnumValueClassName(property.enumType!!)
-                "L$enumValueClass;"
-            }
-            else -> "Ljava/lang/Object;"
-        }
     }
 
     private fun isOwnLink(

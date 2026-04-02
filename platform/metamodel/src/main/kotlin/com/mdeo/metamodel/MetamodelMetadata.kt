@@ -9,13 +9,18 @@ package com.mdeo.metamodel
  *
  * @property fieldIndex The index of the `prop_X` field (i.e. X).
  * @property fieldDescriptor The JVM type descriptor of the field.
- *                            Single-valued: the boxed element type (e.g. `Ljava/lang/Integer;`).
- *                            Multi-valued: `Ljava/util/List;`.
+ *                            Single-valued mandatory primitive: JVM primitive descriptor (`I`,
+ *                            `J`, `F`, `D`, `Z`).  Single-valued optional primitive or object:
+ *                            the reference type (e.g. `Ljava/lang/Integer;`).  Multi-valued:
+ *                            `Ljava/util/List;`.
  * @property isCollection True for multi-valued properties (upper != 1); false for single-valued.
  * @property enumType The metamodel enum name when this property has an enum type, or null.
  * @property lower The lower bound of the multiplicity (0 or 1).
  * @property upper The upper bound of the multiplicity (1, n, or -1 for unbounded).
- * @property elementDescriptor The JVM type descriptor of individual elements
+ * @property elementDescriptor The JVM type descriptor of individual elements.
+ *                            For mandatory single-valued primitives this is the primitive
+ *                            descriptor (`I`, `J`, etc.) matching `fieldDescriptor`.
+ *                            For multi-valued properties list elements are always boxed
  *                            (e.g. `Ljava/lang/Integer;`, `Ljava/lang/String;`).
  */
 data class PropertyFieldMapping(

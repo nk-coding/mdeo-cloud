@@ -80,16 +80,16 @@ class ScriptSubprocessMain : SubprocessMain() {
 
     private fun handleExecute(cmd: ScriptCommand.Execute): ByteArray {
         val timeoutId = 0
-        if (cmd.timeoutMs > 0) registerTimeout(timeoutId, cmd.timeoutMs)
-        val compiledProgram = ScriptCompiler().compile(
-            CompilationInput(cmd.typedAsts),
-            cmd.metamodelData
-        )
-
         val outputStream = ByteArrayOutputStream()
         val printStream = PrintStream(outputStream, true, Charsets.UTF_8)
 
+        if (cmd.timeoutMs > 0) registerTimeout(timeoutId, cmd.timeoutMs)
         try {
+            val compiledProgram = ScriptCompiler().compile(
+                CompilationInput(cmd.typedAsts),
+                cmd.metamodelData
+            )
+
             val env = ExecutionEnvironment(compiledProgram)
 
             val model = if (cmd.modelData != null && compiledProgram.metamodel != null) {

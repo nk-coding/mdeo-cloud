@@ -156,6 +156,79 @@ class Scope(
     }
 
     /**
+     * Looks up a variable by name, returning the nearest declaration found traversing
+     * upward from this scope up to and including [declarationLevel].
+     *
+     * Unlike [lookupVariable], which requires an exact scope-level match, this method
+     * returns the first occurrence of [name] found going toward the root. This is
+     * necessary when looking up captured variables inside a lambda body: a captured
+     * variable is re-declared in the lambda's own parameters scope (at the lambda's
+     * level) rather than at its original [declarationLevel], so an exact-level lookup
+     * would skip the re-declaration and return the stale slot index from the original
+     * outer-function scope.
+     *
+     * @param name The variable name to search for.
+     * @param declarationLevel The scope level at which the variable was originally
+     *                         declared; used as an upper bound for the upward walk.
+     * @return The nearest [VariableInfo] found at or between the current scope and
+     *         [declarationLevel], or null if not found.
+     */
+    fun lookupVariableNearestUpTo(name: String, declarationLevel: Int): VariableInfo? {
+        val v = declaredVariables[name]
+        if (v != null) {
+            return v
+        }
+        if (level <= declarationLevel) {
+            return null
+        }
+        return parent?.lookupVariableNearestUpTo(name, declarationLevel)
+    }
+
+    /**
+     * Looks up a variable by name, respecting lambda-boundary re-declarations.
+     *
+     * Walks upward from this scope toward [declarationLevel].  For each scope:
+     * - If this scope is a lambda-params boundary ([isStaticallyNested] == false) **and**
+     *   [name] is declared here, return it immediately.  Lambda compilation re-declares
+     *   captured variables in the lambda-params scope with the correct JVM slot index for
+     *   that synthetic method; this path is the authoritative slot for use inside the lambda.
+     * - If [name] is declared at the exact [declarationLevel], return it (the original
+     *   declaration in any enclosing scope).
+     * - Statically-nested intermediate scopes (while/if/for bodies) that happen to shadow
+     *   [name] at a level != [declarationLevel] are **skipped**, so the caller gets the
+     *   variable they actually asked for.
+     *
+     * This differs from [lookupVariableNearestUpTo] (which always short-circuits on the
+     * first matching declaration regardless of nesting kind) in that it ignores shadowing
+     * declarations inside statically-nested child scopes, preserving correct behaviour for
+     * code like:
+     * ```
+     * var x = 100          // scope 3
+     * while (...) {
+     *     var x = 10       // scope 4  — shadows, but identifier("x", scope=3) still wants slot at 3
+     * }
+     * ```
+     *
+     * @param name The variable name to search for.
+     * @param declarationLevel The scope level at which the variable was originally declared.
+     * @return The [VariableInfo] for the innermost lambda-boundary re-declaration, or the
+     *         original declaration at [declarationLevel], or null if not found.
+     */
+    fun lookupVariableRespectingLambdaBoundary(name: String, declarationLevel: Int): VariableInfo? {
+        val v = declaredVariables[name]
+        if (v != null && !isStaticallyNested) {
+            return v
+        }
+        if (v != null && level == declarationLevel) {
+            return v
+        }
+        if (level <= declarationLevel) {
+            return null
+        }
+        return parent?.lookupVariableRespectingLambdaBoundary(name, declarationLevel)
+    }
+
+    /**
      * Finds the scope at a specific level by traversing up.
      * 
      * @param targetLevel The target scope level.

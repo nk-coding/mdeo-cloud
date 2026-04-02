@@ -2,6 +2,7 @@ package com.mdeo.script.compiler.expressions
 
 import com.mdeo.expression.ast.expressions.TypedCallArgument
 import com.mdeo.expression.ast.types.ClassTypeRef
+import com.mdeo.expression.ast.types.LambdaType
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.script.compiler.util.CoercionUtil
@@ -98,7 +99,8 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
                 val resolvedType = context.getType(arg.parameterType)
                 context.compileExpression(arg.value, mv, resolvedType)
                 if (i < signatureParameterTypes.size) {
-                    CoercionUtil.emitCoercion(resolvedType, signatureParameterTypes[i], mv, context)
+                    val effectiveTargetType = normalizeSignatureParamType(signatureParameterTypes[i], context)
+                    CoercionUtil.emitCoercion(resolvedType, effectiveTargetType, mv, context)
                 }
             }
             return
@@ -109,7 +111,8 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
             val resolvedType = context.getType(arg.parameterType)
             context.compileExpression(arg.value, mv, resolvedType)
             if (i < signatureParameterTypes.size) {
-                CoercionUtil.emitCoercion(resolvedType, signatureParameterTypes[i], mv, context)
+                val effectiveTargetType = normalizeSignatureParamType(signatureParameterTypes[i], context)
+                CoercionUtil.emitCoercion(resolvedType, effectiveTargetType, mv, context)
             }
         }
 
@@ -130,6 +133,26 @@ abstract class AbstractCallCompiler : ExpressionCompiler() {
 
             mv.visitInsn(Opcodes.AASTORE)
         }
+    }
+
+    /**
+     * Returns the effective coercion target type for a signature parameter.
+     *
+     * If the signature parameter is a [LambdaType] that maps to a predefined runtime
+     * interface (Func0-3, Action0-3, Predicate1), the normalized key is returned so that
+     * the argument lambda is coerced to exactly the predefined interface type. Otherwise
+     * the original type is returned unchanged.
+     *
+     * @param sigType The declared parameter type from the function/method signature.
+     * @param context The compilation context.
+     * @return The type to use as the coercion target.
+     */
+    private fun normalizeSignatureParamType(sigType: ValueType, context: CompilationContext): ReturnType {
+        if (sigType !is LambdaType) {
+            return sigType
+        }
+        val registry = context.getLambdaInterfaceRegistry()
+        return if (registry.isPredefined(sigType)) registry.createKey(sigType) else sigType
     }
 
 }

@@ -4,15 +4,20 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
 private const val HELPER_CLASS = "com/mdeo/metamodel/MultiplicityAccessHelper"
+private const val SET_IMPL_CLASS = "com/mdeo/script/stdlib/impl/collections/SetImpl"
+private const val LIST_IMPL_CLASS = "com/mdeo/script/stdlib/impl/collections/ListImpl"
 
 /**
  * Property definition that emits bytecode to access a generated `prop_X` field
  * on a metamodel-generated instance class.
  *
  * For regular scalar properties the field holds the value directly (or null when unset).
- * For multi-valued properties the field holds a `java.util.List`.
+ * For multi-valued properties the field holds a `java.util.List`, which is wrapped in a
+ * [ListImpl] so that it implements [ReadonlyCollection].
  * For link/association-end fields (which always use `java.util.Set` backing) a single-valued
- * association end additionally calls [MultiplicityAccessHelper.extractFirst] to unwrap the value.
+ * association end additionally calls [MultiplicityAccessHelper.extractFirst] to unwrap the
+ * value, while a multi-valued association end is wrapped in a [SetImpl] so that it
+ * implements [ReadonlyCollection].
  *
  * @param name The property name in the script language.
  * @param descriptor The script-facing JVM type descriptor (always a reference type).
@@ -40,7 +45,6 @@ class DirectFieldPropertyDefinition(
         mv.visitTypeInsn(Opcodes.CHECKCAST, ownerClass)
         mv.visitFieldInsn(Opcodes.GETFIELD, ownerClass, fieldName, fieldDescriptor)
         if (fieldDescriptor == "Ljava/util/Set;") {
-            // Link (association end) field: extract the single element when upper == 1
             if (upper == 1) {
                 mv.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
@@ -53,10 +57,20 @@ class DirectFieldPropertyDefinition(
                     val targetType = descriptor.substring(1, descriptor.length - 1)
                     mv.visitTypeInsn(Opcodes.CHECKCAST, targetType)
                 }
+            } else {
+                mv.visitTypeInsn(Opcodes.NEW, SET_IMPL_CLASS)
+                mv.visitInsn(Opcodes.DUP_X1)
+                mv.visitInsn(Opcodes.SWAP)
+                mv.visitMethodInsn(Opcodes.INVOKESPECIAL, SET_IMPL_CLASS, "<init>",
+                    "(Ljava/util/Collection;)V", false)
             }
-            // Multi-valued link: return Set as-is
+        } else if (fieldDescriptor == "Ljava/util/List;") {
+            mv.visitTypeInsn(Opcodes.NEW, LIST_IMPL_CLASS)
+            mv.visitInsn(Opcodes.DUP_X1)
+            mv.visitInsn(Opcodes.SWAP)
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, LIST_IMPL_CLASS, "<init>",
+                "(Ljava/util/Collection;)V", false)
         }
-        // Regular property (List or direct type): no additional handling needed
     }
 
     override fun emitSet(mv: MethodVisitor, valueDescriptor: String) {

@@ -1,5 +1,6 @@
 package com.mdeo.optimizer.moea
 
+import com.mdeo.optimizer.evaluation.EvaluationFailedException
 import com.mdeo.optimizer.evaluation.EvaluationResult
 import com.mdeo.optimizer.evaluation.EvaluationTask
 import com.mdeo.optimizer.evaluation.MutationEvaluator
@@ -219,6 +220,12 @@ class EvaluationCoordinator(
         // ── Build and dispatch batches ────────────────────────────────────────────
         val batches = buildNodeBatches(mutationTasks, evaluationTasks, importsByDestNode, rebalanceDiscardsByNode, discards)
         val results = runBlocking { evaluator.executeNodeBatches(batches) }
+
+        // ── Fail fast on guidance function evaluation errors ──────────────────────
+        val evaluationFailure = results.firstOrNull { it.errorMessage != null }
+        if (evaluationFailure != null) {
+            throw EvaluationFailedException(evaluationFailure.errorMessage!!)
+        }
 
         // ── Apply rebalance updates ───────────────────────────────────────────────
         val populationBySolutionId = buildPopulationLookup()

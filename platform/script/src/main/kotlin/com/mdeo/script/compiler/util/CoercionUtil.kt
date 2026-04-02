@@ -738,90 +738,22 @@ object CoercionUtil {
     }
     
     /**
-     * Builds the SAM method type for interfaces.
-     * 
-     * For predefined interfaces (Func0-3, Action0-3, Predicate1), uses erased Object types.
-     * For generated interfaces (Lambda$N), uses the actual types from the lambda type.
+     * Builds the SAM method type for the target interface's call method.
+     *
+     * Uses the exact types from the lambda type, so that concrete return types
+     * (e.g. boolean for Predicate1) are preserved rather than erased to Object.
      */
     private fun buildErasedOrActualMethodType(lambdaType: LambdaType, context: CompilationContext): Type {
-        val registry = context.getLambdaInterfaceRegistry()
-        val lookupResult = registry.getInterfaceForLambdaType(lambdaType)
-        val isPredefined = lookupResult.interfaceName.startsWith("com/mdeo/script/runtime")
-        
-        val descriptor = if (isPredefined) {
-            buildErasedMethodDescriptor(lambdaType)
-        } else {
-            buildLambdaCallDescriptor(lambdaType, context)
-        }
-        return Type.getMethodType(descriptor)
-    }
-    
-    /**
-     * Builds the erased method descriptor for generic interfaces.
-     */
-    private fun buildErasedMethodDescriptor(lambdaType: LambdaType): String {
-        val params = lambdaType.parameters.joinToString("") { "Ljava/lang/Object;" }
-        val returnDesc = if (lambdaType.returnType is VoidType) {
-            "V"
-        } else {
-            "Ljava/lang/Object;"
-        }
-        return "($params)$returnDesc"
+        return Type.getMethodType(buildLambdaCallDescriptor(lambdaType, context))
     }
     
     /**
      * Builds the instantiated method type for the target lambda.
-     * 
-     * For predefined generic interfaces (Func0-3), this uses boxed types (Integer, etc.)
-     * because the implementation needs to bridge from Object to boxed types.
-     * 
-     * For generated interfaces, this matches the interface method descriptor exactly
-     * because the interface already uses the correct types.
+     *
+     * Uses the exact types from the lambda type, matching the interface method descriptor.
      */
     private fun buildInstantiatedMethodType(lambdaType: LambdaType, context: CompilationContext): Type {
-        val registry = context.getLambdaInterfaceRegistry()
-        val lookupResult = registry.getInterfaceForLambdaType(lambdaType)
-        val isPredefined = lookupResult.interfaceName.startsWith("com/mdeo/script/runtime")
-        
-        val descriptor = if (isPredefined) {
-            buildBoxedMethodDescriptor(lambdaType)
-        } else {
-            buildLambdaCallDescriptor(lambdaType, context)
-        }
-        return Type.getMethodType(descriptor)
-    }
-    
-    /**
-     * Builds the boxed method descriptor for instantiated generic interfaces.
-     */
-    private fun buildBoxedMethodDescriptor(lambdaType: LambdaType): String {
-        val params = lambdaType.parameters.joinToString("") { param ->
-            getBoxedTypeDescriptor(param.type)
-        }
-        val returnDesc = if (lambdaType.returnType is VoidType) {
-            "V"
-        } else {
-            getBoxedTypeDescriptor(lambdaType.returnType)
-        }
-        return "($params)$returnDesc"
-    }
-    
-    /**
-     * Gets the boxed type descriptor for a type.
-     */
-    private fun getBoxedTypeDescriptor(type: ReturnType): String {
-        if (type !is ClassTypeRef) return "Ljava/lang/Object;"
-        if (type.`package` != "builtin") return "Ljava/lang/Object;"
-        
-        return when (type.type) {
-            "int" -> "Ljava/lang/Integer;"
-            "long" -> "Ljava/lang/Long;"
-            "float" -> "Ljava/lang/Float;"
-            "double" -> "Ljava/lang/Double;"
-            "boolean" -> "Ljava/lang/Boolean;"
-            "string" -> "Ljava/lang/String;"
-            else -> "Ljava/lang/Object;"
-        }
+        return Type.getMethodType(buildLambdaCallDescriptor(lambdaType, context))
     }
     
     /**

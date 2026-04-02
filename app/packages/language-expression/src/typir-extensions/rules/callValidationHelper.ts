@@ -778,7 +778,7 @@ export class GenericResolver<Specifics extends TypirSpecifics> {
                 getClassTypeIdentifier(declaredTypeDefinition);
             actualTypeArgs = actualType.details.typeArgs;
         } else {
-            const result = findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition, this.services);
+            const result = findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition);
             isAllowed = result != undefined;
             actualTypeArgs = result?.typeArgs;
         }

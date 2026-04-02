@@ -220,7 +220,8 @@ class FederatedMutationEvaluator(
                     workerNodeId = batch.nodeId,
                     objectives = result.objectives,
                     constraints = result.constraints,
-                    succeeded = result.succeeded
+                    succeeded = result.succeeded,
+                    errorMessage = result.errorMessage
                 )
             }
         } catch (e: Exception) {

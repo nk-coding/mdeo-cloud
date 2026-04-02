@@ -56,13 +56,11 @@ export function findCommonParentType<Specifics extends TypirSpecifics>(
  *
  * @param type The class type to search from
  * @param targetDefinition The target supertype definition to find
- * @param services Extended Typir services for type operations
  * @returns Object with the supertype and its type arguments, or undefined if not found
  */
-export function findSuperTypeWithTypeArgs<Specifics extends TypirSpecifics>(
+export function findSuperTypeWithTypeArgs(
     type: CustomClassType,
-    targetDefinition: ClassType,
-    services: ExtendedTypirServices<Specifics>
+    targetDefinition: ClassType
 ): { type: CustomClassType; typeArgs: Map<string, CustomValueType> } | undefined {
     const targetIdentifier = getClassTypeIdentifier(targetDefinition);
     const visited = new Set<string>();

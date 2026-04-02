@@ -28,15 +28,10 @@ import { Script, type ScriptType } from "@mdeo/language-script";
 const { AstUtils, CstUtils, isLeafCstNode, GrammarUtils } = sharedImport("langium");
 
 /**
- * Numeric type names accepted for objective function return types.
+ * Numeric type names accepted for objective and constraint function return types.
  * These correspond to the primitive types supported by the Script language.
  */
 const NUMERIC_TYPE_NAMES = new Set(["int", "double", "float", "long"]);
-
-/**
- * Boolean type name accepted for constraint function return types.
- */
-const BOOLEAN_TYPE_NAME = "boolean";
 
 /**
  * Interface mapping for optimization AST types used in validation checks.
@@ -120,7 +115,8 @@ export class OptimizationValidator {
      * Validates a goal section:
      * - At least one objective must be defined
      * - All referenced objective functions must take no arguments and return a numeric type
-     * - All referenced constraint functions must take no arguments and return boolean
+     * - All referenced constraint functions must take no arguments and return a numeric type
+     *   (0.0 = constraint satisfied; any non-zero value = magnitude of violation)
      *
      * @param goal The goal section node to validate
      * @param accept The validation acceptor for reporting diagnostics
@@ -351,8 +347,9 @@ export class OptimizationValidator {
     }
 
     /**
-     * Validates that all functions referenced in constraints take no arguments and return boolean.
-     * Uses only AST-level information (no type system).
+     * Validates that all functions referenced in constraints take no arguments and return a numeric
+     * type. A return value of 0.0 means the constraint is satisfied; any non-zero value represents
+     * the magnitude of violation.
      *
      * @param goal The goal section containing constraints
      * @param accept The validation acceptor
@@ -365,6 +362,7 @@ export class OptimizationValidator {
 
     /**
      * Validates a single constraint's function reference signature.
+     * The function must return a numeric type where 0.0 = satisfied and non-zero = magnitude of violation.
      *
      * @param constraintRef The constraint reference node to check
      * @param accept The validation acceptor
@@ -389,18 +387,22 @@ export class OptimizationValidator {
 
         const returnType = fn.returnType;
         if (returnType == undefined) {
-            accept("error", `Constraint function '${fn.name}' must declare a return type (boolean).`, {
-                node: constraintRef,
-                property: "constraint"
-            });
+            accept(
+                "error",
+                `Constraint function '${fn.name}' must declare a return type (int, double, float, or long).`,
+                {
+                    node: constraintRef,
+                    property: "constraint"
+                }
+            );
             return;
         }
 
         const typeName = this.extractTypeName(returnType);
-        if (typeName !== BOOLEAN_TYPE_NAME) {
+        if (typeName == undefined || !NUMERIC_TYPE_NAMES.has(typeName)) {
             accept(
                 "error",
-                `Constraint function '${fn.name}' must return boolean, but returns '${typeName ?? "unknown"}'.`,
+                `Constraint function '${fn.name}' must return a numeric type (int, double, float, or long), but returns '${typeName ?? "unknown"}'. A return value of 0.0 means satisfied; any non-zero value represents the magnitude of violation.`,
                 {
                     node: constraintRef,
                     property: "constraint"

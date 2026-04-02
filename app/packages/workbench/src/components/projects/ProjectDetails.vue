@@ -4,8 +4,8 @@
             <template #actions>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" class="h-8 w-8" @click="handleOpenProjects">
-                            <FolderOpen class="size-4" />
+                        <Button variant="secondary" size="sm" @click="handleOpenProjects">
+                            Open <FolderOpen class="size-4" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">Open Projects</TooltipContent>

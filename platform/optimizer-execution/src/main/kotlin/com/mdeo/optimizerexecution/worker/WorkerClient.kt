@@ -10,6 +10,7 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.websocket.*
@@ -180,10 +181,15 @@ class WorkerClient(
      */
     suspend fun allocate(request: WorkerAllocationRequest): WorkerAllocationResponse {
         return if (useLocalChannel) {
-            val response = httpClient.post("$baseUrl/api/worker/executions") {
+            val httpResp = httpClient.post("$baseUrl/api/worker/executions") {
                 contentType(ContentType.Application.Json)
                 setBody(request.copy(useLocalChannel = true, orchestratorWsUrl = null))
-            }.body<WorkerAllocationResponse>()
+            }
+            if (!httpResp.status.isSuccess()) {
+                val errorBody = httpResp.bodyAsText()
+                throw IllegalStateException("Worker allocation failed (${httpResp.status.value}): $errorBody")
+            }
+            val response = httpResp.body<WorkerAllocationResponse>()
             startWsSession(request.executionId)
             response
         } else {
@@ -214,10 +220,15 @@ class WorkerClient(
         } else null
 
         val response = try {
-            httpClient.post("$baseUrl/api/worker/executions") {
+            val httpResp = httpClient.post("$baseUrl/api/worker/executions") {
                 contentType(ContentType.Application.Json)
                 setBody(request.copy(orchestratorWsUrl = orchestratorWsUrl))
-            }.body<WorkerAllocationResponse>()
+            }
+            if (!httpResp.status.isSuccess()) {
+                val errorBody = httpResp.bodyAsText()
+                throw IllegalStateException("Worker allocation failed (${httpResp.status.value}): $errorBody")
+            }
+            httpResp.body<WorkerAllocationResponse>()
         } catch (e: Exception) {
             if (registryKey != null) orchestratorRegistry.remove(registryKey)
             throw e

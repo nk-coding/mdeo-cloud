@@ -414,7 +414,5 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
         )
     )
     .method("first", (m) => m.signature((s) => s.returns(genericTypeRef("T"))))
-    .method("firstOrNull", (m) =>
-        m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Any).build()))
-    )
+    .method("firstOrNull", (m) => m.signature((s) => s.returns(typeRef("builtin", DefaultTypeNames.Any).build())))
     .build();

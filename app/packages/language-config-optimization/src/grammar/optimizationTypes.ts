@@ -111,7 +111,9 @@ export type ProblemSectionType = ASTType<typeof ProblemSection>;
 
 /**
  * Constraint reference.
- * References a function that should return a boolean for constraint checking.
+ * References a function that returns a numeric type representing the magnitude of constraint
+ * violation. A return value of 0.0 means the constraint is satisfied; any non-zero value
+ * represents the degree of violation.
  */
 export const ConstraintReference = createInterface("ConfigConstraintReference").attrs({
     constraint: Ref(() => ScriptFunction)

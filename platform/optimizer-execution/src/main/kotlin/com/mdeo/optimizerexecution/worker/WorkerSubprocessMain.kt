@@ -378,8 +378,6 @@ class WorkerSubprocessMain : SubprocessMain() {
     private fun buildEvaluatorAndInitialize(
         request: WorkerSubprocessRequest.Setup
     ): Pair<LocalMutationEvaluator, List<WorkerInitialSolution>> {
-        val metamodel = Metamodel.compile(request.metamodelData)
-
         val transformations: Map<String, TransformationTypedAst> = request.transformationAstJsons
             .mapValues { (_, json) -> transformationJson.decodeFromString<TransformationTypedAst>(json) }
 
@@ -387,6 +385,7 @@ class WorkerSubprocessMain : SubprocessMain() {
             .mapValues { (_, json) -> scriptJson.decodeFromString<ScriptTypedAst>(json) }
 
         val compiledProgram = ScriptCompiler().compile(CompilationInput(scriptAsts), request.metamodelData)
+        val metamodel = compiledProgram.metamodel ?: Metamodel.compile(request.metamodelData)
         val clazz = ExecutionEnvironment(compiledProgram).scriptProgramClass
 
         val objectives = request.goalConfig.objectives.map { obj ->
@@ -638,7 +637,7 @@ class WorkerSubprocessMain : SubprocessMain() {
                     succeeded = true
                 )
             } else {
-                failedResult(task.solutionId)
+                failedResult(task.solutionId, result?.errorMessage)
             }
         } catch (_: Exception) {
             failedResult(task.solutionId)
@@ -689,7 +688,7 @@ class WorkerSubprocessMain : SubprocessMain() {
                     succeeded = true
                 )
             } else {
-                failedResult(task.solutionId)
+                failedResult(task.solutionId, result?.errorMessage)
             }
         } catch (_: Exception) {
             failedResult(task.solutionId)
@@ -730,14 +729,16 @@ class WorkerSubprocessMain : SubprocessMain() {
      * Constructs a failed [BatchResult] for [parentSolutionId] with empty objectives and constraints.
      *
      * @param parentSolutionId The ID of the solution whose mutation or evaluation failed.
+     * @param errorMessage When non-null, indicates a guidance function failure (not a mutation failure).
      * @return A [BatchResult] with [BatchResult.succeeded] set to `false`.
      */
-    private fun failedResult(parentSolutionId: String) = BatchResult(
+    private fun failedResult(parentSolutionId: String, errorMessage: String? = null) = BatchResult(
         parentSolutionId = parentSolutionId,
         newSolutionId = "",
         objectives = emptyList(),
         constraints = emptyList(),
-        succeeded = false
+        succeeded = false,
+        errorMessage = errorMessage
     )
 
 
