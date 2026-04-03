@@ -153,11 +153,7 @@ function convertNode(node: ActionSchemaFileSelectNode, parent: FileSelectTreeNod
     return treeNode;
 }
 
-function filterNodesToProject(
-    nodes: FileSelectTreeNode[],
-    rootPath: string,
-    projectId: string
-): FileSelectTreeNode[] {
+function filterNodesToProject(nodes: FileSelectTreeNode[], rootPath: string, projectId: string): FileSelectTreeNode[] {
     if (rootPath === `/${projectId}` || rootPath.startsWith(`/${projectId}/`)) {
         return nodes;
     }

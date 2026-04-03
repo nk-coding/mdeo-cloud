@@ -11,6 +11,7 @@ import com.mdeo.script.compiler.util.CoercionUtil
 import com.mdeo.script.compiler.CompilationContext
 import com.mdeo.script.compiler.ExpressionCompiler
 import com.mdeo.script.compiler.LambdaInterfaceRegistry
+import com.mdeo.script.compiler.LambdaScope
 import com.mdeo.script.compiler.LocalVariableIndexAssigner
 import com.mdeo.script.compiler.RefTypeUtil
 import com.mdeo.script.compiler.Scope
@@ -137,7 +138,7 @@ class LambdaCompiler : ExpressionCompiler() {
         val capturedPairs = lambdaBodyScope.collectCapturedVariables(lambdaParamsLevel)
 
         return capturedPairs.mapNotNull { (name, declarationLevel) ->
-            val variable = context.currentScope?.lookupVariableNearestUpTo(name, declarationLevel)
+            val variable = context.currentScope?.lookupVariable(name, declarationLevel)
 
             if (variable != null) {
                 CapturedVariable(
@@ -195,13 +196,13 @@ class LambdaCompiler : ExpressionCompiler() {
                 "Lambda body scope not found in scope tree. This indicates a bug in ScopeBuilder."
             )
 
-        val lambdaParamsScope = lambdaBodyScope.parent
+        val lambdaParamsScope = lambdaBodyScope.parent as? LambdaScope
             ?: throw IllegalStateException(
-                "Lambda params scope not found. This indicates a bug in ScopeBuilder."
+                "Lambda params scope should be a LambdaScope. This indicates a bug in ScopeBuilder."
             )
 
         for (captured in capturedVariables) {
-            val varInfo = lambdaParamsScope.declareVariable(captured.name, captured.type)
+            val varInfo = lambdaParamsScope.declareCapturedVariable(captured.name, captured.scopeLevel, captured.type)
             varInfo.isWrittenByLambda = captured.isRef
         }
 
@@ -220,6 +221,7 @@ class LambdaCompiler : ExpressionCompiler() {
         }
 
         assignLambdaSlots(lambdaParamsScope, context)
+        lambdaParamsScope.activateBoundary()
 
         emitParameterCoercion(lambda, actualLambdaType, effectiveLambdaType, lambdaParamsScope, mv)
 
@@ -356,8 +358,6 @@ class LambdaCompiler : ExpressionCompiler() {
         context: CompilationContext,
         mv: MethodVisitor
     ) {
-        // Load `this` — the lambda's synthetic method is an instance method and
-        // needs access to the same instance (and its __ctx field).
         mv.visitVarInsn(Opcodes.ALOAD, 0)
 
         for (captured in capturedVariables) {
@@ -424,8 +424,6 @@ class LambdaCompiler : ExpressionCompiler() {
             }
         }
         val functionalInterface = getFunctionalInterface(lambdaType, context)
-        // `this` is passed as the first captured argument so the synthetic instance
-        // method has access to the script class (and its __ctx field).
         return "(L${context.currentClassName};$capturedParams)L$functionalInterface;"
     }
 

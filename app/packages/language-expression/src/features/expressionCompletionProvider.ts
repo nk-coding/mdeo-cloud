@@ -12,14 +12,8 @@ import type { ExpressionTypirServices } from "../type-system/services.js";
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { TypeTypes } from "../grammar/typeTypes.js";
-import {
-    ClassTypeRef,
-    GenericTypeRef,
-    VoidType,
-    type ClassType,
-    type ValueType,
-    type Method
-} from "../typir-extensions/config/type.js";
+import { type ClassType } from "../typir-extensions/config/type.js";
+import { memberValueTypeToString, memberMethodDetailString } from "./expressionTypeRendering.js";
 
 const { DefaultCompletionProvider } = sharedImport("langium/lsp");
 const { CompletionItemKind } = sharedImport("vscode-languageserver-protocol");
@@ -312,39 +306,6 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
  * @param packageMap Map from user-visible names to internal packages
  * @returns The user-visible package name, or undefined if not found
  */
-function memberValueTypeToString(type: ValueType, typeArgs: Map<string, CustomValueType>): string {
-    if (GenericTypeRef.is(type)) {
-        const resolved = typeArgs.get(type.generic);
-        return resolved != null ? resolved.getName() : type.generic;
-    } else if (ClassTypeRef.is(type)) {
-        const base = type.type;
-        if (type.typeArgs != null && Object.keys(type.typeArgs).length > 0) {
-            const argsStr = Object.values(type.typeArgs)
-                .map((arg) => memberValueTypeToString(arg, typeArgs))
-                .join(", ");
-            return `${base}<${argsStr}>${type.isNullable ? "?" : ""}`;
-        }
-        return `${base}${type.isNullable ? "?" : ""}`;
-    } else {
-        // LambdaType
-        const params = type.parameters.map((p) => memberValueTypeToString(p.type, typeArgs)).join(", ");
-        const ret = VoidType.is(type.returnType)
-            ? "void"
-            : memberValueTypeToString(type.returnType as ValueType, typeArgs);
-        const lambda = `(${params}) => ${ret}`;
-        return type.isNullable ? `(${lambda})?` : lambda;
-    }
-}
-
-function memberMethodDetailString(method: Method, typeArgs: Map<string, CustomValueType>): string {
-    const signatures = Object.values(method.type.signatures);
-    if (signatures.length === 0) return "()";
-    const sig = signatures[0];
-    const params = sig.parameters.map((p) => `${p.name}: ${memberValueTypeToString(p.type, typeArgs)}`).join(", ");
-    const ret = VoidType.is(sig.returnType) ? "void" : memberValueTypeToString(sig.returnType as ValueType, typeArgs);
-    return `(${params}): ${ret}`;
-}
-
 function findUserVisiblePackage(internalPackage: string, packageMap: Map<string, string[]>): string | undefined {
     for (const [userPkg, internalPkgs] of packageMap.entries()) {
         if (internalPkgs.includes(internalPackage)) {

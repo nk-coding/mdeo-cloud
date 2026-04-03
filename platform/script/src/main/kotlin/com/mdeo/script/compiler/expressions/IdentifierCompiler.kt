@@ -26,11 +26,10 @@ import org.objectweb.asm.Opcodes
  * local variable lookup.
  * 
  * This compiler uses polymorphic scope lookup to handle both regular function
- * scopes and lambda body scopes uniformly. The LambdaBodyScope class returns
- * VariableInfo with the correct slot indices and isWrittenByLambda flags for:
- * - Lambda parameters (loaded from local slots)
- * - Captured variables (loaded from parameter slots, with isWrittenByLambda=true if Ref-wrapped)
- * - Local variables declared in the lambda body
+ * scopes and lambda scopes uniformly. The [LambdaScope][com.mdeo.script.compiler.LambdaScope]
+ * subclass overrides [lookupVariable][com.mdeo.script.compiler.Scope.lookupVariable] to
+ * intercept accesses to captured variables, returning the correct JVM slot index for the
+ * lambda's synthetic method.
  * 
  * This compiler overrides [compile] to provide correct coercion from the variable's
  * actual type (from scope lookup) to the expected type, rather than relying on
@@ -65,7 +64,7 @@ class IdentifierCompiler : ExpressionCompiler() {
             return
         }
 
-        val variable = context.currentScope?.lookupVariableRespectingLambdaBoundary(identifier.name, identifier.scope)
+        val variable = context.currentScope?.lookupVariable(identifier.name, identifier.scope)
             ?: throw IllegalStateException("Variable not found: ${identifier.name} at scope level ${identifier.scope}")
 
         compileVariableLoad(variable, variable.type, mv)

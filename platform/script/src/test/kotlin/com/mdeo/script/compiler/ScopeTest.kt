@@ -138,30 +138,18 @@ class ScopeTest {
     }
     
     @Test
-    fun `get scope at level`() {
-        val level2 = Scope(level = 2)
-        val level3 = level2.createChild()
-        val level4 = level3.createChild()
-        val level5 = level4.createChild()
-        
-        assertEquals(level2, level5.getScopeAtLevel(2))
-        assertEquals(level3, level5.getScopeAtLevel(3))
-        assertEquals(level4, level5.getScopeAtLevel(4))
-        assertEquals(level5, level5.getScopeAtLevel(5))
-    }
-    
-    @Test
     fun `statically nested scope by default`() {
         val scope = Scope(level = 3)
         assertTrue(scope.isStaticallyNested)
     }
     
     @Test
-    fun `lambda scope is not statically nested`() {
+    fun `lambda scope is a LambdaScope`() {
         val parent = Scope(level = 3)
-        val lambdaScope = parent.createChild(isStaticallyNested = false)
+        val lambdaScope = LambdaScope(parent)
         
         assertFalse(lambdaScope.isStaticallyNested)
+        assertEquals(4, lambdaScope.level)
     }
     
     @Test
@@ -176,7 +164,7 @@ class ScopeTest {
     @Test
     fun `hasLambdaScopeBetween returns true when lambda scope exists`() {
         val level3 = Scope(level = 3)
-        val lambdaScope = level3.createChild(isStaticallyNested = false)
+        val lambdaScope = LambdaScope(level3)
         val level5 = lambdaScope.createChild()
         
         assertTrue(level5.hasLambdaScopeBetween(3))
@@ -218,7 +206,7 @@ class ScopeTest {
     @Test
     fun `collectCapturedVariables returns empty when no reads from outer scope`() {
         val functionScope = Scope(level = 2)
-        val lambdaParamsScope = functionScope.createChild(isStaticallyNested = false)
+        val lambdaParamsScope = LambdaScope(functionScope)
         val lambdaBodyScope = lambdaParamsScope.createChild()
         
         lambdaBodyScope.recordRead("localVar", 4)
@@ -232,7 +220,7 @@ class ScopeTest {
         val functionScope = Scope(level = 2)
         functionScope.declareVariable("outerVar", type("int"))
         
-        val lambdaParamsScope = functionScope.createChild(isStaticallyNested = false)
+        val lambdaParamsScope = LambdaScope(functionScope)
         val lambdaBodyScope = lambdaParamsScope.createChild()
         
         lambdaBodyScope.recordRead("outerVar", 2)
@@ -247,7 +235,7 @@ class ScopeTest {
         val functionScope = Scope(level = 2)
         functionScope.declareVariable("counter", type("int"))
         
-        val lambdaParamsScope = functionScope.createChild(isStaticallyNested = false)
+        val lambdaParamsScope = LambdaScope(functionScope)
         val lambdaBodyScope = lambdaParamsScope.createChild()
         
         lambdaBodyScope.recordWrite("counter", 2)
@@ -263,7 +251,7 @@ class ScopeTest {
         functionScope.declareVariable("x", type("int"))
         functionScope.declareVariable("y", type("int"))
         
-        val lambdaParamsScope = functionScope.createChild(isStaticallyNested = false)
+        val lambdaParamsScope = LambdaScope(functionScope)
         val lambdaBodyScope = lambdaParamsScope.createChild()
         val nestedWhileScope = lambdaBodyScope.createChild()
         
@@ -281,11 +269,11 @@ class ScopeTest {
         val functionScope = Scope(level = 2)
         functionScope.declareVariable("outerVar", type("int"))
         
-        val lambda1ParamsScope = functionScope.createChild(isStaticallyNested = false)
+        val lambda1ParamsScope = LambdaScope(functionScope)
         val lambda1BodyScope = lambda1ParamsScope.createChild()
         
         /* Nested lambda inside lambda1 */
-        val lambda2ParamsScope = lambda1BodyScope.createChild(isStaticallyNested = false)
+        val lambda2ParamsScope = LambdaScope(lambda1BodyScope)
         val lambda2BodyScope = lambda2ParamsScope.createChild()
         
         lambda2BodyScope.recordRead("outerVar", 2)
@@ -302,7 +290,7 @@ class ScopeTest {
     @Test
     fun `findNearestLambdaScope returns lambda scope`() {
         val functionScope = Scope(level = 2)
-        val lambdaScope = functionScope.createChild(isStaticallyNested = false)
+        val lambdaScope = LambdaScope(functionScope)
         val bodyScope = lambdaScope.createChild()
         
         assertEquals(lambdaScope, bodyScope.findNearestLambdaScope())

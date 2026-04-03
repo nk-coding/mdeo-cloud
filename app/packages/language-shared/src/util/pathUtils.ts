@@ -55,42 +55,49 @@ export interface FileSelectTreeResult {
 }
 
 /**
- * Builds a hierarchical file selection tree from a list of absolute file paths.
- * The common ancestor prefix is stripped so the tree shows only the meaningful
- * structure, and the stripped prefix is returned as `rootPath`.
+ * Builds a hierarchical tree of file selection nodes from a list of absolute file paths.
+ */
+interface InternalNode {
+    name: string;
+    children: InternalNode[];
+}
+
+/**
+ * Converts internal tree nodes to public-facing {@link ActionSchemaFileSelectNode} format.
  *
- * @param absolutePaths Array of absolute file paths to include in the tree
- * @returns Tree nodes and the common root path prefix
+ * @param nodes List of internal nodes to convert
+ * @returns List of public-facing file select nodes
+ */
+function toPublic(nodes: InternalNode[]): ActionSchemaFileSelectNode[] {
+    return nodes.map((n) => {
+        const node: ActionSchemaFileSelectNode = { name: n.name };
+        if (n.children.length > 0) node.children = toPublic(n.children);
+        return node;
+    });
+}
+
+/**
+ * Builds a file selection tree from a list of absolute paths.
+ *
+ * Strips the common `<projectId>/files` prefix from all paths, using the first
+ * path to determine the prefix. All paths are assumed to share the same prefix.
+ *
+ * @param absolutePaths List of absolute file paths to build the tree from.
+ * @returns A tree of {@link ActionSchemaFileSelectNode} nodes and the stripped root path.
  */
 export function buildFileSelectTree(absolutePaths: string[]): FileSelectTreeResult {
-    if (absolutePaths.length === 0) {return { nodes: [], rootPath: "" };}
+    if (absolutePaths.length === 0) return { nodes: [], rootPath: "" };
 
-    const splitPaths = absolutePaths.map((p) => p.split("/").filter(Boolean));
-
-    let commonLen = 0;
-    const first = splitPaths[0];
-    if (first) {
-        outer: for (let i = 0; i < first.length - 1; i++) {
-            for (const parts of splitPaths) {
-                if (parts[i] !== first[i]) break outer;
-            }
-            commonLen++;
-        }
-    }
-
-    const rootPath = commonLen > 0 ? "/" + (first ?? []).slice(0, commonLen).join("/") : "";
-
-    interface InternalNode {
-        name: string;
-        children: InternalNode[];
-    }
+    const firstParts = absolutePaths[0].split("/").filter(Boolean);
+    const markerIndex = firstParts.indexOf("files");
+    const prefixLen = markerIndex >= 0 ? markerIndex + 1 : 0;
+    const rootPath = "/" + firstParts.slice(0, prefixLen).join("/");
 
     const root: InternalNode = { name: "", children: [] };
 
     for (const absolutePath of absolutePaths) {
-        const parts = absolutePath.split("/").filter(Boolean).slice(commonLen);
+        const parts = absolutePath.split("/").filter(Boolean).slice(prefixLen);
         let current = root;
-
         for (const name of parts) {
             let child = current.children.find((c) => c.name === name);
             if (!child) {
@@ -99,14 +106,6 @@ export function buildFileSelectTree(absolutePaths: string[]): FileSelectTreeResu
             }
             current = child;
         }
-    }
-
-    function toPublic(nodes: InternalNode[]): ActionSchemaFileSelectNode[] {
-        return nodes.map((n) => {
-            const node: ActionSchemaFileSelectNode = { name: n.name };
-            if (n.children.length > 0) node.children = toPublic(n.children);
-            return node;
-        });
     }
 
     return { nodes: toPublic(root.children), rootPath };

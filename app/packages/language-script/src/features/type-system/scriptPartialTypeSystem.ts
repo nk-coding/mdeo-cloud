@@ -646,8 +646,9 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 this.typir,
                 []
             );
-            if (genericResolver.isFullyDefined(signature.returnType)) {
-                return genericResolver.resolveType(signature.returnType);
+            const initialResolved = genericResolver.resolveType(signature.returnType);
+            if (!Array.isArray(initialResolved)) {
+                return initialResolved;
             }
             for (let i = 0; i < signature.parameters.length; i++) {
                 const name = signature.parameters[i].name;
@@ -668,8 +669,9 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 }
                 genericResolver.checkAndUpdateArgumentType(i, type);
             }
-            if (genericResolver.isFullyDefined(signature.returnType)) {
-                return genericResolver.resolveType(signature.returnType);
+            const resolvedAfterArgs = genericResolver.resolveType(signature.returnType);
+            if (!Array.isArray(resolvedAfterArgs)) {
+                return resolvedAfterArgs;
             }
             return {
                 $problem: this.inferenceProblem,

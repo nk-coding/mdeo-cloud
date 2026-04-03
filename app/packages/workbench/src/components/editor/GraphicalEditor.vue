@@ -3,6 +3,7 @@
         ref="sprottyWrapper"
         class="sprotty-wrapper w-full h-full relative ml-1.5"
         :class="graphicalEditorPlugin?.stylesCls"
+        @wheel.capture="handleWheel"
     >
         <div v-if="graphicalEditorPlugin != undefined" :id="id"></div>
     </div>
@@ -10,12 +11,12 @@
 <script setup lang="ts">
 import "reflect-metadata";
 import { createContainer } from "@mdeo/editor-common";
-import { computed, inject, onMounted, ref, shallowRef, useId, watch } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, shallowRef, useId, watch } from "vue";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { workbenchStateKey } from "../workbench/util";
 import { DiagramLoader } from "@eclipse-glsp/client";
 import { editorContextKey } from "@/lib/editorPlugin";
-import { useResizeObserver } from "@vueuse/core";
+import { useResizeObserver, useStyleTag } from "@vueuse/core";
 import type { ResetCanvasBoundsAction } from "@mdeo/protocol-common";
 import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { EditMode, TYPES } from "@eclipse-glsp/sprotty";
@@ -27,6 +28,7 @@ const props = defineProps<{
     languagePlugin: ResolvedWorkbenchLanguagePlugin;
     editable: boolean;
     isActive: boolean;
+    captureWheelscroll?: boolean;
 }>();
 
 const { glspClient } = inject(workbenchStateKey)!;
@@ -59,6 +61,21 @@ useResizeObserver(sprottyWrapper, () => {
     actionDispatcher.value?.dispatch({ kind: "resetCanvasBoundsAction" } satisfies ResetCanvasBoundsAction);
 });
 
+/**
+ * Handles wheel events on the graphical editor.
+ * If capture is enabled, stops propagation only when focus is outside the editor.
+ */
+function handleWheel(event: WheelEvent): void {
+    if (!props.captureWheelscroll) {
+        return;
+    }
+
+    const focusedElement = document.activeElement;
+    if (sprottyWrapper.value && focusedElement != null && !sprottyWrapper.value.contains(focusedElement)) {
+        event.stopPropagation();
+    }
+}
+
 onMounted(async () => {
     if (props.languagePlugin.graphicalEditorPlugin == undefined) {
         return;
@@ -83,4 +100,10 @@ onMounted(async () => {
     await diagramLoader.load({ initializeParameters: { applicationId: "mdeo" } });
     diagramLoaded.value = true;
 });
+
+onUnmounted(() => {
+    document.getElementById(`${id}_hidden`)?.remove();
+});
+
+useStyleTag(computed(() => `#${id}_hidden { display: ${props.isActive ? "block" : "none"}; }`));
 </script>

@@ -27,7 +27,8 @@
                             :tab="{ fileUri: embed.uri, temporary: true }"
                             :language-plugin="<ResolvedWorkbenchLanguagePlugin>embed.languagePlugin"
                             :editable="false"
-                            is-active
+                            :is-active="isActive"
+                            capture-wheelscroll
                         />
                     </div>
                     <div v-else class="flex items-center gap-3 px-4 py-6 text-sm text-muted-foreground">
@@ -70,6 +71,7 @@ import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 
 const props = defineProps<{
     uri: Uri;
+    isActive: boolean;
 }>();
 
 const { languagePluginByExtension, monacoApi, project } = inject(workbenchStateKey)!;

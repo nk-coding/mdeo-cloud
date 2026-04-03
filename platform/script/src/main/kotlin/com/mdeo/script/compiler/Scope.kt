@@ -61,7 +61,7 @@ data class VariableInfo(
  *                           Lambdas are NOT statically nested - they create a new JVM scope.
  *                           All other scopes (while, if, for body) ARE statically nested.
  */
-class Scope(
+open class Scope(
     val level: Int,
     val parent: Scope? = null,
     val isStaticallyNested: Boolean = true
@@ -148,98 +148,11 @@ class Scope(
      * @param scopeLevel The scope level where the variable was declared.
      * @return The VariableInfo if found, null otherwise.
      */
-    fun lookupVariable(name: String, scopeLevel: Int): VariableInfo? {
+    open fun lookupVariable(name: String, scopeLevel: Int): VariableInfo? {
         if (level == scopeLevel) {
             return declaredVariables[name]
         }
         return parent?.lookupVariable(name, scopeLevel)
-    }
-
-    /**
-     * Looks up a variable by name, returning the nearest declaration found traversing
-     * upward from this scope up to and including [declarationLevel].
-     *
-     * Unlike [lookupVariable], which requires an exact scope-level match, this method
-     * returns the first occurrence of [name] found going toward the root. This is
-     * necessary when looking up captured variables inside a lambda body: a captured
-     * variable is re-declared in the lambda's own parameters scope (at the lambda's
-     * level) rather than at its original [declarationLevel], so an exact-level lookup
-     * would skip the re-declaration and return the stale slot index from the original
-     * outer-function scope.
-     *
-     * @param name The variable name to search for.
-     * @param declarationLevel The scope level at which the variable was originally
-     *                         declared; used as an upper bound for the upward walk.
-     * @return The nearest [VariableInfo] found at or between the current scope and
-     *         [declarationLevel], or null if not found.
-     */
-    fun lookupVariableNearestUpTo(name: String, declarationLevel: Int): VariableInfo? {
-        val v = declaredVariables[name]
-        if (v != null) {
-            return v
-        }
-        if (level <= declarationLevel) {
-            return null
-        }
-        return parent?.lookupVariableNearestUpTo(name, declarationLevel)
-    }
-
-    /**
-     * Looks up a variable by name, respecting lambda-boundary re-declarations.
-     *
-     * Walks upward from this scope toward [declarationLevel].  For each scope:
-     * - If this scope is a lambda-params boundary ([isStaticallyNested] == false) **and**
-     *   [name] is declared here, return it immediately.  Lambda compilation re-declares
-     *   captured variables in the lambda-params scope with the correct JVM slot index for
-     *   that synthetic method; this path is the authoritative slot for use inside the lambda.
-     * - If [name] is declared at the exact [declarationLevel], return it (the original
-     *   declaration in any enclosing scope).
-     * - Statically-nested intermediate scopes (while/if/for bodies) that happen to shadow
-     *   [name] at a level != [declarationLevel] are **skipped**, so the caller gets the
-     *   variable they actually asked for.
-     *
-     * This differs from [lookupVariableNearestUpTo] (which always short-circuits on the
-     * first matching declaration regardless of nesting kind) in that it ignores shadowing
-     * declarations inside statically-nested child scopes, preserving correct behaviour for
-     * code like:
-     * ```
-     * var x = 100          // scope 3
-     * while (...) {
-     *     var x = 10       // scope 4  — shadows, but identifier("x", scope=3) still wants slot at 3
-     * }
-     * ```
-     *
-     * @param name The variable name to search for.
-     * @param declarationLevel The scope level at which the variable was originally declared.
-     * @return The [VariableInfo] for the innermost lambda-boundary re-declaration, or the
-     *         original declaration at [declarationLevel], or null if not found.
-     */
-    fun lookupVariableRespectingLambdaBoundary(name: String, declarationLevel: Int): VariableInfo? {
-        val v = declaredVariables[name]
-        if (v != null && !isStaticallyNested) {
-            return v
-        }
-        if (v != null && level == declarationLevel) {
-            return v
-        }
-        if (level <= declarationLevel) {
-            return null
-        }
-        return parent?.lookupVariableRespectingLambdaBoundary(name, declarationLevel)
-    }
-
-    /**
-     * Finds the scope at a specific level by traversing up.
-     * 
-     * @param targetLevel The target scope level.
-     * @return The scope at that level, or null if not found.
-     */
-    fun getScopeAtLevel(targetLevel: Int): Scope? {
-        return when {
-            level == targetLevel -> this
-            level > targetLevel -> parent?.getScopeAtLevel(targetLevel)
-            else -> null
-        }
     }
 
     /**
@@ -320,6 +233,86 @@ class Scope(
         for (child in children) {
             child.collectCapturedVariablesRecursive(lambdaParamsLevel, captured)
         }
+    }
+}
+
+/**
+ * A scope representing a lambda's parameter scope.
+ *
+ * During scope tree analysis (before compilation), this behaves identically to a regular
+ * [Scope]. During lambda compilation, captured variables are registered via
+ * [declareCapturedVariable], and [activateBoundary] is called to seal the scope.
+ * After activation, [lookupVariable] intercepts lookups for captured variables
+ * (using their original scope level) and prevents lookups from escaping past
+ * the lambda boundary — since the lambda compiles to a separate JVM method,
+ * outer-scope slots are not directly accessible.
+ *
+ * @param parent The parent scope (the enclosing scope where the lambda is defined).
+ */
+class LambdaScope(parent: Scope) : Scope(
+    level = parent.level + 1,
+    parent = parent,
+    isStaticallyNested = false
+) {
+    /**
+     * Maps (variable name, original scope level) to the local [VariableInfo] in this
+     * lambda's parameter scope. Populated during lambda compilation for each captured variable.
+     */
+    private val capturedVariableOverrides = mutableMapOf<Pair<String, Int>, VariableInfo>()
+
+    /**
+     * When true, [lookupVariable] will not walk past this scope to the parent.
+     * Set to true after all captured variables and parameters have been declared.
+     */
+    private var boundaryActive = false
+
+    /**
+     * Declares a captured variable in this scope, mapping the original (name, scopeLevel)
+     * to the new [VariableInfo] with the correct JVM slot for the lambda's synthetic method.
+     *
+     * @param name The variable name.
+     * @param originalScopeLevel The scope level where the variable was originally declared.
+     * @param type The type of the variable.
+     * @return The created [VariableInfo].
+     */
+    fun declareCapturedVariable(name: String, originalScopeLevel: Int, type: ReturnType): VariableInfo {
+        val info = declareVariable(name, type)
+        capturedVariableOverrides[name to originalScopeLevel] = info
+        return info
+    }
+
+    /**
+     * Activates the lambda boundary. After this call, [lookupVariable] will not
+     * walk past this scope to the parent, enforcing that all variable accesses
+     * within the lambda are resolved locally.
+     */
+    fun activateBoundary() {
+        boundaryActive = true
+    }
+
+    /**
+     * Looks up a variable, respecting the lambda boundary.
+     *
+     * 1. If the variable is a captured variable (by name and original scope level),
+     *    returns the local override with the correct lambda slot index.
+     * 2. If the variable is declared at this scope's level (lambda parameters),
+     *    returns it from [declaredVariables].
+     * 3. If the boundary is active (during compilation), throws — the variable
+     *    should have been captured if it's needed inside the lambda.
+     * 4. If the boundary is not active (during analysis), delegates to the parent.
+     */
+    override fun lookupVariable(name: String, scopeLevel: Int): VariableInfo? {
+        capturedVariableOverrides[name to scopeLevel]?.let { return it }
+        if (level == scopeLevel) {
+            return declaredVariables[name]
+        }
+        if (boundaryActive) {
+            throw IllegalStateException(
+                "Variable '$name' at scope level $scopeLevel is not accessible in lambda scope at level $level. " +
+                    "All outer variables must be captured."
+            )
+        }
+        return parent?.lookupVariable(name, scopeLevel)
     }
 }
 
@@ -481,7 +474,7 @@ class ScopeBuilder(
             }
 
             is TypedLambdaExpression -> {
-                val lambdaParamsScope = scope.createChild(isStaticallyNested = false)
+                val lambdaParamsScope = LambdaScope(scope)
                 
                 val lambdaType = context.getType(expression.evalType) as? LambdaType
 

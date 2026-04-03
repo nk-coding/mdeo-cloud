@@ -110,7 +110,7 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
      * For non-generic functions and lambdas, these are the declared parameter types.
      * Populated alongside {@link chosenOverloadName}.
      */
-    resolvedParameterTypes: CustomValueType[] = [];
+    resolvedParameterTypes: (CustomValueType | undefined)[] = [];
 
     /**
      * Creates a new call validation helper.
@@ -178,8 +178,9 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
                 this.services,
                 this.genericArgumentTypes
             );
-            if (genericResolver.isFullyDefined(signature.returnType)) {
-                this.inferredReturnType = genericResolver.resolveType(signature.returnType);
+            const resolvedReturnType = genericResolver.resolveType(signature.returnType);
+            if (!Array.isArray(resolvedReturnType)) {
+                this.inferredReturnType = resolvedReturnType;
                 this.chosenOverloadName = signatureName;
                 this.resolvedParameterTypes = this.resolveSignatureParameterTypes(signature, genericResolver);
                 return true;
@@ -236,13 +237,18 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
 
         this.validateRequiredParameters(args.length, signature, errors);
 
+        const resolvedReturnType = genericResolver.resolveType(signature.returnType);
+        if (Array.isArray(resolvedReturnType)) {
+            for (const problem of resolvedReturnType) {
+                errors.push(this.createError(this.languageNode, `Return type could not be resolved: ${problem}`));
+            }
+        }
+
         return {
             signatureName,
             signature,
             errors,
-            returnType: genericResolver.isFullyDefined(signature.returnType)
-                ? genericResolver.resolveType(signature.returnType)
-                : undefined,
+            returnType: Array.isArray(resolvedReturnType) ? undefined : resolvedReturnType,
             genericResolver
         };
     }
@@ -281,6 +287,9 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
             const paramIndex = Math.min(i, signature.parameters.length - 1);
             const paramType = signature.parameters[paramIndex]!.type;
             const declaredType = genericResolver.resolveType(paramType);
+            if (Array.isArray(declaredType)) {
+                continue;
+            }
 
             const assignabilityResult = this.services.Assignability.getAssignabilityResult(argType, declaredType);
             if (assignabilityResult.result) {
@@ -525,8 +534,11 @@ export abstract class CallValidationHelper<Specifics extends TypirSpecifics, TPr
     private resolveSignatureParameterTypes(
         signature: FunctionSignature,
         genericResolver: GenericResolver<Specifics>
-    ): CustomValueType[] {
-        return signature.parameters.map((param) => genericResolver.resolveType(param.type));
+    ): (CustomValueType | undefined)[] {
+        return signature.parameters.map((param) => {
+            const resolved = genericResolver.resolveType(param.type);
+            return Array.isArray(resolved) ? undefined : resolved;
+        });
     }
 
     /**
@@ -650,38 +662,57 @@ export class GenericResolver<Specifics extends TypirSpecifics> {
      * @returns true if all generic parameters are resolved
      */
     isFullyDefined(type: ReturnType): boolean {
+        return this.getResolutionProblems(type).length === 0;
+    }
+
+    /**
+     * Returns a list of problems explaining why a type is not fully resolved.
+     * An empty list means the type is fully defined and can be resolved.
+     *
+     * @param type The type to check
+     * @returns A list of {@link TypeResolutionProblem}s, or an empty array if the type is fully defined
+     */
+    private getResolutionProblems(type: ValueType | ReturnType): string[] {
         if (VoidType.is(type)) {
-            return true;
+            return [];
         } else if (GenericTypeRef.is(type)) {
             const localStatus = this.callResolvedGenericArgumentStates.get(type.generic);
-            if (localStatus != undefined) {
-                return (
-                    localStatus !== TypeResolutionState.Undefined &&
-                    localStatus !== TypeResolutionState.Conflict &&
-                    localStatus !== TypeResolutionState.Nullable
-                );
-            } else {
-                return false;
+            if (localStatus == undefined) {
+                return [`Generic type '${type.generic}' is not defined in this scope.`];
+            }
+            switch (localStatus) {
+                case TypeResolutionState.Undefined:
+                    return [`Generic type '${type.generic}' could not be inferred from the provided arguments.`];
+                case TypeResolutionState.Conflict:
+                    return [
+                        `Generic type '${type.generic}' has conflicting type constraints from different arguments.`
+                    ];
+                case TypeResolutionState.Nullable:
+                    return [
+                        `Generic type '${type.generic}' is only known to be nullable but its base type could not be determined.`
+                    ];
+                default:
+                    return [];
             }
         } else if (ClassTypeRef.is(type)) {
-            if (type.typeArgs != undefined) {
-                for (const typeArg of Object.values(type.typeArgs)) {
-                    if (!this.isFullyDefined(typeArg)) {
-                        return false;
-                    }
+            const problems: string[] = [];
+            for (const [argName, typeArgType] of Object.entries(type.typeArgs ?? {})) {
+                for (const problem of this.getResolutionProblems(typeArgType)) {
+                    problems.push(`In type argument '${argName}': ${problem}`);
                 }
             }
-            return true;
+            return problems;
         } else if (LambdaType.is(type)) {
-            if (!this.isFullyDefined(type.returnType)) {
-                return false;
+            const problems: string[] = [];
+            for (const problem of this.getResolutionProblems(type.returnType)) {
+                problems.push(`In return type: ${problem}`);
             }
             for (const param of type.parameters) {
-                if (!this.isFullyDefined(param.type)) {
-                    return false;
+                for (const problem of this.getResolutionProblems(param.type)) {
+                    problems.push(`In parameter '${param.name}': ${problem}`);
                 }
             }
-            return true;
+            return problems;
         } else {
             assertUnreachable(type);
         }
@@ -689,15 +720,20 @@ export class GenericResolver<Specifics extends TypirSpecifics> {
 
     /**
      * Resolves a value type to a concrete CustomValueType using the current generic mappings.
+     * Returns a non-empty array of strings if the type cannot be resolved.
      *
      * @param type The value type to resolve
-     * @returns The resolved concrete type
+     * @returns The resolved concrete type, or an array of problems explaining why resolution failed
      */
-    resolveType(type: ValueType): CustomValueType;
-    resolveType(type: ReturnType): CustomValueType | CustomVoidType;
-    resolveType(type: ValueType | ReturnType): CustomValueType | CustomVoidType {
+    resolveType(type: ValueType): CustomValueType | string[];
+    resolveType(type: ReturnType): CustomValueType | CustomVoidType | string[];
+    resolveType(type: ValueType | ReturnType): CustomValueType | CustomVoidType | string[] {
         if (VoidType.is(type)) {
             return this.services.factory.CustomVoid.getOrCreate();
+        }
+        const problems = this.getResolutionProblems(type);
+        if (problems.length > 0) {
+            return problems;
         }
         return this.typeDefinitionsService.resolveCustomClassOrLambdaType(
             type,

@@ -23,6 +23,7 @@
                 :key="state.tab.fileUri.toString()"
                 v-show="state.tab === activeTab"
                 :uri="state.tab.fileUri"
+                :is-active="state.tab === activeTab"
             />
         </div>
         <div v-show="showNoLanguageSupport" class="h-full flex items-center justify-center p-8">

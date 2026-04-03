@@ -61,7 +61,7 @@ export function getResolvedCallInfo<Specifics extends TypirSpecifics>(
         services,
         false
     );
-    if (helper.chosenOverloadName == undefined) {
+    if (helper.chosenOverloadName == undefined || helper.resolvedParameterTypes.includes(undefined)) {
         return undefined;
     }
     const signature = functionType.details.definition.signatures[helper.chosenOverloadName];
@@ -69,7 +69,7 @@ export function getResolvedCallInfo<Specifics extends TypirSpecifics>(
     const varArgsStartIndex = isVarArgs ? Math.max(0, (signature?.parameters.length ?? 1) - 1) : 0;
     return {
         overloadName: helper.chosenOverloadName,
-        resolvedParameterTypes: helper.resolvedParameterTypes,
+        resolvedParameterTypes: helper.resolvedParameterTypes as CustomValueType[],
         isVarArgs,
         varArgsStartIndex
     };
