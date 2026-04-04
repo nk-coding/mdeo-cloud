@@ -538,4 +538,130 @@ class MdeoModelGraphTest {
         instance.setPropertyByKey("name", "Dining Room")
         assertEquals("Dining Room", instance.getPropertyByKey("name"))
     }
+
+    // ========================================================================
+    // Bidirectional association consistency tests
+    // ========================================================================
+
+    /**
+     * Reproduces the bug where a "move" transformation (create new link, then delete old link)
+     * corrupts the single-valued end of a bidirectional association.
+     *
+     * The sequence is:
+     *   1. Initial state: workItem assigned to sprint2 (edge sprint2→workItem exists)
+     *   2. CREATE edge sprint1→workItem  → workItem.isPlannedFor = sprint1  ✓
+     *   3. DELETE edge sprint2→workItem  → should leave workItem.isPlannedFor = sprint1,
+     *                                      but the bug unconditionally sets isPlannedFor = null
+     *
+     * After the fix the single-valued [isPlannedFor] field must NOT be nullified by the
+     * delete step when the value has already been reassigned by the preceding add-edge step.
+     */
+    @Test
+    fun moveItemBetweenSprints_doesNotCorruptSingleValuedAssociationEnd() {
+        // --- metamodel: Sprint.committedItems (0..*) <-> WorkItem.isPlannedFor (0..1) ---
+        val sprintMetamodelData = MetamodelData(
+            classes = listOf(
+                ClassData(
+                    name = "Sprint",
+                    isAbstract = false,
+                    extends = emptyList(),
+                    properties = emptyList()
+                ),
+                ClassData(
+                    name = "WorkItem",
+                    isAbstract = false,
+                    extends = emptyList(),
+                    properties = emptyList()
+                )
+            ),
+            enums = emptyList(),
+            associations = listOf(
+                AssociationData(
+                    source = AssociationEndData(
+                        className = "Sprint",
+                        name = "committedItems",
+                        multiplicity = MultiplicityData.many()
+                    ),
+                    operator = "<->",
+                    target = AssociationEndData(
+                        className = "WorkItem",
+                        name = "isPlannedFor",
+                        multiplicity = MultiplicityData.single()
+                    )
+                )
+            )
+        )
+        val sprintMetamodel = Metamodel.compile(sprintMetamodelData)
+
+        // Initial model: sprint1, sprint2, workItem – workItem already assigned to sprint2
+        val edgeLabel = EdgeLabelUtils.computeEdgeLabel("committedItems", "isPlannedFor")
+        val modelData = ModelData(
+            metamodelPath = "test.mm",
+            instances = listOf(
+                ModelDataInstance(name = "sprint1", className = "Sprint", properties = emptyMap()),
+                ModelDataInstance(name = "sprint2", className = "Sprint", properties = emptyMap()),
+                ModelDataInstance(name = "workItem", className = "WorkItem", properties = emptyMap())
+            ),
+            links = listOf(
+                ModelDataLink(
+                    sourceName = "sprint2",
+                    sourceProperty = "committedItems",
+                    targetName = "workItem",
+                    targetProperty = "isPlannedFor"
+                )
+            )
+        )
+        val graph = MdeoModelGraph.create(modelData, sprintMetamodel)
+        val g = graph.traversal()
+
+        val sprint1Id = graph.nameRegistry.getVertexId("sprint1") as Int
+        val sprint2Id = graph.nameRegistry.getVertexId("sprint2") as Int
+        val sprint1 = g.V(sprint1Id).next() as MdeoVertex
+        val sprint2 = g.V(sprint2Id).next() as MdeoVertex
+        val workItem = g.V().hasLabel("WorkItem").next() as MdeoVertex
+
+        val sprint1Instance = sprint1.backingInstance
+        val sprint2Instance = sprint2.backingInstance
+        val workItemInstance = workItem.backingInstance
+
+        // Verify initial state
+        assertSame(sprint2Instance, workItemInstance.getPropertyByKey("isPlannedFor") as? ModelInstance,
+            "Initial state: workItem.isPlannedFor should be sprint2")
+        @Suppress("UNCHECKED_CAST")
+        val sprint2Items = sprint2Instance.getPropertyByKey("committedItems") as? Set<ModelInstance>
+        assertNotNull(sprint2Items)
+        assertTrue(sprint2Items.contains(workItemInstance))
+
+        // Step 1 (CREATE): Add edge sprint1 → workItem  (mimics transformation create-link step)
+        sprint1.addEdge(edgeLabel, workItem)
+
+        // After create: workItem.isPlannedFor must be sprint1
+        assertSame(
+            sprint1Instance,
+            workItemInstance.getPropertyByKey("isPlannedFor") as? ModelInstance,
+            "After CREATE edge sprint1→workItem, workItem.isPlannedFor should be sprint1"
+        )
+        @Suppress("UNCHECKED_CAST")
+        val sprint1Items = sprint1Instance.getPropertyByKey("committedItems") as? Set<ModelInstance>
+        assertNotNull(sprint1Items)
+        assertTrue(sprint1Items.contains(workItemInstance))
+
+        // Step 2 (DELETE): Remove edge sprint2 → workItem  (mimics transformation delete-link step)
+        val edgeToRemove = g.V(sprint2.id()).outE(edgeLabel).next()
+        edgeToRemove.remove()
+
+        // After delete: workItem.isPlannedFor must STILL be sprint1 (not null!)
+        assertSame(
+            sprint1Instance,
+            workItemInstance.getPropertyByKey("isPlannedFor") as? ModelInstance,
+            "After DELETE edge sprint2→workItem, workItem.isPlannedFor must remain sprint1, not be nullified"
+        )
+        // sprint2 must no longer hold workItem
+        @Suppress("UNCHECKED_CAST")
+        val sprint2ItemsAfter = sprint2Instance.getPropertyByKey("committedItems") as? Set<ModelInstance>
+        assertTrue(sprint2ItemsAfter == null || !sprint2ItemsAfter.contains(workItemInstance),
+            "sprint2.committedItems must not contain workItem after DELETE")
+
+        graph.close()
+    }
 }

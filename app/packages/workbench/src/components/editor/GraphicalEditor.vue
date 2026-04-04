@@ -11,12 +11,12 @@
 <script setup lang="ts">
 import "reflect-metadata";
 import { createContainer } from "@mdeo/editor-common";
-import { computed, inject, onMounted, onUnmounted, ref, shallowRef, useId, watch } from "vue";
+import { computed, inject, onMounted, ref, shallowRef, useId, watch } from "vue";
 import type { EditorTab } from "@/data/tab/editorTab";
 import { workbenchStateKey } from "../workbench/util";
 import { DiagramLoader } from "@eclipse-glsp/client";
 import { editorContextKey } from "@/lib/editorPlugin";
-import { useResizeObserver, useStyleTag } from "@vueuse/core";
+import { useResizeObserver } from "@vueuse/core";
 import type { ResetCanvasBoundsAction } from "@mdeo/protocol-common";
 import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { EditMode, TYPES } from "@eclipse-glsp/sprotty";
@@ -100,10 +100,4 @@ onMounted(async () => {
     await diagramLoader.load({ initializeParameters: { applicationId: "mdeo" } });
     diagramLoaded.value = true;
 });
-
-onUnmounted(() => {
-    document.getElementById(`${id}_hidden`)?.remove();
-});
-
-useStyleTag(computed(() => `#${id}_hidden { display: ${props.isActive ? "block" : "none"}; }`));
 </script>

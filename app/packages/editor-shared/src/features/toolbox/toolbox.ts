@@ -17,6 +17,8 @@ import { ScrollViewState } from "./views/scrollView.js";
 import { PreviewRenderer } from "./previewRenderer.js";
 import { LayoutAction } from "./layoutAction.js";
 import { CreateEdgeTool } from "../create-edge-tool/createEdgeTool.js";
+import { EditorSettingsManager } from "../editor-settings/editorSettingsManager.js";
+import type { EditorSettings } from "@mdeo/editor-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { html, TYPES } = sharedImport("@eclipse-glsp/sprotty");
@@ -44,6 +46,9 @@ export class Toolbox extends ToolPalette {
 
     @inject(PreviewRenderer)
     public previewRenderer!: PreviewRenderer;
+
+    @inject(EditorSettingsManager)
+    declare protected editorSettings: EditorSettingsManager;
 
     protected currentVNode?: VNode;
     protected searchIndex?: MiniSearch<ToolboxEditEntry>;
@@ -131,12 +136,30 @@ export class Toolbox extends ToolPalette {
     }
 
     /**
+     * Called before the initial model request.
+     * Applies the persisted editor settings to the local state and dispatches them
+     * to the language server so the server holds the current state from the start.
+     */
+    override async preRequestModel(): Promise<void> {
+        const settings = this.editorSettings.getCurrentSettings();
+        this.applySettings(settings);
+        await this.editorSettings.syncToServer();
+    }
+
+    /**
      * Loads palette items from the server and shows the toolbox.
-     * Called automatically by the GLSP framework after the model is loaded.
+     * Activates the settings manager to listen for external (cross-tab) changes
+     * and subscribes to setting updates so the UI reflects them immediately.
      */
     override async postRequestModel(): Promise<void> {
         await this.setPaletteItems();
         this.show(this.editorContext.modelRoot);
+
+        this.editorSettings.activate();
+        this.editorSettings.addListener((settings) => {
+            this.applySettings(settings);
+            this.update();
+        });
     }
 
     /**
@@ -322,19 +345,43 @@ export class Toolbox extends ToolPalette {
     }
 
     /**
-     * Toggles the toolbox open/closed state.
+     * Toggles the toolbox open/closed state, persists, and notifies the language server.
      */
     toggleToolbox(): void {
         this.isOpen = !this.isOpen;
+        this.editorSettings.saveAndSync(this.buildSettings());
         this.update();
     }
 
     /**
-     * Toggles the bottom panel open/closed state.
+     * Toggles the bottom panel open/closed state, persists, and notifies the language server.
      */
     protected toggleBottomPanel(): void {
         this.isBottomPanelOpen = !this.isBottomPanelOpen;
+        this.editorSettings.saveAndSync(this.buildSettings());
         this.update();
+    }
+
+    /**
+     * Builds the current {@link EditorSettings} snapshot from the live state.
+     *
+     * @returns The settings reflecting the current toolbox state.
+     */
+    protected buildSettings(): EditorSettings {
+        return {
+            isOpen: this.isOpen,
+            isBottomSidebarCollapsed: !this.isBottomPanelOpen
+        };
+    }
+
+    /**
+     * Applies the given settings to the toolbox state.
+     *
+     * @param settings The settings to apply.
+     */
+    protected applySettings(settings: EditorSettings): void {
+        this.isOpen = settings.isOpen;
+        this.isBottomPanelOpen = !settings.isBottomSidebarCollapsed;
     }
 
     /**
@@ -415,8 +462,12 @@ export class Toolbox extends ToolPalette {
 
     /**
      * Routes incoming actions to the appropriate handler.
-     * Intercepts {@link SetMarkersAction} to update the error panel; all other
-     * actions are delegated to the parent implementation.
+     * Handles {@link SetMarkersAction} to update the error panel;
+     * all other actions are delegated to the parent implementation.
+     *
+     * {@link UpdateEditorSettingsAction} from the server is handled by
+     * {@link EditorSettingsActionHandler} which notifies this toolbox via
+     * the {@link EditorSettingsManager} listener registered in {@link postRequestModel}.
      *
      * @param action The action dispatched by the GLSP framework.
      */

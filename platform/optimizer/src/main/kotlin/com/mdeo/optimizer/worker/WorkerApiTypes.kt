@@ -4,6 +4,7 @@ import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.GoalConfig
+import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.optimizer.config.SolverConfig
 import kotlinx.serialization.Serializable
 
@@ -48,7 +49,8 @@ data class WorkerAllocationRequest(
     val initialSolutionCount: Int,
     val threadsPerNode: Int,
     val orchestratorWsUrl: String? = null,
-    val useLocalChannel: Boolean = false
+    val useLocalChannel: Boolean = false,
+    val graphBackendType: GraphBackendType = GraphBackendType.MDEO
 )
 
 /**

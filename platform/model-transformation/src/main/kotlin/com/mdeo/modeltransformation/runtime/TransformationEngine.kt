@@ -12,7 +12,6 @@ import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.graph.ModelGraph
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
 /**

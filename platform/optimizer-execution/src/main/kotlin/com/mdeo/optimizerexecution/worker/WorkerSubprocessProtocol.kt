@@ -3,6 +3,7 @@ package com.mdeo.optimizerexecution.worker
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.GoalConfig
+import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.optimizer.config.SolverConfig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -64,7 +65,8 @@ sealed class WorkerSubprocessRequest {
         val useLocalChannel: Boolean = false,
         val scriptTimeoutMs: Long = 0L,
         val transformationTimeoutMs: Long = 0L,
-        val workerThreads: Int = 1
+        val workerThreads: Int = 1,
+        val graphBackendType: GraphBackendType = GraphBackendType.MDEO
     ) : WorkerSubprocessRequest()
 
     /**

@@ -32,6 +32,8 @@ import { RequestCreateEdgeSchemaActionHandler } from "./handler/requestCreateEdg
 import { CreateEdgeSchemaResolver } from "./createEdgeSchemaResolver.js";
 import { DefaultContextActionsProvider } from "../context-actions/defaultContextActionsProvider.js";
 import { LangiumModelValidator } from "./langiumModelValidator.js";
+import { UpdateEditorSettingsActionHandler } from "./handler/updateEditorSettingsActionHandler.js";
+import { EditorSettingsService } from "./editorSettingsService.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =
@@ -81,6 +83,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         applyBindingTarget(context, MetadataManager, this.bindMetadataManager()).inSingletonScope();
         applyBindingTarget(context, BaseLayoutEngine, this.bindCustomLayoutEngine()).inSingletonScope();
         applyBindingTarget(context, CreateEdgeSchemaResolver, this.bindCreateEdgeSchemaResolver()).inSingletonScope();
+        bind(EditorSettingsService).toSelf().inSingletonScope();
         this.configureAdditional(context);
     }
 
@@ -96,14 +99,16 @@ export abstract class BaseDiagramModule extends DiagramModule {
     }
 
     /**
-     * Registers {@link RequestCreateEdgeSchemaActionHandler} in addition to the
-     * handlers configured by the base class.
+     * Registers {@link RequestCreateEdgeSchemaActionHandler} and
+     * {@link UpdateEditorSettingsActionHandler} in addition to the handlers
+     * configured by the base class.
      *
      * @param binding The instance multi-binding used to register action handlers.
      */
     protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
         super.configureActionHandlers(binding);
         binding.add(RequestCreateEdgeSchemaActionHandler);
+        binding.add(UpdateEditorSettingsActionHandler);
     }
 
     /**

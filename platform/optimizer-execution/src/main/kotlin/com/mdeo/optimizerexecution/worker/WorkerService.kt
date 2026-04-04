@@ -162,7 +162,8 @@ class WorkerService(
             useLocalChannel = useLocalChannel,
             scriptTimeoutMs = scriptTimeoutMs,
             transformationTimeoutMs = transformationTimeoutMs,
-            workerThreads = effectiveThreads
+            workerThreads = effectiveThreads,
+            graphBackendType = request.graphBackendType
         )
 
         val setupResult = withContext(dispatcher) {

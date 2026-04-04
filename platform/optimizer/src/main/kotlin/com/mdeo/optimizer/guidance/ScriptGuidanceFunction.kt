@@ -43,7 +43,6 @@ class ScriptGuidanceFunction(
 
     /**
      * Coerces a script return value to [Double].
-     * Non-numeric types log a warning and return `0.0`.
      *
      * @param value The value returned by the script method.
      * @return The numeric representation.
@@ -55,11 +54,10 @@ class ScriptGuidanceFunction(
             is Int -> value.toDouble()
             is Long -> value.toDouble()
             is Number -> value.toDouble()
-            is Boolean -> if (value) 1.0 else 0.0
+            is Boolean -> if (value) 0.0 else 1.0
             null -> 0.0
             else -> {
-                logger.warn("Guidance function $name returned non-numeric value: $value")
-                0.0
+                throw IllegalArgumentException("Unsupported return type from script method: ${value::class.java.name}")
             }
         }
     }

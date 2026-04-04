@@ -5,12 +5,14 @@ import { InitializeViewportLayoutCommand } from "./initializeViewportLayout.js";
 import { EditorScrollMouseListener } from "./scrollMouseListener.js";
 import type { Action, ICommand } from "@eclipse-glsp/sprotty";
 import { FitToScreenCommand } from "./fitToScreen.js";
+import { MdeoHiddenModelViewer } from "./hiddenModelViewer.js";
 
 const { FeatureModule, GLSPScrollMouseListener } = sharedImport("@eclipse-glsp/client");
 const {
     ZoomMouseListener: SprottyZoomMouseListener,
     SetViewportCommand: SprottySetViewportCommand,
     FitToScreenCommand: SprottyFitToScreenCommand,
+    HiddenModelViewer,
     SetModelAction,
     UpdateModelAction,
     TYPES
@@ -30,6 +32,8 @@ export const viewportModule = new FeatureModule(
         rebind(SprottyFitToScreenCommand).toService(FitToScreenCommand);
         bind(EditorScrollMouseListener).toSelf().inSingletonScope();
         rebind(GLSPScrollMouseListener).toService(EditorScrollMouseListener);
+        bind(MdeoHiddenModelViewer).toSelf().inSingletonScope();
+        rebind(HiddenModelViewer).toService(MdeoHiddenModelViewer);
 
         const context = { bind, isBound };
         bind(InitializeViewportLayoutCommand).toSelf();

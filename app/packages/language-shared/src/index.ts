@@ -22,6 +22,7 @@ export * from "./diagram-server/handler/requestCreateEdgeSchemaActionHandler.js"
 export * from "./diagram-server/handler/resetLayoutOperationHandler.js";
 export * from "./diagram-server/handler/triggerActionOperationHandler.js";
 export * from "./diagram-server/handler/updateClientHandler.js";
+export * from "./diagram-server/handler/updateEditorSettingsActionHandler.js";
 export * from "./diagram-server/handler/updateRoutingInformationOperationHandler.js";
 export * from "./diagram-server/model/compartment.js";
 export * from "./diagram-server/model/edge.js";
@@ -49,6 +50,7 @@ export * from "./diagram-server/modelState.js";
 export * from "./diagram-server/modelSubmissionHandler.js";
 export * from "./diagram-server/sourceModelStorage.js";
 export * from "./diagram-server/toolboxItemProvider.js";
+export * from "./diagram-server/editorSettingsService.js";
 export * from "./extended-parser/extendedParser.js";
 export * from "./extended-parser/types.js";
 export * from "./external-reference/externalReferenceCollectionPhase.js";

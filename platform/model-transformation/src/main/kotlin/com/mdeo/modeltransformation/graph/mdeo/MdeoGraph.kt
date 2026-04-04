@@ -387,6 +387,9 @@ class MdeoGraph private constructor(
      * Parses the edge label to determine which association ends exist,
      * then sets or adds to the corresponding link fields on the backing instances.
      *
+     * Both ends are always attempted independently: a missing/unknown property on one
+     * end does not suppress the update of the other end.
+     *
      * @param outVertex The source vertex.
      * @param inVertex The target vertex.
      * @param edgeLabel The edge label.
@@ -397,30 +400,34 @@ class MdeoGraph private constructor(
         val (sourceProperty, targetProperty) = EdgeLabelUtils.parseEdgeLabel(edgeLabel)
 
         if (sourceProperty != null) {
-            val outMeta = outVertex.classMetadata ?: return
-            val linkMapping = outMeta.linkFields[sourceProperty] ?: return
-            if (linkMapping.upper != 1) {
-                @Suppress("UNCHECKED_CAST")
-                val set = outInstance.getPropertyByKey(sourceProperty) as? MutableSet<ModelInstance>
-                    ?: LinkedHashSet()
-                set.add(inInstance)
-                outInstance.setPropertyByKey(sourceProperty, set)
-            } else {
-                outInstance.setPropertyByKey(sourceProperty, inInstance)
+            val outMeta = outVertex.classMetadata
+            val linkMapping = outMeta?.linkFields?.get(sourceProperty)
+            if (outMeta != null && linkMapping != null) {
+                if (linkMapping.upper != 1) {
+                    @Suppress("UNCHECKED_CAST")
+                    val set = outInstance.getPropertyByKey(sourceProperty) as? MutableSet<ModelInstance>
+                        ?: LinkedHashSet()
+                    set.add(inInstance)
+                    outInstance.setPropertyByKey(sourceProperty, set)
+                } else {
+                    outInstance.setPropertyByKey(sourceProperty, inInstance)
+                }
             }
         }
 
         if (targetProperty != null) {
-            val inMeta = inVertex.classMetadata ?: return
-            val linkMapping = inMeta.linkFields[targetProperty] ?: return
-            if (linkMapping.upper != 1) {
-                @Suppress("UNCHECKED_CAST")
-                val set = inInstance.getPropertyByKey(targetProperty) as? MutableSet<ModelInstance>
-                    ?: LinkedHashSet()
-                set.add(outInstance)
-                inInstance.setPropertyByKey(targetProperty, set)
-            } else {
-                inInstance.setPropertyByKey(targetProperty, outInstance)
+            val inMeta = inVertex.classMetadata
+            val linkMapping = inMeta?.linkFields?.get(targetProperty)
+            if (inMeta != null && linkMapping != null) {
+                if (linkMapping.upper != 1) {
+                    @Suppress("UNCHECKED_CAST")
+                    val set = inInstance.getPropertyByKey(targetProperty) as? MutableSet<ModelInstance>
+                        ?: LinkedHashSet()
+                    set.add(outInstance)
+                    inInstance.setPropertyByKey(targetProperty, set)
+                } else {
+                    inInstance.setPropertyByKey(targetProperty, outInstance)
+                }
             }
         }
     }
@@ -430,6 +437,16 @@ class MdeoGraph private constructor(
      *
      * Parses the edge label to determine which association ends exist,
      * then removes or nullifies the corresponding link fields on the backing instances.
+     *
+     * Both ends are always attempted independently: a missing/unknown property on one
+     * end does not suppress the update of the other end.
+     *
+     * For single-valued fields ([upper][com.mdeo.metamodel.LinkFieldMapping.upper] == 1), the
+     * field is only cleared if its current value still refers to the vertex being disconnected.
+     * This prevents a preceding add-edge step in the same transformation from having its
+     * assignment silently overwritten: when a transformation does "create new link, then delete
+     * old link" (e.g. moveItemBetweenSprints), the delete must not nullify a field that was
+     * already reassigned by the create step.
      *
      * @param outVertex The source vertex.
      * @param inVertex The target vertex.
@@ -441,26 +458,36 @@ class MdeoGraph private constructor(
         val (sourceProperty, targetProperty) = EdgeLabelUtils.parseEdgeLabel(edgeLabel)
 
         if (sourceProperty != null) {
-            val outMeta = outVertex.classMetadata ?: return
-            val linkMapping = outMeta.linkFields[sourceProperty] ?: return
-            if (linkMapping.upper != 1) {
-                @Suppress("UNCHECKED_CAST")
-                val set = outInstance.getPropertyByKey(sourceProperty) as? MutableSet<ModelInstance>
-                set?.remove(inInstance)
-            } else {
-                outInstance.setPropertyByKey(sourceProperty, null)
+            val outMeta = outVertex.classMetadata
+            val linkMapping = outMeta?.linkFields?.get(sourceProperty)
+            if (outMeta != null && linkMapping != null) {
+                if (linkMapping.upper != 1) {
+                    @Suppress("UNCHECKED_CAST")
+                    val set = outInstance.getPropertyByKey(sourceProperty) as? MutableSet<ModelInstance>
+                    set?.remove(inInstance)
+                } else {
+                    val currentValue = outInstance.getPropertyByKey(sourceProperty) as? ModelInstance
+                    if (currentValue === inInstance) {
+                        outInstance.setPropertyByKey(sourceProperty, null)
+                    }
+                }
             }
         }
 
         if (targetProperty != null) {
-            val inMeta = inVertex.classMetadata ?: return
-            val linkMapping = inMeta.linkFields[targetProperty] ?: return
-            if (linkMapping.upper != 1) {
-                @Suppress("UNCHECKED_CAST")
-                val set = inInstance.getPropertyByKey(targetProperty) as? MutableSet<ModelInstance>
-                set?.remove(outInstance)
-            } else {
-                inInstance.setPropertyByKey(targetProperty, null)
+            val inMeta = inVertex.classMetadata
+            val linkMapping = inMeta?.linkFields?.get(targetProperty)
+            if (inMeta != null && linkMapping != null) {
+                if (linkMapping.upper != 1) {
+                    @Suppress("UNCHECKED_CAST")
+                    val set = inInstance.getPropertyByKey(targetProperty) as? MutableSet<ModelInstance>
+                    set?.remove(outInstance)
+                } else {
+                    val currentValue = inInstance.getPropertyByKey(targetProperty) as? ModelInstance
+                    if (currentValue === outInstance) {
+                        inInstance.setPropertyByKey(targetProperty, null)
+                    }
+                }
             }
         }
     }

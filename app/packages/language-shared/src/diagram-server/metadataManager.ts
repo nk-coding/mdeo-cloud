@@ -1,13 +1,24 @@
 import { sharedImport } from "../sharedImport.js";
 import type { EdgeMetadata, GraphMetadata, NodeMetadata } from "./metadata.js";
 import { MultiGraph, type NodeAttributes, type EdgeAttributes } from "./graph-edit-distance/multiGraph.js";
-import { optimizeEditPaths, type NodeEditPath, type EdgeEditPath } from "./graph-edit-distance/graphEditDistance.js";
+import {
+    optimizeEditPaths,
+    type NodeEditPath,
+    type EdgeEditPath,
+    type EdgeTuple
+} from "./graph-edit-distance/graphEditDistance.js";
 import { linearSumAssignment } from "./graph-edit-distance/hungarian.js";
 import type { AstNode } from "langium";
 import { AstReflectionKey, LanguageServicesKey } from "./langiumServices.js";
 import type { AstReflection, LanguageServices } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
+
+/**
+ * Minimum number of nodes in either graph before the pruning optimisation is
+ * applied prior to GED computation.
+ */
+const GED_PRUNING_THRESHOLD = 20;
 
 /**
  * Node attributes with added loops property for self-referential edges.
@@ -112,10 +123,14 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
         const currentGraph = this.convertToMultiGraph(mergedMetadata);
         const newGraph = this.convertToMultiGraph(newMetadata);
 
+        if (currentGraph.numberOfNodes === 0) {
+            return newMetadata;
+        }
+
         const lastResult = this.computeGED(currentGraph, newGraph);
 
-        if (!lastResult) {
-            return undefined;
+        if (lastResult == undefined) {
+            return newMetadata;
         }
 
         const [nodePath, edgePath] = lastResult;
@@ -322,6 +337,12 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
     /**
      * Computes the Graph Edit Distance between two graphs.
      *
+     * When either graph exceeds {@link GED_PRUNING_THRESHOLD} nodes, identical
+     * node/edge pairs are pre-matched and removed from both graphs before
+     * running the expensive combinatorial search on the remaining (smaller)
+     * subgraphs.  The pre-matched pairs are merged back into the returned
+     * paths so all downstream processing remains unchanged.
+     *
      * @param currentGraph The current graph.
      * @param newGraph The new graph.
      * @returns The best edit path found or undefined.
@@ -330,7 +351,21 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
         currentGraph: MultiGraph,
         newGraph: MultiGraph
     ): [NodeEditPath, EdgeEditPath, number] | undefined {
-        const generator = optimizeEditPaths(currentGraph, newGraph, {
+        let gedCurrentGraph = currentGraph;
+        let gedNewGraph = newGraph;
+        let preMatchedNodes: NodeEditPath = [];
+        let preMatchedEdges: EdgeEditPath = [];
+
+        const maxNodes = Math.max(currentGraph.numberOfNodes, newGraph.numberOfNodes);
+        if (maxNodes > GED_PRUNING_THRESHOLD) {
+            const { prunedCurrent, prunedNew, stableNodeIds, stableEdges } = this.pruneGraphs(currentGraph, newGraph);
+            gedCurrentGraph = prunedCurrent;
+            gedNewGraph = prunedNew;
+            preMatchedNodes = [...stableNodeIds].map((id) => [id, id]);
+            preMatchedEdges = stableEdges.map((edge) => [edge, edge]);
+        }
+
+        const generator = optimizeEditPaths(gedCurrentGraph, gedNewGraph, {
             nodeSubstCost: (a, b) => this.calculateNodeCost(a, b),
             nodeDelCost: (a) => this.calculateNodeCost(a, undefined),
             nodeInsCost: (a) => this.calculateNodeCost(undefined, a),
@@ -344,7 +379,147 @@ export abstract class MetadataManager<T extends AstNode = AstNode> {
         for (const result of generator) {
             lastResult = result;
         }
-        return lastResult;
+
+        if (lastResult === undefined) {
+            return undefined;
+        }
+
+        const [nodePath, edgePath, cost] = lastResult;
+        return [[...preMatchedNodes, ...nodePath], [...preMatchedEdges, ...edgePath], cost];
+    }
+
+    /**
+     * Identifies nodes and edges that are structurally identical in both
+     * graphs and returns pruned copies with those elements removed.
+     *
+     * A node is considered stable (identical) when:
+     *  - It exists in both graphs with the same ID and type.
+     *  - Every edge incident to it in either graph connects exclusively to
+     *    other stable nodes, and each such edge has a matching counterpart
+     *    (same key and type) in the other graph.
+     *
+     * The second condition is enforced iteratively: nodes whose incident
+     * edges violate it are evicted from the stable set until convergence.
+     * This guarantees the stable set forms a self-contained closed subgraph,
+     * so removed nodes leave no dangling edges in the pruned graphs.
+     *
+     * @param currentGraph The current graph.
+     * @param newGraph The new graph.
+     * @returns Pruned graph copies, the set of stable node IDs, and the list
+     *          of stable edge tuples.
+     */
+    private pruneGraphs(
+        currentGraph: MultiGraph,
+        newGraph: MultiGraph
+    ): {
+        prunedCurrent: MultiGraph;
+        prunedNew: MultiGraph;
+        stableNodeIds: Set<string>;
+        stableEdges: Array<EdgeTuple>;
+    } {
+        const newGraphNodeSet = new Set(newGraph.nodes);
+        const candidateStable = new Set<string>();
+        for (const id of currentGraph.nodes) {
+            if (newGraphNodeSet.has(id) && currentGraph.getNodeData(id).type === newGraph.getNodeData(id).type) {
+                candidateStable.add(id);
+            }
+        }
+
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const nodeId of [...candidateStable]) {
+                if (this.hasCandidateEdgeMismatch(nodeId, candidateStable, currentGraph, newGraph)) {
+                    candidateStable.delete(nodeId);
+                    changed = true;
+                }
+            }
+        }
+
+        const stableEdges: Array<EdgeTuple> = [];
+        for (const [from, to, key] of currentGraph.edges) {
+            if (candidateStable.has(from) && candidateStable.has(to)) {
+                stableEdges.push([from, to, key]);
+            }
+        }
+
+        const prunedCurrent = new MultiGraph();
+        for (const id of currentGraph.nodes) {
+            if (!candidateStable.has(id)) {
+                prunedCurrent.addNode(id, currentGraph.getNodeData(id));
+            }
+        }
+        for (const [from, to, key] of currentGraph.edges) {
+            if (!candidateStable.has(from) && !candidateStable.has(to)) {
+                prunedCurrent.addEdge(from, to, key, currentGraph.getEdgeData(from, to, key));
+            }
+        }
+
+        const prunedNew = new MultiGraph();
+        for (const id of newGraph.nodes) {
+            if (!candidateStable.has(id)) {
+                prunedNew.addNode(id, newGraph.getNodeData(id));
+            }
+        }
+        for (const [from, to, key] of newGraph.edges) {
+            if (!candidateStable.has(from) && !candidateStable.has(to)) {
+                prunedNew.addEdge(from, to, key, newGraph.getEdgeData(from, to, key));
+            }
+        }
+
+        return { prunedCurrent, prunedNew, stableNodeIds: candidateStable, stableEdges };
+    }
+
+    /**
+     * Returns true if the given candidate node has any edge mismatch that
+     * prevents it from being in the stable set.
+     *
+     * A mismatch occurs when:
+     *  - An edge incident to the node connects to a node outside the
+     *    candidate set (edge would become dangling after pruning).
+     *  - An edge present in one graph has no counterpart (same key) in the
+     *    other graph.
+     *  - A matching edge exists in both graphs but with different types.
+     *
+     * @param nodeId The candidate node to check.
+     * @param candidates The current stable candidate set.
+     * @param currentGraph The current graph.
+     * @param newGraph The new graph.
+     */
+    private hasCandidateEdgeMismatch(
+        nodeId: string,
+        candidates: Set<string>,
+        currentGraph: MultiGraph,
+        newGraph: MultiGraph
+    ): boolean {
+        const currentAdj = currentGraph.adj(nodeId);
+        for (const [neighbor, edgeMap] of currentAdj) {
+            if (!candidates.has(neighbor)) {
+                return true;
+            }
+            for (const [key, attrs] of edgeMap) {
+                if (!newGraph.hasEdge(nodeId, neighbor, key)) {
+                    return true;
+                }
+                if ((attrs as EdgeAttributes).type !== newGraph.getEdgeData(nodeId, neighbor, key).type) {
+                    return true;
+                }
+            }
+        }
+
+        const newAdj = newGraph.adj(nodeId);
+        for (const [neighbor, edgeMap] of newAdj) {
+            if (!candidates.has(neighbor)) {
+                return true;
+            }
+            for (const [key] of edgeMap) {
+                if (!currentGraph.hasEdge(nodeId, neighbor, key)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

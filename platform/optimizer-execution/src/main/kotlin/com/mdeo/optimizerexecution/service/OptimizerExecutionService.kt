@@ -478,7 +478,8 @@ class OptimizerExecutionService(
             goalConfig = config.goal,
             solverConfig = config.solver,
             initialSolutionCount = config.solver.parameters.population,
-            threadsPerNode = -1
+            threadsPerNode = -1,
+            graphBackendType = config.runtime.backend ?: GraphBackendType.MDEO
         )
     }
 

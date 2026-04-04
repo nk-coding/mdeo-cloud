@@ -2,7 +2,10 @@ package com.mdeo.optimizer.evaluation
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.SerializedModel
+import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.graph.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy
 import com.mdeo.optimizer.solution.Solution
@@ -21,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
  * @param constraints The constraint guidance functions used for feasibility checks.
  * @param metamodel The compiled metamodel used to reconstitute solutions from [ModelData].
  * @param nodeId Optional identifier for this evaluator node (defaults to [DEFAULT_NODE_ID]).
+ * @param graphBackendType The graph backend to use when reconstituting imported solutions.
  */
 class LocalMutationEvaluator(
     private val initialSolutionProvider: () -> Solution,
@@ -28,7 +32,8 @@ class LocalMutationEvaluator(
     private val objectives: List<GuidanceFunction>,
     private val constraints: List<GuidanceFunction>,
     private val metamodel: Metamodel? = null,
-    private val nodeId: String = DEFAULT_NODE_ID
+    private val nodeId: String = DEFAULT_NODE_ID,
+    private val graphBackendType: GraphBackendType = GraphBackendType.MDEO
 ) : MutationEvaluator {
 
     private val solutions: ConcurrentHashMap<String, Solution> = ConcurrentHashMap()
@@ -90,7 +95,10 @@ class LocalMutationEvaluator(
      */
     fun receiveSolution(solutionId: String, serializedModel: SerializedModel) {
         val mm = checkNotNull(metamodel) { "Cannot receive solutions without a metamodel" }
-        val modelGraph = MdeoModelGraph.create(serializedModel, mm)
+        val modelGraph = when (graphBackendType) {
+            GraphBackendType.MDEO -> MdeoModelGraph.create(serializedModel, mm)
+            GraphBackendType.Tinker -> TinkerModelGraph.create(serializedModel.toModelData(mm), mm)
+        }
         solutions[solutionId] = Solution(modelGraph)
     }
 

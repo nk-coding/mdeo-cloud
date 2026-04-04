@@ -25,6 +25,9 @@ import { useColorMode } from "@vueuse/core";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/sonner";
 import "vue-sonner/style.css";
+import { useEditorSettingsPersistence } from "./data/editorSettingsPersistence";
+
+useEditorSettingsPersistence();
 
 const monaco = inject(monacoApiProviderKey)!;
 const backendApi = new BackendApi();

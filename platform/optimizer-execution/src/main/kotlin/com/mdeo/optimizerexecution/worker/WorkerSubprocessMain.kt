@@ -21,6 +21,8 @@ import com.mdeo.optimizer.operators.MutationStrategyFactory
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.optimizer.worker.*
 import com.mdeo.modeltransformation.graph.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst
 import com.mdeo.script.ast.expressions.TypedExpressionSerializer as ScriptExpressionSerializer
 import com.mdeo.script.ast.statements.TypedStatementSerializer
@@ -402,14 +404,20 @@ class WorkerSubprocessMain : SubprocessMain() {
 
         val mutationStrategy = MutationStrategyFactory.create(request.solverConfig.parameters.mutation, transformations)
 
+        val graphBackendType = request.graphBackendType
         val localEvaluator = LocalMutationEvaluator(
             initialSolutionProvider = {
-                Solution(MdeoModelGraph.create(request.initialModelData, metamodel))
+                val modelGraph = when (graphBackendType) {
+                    GraphBackendType.MDEO -> MdeoModelGraph.create(request.initialModelData, metamodel)
+                    GraphBackendType.Tinker -> TinkerModelGraph.create(request.initialModelData, metamodel)
+                }
+                Solution(modelGraph)
             },
             mutationStrategy = mutationStrategy,
             objectives = objectives,
             constraints = constraints,
-            metamodel = metamodel
+            metamodel = metamodel,
+            graphBackendType = graphBackendType
         )
 
         val initialSolutions: List<WorkerInitialSolution> = if (!request.skipInitialization) {
