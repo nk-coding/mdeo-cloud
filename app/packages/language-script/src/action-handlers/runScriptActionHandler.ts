@@ -11,7 +11,7 @@ import {
 } from "@mdeo/language-common";
 import { sharedImport, type ActionHandler, resolveRelativePath, buildFileSelectTree } from "@mdeo/language-shared";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
-import type { LangiumSharedServices } from "langium/lsp";
+import type { ExtendedLangiumSharedServices } from "@mdeo/language-common";
 import { type ScriptType } from "../grammar/scriptTypes.js";
 import type { ModelType } from "@mdeo/language-model";
 
@@ -64,14 +64,14 @@ export class RunScriptActionHandler implements ActionHandler {
     /**
      * Shared Langium services for accessing workspace documents.
      */
-    private readonly sharedServices: LangiumSharedServices;
+    private readonly sharedServices: ExtendedLangiumSharedServices;
 
     /**
      * Creates a new run script action handler.
      *
      * @param sharedServices Shared Langium services
      */
-    constructor(sharedServices: LangiumSharedServices) {
+    constructor(sharedServices: ExtendedLangiumSharedServices) {
         this.sharedServices = sharedServices;
     }
 
@@ -89,6 +89,19 @@ export class RunScriptActionHandler implements ActionHandler {
      */
     async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
         const data = params.data as FileMenuActionData;
+
+        const validationError = this.checkValidationErrors(URI.parse(data.uri).toString());
+        if (validationError != undefined) {
+            return {
+                kind: "page",
+                page: {
+                    title: "Run Script Method",
+                    description: validationError,
+                    schema: { properties: {} },
+                    isLastPage: true
+                }
+            };
+        }
 
         const methods = await this.findParameterlessMethods(data.uri);
 
@@ -137,6 +150,10 @@ export class RunScriptActionHandler implements ActionHandler {
             const methods = await this.findParameterlessMethods(data.uri);
             if (methods.length === 1 && typeof rawInputs === "object" && rawInputs !== null) {
                 const modelPath = (rawInputs as unknown as MethodAndModelSelectionInputs).modelPath;
+                const modelSubmitError = this.checkSubmitValidationErrors(data.uri, modelPath);
+                if (modelSubmitError != undefined) {
+                    return { kind: "error", message: "Cannot start execution", description: modelSubmitError };
+                }
                 return this.createExecutionSubmit(data.uri, methods[0], modelPath);
             }
             return {
@@ -156,7 +173,86 @@ export class RunScriptActionHandler implements ActionHandler {
 
         const modelPath = (rawInputs as MethodAndModelSelectionInputs).modelPath;
 
+        const submitValidationError = this.checkSubmitValidationErrors(data.uri, modelPath);
+        if (submitValidationError != undefined) {
+            return { kind: "error", message: "Cannot start execution", description: submitValidationError };
+        }
+
         return this.createExecutionSubmit(data.uri, methodName, modelPath);
+    }
+
+    /**
+     * Checks if the given URI string and its transitive dependencies have validation errors.
+     *
+     * @param mainUri The main document URI string to check along with its transitive deps
+     * @returns An error message listing files with errors, or undefined if none found
+     */
+    private checkValidationErrors(mainUri: string): string | undefined {
+        const builder = this.sharedServices.workspace.DocumentBuilder;
+        const allUris = new Set<string>([mainUri]);
+        for (const dep of builder.getTransitiveDependencies(mainUri)) {
+            allUris.add(dep);
+        }
+        const langiumDocuments = this.sharedServices.workspace.LangiumDocuments;
+        const filesWithErrors: string[] = [];
+        for (const uriStr of allUris) {
+            const doc = langiumDocuments.getDocument(URI.parse(uriStr));
+            if (doc == undefined) continue;
+            const hasErrors =
+                doc.parseResult.lexerErrors.length > 0 ||
+                doc.parseResult.parserErrors.length > 0 ||
+                (doc.diagnostics != undefined && doc.diagnostics.some((d) => (d.severity ?? 1) === 1));
+            if (hasErrors) {
+                filesWithErrors.push(URI.parse(uriStr).path);
+            }
+        }
+        if (filesWithErrors.length === 0) return undefined;
+        const fileList = filesWithErrors.map((p) => `\u2022 ${p.split("/").pop() ?? p}`).join("\n");
+        return `Cannot start execution. The following files have validation errors:\n${fileList}`;
+    }
+
+    /**
+     * Checks validation errors for submit, including the optional model file.
+     *
+     * @param scriptUri URI string of the script file
+     * @param modelPath Optional model path from the selection (workspace-relative)
+     * @returns An error message or undefined if no errors
+     */
+    private checkSubmitValidationErrors(scriptUri: string, modelPath: string | undefined): string | undefined {
+        const scriptUriStr = URI.parse(scriptUri).toString();
+        const urisToCheck = [scriptUriStr];
+        if (modelPath != undefined) {
+            const modelDoc = this.sharedServices.workspace.LangiumDocuments.all.find(
+                (doc) => doc.uri.path === modelPath || doc.uri.path.endsWith(modelPath)
+            );
+            if (modelDoc != undefined) {
+                urisToCheck.push(modelDoc.uri.toString());
+            }
+        }
+        const builder = this.sharedServices.workspace.DocumentBuilder;
+        const allUris = new Set<string>();
+        for (const uri of urisToCheck) {
+            allUris.add(uri);
+            for (const dep of builder.getTransitiveDependencies(uri)) {
+                allUris.add(dep);
+            }
+        }
+        const langiumDocuments = this.sharedServices.workspace.LangiumDocuments;
+        const filesWithErrors: string[] = [];
+        for (const uriStr of allUris) {
+            const doc = langiumDocuments.getDocument(URI.parse(uriStr));
+            if (doc == undefined) continue;
+            const hasErrors =
+                doc.parseResult.lexerErrors.length > 0 ||
+                doc.parseResult.parserErrors.length > 0 ||
+                (doc.diagnostics != undefined && doc.diagnostics.some((d) => (d.severity ?? 1) === 1));
+            if (hasErrors) {
+                filesWithErrors.push(URI.parse(uriStr).path);
+            }
+        }
+        if (filesWithErrors.length === 0) return undefined;
+        const fileList = filesWithErrors.map((p) => `\u2022 ${p.split("/").pop() ?? p}`).join("\n");
+        return `Cannot start execution. The following files have validation errors:\n${fileList}`;
     }
 
     /**

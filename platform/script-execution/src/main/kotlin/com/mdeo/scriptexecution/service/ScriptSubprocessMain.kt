@@ -107,6 +107,16 @@ class ScriptSubprocessMain : SubprocessMain() {
                     output = outputStream.toString(Charsets.UTF_8)
                 )
             ).toByteArray()
+        } catch (t: Throwable) {
+            val stackTraceBuf = ByteArrayOutputStream()
+            t.printStackTrace(PrintStream(stackTraceBuf, true, Charsets.UTF_8))
+            return json.encodeToString<ScriptResponse>(
+                ScriptResponse.ExecuteError(
+                    message = t.toString(),
+                    stackTrace = stackTraceBuf.toString(Charsets.UTF_8),
+                    output = outputStream.toString(Charsets.UTF_8)
+                )
+            ).toByteArray()
         } finally {
             cancelTimeout(timeoutId)
             printStream.close()
@@ -156,6 +166,19 @@ sealed class ScriptResponse {
     @SerialName("execute_ok")
     data class ExecuteOk(
         val result: String?,
+        val output: String?
+    ) : ScriptResponse()
+
+    /**
+     * Runtime error during script execution (e.g. [StackOverflowError], [OutOfMemoryError]).
+     * Carries the throwable's string representation, its full stack trace, and any output
+     * that was captured before the error occurred.
+     */
+    @Serializable
+    @SerialName("execute_error")
+    data class ExecuteError(
+        val message: String,
+        val stackTrace: String?,
         val output: String?
     ) : ScriptResponse()
 

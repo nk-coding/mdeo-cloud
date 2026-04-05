@@ -4,7 +4,8 @@ import type {
     ActionStartResponse,
     ActionSubmitParams,
     ActionSubmitResponse,
-    FileMenuActionData
+    FileMenuActionData,
+    ExtendedLangiumSharedServices
 } from "@mdeo/language-common";
 import { FileCategory, parseUri } from "@mdeo/language-common";
 import { sharedImport, type ActionHandler } from "@mdeo/language-shared";
@@ -16,7 +17,25 @@ const { URI } = sharedImport("langium");
  * Produces a direct execution request for the originating .config file.
  */
 export class RunMdeoConfigActionHandler implements ActionHandler {
+    private readonly sharedServices: ExtendedLangiumSharedServices;
+
+    constructor(sharedServices: ExtendedLangiumSharedServices) {
+        this.sharedServices = sharedServices;
+    }
+
     async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
+        const typedData = params.data as Partial<FileMenuActionData>;
+        if (typeof typedData.uri === "string") {
+            const validationError = this.checkValidationErrors(URI.parse(typedData.uri).toString());
+            if (validationError != undefined) {
+                return {
+                    kind: "error",
+                    message: "Cannot start execution",
+                    description: validationError
+                };
+            }
+        }
+
         const executionRequest = this.createExecutionRequest(params.data);
         if (executionRequest == undefined) {
             return {
@@ -36,6 +55,36 @@ export class RunMdeoConfigActionHandler implements ActionHandler {
             kind: "error",
             message: "Run action does not support additional submit steps"
         };
+    }
+
+    /**
+     * Checks if the given URI and its transitive dependencies have validation errors.
+     *
+     * @param mainUri The main document URI string to check along with its transitive deps
+     * @returns An error message listing files with errors, or undefined if none found
+     */
+    private checkValidationErrors(mainUri: string): string | undefined {
+        const builder = this.sharedServices.workspace.DocumentBuilder;
+        const allUris = new Set<string>([mainUri]);
+        for (const dep of builder.getTransitiveDependencies(mainUri)) {
+            allUris.add(dep);
+        }
+        const langiumDocuments = this.sharedServices.workspace.LangiumDocuments;
+        const filesWithErrors: string[] = [];
+        for (const uriStr of allUris) {
+            const doc = langiumDocuments.getDocument(URI.parse(uriStr));
+            if (doc == undefined) continue;
+            const hasErrors =
+                doc.parseResult.lexerErrors.length > 0 ||
+                doc.parseResult.parserErrors.length > 0 ||
+                (doc.diagnostics != undefined && doc.diagnostics.some((d) => (d.severity ?? 1) === 1));
+            if (hasErrors) {
+                filesWithErrors.push(URI.parse(uriStr).path);
+            }
+        }
+        if (filesWithErrors.length === 0) return undefined;
+        const fileList = filesWithErrors.map((p) => `\u2022 ${p.split("/").pop() ?? p}`).join("\n");
+        return `Cannot start execution. The following files have validation errors:\n${fileList}`;
     }
 
     private createExecutionRequest(data: unknown): ActionExecutionRequest | undefined {

@@ -2,13 +2,13 @@
     <Dialog v-model:open="isOpen">
         <DialogContent class="sm:max-w-2xl w-full flex flex-col">
             <DialogHeader>
-                <DialogTitle>{{ currentPage?.title ?? "Action" }}</DialogTitle>
-                <DialogDescription v-if="currentPage?.description">
-                    {{ currentPage.description }}
+                <DialogTitle>{{ errorState?.message ?? currentPage?.title ?? "Action" }}</DialogTitle>
+                <DialogDescription v-if="errorState?.description ?? currentPage?.description">
+                    {{ errorState?.description ?? currentPage?.description }}
                 </DialogDescription>
             </DialogHeader>
 
-            <div class="flex max-h-[60vh]">
+            <div v-if="!errorState" class="flex max-h-[60vh]">
                 <ScrollArea class="flex-1 min-h-10 -mx-2">
                     <ActionForm
                         v-if="currentPage"
@@ -20,7 +20,10 @@
                 </ScrollArea>
             </div>
 
-            <DialogFooter class="flex flex-row justify-between sm:justify-between">
+            <DialogFooter v-if="errorState" class="flex flex-row justify-end sm:justify-end">
+                <Button @click="closeDialog">OK</Button>
+            </DialogFooter>
+            <DialogFooter v-else class="flex flex-row justify-between sm:justify-between">
                 <div>
                     <Button v-if="canGoPrevious" variant="outline" :disabled="isSubmitting" @click="handlePrevious">
                         <ChevronLeft class="size-4 mr-1" />
@@ -86,6 +89,7 @@ const { pendingAction, languageClient, backendApi, project } = workbenchState;
 
 const isOpen = ref(false);
 const currentPage = ref<ActionDialogPage>();
+const errorState = ref<{ message: string; description?: string }>();
 const previousPagesStack = ref<{ page: ActionDialogPage; inputs: unknown }[]>([]);
 const nextValuesStack = ref<unknown[]>([]);
 const currentInputs = ref<unknown>({});
@@ -134,6 +138,7 @@ async function startActionDialog(params: { type: string; languageId: string; dat
 
 function resetDialogState(): void {
     currentPage.value = undefined;
+    errorState.value = undefined;
     previousPagesStack.value = [];
     nextValuesStack.value = [];
     currentInputs.value = {};
@@ -222,9 +227,8 @@ async function handleCompletionEffects(executions?: ActionExecutionRequest[]): P
 }
 
 function handleErrorResponse(response: ActionStartErrorResponse | ActionSubmitErrorResponse): void {
-    showError(response.message, {
-        description: response.description
-    });
+    errorState.value = { message: response.message, description: response.description };
+    isOpen.value = true;
 }
 
 async function handleSubmitResponse(response: ActionSubmitResponse): Promise<void> {
@@ -250,7 +254,6 @@ async function handleSubmitResponse(response: ActionSubmitResponse): Promise<voi
         closeDialog();
     } else if (response.kind === "error") {
         handleErrorResponse(response);
-        closeDialog();
     }
 }
 

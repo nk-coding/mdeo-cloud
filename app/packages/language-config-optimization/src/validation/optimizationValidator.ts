@@ -12,6 +12,7 @@ import { MetaModel, isMetamodelCompatible } from "@mdeo/language-metamodel";
 import { Model } from "@mdeo/language-model";
 import {
     RangeMultiplicity,
+    SingleMultiplicity,
     type ProblemSectionType,
     type GoalSectionType,
     type ObjectiveType,
@@ -19,6 +20,7 @@ import {
     type RefinementType,
     type MultiplicityType,
     type RangeMultiplicityType,
+    type SingleMultiplicityType,
     type FunctionFileImportType
 } from "../grammar/optimizationTypes.js";
 import { findProblemSection, getMetamodelUri } from "../features/util.js";
@@ -412,17 +414,37 @@ export class OptimizationValidator {
     }
 
     /**
-     * Validates that a range multiplicity has a valid range (upper >= lower).
-     * Mirrors the check from the metamodel language.
-     * Has no effect on single multiplicities.
+     * Validates a multiplicity: checks that bounds are non-negative, and for range
+     * multiplicities also checks that the upper bound is >= the lower bound.
+     * Mirrors the checks from the metamodel language.
      *
      * @param multiplicity The multiplicity node to check
      * @param node The parent AST node used for error reporting
      * @param accept The validation acceptor
      */
     private validateMultiplicityRange(multiplicity: MultiplicityType, node: AstNode, accept: ValidationAcceptor): void {
-        if (multiplicity.$type === RangeMultiplicity.name) {
+        if (multiplicity.$type === SingleMultiplicity.name) {
+            const single = multiplicity as SingleMultiplicityType;
+            if (single.numericValue !== undefined && single.numericValue < 0) {
+                accept("error", `Multiplicity value (${single.numericValue}) must not be negative.`, {
+                    node,
+                    property: "multiplicity"
+                });
+            }
+        } else if (multiplicity.$type === RangeMultiplicity.name) {
             const range = multiplicity as RangeMultiplicityType;
+            if (range.lower < 0) {
+                accept("error", `Multiplicity lower bound (${range.lower}) must not be negative.`, {
+                    node,
+                    property: "multiplicity"
+                });
+            }
+            if (range.upperNumeric !== undefined && range.upperNumeric < 0) {
+                accept("error", `Multiplicity upper bound (${range.upperNumeric}) must not be negative.`, {
+                    node,
+                    property: "multiplicity"
+                });
+            }
             if (range.upper === "*") {
                 return;
             }

@@ -45,7 +45,6 @@ import { NoopExternalReferenceResolver } from "./noopExternalReferenceResolver";
 import { addActionHandlers } from "./actionHandlers";
 import { ConcurrentLangiumDocuments } from "./concurrentLangiumDocuments";
 import { DependencyAwareDocumentBuilder } from "./dependencyAwareDocumentBuilder";
-import { setupDependencyTracking } from "./backgroundValidation";
 
 const messageReader = new BrowserMessageReader(self);
 const messageWriter = new BrowserMessageWriter(self);
@@ -180,9 +179,6 @@ function createLanguageServices(context: DefaultSharedModuleContext) {
 
 const shared = createLanguageServices({ connection, ...lspFileSystem(connection) });
 
-// Enable validation during the initial workspace build so diagnostics are published
-// for all files immediately, not only after a file is opened in the editor.
-// By default, Langium's initialBuildOptions is {} which skips validation entirely.
 const workspaceManager = shared.workspace.WorkspaceManager as { initialBuildOptions?: object };
 workspaceManager.initialBuildOptions = {
     validation: {
@@ -194,5 +190,4 @@ connection.sendNotification(ServerReadyNotification.method, {});
 
 configureGLSPServer(shared);
 addActionHandlers(connection, shared, pluginContext);
-setupDependencyTracking(shared, resolvedPlugins);
 langiumLsp.startLanguageServer(shared);

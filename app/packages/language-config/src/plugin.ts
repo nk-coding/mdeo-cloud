@@ -24,7 +24,7 @@ import {
     type ActionHandlerRegistryAdditionalServices
 } from "@mdeo/language-shared";
 import { registerConfigSerializers } from "./features/configSerializers.js";
-import { ConfigExternalReferenceCollector } from "./features/configExternalReferenceCollector.js";
+import { ConfigDelegatingExternalReferenceCollector } from "./features/configDelegatingExternalReferenceCollector.js";
 import { registerConfigValidationChecks } from "./validation/configValidator.js";
 import { ConfigActionProvider } from "./features/configActionProvider.js";
 import { RunConfigActionHandler } from "./action-handlers/runConfigActionHandler.js";
@@ -66,7 +66,8 @@ export const configPluginProvider: LangiumLanguagePluginProvider<ConfigAdditiona
                 },
                 references: {
                     ScopeProvider: (services) => new ConfigDelegatingScopeProvider(services, resolvedPlugins),
-                    ExternalReferenceCollector: () => new ConfigExternalReferenceCollector()
+                    ExternalReferenceCollector: (services) =>
+                        new ConfigDelegatingExternalReferenceCollector(services, resolvedPlugins)
                 },
                 lsp: {
                     CompletionProvider: (services) => new ConfigDelegatingCompletionProvider(services, resolvedPlugins),

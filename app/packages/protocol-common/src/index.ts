@@ -1,6 +1,6 @@
 export * from "./actions/createEdgeSchemaActions.js";
-export * from "./actions/resetCanvasBoundsAction.js";
 export * from "./actions/editorSettingsAction.js";
+export * from "./actions/resetCanvasBoundsAction.js";
 export * from "./context-actions/contextActionsOperation.js";
 export * from "./context-actions/contextActionsTypes.js";
 export * from "./operations/createEdgeOperation.js";

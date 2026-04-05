@@ -270,23 +270,45 @@ class ExecutionService(
                 val response = runCatching {
                     Json.decodeFromString(ScriptResponse.serializer(), result.data.decodeToString())
                 }.getOrNull()
-                val executeOk = response as? ScriptResponse.ExecuteOk
-                if (executeOk != null) {
-                    transaction {
-                        ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
-                            it[ExecutionsTable.result] = executeOk.result ?: "null"
-                            it[ExecutionsTable.output] = executeOk.output
+                when (val resp = response) {
+                    is ScriptResponse.ExecuteOk -> {
+                        transaction {
+                            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                                it[ExecutionsTable.result] = resp.result ?: "null"
+                                it[ExecutionsTable.output] = resp.output
+                            }
                         }
+                        updateExecutionState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
+                        logger.info("Execution $executionId completed successfully")
+                        subprocessPool.resetAndRelease(subprocess)
                     }
-                    updateExecutionState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
-                    logger.info("Execution $executionId completed successfully")
-                    subprocessPool.resetAndRelease(subprocess)
-                } else {
-                    logger.error("Unexpected subprocess response format for execution $executionId")
-                    subprocess.destroy()
-                    val msg = "Internal error: unexpected subprocess response"
-                    storeError(executionId, msg)
-                    updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
+                    is ScriptResponse.ExecuteError -> {
+                        val errorText = buildString {
+                            append(resp.message)
+                            if (!resp.stackTrace.isNullOrBlank()) {
+                                append("\n\n")
+                                append(resp.stackTrace)
+                            }
+                        }
+                        transaction {
+                            ExecutionsTable.update({ ExecutionsTable.id eq executionId.toKotlinUuid() }) {
+                                it[ExecutionsTable.error] = errorText
+                                it[ExecutionsTable.output] = resp.output
+                            }
+                        }
+                        subprocess.destroy()
+                        logger.error("Execution $executionId failed with runtime error: ${resp.message}")
+                        updateExecutionState(
+                            executionId, ExecutionState.FAILED, "Runtime error: ${resp.message}", jwtToken
+                        )
+                    }
+                    else -> {
+                        logger.error("Unexpected subprocess response format for execution $executionId")
+                        subprocess.destroy()
+                        val msg = "Internal error: unexpected subprocess response"
+                        storeError(executionId, msg)
+                        updateExecutionState(executionId, ExecutionState.FAILED, msg, jwtToken)
+                    }
                 }
             }
             is SubprocessResult.Timeout -> {
@@ -556,9 +578,9 @@ class ExecutionService(
                     }
                 } else {
                     buildString {
-                        append("## Runtime Error\n\n")
+                        append("## Runtime Error\n\n```\n")
                         append(errorText)
-                        append("\n\n## Output\n\n")
+                        append("\n```\n\n## Output\n\n")
                         if (output.isNullOrBlank()) {
                             append("*no output produced*")
                         } else {

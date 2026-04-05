@@ -94,9 +94,9 @@ const configMdeoPlugin: LangiumLanguagePlugin<MdeoServices> = {
         AstSerializer: (services) => new DefaultAstSerializer(services),
         MdeoMetamodelResolver: () => new DefaultMdeoMetamodelResolver(),
         action: {
-            ActionHandlerRegistry: () => {
+            ActionHandlerRegistry: (services) => {
                 const registry = new ActionHandlerRegistry();
-                registry.register("run", new RunMdeoConfigActionHandler());
+                registry.register("run", new RunMdeoConfigActionHandler(services.shared));
                 return registry;
             },
             ActionProvider: () => new DefaultActionProvider()

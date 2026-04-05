@@ -88,6 +88,7 @@ export class MetamodelValidator {
     validateMetaModel(metaModel: MetaModelType, accept: ValidationAcceptor): void {
         this.validateClassEnumNameUniqueness(metaModel, accept);
         this.validateNoCyclicImports(metaModel, accept);
+        this.validateNoClassHierarchyCycles(metaModel, accept);
     }
 
     /**
@@ -269,6 +270,71 @@ export class MetamodelValidator {
                         property: "name"
                     }
                 );
+            }
+        }
+    }
+
+    /**
+     * Validates that no class (directly or transitively) extends itself.
+     * Uses a single DFS pass over all local classes with 3-color marking
+     * (unvisited / in-stack / done) to efficiently detect back edges.
+     *
+     * @param metaModel The metamodel to validate
+     * @param accept The validation acceptor
+     */
+    private validateNoClassHierarchyCycles(metaModel: MetaModelType, accept: ValidationAcceptor): void {
+        const allClasses: ClassType[] = [];
+        for (const element of metaModel.elements ?? []) {
+            if (this.reflection.isInstance(element, Class)) {
+                allClasses.push(element as ClassType);
+            }
+        }
+
+        // 0 = unvisited (WHITE), 1 = in current DFS path (GRAY), 2 = fully processed (BLACK)
+        const color = new Map<ClassType, 0 | 1 | 2>();
+        for (const cls of allClasses) {
+            color.set(cls, 0);
+        }
+
+        const path: ClassType[] = [];
+        const reportedCycle = new Set<ClassType>();
+
+        const dfs = (cls: ClassType): void => {
+            color.set(cls, 1);
+            path.push(cls);
+
+            for (const ext of cls.extensions?.extensions ?? []) {
+                const parent = ext.class?.ref;
+                if (parent == undefined) continue;
+
+                const parentColor = color.get(parent);
+                if (parentColor === 1) {
+                    // Back edge: parent is still in the DFS stack → cycle detected.
+                    // Report on all classes from parent to cls (inclusive) in the current path.
+                    const cycleStart = path.indexOf(parent);
+                    for (let i = cycleStart; i < path.length; i++) {
+                        const cycleCls = path[i]!;
+                        if (!reportedCycle.has(cycleCls)) {
+                            reportedCycle.add(cycleCls);
+                            accept("error", `Class '${cycleCls.name}' is part of a cyclic class hierarchy.`, {
+                                node: cycleCls,
+                                property: "name"
+                            });
+                        }
+                    }
+                } else if (parentColor === 0) {
+                    dfs(parent);
+                }
+                // parentColor === 2 or undefined (external/imported class): fully processed, skip
+            }
+
+            path.pop();
+            color.set(cls, 2);
+        };
+
+        for (const cls of allClasses) {
+            if (color.get(cls) === 0) {
+                dfs(cls);
             }
         }
     }
@@ -498,12 +564,34 @@ export class MetamodelValidator {
     }
 
     /**
-     * Validates a range multiplicity (upper bound >= lower bound).
+     * Validates a multiplicity: checks that bounds are non-negative, and for range
+     * multiplicities also checks that the upper bound is >= the lower bound.
      */
     private validateMultiplicityRange(multiplicity: MultiplicityType, node: AstNode, accept: ValidationAcceptor): void {
-        if (this.reflection.isInstance(multiplicity, RangeMultiplicity)) {
+        if (this.reflection.isInstance(multiplicity, SingleMultiplicity)) {
+            const numericValue = multiplicity.numericValue;
+            if (numericValue !== undefined && numericValue < 0) {
+                accept("error", `Multiplicity value (${numericValue}) must not be negative.`, {
+                    node,
+                    property: "multiplicity"
+                });
+            }
+        } else if (this.reflection.isInstance(multiplicity, RangeMultiplicity)) {
             const lower = multiplicity.lower;
             const upperNumeric = multiplicity.upperNumeric;
+
+            if (lower < 0) {
+                accept("error", `Multiplicity lower bound (${lower}) must not be negative.`, {
+                    node,
+                    property: "multiplicity"
+                });
+            }
+            if (upperNumeric !== undefined && upperNumeric < 0) {
+                accept("error", `Multiplicity upper bound (${upperNumeric}) must not be negative.`, {
+                    node,
+                    property: "multiplicity"
+                });
+            }
 
             if (multiplicity.upper === "*") {
                 return;

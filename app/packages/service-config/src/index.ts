@@ -17,6 +17,7 @@ import { convertIcon } from "@mdeo/language-common";
 import type { ConfigAdditionalServices } from "@mdeo/language-config";
 import type { LanguagePlugin } from "@mdeo/plugin";
 import { DefaultScopeProvider } from "langium";
+import { DefaultExternalReferenceCollector } from "../../language-shared/src/external-reference/defaultExternalReferenceCollector.js";
 
 const icon: ActionIconNode = convertIcon(Settings);
 
@@ -71,7 +72,8 @@ const configLanguageConfig: LanguageServiceConfig<ConfigAdditionalServices> = {
     languagePluginProvider: configPluginProvider,
     serviceModule: {
         references: {
-            ScopeProvider: (services) => new DefaultScopeProvider(services)
+            ScopeProvider: (services) => new DefaultScopeProvider(services),
+            ExternalReferenceCollector: () => new DefaultExternalReferenceCollector()
         }
     },
     fileDataHandlers: {

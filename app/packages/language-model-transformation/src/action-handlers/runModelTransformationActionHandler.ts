@@ -12,7 +12,7 @@ import {
 } from "@mdeo/language-common";
 import { sharedImport, type ActionHandler, resolveRelativePath, buildFileSelectTree } from "@mdeo/language-shared";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
-import type { LangiumSharedServices } from "langium/lsp";
+import type { ExtendedLangiumSharedServices } from "@mdeo/language-common";
 import type { ModelTransformationType } from "../grammar/modelTransformationTypes.js";
 import type { ModelType } from "@mdeo/language-model";
 
@@ -51,14 +51,14 @@ export class RunModelTransformationActionHandler implements ActionHandler {
     /**
      * Shared Langium services for accessing workspace documents.
      */
-    private readonly sharedServices: LangiumSharedServices;
+    private readonly sharedServices: ExtendedLangiumSharedServices;
 
     /**
      * Creates a new run model transformation action handler.
      *
      * @param sharedServices Shared Langium services
      */
-    constructor(sharedServices: LangiumSharedServices) {
+    constructor(sharedServices: ExtendedLangiumSharedServices) {
         this.sharedServices = sharedServices;
     }
 
@@ -75,6 +75,11 @@ export class RunModelTransformationActionHandler implements ActionHandler {
      */
     async startAction(params: ActionStartParams): Promise<ActionStartResponse> {
         const data = params.data as FileMenuActionData;
+
+        const validationError = this.checkValidationErrors(URI.parse(data.uri).toString());
+        if (validationError != undefined) {
+            return this.createErrorPage(validationError);
+        }
 
         const metamodelUri = await this.getTransformationMetamodelUri(data.uri);
         if (!metamodelUri) {
@@ -120,7 +125,55 @@ export class RunModelTransformationActionHandler implements ActionHandler {
             };
         }
 
+        const modelDoc = this.sharedServices.workspace.LangiumDocuments.all.find(
+            (doc) => doc.uri.path === modelPath || doc.uri.path.endsWith(modelPath)
+        );
+        if (modelDoc != undefined) {
+            const modelValidationError = this.checkValidationErrors(modelDoc.uri.toString());
+            if (modelValidationError != undefined) {
+                return {
+                    kind: "error",
+                    message: "Cannot start execution",
+                    description: modelValidationError
+                };
+            }
+        }
+
         return this.createExecutionSubmit(data.uri, modelPath);
+    }
+
+    /**
+     * Checks if the given URI and its transitive dependencies have validation errors.
+     *
+     * @param mainUri The main document URI to check (additional URIs are also checked)
+     * @param additionalUris Additional URIs to check along with their deps
+     * @returns An error message listing files with errors, or undefined if none found
+     */
+    private checkValidationErrors(mainUri: string, ...additionalUris: string[]): string | undefined {
+        const builder = this.sharedServices.workspace.DocumentBuilder;
+        const allUris = new Set<string>();
+        for (const uri of [mainUri, ...additionalUris]) {
+            allUris.add(uri);
+            for (const dep of builder.getTransitiveDependencies(uri)) {
+                allUris.add(dep);
+            }
+        }
+        const langiumDocuments = this.sharedServices.workspace.LangiumDocuments;
+        const filesWithErrors: string[] = [];
+        for (const uriStr of allUris) {
+            const doc = langiumDocuments.getDocument(URI.parse(uriStr));
+            if (doc == undefined) continue;
+            const hasErrors =
+                doc.parseResult.lexerErrors.length > 0 ||
+                doc.parseResult.parserErrors.length > 0 ||
+                (doc.diagnostics != undefined && doc.diagnostics.some((d) => (d.severity ?? 1) === 1));
+            if (hasErrors) {
+                filesWithErrors.push(URI.parse(uriStr).path);
+            }
+        }
+        if (filesWithErrors.length === 0) return undefined;
+        const fileList = filesWithErrors.map((p) => `\u2022 ${p.split("/").pop() ?? p}`).join("\n");
+        return `Cannot start execution. The following files have validation errors:\n${fileList}`;
     }
 
     /**
