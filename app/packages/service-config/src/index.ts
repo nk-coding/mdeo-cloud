@@ -17,7 +17,6 @@ import { convertIcon } from "@mdeo/language-common";
 import type { ConfigAdditionalServices } from "@mdeo/language-config";
 import type { LanguagePlugin } from "@mdeo/plugin";
 import { DefaultScopeProvider } from "langium";
-import { DefaultExternalReferenceCollector } from "../../language-shared/src/external-reference/defaultExternalReferenceCollector.js";
 
 const icon: ActionIconNode = convertIcon(Settings);
 
@@ -60,6 +59,7 @@ initializePluginContext();
 const { configPluginProvider } = await import("@mdeo/language-config");
 const { configDataHandler, CONFIG_DATA_KEY } = await import("./handler/configFileDataHandler.js");
 const { ConfigExecutionHandler } = await import("./handler/configExecutionHandler.js");
+const { DefaultExternalReferenceCollector } = await import("@mdeo/language-shared");
 
 const envConfig = parseServiceConfigFromEnv();
 const configExecutionHandler = new ConfigExecutionHandler();
