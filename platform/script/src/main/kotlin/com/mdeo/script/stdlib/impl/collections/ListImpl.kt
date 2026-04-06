@@ -31,7 +31,7 @@ class ListImpl<T> : AbstractOrderedCollection<T, ArrayList<T>>, ScriptList<T> {
         }
     })
 
-    override fun asList(): ScriptList<T> = ListImpl(backing)
+    override fun toList(): ScriptList<T> = ListImpl(backing)
 
     override fun clone(): ScriptList<T> = ListImpl(backing)
 

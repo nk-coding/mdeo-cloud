@@ -115,7 +115,7 @@ class OrderedSetImpl<T> : AbstractCollection<T, LinkedHashSet<T>>, OrderedSet<T>
         return OrderedSetImpl(sorted)
     }
 
-    override fun asOrderedSet(): OrderedSet<T> = OrderedSetImpl(backing)
+    override fun toOrderedSet(): OrderedSet<T> = OrderedSetImpl(backing)
 
     override fun clone(): OrderedSet<T> = OrderedSetImpl(backing)
 

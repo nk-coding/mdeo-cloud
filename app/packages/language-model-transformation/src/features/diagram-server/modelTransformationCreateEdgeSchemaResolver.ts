@@ -1,10 +1,12 @@
 import type { CreateEdgeSchema } from "@mdeo/protocol-common";
-import { CreateEdgeSchemaResolver, sharedImport } from "@mdeo/language-shared";
-import type {
-    ModelState,
-    GModelIndex,
-    InitialCreateEdgeSchemaRequest,
-    TargetCreateEdgeSchemaRequest
+import type { ModelState, GModelIndex } from "@mdeo/language-shared";
+import {
+    CreateEdgeSchemaResolver,
+    sharedImport,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil,
+    type InitialCreateEdgeSchemaRequest,
+    type TargetCreateEdgeSchemaRequest
 } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 import {
@@ -22,7 +24,6 @@ import { GPatternLinkEdge } from "./model/patternLinkEdge.js";
 import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkEndLabel } from "./model/patternLinkEndLabel.js";
 import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import type { GModelElementSchema } from "@eclipse-glsp/protocol";
 import type { PatternLinkSchemaParams } from "./handler/createPatternLinkOperationHandler.js";
 

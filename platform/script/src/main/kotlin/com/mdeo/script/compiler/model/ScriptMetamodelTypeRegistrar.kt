@@ -17,6 +17,7 @@ import com.mdeo.script.compiler.registry.type.PropertyDefinition
 import com.mdeo.script.compiler.registry.type.TypeDefinitionImpl
 import com.mdeo.script.compiler.registry.type.TypeRegistry
 import com.mdeo.script.compiler.ScriptCompiler
+import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
@@ -120,6 +121,18 @@ object ScriptMetamodelTypeRegistrar {
         )
 
         typeDef.addMethod(ClassContainerAllMethodDefinition(
+            className = classData.name,
+            containerClassName = containerClassName,
+            instanceClassName = instanceClassName,
+            metamodelPath = metamodelPath
+        ))
+        typeDef.addMethod(ClassContainerFirstMethodDefinition(
+            className = classData.name,
+            containerClassName = containerClassName,
+            instanceClassName = instanceClassName,
+            metamodelPath = metamodelPath
+        ))
+        typeDef.addMethod(ClassContainerFirstOrNullMethodDefinition(
             className = classData.name,
             containerClassName = containerClassName,
             instanceClassName = instanceClassName,
@@ -300,12 +313,9 @@ private class ClassContainerAllMethodDefinition(
         get() = true
 
     override fun emitInvocation(mv: MethodVisitor) {
-        // Stack: [containerInstance, scriptContext]
-        // Discard the container instance — we access the model through ScriptContext.
         mv.visitInsn(Opcodes.SWAP)
         mv.visitInsn(Opcodes.POP)
 
-        // Stack: [scriptContext]
         mv.visitMethodInsn(
             Opcodes.INVOKEINTERFACE,
             ScriptCompiler.CONTEXT_INTERNAL_NAME,
@@ -322,7 +332,6 @@ private class ClassContainerAllMethodDefinition(
             false
         )
 
-        // Wrap result in BagImpl(Collection)
         mv.visitTypeInsn(Opcodes.NEW, "com/mdeo/script/stdlib/impl/collections/BagImpl")
         mv.visitInsn(Opcodes.DUP_X1)
         mv.visitInsn(Opcodes.SWAP)
@@ -333,6 +342,114 @@ private class ClassContainerAllMethodDefinition(
             "(Ljava/util/Collection;)V",
             false
         )
+    }
+}
+
+private class ClassContainerFirstMethodDefinition(
+    private val className: String,
+    private val containerClassName: String,
+    private val instanceClassName: String,
+    private val metamodelPath: String
+) : MethodDefinition {
+
+    override val overloadKey: String = ""
+    override val name: String = "first"
+    override val descriptor: String = "()Ljava/lang/Object;"
+    override val isStatic: Boolean = false
+    override val ownerClass: String = containerClassName
+    override val isInterface: Boolean = false
+    override val jvmMethodName: String = "first"
+    override val isVarArgs: Boolean = false
+    override val parameterTypes: List<ValueType> = emptyList()
+    override val returnType: ReturnType =
+        ClassTypeRef(`package` = "${ScriptMetamodelTypeRegistrar.CLASS_PACKAGE}$metamodelPath", type = className, isNullable = false)
+
+    override val requiresContext: Boolean
+        get() = true
+
+    override fun emitInvocation(mv: MethodVisitor) {
+        mv.visitInsn(Opcodes.SWAP)
+        mv.visitInsn(Opcodes.POP)
+
+        mv.visitMethodInsn(
+            Opcodes.INVOKEINTERFACE,
+            ScriptCompiler.CONTEXT_INTERNAL_NAME,
+            "getModel",
+            "()Lcom/mdeo/metamodel/Model;",
+            true
+        )
+        mv.visitLdcInsn(className)
+        mv.visitMethodInsn(
+            Opcodes.INVOKEVIRTUAL,
+            "com/mdeo/metamodel/Model",
+            "getAllInstances",
+            "(Ljava/lang/String;)Ljava/util/List;",
+            false
+        )
+
+        mv.visitInsn(Opcodes.ICONST_0)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "get", "(I)Ljava/lang/Object;", true)
+    }
+}
+
+private class ClassContainerFirstOrNullMethodDefinition(
+    private val className: String,
+    private val containerClassName: String,
+    private val instanceClassName: String,
+    private val metamodelPath: String
+) : MethodDefinition {
+
+    override val overloadKey: String = ""
+    override val name: String = "firstOrNull"
+    override val descriptor: String = "()Ljava/lang/Object;"
+    override val isStatic: Boolean = false
+    override val ownerClass: String = containerClassName
+    override val isInterface: Boolean = false
+    override val jvmMethodName: String = "firstOrNull"
+    override val isVarArgs: Boolean = false
+    override val parameterTypes: List<ValueType> = emptyList()
+    override val returnType: ReturnType =
+        ClassTypeRef(`package` = "${ScriptMetamodelTypeRegistrar.CLASS_PACKAGE}$metamodelPath", type = className, isNullable = true)
+
+    override val requiresContext: Boolean
+        get() = true
+
+    override fun emitInvocation(mv: MethodVisitor) {
+        mv.visitInsn(Opcodes.SWAP)
+        mv.visitInsn(Opcodes.POP)
+
+        mv.visitMethodInsn(
+            Opcodes.INVOKEINTERFACE,
+            ScriptCompiler.CONTEXT_INTERNAL_NAME,
+            "getModel",
+            "()Lcom/mdeo/metamodel/Model;",
+            true
+        )
+        mv.visitLdcInsn(className)
+        mv.visitMethodInsn(
+            Opcodes.INVOKEVIRTUAL,
+            "com/mdeo/metamodel/Model",
+            "getAllInstances",
+            "(Ljava/lang/String;)Ljava/util/List;",
+            false
+        )
+
+        mv.visitInsn(Opcodes.DUP)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "isEmpty", "()Z", true)
+
+        val emptyLabel = Label()
+        val endLabel = Label()
+        mv.visitJumpInsn(Opcodes.IFNE, emptyLabel)
+
+        mv.visitInsn(Opcodes.ICONST_0)
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/List", "get", "(I)Ljava/lang/Object;", true)
+        mv.visitJumpInsn(Opcodes.GOTO, endLabel)
+
+        mv.visitLabel(emptyLabel)
+        mv.visitInsn(Opcodes.POP)
+        mv.visitInsn(Opcodes.ACONST_NULL)
+
+        mv.visitLabel(endLabel)
     }
 }
 

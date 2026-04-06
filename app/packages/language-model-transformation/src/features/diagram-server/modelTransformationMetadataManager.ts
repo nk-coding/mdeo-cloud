@@ -7,7 +7,9 @@ import {
     type ModelIdRegistry,
     DefaultModelIdRegistry,
     ModelIdProvider,
-    type ModelIdProvider as ModelIdProviderType
+    type ModelIdProvider as ModelIdProviderType,
+    NodeLayoutMetadataUtil,
+    EdgeLayoutMetadataUtil
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
 import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
@@ -31,7 +33,6 @@ import {
     type ControlFlowMatchNode,
     type ControlFlowEdge
 } from "./modelTransformationControlFlowConverter.js";
-import { NodeLayoutMetadataUtil, EdgeLayoutMetadataUtil } from "./metadataTypes.js";
 import { ModelTransformationIdGenerator } from "./modelTransformationIdGenerator.js";
 
 const { injectable, inject } = sharedImport("inversify");

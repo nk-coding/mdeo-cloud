@@ -33,7 +33,6 @@ export * from "./features/diagram-server/model/splitNode.js";
 export * from "./features/diagram-server/model/startNode.js";
 export * from "./features/diagram-server/model/variableLabel.js";
 export * from "./features/diagram-server/model/whereClauseLabel.js";
-export * from "./features/diagram-server/metadataTypes.js";
 export * from "./features/diagram-server/modelTransformationControlFlowConverter.js";
 export * from "./features/diagram-server/modelTransformationCreateEdgeSchemaResolver.js";
 export * from "./features/diagram-server/modelTransformationDiagramConfiguration.js";

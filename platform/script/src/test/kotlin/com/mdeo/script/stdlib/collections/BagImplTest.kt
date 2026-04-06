@@ -319,28 +319,28 @@ class BagImplTest {
     @Test
     fun `asList creates list with all duplicates`() {
         val bag = BagImpl.of(1, 1, 2, 2)
-        val list = bag.asList()
+        val list = bag.toList()
         assertEquals(4, list.size())
     }
 
     @Test
     fun `asSet removes duplicates`() {
         val bag = BagImpl.of(1, 1, 2, 2, 3, 3)
-        val set = bag.asSet()
+        val set = bag.toSet()
         assertEquals(3, set.size())
     }
 
     @Test
     fun `asOrderedSet removes duplicates`() {
         val bag = BagImpl.of(1, 1, 2, 2, 3, 3)
-        val orderedSet = bag.asOrderedSet()
+        val orderedSet = bag.toOrderedSet()
         assertEquals(3, orderedSet.size())
     }
 
     @Test
     fun `asBag creates copy`() {
         val bag = BagImpl.of(1, 1, 2)
-        val copy = bag.asBag()
+        val copy = bag.toBag()
         bag.add(3)
         assertEquals(3, copy.size())
     }

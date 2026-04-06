@@ -9,6 +9,7 @@ import com.mdeo.script.ast.expressions.TypedLambdaExpression
 import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
 import com.mdeo.expression.ast.expressions.TypedTernaryExpression
+import com.mdeo.expression.ast.expressions.TypedTypeCastExpression
 import com.mdeo.expression.ast.expressions.TypedUnaryExpression
 import com.mdeo.expression.ast.statements.TypedAssignmentStatement
 import com.mdeo.expression.ast.statements.TypedExpressionStatement
@@ -515,6 +516,10 @@ class ScopeBuilder(
                 collectFromExpression(expression.condition, scope)
                 collectFromExpression(expression.trueExpression, scope)
                 collectFromExpression(expression.falseExpression, scope)
+            }
+
+            is TypedTypeCastExpression -> {
+                collectFromExpression(expression.expression, scope)
             }
 
             else -> {}

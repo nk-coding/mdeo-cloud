@@ -1,5 +1,6 @@
 package com.mdeo.optimizer.guidance
 
+import com.mdeo.optimizer.config.ObjectiveTendency
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.script.runtime.ScriptContext
 import com.mdeo.script.runtime.SimpleScriptContext
@@ -12,17 +13,21 @@ import java.lang.reflect.InvocationTargetException
  *
  * The script class is instantiated with a [SimpleScriptContext] wrapping the solution's
  * model graph, then the named method is invoked and its return value is coerced to [Double].
+ * For [ObjectiveTendency.MAXIMIZE] objectives the raw value is negated so that MOEA Framework,
+ * which minimises internally, receives the correct directional signal.
  *
  * @param clazz The compiled script class to instantiate.
  * @param jvmMethodName The no-arg method on [clazz] to call for the fitness value.
  * @param printStream Output stream made available to scripts via the [ScriptContext].
  * @param name Human-readable name of this guidance function.
+ * @param tendency Whether to minimise or maximise the function value. Defaults to [ObjectiveTendency.MINIMIZE].
  */
 class ScriptGuidanceFunction(
     private val clazz: Class<*>,
     private val jvmMethodName: String,
     private val printStream: PrintStream,
-    override val name: String
+    override val name: String,
+    private val tendency: ObjectiveTendency = ObjectiveTendency.MINIMIZE
 ) : GuidanceFunction {
 
     private val logger = LoggerFactory.getLogger(ScriptGuidanceFunction::class.java)
@@ -38,7 +43,7 @@ class ScriptGuidanceFunction(
         } catch (e: InvocationTargetException) {
             throw e.cause ?: e
         }
-        return toDouble(result)
+        return toDouble(result) * tendency.numericalDirection()
     }
 
     /**

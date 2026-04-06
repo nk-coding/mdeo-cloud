@@ -421,7 +421,7 @@ class OrderedSetImplTest {
     @Test
     fun `asOrderedSet creates copy`() {
         val set = OrderedSetImpl.of(1, 2, 3)
-        val copy = set.asOrderedSet()
+        val copy = set.toOrderedSet()
         set.add(4)
         assertEquals(3, copy.size())
     }
@@ -429,7 +429,7 @@ class OrderedSetImplTest {
     @Test
     fun `asList preserves order`() {
         val set = OrderedSetImpl.of(3, 1, 2)
-        val list = set.asList()
+        val list = set.toList()
         assertEquals(3, list.first())
         assertEquals(2, list.last())
     }
@@ -437,7 +437,7 @@ class OrderedSetImplTest {
     @Test
     fun `asSet converts to set`() {
         val set = OrderedSetImpl.of(1, 2, 3)
-        val regularSet = set.asSet()
+        val regularSet = set.toSet()
         assertEquals(3, regularSet.size())
     }
 

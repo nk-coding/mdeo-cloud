@@ -14,56 +14,6 @@ private const val ANY_HELPER = "com/mdeo/script/stdlib/impl/primitives/AnyHelper
 fun createAnyType(): TypeDefinition {
     return typeDefinition("builtin", "Any") {
         jvmClass("java/lang/Object")
-        staticMethod("asBoolean") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)Z",
-                ANY_HELPER,
-                parameterTypes = emptyList(),
-                returnType = BuiltinTypes.BOOLEAN
-            )
-        }
-
-        staticMethod("asInteger") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)I",
-                ANY_HELPER,
-                parameterTypes = emptyList(),
-                returnType = BuiltinTypes.INT
-            )
-        }
-
-        staticMethod("asReal") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)D",
-                ANY_HELPER,
-                parameterTypes = emptyList(),
-                returnType = BuiltinTypes.DOUBLE
-            )
-        }
-
-        staticMethod("asDouble") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)D",
-                ANY_HELPER,
-                parameterTypes = emptyList(),
-                returnType = BuiltinTypes.DOUBLE
-            )
-        }
-
-        staticMethod("asFloat") {
-            overload(
-                "",
-                "(Ljava/lang/Object;)F",
-                ANY_HELPER,
-                parameterTypes = emptyList(),
-                returnType = BuiltinTypes.FLOAT
-            )
-        }
-
         staticMethod("toString") {
             overload(
                 "",

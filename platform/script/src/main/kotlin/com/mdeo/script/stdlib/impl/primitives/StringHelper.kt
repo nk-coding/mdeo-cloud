@@ -314,6 +314,21 @@ object StringHelper {
     @JvmStatic
     fun asBoolean(str: String): Boolean = str.trim().equals("true", ignoreCase = true)
 
+    @JvmStatic
+    fun toBoolean(str: String): Boolean = str.trim().equals("true", ignoreCase = true)
+
+    @JvmStatic
+    fun toInt(str: String): Int = str.trim().toInt()
+
+    @JvmStatic
+    fun toReal(str: String): Double = str.trim().toDouble()
+
+    @JvmStatic
+    fun toDouble(str: String): Double = str.trim().toDouble()
+
+    @JvmStatic
+    fun toFloat(str: String): Float = str.trim().toFloat()
+
     /**
      * Checks if the string contains the specified substring.
      *

@@ -93,11 +93,6 @@ object PopulationRebalancer {
             excess[nodeId] = have - idealPerNode[i]
         }
 
-        // Sort refs within each node by "popularity" (transformation count proxy).
-        // We prefer to move solutions that were NOT heavily used as parents.
-        // We don't have per-solution popularity, but we can use the node's ratio:
-        // a node with high transformations-per-solution has popular solutions.
-        // Within a node, we just pick arbitrarily (shuffle for fairness).
         val mutableRefsByNode = refsByNode.mapValues { it.value.toMutableList().apply { shuffle() } }.toMutableMap()
 
         val transfers = mutableListOf<RebalanceTransfer>()

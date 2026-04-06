@@ -10,6 +10,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import java.time.Instant
 
 /**
  * Configures authentication routes.
@@ -36,7 +37,8 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
             
             call.sessions.set(UserSession(
                 userId = user.id,
-                username = user.username
+                username = user.username,
+                createdAt = Instant.now().epochSecond
             ))
 
             val isAdmin = user.roles.contains(UserRoles.ADMIN)
@@ -67,7 +69,8 @@ fun Route.authRoutes(userService: UserService, jwtService: JwtService) {
 
             call.sessions.set(UserSession(
                 userId = user.id,
-                username = user.username
+                username = user.username,
+                createdAt = Instant.now().epochSecond
             ))
 
             val isAdmin = user.roles.contains(UserRoles.ADMIN)

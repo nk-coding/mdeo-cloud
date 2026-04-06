@@ -173,7 +173,7 @@ class OptimizerExecutionService(
                 runOptimization(executionId, projectId, config, jwtToken)
             } catch (e: CancellationException) {
                 logger.info("Optimizer execution $executionId was cancelled")
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 handleUnexpectedError(executionId, e, jwtToken)
             }
         }
@@ -389,7 +389,7 @@ class OptimizerExecutionService(
             } catch (e: CancellationException) {
                 logger.info("Optimizer execution $executionId stopped: ${e.message}")
                 return
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 logger.error("Optimization failed", e)
                 storeError(executionId, e.message)
                 updateState(executionId, ExecutionState.FAILED, "Optimization failed: ${e.message}", jwtToken)
@@ -1062,7 +1062,7 @@ class OptimizerExecutionService(
      * @param e The unexpected exception.
      * @param jwtToken Authentication token for the state update API call.
      */
-    private suspend fun handleUnexpectedError(executionId: UUID, e: Exception, jwtToken: String) {
+    private suspend fun handleUnexpectedError(executionId: UUID, e: Throwable, jwtToken: String) {
         logger.error("Unexpected error during optimization", e)
         transaction {
             OptimizerExecutionsTable.update({

@@ -218,7 +218,10 @@ export class CreatePatternInstanceOperationHandler
         className: string,
         modifier: PatternModifierKind
     ): Promise<PatternObjectInstanceType> {
-        const baseName = `new${className}`;
+        const baseName =
+            modifier === PatternModifierKind.CREATE
+                ? `new${className}`
+                : `${className.charAt(0).toLowerCase()}${className.slice(1)}`;
         const name = await this.findUniqueName(baseName);
 
         const modifierNode: PatternModifierType | undefined =
@@ -432,7 +435,10 @@ export class CreatePatternInstanceOperationHandler
      */
     private createNewInstanceGhostElement(className: string, modifier: PatternModifierKind): GhostElement {
         const nodeId = "__ghost_pattern_instance";
-        const instanceName = `new${className}`;
+        const instanceName =
+            modifier === PatternModifierKind.CREATE
+                ? `new${className}`
+                : `${className.charAt(0).toLowerCase()}${className.slice(1)}`;
         return this.buildGhostElement(nodeId, instanceName, className, modifier);
     }
 

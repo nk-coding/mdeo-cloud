@@ -67,14 +67,38 @@ variable "execution_timeout_ms" {
 
 variable "session_max_idle_seconds" {
   type        = number
-  description = "Maximum idle time (in seconds) before a backend session expires"
-  default     = 3600
+  description = "Idle timeout (in seconds) before a backend session cookie expires. The cookie Max-Age is refreshed on every authenticated request (sliding window)."
+  default     = 604800
 }
 
 variable "session_max_absolute_seconds" {
   type        = number
-  description = "Absolute maximum session lifetime in seconds"
-  default     = 86400
+  description = "Absolute maximum session lifetime in seconds, measured from login time. Regardless of activity, the user is forced to re-login after this duration."
+  default     = 15768000
+}
+
+variable "session_encryption_key" {
+  type        = string
+  description = "64 hex-character (32-byte) HMAC key used to sign session cookies. If null, a random key is generated and stored in Terraform state."
+  sensitive   = true
+  nullable    = true
+  default     = null
+}
+
+variable "jwt_private_key" {
+  type        = string
+  description = "RSA private key for JWT signing, in PEM (PKCS#8) or raw Base64-DER format. If null (and jwt_public_key is also null), a 2048-bit key pair is generated automatically."
+  sensitive   = true
+  nullable    = true
+  default     = null
+}
+
+variable "jwt_public_key" {
+  type        = string
+  description = "RSA public key for JWT verification, in PEM (PKIX) or raw Base64-DER format. Must be set together with jwt_private_key, or left null to use the auto-generated pair."
+  sensitive   = true
+  nullable    = true
+  default     = null
 }
 
 variable "max_langium_instances" {

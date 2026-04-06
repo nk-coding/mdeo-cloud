@@ -1,6 +1,14 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
-import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } from "@mdeo/language-shared";
-import type { GraphMetadata, ModelIdRegistry } from "@mdeo/language-shared";
+import {
+    sharedImport,
+    BaseGModelFactory,
+    GCompartment,
+    GHorizontalDivider,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil,
+    type GraphMetadata,
+    type ModelIdRegistry
+} from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 import { ID, type PartialAstNode } from "@mdeo/language-common";
 import type { SingleMultiplicityType, RangeMultiplicityType } from "../../grammar/metamodelTypes.js";
@@ -39,7 +47,6 @@ import { GAssociationMultiplicityNode } from "./model/associationMultiplicityNod
 import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
 import { GAssociationMultiplicityLabel } from "./model/associationMultiplicityLabel.js";
 import { GEnumTitleCompartment } from "./model/enumTitleCompartment.js";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { AssociationEndKind, MetamodelElementType } from "@mdeo/protocol-metamodel";
 
 const { injectable } = sharedImport("inversify");

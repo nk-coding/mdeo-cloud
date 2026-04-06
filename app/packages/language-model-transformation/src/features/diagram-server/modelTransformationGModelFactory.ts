@@ -1,8 +1,14 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
-import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } from "@mdeo/language-shared";
+import {
+    sharedImport,
+    BaseGModelFactory,
+    GCompartment,
+    GHorizontalDivider,
+    NodeLayoutMetadataUtil,
+    EdgeLayoutMetadataUtil
+} from "@mdeo/language-shared";
 import type { ModelIdRegistry, GraphMetadata } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
-import { NodeLayoutMetadataUtil, EdgeLayoutMetadataUtil } from "./metadataTypes.js";
 import {
     type ModelTransformationType,
     type PatternObjectInstanceType,

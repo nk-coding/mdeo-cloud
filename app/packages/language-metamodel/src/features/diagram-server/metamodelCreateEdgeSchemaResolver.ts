@@ -1,5 +1,10 @@
 import type { CreateEdgeSchema } from "@mdeo/protocol-common";
-import { CreateEdgeSchemaResolver, sharedImport } from "@mdeo/language-shared";
+import {
+    CreateEdgeSchemaResolver,
+    sharedImport,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil
+} from "@mdeo/language-shared";
 import type { ModelState, GModelIndex } from "@mdeo/language-shared";
 import type { InitialCreateEdgeSchemaRequest, TargetCreateEdgeSchemaRequest } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
@@ -11,7 +16,6 @@ import { GAssociationPropertyNode } from "./model/associationPropertyNode.js";
 import { GAssociationPropertyLabel } from "./model/associationPropertyLabel.js";
 import { GInheritanceEdge } from "./model/inheritanceEdge.js";
 import { GClassNode } from "./model/classNode.js";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { collectAllPropertyNames } from "../../validation/metamodelValidator.js";
 import { generateDefaultPropertyName } from "./handler/metamodelHandlerUtils.js";
 

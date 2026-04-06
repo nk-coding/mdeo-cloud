@@ -1,8 +1,15 @@
 import type { CreateEdgeSchema } from "@mdeo/protocol-common";
 import { ModelElementType } from "@mdeo/protocol-model";
-import { sharedImport, CreateEdgeSchemaResolver } from "@mdeo/language-shared";
-import type { ModelState, GModelIndex } from "@mdeo/language-shared";
-import type { InitialCreateEdgeSchemaRequest, TargetCreateEdgeSchemaRequest } from "@mdeo/language-shared";
+import {
+    sharedImport,
+    CreateEdgeSchemaResolver,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil,
+    type ModelState,
+    type GModelIndex,
+    type InitialCreateEdgeSchemaRequest,
+    type TargetCreateEdgeSchemaRequest
+} from "@mdeo/language-shared";
 import type { PartialObjectInstance } from "../../grammar/modelPartialTypes.js";
 import { ObjectInstance } from "../../grammar/modelTypes.js";
 import type { AstNode } from "langium";
@@ -10,7 +17,6 @@ import { LinkAssociationResolver } from "./linkAssociationResolver.js";
 import { GLinkEdge } from "./model/linkEdge.js";
 import { GLinkEndNode } from "./model/linkEndNode.js";
 import { GLinkEndLabel } from "./model/linkEndLabel.js";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import type { GModelElementSchema } from "@eclipse-glsp/protocol";
 
 const { injectable, inject } = sharedImport("inversify");

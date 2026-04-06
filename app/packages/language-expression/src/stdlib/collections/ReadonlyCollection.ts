@@ -8,7 +8,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
     .generics("T")
     .extends(DefaultTypeNames.Any)
     .extends(DefaultTypeNames.Iterable, { T: genericTypeRef("T") })
-    .method("asBag", (m) =>
+    .method("toBag", (m) =>
         m.signature((s) =>
             s.returns(
                 typeRef("builtin", "Bag")
@@ -17,7 +17,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             )
         )
     )
-    .method("asOrderedSet", (m) =>
+    .method("toOrderedSet", (m) =>
         m.signature((s) =>
             s.returns(
                 typeRef("builtin", "OrderedSet")
@@ -26,7 +26,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             )
         )
     )
-    .method("asList", (m) =>
+    .method("toList", (m) =>
         m.signature((s) =>
             s.returns(
                 typeRef("builtin", "List")
@@ -35,7 +35,7 @@ export const ReadonlyCollectionType = classType("ReadonlyCollection")
             )
         )
     )
-    .method("asSet", (m) =>
+    .method("toSet", (m) =>
         m.signature((s) =>
             s.returns(
                 typeRef("builtin", "Set")

@@ -207,7 +207,7 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
      */
     protected async createObjectAst(className?: string, classType?: ClassType): Promise<ObjectInstanceType> {
         const typeName = className ?? "Object";
-        const baseName = `new${typeName}`;
+        const baseName = `${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}`;
         const name = await this.findUniqueName(baseName);
 
         const properties = classType ? this.createDefaultProperties(classType) : [];

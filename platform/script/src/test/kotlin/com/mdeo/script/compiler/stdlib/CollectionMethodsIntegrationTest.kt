@@ -836,7 +836,7 @@ class CollectionMethodsIntegrationTest {
                                         ),
                                         resultTypeIndex = setType
                                     ),
-                                    member = "asList",
+                                    member = "toList",
                                     overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = listType
@@ -882,7 +882,7 @@ class CollectionMethodsIntegrationTest {
                                         ),
                                         resultTypeIndex = listType
                                     ),
-                                    member = "asSet",
+                                    member = "toSet",
                                     overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = setType
@@ -928,7 +928,7 @@ class CollectionMethodsIntegrationTest {
                                         ),
                                         resultTypeIndex = listType
                                     ),
-                                    member = "asBag",
+                                    member = "toBag",
                                     overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = bagType
@@ -974,7 +974,7 @@ class CollectionMethodsIntegrationTest {
                                         ),
                                         resultTypeIndex = listType
                                     ),
-                                    member = "asOrderedSet",
+                                    member = "toOrderedSet",
                                     overload = "",
                                     arguments = emptyList(),
                                     resultTypeIndex = orderedSetType

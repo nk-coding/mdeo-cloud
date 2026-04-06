@@ -302,28 +302,28 @@ class SetImplTest {
     @Test
     fun `asList creates list with all elements`() {
         val set = SetImpl.of(1, 2, 3)
-        val list = set.asList()
+        val list = set.toList()
         assertEquals(3, list.size())
     }
 
     @Test
     fun `asBag creates bag with all elements`() {
         val set = SetImpl.of(1, 2, 3)
-        val bag = set.asBag()
+        val bag = set.toBag()
         assertEquals(3, bag.size())
     }
 
     @Test
     fun `asOrderedSet creates ordered set`() {
         val set = SetImpl.of(1, 2, 3)
-        val orderedSet = set.asOrderedSet()
+        val orderedSet = set.toOrderedSet()
         assertEquals(3, orderedSet.size())
     }
 
     @Test
     fun `asSet creates new set`() {
         val set = SetImpl.of(1, 2, 3)
-        val newSet = set.asSet()
+        val newSet = set.toSet()
         assertEquals(3, newSet.size())
     }
 

@@ -7,12 +7,13 @@ import {
     type ModelIdRegistry,
     DefaultModelIdRegistry,
     ModelIdProvider,
-    type ModelIdProvider as ModelIdProviderType
+    type ModelIdProvider as ModelIdProviderType,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes } from "@mdeo/language-shared";
 import { ModelElementType } from "@mdeo/protocol-model";
 import type { PartialModel, PartialObjectInstance, PartialLink } from "../../grammar/modelPartialTypes.js";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 
 const { injectable, inject } = sharedImport("inversify");
 

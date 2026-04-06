@@ -132,26 +132,6 @@ class RegistryMemberCallCompilerTest {
         }
 
         @Test
-        fun `double inherits asBoolean from any`() {
-            val method = TypeRegistry.GLOBAL.lookupMethod(
-                ClassTypeRef("builtin", "double", false),
-                "asBoolean",
-                ""
-            )
-            assertNotNull(method)
-        }
-
-        @Test
-        fun `float inherits asInteger from any`() {
-            val method = TypeRegistry.GLOBAL.lookupMethod(
-                ClassTypeRef("builtin", "float", false),
-                "asInteger",
-                ""
-            )
-            assertNotNull(method)
-        }
-
-        @Test
         fun `string inherits format from any`() {
             val method = TypeRegistry.GLOBAL.lookupMethod(
                 ClassTypeRef("builtin", "string", false),

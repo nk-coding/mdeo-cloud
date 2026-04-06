@@ -55,16 +55,25 @@ export function acceptRelativePathCompletions(
     let filteredPaths = paths;
     let range: Range = { start: context.position, end: context.position };
 
+    let insideString = false;
     if (existingText.length > 0) {
-        const existingPath = existingText.substring(1);
-        filteredPaths = paths.filter((path) => path.startsWith(existingPath));
-        const start = context.textDocument.positionAt(context.tokenOffset + 1);
-        const end = context.textDocument.positionAt(context.tokenEndOffset - 1);
-        range = { start, end };
+        insideString = existingText.startsWith('"') || existingText.startsWith("'");
+        if (insideString) {
+            const existingPath = existingText.substring(1);
+            filteredPaths = paths.filter((path) => path.startsWith(existingPath));
+            const start = context.textDocument.positionAt(context.tokenOffset + 1);
+            const end = context.textDocument.positionAt(context.tokenEndOffset - 1);
+            range = { start, end };
+        } else {
+            filteredPaths = paths.filter((path) => path.startsWith(existingText));
+            const start = context.textDocument.positionAt(context.tokenOffset);
+            const end = context.textDocument.positionAt(context.tokenEndOffset);
+            range = { start, end };
+        }
     }
 
     for (const path of filteredPaths) {
-        const delimiter = existingText.length > 0 ? "" : '"';
+        const delimiter = insideString ? "" : '"';
         acceptor(context, {
             label: path,
             textEdit: {

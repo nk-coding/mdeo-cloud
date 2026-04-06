@@ -89,7 +89,7 @@ class OptimizationOrchestrator(
                     throw e
                 } catch (e: EvaluationFailedException) {
                     throw e
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     val msg = "Unable to run search. Encountered exception: ${e.message}"
                     logger.error(msg, e)
                     throw RuntimeException(msg, e)

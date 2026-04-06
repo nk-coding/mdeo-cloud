@@ -45,9 +45,11 @@ data class AppConfig(
                 ),
                 session = SessionConfig(
                     maxIdleSeconds = System.getenv("SESSION_MAX_IDLE_SECONDS")?.toLongOrNull()
-                        ?: TimeUnit.DAYS.toSeconds(7),
+                        ?: TimeUnit.DAYS.toSeconds(1),
+                    maxAbsoluteSeconds = System.getenv("SESSION_MAX_ABSOLUTE_SECONDS")?.toLongOrNull()
+                        ?: TimeUnit.DAYS.toSeconds(30),
                     cookieSecure = System.getenv("COOKIE_SECURE")?.toBoolean() ?: true,
-                    encryptionKey = System.getenv("SESSION_ENCRYPTION_KEY") 
+                    encryptionKey = System.getenv("SESSION_ENCRYPTION_KEY")
                         ?: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
                     sameSite = System.getenv("COOKIE_SAMESITE") ?: "Strict"
                 ),
@@ -122,13 +124,18 @@ data class DatabaseConfig(
 /**
  * Session management configuration.
  *
- * @property maxIdleSeconds Maximum seconds a session can be idle before expiration
+ * @property maxIdleSeconds Idle timeout in seconds – the cookie Max-Age is refreshed to this
+ *   value on every authenticated request (sliding window).
+ * @property maxAbsoluteSeconds Hard upper bound on session lifetime in seconds, measured from
+ *   [UserSession.createdAt]. Once this threshold is exceeded the session is invalidated
+ *   regardless of recent activity.
  * @property cookieSecure Whether to use secure cookies (HTTPS only)
  * @property encryptionKey The key used for session encryption/signing
  * @property sameSite The SameSite attribute for session cookies
  */
 data class SessionConfig(
     val maxIdleSeconds: Long,
+    val maxAbsoluteSeconds: Long,
     val cookieSecure: Boolean,
     val encryptionKey: String,
     val sameSite: String

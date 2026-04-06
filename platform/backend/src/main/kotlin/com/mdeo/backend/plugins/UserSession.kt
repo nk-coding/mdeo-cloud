@@ -13,9 +13,13 @@ import kotlinx.serialization.Serializable
  *
  * @property userId Unique identifier for the user.
  * @property username The user's display name.
+ * @property createdAt Epoch-seconds timestamp of when this session was first created.
+ *   Used to enforce an absolute session lifetime (sliding extension is capped at this
+ *   plus [com.mdeo.backend.config.SessionConfig.maxAbsoluteSeconds]).
  */
 @Serializable
 data class UserSession(
     val userId: String,
-    val username: String
+    val username: String,
+    val createdAt: Long
 )

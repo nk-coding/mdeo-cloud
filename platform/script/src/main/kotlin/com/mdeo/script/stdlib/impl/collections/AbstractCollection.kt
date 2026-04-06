@@ -169,19 +169,19 @@ abstract class AbstractCollection<T, C : MutableCollection<T>>(
         }
     }
 
-    override fun asBag(): Bag<T> {
+    override fun toBag(): Bag<T> {
         return BagImpl(backing)
     }
 
-    override fun asOrderedSet(): OrderedSet<T> {
+    override fun toOrderedSet(): OrderedSet<T> {
         return OrderedSetImpl(backing)
     }
 
-    override fun asList(): ScriptList<T> {
+    override fun toList(): ScriptList<T> {
         return ListImpl(backing)
     }
 
-    override fun asSet(): ScriptSet<T> {
+    override fun toSet(): ScriptSet<T> {
         return SetImpl(backing)
     }
 

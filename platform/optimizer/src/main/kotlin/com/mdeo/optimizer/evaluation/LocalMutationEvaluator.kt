@@ -114,7 +114,7 @@ class LocalMutationEvaluator(
         val copy = parent.deepCopy()
         val mutated = try {
             mutationStrategy.mutate(copy)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             copy.close()
             return EvaluationResult(
                 parentSolutionId = task.solutionId,
@@ -132,7 +132,7 @@ class LocalMutationEvaluator(
         try {
             objectives = evaluateObjectives(mutated)
             constraints = evaluateConstraints(mutated)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             solutions.remove(newId)?.close()
             return EvaluationResult(
                 parentSolutionId = task.solutionId,
@@ -170,7 +170,7 @@ class LocalMutationEvaluator(
         try {
             objectives = evaluateObjectives(solution)
             constraints = evaluateConstraints(solution)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             return EvaluationResult(
                 parentSolutionId = task.solutionId,
                 newSolutionId = "",

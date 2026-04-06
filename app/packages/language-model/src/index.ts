@@ -21,7 +21,6 @@ export * from "./features/diagram-server/model/objectNameLabel.js";
 export * from "./features/diagram-server/model/objectNode.js";
 export * from "./features/diagram-server/model/propertyLabel.js";
 export * from "./features/diagram-server/linkAssociationResolver.js";
-export * from "./features/diagram-server/metadataTypes.js";
 export * from "./features/diagram-server/modelCreateEdgeSchemaResolver.js";
 export * from "./features/diagram-server/modelDiagramConfiguration.js";
 export * from "./features/diagram-server/modelDiagramModule.js";

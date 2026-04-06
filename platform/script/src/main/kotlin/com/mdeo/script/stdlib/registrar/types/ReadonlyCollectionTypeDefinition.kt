@@ -70,22 +70,22 @@ fun createReadonlyCollectionType(): TypeDefinition {
                 parameterTypes = listOf(BuiltinTypes.NULLABLE_ANY), returnType = BuiltinTypes.READONLY_COLLECTION)
         }
 
-        instanceMethod("asList") {
+        instanceMethod("toList") {
             overload("", "()Lcom/mdeo/script/stdlib/impl/collections/ScriptList;", READONLY_COLLECTION, isInterface = true,
                 parameterTypes = emptyList(), returnType = BuiltinTypes.LIST)
         }
 
-        instanceMethod("asSet") {
+        instanceMethod("toSet") {
             overload("", "()Lcom/mdeo/script/stdlib/impl/collections/ScriptSet;", READONLY_COLLECTION, isInterface = true,
                 parameterTypes = emptyList(), returnType = BuiltinTypes.SET)
         }
 
-        instanceMethod("asBag") {
+        instanceMethod("toBag") {
             overload("", "()Lcom/mdeo/script/stdlib/impl/collections/Bag;", READONLY_COLLECTION, isInterface = true,
                 parameterTypes = emptyList(), returnType = BuiltinTypes.BAG)
         }
 
-        instanceMethod("asOrderedSet") {
+        instanceMethod("toOrderedSet") {
             overload("", "()Lcom/mdeo/script/stdlib/impl/collections/OrderedSet;", READONLY_COLLECTION, isInterface = true,
                 parameterTypes = emptyList(), returnType = BuiltinTypes.ORDERED_SET)
         }

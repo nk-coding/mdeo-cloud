@@ -1,3 +1,47 @@
+# ---------------------------------------------------------------------------
+# Backend secrets
+# ---------------------------------------------------------------------------
+
+# Session HMAC key: use the caller-supplied value or auto-generate a 32-byte
+# random hex string (stored in Terraform state).
+resource "random_id" "session_key" {
+  count       = var.session_encryption_key == null ? 1 : 0
+  byte_length = 32
+}
+
+# JWT RSA key pair: use caller-supplied keys or auto-generate once.
+# Both vars must be set together; if either is null the pair is generated.
+resource "tls_private_key" "jwt_rsa" {
+  count     = (var.jwt_private_key == null || var.jwt_public_key == null) ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+locals {
+  _session_key    = var.session_encryption_key != null ? var.session_encryption_key : random_id.session_key[0].hex
+  _jwt_private_key = var.jwt_private_key != null ? var.jwt_private_key : tls_private_key.jwt_rsa[0].private_key_pem
+  _jwt_public_key  = var.jwt_public_key != null ? var.jwt_public_key : tls_private_key.jwt_rsa[0].public_key_pem
+}
+
+resource "kubernetes_secret_v1" "backend_secrets" {
+  metadata {
+    name      = "backend-secrets"
+    namespace = local.ns
+    labels = {
+      "app.kubernetes.io/name"    = "backend"
+      "app.kubernetes.io/part-of" = "mdeo"
+    }
+  }
+
+  data = {
+    session_encryption_key = local._session_key
+    jwt_private_key        = local._jwt_private_key
+    jwt_public_key         = local._jwt_public_key
+  }
+}
+
+# ---------------------------------------------------------------------------
+
 resource "kubernetes_service_v1" "backend" {
   metadata {
     name      = "backend"
@@ -107,8 +151,31 @@ resource "kubernetes_deployment_v1" "backend" {
             value = tostring(var.session_max_absolute_seconds)
           }
           env {
-            name  = "CSRF_ROTATION_SECONDS"
-            value = "300"
+            name = "SESSION_ENCRYPTION_KEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.backend_secrets.metadata[0].name
+                key  = "session_encryption_key"
+              }
+            }
+          }
+          env {
+            name = "JWT_PRIVATE_KEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.backend_secrets.metadata[0].name
+                key  = "jwt_private_key"
+              }
+            }
+          }
+          env {
+            name = "JWT_PUBLIC_KEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.backend_secrets.metadata[0].name
+                key  = "jwt_public_key"
+              }
+            }
           }
 
           # Cookie / CORS
@@ -178,5 +245,5 @@ resource "kubernetes_deployment_v1" "backend" {
     }
   }
 
-  depends_on = [kubernetes_manifest.db_cluster]
+  depends_on = [kubernetes_manifest.db_cluster, kubernetes_secret_v1.backend_secrets]
 }

@@ -211,7 +211,11 @@ function printCallExpression(context: PrintContext<CallExpressionType>, types: E
         docs.push(path.call(print, "genericArgs"));
     }
 
-    docs.push(group(["(", indent([softline, join([",", line], path.map(print, "arguments"))]), softline, ")"]));
+    if (ctx.arguments && ctx.arguments.length > 0) {
+        docs.push(group(["(", indent([softline, join([",", line], path.map(print, "arguments"))]), softline, ")"]));
+    } else {
+        docs.push("()");
+    }
 
     return group(docs);
 }
@@ -252,7 +256,11 @@ function printMemberCallExpression(context: PrintContext<MemberCallExpressionTyp
         docs.push(path.call(print, "genericArgs"));
     }
 
-    docs.push(group(["(", indent([softline, join([",", line], path.map(print, "arguments"))]), softline, ")"]));
+    if (ctx.arguments && ctx.arguments.length > 0) {
+        docs.push(group(["(", indent([softline, join([",", line], path.map(print, "arguments"))]), softline, ")"]));
+    } else {
+        docs.push("()");
+    }
 
     return group(docs);
 }

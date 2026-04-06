@@ -7,7 +7,9 @@ import {
     type ModelIdRegistry,
     DefaultModelIdRegistry,
     ModelIdProvider,
-    type ModelIdProvider as ModelIdProviderType
+    type ModelIdProvider as ModelIdProviderType,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil
 } from "@mdeo/language-shared";
 import type { NodeAttributes, EdgeAttributes, Attributes } from "@mdeo/language-shared";
 import type { AstNode, LangiumDocument } from "langium";
@@ -19,7 +21,6 @@ import type {
     PartialEnum
 } from "../../grammar/metamodelPartialTypes.js";
 import { Association, Class, Enum } from "../../grammar/metamodelTypes.js";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { getExportedEntitiesFromMetamodelFile } from "../importHelpers.js";
 
 const { injectable, inject } = sharedImport("inversify");

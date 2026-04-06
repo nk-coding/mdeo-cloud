@@ -91,7 +91,7 @@ fun Application.module(appConfig: AppConfig) {
     configureSerialization()
     configureCors(appConfig.cors)
     configureStatusPages()
-    configureAuthentication(services.jwtService, services.userService)
+    configureAuthentication(services.jwtService, services.userService, appConfig.session)
     
     install(WebSockets) {
         pingPeriodMillis = 30_000

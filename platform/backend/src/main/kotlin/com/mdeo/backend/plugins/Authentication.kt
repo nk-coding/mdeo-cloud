@@ -1,6 +1,7 @@
 package com.mdeo.backend.plugins
 
 import com.auth0.jwt.interfaces.Payload
+import com.mdeo.backend.config.SessionConfig
 import com.mdeo.backend.service.JwtService
 import com.mdeo.backend.service.UserService
 import io.ktor.http.*
@@ -9,6 +10,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
+import java.time.Instant
 import java.util.*
 
 const val AUTH_SESSION = "auth-session"
@@ -26,16 +28,33 @@ data class JwtPrincipal(
 /**
  * Configure session-based authentication using Ktor's built-in session authentication.
  *
- * Validates that a UserSession exists and returns an unauthorized response if validation fails.
- * 
- * @param jwtService Service for JWT operations, used to validate JWT tokens in the JWT authentication provider.
- * @param userService Service for user operations, made available for per-request resolution to check user permissions.
+ * Implements a sliding-window session: on every authenticated request the response
+ * carries a refreshed `Set-Cookie` so the idle timeout is extended from the current
+ * time, while [SessionConfig.maxAbsoluteSeconds] caps the total session lifetime
+ * measured from [UserSession.createdAt].
+ *
+ * Old cookies that pre-date the [UserSession.createdAt] field (`createdAt == 0`) are
+ * treated as expired so that existing sessions are invalidated cleanly after a deploy.
+ *
+ * @param jwtService Service for JWT operations.
+ * @param userService Service for user operations.
+ * @param sessionConfig Session lifetime / cookie settings.
  */
-fun Application.configureAuthentication(jwtService: JwtService, userService: UserService) {
+fun Application.configureAuthentication(jwtService: JwtService, userService: UserService, sessionConfig: SessionConfig) {
     install(Authentication) {
         session<UserSession>(AUTH_SESSION) {
             validate { session ->
-                session
+                val now = Instant.now().epochSecond
+                val age = now - session.createdAt
+                if (session.createdAt == 0L || age >= sessionConfig.maxAbsoluteSeconds) {
+                    // Expired or legacy session without createdAt – clear the cookie and reject.
+                    sessions.clear<UserSession>()
+                    null
+                } else {
+                    // Valid session: refresh the cookie so the idle window slides forward.
+                    sessions.set(session)
+                    session
+                }
             }
             challenge {
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Not authenticated"))

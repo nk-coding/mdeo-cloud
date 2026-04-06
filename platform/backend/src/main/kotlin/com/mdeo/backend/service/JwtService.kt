@@ -54,10 +54,12 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
     fun init() {
         logger.info("Initializing JWT service...")
         
-        if (jwtConfig.privateKey != null && jwtConfig.publicKey != null) {
+        val configPrivateKey = jwtConfig.privateKey
+        val configPublicKey = jwtConfig.publicKey
+        if (configPrivateKey != null && configPublicKey != null) {
             logger.info("Loading RSA key pair from configuration")
-            val privateKeyBytes = Base64.getDecoder().decode(jwtConfig.privateKey)
-            val publicKeyBytes = Base64.getDecoder().decode(jwtConfig.publicKey)
+            val privateKeyBytes = decodePemOrBase64(configPrivateKey)
+            val publicKeyBytes = decodePemOrBase64(configPublicKey)
             
             val keyFactory = KeyFactory.getInstance("RSA")
             privateKey = keyFactory.generatePrivate(PKCS8EncodedKeySpec(privateKeyBytes)) as RSAPrivateKey
@@ -231,4 +233,25 @@ class JwtService(services: InjectedServices) : BaseService(), InjectedServices b
      * @return The issuer string
      */
     fun getIssuer(): String = jwtConfig.issuer
+
+    /**
+     * Decodes a cryptographic key that is provided either as a PEM string (with
+     * `-----BEGIN ...-----` / `-----END ...-----` headers) or as raw Base64-encoded
+     * DER bytes.  Both formats are accepted so that:
+     * - Automated provisioning tools (e.g. Terraform `tls_private_key`) can pass PEM
+     *   directly without extra encoding steps.
+     * - Existing deployments that already store raw Base64 DER continue to work unchanged.
+     */
+    private fun decodePemOrBase64(key: String): ByteArray {
+        val trimmed = key.trim()
+        return if (trimmed.startsWith("-----")) {
+            // PEM: strip header/footer lines and decode the inner Base64 block.
+            val b64 = trimmed.lines()
+                .filter { !it.startsWith("-----") }
+                .joinToString("")
+            Base64.getDecoder().decode(b64)
+        } else {
+            Base64.getDecoder().decode(trimmed)
+        }
+    }
 }

@@ -179,11 +179,11 @@ class BagImpl<T> : Bag<T> {
         }
     }
 
-    override fun asBag(): Bag<T> = BagImpl(backing)
+    override fun toBag(): Bag<T> = BagImpl(backing)
 
-    override fun asOrderedSet(): OrderedSet<T> = OrderedSetImpl(backing.uniqueSet())
+    override fun toOrderedSet(): OrderedSet<T> = OrderedSetImpl(backing.uniqueSet())
 
-    override fun asList(): ScriptList<T> {
+    override fun toList(): ScriptList<T> {
         val list = ArrayList<T>()
         for (element in backing) {
             list.add(element)
@@ -191,7 +191,7 @@ class BagImpl<T> : Bag<T> {
         return ListImpl(list)
     }
 
-    override fun asSet(): ScriptSet<T> = SetImpl(backing.uniqueSet())
+    override fun toSet(): ScriptSet<T> = SetImpl(backing.uniqueSet())
 
     override fun clone(): Bag<T> = BagImpl(backing)
 

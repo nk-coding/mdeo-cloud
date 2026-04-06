@@ -1136,7 +1136,7 @@ class ListImplTest {
     @Test
     fun `asBag converts to bag`() {
         val list = ListImpl.of(1, 2, 2, 3)
-        val bag = list.asBag()
+        val bag = list.toBag()
         assertNotNull(bag)
         assertEquals(4, bag.size())
     }
@@ -1144,21 +1144,21 @@ class ListImplTest {
     @Test
     fun `asBag preserves duplicates`() {
         val list = ListImpl.of(1, 1, 1)
-        val bag = list.asBag()
+        val bag = list.toBag()
         assertEquals(3, bag.count(1))
     }
 
     @Test
     fun `asBag handles empty list`() {
         val list = ListImpl<Int>()
-        val bag = list.asBag()
+        val bag = list.toBag()
         assertTrue(bag.isEmpty())
     }
 
     @Test
     fun `asBag creates new collection`() {
         val list = ListImpl.of(1, 2)
-        val bag = list.asBag()
+        val bag = list.toBag()
         list.add(3)
         assertEquals(2, bag.size())
     }
@@ -1167,7 +1167,7 @@ class ListImplTest {
     fun `asBag preserves null elements`() {
         val list = ListImpl<String?>()
         list.add(null)
-        val bag = list.asBag()
+        val bag = list.toBag()
         assertTrue(bag.includes(null))
     }
 
@@ -1175,14 +1175,14 @@ class ListImplTest {
     @Test
     fun `asOrderedSet removes duplicates`() {
         val list = ListImpl.of(1, 2, 2, 3)
-        val orderedSet = list.asOrderedSet()
+        val orderedSet = list.toOrderedSet()
         assertEquals(3, orderedSet.size())
     }
 
     @Test
     fun `asOrderedSet preserves order`() {
         val list = ListImpl.of(3, 1, 2)
-        val orderedSet = list.asOrderedSet()
+        val orderedSet = list.toOrderedSet()
         assertEquals(3, orderedSet.first())
         assertEquals(2, orderedSet.last())
     }
@@ -1190,14 +1190,14 @@ class ListImplTest {
     @Test
     fun `asOrderedSet handles empty list`() {
         val list = ListImpl<Int>()
-        val orderedSet = list.asOrderedSet()
+        val orderedSet = list.toOrderedSet()
         assertTrue(orderedSet.isEmpty())
     }
 
     @Test
     fun `asOrderedSet creates new collection`() {
         val list = ListImpl.of(1, 2)
-        val orderedSet = list.asOrderedSet()
+        val orderedSet = list.toOrderedSet()
         list.add(3)
         assertEquals(2, orderedSet.size())
     }
@@ -1207,7 +1207,7 @@ class ListImplTest {
         val list = ListImpl<String?>()
         list.add(null)
         list.add(null)
-        val orderedSet = list.asOrderedSet()
+        val orderedSet = list.toOrderedSet()
         assertEquals(1, orderedSet.size())
     }
 
@@ -1215,35 +1215,35 @@ class ListImplTest {
     @Test
     fun `asList creates new list`() {
         val list = ListImpl.of(1, 2, 3)
-        val newList = list.asList()
+        val newList = list.toList()
         assertEquals(3, newList.size())
     }
 
     @Test
     fun `asList preserves order`() {
         val list = ListImpl.of(3, 1, 2)
-        val newList = list.asList()
+        val newList = list.toList()
         assertEquals(3, newList.first())
     }
 
     @Test
     fun `asList preserves duplicates`() {
         val list = ListImpl.of(1, 1, 1)
-        val newList = list.asList()
+        val newList = list.toList()
         assertEquals(3, newList.size())
     }
 
     @Test
     fun `asList handles empty list`() {
         val list = ListImpl<Int>()
-        val newList = list.asList()
+        val newList = list.toList()
         assertTrue(newList.isEmpty())
     }
 
     @Test
     fun `asList creates independent copy`() {
         val list = ListImpl.of(1, 2)
-        val newList = list.asList()
+        val newList = list.toList()
         list.add(3)
         assertEquals(2, newList.size())
     }
@@ -1252,21 +1252,21 @@ class ListImplTest {
     @Test
     fun `asSet removes duplicates`() {
         val list = ListImpl.of(1, 2, 2, 3)
-        val set = list.asSet()
+        val set = list.toSet()
         assertEquals(3, set.size())
     }
 
     @Test
     fun `asSet handles empty list`() {
         val list = ListImpl<Int>()
-        val set = list.asSet()
+        val set = list.toSet()
         assertTrue(set.isEmpty())
     }
 
     @Test
     fun `asSet creates new collection`() {
         val list = ListImpl.of(1, 2)
-        val set = list.asSet()
+        val set = list.toSet()
         list.add(3)
         assertEquals(2, set.size())
     }
@@ -1274,7 +1274,7 @@ class ListImplTest {
     @Test
     fun `asSet preserves all unique elements`() {
         val list = ListImpl.of(1, 2, 3)
-        val set = list.asSet()
+        val set = list.toSet()
         assertTrue(set.includes(1))
         assertTrue(set.includes(2))
         assertTrue(set.includes(3))
@@ -1285,7 +1285,7 @@ class ListImplTest {
         val list = ListImpl<String?>()
         list.add(null)
         list.add(null)
-        val set = list.asSet()
+        val set = list.toSet()
         assertEquals(1, set.size())
     }
 

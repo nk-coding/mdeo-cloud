@@ -179,10 +179,8 @@ class EvaluationCoordinator(
             }
         }
 
-        // ── Initialize uninitialized solutions on workers ─────────────────────────
         val evaluationTasks = mutableListOf<EvaluationTask>()
         if (uninitializedSolutions.isNotEmpty()) {
-            // Flush pending discards before initialization (same as former handleInitialization)
             if (pendingDiscards.isNotEmpty()) {
                 val discards = pendingDiscards.toList()
                 pendingDiscards.clear()
@@ -206,10 +204,8 @@ class EvaluationCoordinator(
             }
         }
 
-        // ── Build mutation tasks from offspring parent refs ────────────────────────
         val mutationTasks = buildMutationTasks(mutationSolutions)
 
-        // ── Rebalancing and discards ──────────────────────────────────────────────
         val rebalancePlan = pendingRebalancePlan
         pendingRebalancePlan = emptyList()
         val (importsByDestNode, rebalanceDiscardsByNode) = fetchRebalanceData(rebalancePlan)
@@ -217,37 +213,27 @@ class EvaluationCoordinator(
         val discards = pendingDiscards.toList()
         pendingDiscards.clear()
 
-        // ── Build and dispatch batches ────────────────────────────────────────────
         val batches = buildNodeBatches(mutationTasks, evaluationTasks, importsByDestNode, rebalanceDiscardsByNode, discards)
         val results = runBlocking { evaluator.executeNodeBatches(batches) }
 
-        // ── Fail fast on guidance function evaluation errors ──────────────────────
         val evaluationFailure = results.firstOrNull { it.errorMessage != null }
         if (evaluationFailure != null) {
             throw EvaluationFailedException(evaluationFailure.errorMessage!!)
         }
 
-        // ── Apply rebalance updates ───────────────────────────────────────────────
         val populationBySolutionId = buildPopulationLookup()
         applyRebalanceUpdates(rebalancePlan, populationBySolutionId)
 
-        // ── Apply results ─────────────────────────────────────────────────────────
-        // Index-based matching for mutation results: results for mutation tasks come
-        // first in the flat result list (per-node: mutations before evaluations).
-        // Within each node the order matches the task order.
         val mutationResultsByParent = mutableMapOf<String, MutableList<EvaluationResult>>()
         val evalResultsBySolution = mutableMapOf<String, EvaluationResult>()
         for (result in results) {
             if (result.parentSolutionId == result.newSolutionId) {
-                // Evaluation-only result (no new solution created)
                 evalResultsBySolution[result.parentSolutionId] = result
             } else {
-                // Mutation result
                 mutationResultsByParent.getOrPut(result.parentSolutionId) { mutableListOf() }.add(result)
             }
         }
 
-        // Apply evaluation results to uninitialized solutions
         for (solution in uninitializedSolutions) {
             val ref = solution.getWorkerRef() ?: continue
             val result = evalResultsBySolution[ref.solutionId]
@@ -258,7 +244,6 @@ class EvaluationCoordinator(
             }
         }
 
-        // Apply mutation results to generation solutions (consume from per-parent queues)
         for (solution in mutationSolutions) {
             val parentRef = solution.getAttribute(DelegatingVariation.PARENT_REF_KEY) as? WorkerSolutionRef
             val resultQueue = parentRef?.let { mutationResultsByParent[it.solutionId] }
@@ -410,10 +395,14 @@ class EvaluationCoordinator(
      */
     private fun applyFitness(solution: Solution, objectives: List<Double>, constraints: List<Double>) {
         for (i in objectives.indices) {
-            if (i < solution.numberOfObjectives) solution.setObjectiveValue(i, objectives[i])
+            if (i < solution.numberOfObjectives) {
+                solution.setObjectiveValue(i, objectives[i])
+            }
         }
         for (i in constraints.indices) {
-            if (i < solution.numberOfConstraints) solution.setConstraintValue(i, constraints[i])
+            if (i < solution.numberOfConstraints) {
+                solution.setConstraintValue(i, constraints[i])
+            }
         }
     }
 
@@ -424,8 +413,12 @@ class EvaluationCoordinator(
      * @param solution The MOEA solution to penalise.
      */
     private fun applyPenaltyFitness(solution: Solution) {
-        for (i in 0 until solution.numberOfObjectives) solution.setObjectiveValue(i, Double.MAX_VALUE)
-        for (i in 0 until solution.numberOfConstraints) solution.setConstraintValue(i, Double.MAX_VALUE)
+        for (i in 0 until solution.numberOfObjectives) {
+            solution.setObjectiveValue(i, Double.MAX_VALUE)
+        }
+        for (i in 0 until solution.numberOfConstraints) {
+            solution.setConstraintValue(i, Double.MAX_VALUE)
+        }
     }
 }
 

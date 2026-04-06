@@ -34,7 +34,7 @@ class SetImpl<T> : AbstractCollection<T, HashSet<T>>, ScriptSet<T> {
         }
     })
 
-    override fun asSet(): ScriptSet<T> = SetImpl(backing)
+    override fun toSet(): ScriptSet<T> = SetImpl(backing)
 
     override fun clone(): ScriptSet<T> = SetImpl(backing)
 

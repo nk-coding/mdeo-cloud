@@ -1,5 +1,12 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
-import { sharedImport, BaseGModelFactory, GCompartment, GHorizontalDivider } from "@mdeo/language-shared";
+import {
+    sharedImport,
+    BaseGModelFactory,
+    GCompartment,
+    GHorizontalDivider,
+    EdgeLayoutMetadataUtil,
+    NodeLayoutMetadataUtil
+} from "@mdeo/language-shared";
 import type { ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/protocol-common";
 import { ID } from "@mdeo/language-common";
@@ -16,7 +23,6 @@ import { GPropertyLabel } from "./model/propertyLabel.js";
 import { GLinkEdge } from "./model/linkEdge.js";
 import { GLinkEndNode } from "./model/linkEndNode.js";
 import { GLinkEndLabel } from "./model/linkEndLabel.js";
-import { EdgeLayoutMetadataUtil, NodeLayoutMetadataUtil } from "./metadataTypes.js";
 import { ModelElementType } from "@mdeo/protocol-model";
 import { LinkAssociationResolver } from "./linkAssociationResolver.js";
 import {

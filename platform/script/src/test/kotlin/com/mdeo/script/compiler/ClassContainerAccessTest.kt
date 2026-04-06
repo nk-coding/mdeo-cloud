@@ -767,4 +767,134 @@ class ClassContainerAccessTest {
         assertEquals("tip", result)
     }
 
+    // -------------------------------------------------------------------------
+    // Class container – first() and firstOrNull()
+    // -------------------------------------------------------------------------
+
+    private fun buildPersonMetamodel(): MetamodelData = MetamodelData(
+        path = metamodelPath,
+        classes = listOf(
+            ClassData(
+                name = "Person",
+                isAbstract = false,
+                properties = listOf(
+                    PropertyData(name = "name", primitiveType = "string", multiplicity = MultiplicityData.single())
+                )
+            )
+        )
+    )
+
+    private fun buildPersonFirstAst(): TypedAst = buildTypedAst {
+        val stringIdx       = addType(ClassTypeRef("builtin", "string", false))
+        val personIdx       = addType(ClassTypeRef(classPackage, "Person", false))
+        val personContIdx   = addType(ClassTypeRef(classContainerPackage, "Person", false))
+
+        function(
+            name = "test",
+            returnType = stringIdx,
+            body = listOf(
+                returnStmt(
+                    memberAccess(
+                        expression = memberCall(
+                            expression = identifier("Person", personContIdx, scope = 1),
+                            member = "first",
+                            overload = "",
+                            arguments = emptyList(),
+                            resultTypeIndex = personIdx
+                        ),
+                        member = "name",
+                        resultTypeIndex = stringIdx
+                    )
+                )
+            )
+        )
+    }
+
+    private fun buildPersonFirstOrNullAst(): TypedAst = buildTypedAst {
+        val stringIdx       = addType(ClassTypeRef("builtin", "string", false))
+        val personIdx       = addType(ClassTypeRef(classPackage, "Person", true))
+        val personContIdx   = addType(ClassTypeRef(classContainerPackage, "Person", false))
+
+        function(
+            name = "test",
+            returnType = personIdx,
+            body = listOf(
+                returnStmt(
+                    memberCall(
+                        expression = identifier("Person", personContIdx, scope = 1),
+                        member = "firstOrNull",
+                        overload = "",
+                        arguments = emptyList(),
+                        resultTypeIndex = personIdx
+                    )
+                )
+            )
+        )
+    }
+
+    /**
+     * `Person.first()` returns the first instance when the model has instances.
+     */
+    @Test
+    fun `Person dot first() returns name of first instance`() {
+        val metamodelData = buildPersonMetamodel()
+        val ast = buildPersonFirstAst()
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = listOf(
+                ModelDataInstance("p1", "Person", mapOf("name" to ModelDataPropertyValue.StringValue("Alice"))),
+                ModelDataInstance("p2", "Person", mapOf("name" to ModelDataPropertyValue.StringValue("Bob")))
+            ),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertEquals("Alice", result)
+    }
+
+    /**
+     * `Person.firstOrNull()` returns null when the model has no instances.
+     */
+    @Test
+    fun `Person dot firstOrNull() returns null for empty model`() {
+        val metamodelData = buildPersonMetamodel()
+        val ast = buildPersonFirstOrNullAst()
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = emptyList(),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertNull(result)
+    }
+
+    /**
+     * `Person.firstOrNull()` returns the first instance when the model has instances.
+     */
+    @Test
+    fun `Person dot firstOrNull() returns first instance when model is non-empty`() {
+        val metamodelData = buildPersonMetamodel()
+        val ast = buildPersonFirstOrNullAst()
+        val program = compiler.compile(CompilationInput(mapOf(testFilePath to ast)), metamodelData)
+
+        val modelData = ModelData(
+            metamodelPath = metamodelPath,
+            instances = listOf(
+                ModelDataInstance("p1", "Person", mapOf("name" to ModelDataPropertyValue.StringValue("Alice")))
+            ),
+            links = emptyList()
+        )
+        val env = ExecutionEnvironment(program)
+        val model = program.metamodel!!.loadModel(modelData)
+        val result = env.invoke(testFilePath, "test", SimpleScriptContext(System.out, model))
+        assertTrue(result != null, "Expected non-null Person instance")
+    }
+
 }

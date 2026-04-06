@@ -202,5 +202,45 @@ fun createStringType(): TypeDefinition {
                 returnType = BuiltinTypes.STRING
             )
         }
+
+        staticMethod("toBoolean") {
+            overload(
+                "", "(Ljava/lang/String;)Z", STRING_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.BOOLEAN
+            )
+        }
+
+        staticMethod("toInt") {
+            overload(
+                "", "(Ljava/lang/String;)I", STRING_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.INT
+            )
+        }
+
+        staticMethod("toReal") {
+            overload(
+                "", "(Ljava/lang/String;)D", STRING_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.DOUBLE
+            )
+        }
+
+        staticMethod("toDouble") {
+            overload(
+                "", "(Ljava/lang/String;)D", STRING_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.DOUBLE
+            )
+        }
+
+        staticMethod("toFloat") {
+            overload(
+                "", "(Ljava/lang/String;)F", STRING_HELPER,
+                parameterTypes = emptyList(),
+                returnType = BuiltinTypes.FLOAT
+            )
+        }
     }
 }

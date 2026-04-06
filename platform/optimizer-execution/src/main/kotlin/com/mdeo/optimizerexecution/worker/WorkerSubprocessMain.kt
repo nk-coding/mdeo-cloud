@@ -23,6 +23,7 @@ import com.mdeo.optimizer.worker.*
 import com.mdeo.modeltransformation.graph.MdeoModelGraph
 import com.mdeo.modeltransformation.graph.TinkerModelGraph
 import com.mdeo.optimizer.config.GraphBackendType
+import com.mdeo.optimizer.config.ObjectiveTendency
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst
 import com.mdeo.script.ast.expressions.TypedExpressionSerializer as ScriptExpressionSerializer
 import com.mdeo.script.ast.statements.TypedStatementSerializer
@@ -393,7 +394,7 @@ class WorkerSubprocessMain : SubprocessMain() {
         val objectives = request.goalConfig.objectives.map { obj ->
             val jvmName = compiledProgram.functionLookup[obj.path]?.get(obj.functionName)
                 ?: error("Objective '${obj.functionName}' not found in '${obj.path}'")
-            ScriptGuidanceFunction(clazz, jvmName, System.out, "${obj.path}::${obj.functionName}")
+            ScriptGuidanceFunction(clazz, jvmName, System.out, "${obj.path}::${obj.functionName}", obj.type)
         }
 
         val constraints = request.goalConfig.constraints.map { con ->
@@ -647,7 +648,7 @@ class WorkerSubprocessMain : SubprocessMain() {
             } else {
                 failedResult(task.solutionId, result?.errorMessage)
             }
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             failedResult(task.solutionId)
         } finally {
             cancelTimeout(evalId)
@@ -698,7 +699,7 @@ class WorkerSubprocessMain : SubprocessMain() {
             } else {
                 failedResult(task.solutionId, result?.errorMessage)
             }
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             failedResult(task.solutionId)
         } finally {
             cancelTimeout(evalId)

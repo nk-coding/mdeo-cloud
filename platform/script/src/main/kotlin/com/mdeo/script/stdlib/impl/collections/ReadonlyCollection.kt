@@ -129,22 +129,22 @@ interface ReadonlyCollection<out T> : ScriptIterable<T> {
     /**
      * Converts this collection to a Bag.
      */
-    fun asBag(): Bag<@UnsafeVariance T>
+    fun toBag(): Bag<@UnsafeVariance T>
 
     /**
      * Converts this collection to an OrderedSet.
      */
-    fun asOrderedSet(): OrderedSet<@UnsafeVariance T>
+    fun toOrderedSet(): OrderedSet<@UnsafeVariance T>
 
     /**
      * Converts this collection to a List.
      */
-    fun asList(): ScriptList<@UnsafeVariance T>
+    fun toList(): ScriptList<@UnsafeVariance T>
 
     /**
      * Converts this collection to a Set.
      */
-    fun asSet(): ScriptSet<@UnsafeVariance T>
+    fun toSet(): ScriptSet<@UnsafeVariance T>
 
     /**
      * Creates a clone of this collection.

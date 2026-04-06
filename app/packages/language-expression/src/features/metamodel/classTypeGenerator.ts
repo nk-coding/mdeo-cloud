@@ -137,11 +137,41 @@ class ClassTypeGenerator {
             }
         };
 
+        const firstMethodSignature: FunctionSignature = {
+            returnType: { package: this.classPackage, type: className, isNullable: false },
+            parameters: []
+        };
+
+        const firstMethod: Method = {
+            name: "first",
+            isProperty: false,
+            type: {
+                signatures: {
+                    [FunctionSignature.DEFAULT_SIGNATURE]: firstMethodSignature
+                }
+            }
+        };
+
+        const firstOrNullMethodSignature: FunctionSignature = {
+            returnType: { package: this.classPackage, type: className, isNullable: true },
+            parameters: []
+        };
+
+        const firstOrNullMethod: Method = {
+            name: "firstOrNull",
+            isProperty: false,
+            type: {
+                signatures: {
+                    [FunctionSignature.DEFAULT_SIGNATURE]: firstOrNullMethodSignature
+                }
+            }
+        };
+
         return {
             name: className,
             package: this.classContainerPackage,
             properties: {},
-            methods: { all: allMethod },
+            methods: { all: allMethod, first: firstMethod, firstOrNull: firstOrNullMethod },
             isVirtual: true
         };
     }
