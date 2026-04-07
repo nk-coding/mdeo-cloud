@@ -13,6 +13,8 @@ export * from "./features/change-bounds-tool/feedbackMoveMouseListener.js";
 export * from "./features/context-actions/contextActions.js";
 export * from "./features/context-actions/contextItemsState.js";
 export * from "./features/context-actions/featureModule.js";
+export * from "./features/copy-paste/clipboardService.js";
+export * from "./features/copy-paste/featureModule.js";
 export * from "./features/create-edge-tool/createEdgeFeedback.js";
 export * from "./features/create-edge-tool/createEdgeProvider.js";
 export * from "./features/create-edge-tool/createEdgeTool.js";

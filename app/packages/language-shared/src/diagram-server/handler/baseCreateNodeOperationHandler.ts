@@ -6,8 +6,9 @@ import type { NodeMetadata } from "../metadata.js";
 import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
+import { ExistingNamesProvider } from "../existingNamesProvider.js";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 
 /**
  * Result of a create node operation.
@@ -34,6 +35,8 @@ export interface CreateNodeResult {
  */
 @injectable()
 export abstract class BaseCreateNodeOperationHandler extends BaseOperationHandler {
+    @inject(ExistingNamesProvider)
+    protected existingNamesProvider!: ExistingNamesProvider;
     override async createCommand(operation: CreateNodeOperation): Promise<Command | undefined> {
         const result = await this.createNode(operation);
 
@@ -84,19 +87,14 @@ export abstract class BaseCreateNodeOperationHandler extends BaseOperationHandle
     }
 
     /**
-     * Finds a unique name by checking existing exported symbols in the source model.
+     * Finds a unique name by checking names already present in the source model
+     * via the injected {@link ExistingNamesProvider}.
      *
      * @param name The base name to check for uniqueness
      * @returns The unique name, potentially with a numerical suffix appended
      */
     protected async findUniqueName(name: string): Promise<string> {
-        const document = this.modelState.sourceModel?.$document;
-        if (!document) {
-            return name;
-        }
-        const exported =
-            await this.modelState.languageServices.references.ScopeComputation.collectExportedSymbols(document);
-        const names = new Set(exported.map((description) => description.name));
+        const names = await this.existingNamesProvider.getExistingNames();
         if (!names.has(name)) {
             return name;
         }

@@ -34,6 +34,9 @@ import { DefaultContextActionsProvider } from "../context-actions/defaultContext
 import { LangiumModelValidator } from "./langiumModelValidator.js";
 import { UpdateEditorSettingsActionHandler } from "./handler/updateEditorSettingsActionHandler.js";
 import { EditorSettingsService } from "./editorSettingsService.js";
+import { BaseCutOperationHandler } from "./handler/baseCutOperationHandler.js";
+import { ExistingNamesProvider, DefaultExistingNamesProvider } from "./existingNamesProvider.js";
+import type { ExistingNamesProvider as IExistingNamesProvider } from "./existingNamesProvider.js";
 
 const { injectable } = sharedImport("inversify");
 const { DiagramModule, bindOrRebind, applyBindingTarget, CompoundOperationHandler } =
@@ -83,6 +86,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         applyBindingTarget(context, MetadataManager, this.bindMetadataManager()).inSingletonScope();
         applyBindingTarget(context, BaseLayoutEngine, this.bindCustomLayoutEngine()).inSingletonScope();
         applyBindingTarget(context, CreateEdgeSchemaResolver, this.bindCreateEdgeSchemaResolver()).inSingletonScope();
+        applyBindingTarget(context, ExistingNamesProvider, this.bindExistingNamesProvider()).inSingletonScope();
         bind(EditorSettingsService).toSelf().inSingletonScope();
         this.configureAdditional(context);
     }
@@ -188,6 +192,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
         binding.add(UpdateRoutingInformationOperationHandler);
         binding.add(LayoutOperationHandler);
         binding.add(ResetLayoutOperationHandler);
+        binding.add(BaseCutOperationHandler);
     }
 
     /**
@@ -218,4 +223,15 @@ export abstract class BaseDiagramModule extends DiagramModule {
      * @returns The binding target for the {@link CreateEdgeSchemaResolver}.
      */
     protected abstract bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver>;
+
+    /**
+     * Binds the provider that supplies the set of names already present in the
+     * target document. Override in language-specific diagram modules to include
+     * additional names (e.g. from imported files).
+     *
+     * @returns The binding target for {@link ExistingNamesProvider}.
+     */
+    protected bindExistingNamesProvider(): BindingTarget<IExistingNamesProvider> {
+        return DefaultExistingNamesProvider;
+    }
 }

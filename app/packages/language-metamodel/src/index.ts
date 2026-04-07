@@ -29,6 +29,7 @@ export * from "./features/diagram-server/model/propertyLabel.js";
 export * from "./features/diagram-server/metamodelCreateEdgeSchemaResolver.js";
 export * from "./features/diagram-server/metamodelDiagramConfiguration.js";
 export * from "./features/diagram-server/metamodelDiagramModule.js";
+export * from "./features/diagram-server/metamodelExistingNamesProvider.js";
 export * from "./features/diagram-server/metamodelGModelFactory.js";
 export * from "./features/diagram-server/metamodelLabelEditValidator.js";
 export * from "./features/diagram-server/metamodelLayoutEngine.js";

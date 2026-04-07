@@ -44,6 +44,15 @@ export interface ModelIdRegistry {
      * @returns True if the node has an ID, false otherwise
      */
     hasId(node: AstNode): boolean;
+
+    /**
+     * Gets the root nodes to start indexing from. By default, this is just the given root node,
+     * but providers can override this to include additional nodes (e.g. imported models).
+     *
+     * @param rootNode The original root node of the model
+     * @returns An array of AST nodes to index as roots
+     */
+    getRootNodes(rootNode: AstNode): AstNode[];
 }
 
 /**
@@ -108,6 +117,10 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
         return this.idMap.has(node);
     }
 
+    getRootNodes(rootNode: AstNode): AstNode[] {
+        return [rootNode, ...this.idProvider.getAdditional(rootNode)];
+    }
+
     /**
      * Generates IDs for all nodes in the model tree.
      * Traversal is pre-order (parent before child), so parent names are available
@@ -116,7 +129,7 @@ export class DefaultModelIdRegistry implements ModelIdRegistry {
      * @param rootNode The root node to start traversal from
      */
     private generateIds(rootNode: AstNode): void {
-        const rootNodes = [rootNode, ...this.idProvider.getAdditional(rootNode)];
+        const rootNodes = this.getRootNodes(rootNode);
         for (const root of rootNodes) {
             const stream = AstUtils.streamAllContents(root);
 
@@ -197,5 +210,9 @@ export class PlaceholderModelIdRegistry implements ModelIdRegistry {
 
     hasId(): boolean {
         return true;
+    }
+
+    getRootNodes(rootNode: AstNode): AstNode[] {
+        return [rootNode];
     }
 }

@@ -21,6 +21,10 @@ import { iconRegistryModule } from "./icon-registry/featureModule.js";
 import { decorationModule } from "./decoration/featureModule.js";
 import { editorSettingsModule } from "./editor-settings/editorSettingsModule.js";
 import { toolStateModule } from "./tool-state/featureModule.js";
+import { copyPasteModule } from "./copy-paste/featureModule.js";
+import { sharedImport } from "../sharedImport.js";
+
+const { standaloneCopyPasteModule, standaloneSelectModule } = sharedImport("@eclipse-glsp/client");
 
 /**
  * Default modules for the editor shared features.
@@ -49,5 +53,8 @@ export const DEFAULT_MODULES = [
     createNodeToolModule,
     iconRegistryModule,
     decorationModule,
-    toolStateModule
+    toolStateModule,
+    copyPasteModule,
+    standaloneCopyPasteModule,
+    standaloneSelectModule
 ];

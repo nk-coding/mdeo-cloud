@@ -2,7 +2,8 @@ import type {
     InstanceMultiBinding,
     LabelEditValidator,
     OperationHandlerConstructor,
-    ToolPaletteItemProvider
+    ToolPaletteItemProvider,
+    ActionHandlerConstructor
 } from "@eclipse-glsp/server";
 import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
 import type { BaseLayoutEngine, MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
@@ -23,6 +24,8 @@ import { CreateLinkOperationHandler } from "./handler/createLinkOperationHandler
 import { AddPropertyValueOperationHandler } from "./handler/addPropertyValueOperationHandler.js";
 import { ChangeLinkTypeOperationHandler } from "./handler/changeLinkTypeOperationHandler.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
+import { ModelRequestClipboardDataActionHandler } from "./handler/modelRequestClipboardDataActionHandler.js";
+import { ModelPasteOperationHandler } from "./handler/modelPasteOperationHandler.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -57,6 +60,12 @@ export class ModelDiagramModule extends BaseDiagramModule {
         binding.add(ModelDeleteElementOperationHandler);
         binding.add(AddPropertyValueOperationHandler);
         binding.add(ChangeLinkTypeOperationHandler);
+        binding.add(ModelPasteOperationHandler);
+    }
+
+    protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
+        super.configureActionHandlers(binding);
+        binding.add(ModelRequestClipboardDataActionHandler);
     }
 
     protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {

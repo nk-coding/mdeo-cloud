@@ -2,7 +2,8 @@ import type {
     InstanceMultiBinding,
     LabelEditValidator,
     OperationHandlerConstructor,
-    ToolPaletteItemProvider
+    ToolPaletteItemProvider,
+    ActionHandlerConstructor
 } from "@eclipse-glsp/server";
 import type { BindingTarget, DiagramConfiguration, GModelFactory } from "@eclipse-glsp/server";
 import type { BaseLayoutEngine, MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
@@ -27,6 +28,10 @@ import { AddEnumEntryOperationHandler } from "./handler/addEnumEntryOperationHan
 import { AddPropertyOperationHandler } from "./handler/addPropertyOperationHandler.js";
 import { ChangeAssociationEndOperationHandler } from "./handler/changeAssociationEndOperationHandler.js";
 import { ToggleAbstractClassOperationHandler } from "./handler/toggleAbstractClassOperationHandler.js";
+import { MetamodelRequestClipboardDataActionHandler } from "./handler/metamodelRequestClipboardDataActionHandler.js";
+import { MetamodelPasteOperationHandler } from "./handler/metamodelPasteOperationHandler.js";
+import { MetamodelExistingNamesProvider } from "./metamodelExistingNamesProvider.js";
+import type { ExistingNamesProvider } from "@mdeo/language-shared";
 const { injectable } = sharedImport("inversify");
 
 /**
@@ -64,6 +69,12 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
         binding.add(ChangeAssociationEndOperationHandler);
         binding.add(AddPropertyOperationHandler);
         binding.add(AddEnumEntryOperationHandler);
+        binding.add(MetamodelPasteOperationHandler);
+    }
+
+    protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
+        super.configureActionHandlers(binding);
+        binding.add(MetamodelRequestClipboardDataActionHandler);
     }
 
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {
@@ -80,5 +91,9 @@ export class MetamodelDiagramModule extends BaseDiagramModule {
 
     protected override bindCreateEdgeSchemaResolver(): BindingTarget<CreateEdgeSchemaResolver> {
         return MetamodelCreateEdgeSchemaResolver;
+    }
+
+    protected override bindExistingNamesProvider(): BindingTarget<ExistingNamesProvider> {
+        return MetamodelExistingNamesProvider;
     }
 }

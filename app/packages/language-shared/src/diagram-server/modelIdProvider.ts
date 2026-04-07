@@ -59,7 +59,7 @@ export abstract class BaseModelIdProvider implements ModelIdProvider {
      * @param s The raw string to escape
      * @returns The escaped string safe for use in IDs
      */
-    protected static escapeIdPart(s: string): string {
+    static escapeIdPart(s: string): string {
         return s.replace(/@/g, "_at_").replace(/:/g, "_colon_");
     }
 }

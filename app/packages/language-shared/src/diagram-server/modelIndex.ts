@@ -32,11 +32,13 @@ export class GModelIndex extends BaseGModelIndex {
     indexSourceModelRoot(root: AstNode, idRegistry: ModelIdRegistry): void {
         this.idToAstNode.clear();
         this.astNodeToId.clear();
-        for (const node of AstUtils.streamAst(root)) {
-            if (idRegistry.hasId(node)) {
-                const id = idRegistry.getId(node);
-                this.idToAstNode.set(id, node);
-                this.astNodeToId.set(node, id);
+        for (const rootNode of idRegistry.getRootNodes(root)) {
+            for (const node of AstUtils.streamAst(rootNode)) {
+                if (idRegistry.hasId(node)) {
+                    const id = idRegistry.getId(node);
+                    this.idToAstNode.set(id, node);
+                    this.astNodeToId.set(node, id);
+                }
             }
         }
     }
