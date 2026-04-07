@@ -24,9 +24,9 @@ const { GrammarUtils } = sharedImport("langium");
  *
  * Label ID formats:
  * - Root (empty) action: {@code ${NEW_PROPERTY_VALUE_LABEL_PREFIX}${objectNodeId}}
- * - Pre-selected property child: {@code ${NEW_PROPERTY_VALUE_LABEL_PREFIX}${objectNodeId}@@${propertyName}}
+ * - Pre-selected property child: {@code ${NEW_PROPERTY_VALUE_LABEL_PREFIX}${objectNodeId}__${propertyName}}
  *
- * The {@code @@} separator is used only for uniqueness; validators extract the
+ * The {@code __} separator is used only for uniqueness; validators extract the
  * {@code objectNodeId} by splitting on it and parse the property name from the
  * edited text itself.
  */
@@ -142,7 +142,7 @@ export class AddPropertyValueOperationHandler extends BaseOperationHandler imple
         const nodeId = element.id;
         const labelId =
             propertyName != undefined
-                ? `${NEW_PROPERTY_VALUE_LABEL_PREFIX}${nodeId}@@${propertyName}`
+                ? `${NEW_PROPERTY_VALUE_LABEL_PREFIX}${nodeId}__${propertyName}`
                 : `${NEW_PROPERTY_VALUE_LABEL_PREFIX}${nodeId}`;
 
         let prefillText = "";

@@ -1,4 +1,4 @@
-import { GEdge, GNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
+import { GEdge, GIssueMarker, GNode, nodeLayoutMetadataFeature, sharedImport } from "@mdeo/editor-shared";
 import type { GModelElement, Point, Bounds } from "@eclipse-glsp/sprotty";
 import { GMatchNodeView } from "../views/matchNodeView.js";
 import { GMatchNodeCompartments } from "./matchNodeCompartments.js";
@@ -110,7 +110,7 @@ export class GMatchNode extends GNode {
         for (const child of this.children) {
             if (child instanceof GMatchNodeCompartments) {
                 containerNode = child;
-            } else {
+            } else if (!(child instanceof GIssueMarker)) {
                 innerChildren.push(child);
             }
         }

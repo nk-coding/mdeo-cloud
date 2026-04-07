@@ -18,9 +18,9 @@ export class ModelTransformationIdGenerator {
      */
     static controlFlowEdge(sourceId: string, targetId: string, label?: string): string {
         if (label != undefined) {
-            return `${sourceId}@${targetId}:${label}`;
+            return `${sourceId}_to_${targetId}_label_${label}`;
         }
-        return `${sourceId}@${targetId}`;
+        return `${sourceId}_to_${targetId}`;
     }
 
     /**
@@ -42,6 +42,6 @@ export class ModelTransformationIdGenerator {
      * @returns The containment edge ID
      */
     static instanceToMatchEdge(instanceNodeId: string, matchNodeId: string): string {
-        return `${instanceNodeId}@${matchNodeId}`;
+        return `${instanceNodeId}_in_${matchNodeId}`;
     }
 }

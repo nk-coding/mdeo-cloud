@@ -67,7 +67,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         }
 
         if (this.reflection.isInstance(node, PatternObjectInstance)) {
-            return node.name ?? "unnamed";
+            return ModelTransformationModelIdProvider.escapeIdPart(node.name ?? "unnamed");
         }
         if (this.reflection.isInstance(node, PatternObjectInstanceReference)) {
             return this.getPatternObjectInstanceReferenceName(node, registry);
@@ -188,7 +188,9 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         node: PatternObjectInstanceReferenceType,
         registry: ModelIdRegistry
     ): string {
-        const instanceRefName = node.instance.ref?.name ?? node.instance.$refText ?? "unnamed";
+        const instanceRefName = ModelTransformationModelIdProvider.escapeIdPart(
+            node.instance.ref?.name ?? node.instance.$refText ?? "unnamed"
+        );
         const container = node.$container;
         if (container) {
             const parent = this.findParentStatement(container);
@@ -216,7 +218,9 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
         node: PatternObjectInstanceDeleteType,
         registry: ModelIdRegistry
     ): string {
-        const instanceRefName = node.instance.ref?.name ?? node.instance.$refText ?? "unnamed";
+        const instanceRefName = ModelTransformationModelIdProvider.escapeIdPart(
+            node.instance.ref?.name ?? node.instance.$refText ?? "unnamed"
+        );
         const container = node.$container;
         if (container) {
             const parent = this.findParentStatement(container);
@@ -275,7 +279,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
     }
 
     /**
-     * Generates a name for a {@link PatternLinkEnd} by appending "\@source" or "\@target"
+     * Generates a name for a {@link PatternLinkEnd} by appending "_source" or "_target"
      * to its containing link's name.
      *
      * @param node The pattern link end node
@@ -287,7 +291,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
             const link = parent as PatternLinkType;
             const linkName = this.getPatternLinkName(link);
             const isSource = link.source === node;
-            return `${linkName}@${isSource ? "source" : "target"}`;
+            return `${linkName}_${isSource ? "source" : "target"}`;
         }
         return "linkEnd";
     }
@@ -296,7 +300,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
      * Generates a name for a {@link PatternPropertyAssignment} based on the parent
      * instance name and the assigned property name.
      *
-     * Format: "{instanceName}\@{propertyName}"
+     * Format: "{instanceName}_prop_{propertyName}"
      *
      * @param node The pattern property assignment node
      * @returns The generated name for the property assignment
@@ -307,7 +311,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
 
         if (parent != undefined && this.reflection.isInstance(parent, PatternObjectInstance)) {
             const parentObj = parent as PatternObjectInstanceType;
-            return `${parentObj.name ?? "unnamed"}@${propName}`;
+            return `${ModelTransformationModelIdProvider.escapeIdPart(parentObj.name ?? "unnamed")}_prop_${ModelTransformationModelIdProvider.escapeIdPart(propName)}`;
         }
 
         return propName;
@@ -341,7 +345,7 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
      * @returns The variable's declared name, or "unnamed" if absent
      */
     private getPatternVariableName(node: PatternVariableType): string {
-        return node.name ?? "unnamed";
+        return ModelTransformationModelIdProvider.escapeIdPart(node.name ?? "unnamed");
     }
 
     /**

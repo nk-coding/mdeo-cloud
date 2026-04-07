@@ -77,7 +77,10 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 }
             },
             generateToolbarView(context),
-            hasItems && context.toolType !== ToolType.HAND && context.toolType !== ToolType.MARQUEE && !isCreationTool(context.toolType)
+            hasItems &&
+                context.toolType !== ToolType.HAND &&
+                context.toolType !== ToolType.MARQUEE &&
+                !isCreationTool(context.toolType)
                 ? generateDetailsPanelView(context)
                 : undefined,
             generateErrorView(context)

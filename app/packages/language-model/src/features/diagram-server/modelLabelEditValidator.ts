@@ -80,7 +80,7 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
                 return ValidationStatus.NONE;
             }
             const rest = modelElementId.substring(NEW_PROPERTY_VALUE_LABEL_PREFIX.length);
-            const sepIdx = rest.indexOf("@@");
+            const sepIdx = rest.indexOf("__");
             const nodeId = sepIdx >= 0 ? rest.substring(0, sepIdx) : rest;
             return this.validatePropertyValueForObject(text, nodeId) ?? ValidationStatus.NONE;
         }
@@ -342,6 +342,14 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
             return this.validateListTokens(innerTokens);
         }
 
+        // Allow 3-token enum value pattern: ID . ID
+        if (tokens.length === 3 && tokens[1].image === ".") {
+            const v1 = this.validateSingleValueToken(tokens[0]);
+            if (v1 != undefined) return v1;
+            const v2 = this.validateSingleValueToken(tokens[2]);
+            return v2;
+        }
+
         if (tokens.length !== 1) {
             return this.error("Single value must be a single token (number, string, boolean, or identifier).");
         }
@@ -374,24 +382,27 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
             return undefined;
         }
 
-        let expectingValue = true;
-        for (const token of tokens) {
-            if (expectingValue) {
-                const validation = this.validateSingleValueToken(token);
-                if (validation != undefined) {
-                    return validation;
-                }
-                expectingValue = false;
-            } else {
-                if (token.image !== ",") {
-                    return this.error(`Expected comma between list entries, got: ${token.image}`);
-                }
-                expectingValue = true;
-            }
+        // Check for trailing comma
+        if (tokens[tokens.length - 1].image === ",") {
+            return this.error("List cannot end with a comma.");
         }
 
-        if (expectingValue) {
-            return this.error("List cannot end with a comma.");
+        const entries = this.extractListEntryTokens(tokens);
+        for (const entryTokens of entries) {
+            if (entryTokens.length === 0) {
+                return this.error("Empty list entry.");
+            }
+            if (entryTokens.length === 3 && entryTokens[1].image === ".") {
+                const v1 = this.validateSingleValueToken(entryTokens[0]);
+                if (v1 != undefined) return v1;
+                const v2 = this.validateSingleValueToken(entryTokens[2]);
+                if (v2 != undefined) return v2;
+            } else if (entryTokens.length === 1) {
+                const validation = this.validateSingleValueToken(entryTokens[0]);
+                if (validation != undefined) return validation;
+            } else {
+                return this.error("Expected single value or enum value (EnumName.Entry) in list.");
+            }
         }
 
         return undefined;
@@ -529,19 +540,24 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
         valueTokens: IToken[],
         propertyDef: PropertyType
     ): ValidationStatusType | undefined {
+        const reflection = this.reflection;
+        const propertyType = propertyDef.type;
+
+        if (reflection.isInstance(propertyType, EnumTypeReference)) {
+            // Enum values consist of [ID, ".", ID] tokens; reconstruct full value string
+            const fullValue = valueTokens.map((t) => t.image).join("");
+            return this.validateEnumValue(fullValue, propertyType);
+        }
+
         if (valueTokens.length !== 1) {
             return this.error("Expected a single value token.");
         }
 
         const token = valueTokens[0];
         const valueStr = token.image;
-        const reflection = this.reflection;
-        const propertyType = propertyDef.type;
 
         if (reflection.isInstance(propertyType, PrimitiveType)) {
             return this.validatePrimitiveValue(valueStr, propertyType.name, token);
-        } else if (reflection.isInstance(propertyType, EnumTypeReference)) {
-            return this.validateEnumValue(valueStr, propertyType);
         }
 
         return this.error("Unknown property type.");
@@ -619,15 +635,19 @@ export class ModelLabelEditValidator extends BaseLabelEditValidator {
             return this.error("Invalid enum reference.");
         }
 
-        const trimmed = valueStr.trim();
+        const serializer = this.modelState.languageServices.AstSerializer;
+        const serializedEnumName = serializer.serializePrimitive({ value: enumDef.name ?? "?" }, ID);
         const enumEntries = enumDef.entries ?? [];
         const validEntries = enumEntries
             .map((entry) => entry.name)
             .filter((name) => name != undefined)
-            .map((name) => `${enumDef?.name ?? "?"}.${name}`);
+            .map((name) => {
+                const serializedEntry = serializer.serializePrimitive({ value: name as string }, ID);
+                return `${serializedEnumName}.${serializedEntry}`;
+            });
 
-        if (!validEntries.includes(trimmed)) {
-            return this.error(`Invalid enum value. Expected one of: ${validEntries.join(", ")}, got '${trimmed}'.`);
+        if (!validEntries.includes(valueStr)) {
+            return this.error(`Invalid enum value. Expected one of: ${validEntries.join(", ")}, got '${valueStr}'.`);
         }
 
         return undefined;

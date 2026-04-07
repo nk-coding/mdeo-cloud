@@ -105,7 +105,8 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                 "elk.algorithm": "layered",
                 "elk.direction": "DOWN",
                 "elk.spacing.nodeNode": "50",
-                "elk.layered.spacing.nodeNodeBetweenLayers": "50"
+                "elk.layered.spacing.nodeNodeBetweenLayers": "50",
+                "elk.spacing.edgeEdge": "40"
             },
             children: nodes,
             edges: edges
@@ -182,6 +183,7 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
                 "elk.algorithm": "layered",
                 "elk.direction": "RIGHT",
                 "elk.spacing.nodeNode": "30",
+                "elk.spacing.edgeEdge": "40",
                 "elk.padding": `[top=${topPadding},left=${MATCH_NODE_INNER_PADDING},bottom=${bottomPadding},right=${MATCH_NODE_INNER_PADDING}]`
             },
             children: childNodes,

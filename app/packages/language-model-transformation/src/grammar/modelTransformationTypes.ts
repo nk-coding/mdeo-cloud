@@ -56,23 +56,13 @@ export const PatternVariable = createInterface("PatternVariable").attrs({
 export type PatternVariableType = ASTType<typeof PatternVariable>;
 
 /**
- * Property value in a pattern object instance.
- */
-export const PropertyValue: BaseType<AstNode> = createType("PropertyValue").types(BaseExpression);
-
-/**
- * Type representing a PropertyValue AST node.
- */
-export type PropertyValueType = ASTType<typeof PropertyValue>;
-
-/**
  * Property assignment in a pattern object instance.
  * Uses = for assignment or == for comparison.
  */
 export const PatternPropertyAssignment = createInterface("PatternPropertyAssignment").attrs({
     name: Ref(() => Property),
     operator: String,
-    value: PropertyValue
+    value: BaseExpression
 });
 
 /**

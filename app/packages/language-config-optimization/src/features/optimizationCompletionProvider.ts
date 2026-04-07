@@ -1,6 +1,7 @@
 import type { AstReflection, ExtendedLangiumServices, AstSerializerAdditionalServices } from "@mdeo/language-common";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import {
+    BaseCompletionProvider,
     FileImportCompletionHelper,
     computeRelativePathCompletions,
     acceptRelativePathCompletions,
@@ -25,7 +26,6 @@ import {
 import { findProblemSection, getMetamodelUri } from "./util.js";
 import type { ScriptType } from "@mdeo/language-script";
 
-const { DefaultCompletionProvider } = sharedImport("langium/lsp");
 const { AstUtils } = sharedImport("langium");
 const { CompletionItemKind } = sharedImport("vscode-languageserver-protocol");
 
@@ -96,7 +96,7 @@ class OptimizationFunctionImportHelper extends FileImportCompletionHelper<AstNod
  *   functions from compatible scripts, with automatic import insertion)
  * - Relative path completions for file path properties
  */
-export class OptimizationCompletionProvider extends DefaultCompletionProvider {
+export class OptimizationCompletionProvider extends BaseCompletionProvider {
     override readonly completionOptions: CompletionProviderOptions = { triggerCharacters: ['"', "/", "."] };
 
     private readonly documents: LangiumDocuments;

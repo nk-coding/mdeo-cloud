@@ -203,7 +203,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         if (cfgMatchNode.pattern?.elements != undefined) {
             for (const element of cfgMatchNode.pattern.elements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
-                    this.createPatternInstanceNode(node, element, idRegistry);
+                    this.addPatternInstanceNode(node, element, idRegistry);
                 }
             }
         }
@@ -255,15 +255,23 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param instance The pattern object instance
      * @param idRegistry The model ID registry
      */
-    private createPatternInstanceNode(
-        parent: GMatchNode,
+    /**
+     * Creates a visual node for a single pattern object instance.
+     * This method is the canonical factory method used for both regular diagram rendering
+     * and ghost/preview element creation, analogous to {@link ModelGModelFactory.createObjectNode}.
+     *
+     * @param instance The pattern object instance AST node
+     * @param nodeId The unique node ID
+     * @param metadata The layout metadata for the node
+     * @param idRegistry The ID registry for element ID generation
+     * @returns The constructed GPatternInstanceNode
+     */
+    createPatternInstanceNode(
         instance: PatternObjectInstanceType,
+        nodeId: string,
+        metadata: NodeLayoutMetadata,
         idRegistry: ModelIdRegistry
-    ): void {
-        const nodeId = idRegistry.getId(instance);
-        const validatedMetadata = this.modelState.getValidatedMetadata();
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-
+    ): GPatternInstanceNode {
         const name = instance.name ?? "unnamed";
         const typeName = instance.class?.$refText ?? instance.class?.ref?.name ?? undefined;
         const modifier = this.getPatternModifierKind(instance.modifier?.modifier);
@@ -307,7 +315,25 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             node.children.push(...propertyChildren);
         }
 
-        parent.children.push(node);
+        return node;
+    }
+
+    /**
+     * Adds a pattern instance node for a locally declared instance to the given parent match node.
+     *
+     * @param parent The parent match node to add the instance node to
+     * @param instance The pattern object instance AST node to create the visual node for
+     * @param idRegistry The model ID registry, used to obtain the unique node ID for the instance
+     */
+    private addPatternInstanceNode(
+        parent: GMatchNode,
+        instance: PatternObjectInstanceType,
+        idRegistry: ModelIdRegistry
+    ): void {
+        const nodeId = idRegistry.getId(instance);
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
+        parent.children.push(this.createPatternInstanceNode(instance, nodeId, metadata, idRegistry));
     }
 
     /**
@@ -464,7 +490,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             .build();
 
         for (const prop of properties) {
-            if (prop == undefined) continue;
+            if (prop == undefined) {
+                continue;
+            }
 
             const propId = idRegistry.getId(prop);
             const rawPropName = prop.name?.$refText ?? prop.name?.ref?.name ?? "?";
@@ -825,12 +853,6 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         graph.children.push(edge);
     }
 
-    /**
-     * Gets the pattern modifier kind from a string.
-     *
-     * @param modifier The modifier string
-     * @returns The PatternModifierKind
-     */
     private getPatternModifierKind(modifier: string | undefined): PatternModifierKind {
         switch (modifier) {
             case "create":

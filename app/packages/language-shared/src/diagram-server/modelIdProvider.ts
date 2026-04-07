@@ -49,4 +49,17 @@ export abstract class BaseModelIdProvider implements ModelIdProvider {
     getAdditional(_node: AstNode): AstNode[] {
         return [];
     }
+
+    /**
+     * Escapes a string for safe use as part of a diagram element ID.
+     * Replaces characters that are problematic in IDs (e.g. in CSS selectors or URLs):
+     * - `@` is replaced with `_at_`
+     * - `:` is replaced with `_colon_`
+     *
+     * @param s The raw string to escape
+     * @returns The escaped string safe for use in IDs
+     */
+    protected static escapeIdPart(s: string): string {
+        return s.replace(/@/g, "_at_").replace(/:/g, "_colon_");
+    }
 }

@@ -54,7 +54,8 @@ export class ModelLayoutEngine extends BaseLayoutEngine {
             id: model.id,
             layoutOptions: {
                 "elk.algorithm": "layered",
-                "elk.direction": "DOWN"
+                "elk.direction": "DOWN",
+                "elk.spacing.edgeEdge": "40"
             },
             children: nodes,
             edges: edges

@@ -101,25 +101,25 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * @returns The class name or "unnamed"
      */
     private getClassName(node: PartialClass): string {
-        return node.name ?? "unnamed";
+        return MetamodelModelIdProvider.escapeIdPart(node.name ?? "unnamed");
     }
 
     /**
      * Generates ID for Enum node based on enum name.
      */
     private getEnumName(node: PartialEnum): string {
-        return node.name ?? "unnamed";
+        return MetamodelModelIdProvider.escapeIdPart(node.name ?? "unnamed");
     }
 
     /**
      * Generates ID for EnumEntry node based on parent enum and entry name.
      */
     private getEnumEntryName(node: PartialEnumEntry): string {
-        const entryName = node.name ?? "unnamed";
+        const entryName = MetamodelModelIdProvider.escapeIdPart(node.name ?? "unnamed");
         const parent = node.$container;
         if (parent != undefined && this.reflection.isInstance(parent, Enum)) {
             const parentEnum = parent as PartialEnum;
-            return `${parentEnum.name ?? "unnamed"}_entry_${entryName}`;
+            return `${MetamodelModelIdProvider.escapeIdPart(parentEnum.name ?? "unnamed")}_entry_${entryName}`;
         }
         return entryName;
     }
@@ -128,7 +128,7 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * Generates ID for Property node based on parent class and property name.
      */
     private getPropertyName(node: PartialProperty): string {
-        const propName = node.name ?? "unnamed";
+        const propName = MetamodelModelIdProvider.escapeIdPart(node.name ?? "unnamed");
         const parent = node.$container;
         if (parent != undefined && this.reflection.isInstance(parent, Class)) {
             const parentClass = parent as PartialClass;
@@ -142,10 +142,10 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * Uses class names and properties to create a semantic ID.
      */
     private getAssociationName(node: PartialAssociation): string {
-        const startClassName = this.resolveClassName(node.source?.class);
-        const targetClassName = this.resolveClassName(node.target?.class);
-        const startProperty = node.source?.name ?? "";
-        const targetProperty = node.target?.name ?? "";
+        const startClassName = MetamodelModelIdProvider.escapeIdPart(this.resolveClassName(node.source?.class));
+        const targetClassName = MetamodelModelIdProvider.escapeIdPart(this.resolveClassName(node.target?.class));
+        const startProperty = MetamodelModelIdProvider.escapeIdPart(node.source?.name ?? "");
+        const targetProperty = MetamodelModelIdProvider.escapeIdPart(node.target?.name ?? "");
 
         return `${startClassName}_${startProperty}_${targetClassName}_${targetProperty}`;
     }
@@ -154,8 +154,8 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      * Generates ID for AssociationEnd.
      */
     private getAssociationEndName(node: PartialAssociationEnd): string {
-        const className = this.resolveClassName(node.class);
-        const property = node.name ?? "noProperty";
+        const className = MetamodelModelIdProvider.escapeIdPart(this.resolveClassName(node.class));
+        const property = MetamodelModelIdProvider.escapeIdPart(node.name ?? "noProperty");
         return `${className}_${property}`;
     }
 
@@ -167,8 +167,11 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
      */
     private getClassExtensionName(node: PartialClassExtension): string {
         const owningClass = node.$container?.$container as PartialClass | undefined;
-        const parentClassName = owningClass != undefined ? this.getClassName(owningClass) : "unknownParent";
-        const extensionName = this.resolveClassName(node.class);
+        const parentClassName =
+            owningClass != undefined
+                ? MetamodelModelIdProvider.escapeIdPart(this.getClassName(owningClass))
+                : "unknownParent";
+        const extensionName = MetamodelModelIdProvider.escapeIdPart(this.resolveClassName(node.class));
         return `${parentClassName}_${extensionName}`;
     }
 
@@ -185,7 +188,7 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
         const resolved = clsReference.ref;
 
         if (this.reflection.isInstance(resolved, Class)) {
-            return this.getClassName(resolved);
+            return MetamodelModelIdProvider.escapeIdPart(this.getClassName(resolved));
         }
 
         return "unknown";

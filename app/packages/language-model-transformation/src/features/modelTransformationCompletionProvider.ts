@@ -2,7 +2,7 @@ import { ExpressionCompletionProvider, type ExpressionTypes, type TypeTypes } fr
 import { computeRelativePathCompletions, acceptRelativePathCompletions, sharedImport } from "@mdeo/language-shared";
 import type { CompletionAcceptor, CompletionContext, CompletionProviderOptions, NextFeature } from "langium/lsp";
 import type { LangiumDocuments, MaybePromise } from "langium";
-import type { ExtendedLangiumServices } from "@mdeo/language-common";
+import type { AstSerializerAdditionalServices, ExtendedLangiumServices } from "@mdeo/language-common";
 import type { ModelTransformationTypirServices } from "../plugin.js";
 import { MetamodelFileImport } from "../grammar/modelTransformationTypes.js";
 
@@ -20,7 +20,8 @@ export class ModelTransformationCompletionProvider extends ExpressionCompletionP
     private readonly documents: LangiumDocuments;
 
     constructor(
-        services: { typir: ModelTransformationTypirServices } & ExtendedLangiumServices,
+        services: { typir: ModelTransformationTypirServices } & ExtendedLangiumServices &
+            AstSerializerAdditionalServices,
         expressionTypes: ExpressionTypes,
         typeTypes?: TypeTypes
     ) {

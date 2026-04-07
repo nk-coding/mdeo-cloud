@@ -95,7 +95,13 @@ export abstract class GLabelView implements IView {
                 blur: () => this.applyLabelEdit(model),
                 input: (event: Event) => this.handleInput(event, model),
                 click: (event: Event) => event.stopPropagation(),
-                mousedown: (event: Event) => event.stopPropagation(),
+                mousedown: (event: Event) => {
+                    const target = event.target as HTMLTextAreaElement;
+                    if (target.selectionStart !== target.selectionEnd) {
+                        target.selectionEnd = target.selectionStart;
+                    }
+                    event.stopPropagation();
+                },
                 mouseup: (event: Event) => event.stopPropagation(),
                 keyup: (event: Event) => event.stopPropagation(),
                 keypress: (event: Event) => event.stopPropagation()

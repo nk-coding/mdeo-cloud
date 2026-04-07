@@ -1,5 +1,6 @@
 export * from "./action/actionHandlerRegistry.js";
 export * from "./action/actionModule.js";
+export * from "./completion/baseCompletionProvider.js";
 export * from "./action/actionProvider.js";
 export * from "./context-actions/baseContextItemProvider.js";
 export * from "./context-actions/contextActionRequestContext.js";

@@ -1,10 +1,14 @@
-import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
-import { computeRelativePathCompletions, acceptRelativePathCompletions, sharedImport } from "@mdeo/language-shared";
+import type { AstReflection, AstSerializerAdditionalServices, ExtendedLangiumServices } from "@mdeo/language-common";
+import {
+    BaseCompletionProvider,
+    computeRelativePathCompletions,
+    acceptRelativePathCompletions,
+    sharedImport
+} from "@mdeo/language-shared";
 import type { CompletionAcceptor, CompletionContext, CompletionProviderOptions, NextFeature } from "langium/lsp";
 import type { LangiumDocuments, MaybePromise } from "langium";
 import { UsingPath } from "../grammar/mdeoTypes.js";
 
-const { DefaultCompletionProvider } = sharedImport("langium/lsp");
 const { AstUtils } = sharedImport("langium");
 
 /**
@@ -13,7 +17,7 @@ const { AstUtils } = sharedImport("langium");
  * Provides relative path completions for file path string properties such as
  * using paths (model transformation files).
  */
-export class MdeoCompletionProvider extends DefaultCompletionProvider {
+export class MdeoCompletionProvider extends BaseCompletionProvider {
     override readonly completionOptions: CompletionProviderOptions = { triggerCharacters: ['"', "/", "."] };
 
     private readonly documents: LangiumDocuments;
@@ -22,7 +26,7 @@ export class MdeoCompletionProvider extends DefaultCompletionProvider {
     /**
      * @param services Combined Langium services
      */
-    constructor(services: ExtendedLangiumServices) {
+    constructor(services: ExtendedLangiumServices & AstSerializerAdditionalServices) {
         super(services);
         this.documents = services.shared.workspace.LangiumDocuments;
         this.reflection = services.shared.AstReflection;

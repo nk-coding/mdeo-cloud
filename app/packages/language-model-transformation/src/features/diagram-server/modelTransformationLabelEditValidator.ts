@@ -92,7 +92,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
                 return ValidationStatus.NONE;
             }
             const rest = modelElementId.substring(NEW_PROPERTY_COMPARISON_LABEL_PREFIX.length);
-            const sepIdx = rest.indexOf("@@");
+            const sepIdx = rest.indexOf("__");
             const nodeId = sepIdx >= 0 ? rest.substring(0, sepIdx) : rest;
             return this.validatePropertyLabelForNode(text, nodeId) ?? ValidationStatus.NONE;
         }

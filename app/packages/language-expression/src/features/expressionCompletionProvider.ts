@@ -4,18 +4,22 @@ import type { CustomValueType } from "../typir-extensions/kinds/custom-value/cus
 import { isCustomValueType } from "../typir-extensions/kinds/custom-value/custom-value-type.js";
 import { isCustomFunctionType } from "../typir-extensions/kinds/custom-function/custom-function-type.js";
 import type { ExtendedTypirServices } from "../typir-extensions/service/extendedTypirServices.js";
-import { sharedImport } from "@mdeo/language-shared";
+import { sharedImport, BaseCompletionProvider } from "@mdeo/language-shared";
 import type { CompletionAcceptor, CompletionContext, CompletionProviderOptions, NextFeature } from "langium/lsp";
 import type { CompletionItemKind as CompletionItemKindType } from "vscode-languageserver-protocol";
 import type { MaybePromise, AstUtils as AstUtilsType } from "langium";
 import type { ExpressionTypirServices } from "../type-system/services.js";
-import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
+import {
+    ID,
+    type AstReflection,
+    type AstSerializerAdditionalServices,
+    type ExtendedLangiumServices
+} from "@mdeo/language-common";
 import type { ExpressionTypes } from "../grammar/expressionTypes.js";
 import type { TypeTypes } from "../grammar/typeTypes.js";
 import { type ClassType } from "../typir-extensions/config/type.js";
 import { memberValueTypeToString, memberMethodDetailString } from "./expressionTypeRendering.js";
 
-const { DefaultCompletionProvider } = sharedImport("langium/lsp");
 const { CompletionItemKind } = sharedImport("vscode-languageserver-protocol");
 const { AstUtils } = sharedImport("langium");
 
@@ -28,7 +32,7 @@ const { AstUtils } = sharedImport("langium");
  * - IdentifierExpression names (variables, functions, etc. from Typir scopes)
  * - MemberAccessExpression / MemberCallExpression members (properties/methods from inferred types)
  */
-export class ExpressionCompletionProvider extends DefaultCompletionProvider {
+export class ExpressionCompletionProvider extends BaseCompletionProvider {
     private readonly typirScopeProvider: ScopeProvider<TypirLangiumSpecifics>;
     private readonly typirInference: ExtendedTypirServices<TypirLangiumSpecifics>["Inference"];
     protected readonly reflection: AstReflection;
@@ -47,7 +51,8 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
     constructor(
         services: {
             typir: ExpressionTypirServices<TypirLangiumSpecifics>;
-        } & ExtendedLangiumServices,
+        } & ExtendedLangiumServices &
+            AstSerializerAdditionalServices,
         protected readonly expressionTypes: ExpressionTypes,
         protected readonly typeTypes?: TypeTypes
     ) {
@@ -135,34 +140,54 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
                 }
                 const internalPackageSet = new Set(internalPackages);
                 const seen = new Set<string>();
-                for (const t of this.typir.TypeDefinitions.getAllClassTypes()) {
-                    if (t.isVirtual !== true && internalPackageSet.has(t.package) && !seen.has(t.name)) {
-                        seen.add(t.name);
-                        acceptor(context, { label: t.name, kind: CompletionItemKind.Class, sortText: "0" });
+                for (const type of this.typir.TypeDefinitions.getAllClassTypes()) {
+                    if (type.isVirtual !== true && internalPackageSet.has(type.package) && !seen.has(type.name)) {
+                        seen.add(type.name);
+                        acceptor(context, {
+                            label: type.name,
+                            insertText: this.astSerializer.serializePrimitive({ value: type.name }, ID),
+                            kind: CompletionItemKind.Class,
+                            sortText: "0"
+                        });
                     }
                 }
             } else {
                 const relevantTypes = this.typir.TypeDefinitions.getAllClassTypes().filter(
-                    (t) => t.isVirtual !== true && allInternalPackages.has(t.package)
+                    (type) => type.isVirtual !== true && allInternalPackages.has(type.package)
                 );
                 const byName = new Map<string, ClassType[]>();
-                for (const t of relevantTypes) {
-                    const list = byName.get(t.name) ?? [];
-                    list.push(t);
-                    byName.set(t.name, list);
+                for (const type of relevantTypes) {
+                    const list = byName.get(type.name) ?? [];
+                    list.push(type);
+                    byName.set(type.name, list);
                 }
                 for (const pkgName of packageMap.keys()) {
-                    acceptor(context, { label: pkgName, kind: CompletionItemKind.Module, sortText: "1" });
+                    acceptor(context, {
+                        label: pkgName,
+                        insertText: this.astSerializer.serializePrimitive({ value: pkgName }, ID),
+                        kind: CompletionItemKind.Module,
+                        sortText: "1"
+                    });
                 }
                 for (const [name, types] of byName.entries()) {
                     if (types.length === 1) {
-                        acceptor(context, { label: name, kind: CompletionItemKind.Class, sortText: "0" });
+                        acceptor(context, {
+                            label: name,
+                            insertText: this.astSerializer.serializePrimitive({ value: name }, ID),
+                            kind: CompletionItemKind.Class,
+                            sortText: "0"
+                        });
                     } else {
-                        for (const t of types) {
-                            const userPkg = findUserVisiblePackage(t.package, packageMap);
+                        for (const type of types) {
+                            const userPkg = findUserVisiblePackage(type.package, packageMap);
                             if (userPkg != undefined) {
                                 const qualified = `${userPkg}.${name}`;
-                                acceptor(context, { label: qualified, kind: CompletionItemKind.Class, sortText: "0" });
+                                acceptor(context, {
+                                    label: qualified,
+                                    insertText: this.astSerializer.serializePrimitive({ value: qualified }, ID),
+                                    kind: CompletionItemKind.Class,
+                                    sortText: "0"
+                                });
                             }
                         }
                     }
@@ -206,6 +231,7 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
 
                 acceptor(context, {
                     label: entry.name,
+                    insertText: this.astSerializer.serializePrimitive({ value: entry.name }, ID),
                     kind,
                     detail: typeName,
                     sortText: "0"
@@ -283,6 +309,7 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
         for (const prop of valueType.getAllProperties()) {
             acceptor(context, {
                 label: prop.name,
+                insertText: this.astSerializer.serializePrimitive({ value: prop.name }, ID),
                 kind: CompletionItemKind.Property,
                 detail: memberValueTypeToString(prop.type, typeArgs),
                 sortText: "0"
@@ -291,6 +318,7 @@ export class ExpressionCompletionProvider extends DefaultCompletionProvider {
         for (const method of valueType.getAllMethods()) {
             acceptor(context, {
                 label: method.name,
+                insertText: this.astSerializer.serializePrimitive({ value: method.name }, ID),
                 kind: CompletionItemKind.Method,
                 detail: memberMethodDetailString(method, typeArgs),
                 sortText: "0"

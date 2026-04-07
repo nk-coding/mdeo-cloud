@@ -465,9 +465,7 @@ export class Toolbox extends ToolPalette {
             return;
         }
 
-        const isNodeCreation = item.paletteItem.actions.some(
-            (a) => a.kind === "triggerNodeCreation"
-        );
+        const isNodeCreation = item.paletteItem.actions.some((a) => a.kind === "triggerNodeCreation");
         if (isNodeCreation) {
             this.toolType = ToolType.CREATE_NODE;
             this.toolStateManager.setActiveTool(ToolType.CREATE_NODE);

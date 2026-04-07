@@ -5,7 +5,8 @@ import {
     GCompartment,
     GHorizontalDivider,
     EdgeLayoutMetadataUtil,
-    NodeLayoutMetadataUtil
+    NodeLayoutMetadataUtil,
+    parseIdentifier
 } from "@mdeo/language-shared";
 import type { ModelIdRegistry } from "@mdeo/language-shared";
 import type { NodeLayoutMetadata, EdgeLayoutMetadata } from "@mdeo/protocol-common";
@@ -282,9 +283,15 @@ export class ModelGModelFactory extends BaseGModelFactory<PartialModel> {
      * @returns The formatted string
      */
     private formatEnumValue(value: EnumValueType): string {
-        const enumName = value.enumRef?.$refText ?? "?";
-        const entryName = value.value?.$refText ?? "?";
-        return `${enumName}.${entryName}`;
+        const serializer = this.modelState.languageServices.AstSerializer;
+        const rawEnumName =
+            (value.enumRef?.ref as { name?: string } | undefined)?.name ??
+            parseIdentifier(value.enumRef?.$refText ?? "?");
+        const rawEntryName =
+            (value.value?.ref as { name?: string } | undefined)?.name ?? parseIdentifier(value.value?.$refText ?? "?");
+        const serializedEnumName = serializer.serializePrimitive({ value: rawEnumName }, ID);
+        const serializedEntryName = serializer.serializePrimitive({ value: rawEntryName }, ID);
+        return `${serializedEnumName}.${serializedEntryName}`;
     }
 
     /**

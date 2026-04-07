@@ -3,10 +3,8 @@ import { sharedImport } from "../../sharedImport.js";
 
 const { injectable } = sharedImport("inversify");
 const { DisposableCollection } = sharedImport("@eclipse-glsp/sprotty");
-const {
-    NodeCreationTool: GLSPNodeCreationTool,
-    NodeCreationToolMouseListener: GLSPNodeCreationToolMouseListener
-} = sharedImport("@eclipse-glsp/client");
+const { NodeCreationTool: GLSPNodeCreationTool, NodeCreationToolMouseListener: GLSPNodeCreationToolMouseListener } =
+    sharedImport("@eclipse-glsp/client");
 
 /**
  * Mouse listener subclass that treats a drag-release as equivalent to a plain click-release.

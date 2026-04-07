@@ -62,7 +62,7 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
      * @returns The generated ID
      */
     private getObjectInstanceName(node: PartialObjectInstance): string {
-        const objectName = node.name ?? "unnamed";
+        const objectName = ModelModelIdProvider.escapeIdPart(node.name ?? "unnamed");
         const className = this.resolveClassName(node.class);
         return `${className}_${objectName}`;
     }
@@ -98,8 +98,8 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
         }
 
         const obj = objectRef.ref as PartialObjectInstance;
-        const objectName = obj.name ?? "unnamed";
-        const property = linkEnd.property?.$refText ?? "";
+        const objectName = ModelModelIdProvider.escapeIdPart(obj.name ?? "unnamed");
+        const property = ModelModelIdProvider.escapeIdPart(linkEnd.property?.$refText ?? "");
 
         if (property) {
             return `${objectName}_${property}`;
@@ -131,7 +131,7 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
      * @returns The generated ID
      */
     private getPropertyAssignmentName(node: PartialPropertyAssignment): string {
-        const propName = node.name?.$refText ?? node.name?.ref?.name ?? "unnamed";
+        const propName = ModelModelIdProvider.escapeIdPart(node.name?.$refText ?? node.name?.ref?.name ?? "unnamed");
         const parent = node.$container;
 
         if (parent != undefined && this.reflection.isInstance(parent, ObjectInstance)) {
@@ -156,9 +156,9 @@ export class ModelModelIdProvider extends BaseModelIdProvider {
 
         const resolved = classRef.ref;
         if (resolved != undefined && "name" in resolved) {
-            return (resolved as { name?: string }).name ?? "unknown";
+            return ModelModelIdProvider.escapeIdPart((resolved as { name?: string }).name ?? "unknown");
         }
 
-        return classRef.$refText ?? "unknown";
+        return ModelModelIdProvider.escapeIdPart(classRef.$refText ?? "unknown");
     }
 }

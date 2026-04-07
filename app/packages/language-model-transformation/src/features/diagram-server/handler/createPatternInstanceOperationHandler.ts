@@ -1,6 +1,7 @@
 import {
     BaseCreateNodeOperationHandler,
     MetadataManager,
+    PlaceholderModelIdRegistry,
     resolveRelativePath,
     sharedImport,
     GCompartment,
@@ -14,15 +15,18 @@ import {
     PatternObjectInstance,
     PatternObjectInstanceReference,
     PatternObjectInstanceDelete,
+    PatternPropertyAssignment,
     MatchStatement,
     IfMatchStatement,
     WhileMatchStatement,
     UntilMatchStatement,
     ForMatchStatement,
     PatternModifier,
+    expressionTypes,
     type PatternObjectInstanceType,
     type PatternObjectInstanceReferenceType,
     type PatternObjectInstanceDeleteType,
+    type PatternPropertyAssignmentType,
     type PatternType,
     type ModelTransformationType,
     type PatternModifierType,
@@ -39,8 +43,31 @@ import { GPatternInstanceNode } from "../model/patternInstanceNode.js";
 import { GPatternInstanceNameLabel } from "../model/patternInstanceNameLabel.js";
 import { GPatternModifierTitleCompartment } from "../model/patternModifierTitleCompartment.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import { Class, type ClassType, getExportedEntitiesFromMetamodelFile } from "@mdeo/language-metamodel";
+import {
+    Class,
+    Enum,
+    EnumTypeReference,
+    PrimitiveType,
+    MetamodelPrimitiveTypes,
+    isMultipleMultiplicity,
+    isOptionalMultiplicity,
+    type ClassType,
+    type PropertyType,
+    getExportedEntitiesFromMetamodelFile
+} from "@mdeo/language-metamodel";
 import type { MetamodelFileImportType } from "../../../grammar/modelTransformationTypes.js";
+import type {
+    BaseExpressionType,
+    BooleanLiteralExpressionType,
+    DoubleLiteralExpressionType,
+    FloatLiteralExpressionType,
+    IntLiteralExpressionType,
+    ListExpressionType,
+    LongLiteralExpressionType,
+    MemberAccessExpressionType,
+    StringLiteralExpressionType
+} from "@mdeo/language-expression";
+import { ID } from "@mdeo/language-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { CreateNodeOperation: CreateNodeOperationKind, TriggerNodeCreationAction } =
@@ -157,7 +184,10 @@ export class CreatePatternInstanceOperationHandler
         const items: GroupedToolboxItem[] = [];
 
         for (const classInfo of classes) {
-            const ghostElement = this.createNewInstanceGhostElement(classInfo.name, this.modifierStringToKind(mode));
+            const ghostElement = await this.createNewInstanceGhostElement(
+                classInfo.name,
+                this.modifierStringToKind(mode)
+            );
             items.push({
                 item: {
                     id: `create-pattern-instance-${mode}-${classInfo.name}`,
@@ -213,6 +243,10 @@ export class CreatePatternInstanceOperationHandler
 
     /**
      * Creates a PatternObjectInstance AST node for a new instance.
+     *
+     * @param className The name of the class/type of the instance
+     * @param modifier The modifier kind (create, delete, require, forbid, or none) that determines the instance's modifier and default properties
+     * @returns A fully constructed `PatternObjectInstanceType` AST node with an unresolved class reference and default property values
      */
     private async createPatternObjectInstanceAst(
         className: string,
@@ -232,15 +266,168 @@ export class CreatePatternInstanceOperationHandler
                   }
                 : undefined;
 
+        const classType = this.getAvailableNonAbstractClasses().find((c) => c.name === className)?.classType;
+        const properties =
+            modifier === PatternModifierKind.CREATE && classType !== undefined
+                ? this.createDefaultPatternProperties(classType)
+                : [];
+
         const instance: PatternObjectInstanceType = {
             $type: PatternObjectInstance.name,
             modifier: modifierNode,
             name,
             class: { $refText: className, ref: undefined },
-            properties: []
+            properties
         };
 
         return instance;
+    }
+
+    /**
+     * Creates default property assignments for a new pattern instance based on the given class type.
+     *
+     * @param classType The class type of the new instance, used to determine which properties to include and their default values
+     * @returns An array of `PatternPropertyAssignmentType` nodes for all non-optional properties of the class and its superclasses, with default values where possible
+     */
+    private createDefaultPatternProperties(classType: ClassType): PatternPropertyAssignmentType[] {
+        const reflection = this.modelState.languageServices.shared.AstReflection;
+        const properties: PatternPropertyAssignmentType[] = [];
+        const allProperties = this.getAllClassProperties(classType);
+
+        for (const prop of allProperties) {
+            if (isOptionalMultiplicity(prop.multiplicity, reflection)) {
+                continue;
+            }
+
+            if (isMultipleMultiplicity(prop.multiplicity, reflection)) {
+                const expression: ListExpressionType = {
+                    $type: expressionTypes.listExpressionType.name,
+                    $cstNode: {
+                        text: "[]"
+                    } as any,
+                    elements: []
+                };
+                properties.push({
+                    $type: PatternPropertyAssignment.name,
+                    name: { $refText: prop.name ?? "", ref: prop },
+                    operator: "=",
+                    value: expression
+                });
+                continue;
+            } else {
+                const defaultValue = this.getDefaultExpressionForType(prop);
+                if (defaultValue != undefined) {
+                    properties.push({
+                        $type: PatternPropertyAssignment.name,
+                        name: { $refText: prop.name ?? "", ref: prop },
+                        operator: "=",
+                        value: defaultValue
+                    });
+                }
+            }
+        }
+
+        return properties;
+    }
+
+    /**
+     * Retrieves all properties of the given class type, including inherited properties from superclasses.
+     *
+     * @param classType The class type to retrieve properties for
+     * @returns An array of `PropertyType` objects representing all properties of the class and its superclasses
+     */
+    private getAllClassProperties(classType: ClassType): PropertyType[] {
+        const properties: PropertyType[] = [];
+        const visited = new Set<ClassType>();
+
+        const collectProperties = (cls: ClassType): void => {
+            if (visited.has(cls)) {
+                return;
+            }
+            visited.add(cls);
+            properties.push(...(cls.properties ?? []));
+            for (const extension of cls.extensions?.extensions ?? []) {
+                const parentClass = extension.class?.ref;
+                if (parentClass && this.reflection.isInstance(parentClass, Class)) {
+                    collectProperties(parentClass as ClassType);
+                }
+            }
+        };
+
+        collectProperties(classType);
+        return properties;
+    }
+
+    /**
+     * Retrieves the default expression for a given property type.
+     *
+     * @param property The property to retrieve the default expression for
+     * @returns A `BaseExpressionType` representing the default value, or `undefined` if no default is available
+     */
+    private getDefaultExpressionForType(property: PropertyType): BaseExpressionType | undefined {
+        const type = property.type;
+
+        if (this.reflection.isInstance(type, PrimitiveType)) {
+            switch (type.name) {
+                case MetamodelPrimitiveTypes.INT:
+                    return {
+                        $type: expressionTypes.intLiteralExpressionType.name,
+                        value: "0",
+                        $cstNode: { text: "0" } as any
+                    } as IntLiteralExpressionType;
+                case MetamodelPrimitiveTypes.LONG:
+                    return {
+                        $type: expressionTypes.longLiteralExpressionType.name,
+                        value: "0",
+                        $cstNode: { text: "0" } as any
+                    } as LongLiteralExpressionType;
+                case MetamodelPrimitiveTypes.FLOAT:
+                    return {
+                        $type: expressionTypes.floatLiteralExpressionType.name,
+                        value: "0",
+                        $cstNode: { text: "0" } as any
+                    } as FloatLiteralExpressionType;
+                case MetamodelPrimitiveTypes.DOUBLE:
+                    return {
+                        $type: expressionTypes.doubleLiteralExpressionType.name,
+                        value: "0",
+                        $cstNode: { text: "0" } as any
+                    } as DoubleLiteralExpressionType;
+                case MetamodelPrimitiveTypes.BOOLEAN:
+                    return {
+                        $type: expressionTypes.booleanLiteralExpressionType.name,
+                        value: false,
+                        $cstNode: { text: "false" } as any
+                    } as BooleanLiteralExpressionType;
+                case MetamodelPrimitiveTypes.STRING:
+                    return {
+                        $type: expressionTypes.stringLiteralExpressionType.name,
+                        value: "",
+                        $cstNode: { text: '""' } as any
+                    } as StringLiteralExpressionType;
+            }
+        } else if (this.reflection.isInstance(type, EnumTypeReference)) {
+            const enumType = type.enum?.ref;
+            if (!this.reflection.isInstance(enumType, Enum)) {
+                return undefined;
+            }
+            const firstEntry = enumType.entries?.[0]?.name;
+            if (firstEntry === undefined) {
+                return undefined;
+            }
+            const astSerializer = this.modelState.languageServices.AstSerializer;
+            return {
+                $type: expressionTypes.memberAccessExpressionType.name,
+                expression: { $type: expressionTypes.identifierExpressionType.name, name: enumType.name ?? "" },
+                member: firstEntry,
+                isNullChaining: false,
+                $cstNode: {
+                    text: `${astSerializer.serializePrimitive({ value: enumType.name }, ID)}.${astSerializer.serializePrimitive({ value: firstEntry }, ID)}`
+                } as any
+            } as MemberAccessExpressionType;
+        }
+
+        return undefined;
     }
 
     /**
@@ -428,18 +615,26 @@ export class CreatePatternInstanceOperationHandler
 
     /**
      * Creates a ghost element for dragging a new instance into a match node.
+     * For CREATE mode, the ghost includes the default properties of the class.
      *
      * @param className The class name used to derive the default instance name (`new<ClassName>`)
      * @param modifier The modifier kind applied to the new instance
      * @returns A `GhostElement` wrapping a preview `GPatternInstanceNode`
      */
-    private createNewInstanceGhostElement(className: string, modifier: PatternModifierKind): GhostElement {
+    private async createNewInstanceGhostElement(
+        className: string,
+        modifier: PatternModifierKind
+    ): Promise<GhostElement> {
         const nodeId = "__ghost_pattern_instance";
-        const instanceName =
-            modifier === PatternModifierKind.CREATE
-                ? `new${className}`
-                : `${className.charAt(0).toLowerCase()}${className.slice(1)}`;
-        return this.buildGhostElement(nodeId, instanceName, className, modifier);
+        const instance = await this.createPatternObjectInstanceAst(className, modifier);
+        const idRegistry = new PlaceholderModelIdRegistry(nodeId);
+        const template = this.gModelFactory.createPatternInstanceNode(
+            instance,
+            idRegistry.getId(instance),
+            this.metadataManager.getDefaultMetadata({ type: ModelTransformationElementType.NODE_PATTERN_INSTANCE }),
+            idRegistry
+        );
+        return { template, dynamic: true };
     }
 
     /**

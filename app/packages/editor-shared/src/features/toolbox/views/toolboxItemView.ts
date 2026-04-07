@@ -40,6 +40,7 @@ export function generateToolboxItemView(
             on: {
                 click: (event: Event) => {
                     event.preventDefault();
+                    context.showPreviewFor = undefined;
                     context.onPaletteItemClick(item);
                 },
                 mouseenter: () => {
@@ -177,6 +178,7 @@ function handlePaletteKeyDown(
         case " ":
             event.preventDefault();
             if (currentLocal >= 0 && currentLocal < totalItems) {
+                context.showPreviewFor = undefined;
                 context.onPaletteItemClick(items[currentLocal]);
             }
             break;
