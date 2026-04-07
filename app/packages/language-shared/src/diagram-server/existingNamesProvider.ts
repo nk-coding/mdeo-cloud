@@ -41,7 +41,7 @@ export class DefaultExistingNamesProvider implements ExistingNamesProvider {
 
     async getExistingNames(): Promise<Set<string>> {
         const document = this.modelState.sourceModel?.$document;
-        if (!document) {
+        if (document == undefined) {
             return new Set();
         }
         const exported =

@@ -11,7 +11,6 @@ import { ModelModelIdProvider } from "../modelModelIdProvider.js";
 
 const { injectable } = sharedImport("inversify");
 
-
 /**
  * Model-specific paste operation handler.
  *

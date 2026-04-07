@@ -5,7 +5,8 @@ import type {
     InstanceMultiBinding,
     LabelEditValidator,
     OperationHandlerConstructor,
-    ToolPaletteItemProvider
+    ToolPaletteItemProvider,
+    ActionHandlerConstructor
 } from "@eclipse-glsp/server";
 import type { BaseLayoutEngine, MetadataManager, ModelIdProvider } from "@mdeo/language-shared";
 import { BaseDiagramModule, sharedImport } from "@mdeo/language-shared";
@@ -27,6 +28,8 @@ import { ChangeLinkTypeOperationHandler } from "./handler/changeLinkTypeOperatio
 import { ChangePatternElementModifierOperationHandler } from "./handler/changePatternElementModifierOperationHandler.js";
 import { InsertControlFlowStatementOperationHandler } from "./handler/insertControlFlowStatementOperationHandler.js";
 import { ConvertMatchNodeOperationHandler } from "./handler/convertMatchNodeOperationHandler.js";
+import { ModelTransformationRequestClipboardDataActionHandler } from "./handler/modelTransformationRequestClipboardDataActionHandler.js";
+import { ModelTransformationPasteOperationHandler } from "./handler/modelTransformationPasteOperationHandler.js";
 import { ModelTransformationLabelEditValidator } from "./modelTransformationLabelEditValidator.js";
 import { ModelTransformationToolPaletteItemProvider } from "./modelTransformationToolPaletteItemProvider.js";
 import type { CreateEdgeSchemaResolver } from "@mdeo/language-shared";
@@ -77,6 +80,12 @@ export class ModelTransformationDiagramModule extends BaseDiagramModule {
         binding.add(ChangePatternElementModifierOperationHandler);
         binding.add(InsertControlFlowStatementOperationHandler);
         binding.add(ConvertMatchNodeOperationHandler);
+        binding.add(ModelTransformationPasteOperationHandler);
+    }
+
+    protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
+        super.configureActionHandlers(binding);
+        binding.add(ModelTransformationRequestClipboardDataActionHandler);
     }
 
     protected override bindLabelEditValidator(): BindingTarget<LabelEditValidator> {

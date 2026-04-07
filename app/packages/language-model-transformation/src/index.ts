@@ -11,7 +11,9 @@ export * from "./features/diagram-server/handler/createPatternLinkOperationHandl
 export * from "./features/diagram-server/handler/insertControlFlowStatementOperationHandler.js";
 export * from "./features/diagram-server/handler/modelTransformationApplyLabelEditOperationHandler.js";
 export * from "./features/diagram-server/handler/modelTransformationDeleteElementOperationHandler.js";
+export * from "./features/diagram-server/handler/modelTransformationPasteOperationHandler.js";
 export * from "./features/diagram-server/handler/modelTransformationReconnectEdgeOperationHandler.js";
+export * from "./features/diagram-server/handler/modelTransformationRequestClipboardDataActionHandler.js";
 export * from "./features/diagram-server/model/controlFlowEdge.js";
 export * from "./features/diagram-server/model/controlFlowLabel.js";
 export * from "./features/diagram-server/model/controlFlowLabelNode.js";
