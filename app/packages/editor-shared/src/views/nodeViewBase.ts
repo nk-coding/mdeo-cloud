@@ -6,6 +6,7 @@ import type { VNode } from "snabbdom";
 import { renderCreateEdgeEndpoint } from "./edgeView.js";
 import { isIssueMarker, ISSUE_MARKER_SIZE } from "../features/decoration/issueMarker.js";
 import type { GIssueMarker } from "../model/issueMarker.js";
+import { ToolStateManager } from "../features/tool-state/toolStateManager.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, ShapeView } = sharedImport("@eclipse-glsp/sprotty");
@@ -40,6 +41,12 @@ export abstract class GNodeViewBase extends ShapeView {
     static readonly INNER_POINT_SIZE = 8;
 
     @inject(EdgeEditHighlightState) protected highlightState!: EdgeEditHighlightState;
+
+    /**
+     * Tool state manager used to suppress the selection rectangle and resize handles
+     * while a creation tool is active, keeping the canvas visually clean.
+     */
+    @inject(ToolStateManager) protected toolStateManager!: ToolStateManager;
 
     /**
      * Configuration for all resize handles (edges and corners)
@@ -89,7 +96,7 @@ export abstract class GNodeViewBase extends ShapeView {
             result.push(...this.renderEdgeEditHighlightBorder(model));
         }
 
-        if (!model.selected) {
+        if (!model.selected || this.toolStateManager.isCreationMode()) {
             return result;
         }
 

@@ -11,6 +11,7 @@ import { EdgeRouter, type RouteComputationResult } from "../edge-routing/edgeRou
 import { GNode } from "../../model/node.js";
 import { GEdge } from "../../model/edge.js";
 import { GNodeViewBase } from "../../views/nodeViewBase.js";
+import { ToolStateManager } from "../tool-state/toolStateManager.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const {
@@ -126,6 +127,13 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
      */
     @inject(TYPES.ViewerOptions)
     private viewerOptions!: { baseDiv: string };
+
+    /**
+     * Tool state manager used to suppress the context rail while a creation
+     * tool (node or edge) is active, keeping the canvas visually clean.
+     */
+    @inject(ToolStateManager)
+    private toolStateManager!: ToolStateManager;
 
     /**
      * Cache mapping `"contextId:elementId"` keys to the corresponding item arrays
@@ -366,13 +374,18 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
 
     /**
      * Builds the root snabbdom VNode for all rail overlays in the diagram.
-     * Returns an empty `<div>` if the viewport is unavailable or if anything
-     * other than exactly one element is selected.
+     * Returns an empty `<div>` if the viewport is unavailable, if anything
+     * other than exactly one element is selected, or if a creation tool is
+     * currently active (to avoid visual clutter during element placement).
      *
      * @param root The current (potentially mid-animation) model root.
      * @returns A VNode that wraps zero or more positioned overlay divs.
      */
     private buildRailsVNode(root: Readonly<GModelRoot>): VNode {
+        if (this.toolStateManager.isCreationMode()) {
+            return html("div", null);
+        }
+
         const selection = [...root.index.all().filter((element) => isSelected(element))];
 
         const railOverlays: VNode[] = [];

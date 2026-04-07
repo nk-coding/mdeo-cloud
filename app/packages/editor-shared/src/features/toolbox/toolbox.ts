@@ -18,6 +18,7 @@ import { PreviewRenderer } from "./previewRenderer.js";
 import { LayoutAction } from "./layoutAction.js";
 import { CreateEdgeTool } from "../create-edge-tool/createEdgeTool.js";
 import { EditorSettingsManager } from "../editor-settings/editorSettingsManager.js";
+import { ToolStateManager } from "../tool-state/toolStateManager.js";
 import type { EditorSettings } from "@mdeo/editor-common";
 
 const { injectable, inject } = sharedImport("inversify");
@@ -49,6 +50,9 @@ export class Toolbox extends ToolPalette {
 
     @inject(EditorSettingsManager)
     declare protected editorSettings: EditorSettingsManager;
+
+    @inject(ToolStateManager)
+    protected toolStateManager!: ToolStateManager;
 
     protected currentVNode?: VNode;
     protected searchIndex?: MiniSearch<ToolboxEditEntry>;
@@ -252,10 +256,13 @@ export class Toolbox extends ToolPalette {
 
     /**
      * Changes the active tool back to pointer if it is not already, and updates the UI.
+     * Called by the GLSP framework when {@link EnableDefaultToolsAction} is dispatched,
+     * including after a node is created or the user cancels a creation gesture.
      */
     override changeActiveButton(): void {
         if (this.toolType !== ToolType.POINTER) {
             this.toolType = ToolType.POINTER;
+            this.toolStateManager.setActiveTool(ToolType.POINTER);
             this.update();
         }
     }
@@ -402,6 +409,7 @@ export class Toolbox extends ToolPalette {
         }
 
         this.toolType = tool;
+        this.toolStateManager.setActiveTool(tool);
 
         const action = this.getToolAction(tool);
         if (action) {
@@ -455,6 +463,15 @@ export class Toolbox extends ToolPalette {
     onPaletteItemClick(item: ToolboxEditEntry): void {
         if (this.editorContext.isReadonly) {
             return;
+        }
+
+        const isNodeCreation = item.paletteItem.actions.some(
+            (a) => a.kind === "triggerNodeCreation"
+        );
+        if (isNodeCreation) {
+            this.toolType = ToolType.CREATE_NODE;
+            this.toolStateManager.setActiveTool(ToolType.CREATE_NODE);
+            this.update();
         }
 
         this.actionDispatcher.dispatchAll(item.paletteItem.actions);

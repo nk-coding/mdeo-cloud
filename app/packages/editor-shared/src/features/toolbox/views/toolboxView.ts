@@ -1,7 +1,7 @@
 import type { VNode } from "snabbdom";
 import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
-import { ToolType } from "../toolboxTypes.js";
+import { ToolType, isCreationTool } from "../toolboxTypes.js";
 import { generateToolbarView } from "./toolbarView.js";
 import { generateDetailsPanelView } from "./detailsPanelView.js";
 import { generateErrorView } from "./errorView.js";
@@ -77,7 +77,7 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 }
             },
             generateToolbarView(context),
-            hasItems && context.toolType !== ToolType.HAND && context.toolType !== ToolType.MARQUEE
+            hasItems && context.toolType !== ToolType.HAND && context.toolType !== ToolType.MARQUEE && !isCreationTool(context.toolType)
                 ? generateDetailsPanelView(context)
                 : undefined,
             generateErrorView(context)

@@ -9,6 +9,7 @@ export enum ToolType {
     HAND = "hand",
     MARQUEE = "marquee",
     CREATE_EDGE = "create-edge",
+    CREATE_NODE = "create-node",
     LAYOUT = "layout",
     BOTTOM_PANEL_TOGGLE = "bottom-panel-toggle"
 }
@@ -22,6 +23,18 @@ export enum ToolType {
  */
 export function isRegularInteractionTool(toolType: ToolType): boolean {
     return toolType === ToolType.POINTER;
+}
+
+/**
+ * Checks if the given tool type is an element creation tool (node or edge).
+ * While a creation tool is active the UI suppresses contextual overlays
+ * (context rail, selection highlight) and the toolbox bottom panel.
+ *
+ * @param toolType The tool type to check
+ * @returns `true` when the user is in node- or edge-creation mode
+ */
+export function isCreationTool(toolType: ToolType): boolean {
+    return toolType === ToolType.CREATE_NODE || toolType === ToolType.CREATE_EDGE;
 }
 
 /**

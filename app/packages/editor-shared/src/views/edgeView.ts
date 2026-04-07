@@ -7,6 +7,7 @@ import type { AnchorSide } from "@mdeo/protocol-common";
 import { findViewportZoom } from "../base/findViewportZoom.js";
 import type { ContextActionRailOrientation } from "../features/context-actions/contextActions.js";
 import { isIssueMarker, ISSUE_MARKER_SIZE } from "../features/decoration/issueMarker.js";
+import { ToolStateManager } from "../features/tool-state/toolStateManager.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { svg, Point: PointUtil } = sharedImport("@eclipse-glsp/sprotty");
@@ -117,6 +118,12 @@ export abstract class GEdgeView implements IView {
     @inject(EdgeRouter) protected edgeRouter!: EdgeRouter;
 
     /**
+     * Tool state manager used to suppress the reconnect handles while a creation
+     * tool is active, keeping the canvas visually clean.
+     */
+    @inject(ToolStateManager) protected toolStateManager!: ToolStateManager;
+
+    /**
      * Distance from the edge line to the first attachment (in pixels)
      */
     protected attachmentDistanceToLine = 2;
@@ -188,7 +195,7 @@ export abstract class GEdgeView implements IView {
         const targetElementOffset = targetMarkerData?.elementOffset ?? 0;
         children.push(...this.renderAttachments(attachments, routeResult, sourceElementOffset, targetElementOffset));
 
-        if (isSelected(model) && route.length >= 2) {
+        if (isSelected(model) && route.length >= 2 && !this.toolStateManager.isCreationMode()) {
             children.push(...this.renderReconnectHandles(model, route));
         }
 

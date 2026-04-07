@@ -3,7 +3,7 @@ import { sharedImport } from "../../../sharedImport.js";
 import type { Toolbox } from "../toolbox.js";
 import { toolboxTools } from "../tools.js";
 import type { ToolDefinition } from "../toolboxTypes.js";
-import { ToolType } from "../toolboxTypes.js";
+import { ToolType, isCreationTool } from "../toolboxTypes.js";
 import { iconButtonClasses } from "./styles.js";
 
 const { html } = sharedImport("@eclipse-glsp/sprotty");
@@ -56,7 +56,10 @@ function generateToolButton(context: Toolbox, tool: ToolDefinition): VNode {
 
     const isDisabled =
         (tool.id === ToolType.BOTTOM_PANEL_TOGGLE &&
-            (!hasItems || context.toolType === ToolType.HAND || context.toolType === ToolType.MARQUEE)) ||
+            (!hasItems ||
+                context.toolType === ToolType.HAND ||
+                context.toolType === ToolType.MARQUEE ||
+                isCreationTool(context.toolType))) ||
         (tool.id === ToolType.CREATE_EDGE && context.isLayoutable);
     const isInteractable = context.isOpen && !isDisabled;
 
