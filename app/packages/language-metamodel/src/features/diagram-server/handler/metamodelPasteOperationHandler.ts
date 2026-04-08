@@ -1,13 +1,19 @@
 import type { PasteOperation } from "@eclipse-glsp/protocol";
 import type { Point } from "@eclipse-glsp/protocol";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import { BasePasteOperationHandler, sharedImport, type PasteInsertionResult } from "@mdeo/language-shared";
+import {
+    BasePasteOperationHandler,
+    sharedImport,
+    computeInsertionMetadata,
+    type PasteInsertionResult,
+    type InsertedElementMetadata,
+    type InsertSpecification
+} from "@mdeo/language-shared";
 import type { SerializedClipboardNode } from "@mdeo/language-shared";
-import type { MetadataEdits } from "@mdeo/language-shared";
 import type { ClipboardEdgeMetadata } from "@mdeo/language-shared";
+import type { AstNode } from "langium";
 import { MetamodelElementType } from "@mdeo/protocol-metamodel";
-import { Class, Enum } from "../../../grammar/metamodelTypes.js";
-import { MetamodelModelIdProvider } from "../metamodelModelIdProvider.js";
+import { Association, Class, Enum, type ClassType } from "../../../grammar/metamodelTypes.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -51,74 +57,127 @@ export class MetamodelPasteOperationHandler extends BasePasteOperationHandler {
         const isEmpty = document?.textDocument.getText().trim().length === 0;
 
         const edits: WorkspaceEdit[] = [];
-        const metadataNodes: Record<string, { type: string; meta: object }> = {};
 
         for (let i = 0; i < astNodeLikes.length; i++) {
             const nodeLike = astNodeLikes[i];
             const serialized = await this.serializeNode(nodeLike as any);
             const edit = await this.createInsertAfterNodeEdit(rootCstNode, serialized, !isEmpty || edits.length > 0);
             edits.push(edit);
-
-            // Build metadata edit for nodes that have a target position.
-            const name = nodeLike.name as string | undefined;
-            if (name) {
-                const position = offsetPositions.get(name);
-                if (position) {
-                    const $type = serializedNodes[i].$type;
-                    const elementId = `${$type}_${MetamodelModelIdProvider.escapeIdPart(name)}`;
-                    const elementType =
-                        $type === Class.name
-                            ? MetamodelElementType.NODE_CLASS
-                            : $type === Enum.name
-                              ? MetamodelElementType.NODE_ENUM
-                              : undefined;
-                    if (elementType) {
-                        metadataNodes[elementId] = { type: elementType, meta: { position } };
-                    }
-                }
-            }
         }
 
         if (edits.length === 0) {
             return undefined;
         }
 
-        // Build edge metadata edits for pasted associations.
-        // offsetEdgeData entries already carry post-rename class names and offset routing points.
-        const metadataEdges: Record<string, { type: string; from: string; to: string; meta: object }> = {};
-        for (const edgeEntry of offsetEdgeData) {
-            const srcEscaped = MetamodelModelIdProvider.escapeIdPart(edgeEntry.sourceClass);
-            const tgtEscaped = MetamodelModelIdProvider.escapeIdPart(edgeEntry.targetClass);
-            const srcPropEscaped = MetamodelModelIdProvider.escapeIdPart(edgeEntry.sourceProperty);
-            const tgtPropEscaped = MetamodelModelIdProvider.escapeIdPart(edgeEntry.targetProperty);
-            const edgeId = `Association_${srcEscaped}_${srcPropEscaped}_${tgtEscaped}_${tgtPropEscaped}`;
-            const fromId = `Class_${srcEscaped}`;
-            const toId = `Class_${tgtEscaped}`;
-            metadataEdges[edgeId] = {
-                type: MetamodelElementType.EDGE_ASSOCIATION,
-                from: fromId,
-                to: toId,
-                meta: {
-                    routingPoints: edgeEntry.routingPoints,
-                    ...(edgeEntry.sourceAnchor ? { sourceAnchor: edgeEntry.sourceAnchor } : {}),
-                    ...(edgeEntry.targetAnchor ? { targetAnchor: edgeEntry.targetAnchor } : {})
-                }
-            };
-        }
+        const sourceModel = this.modelState.sourceModel!;
+        const insertSpecs: InsertSpecification[] = [
+            {
+                container: sourceModel,
+                property: "elements",
+                elements: astNodeLikes.map((n) => n as unknown as AstNode)
+            }
+        ];
 
-        const hasNodeEdits = Object.keys(metadataNodes).length > 0;
-        const hasEdgeEdits = Object.keys(metadataEdges).length > 0;
-        const metadataEdits: MetadataEdits | undefined =
-            hasNodeEdits || hasEdgeEdits
-                ? {
-                      nodes: hasNodeEdits ? metadataNodes : undefined,
-                      edges: hasEdgeEdits ? metadataEdges : undefined
-                  }
-                : undefined;
+        const insertedElements: InsertedElementMetadata[] = [];
+        for (let i = 0; i < astNodeLikes.length; i++) {
+            const nodeLike = astNodeLikes[i];
+            const $type = serializedNodes[i].$type;
+            if ($type === Class.name || $type === Enum.name) {
+                const name = nodeLike.name as string | undefined;
+                const position = name ? offsetPositions.get(name) : undefined;
+                const elementType =
+                    $type === Class.name ? MetamodelElementType.NODE_CLASS : MetamodelElementType.NODE_ENUM;
+                if (position) {
+                    insertedElements.push({
+                        element: nodeLike as unknown as AstNode,
+                        node: { type: elementType, meta: { position } }
+                    });
+                }
+            } else if ($type === Association.name) {
+                const edgeEntry = this.findMatchingEdgeEntry(nodeLike, offsetEdgeData);
+                if (edgeEntry) {
+                    const srcClassNode = this.resolveClassByName(edgeEntry.sourceClass, astNodeLikes, sourceModel);
+                    const tgtClassNode = this.resolveClassByName(edgeEntry.targetClass, astNodeLikes, sourceModel);
+                    if (srcClassNode && tgtClassNode) {
+                        insertedElements.push({
+                            element: nodeLike as unknown as AstNode,
+                            edge: {
+                                type: MetamodelElementType.EDGE_ASSOCIATION,
+                                from: srcClassNode,
+                                to: tgtClassNode,
+                                meta: {
+                                    routingPoints: edgeEntry.routingPoints,
+                                    ...(edgeEntry.sourceAnchor ? { sourceAnchor: edgeEntry.sourceAnchor } : {}),
+                                    ...(edgeEntry.targetAnchor ? { targetAnchor: edgeEntry.targetAnchor } : {})
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
 
         return {
             workspaceEdit: this.mergeWorkspaceEdits(edits),
-            metadataEdits
+            metadataEdits: computeInsertionMetadata(
+                sourceModel,
+                this.idProvider,
+                insertSpecs,
+                insertedElements,
+                this.modelState.metadata
+            )
         };
+    }
+
+    /**
+     * Finds the {@link ClipboardEdgeMetadata} entry that corresponds to a pasted
+     * association node-like by matching source and target class names and property names.
+     *
+     * @param associationLike The deserialized association node-like object.
+     * @param edgeData The list of clipboard edge metadata entries.
+     * @returns The matching entry, or `undefined` if none is found.
+     */
+    private findMatchingEdgeEntry(
+        associationLike: Record<string, unknown>,
+        edgeData: ClipboardEdgeMetadata[]
+    ): ClipboardEdgeMetadata | undefined {
+        const src = associationLike.source as Record<string, unknown> | undefined;
+        const tgt = associationLike.target as Record<string, unknown> | undefined;
+        const srcClass = (src?.class as { $refText?: string } | undefined)?.$refText;
+        const tgtClass = (tgt?.class as { $refText?: string } | undefined)?.$refText;
+        const srcProp = src?.name as string | undefined;
+        const tgtProp = tgt?.name as string | undefined;
+        return edgeData.find(
+            (e) =>
+                e.sourceClass === srcClass &&
+                e.targetClass === tgtClass &&
+                e.sourceProperty === srcProp &&
+                e.targetProperty === tgtProp
+        );
+    }
+
+    /**
+     * Resolves a class AstNode by name, checking first among the node-likes being pasted
+     * (for co-pasted classes), then in the existing source model elements.
+     *
+     * @param className The class name to find.
+     * @param pastedNodeLikes The node-like objects being co-pasted in the same operation.
+     * @param sourceModel The current model root.
+     * @returns The matching {@link ClassType} AstNode, or `undefined` if not found.
+     */
+    private resolveClassByName(
+        className: string,
+        pastedNodeLikes: Record<string, unknown>[],
+        sourceModel: AstNode
+    ): ClassType | undefined {
+        const pasted = pastedNodeLikes.find((n) => n.$type === Class.name && n.name === className);
+        if (pasted) {
+            return pasted as unknown as ClassType;
+        }
+        const elements = (sourceModel as unknown as Record<string, unknown>).elements as AstNode[] | undefined;
+        return elements?.find((e: unknown) => {
+            const r = e as Record<string, unknown>;
+            return r.$type === Class.name && r.name === className;
+        }) as ClassType | undefined;
     }
 }

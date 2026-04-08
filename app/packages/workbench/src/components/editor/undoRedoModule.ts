@@ -1,5 +1,4 @@
 import { ContainerModule } from "inversify";
-import type { PluginContext } from "@mdeo/editor-common";
 import type * as monacoType from "monaco-editor";
 import { RemoteUndoAction, RemoteRedoAction } from "@mdeo/protocol-common";
 import { onAction } from "@eclipse-glsp/client";
@@ -18,12 +17,7 @@ import { onAction } from "@eclipse-glsp/client";
  *   which Monaco editor should receive the undo/redo command.
  * @returns A container module that registers the undo/redo action handlers.
  */
-export function createUndoRedoModule(
-    monaco: typeof monacoType,
-    fileUri: string
-): ContainerModule {
-
-
+export function createUndoRedoModule(monaco: typeof monacoType, fileUri: string): ContainerModule {
     return new ContainerModule((bind, _unbind, isBound) => {
         const context = { bind, isBound };
 

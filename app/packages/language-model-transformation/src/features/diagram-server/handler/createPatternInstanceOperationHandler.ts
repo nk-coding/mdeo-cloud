@@ -4,13 +4,13 @@ import {
     PlaceholderModelIdRegistry,
     resolveRelativePath,
     sharedImport,
-    GCompartment,
     type CreateNodeResult,
     type GroupedToolboxItem,
     type ToolboxItemProvider
 } from "@mdeo/language-shared";
 import type { CreateNodeOperation, GhostElement, Args } from "@eclipse-glsp/protocol";
 import type { AstNode, CompositeCstNode } from "langium";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 import {
     PatternObjectInstance,
     PatternObjectInstanceReference,
@@ -39,9 +39,6 @@ import {
 import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import type { ModelTransformationMetadataManager } from "../modelTransformationMetadataManager.js";
 import type { ModelTransformationGModelFactory } from "../modelTransformationGModelFactory.js";
-import { GPatternInstanceNode } from "../model/patternInstanceNode.js";
-import { GPatternInstanceNameLabel } from "../model/patternInstanceNameLabel.js";
-import { GPatternModifierTitleCompartment } from "../model/patternModifierTitleCompartment.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import {
     Class,
@@ -128,29 +125,17 @@ export class CreatePatternInstanceOperationHandler
         const modifier = operation.args?.modifier as string | undefined;
 
         let workspaceEdit: WorkspaceEdit;
-        let nodeId: string;
+        let insertedNode: AstNode;
 
         if (actionType === "add-instance" && instanceName) {
-            const patternElementId = this.index.getElementId(pattern);
-            const patternName =
-                patternElementId != undefined && patternElementId.startsWith("Pattern_")
-                    ? patternElementId.slice("Pattern_".length)
-                    : undefined;
-
             if (modifier === "delete") {
                 const deleteNode = this.createDeleteAst(instanceName);
                 workspaceEdit = await this.insertIntoPattern(pattern, deleteNode);
-                nodeId =
-                    patternName != undefined
-                        ? `${PatternObjectInstanceDelete.name}_${patternName}_ref_${instanceName}`
-                        : `${PatternObjectInstanceDelete.name}_${instanceName}`;
+                insertedNode = deleteNode;
             } else {
                 const refNode = this.createReferenceAst(instanceName);
                 workspaceEdit = await this.insertIntoPattern(pattern, refNode);
-                nodeId =
-                    patternName != undefined
-                        ? `${PatternObjectInstanceReference.name}_${patternName}_ref_${instanceName}`
-                        : `${PatternObjectInstanceReference.name}_${instanceName}`;
+                insertedNode = refNode;
             }
         } else {
             const className = operation.args?.className as string | undefined;
@@ -160,13 +145,29 @@ export class CreatePatternInstanceOperationHandler
             const modifierKind = this.modifierStringToKind(modifier);
             const newInstance = await this.createPatternObjectInstanceAst(className, modifierKind);
             workspaceEdit = await this.insertIntoPattern(pattern, newInstance);
-            nodeId = `${PatternObjectInstance.name}_${newInstance.name}`;
+            insertedNode = newInstance;
+        }
+
+        const metadata: NodeLayoutMetadata = {};
+        if (operation.location) {
+            metadata.position = operation.location;
         }
 
         return {
-            nodeId,
-            nodeType: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
-            workspaceEdit
+            workspaceEdit,
+            insertSpecifications: [
+                {
+                    container: pattern,
+                    property: "elements",
+                    elements: [insertedNode]
+                }
+            ],
+            insertedElements: [
+                {
+                    element: insertedNode,
+                    node: { type: ModelTransformationElementType.NODE_PATTERN_INSTANCE, meta: metadata }
+                }
+            ]
         };
     }
 
@@ -212,7 +213,9 @@ export class CreatePatternInstanceOperationHandler
             const isDeleteMode = mode === "delete";
             for (const instance of existingInstances) {
                 const name = instance.name;
-                if (!name) continue;
+                if (name == undefined) {
+                    continue;
+                }
 
                 const addModifierKind = isDeleteMode ? PatternModifierKind.DELETE : PatternModifierKind.NONE;
                 const ghostElement = this.createAddInstanceGhostElement(name, addModifierKind);
@@ -646,66 +649,15 @@ export class CreatePatternInstanceOperationHandler
      */
     private createAddInstanceGhostElement(instanceName: string, modifier: PatternModifierKind): GhostElement {
         const nodeId = "__ghost_add_instance";
-        return this.buildGhostElement(nodeId, instanceName, undefined, modifier);
-    }
-
-    /**
-     * Builds a `GPatternInstanceNode` ghost element suitable for drag-and-drop preview.
-     * If `modifier` is not NONE, a modifier compartment is used as the header;
-     * otherwise a standard header compartment is used.
-     *
-     * @param nodeId A stable placeholder ID for the ghost node (e.g. `__ghost_pattern_instance`)
-     * @param name The instance name shown in the label
-     * @param typeName The optional class/type name appended after ` : ` in the label
-     * @param modifier The modifier kind that determines the visual appearance of the ghost
-     * @returns A dynamic `GhostElement` whose template is the constructed pattern instance node
-     */
-    private buildGhostElement(
-        nodeId: string,
-        name: string,
-        typeName: string | undefined,
-        modifier: PatternModifierKind
-    ): GhostElement {
-        const defaultMeta = this.metadataManager.getDefaultMetadata({
+        const idRegistry = new PlaceholderModelIdRegistry(nodeId);
+        const metadata = this.metadataManager.getDefaultMetadata({
             type: ModelTransformationElementType.NODE_PATTERN_INSTANCE
         });
-        const node = GPatternInstanceNode.builder().id(nodeId).name(name).modifier(modifier).meta(defaultMeta).build();
-
-        if (typeName !== undefined) {
-            node.typeName = typeName;
-        }
-
-        if (modifier !== PatternModifierKind.NONE) {
-            const modifierCompartment = GPatternModifierTitleCompartment.builder()
-                .id(`${nodeId}#modifier-title`)
-                .build();
-            const labelText = typeName !== undefined ? `${name} : ${typeName}` : name;
-            const label = GPatternInstanceNameLabel.builder()
-                .id(`${nodeId}#name`)
-                .text(labelText)
-                .readonly(true)
-                .build();
-            modifierCompartment.children.push(label);
-            node.children.push(modifierCompartment);
-        } else {
-            const compartment = GCompartment.builder()
-                .type(ModelTransformationElementType.COMPARTMENT)
-                .id(`${nodeId}#header`)
-                .build();
-            const labelText = typeName !== undefined ? `${name} : ${typeName}` : name;
-            const label = GPatternInstanceNameLabel.builder()
-                .id(`${nodeId}#name`)
-                .text(labelText)
-                .readonly(true)
-                .build();
-            compartment.children.push(label);
-            node.children.push(compartment);
-        }
-
-        return {
-            template: node,
-            dynamic: true
-        };
+        const template =
+            modifier === PatternModifierKind.DELETE
+                ? this.gModelFactory.createDeleteInstanceNode(instanceName, nodeId, metadata)
+                : this.gModelFactory.createReferenceInstanceNode(instanceName, nodeId, metadata, idRegistry);
+        return { template, dynamic: true };
     }
 
     /**

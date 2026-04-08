@@ -9,6 +9,7 @@ import {
     type ToolboxItemProvider
 } from "@mdeo/language-shared";
 import type { CreateNodeOperation, GhostElement } from "@eclipse-glsp/protocol";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 import {
     EnumValue,
     ListValue,
@@ -78,13 +79,27 @@ export class CreateObjectOperationHandler extends BaseCreateNodeOperationHandler
             const classType = classes.find((cls) => cls.name === className)?.classType;
             const node = await this.createObjectAst(className, classType);
             const edit = await this.createObjectNode(node);
-            const typeName = node.class?.$refText ?? "Unknown";
-            const nodeId = `${ObjectInstance.name}_${typeName}_${node.name}`;
+
+            const metadata: NodeLayoutMetadata = {};
+            if (operation.location) {
+                metadata.position = operation.location;
+            }
 
             return {
-                nodeId,
-                nodeType: ModelElementType.NODE_OBJECT,
-                workspaceEdit: edit
+                workspaceEdit: edit,
+                insertSpecifications: [
+                    {
+                        container: this.modelState.sourceModel!,
+                        property: "objects",
+                        elements: [node]
+                    }
+                ],
+                insertedElements: [
+                    {
+                        element: node,
+                        node: { type: ModelElementType.NODE_OBJECT, meta: metadata }
+                    }
+                ]
             };
         }
         return undefined;

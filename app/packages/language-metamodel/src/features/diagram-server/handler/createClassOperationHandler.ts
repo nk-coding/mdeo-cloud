@@ -12,6 +12,7 @@ import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
 import type { MetamodelMetadataManager } from "../metamodelMetadataManager.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { CreateNodeOperation: CreateNodeOperationKind, TriggerNodeCreationAction } =
@@ -40,11 +41,27 @@ export class CreateClassOperationHandler extends BaseCreateNodeOperationHandler 
         if (operation.elementTypeId === "node:class") {
             const node = await this.createClassAst(operation.args?.includeProperty === true);
             const edit = await this.createClassNode(node);
-            const nodeId = `${Class.name}_${node.name}`;
+
+            const metadata: NodeLayoutMetadata = {};
+            if (operation.location) {
+                metadata.position = operation.location;
+            }
+
             return {
-                nodeId,
-                nodeType: MetamodelElementType.NODE_CLASS,
-                workspaceEdit: edit
+                workspaceEdit: edit,
+                insertSpecifications: [
+                    {
+                        container: this.modelState.sourceModel!,
+                        property: "elements",
+                        elements: [node]
+                    }
+                ],
+                insertedElements: [
+                    {
+                        element: node,
+                        node: { type: MetamodelElementType.NODE_CLASS, meta: metadata }
+                    }
+                ]
             };
         }
         return undefined;

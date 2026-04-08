@@ -18,6 +18,8 @@ import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { MetadataEdits } from "./operationHandlerCommand.js";
 import { sharedImport } from "../../sharedImport.js";
 import { ExistingNamesProvider } from "../existingNamesProvider.js";
+import type { ModelIdProvider } from "../modelIdProvider.js";
+import { ModelIdProvider as ModelIdProviderKey } from "../modelIdProvider.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { PasteOperation: PasteOperationKind } = sharedImport("@eclipse-glsp/protocol");
@@ -43,6 +45,9 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
 
     @inject(ExistingNamesProvider)
     protected existingNamesProvider!: ExistingNamesProvider;
+
+    @inject(ModelIdProviderKey)
+    protected idProvider!: ModelIdProvider;
 
     /**
      * Creates a command for the paste operation by deserializing the clipboard

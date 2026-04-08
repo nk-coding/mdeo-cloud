@@ -1,6 +1,7 @@
 import type { GNode, ModelState, GModelIndex } from "@mdeo/language-shared";
 import { BaseCreateEdgeOperationHandler, sharedImport, type CreateEdgeResult } from "@mdeo/language-shared";
 import type { CreateEdgeOperation } from "@mdeo/protocol-common";
+import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
 import type { PartialObjectInstance } from "../../../grammar/modelPartialTypes.js";
 import { ObjectInstance, Link, LinkEnd } from "../../../grammar/modelTypes.js";
 import type { LinkType, LinkEndType } from "../../../grammar/modelTypes.js";
@@ -95,12 +96,31 @@ export class CreateLinkOperationHandler extends BaseCreateEdgeOperationHandler {
         const linkText = await this.serializeNode(linkNode);
         const workspaceEdit = await this.createInsertAfterNodeEdit(rootCstNode, linkText, !isEmpty);
 
-        const edgeId = this.computeLinkId(sourceObject, targetObject, sourceProperty, targetProperty);
-
         return {
-            edgeId,
             edgeType: ModelElementType.EDGE_LINK,
-            workspaceEdit
+            workspaceEdit,
+            insertSpecifications: [
+                {
+                    container: this.modelState.sourceModel!,
+                    property: "links",
+                    elements: [linkNode]
+                }
+            ],
+            insertedElements: [
+                {
+                    element: linkNode,
+                    edge: {
+                        type: ModelElementType.EDGE_LINK,
+                        from: sourceObject as AstNode,
+                        to: targetObject as AstNode,
+                        meta: {
+                            routingPoints: operation.routingPoints ?? [],
+                            sourceAnchor: operation.sourceAnchor,
+                            targetAnchor: operation.targetAnchor
+                        } satisfies EdgeLayoutMetadata
+                    }
+                }
+            ]
         };
     }
 
@@ -119,30 +139,5 @@ export class CreateLinkOperationHandler extends BaseCreateEdgeOperationHandler {
             return undefined;
         }
         return astNode as PartialObjectInstance;
-    }
-
-    /**
-     * Computes link IDs compatible with ModelModelIdProvider logic.
-     * Format: Link_{objectName}[_{property}]--{objectName}[_{property}]
-     *
-     * @param sourceObject The source object instance
-     * @param targetObject The target object instance
-     * @param sourceProperty Optional disambiguated source-end property
-     * @param targetProperty Optional disambiguated target-end property
-     * @returns A stable link identifier compatible with server-side id provider logic
-     */
-    protected computeLinkId(
-        sourceObject: PartialObjectInstance,
-        targetObject: PartialObjectInstance,
-        sourceProperty: string | undefined,
-        targetProperty: string | undefined
-    ): string {
-        const sourceName = sourceObject.name ?? "unnamed";
-        const targetName = targetObject.name ?? "unnamed";
-
-        const sourceEnd = sourceProperty ? `${sourceName}_${sourceProperty}` : sourceName;
-        const targetEnd = targetProperty ? `${targetName}_${targetProperty}` : targetName;
-
-        return `${Link.name}_${sourceEnd}--${targetEnd}`;
     }
 }

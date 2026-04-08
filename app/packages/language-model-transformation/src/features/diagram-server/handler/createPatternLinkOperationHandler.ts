@@ -3,8 +3,6 @@ import {
     BaseCreateEdgeOperationHandler,
     sharedImport,
     DefaultModelIdRegistry,
-    ModelIdProvider as ModelIdProviderKey,
-    type ModelIdProvider,
     type ModelIdRegistry
 } from "@mdeo/language-shared";
 import type { CreateEdgeOperation } from "@mdeo/protocol-common";
@@ -30,6 +28,8 @@ import type { ClassType } from "@mdeo/language-metamodel";
 import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { GPatternInstanceNode } from "../model/patternInstanceNode.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
+
+import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -91,9 +91,6 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
     @inject(GModelIndexKey)
     protected readonly localIndex!: GModelIndex;
 
-    @inject(ModelIdProviderKey)
-    protected readonly idProvider!: ModelIdProvider;
-
     /**
      * Creates a new pattern link between two pattern instance nodes.
      *
@@ -116,6 +113,12 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
         }
 
         if (!(sourceElement instanceof GPatternInstanceNode) || !(targetElement instanceof GPatternInstanceNode)) {
+            return undefined;
+        }
+
+        const sourceAstNode = this.localIndex.getAstNode(sourceElement) as AstNode | undefined;
+        const targetAstNode = this.localIndex.getAstNode(targetElement) as AstNode | undefined;
+        if (!sourceAstNode || !targetAstNode) {
             return undefined;
         }
 
@@ -175,12 +178,31 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
         const linkText = await this.serializeNode(linkNode);
         const workspaceEdit = this.insertLinkIntoPattern(sourceInfo.pattern, linkText);
 
-        const edgeId = this.computePatternLinkId(sourceInfo.name, targetInfo.name, sourceProperty, targetProperty);
-
         return {
-            edgeId,
             edgeType: ModelTransformationElementType.EDGE_PATTERN_LINK,
-            workspaceEdit
+            workspaceEdit,
+            insertSpecifications: [
+                {
+                    container: sourceInfo.pattern,
+                    property: "elements",
+                    elements: [linkNode]
+                }
+            ],
+            insertedElements: [
+                {
+                    element: linkNode,
+                    edge: {
+                        type: ModelTransformationElementType.EDGE_PATTERN_LINK,
+                        from: sourceAstNode,
+                        to: targetAstNode,
+                        meta: {
+                            routingPoints: operation.routingPoints ?? [],
+                            sourceAnchor: operation.sourceAnchor,
+                            targetAnchor: operation.targetAnchor
+                        } satisfies EdgeLayoutMetadata
+                    }
+                }
+            ]
         };
     }
 
@@ -267,29 +289,6 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
         const closeBrace = content[content.length - 1]!;
         const hasContent = (pattern.elements?.length ?? 0) > 0;
         return this.insertIntoScope(openBrace, closeBrace, hasContent, text);
-    }
-
-    /**
-     * Computes the pattern link edge ID in the same format as the ID provider.
-     *
-     * The ID follows the schema `PatternLink_<sourceEnd>--<targetEnd>`, where each end
-     * is formatted as `<instanceName>[_<property>]`.
-     *
-     * @param sourceName The name of the source pattern object instance
-     * @param targetName The name of the target pattern object instance
-     * @param sourceProperty Optional source-side property name
-     * @param targetProperty Optional target-side property name
-     * @returns The stable edge ID compatible with the server ID provider
-     */
-    private computePatternLinkId(
-        sourceName: string,
-        targetName: string,
-        sourceProperty: string | undefined,
-        targetProperty: string | undefined
-    ): string {
-        const sourceEnd = sourceProperty ? `${sourceName}_${sourceProperty}` : sourceName;
-        const targetEnd = targetProperty ? `${targetName}_${targetProperty}` : targetName;
-        return `${PatternLink.name}_${sourceEnd}--${targetEnd}`;
     }
 
     /**

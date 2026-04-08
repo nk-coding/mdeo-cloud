@@ -17,6 +17,8 @@ import {
     PatternVariable,
     type ModelTransformationType,
     type PatternObjectInstanceType,
+    type PatternObjectInstanceReferenceType,
+    type PatternObjectInstanceDeleteType,
     type PatternLinkType,
     type PatternType,
     type TransformationStatementType,
@@ -46,6 +48,8 @@ interface NamedElement {
 interface ModelTransformationAstTypes {
     ModelTransformation: ModelTransformationType;
     PatternObjectInstance: PatternObjectInstanceType;
+    PatternObjectInstanceReference: PatternObjectInstanceReferenceType;
+    PatternObjectDelete: PatternObjectInstanceDeleteType;
     PatternLink: PatternLinkType;
     StatementsScope: StatementsScopeType;
 }
@@ -62,6 +66,8 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
     const checks: ValidationChecks<ModelTransformationAstTypes> = {
         ModelTransformation: validator.validateTransformation.bind(validator),
         PatternObjectInstance: validator.validateObjectInstance.bind(validator),
+        PatternObjectInstanceReference: validator.validateObjectInstanceReference.bind(validator),
+        PatternObjectDelete: validator.validateObjectInstanceDelete.bind(validator),
         PatternLink: validator.validateLink.bind(validator),
         StatementsScope: validator.validateStatementsScopeDeadCode.bind(validator)
     };
@@ -431,6 +437,91 @@ export class ModelTransformationValidator extends BaseModelValidator {
     }
 
     /**
+     * Validates a pattern object instance reference.
+     *
+     * @param ref The pattern object instance reference to validate
+     * @param accept The validation acceptor
+     */
+    validateObjectInstanceReference(ref: PatternObjectInstanceReferenceType, accept: ValidationAcceptor): void {
+        const instance = ref.instance?.ref;
+        if (!instance) {
+            return;
+        }
+
+        this.validateReferenceNotInSamePattern(ref, instance, "instance", accept);
+        this.validateReferenceTargetModifier(instance, ref, "instance", accept);
+    }
+
+    /**
+     * Validates a pattern object instance delete.
+     *
+     * @param del The pattern object delete to validate
+     * @param accept The validation acceptor
+     */
+    validateObjectInstanceDelete(del: PatternObjectInstanceDeleteType, accept: ValidationAcceptor): void {
+        const instance = del.instance?.ref;
+        if (!instance) {
+            return;
+        }
+
+        this.validateReferenceNotInSamePattern(del, instance, "instance", accept);
+        this.validateReferenceTargetModifier(instance, del, "instance", accept);
+    }
+
+    /**
+     * Validates that a reference does not refer to an instance defined in the same pattern.
+     *
+     * @param referenceNode The reference node (PatternObjectInstanceReference or PatternObjectDelete)
+     * @param targetInstance The referenced instance
+     * @param property The property name for diagnostics
+     * @param accept The validation acceptor
+     */
+    private validateReferenceNotInSamePattern(
+        referenceNode: AstNode,
+        targetInstance: PatternObjectInstanceType,
+        property: string,
+        accept: ValidationAcceptor
+    ): void {
+        const referencePattern = this.findContainingPattern(referenceNode);
+        const instancePattern = this.findContainingPattern(targetInstance);
+
+        if (referencePattern != undefined && referencePattern === instancePattern) {
+            accept("error", `Cannot reference instance '${targetInstance.name}' defined in the same pattern.`, {
+                node: referenceNode,
+                property
+            });
+        }
+    }
+
+    /**
+     * Validates that a reference target has a compatible modifier (no modifier or create).
+     *
+     * @param targetInstance The referenced instance
+     * @param referenceNode The reference node for diagnostics
+     * @param property The property name for diagnostics
+     * @param accept The validation acceptor
+     */
+    private validateReferenceTargetModifier(
+        targetInstance: PatternObjectInstanceType,
+        referenceNode: AstNode,
+        property: string,
+        accept: ValidationAcceptor
+    ): void {
+        const modifier = targetInstance.modifier?.modifier;
+
+        if (modifier != undefined && modifier !== "none" && modifier !== "create") {
+            accept(
+                "error",
+                `Cannot reference a '${modifier}' instance '${targetInstance.name}'. Only instances with no modifier or 'create' can be referenced.`,
+                {
+                    node: referenceNode,
+                    property
+                }
+            );
+        }
+    }
+
+    /**
      * Validates a pattern link.
      *
      * @param link The pattern link to validate
@@ -491,7 +582,8 @@ export class ModelTransformationValidator extends BaseModelValidator {
         accept: ValidationAcceptor
     ): void {
         const linkModifier = link.modifier?.modifier;
-        const endpointModifier = endpointObject.modifier?.modifier;
+        const linkPattern = this.findContainingPattern(link);
+        const endpointModifier = this.resolveEffectiveModifier(linkPattern, endpointObject);
 
         if (endpointModifier == undefined || endpointModifier === "none") {
             return;
@@ -514,6 +606,31 @@ export class ModelTransformationValidator extends BaseModelValidator {
                 property: endpointProperty
             }
         );
+    }
+
+    /**
+     * Resolves the effective modifier of an endpoint object for validation purposes.
+     * If the endpoint is from a different pattern than the context and has a 'create' modifier,
+     * it is treated as having no modifier (as the creation occurred in a previous match).
+     *
+     * @param contextPattern The pattern where the validation context is
+     * @param endpointObject The endpoint object instance
+     * @returns The effective modifier string, or undefined
+     */
+    private resolveEffectiveModifier(
+        contextPattern: PatternType | undefined,
+        endpointObject: PatternObjectInstanceType
+    ): string | undefined {
+        const endpointModifier = endpointObject.modifier?.modifier;
+
+        if (endpointModifier === "create") {
+            const endpointPattern = this.findContainingPattern(endpointObject);
+            if (contextPattern !== endpointPattern) {
+                return undefined;
+            }
+        }
+
+        return endpointModifier;
     }
 
     /**

@@ -405,13 +405,11 @@ function findUniqueName(baseName: string, usedNames: Set<string>): string {
  * @param renameMap - Mapping from old names to new names.
  */
 function applyRenames(node: SerializedClipboardNode, renameMap: Map<string, string>): void {
-    // Rename the node itself if it has a name
     const name = getNodeName(node);
     if (name !== undefined && renameMap.has(name)) {
         node["name"] = renameMap.get(name)!;
     }
 
-    // Recursively update all properties
     for (const [key, value] of Object.entries(node)) {
         if (key === "$type") {
             continue;

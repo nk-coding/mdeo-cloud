@@ -49,10 +49,17 @@ export class MetamodelDiagramConfiguration implements DiagramConfiguration {
                 deletable: false,
                 resizable: false,
                 reparentable: false,
-                containableElementTypeIds: [MetamodelElementType.NODE_CLASS]
+                containableElementTypeIds: [MetamodelElementType.NODE_CLASS, MetamodelElementType.NODE_ENUM]
             },
             {
                 elementTypeId: MetamodelElementType.NODE_CLASS,
+                repositionable: true,
+                deletable: true,
+                resizable: true,
+                reparentable: false
+            },
+            {
+                elementTypeId: MetamodelElementType.NODE_ENUM,
                 repositionable: true,
                 deletable: true,
                 resizable: true,

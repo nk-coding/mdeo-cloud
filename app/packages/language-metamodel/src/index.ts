@@ -11,7 +11,9 @@ export * from "./features/diagram-server/handler/metamodelApplyLabelEditOperatio
 export * from "./features/diagram-server/handler/metamodelBaseCreateEdgeOperationHandler.js";
 export * from "./features/diagram-server/handler/metamodelDeleteElementOperationHandler.js";
 export * from "./features/diagram-server/handler/metamodelHandlerUtils.js";
+export * from "./features/diagram-server/handler/metamodelPasteOperationHandler.js";
 export * from "./features/diagram-server/handler/metamodelReconnectEdgeOperationHandler.js";
+export * from "./features/diagram-server/handler/metamodelRequestClipboardDataActionHandler.js";
 export * from "./features/diagram-server/handler/toggleAbstractClassOperationHandler.js";
 export * from "./features/diagram-server/model/associationEdge.js";
 export * from "./features/diagram-server/model/associationMultiplicityLabel.js";

@@ -1,12 +1,14 @@
 import type { Command } from "@eclipse-glsp/server";
 import type { CreateNodeOperation } from "@eclipse-glsp/protocol";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
-import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
-import type { NodeMetadata } from "../metadata.js";
+import type { InsertSpecification } from "../modelIdInsert.js";
 import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import { ExistingNamesProvider } from "../existingNamesProvider.js";
+import { computeInsertionMetadata, type InsertedElementMetadata } from "./insertionMetadataHelper.js";
+import type { ModelIdProvider } from "../modelIdProvider.js";
+import { ModelIdProvider as ModelIdProviderKey } from "../modelIdProvider.js";
 
 const { injectable, inject } = sharedImport("inversify");
 
@@ -15,28 +17,40 @@ const { injectable, inject } = sharedImport("inversify");
  */
 export interface CreateNodeResult {
     /**
-     * The ID of the newly created node.
-     */
-    nodeId: string;
-    /**
-     * The type identifier for the node (used in metadata).
-     */
-    nodeType: string;
-    /**
      * The workspace edit to apply to update the source model.
      */
     workspaceEdit: WorkspaceEdit;
+    /**
+     * Insert specifications describing what was added to the model.
+     * Used together with {@link insertedElements} for automatic id computation
+     * via the model id provider.
+     */
+    insertSpecifications: InsertSpecification[];
+    /**
+     * Metadata for each inserted AstNode, keyed by the same AstNode references
+     * used in the {@link insertSpecifications}. The base handler resolves id
+     * computation and builds metadata edits automatically.
+     */
+    insertedElements: InsertedElementMetadata[];
 }
 
 /**
  * Base handler for applying create node operations from the client.
  * Subclasses must implement the createNode method to define
  * language-specific node creation behavior.
+ *
+ * <p>Ids are computed automatically via the injected {@link ModelIdProvider}
+ * using the {@link CreateNodeResult.insertSpecifications} and
+ * {@link CreateNodeResult.insertedElements} provided by subclasses.
  */
 @injectable()
 export abstract class BaseCreateNodeOperationHandler extends BaseOperationHandler {
     @inject(ExistingNamesProvider)
     protected existingNamesProvider!: ExistingNamesProvider;
+
+    @inject(ModelIdProviderKey)
+    protected idProvider!: ModelIdProvider;
+
     override async createCommand(operation: CreateNodeOperation): Promise<Command | undefined> {
         const result = await this.createNode(operation);
 
@@ -44,8 +58,13 @@ export abstract class BaseCreateNodeOperationHandler extends BaseOperationHandle
             return undefined;
         }
 
-        const metadata = this.buildNodeMetadata(operation, result);
-
+        const metadata = computeInsertionMetadata(
+            this.modelState.sourceModel!,
+            this.idProvider,
+            result.insertSpecifications,
+            result.insertedElements,
+            this.modelState.metadata
+        );
         return new OperationHandlerCommand(this.modelState, result.workspaceEdit, metadata);
     }
 
@@ -57,34 +76,6 @@ export abstract class BaseCreateNodeOperationHandler extends BaseOperationHandle
      * @returns The create node result containing node ID, type, and workspace edit, or undefined if not applicable
      */
     abstract createNode(operation: CreateNodeOperation): Promise<CreateNodeResult | undefined>;
-
-    /**
-     * Builds metadata for the newly created node.
-     * Sets the node's position from the operation and includes type information.
-     *
-     * @param operation The create node operation
-     * @param result The create node result
-     * @returns Metadata object with node information
-     */
-    protected buildNodeMetadata(
-        operation: CreateNodeOperation,
-        result: CreateNodeResult
-    ): { nodes: Record<string, Partial<NodeMetadata>> } {
-        const layoutMetadata: NodeLayoutMetadata = {};
-
-        if (operation.location) {
-            layoutMetadata.position = operation.location;
-        }
-
-        return {
-            nodes: {
-                [result.nodeId]: {
-                    type: result.nodeType,
-                    meta: layoutMetadata
-                }
-            }
-        };
-    }
 
     /**
      * Finds a unique name by checking names already present in the source model

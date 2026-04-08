@@ -1,13 +1,17 @@
 import type { Command } from "@eclipse-glsp/server";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import type { EdgeMetadata } from "../metadata.js";
+import type { InsertSpecification } from "../modelIdInsert.js";
 import { sharedImport } from "../../sharedImport.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import { GNode } from "../model/node.js";
+import { computeInsertionMetadata, type InsertedElementMetadata } from "./insertionMetadataHelper.js";
+import type { ModelIdProvider } from "../modelIdProvider.js";
+import { ModelIdProvider as ModelIdProviderKey } from "../modelIdProvider.js";
 
-const { injectable } = sharedImport("inversify");
+const { injectable, inject } = sharedImport("inversify");
 
 /**
  * Result of a create-edge operation.
@@ -15,8 +19,10 @@ const { injectable } = sharedImport("inversify");
 export interface CreateEdgeResult {
     /**
      * The ID of the newly created edge.
+     * Only required when not using the automatic id computation via
+     * {@link insertSpecifications} and {@link insertedElements}.
      */
-    edgeId: string;
+    edgeId?: string;
     /**
      * The edge type identifier.
      */
@@ -25,14 +31,36 @@ export interface CreateEdgeResult {
      * Workspace edit to apply to the source model.
      */
     workspaceEdit: WorkspaceEdit;
+    /**
+     * Optional insert specifications describing what was added to the model.
+     * When provided together with {@link insertedElements}, ids are computed
+     * automatically via the model id provider instead of using the manual {@link edgeId}.
+     */
+    insertSpecifications?: InsertSpecification[];
+    /**
+     * Metadata for each inserted AstNode. When provided, the base handler
+     * resolves id computation and builds metadata edits automatically.
+     */
+    insertedElements?: InsertedElementMetadata[];
 }
 
 /**
  * Base handler for create-edge operations.
  * Subclasses implement language-specific edge insertion and ID derivation.
+ *
+ * <p>Supports two modes:
+ * <ul>
+ *   <li><b>Manual ids</b>: the subclass provides a {@link CreateEdgeResult.edgeId} directly.</li>
+ *   <li><b>Automatic ids</b>: the subclass provides {@link CreateEdgeResult.insertSpecifications}
+ *       and {@link CreateEdgeResult.insertedElements}, and the base handler computes ids
+ *       via the injected {@link ModelIdProvider}.</li>
+ * </ul>
  */
 @injectable()
 export abstract class BaseCreateEdgeOperationHandler extends BaseOperationHandler {
+    @inject(ModelIdProviderKey)
+    protected idProvider!: ModelIdProvider;
+
     override async createCommand(operation: CreateEdgeOperation): Promise<Command | undefined> {
         const sourceElement = this.modelState.index.find(operation.sourceElementId);
         const targetElement = this.modelState.index.find(operation.targetElementId);
@@ -44,6 +72,17 @@ export abstract class BaseCreateEdgeOperationHandler extends BaseOperationHandle
         const result = await this.createEdge(operation, sourceElement, targetElement);
         if (!result) {
             return undefined;
+        }
+
+        if (result.insertSpecifications != undefined && result.insertedElements != undefined) {
+            const metadata = computeInsertionMetadata(
+                this.modelState.sourceModel!,
+                this.idProvider,
+                result.insertSpecifications,
+                result.insertedElements,
+                this.modelState.metadata
+            );
+            return new OperationHandlerCommand(this.modelState, result.workspaceEdit, metadata);
         }
 
         const metadata = this.buildEdgeMetadata(operation, result);
@@ -77,7 +116,7 @@ export abstract class BaseCreateEdgeOperationHandler extends BaseOperationHandle
     ): { edges: Record<string, Partial<EdgeMetadata>> } {
         return {
             edges: {
-                [result.edgeId]: {
+                [result.edgeId!]: {
                     from: operation.sourceElementId,
                     to: operation.targetElementId,
                     type: result.edgeType,

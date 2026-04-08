@@ -11,6 +11,7 @@ import type { WorkspaceEdit } from "vscode-languageserver-types";
 import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import type { MetamodelGModelFactory } from "../metamodelGModelFactory.js";
 import type { MetamodelMetadataManager } from "../metamodelMetadataManager.js";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
 const { CreateNodeOperation: CreateNodeOperationKind, TriggerNodeCreationAction } =
@@ -164,11 +165,27 @@ export class CreateEnumOperationHandler extends BaseCreateNodeOperationHandler i
         const includeEntry = operation.args?.includeEntry === true;
         const enumNode = await this.createEnumAst(includeEntry);
         const edit = await this.createEnumNode(enumNode);
-        const nodeId = `${Enum.name}_${enumNode.name}`;
+
+        const metadata: NodeLayoutMetadata = {};
+        if (operation.location) {
+            metadata.position = operation.location;
+        }
+
         return {
-            nodeId,
-            nodeType: MetamodelElementType.NODE_ENUM,
-            workspaceEdit: edit
+            workspaceEdit: edit,
+            insertSpecifications: [
+                {
+                    container: this.modelState.sourceModel!,
+                    property: "elements",
+                    elements: [enumNode]
+                }
+            ],
+            insertedElements: [
+                {
+                    element: enumNode,
+                    node: { type: MetamodelElementType.NODE_ENUM, meta: metadata }
+                }
+            ]
         };
     }
 }

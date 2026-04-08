@@ -1,7 +1,6 @@
 import type { GNode, CreateEdgeResult } from "@mdeo/language-shared";
 import { sharedImport } from "@mdeo/language-shared";
 import type { CreateEdgeOperation } from "@mdeo/protocol-common";
-import { GClassNode } from "../model/classNode.js";
 import {
     Association,
     AssociationEnd,
@@ -12,6 +11,8 @@ import {
 } from "../../../grammar/metamodelTypes.js";
 import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import { MetamodelBaseCreateEdgeOperationHandler } from "./metamodelBaseCreateEdgeOperationHandler.js";
+
+import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable } = sharedImport("inversify");
 
@@ -54,7 +55,8 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
             return undefined;
         }
 
-        if (!(targetElement instanceof GClassNode) || !targetElement.name) {
+        const targetClass = this.resolveClass(targetElement);
+        if (!targetClass) {
             return undefined;
         }
 
@@ -66,7 +68,7 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
             return undefined;
         }
 
-        return this.createAssociationEdge(sourceClass, targetElement.name, operator, params);
+        return this.createAssociationEdge(sourceClass, targetClass, operator, params, operation);
     }
 
     /**
@@ -87,11 +89,12 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
      */
     private async createAssociationEdge(
         sourceClass: ClassType,
-        targetClassName: string,
+        targetClass: ClassType,
         operator: MetamodelAssociationOperators,
-        params: MetamodelCreateEdgeParams
+        params: MetamodelCreateEdgeParams,
+        operation: CreateEdgeOperation
     ): Promise<CreateEdgeResult | undefined> {
-        if (!sourceClass.name) {
+        if (!sourceClass.name || !targetClass.name) {
             return undefined;
         }
 
@@ -104,7 +107,7 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
 
         const targetEnd: AssociationEndType = {
             $type: AssociationEnd.name,
-            class: { $refText: targetClassName, ref: undefined },
+            class: { $refText: targetClass.name, ref: targetClass },
             name: params.targetLabel,
             multiplicity: undefined
         };
@@ -127,14 +130,31 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
         const serialized = await this.serializeNode(associationNode);
         const workspaceEdit = await this.createInsertAfterNodeEdit(rootCstNode, serialized, !isEmpty);
 
-        const sourceProp = params.sourceLabel ?? "";
-        const targetProp = params.targetLabel ?? "";
-        const edgeId = `${Association.name}_${sourceClass.name}_${sourceProp}_${operator}_${targetClassName}_${targetProp}`;
-
         return {
-            edgeId,
             edgeType: MetamodelElementType.EDGE_ASSOCIATION,
-            workspaceEdit
+            workspaceEdit,
+            insertSpecifications: [
+                {
+                    container: this.modelState.sourceModel!,
+                    property: "elements",
+                    elements: [associationNode]
+                }
+            ],
+            insertedElements: [
+                {
+                    element: associationNode,
+                    edge: {
+                        type: MetamodelElementType.EDGE_ASSOCIATION,
+                        from: sourceClass,
+                        to: targetClass,
+                        meta: {
+                            routingPoints: operation.routingPoints ?? [],
+                            sourceAnchor: operation.sourceAnchor,
+                            targetAnchor: operation.targetAnchor
+                        } satisfies EdgeLayoutMetadata
+                    }
+                }
+            ]
         };
     }
 }

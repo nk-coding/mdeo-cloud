@@ -337,28 +337,23 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     }
 
     /**
-     * Creates a referenced instance node (instance from a previous match that is re-used here).
+     * Creates a standalone reference instance node representing a re-use of an existing instance.
+     * This is the canonical factory method used for both diagram rendering and ghost/preview creation.
      *
-     * @param parent        The parent match node to add the child to.
-     * @param instanceName  The name of the referenced instance.
-     * @param matchName     The name of the match that originally declared the instance.
-     * @param reference     The `PatternObjectInstanceReference` AST node, or `undefined` if unresolved.
-     * @param idRegistry    The model ID registry used to obtain the element's graph ID.
+     * @param instanceName The name of the referenced instance
+     * @param nodeId A unique node ID
+     * @param metadata Layout metadata for the node
+     * @param idRegistry The ID registry for child element IDs
+     * @param reference Optional PatternObjectInstanceReference AST node for class resolution and properties
+     * @returns A GPatternInstanceNode with NONE modifier
      */
-    private createReferencedInstanceNode(
-        parent: GMatchNode,
+    createReferenceInstanceNode(
         instanceName: string,
-        matchName: string,
-        reference: PatternObjectInstanceReferenceType | undefined,
-        idRegistry: ModelIdRegistry
-    ): void {
-        const nodeId =
-            reference != undefined
-                ? idRegistry.getId(reference)
-                : `PatternObjectInstanceReference_${matchName}_ref_${instanceName}`;
-        const validatedMetadata = this.modelState.getValidatedMetadata();
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-
+        nodeId: string,
+        metadata: NodeLayoutMetadata,
+        idRegistry: ModelIdRegistry,
+        reference?: PatternObjectInstanceReferenceType
+    ): GPatternInstanceNode {
         const resolvedClassForRef = reference?.instance?.ref?.class?.ref as ClassType | undefined;
         const classHierarchyForRef =
             resolvedClassForRef != undefined
@@ -384,32 +379,53 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             node.children.push(...propertyChildren);
         }
 
+        return node;
+    }
+
+    /**
+     * Creates a referenced instance node (instance from a previous match that is re-used here).
+     *
+     * @param parent        The parent match node to add the child to.
+     * @param instanceName  The name of the referenced instance.
+     * @param matchName     The name of the match that originally declared the instance.
+     * @param reference     The `PatternObjectInstanceReference` AST node, or `undefined` if unresolved.
+     * @param idRegistry    The model ID registry used to obtain the element's graph ID.
+     */
+    private createReferencedInstanceNode(
+        parent: GMatchNode,
+        instanceName: string,
+        matchName: string,
+        reference: PatternObjectInstanceReferenceType | undefined,
+        idRegistry: ModelIdRegistry
+    ): void {
+        const nodeId =
+            reference != undefined
+                ? idRegistry.getId(reference)
+                : `PatternObjectInstanceReference_${matchName}_ref_${instanceName}`;
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
+
+        const node = this.createReferenceInstanceNode(instanceName, nodeId, metadata, idRegistry, reference);
         parent.children.push(node);
         this.referencedInstancesInCurrentMatch.set(instanceName, nodeId);
     }
 
     /**
-     * Creates a deleted instance node (instance declared in a previous match, now deleted).
-     * The node is rendered with the DELETE modifier compartment to visually distinguish it.
+     * Creates a standalone delete instance node representing the deletion of an existing instance.
+     * This is the canonical factory method used for both diagram rendering and ghost/preview creation.
      *
-     * The type name is resolved from the referenced `PatternObjectInstance` when available,
-     * so the node shows `name : Type` just like a locally declared instance with DELETE modifier.
-     *
-     * @param parent The parent match node to add the child to
      * @param instanceName The name of the instance being deleted
-     * @param deleteElement The PatternObjectInstanceDelete AST node, used to look up the registry ID
-     * @param idRegistry The model ID registry
+     * @param nodeId A unique node ID
+     * @param metadata Layout metadata for the node
+     * @param deleteElement Optional PatternObjectInstanceDelete AST node for class resolution
+     * @returns A GPatternInstanceNode with DELETE modifier
      */
-    private createDeletedInstanceNode(
-        parent: GMatchNode,
+    createDeleteInstanceNode(
         instanceName: string,
-        deleteElement: PatternObjectInstanceDeleteType,
-        idRegistry: ModelIdRegistry
-    ): void {
-        const nodeId = idRegistry.getId(deleteElement);
-        const validatedMetadata = this.modelState.getValidatedMetadata();
-        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-
+        nodeId: string,
+        metadata: NodeLayoutMetadata,
+        deleteElement?: PatternObjectInstanceDeleteType
+    ): GPatternInstanceNode {
         const resolvedClassForDel = deleteElement?.instance?.ref?.class?.ref as ClassType | undefined;
         const classHierarchyForDel =
             resolvedClassForDel != undefined
@@ -440,6 +456,32 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         modifierCompartment.children.push(label);
         node.children.push(modifierCompartment);
 
+        return node;
+    }
+
+    /**
+     * Creates a deleted instance node (instance declared in a previous match, now deleted).
+     * The node is rendered with the DELETE modifier compartment to visually distinguish it.
+     *
+     * The type name is resolved from the referenced `PatternObjectInstance` when available,
+     * so the node shows `name : Type` just like a locally declared instance with DELETE modifier.
+     *
+     * @param parent The parent match node to add the child to
+     * @param instanceName The name of the instance being deleted
+     * @param deleteElement The PatternObjectInstanceDelete AST node, used to look up the registry ID
+     * @param idRegistry The model ID registry
+     */
+    private createDeletedInstanceNode(
+        parent: GMatchNode,
+        instanceName: string,
+        deleteElement: PatternObjectInstanceDeleteType,
+        idRegistry: ModelIdRegistry
+    ): void {
+        const nodeId = idRegistry.getId(deleteElement);
+        const validatedMetadata = this.modelState.getValidatedMetadata();
+        const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
+
+        const node = this.createDeleteInstanceNode(instanceName, nodeId, metadata, deleteElement);
         parent.children.push(node);
         this.referencedInstancesInCurrentMatch.set(instanceName, nodeId);
     }

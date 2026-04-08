@@ -186,11 +186,12 @@ export class MetamodelModelIdProvider extends BaseModelIdProvider {
             return "unresolved";
         }
         const resolved = clsReference.ref;
-
         if (this.reflection.isInstance(resolved, Class)) {
             return MetamodelModelIdProvider.escapeIdPart(this.getClassName(resolved));
         }
-
+        if (clsReference.$refText) {
+            return MetamodelModelIdProvider.escapeIdPart(clsReference.$refText);
+        }
         return "unknown";
     }
 
