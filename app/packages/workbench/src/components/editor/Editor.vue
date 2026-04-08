@@ -54,7 +54,7 @@
     </div>
 </template>
 <script setup lang="ts">
-import { computed, inject, onMounted, shallowRef, useTemplateRef, watch } from "vue";
+import { computed, inject, nextTick, onMounted, shallowRef, useTemplateRef, watch } from "vue";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable";
 import { useResizeObserver, watchArray } from "@vueuse/core";
 import * as monacoType from "monaco-editor";
@@ -200,7 +200,20 @@ onMounted(() => {
     monacoEditor.layout();
     editor.value = monacoEditor;
     monacoApi.openEditorFunc = async (createModelReference, options) => {
-        openTab(createModelReference.object.textEditorModel.uri, options?.pinned !== true);
+        const targetUri = createModelReference.object.textEditorModel.uri;
+        openTab(targetUri, options?.pinned !== true);
+        const sel = (options as { selection?: monacoType.IRange } | undefined)?.selection;
+        if (sel != undefined) {
+            const tab = activeTab.value;
+            if (tab != null) {
+                getOrCreateEditorState(tab).setPendingSelection(sel);
+            }
+            await nextTick();
+            if (editor.value?.getModel()?.uri.toString() === targetUri.toString()) {
+                editor.value.setSelection(sel);
+                editor.value.revealRangeNearTopIfOutsideViewport(sel);
+            }
+        }
         return undefined;
     };
 });

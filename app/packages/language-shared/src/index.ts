@@ -25,6 +25,7 @@ export * from "./diagram-server/handler/operationHandlerCommand.js";
 export * from "./diagram-server/handler/partialChangeBoundsOperationHandler.js";
 export * from "./diagram-server/handler/requestCreateEdgeSchemaActionHandler.js";
 export * from "./diagram-server/handler/resetLayoutOperationHandler.js";
+export * from "./diagram-server/handler/revealSourceActionHandler.js";
 export * from "./diagram-server/handler/triggerActionOperationHandler.js";
 export * from "./diagram-server/handler/updateClientHandler.js";
 export * from "./diagram-server/handler/updateEditorSettingsActionHandler.js";

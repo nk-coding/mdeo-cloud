@@ -22,6 +22,7 @@ import {
     ReadMetadataRequest,
     WriteMetadataRequest,
     TriggerActionNotification,
+    RevealSourceNotification,
     type ReadFileParams,
     type StatParams,
     type StatResponse,
@@ -738,13 +739,29 @@ export class WorkbenchState {
 
     /**
      * Registers action notification handlers on the language client.
-     * Handles notifications from the language server to trigger action dialogs.
+     * Handles notifications from the language server to trigger action dialogs
+     * and to reveal source ranges in the Monaco textual editor.
      *
      * @param client The language client to register handlers on
      */
     private registerActionHandlers(client: MonacoLanguageClient) {
         client.onNotification(TriggerActionNotification.type, (params) => {
             this.pendingAction.value = params;
+        });
+
+        client.onNotification(RevealSourceNotification.type, async (params) => {
+            await this.monacoApi.editorService.openEditor({
+                resource: Uri.parse(params.uri),
+                options: {
+                    pinned: false,
+                    selection: {
+                        startLineNumber: params.range.start.line + 1,
+                        startColumn: params.range.start.character + 1,
+                        endLineNumber: params.range.end.line + 1,
+                        endColumn: params.range.end.character + 1
+                    }
+                }
+            });
         });
     }
 }

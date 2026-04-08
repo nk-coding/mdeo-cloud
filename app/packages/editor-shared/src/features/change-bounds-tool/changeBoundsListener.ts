@@ -33,6 +33,20 @@ const {
 
 export class ChangeBoundsListener extends GLSPChangeBoundsListener {
     /**
+     * Skips all change-bounds tracking when the alt key is held.  Alt+click is reserved
+     * for the reveal-source action; without this guard the drag-tracking state machine
+     * in {@link DragAwareMouseListener} is left in a stale "mouse-down" state after focus
+     * moves to the newly opened tab, which causes a spurious move/resize once the user
+     * returns to the diagram.
+     */
+    override mouseDown(target: GModelElement, event: MouseEvent): Action[] {
+        if (event.altKey) {
+            return [];
+        }
+        return super.mouseDown(target, event);
+    }
+
+    /**
      * Updates the resize element by extracting resize handle location from SVG data attributes.
      * Creates a virtual GResizeHandle when a resize handle location is detected in the event target.
      *

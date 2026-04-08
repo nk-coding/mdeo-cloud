@@ -7,7 +7,7 @@ import {
     sharedImport,
     type PasteInsertionResult,
     type SerializedClipboardNode,
-    type ClipboardEdgeMetadata,
+    type ClipboardEdgeMetadata
 } from "@mdeo/language-shared";
 import type { MetadataEdits } from "@mdeo/language-shared";
 import {

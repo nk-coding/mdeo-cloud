@@ -29,6 +29,7 @@ import { BaseLayoutEngine } from "./layoutEngine.js";
 import { LayoutOperationHandler } from "./handler/layoutOperationHandler.js";
 import { ResetLayoutOperationHandler } from "./handler/resetLayoutOperationHandler.js";
 import { RequestCreateEdgeSchemaActionHandler } from "./handler/requestCreateEdgeSchemaActionHandler.js";
+import { RevealSourceActionHandler } from "./handler/revealSourceActionHandler.js";
 import { CreateEdgeSchemaResolver } from "./createEdgeSchemaResolver.js";
 import { DefaultContextActionsProvider } from "../context-actions/defaultContextActionsProvider.js";
 import { LangiumModelValidator } from "./langiumModelValidator.js";
@@ -112,6 +113,7 @@ export abstract class BaseDiagramModule extends DiagramModule {
     protected override configureActionHandlers(binding: InstanceMultiBinding<ActionHandlerConstructor>): void {
         super.configureActionHandlers(binding);
         binding.add(RequestCreateEdgeSchemaActionHandler);
+        binding.add(RevealSourceActionHandler);
         binding.add(UpdateEditorSettingsActionHandler);
     }
 

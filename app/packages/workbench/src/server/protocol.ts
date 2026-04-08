@@ -1,6 +1,7 @@
 import type { ServerPlugin } from "@/data/plugin/serverPlugin";
 import { NotificationType, RequestType } from "vscode-languageserver-protocol";
 import type { ActionStartParams } from "@mdeo/language-common";
+import type { Range } from "vscode-languageserver-types";
 
 /**
  * Namespace for the get plugins request
@@ -191,4 +192,31 @@ export namespace TriggerActionNotification {
      * Notification type for triggering an action dialog
      */
     export const type = new NotificationType<ActionStartParams>("action/trigger");
+}
+
+/**
+ * Parameters for the reveal-source notification.
+ */
+export interface RevealSourceParams {
+    /**
+     * URI of the document whose source should be revealed.
+     */
+    uri: string;
+    /**
+     * LSP range within the document that should be selected and scrolled into view.
+     */
+    range: Range;
+}
+
+/**
+ * Namespace for the reveal-source notification.
+ * Sent from the language server to the workbench when a graphical element has been
+ * alt-clicked or its issue marker has been double-clicked, instructing the workbench
+ * to select and reveal the corresponding source range in the Monaco textual editor.
+ */
+export namespace RevealSourceNotification {
+    /**
+     * Notification type for revealing a source range in the Monaco editor.
+     */
+    export const type = new NotificationType<RevealSourceParams>("textDocument/revealSource");
 }

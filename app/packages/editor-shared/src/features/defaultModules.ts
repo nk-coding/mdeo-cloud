@@ -9,6 +9,8 @@ import { metadataModule } from "./metadata/featureModule.js";
 import { moveModule } from "./move/featureModule.js";
 import { pointerToolModule } from "./pointer-tool/featureModule.js";
 import { reconnectEdgeModule } from "./reconnect-edge/featureModule.js";
+import { revealSourceModule } from "./reveal-source/featureModule.js";
+import { remoteUndoRedoModule } from "./undo-redo/featureModule.js";
 import { viewportModule } from "./viewport/featureModule.js";
 import { toolboxModule } from "./toolbox/featureModule.js";
 import { gridModule } from "./grid/featureModule.js";
@@ -42,6 +44,8 @@ export const DEFAULT_MODULES = [
     moveModule,
     pointerToolModule,
     reconnectEdgeModule,
+    revealSourceModule,
+    remoteUndoRedoModule,
     viewportModule,
     editorSettingsModule,
     toolboxModule,

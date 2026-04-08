@@ -9,13 +9,16 @@ const { FeedbackMoveMouseListener: GLSPFeedbackMoveMouseListener } = sharedImpor
  */
 export class FeedbackMoveMouseListener extends GLSPFeedbackMoveMouseListener {
     /**
-     * Initializes a move operation, but skips initialization if the event target is a resize handle.
-     * This prevents conflicts between move and resize operations.
+     * Initializes a move operation, but skips initialization if the event target is a resize handle
+     * or if the alt key is held (which means the user intends a reveal-source action, not a move).
      *
      * @param target The target element to move
      * @param event The mouse event that triggered the move
      */
     protected override initializeMove(target: GModelElement, event: MouseEvent): void {
+        if (event.altKey) {
+            return;
+        }
         const eventTarget = event?.target;
         if (eventTarget instanceof SVGElement) {
             const location = eventTarget.dataset["resizeHandleLocation"];

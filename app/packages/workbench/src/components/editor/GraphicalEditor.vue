@@ -22,6 +22,7 @@ import type { IActionDispatcher } from "@eclipse-glsp/sprotty";
 import { EditMode, TYPES } from "@eclipse-glsp/sprotty";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 import type { UpdateClientOperation } from "@mdeo/language-shared";
+import { createUndoRedoModule } from "./undoRedoModule";
 
 const props = defineProps<{
     tab: EditorTab;
@@ -31,7 +32,7 @@ const props = defineProps<{
     captureWheelscroll?: boolean;
 }>();
 
-const { glspClient } = inject(workbenchStateKey)!;
+const { glspClient, monacoApi } = inject(workbenchStateKey)!;
 const editorContext = inject(editorContextKey)!;
 
 const id = useId();
@@ -92,6 +93,9 @@ onMounted(async () => {
         sourceUri: props.tab.fileUri.toString(),
         editMode: props.editable ? EditMode.EDITABLE : "layoutable"
     });
+
+    const undoRedo = createUndoRedoModule(monacoApi.monaco, props.tab.fileUri.toString());
+    container.load(undoRedo);
 
     const currentActionDispatcher = container.get<IActionDispatcher>(TYPES.IActionDispatcher);
     actionDispatcher.value = currentActionDispatcher;

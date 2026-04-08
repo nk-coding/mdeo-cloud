@@ -5,7 +5,7 @@ import { type IReference, type ITextFileEditorModel, createModelReference } from
 import type { ICodeEditorViewState } from "@codingame/monaco-vscode-api/vscode/vs/editor/common/editorCommon";
 import type { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
 import { FileCategory, parseUri, type ParsedUri } from "@mdeo/language-common";
-import type { IDisposable } from "monaco-editor";
+import type { IDisposable, IRange } from "monaco-editor";
 import type { Uri } from "vscode";
 import { computed, watch, type ComputedRef, type ShallowRef } from "vue";
 
@@ -23,6 +23,13 @@ export class EditorState implements IDisposable {
      * Indicates whether this editor tab is currently active.
      */
     private isActive: boolean = false;
+
+    /**
+     * A selection range to reveal once the Monaco model is loaded into the editor.
+     * Set by {@link setPendingSelection} and consumed (and cleared) by
+     * {@link updateModelIfActive} when the model is actually applied.
+     */
+    private pendingSelection: IRange | undefined;
 
     /**
      * The parsed URI of the file opened in this editor tab.
@@ -116,6 +123,18 @@ export class EditorState implements IDisposable {
     }
 
     /**
+     * Requests that the given range be selected and revealed the next time the Monaco
+     * model is applied to the editor.  If the model is already active and loaded this
+     * will take effect immediately via the next {@link updateModelIfActive} call
+     * triggered by {@link activate}.
+     *
+     * @param selection The range to select and reveal (1-based Monaco coordinates).
+     */
+    setPendingSelection(selection: IRange): void {
+        this.pendingSelection = selection;
+    }
+
+    /**
      * Deactivates the editor state, saving the current view state if applicable.
      */
     deactivate(): void {
@@ -135,6 +154,12 @@ export class EditorState implements IDisposable {
         this.editor.value.setModel(this.textualEditorState.modelReference.object.textEditorModel);
         if (this.textualEditorState.viewState != undefined) {
             this.editor.value.restoreViewState(this.textualEditorState.viewState);
+        }
+        if (this.pendingSelection != undefined) {
+            const sel = this.pendingSelection;
+            this.pendingSelection = undefined;
+            this.editor.value.setSelection(sel);
+            this.editor.value.revealRangeNearTop(sel);
         }
     }
 
