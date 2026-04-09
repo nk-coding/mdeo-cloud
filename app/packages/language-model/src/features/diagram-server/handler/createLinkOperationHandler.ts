@@ -99,28 +99,24 @@ export class CreateLinkOperationHandler extends BaseCreateEdgeOperationHandler {
         return {
             edgeType: ModelElementType.EDGE_LINK,
             workspaceEdit,
-            insertSpecifications: [
-                {
-                    container: this.modelState.sourceModel!,
-                    property: "links",
-                    elements: [linkNode]
+            insertSpecification: {
+                container: this.modelState.sourceModel!,
+                property: "links",
+                elements: [linkNode]
+            },
+            insertedElement: {
+                element: linkNode,
+                edge: {
+                    type: ModelElementType.EDGE_LINK,
+                    from: sourceObject as AstNode,
+                    to: targetObject as AstNode,
+                    meta: {
+                        routingPoints: operation.routingPoints ?? [],
+                        sourceAnchor: operation.sourceAnchor,
+                        targetAnchor: operation.targetAnchor
+                    } satisfies EdgeLayoutMetadata
                 }
-            ],
-            insertedElements: [
-                {
-                    element: linkNode,
-                    edge: {
-                        type: ModelElementType.EDGE_LINK,
-                        from: sourceObject as AstNode,
-                        to: targetObject as AstNode,
-                        meta: {
-                            routingPoints: operation.routingPoints ?? [],
-                            sourceAnchor: operation.sourceAnchor,
-                            targetAnchor: operation.targetAnchor
-                        } satisfies EdgeLayoutMetadata
-                    }
-                }
-            ]
+            }
         };
     }
 

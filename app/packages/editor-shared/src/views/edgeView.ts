@@ -156,7 +156,29 @@ export abstract class GEdgeView implements IView {
      * @returns The rendered VNode or undefined if rendering is not possible
      */
     render(model: Readonly<GEdge>, context: RenderingContext): VNode | undefined {
-        const routeResult = this.edgeRouter.computeRoute(model);
+        let routeResult: RouteComputationResult;
+        if (context.targetKind !== "hidden") {
+            routeResult = this.edgeRouter.computeRoute(model);
+        } else {
+            routeResult = {
+                route: [
+                    { x: 0, y: 0 },
+                    { x: 0, y: 0 }
+                ],
+                meta: {
+                    routingPoints: []
+                },
+                sourceAnchor: {
+                    side: "top",
+                    value: 0
+                },
+                targetAnchor: {
+                    side: "top",
+                    value: 0
+                }
+            };
+        }
+
         const route = routeResult.route;
 
         const sourceMarkerData = this.renderSourceMarker(model, context);

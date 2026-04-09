@@ -2,6 +2,7 @@ import type { Command } from "@eclipse-glsp/server";
 import type { PasteOperation } from "@eclipse-glsp/protocol";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 import type { Point } from "@eclipse-glsp/protocol";
+import type { AstNode } from "langium";
 import {
     deserializeClipboardData,
     resolveUniqueNames,
@@ -10,12 +11,12 @@ import {
     CLIPBOARD_POSITION_FORMAT,
     PASTE_DEFAULT_OFFSET,
     type ClipboardEdgeMetadata,
-    type ClipboardPositionData,
-    type SerializedClipboardNode
+    type ClipboardPositionData
 } from "../../clipboard/clipboardAstSerializer.js";
 import { BaseOperationHandler } from "./baseOperationHandler.js";
 import { OperationHandlerCommand } from "./operationHandlerCommand.js";
 import type { MetadataEdits } from "./operationHandlerCommand.js";
+import type { InsertedElementMetadata } from "./insertionMetadataHelper.js";
 import { sharedImport } from "../../sharedImport.js";
 import { ExistingNamesProvider } from "../existingNamesProvider.js";
 import type { ModelIdProvider } from "../modelIdProvider.js";
@@ -25,18 +26,21 @@ const { injectable, inject } = sharedImport("inversify");
 const { PasteOperation: PasteOperationKind } = sharedImport("@eclipse-glsp/protocol");
 
 /**
+ * Context provided to {@link BasePasteOperationHandler.resolveReference} for
+ * each unresolved cross-reference encountered while preparing pasted nodes.
+ */
+export interface ReferenceResolutionContext {
+    /** The property name on the owner node that holds this reference. */
+    readonly propertyName: string;
+    /** The immediate owner of this reference. */
+    readonly ownerNode: AstNode;
+    /** All top-level nodes being pasted in the same operation (resolved refs already present). */
+    readonly allPastedNodes: AstNode[];
+}
+
+/**
  * Base operation handler for paste operations.
  *
- * <p>Deserializes clipboard data produced by {@link BaseRequestClipboardDataActionHandler},
- * generates unique names for all named nodes, updates internal references accordingly,
- * and delegates the actual insertion to language-specific subclasses.
- *
- * <p>Subclasses must implement:
- * <ul>
- *   <li>{@link insertNodes} – creates workspace edits for inserting the deserialized nodes</li>
- * </ul>
- *
- * <p>The set of already-used names is obtained from the injected
  * {@link ExistingNamesProvider}, which can be rebound in the diagram module.
  */
 @injectable()
@@ -51,8 +55,8 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
 
     /**
      * Creates a command for the paste operation by deserializing the clipboard
-     * data, resolving unique names, converting to AST-node-like objects, and
-     * delegating insertion to the subclass.
+     * data, resolving unique names, resolving cross-references, validating nodes,
+     * and delegating insertion to the subclass.
      *
      * @param operation - The paste operation with clipboard data.
      * @returns A command that applies the paste, or {@code undefined} if the
@@ -78,14 +82,18 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
             operation.editorContext.lastMousePosition
         );
 
-        const astNodeLikes = clipboardData.nodes.map((node) => toAstNodeLike(node));
-        const result = await this.insertNodes(
-            astNodeLikes,
-            clipboardData.nodes,
-            operation,
-            nodePositions,
-            offsetEdgeData
-        );
+        const rawNodes = clipboardData.nodes.map((node) => toAstNodeLike(node) as unknown as AstNode);
+        this.resolveAllRefs(rawNodes);
+        const astNodes = rawNodes.flatMap((node) => {
+            const validated = this.validateNode(node);
+            return validated !== undefined ? [validated] : [];
+        });
+
+        if (astNodes.length === 0) {
+            return undefined;
+        }
+
+        const result = await this.insertNodes(astNodes, operation, nodePositions, offsetEdgeData);
 
         if (!result) {
             return undefined;
@@ -169,29 +177,181 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
     }
 
     /**
+     * Walks all pasted nodes and resolves any unresolved cross-references
+     * ({@code ref: undefined}) by calling the abstract {@link resolveReference}.
+     * References that cannot be resolved are left with {@code ref: undefined}
+     * and a valid {@code $refText} so the serializer can still produce text.
+     */
+    private resolveAllRefs(allPastedNodes: AstNode[]): void {
+        for (const node of allPastedNodes) {
+            this.resolveRefsInNode(node, allPastedNodes);
+        }
+    }
+
+    private resolveRefsInNode(node: AstNode, allPastedNodes: AstNode[]): void {
+        for (const [key, value] of Object.entries(node)) {
+            if (key.startsWith("$")) {
+                continue;
+            }
+            this.resolveRefsInValue(value, key, node, allPastedNodes);
+        }
+    }
+
+    private resolveRefsInValue(
+        value: unknown,
+        propertyName: string,
+        ownerNode: AstNode,
+        allPastedNodes: AstNode[]
+    ): void {
+        if (value === null || value === undefined) {
+            return;
+        }
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                this.resolveRefsInValue(item, propertyName, ownerNode, allPastedNodes);
+            }
+            return;
+        }
+        if (typeof value === "object") {
+            const obj = value as Record<string, unknown>;
+            if ("$refText" in obj && "ref" in obj && obj.ref === undefined) {
+                const refText = obj.$refText as string;
+                const resolved = this.resolveReference(refText, { propertyName, ownerNode, allPastedNodes });
+                if (resolved !== undefined) {
+                    obj.ref = resolved;
+                }
+            } else if ("$type" in obj) {
+                this.resolveRefsInNode(obj as unknown as AstNode, allPastedNodes);
+            } else {
+                for (const [k, v] of Object.entries(obj)) {
+                    this.resolveRefsInValue(v, k, ownerNode, allPastedNodes);
+                }
+            }
+        }
+    }
+
+    /**
+     * Attempts to resolve a single cross-reference by name and context.
+     *
+     * <p>Implementations should look up the target first among
+     * {@link ReferenceResolutionContext.allPastedNodes} (for co-pasted elements)
+     * and then in the current source model. Returning {@code undefined} leaves
+     * the reference with only a {@code $refText}, which is tolerated for
+     * optional references (e.g. enum-type properties in a class) but should
+     * cause {@link validateNode} to reject edges whose required ends are missing.
+     *
+     * @param refText - The reference text (name) to resolve.
+     * @param context - Contextual information about where the reference appears.
+     * @returns The resolved AST node, or {@code undefined} if not found.
+     */
+    protected abstract resolveReference(refText: string, context: ReferenceResolutionContext): AstNode | undefined;
+
+    /**
+     * Validates and optionally transforms a single pasted AST node after
+     * reference resolution.
+     *
+     * @param node - The resolved AST node to validate.
+     * @returns The node to include (possibly modified), or {@code undefined} to skip it.
+     */
+    protected validateNode(node: AstNode): AstNode | undefined {
+        return node;
+    }
+
+    /**
      * Creates workspace edits and optional metadata edits to insert the pasted
      * nodes into the target document.
      *
-     * @param astNodeLikes - The deserialized AST-node-like objects ready for text serialization.
-     *   These objects have the shape of AST nodes with correct {@code $type} and property
-     *   values, but without Langium runtime fields.
-     * @param serializedNodes - The original serialized clipboard nodes (useful for inspecting
-     *   raw clipboard data if needed).
+     * <p>All nodes passed here have already had their cross-references resolved
+     * (to the extent possible) and have passed {@link validateNode}. Edges are
+     * guaranteed to have both ends resolved; their {@code .ref} fields are safe
+     * to access without additional null-checks.
+     *
+     * @param astNodes - The prepared AST nodes ready for serialization and insertion.
      * @param operation - The original paste operation, providing editor context.
-     * @param offsetPositions - Map from final node name to its computed target position in
-     *   diagram coordinates. Subclasses should use these to populate metadata edits so that
-     *   pasted nodes appear near the mouse cursor. Keyed by the final node name after
-     *   uniqueness resolution.
+     * @param offsetPositions - Map from final node name to its computed target
+     *   position in diagram coordinates.
+     * @param offsetEdgeData - Edge routing metadata with renamed and offset routing points.
      * @returns An object containing the workspace edit and optional metadata edits,
      *   or {@code undefined} if no insertion is possible.
      */
     protected abstract insertNodes(
-        astNodeLikes: Record<string, unknown>[],
-        serializedNodes: SerializedClipboardNode[],
+        astNodes: AstNode[],
         operation: PasteOperation,
         offsetPositions: Map<string, Point>,
         offsetEdgeData: ClipboardEdgeMetadata[]
     ): Promise<PasteInsertionResult | undefined>;
+
+    /**
+     * Finds the {@link ClipboardEdgeMetadata} entry that matches the given source
+     * and target endpoint identifiers.
+     *
+     * @param sourceEndName - The name of the source end (object / class name).
+     * @param sourceEndProperty - The property name on the source end (empty string if none).
+     * @param targetEndName - The name of the target end.
+     * @param targetEndProperty - The property name on the target end (empty string if none).
+     * @param offsetEdgeData - The list of clipboard edge metadata entries to search.
+     * @returns The matching entry, or {@code undefined} if none is found.
+     */
+    protected findEdgeMetadata(
+        sourceEndName: string,
+        sourceEndProperty: string,
+        targetEndName: string,
+        targetEndProperty: string,
+        offsetEdgeData: ClipboardEdgeMetadata[]
+    ): ClipboardEdgeMetadata | undefined {
+        return offsetEdgeData.find(
+            (e) =>
+                e.sourceClass === sourceEndName &&
+                e.targetClass === targetEndName &&
+                e.sourceProperty === sourceEndProperty &&
+                e.targetProperty === targetEndProperty
+        );
+    }
+
+    /**
+     * Builds an {@link InsertedElementMetadata} descriptor for a diagram node
+     * (non-edge) element.
+     *
+     * @param element - The AST node being inserted.
+     * @param type - The diagram element type identifier.
+     * @param position - The target position in diagram coordinates.
+     * @returns The metadata descriptor.
+     */
+    protected buildNodeElementMetadata(element: AstNode, type: string, position: Point): InsertedElementMetadata {
+        return { element, node: { type, meta: { position } } };
+    }
+
+    /**
+     * Builds an {@link InsertedElementMetadata} descriptor for a diagram edge element.
+     *
+     * @param element - The AST node being inserted.
+     * @param type - The diagram element type identifier.
+     * @param from - The AST node of the source end.
+     * @param to - The AST node of the target end.
+     * @param edgeMeta - The clipboard edge metadata carrying routing points and anchors.
+     * @returns The metadata descriptor.
+     */
+    protected buildEdgeElementMetadata(
+        element: AstNode,
+        type: string,
+        from: AstNode,
+        to: AstNode,
+        edgeMeta: ClipboardEdgeMetadata
+    ): InsertedElementMetadata {
+        return {
+            element,
+            edge: {
+                type,
+                from,
+                to,
+                meta: {
+                    routingPoints: edgeMeta.routingPoints,
+                    ...(edgeMeta.sourceAnchor ? { sourceAnchor: edgeMeta.sourceAnchor } : {}),
+                    ...(edgeMeta.targetAnchor ? { targetAnchor: edgeMeta.targetAnchor } : {})
+                }
+            }
+        };
+    }
 }
 
 /**

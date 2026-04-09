@@ -133,28 +133,24 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
         return {
             edgeType: MetamodelElementType.EDGE_ASSOCIATION,
             workspaceEdit,
-            insertSpecifications: [
-                {
-                    container: this.modelState.sourceModel!,
-                    property: "elements",
-                    elements: [associationNode]
+            insertSpecification: {
+                container: this.modelState.sourceModel!,
+                property: "elements",
+                elements: [associationNode]
+            },
+            insertedElement: {
+                element: associationNode,
+                edge: {
+                    type: MetamodelElementType.EDGE_ASSOCIATION,
+                    from: sourceClass,
+                    to: targetClass,
+                    meta: {
+                        routingPoints: operation.routingPoints ?? [],
+                        sourceAnchor: operation.sourceAnchor,
+                        targetAnchor: operation.targetAnchor
+                    } satisfies EdgeLayoutMetadata
                 }
-            ],
-            insertedElements: [
-                {
-                    element: associationNode,
-                    edge: {
-                        type: MetamodelElementType.EDGE_ASSOCIATION,
-                        from: sourceClass,
-                        to: targetClass,
-                        meta: {
-                            routingPoints: operation.routingPoints ?? [],
-                            sourceAnchor: operation.sourceAnchor,
-                            targetAnchor: operation.targetAnchor
-                        } satisfies EdgeLayoutMetadata
-                    }
-                }
-            ]
+            }
         };
     }
 }

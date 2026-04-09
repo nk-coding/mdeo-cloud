@@ -1,19 +1,26 @@
 import type { PasteOperation } from "@eclipse-glsp/protocol";
 import type { Point } from "@eclipse-glsp/protocol";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
+import type { AstNode } from "langium";
 import {
     BasePasteOperationHandler,
     sharedImport,
     computeInsertionMetadata,
     type PasteInsertionResult,
     type InsertedElementMetadata,
-    type InsertSpecification
+    type InsertSpecification,
+    type ReferenceResolutionContext,
+    type ClipboardEdgeMetadata
 } from "@mdeo/language-shared";
-import type { SerializedClipboardNode } from "@mdeo/language-shared";
-import type { ClipboardEdgeMetadata } from "@mdeo/language-shared";
-import type { AstNode } from "langium";
 import { MetamodelElementType } from "@mdeo/protocol-metamodel";
-import { Association, Class, Enum, type ClassType } from "../../../grammar/metamodelTypes.js";
+import {
+    Association,
+    Class,
+    Enum,
+    type AssociationType,
+    type ClassType,
+    type EnumType
+} from "../../../grammar/metamodelTypes.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -21,29 +28,70 @@ const { injectable } = sharedImport("inversify");
  * Metamodel-specific paste operation handler.
  *
  * <p>Inserts deserialized top-level metamodel nodes (classes, enums, associations)
- * at the end of the current document. For nodes that have a recorded position in
- * the clipboard data, metadata edits are emitted so the pasted elements appear
- * near the mouse cursor rather than at their original location.
+ * at the end of the current document. Associations whose source or target class
+ * reference cannot be resolved are silently dropped. Class nodes have invalid
+ * class extensions (pointing to absent classes) stripped before insertion.
  */
 @injectable()
 export class MetamodelPasteOperationHandler extends BasePasteOperationHandler {
     /**
+     * Resolves a cross-reference by searching first among co-pasted nodes and
+     * then in the existing source model elements. Only Class nodes are targets of
+     * references in the metamodel language.
+     */
+    protected override resolveReference(
+        refText: string,
+        { allPastedNodes }: ReferenceResolutionContext
+    ): AstNode | undefined {
+        const pasted = allPastedNodes.find((n) => n.$type === Class.name && (n as ClassType).name === refText);
+        if (pasted) {
+            return pasted;
+        }
+        const elements = (this.modelState.sourceModel as unknown as { elements?: AstNode[] })?.elements ?? [];
+        return elements.find((e) => e.$type === Class.name && (e as ClassType).name === refText);
+    }
+
+    /**
+     * Validates a pasted node after reference resolution:
+     * <ul>
+     *   <li>{@link Association}: dropped when either end's class reference is unresolved.</li>
+     *   <li>{@link Class}: class extensions whose target is unresolved are stripped; the
+     *       class itself is always kept.</li>
+     *   <li>Everything else ({@link Enum}, etc.) is kept unchanged.</li>
+     * </ul>
+     */
+    protected override validateNode(node: AstNode): AstNode | undefined {
+        if (node.$type === Association.name) {
+            const assoc = node as AssociationType;
+            if (!assoc.source.class.ref || !assoc.target.class.ref) {
+                return undefined;
+            }
+            return node;
+        }
+
+        if (node.$type === Class.name) {
+            const classNode = node as ClassType;
+            if (classNode.extensions) {
+                const valid = classNode.extensions.extensions.filter((ext) => ext.class.ref !== undefined);
+                if (valid.length !== classNode.extensions.extensions.length) {
+                    classNode.extensions.extensions = valid;
+                    if (valid.length === 0) {
+                        classNode.extensions = undefined;
+                    }
+                }
+            }
+            return node;
+        }
+
+        return node;
+    }
+
+    /**
      * Inserts all pasted nodes at the end of the metamodel document and
      * generates metadata edits to position them near the paste cursor.
-     *
-     * <p>Each node is serialized to text via the AST serializer and appended
-     * after the root CST node, with a blank line separating each insertion.
-     *
-     * @param astNodeLikes - The deserialized AST-node-like objects.
-     * @param serializedNodes - The original serialized clipboard nodes.
-     * @param _operation - The paste operation (unused).
-     * @param offsetPositions - Map from final node name to its target position.
-     * @returns The combined workspace edit and metadata edits, or {@code undefined}
-     *   if no insertion is possible.
      */
     protected override async insertNodes(
-        astNodeLikes: Record<string, unknown>[],
-        serializedNodes: SerializedClipboardNode[],
+        astNodes: AstNode[],
         _operation: PasteOperation,
         offsetPositions: Map<string, Point>,
         offsetEdgeData: ClipboardEdgeMetadata[]
@@ -57,11 +105,9 @@ export class MetamodelPasteOperationHandler extends BasePasteOperationHandler {
         const isEmpty = document?.textDocument.getText().trim().length === 0;
 
         const edits: WorkspaceEdit[] = [];
-
-        for (let i = 0; i < astNodeLikes.length; i++) {
-            const nodeLike = astNodeLikes[i];
-            const serialized = await this.serializeNode(nodeLike as any);
-            const edit = await this.createInsertAfterNodeEdit(rootCstNode, serialized, !isEmpty || edits.length > 0);
+        for (let i = 0; i < astNodes.length; i++) {
+            const serialized = await this.serializeNode(astNodes[i] as any);
+            const edit = await this.createInsertAfterNodeEdit(rootCstNode, serialized, !isEmpty || i > 0);
             edits.push(edit);
         }
 
@@ -70,49 +116,42 @@ export class MetamodelPasteOperationHandler extends BasePasteOperationHandler {
         }
 
         const sourceModel = this.modelState.sourceModel!;
-        const insertSpecs: InsertSpecification[] = [
-            {
-                container: sourceModel,
-                property: "elements",
-                elements: astNodeLikes.map((n) => n as unknown as AstNode)
-            }
-        ];
+        const insertSpec: InsertSpecification = {
+            container: sourceModel,
+            property: "elements",
+            elements: astNodes
+        };
 
         const insertedElements: InsertedElementMetadata[] = [];
-        for (let i = 0; i < astNodeLikes.length; i++) {
-            const nodeLike = astNodeLikes[i];
-            const $type = serializedNodes[i].$type;
-            if ($type === Class.name || $type === Enum.name) {
-                const name = nodeLike.name as string | undefined;
+        for (const node of astNodes) {
+            if (node.$type === Class.name || node.$type === Enum.name) {
+                const name = (node as ClassType | EnumType).name;
                 const position = name ? offsetPositions.get(name) : undefined;
-                const elementType =
-                    $type === Class.name ? MetamodelElementType.NODE_CLASS : MetamodelElementType.NODE_ENUM;
                 if (position) {
-                    insertedElements.push({
-                        element: nodeLike as unknown as AstNode,
-                        node: { type: elementType, meta: { position } }
-                    });
+                    const elementType =
+                        node.$type === Class.name ? MetamodelElementType.NODE_CLASS : MetamodelElementType.NODE_ENUM;
+                    insertedElements.push(this.buildNodeElementMetadata(node, elementType, position));
                 }
-            } else if ($type === Association.name) {
-                const edgeEntry = this.findMatchingEdgeEntry(nodeLike, offsetEdgeData);
-                if (edgeEntry) {
-                    const srcClassNode = this.resolveClassByName(edgeEntry.sourceClass, astNodeLikes, sourceModel);
-                    const tgtClassNode = this.resolveClassByName(edgeEntry.targetClass, astNodeLikes, sourceModel);
-                    if (srcClassNode && tgtClassNode) {
-                        insertedElements.push({
-                            element: nodeLike as unknown as AstNode,
-                            edge: {
-                                type: MetamodelElementType.EDGE_ASSOCIATION,
-                                from: srcClassNode,
-                                to: tgtClassNode,
-                                meta: {
-                                    routingPoints: edgeEntry.routingPoints,
-                                    ...(edgeEntry.sourceAnchor ? { sourceAnchor: edgeEntry.sourceAnchor } : {}),
-                                    ...(edgeEntry.targetAnchor ? { targetAnchor: edgeEntry.targetAnchor } : {})
-                                }
-                            }
-                        });
-                    }
+            } else if (node.$type === Association.name) {
+                const assoc = node as AssociationType;
+                // Both ends are guaranteed to be resolved by validateNode.
+                const edgeMeta = this.findEdgeMetadata(
+                    assoc.source.class.ref!.name,
+                    assoc.source.name ?? "",
+                    assoc.target.class.ref!.name,
+                    assoc.target.name ?? "",
+                    offsetEdgeData
+                );
+                if (edgeMeta) {
+                    insertedElements.push(
+                        this.buildEdgeElementMetadata(
+                            node,
+                            MetamodelElementType.EDGE_ASSOCIATION,
+                            assoc.source.class.ref! as AstNode,
+                            assoc.target.class.ref! as AstNode,
+                            edgeMeta
+                        )
+                    );
                 }
             }
         }
@@ -122,62 +161,10 @@ export class MetamodelPasteOperationHandler extends BasePasteOperationHandler {
             metadataEdits: computeInsertionMetadata(
                 sourceModel,
                 this.idProvider,
-                insertSpecs,
+                [insertSpec],
                 insertedElements,
                 this.modelState.metadata
             )
         };
-    }
-
-    /**
-     * Finds the {@link ClipboardEdgeMetadata} entry that corresponds to a pasted
-     * association node-like by matching source and target class names and property names.
-     *
-     * @param associationLike The deserialized association node-like object.
-     * @param edgeData The list of clipboard edge metadata entries.
-     * @returns The matching entry, or `undefined` if none is found.
-     */
-    private findMatchingEdgeEntry(
-        associationLike: Record<string, unknown>,
-        edgeData: ClipboardEdgeMetadata[]
-    ): ClipboardEdgeMetadata | undefined {
-        const src = associationLike.source as Record<string, unknown> | undefined;
-        const tgt = associationLike.target as Record<string, unknown> | undefined;
-        const srcClass = (src?.class as { $refText?: string } | undefined)?.$refText;
-        const tgtClass = (tgt?.class as { $refText?: string } | undefined)?.$refText;
-        const srcProp = src?.name as string | undefined;
-        const tgtProp = tgt?.name as string | undefined;
-        return edgeData.find(
-            (e) =>
-                e.sourceClass === srcClass &&
-                e.targetClass === tgtClass &&
-                e.sourceProperty === srcProp &&
-                e.targetProperty === tgtProp
-        );
-    }
-
-    /**
-     * Resolves a class AstNode by name, checking first among the node-likes being pasted
-     * (for co-pasted classes), then in the existing source model elements.
-     *
-     * @param className The class name to find.
-     * @param pastedNodeLikes The node-like objects being co-pasted in the same operation.
-     * @param sourceModel The current model root.
-     * @returns The matching {@link ClassType} AstNode, or `undefined` if not found.
-     */
-    private resolveClassByName(
-        className: string,
-        pastedNodeLikes: Record<string, unknown>[],
-        sourceModel: AstNode
-    ): ClassType | undefined {
-        const pasted = pastedNodeLikes.find((n) => n.$type === Class.name && n.name === className);
-        if (pasted) {
-            return pasted as unknown as ClassType;
-        }
-        const elements = (sourceModel as unknown as Record<string, unknown>).elements as AstNode[] | undefined;
-        return elements?.find((e: unknown) => {
-            const r = e as Record<string, unknown>;
-            return r.$type === Class.name && r.name === className;
-        }) as ClassType | undefined;
     }
 }

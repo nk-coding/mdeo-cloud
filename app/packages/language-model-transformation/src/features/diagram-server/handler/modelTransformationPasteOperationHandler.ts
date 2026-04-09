@@ -7,10 +7,10 @@ import {
     sharedImport,
     computeInsertionMetadata,
     type PasteInsertionResult,
-    type SerializedClipboardNode,
     type ClipboardEdgeMetadata,
     type InsertedElementMetadata,
-    type InsertSpecification
+    type InsertSpecification,
+    type ReferenceResolutionContext
 } from "@mdeo/language-shared";
 import type { MetadataEdits } from "@mdeo/language-shared";
 import {
@@ -25,6 +25,8 @@ import {
     PatternObjectInstanceDelete,
     PatternLink,
     type PatternType,
+    type PatternObjectInstanceType,
+    type PatternLinkType,
     type MatchStatementType,
     type IfMatchStatementType,
     type WhileMatchStatementType,
@@ -64,12 +66,70 @@ const MATCH_STATEMENT_TYPES = new Set([
  *   <li><b>Only pattern elements + no match node selected</b>: a new match statement
  *       wrapping all pattern elements is appended at the end of the file.</li>
  * </ol>
+ *
+ * <p>{@link PatternLink} nodes whose source or target object reference cannot be
+ * resolved are silently dropped.
  */
 @injectable()
 export class ModelTransformationPasteOperationHandler extends BasePasteOperationHandler {
+    /**
+     * Resolves a cross-reference. For pattern elements, the targets are
+     * PatternObjectInstance nodes. Looks first in the co-pasted nodes, then
+     * in the current pattern (when pasting into a selected match block) or the
+     * entire source model.
+     */
+    protected override resolveReference(
+        refText: string,
+        { allPastedNodes }: ReferenceResolutionContext
+    ): AstNode | undefined {
+        const pasted = allPastedNodes.find(
+            (n) => n.$type === PatternObjectInstance.name && (n as PatternObjectInstanceType).name === refText
+        );
+        if (pasted) {
+            return pasted;
+        }
+        // Search the entire source model tree for a matching PatternObjectInstance.
+        return this.findPatternInstance(this.modelState.sourceModel!, refText);
+    }
+
+    private findPatternInstance(node: AstNode, name: string): AstNode | undefined {
+        if (node.$type === PatternObjectInstance.name && (node as PatternObjectInstanceType).name === name) {
+            return node;
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (key.startsWith("$")) continue;
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    if (item && typeof item === "object" && "$type" in item) {
+                        const found = this.findPatternInstance(item as AstNode, name);
+                        if (found) return found;
+                    }
+                }
+            } else if (value && typeof value === "object" && "$type" in value) {
+                const found = this.findPatternInstance(value as AstNode, name);
+                if (found) return found;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Validates a pasted node after reference resolution.
+     * {@link PatternLink} nodes are dropped when either end's object reference
+     * is unresolved.
+     */
+    protected override validateNode(node: AstNode): AstNode | undefined {
+        if (node.$type === PatternLink.name) {
+            const link = node as PatternLinkType;
+            if (!link.source.object.ref || !link.target.object.ref) {
+                return undefined;
+            }
+        }
+        return node;
+    }
+
     protected override async insertNodes(
-        astNodeLikes: Record<string, unknown>[],
-        serializedNodes: SerializedClipboardNode[],
+        astNodes: AstNode[],
         operation: PasteOperation,
         offsetPositions: Map<string, Point>,
         offsetEdgeData: ClipboardEdgeMetadata[]
@@ -79,17 +139,8 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
             return undefined;
         }
 
-        const patternElements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[] = [];
-        const matchStatements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[] = [];
-
-        for (let i = 0; i < serializedNodes.length; i++) {
-            const $type = serializedNodes[i].$type;
-            if (PATTERN_ELEMENT_TYPES.has($type)) {
-                patternElements.push({ nodeLike: astNodeLikes[i], serialized: serializedNodes[i] });
-            } else if (MATCH_STATEMENT_TYPES.has($type)) {
-                matchStatements.push({ nodeLike: astNodeLikes[i], serialized: serializedNodes[i] });
-            }
-        }
+        const patternElements = astNodes.filter((n) => PATTERN_ELEMENT_TYPES.has(n.$type));
+        const matchStatements = astNodes.filter((n) => MATCH_STATEMENT_TYPES.has(n.$type));
 
         const selectedPattern = this.findSelectedPattern(operation.editorContext.selectedElementIds);
 
@@ -160,7 +211,6 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
 
     /**
      * Extracts the Pattern from a statement AST node.
-     * The AST node may be a MatchStatement, Pattern, or a derived match statement.
      */
     private extractPattern(node: AstNode): PatternType | undefined {
         if (this.reflection.isInstance(node, Pattern)) {
@@ -190,8 +240,8 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
      */
     private async insertPatternElementsIntoMatch(
         pattern: PatternType,
-        patternElements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[],
-        matchStatements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[],
+        patternElements: AstNode[],
+        matchStatements: AstNode[],
         offsetPositions: Map<string, Point>,
         offsetEdgeData: ClipboardEdgeMetadata[]
     ): Promise<PasteInsertionResult | undefined> {
@@ -210,8 +260,7 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
         const edits: WorkspaceEdit[] = [];
 
         for (let i = 0; i < patternElements.length; i++) {
-            const { nodeLike } = patternElements[i];
-            const serializedText = await this.serializeNode(nodeLike as any);
+            const serializedText = await this.serializeNode(patternElements[i] as any);
             const edit = this.insertIntoScope(openBrace, closeBrace, hasContent || i > 0, serializedText);
             edits.push(edit);
         }
@@ -225,60 +274,55 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
             return undefined;
         }
 
-        // Use InsertSpecification to compute ids for the newly inserted pattern elements.
-        const insertSpecs: InsertSpecification[] = [
-            {
-                container: pattern,
-                property: "elements",
-                elements: patternElements.map((pe) => pe.nodeLike as unknown as AstNode)
-            }
-        ];
+        const insertSpec: InsertSpecification = {
+            container: pattern,
+            property: "elements",
+            elements: patternElements
+        };
 
-        const pastedInstancesByName = new Map<string, AstNode>();
+        const instancesByName = new Map<string, AstNode>();
         const insertedElements: InsertedElementMetadata[] = [];
-        for (const { nodeLike, serialized } of patternElements) {
-            if (serialized.$type === PatternObjectInstance.name) {
-                const name = nodeLike.name as string | undefined;
-                if (name) pastedInstancesByName.set(name, nodeLike as unknown as AstNode);
-                const position = name ? offsetPositions.get(name) : undefined;
+
+        for (const node of patternElements) {
+            if (node.$type === PatternObjectInstance.name) {
+                const instance = node as PatternObjectInstanceType;
+                if (instance.name) {
+                    instancesByName.set(instance.name, node);
+                }
+                const position = instance.name ? offsetPositions.get(instance.name) : undefined;
                 if (position) {
-                    insertedElements.push({
-                        element: nodeLike as unknown as AstNode,
-                        node: { type: ModelTransformationElementType.NODE_PATTERN_INSTANCE, meta: { position } }
-                    });
+                    insertedElements.push(
+                        this.buildNodeElementMetadata(
+                            node,
+                            ModelTransformationElementType.NODE_PATTERN_INSTANCE,
+                            position
+                        )
+                    );
                 }
             }
         }
 
-        for (const { nodeLike, serialized } of patternElements) {
-            if (serialized.$type === PatternLink.name) {
-                const edgeEntry = this.findMatchingEdgeEntry(nodeLike, offsetEdgeData);
-                if (edgeEntry) {
-                    const sourceNode = this.resolvePatternInstanceByName(
-                        edgeEntry.sourceClass,
-                        pastedInstancesByName,
-                        pattern
+        for (const node of patternElements) {
+            if (node.$type === PatternLink.name) {
+                const link = node as PatternLinkType;
+                // Both ends guaranteed resolved by validateNode.
+                const edgeMeta = this.findEdgeMetadata(
+                    link.source.object.ref!.name,
+                    link.source.property?.$refText ?? "",
+                    link.target.object.ref!.name,
+                    link.target.property?.$refText ?? "",
+                    offsetEdgeData
+                );
+                if (edgeMeta) {
+                    insertedElements.push(
+                        this.buildEdgeElementMetadata(
+                            node,
+                            ModelTransformationElementType.EDGE_PATTERN_LINK,
+                            link.source.object.ref! as AstNode,
+                            link.target.object.ref! as AstNode,
+                            edgeMeta
+                        )
                     );
-                    const targetNode = this.resolvePatternInstanceByName(
-                        edgeEntry.targetClass,
-                        pastedInstancesByName,
-                        pattern
-                    );
-                    if (sourceNode && targetNode) {
-                        insertedElements.push({
-                            element: nodeLike as unknown as AstNode,
-                            edge: {
-                                type: ModelTransformationElementType.EDGE_PATTERN_LINK,
-                                from: sourceNode,
-                                to: targetNode,
-                                meta: {
-                                    routingPoints: edgeEntry.routingPoints,
-                                    ...(edgeEntry.sourceAnchor ? { sourceAnchor: edgeEntry.sourceAnchor } : {}),
-                                    ...(edgeEntry.targetAnchor ? { targetAnchor: edgeEntry.targetAnchor } : {})
-                                }
-                            }
-                        });
-                    }
                 }
             }
         }
@@ -286,7 +330,7 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
         const metadataEdits = computeInsertionMetadata(
             this.modelState.sourceModel!,
             this.idProvider,
-            insertSpecs,
+            [insertSpec],
             insertedElements,
             this.modelState.metadata
         );
@@ -302,8 +346,8 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
      * pattern elements in a new match.
      */
     private async insertMatchStatementsAtEnd(
-        matchStatements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[],
-        patternElements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[],
+        matchStatements: AstNode[],
+        patternElements: AstNode[],
         _offsetPositions: Map<string, Point>
     ): Promise<PasteInsertionResult | undefined> {
         const rootCstNode = this.modelState.sourceModel?.$cstNode;
@@ -315,10 +359,9 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
         const isEmpty = document?.textDocument.getText().trim().length === 0;
 
         const edits: WorkspaceEdit[] = [];
-        const metadataNodes: Record<string, { type: string; meta: object }> = {};
 
-        for (const { nodeLike } of matchStatements) {
-            const serializedText = await this.serializeNode(nodeLike as any);
+        for (const node of matchStatements) {
+            const serializedText = await this.serializeNode(node as any);
             const edit = await this.createInsertAfterNodeEdit(
                 rootCstNode,
                 serializedText,
@@ -337,8 +380,7 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
             return undefined;
         }
 
-        const metadataEdits: MetadataEdits | undefined =
-            Object.keys(metadataNodes).length > 0 ? { nodes: metadataNodes } : undefined;
+        const metadataEdits: MetadataEdits | undefined = undefined;
 
         return {
             workspaceEdit: this.mergeWorkspaceEdits(edits),
@@ -351,7 +393,7 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
      * wrapping all elements.
      */
     private async insertPatternElementsAsNewMatch(
-        patternElements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[],
+        patternElements: AstNode[],
         _offsetPositions: Map<string, Point>
     ): Promise<PasteInsertionResult | undefined> {
         const rootCstNode = this.modelState.sourceModel?.$cstNode;
@@ -373,14 +415,11 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
 
     /**
      * Builds match statement text that wraps the given pattern elements.
-     * Produces: `match {\n  element1\n  element2\n  ...\n}`
      */
-    private async buildWrappedMatchText(
-        patternElements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[]
-    ): Promise<string> {
+    private async buildWrappedMatchText(patternElements: AstNode[]): Promise<string> {
         const elementTexts: string[] = [];
-        for (const { nodeLike } of patternElements) {
-            const text = await this.serializeNode(nodeLike as any);
+        for (const node of patternElements) {
+            const text = await this.serializeNode(node as any);
             elementTexts.push(text);
         }
 
@@ -393,11 +432,9 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
     }
 
     /**
-     * Helper to create workspace edits for inserting match statements at the end of the file.
+     * Creates workspace edits for inserting match statements at the end of the file.
      */
-    private async insertMatchStatementsAtEndEdits(
-        matchStatements: { nodeLike: Record<string, unknown>; serialized: SerializedClipboardNode }[]
-    ): Promise<WorkspaceEdit[]> {
+    private async insertMatchStatementsAtEndEdits(matchStatements: AstNode[]): Promise<WorkspaceEdit[]> {
         const rootCstNode = this.modelState.sourceModel?.$cstNode;
         if (!rootCstNode) {
             return [];
@@ -407,8 +444,8 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
         const isEmpty = document?.textDocument.getText().trim().length === 0;
 
         const edits: WorkspaceEdit[] = [];
-        for (const { nodeLike } of matchStatements) {
-            const serializedText = await this.serializeNode(nodeLike as any);
+        for (const node of matchStatements) {
+            const serializedText = await this.serializeNode(node as any);
             const edit = await this.createInsertAfterNodeEdit(
                 rootCstNode,
                 serializedText,
@@ -417,34 +454,5 @@ export class ModelTransformationPasteOperationHandler extends BasePasteOperation
             edits.push(edit);
         }
         return edits;
-    }
-
-    private findMatchingEdgeEntry(
-        linkLike: Record<string, unknown>,
-        edgeData: ClipboardEdgeMetadata[]
-    ): ClipboardEdgeMetadata | undefined {
-        const src = linkLike.source as Record<string, unknown> | undefined;
-        const tgt = linkLike.target as Record<string, unknown> | undefined;
-        const srcName = (src?.object as { $refText?: string } | undefined)?.$refText;
-        const tgtName = (tgt?.object as { $refText?: string } | undefined)?.$refText;
-        const srcProp = (src?.property as { $refText?: string } | undefined)?.$refText ?? "";
-        const tgtProp = (tgt?.property as { $refText?: string } | undefined)?.$refText ?? "";
-        return edgeData.find(
-            (e) =>
-                e.sourceClass === srcName &&
-                e.targetClass === tgtName &&
-                e.sourceProperty === srcProp &&
-                e.targetProperty === tgtProp
-        );
-    }
-
-    private resolvePatternInstanceByName(
-        name: string,
-        pastedInstances: Map<string, AstNode>,
-        pattern: PatternType
-    ): AstNode | undefined {
-        const pasted = pastedInstances.get(name);
-        if (pasted) return pasted;
-        return pattern.elements?.find((e) => (e as unknown as { name?: string }).name === name) as AstNode | undefined;
     }
 }

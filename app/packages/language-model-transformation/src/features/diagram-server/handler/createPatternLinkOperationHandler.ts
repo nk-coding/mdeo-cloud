@@ -181,28 +181,24 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
         return {
             edgeType: ModelTransformationElementType.EDGE_PATTERN_LINK,
             workspaceEdit,
-            insertSpecifications: [
-                {
-                    container: sourceInfo.pattern,
-                    property: "elements",
-                    elements: [linkNode]
+            insertSpecification: {
+                container: sourceInfo.pattern,
+                property: "elements",
+                elements: [linkNode]
+            },
+            insertedElement: {
+                element: linkNode,
+                edge: {
+                    type: ModelTransformationElementType.EDGE_PATTERN_LINK,
+                    from: sourceAstNode,
+                    to: targetAstNode,
+                    meta: {
+                        routingPoints: operation.routingPoints ?? [],
+                        sourceAnchor: operation.sourceAnchor,
+                        targetAnchor: operation.targetAnchor
+                    } satisfies EdgeLayoutMetadata
                 }
-            ],
-            insertedElements: [
-                {
-                    element: linkNode,
-                    edge: {
-                        type: ModelTransformationElementType.EDGE_PATTERN_LINK,
-                        from: sourceAstNode,
-                        to: targetAstNode,
-                        meta: {
-                            routingPoints: operation.routingPoints ?? [],
-                            sourceAnchor: operation.sourceAnchor,
-                            targetAnchor: operation.targetAnchor
-                        } satisfies EdgeLayoutMetadata
-                    }
-                }
-            ]
+            }
         };
     }
 
