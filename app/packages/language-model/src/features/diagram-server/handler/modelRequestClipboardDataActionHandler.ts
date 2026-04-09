@@ -28,7 +28,7 @@ export class ModelRequestClipboardDataActionHandler extends BaseRequestClipboard
     /**
      * Filters selected AST nodes to only include object instances and links.
      *
-     * @param selectedAstNodes - The raw AST nodes from the selected graph elements.
+     * @param selectedAstNodes The raw AST nodes from the selected graph elements.
      * @returns The filtered list of top-level nodes for clipboard serialization.
      */
     protected override getTopLevelAstNodes(selectedAstNodes: AstNode[]): AstNode[] {

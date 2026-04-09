@@ -394,7 +394,9 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
                 if (element instanceof GNode) {
                     railOverlays.push(...this.buildNodeRailOverlays(element));
                 } else if (element instanceof GEdge) {
-                    railOverlays.push(...this.buildEdgeRailOverlays(element));
+                    if (!element.reconnectData) {
+                        railOverlays.push(...this.buildEdgeRailOverlays(element));
+                    }
                 }
             }
         }
@@ -508,7 +510,8 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
         const edgeDirSign = isHorizontal ? (anchor.dx >= 0 ? 1 : -1) : anchor.dy >= 0 ? 1 : -1;
         const oppositeSign = -edgeDirSign;
 
-        const cssTransform = this.buildEdgeRailCssTransform(isHorizontal, oppositeSign);
+        const extraOffset = position !== EdgeAttachmentPosition.MIDDLE ? 12 : 0;
+        const cssTransform = this.buildEdgeRailCssTransform(isHorizontal, oppositeSign, extraOffset);
 
         return this.buildRailOverlay(items, absoluteAnchor, orientation, cssTransform);
     }
@@ -522,18 +525,19 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
      * @param oppositeSign −1 when the rail should be placed against the edge direction, +1 otherwise.
      * @returns A CSS transform string.
      */
-    private buildEdgeRailCssTransform(isHorizontal: boolean, oppositeSign: number): string {
+    private buildEdgeRailCssTransform(isHorizontal: boolean, oppositeSign: number, extraOffset: number = 0): string {
+        const offset = ContextActionsUIExtension.EDGE_DISTANCE_TO_LINE + extraOffset;
         if (isHorizontal) {
             if (oppositeSign > 0) {
-                return `translate(${ContextActionsUIExtension.EDGE_DISTANCE_TO_LINE}px, -50%)`;
+                return `translate(${offset}px, -50%)`;
             } else {
-                return `translate(calc(-100% - ${ContextActionsUIExtension.EDGE_DISTANCE_TO_LINE}px), -50%)`;
+                return `translate(calc(-100% - ${offset}px), -50%)`;
             }
         } else {
             if (oppositeSign > 0) {
-                return `translate(-50%, ${ContextActionsUIExtension.EDGE_DISTANCE_TO_LINE}px)`;
+                return `translate(-50%, ${offset}px)`;
             } else {
-                return `translate(-50%, calc(-100% - ${ContextActionsUIExtension.EDGE_DISTANCE_TO_LINE}px))`;
+                return `translate(-50%, calc(-100% - ${offset}px))`;
             }
         }
     }

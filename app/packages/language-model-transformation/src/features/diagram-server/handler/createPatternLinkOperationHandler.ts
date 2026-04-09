@@ -29,8 +29,6 @@ import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/proto
 import { GPatternInstanceNode } from "../model/patternInstanceNode.js";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 
-import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
-
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
 
@@ -191,12 +189,7 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
                 edge: {
                     type: ModelTransformationElementType.EDGE_PATTERN_LINK,
                     from: sourceAstNode,
-                    to: targetAstNode,
-                    meta: {
-                        routingPoints: operation.routingPoints ?? [],
-                        sourceAnchor: operation.sourceAnchor,
-                        targetAnchor: operation.targetAnchor
-                    } satisfies EdgeLayoutMetadata
+                    to: targetAstNode
                 }
             }
         };

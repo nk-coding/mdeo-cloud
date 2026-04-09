@@ -16,7 +16,9 @@ export interface RemoteUndoAction extends Action {
  * Namespace for {@link RemoteUndoAction}.
  */
 export namespace RemoteUndoAction {
-    /** Discriminant string for {@link RemoteUndoAction}. */
+    /**
+     * Discriminant string for {@link RemoteUndoAction}.
+     */
     export const KIND = "remoteUndo" as const;
 
     /**
@@ -46,7 +48,9 @@ export interface RemoteRedoAction extends Action {
  * Namespace for {@link RemoteRedoAction}.
  */
 export namespace RemoteRedoAction {
-    /** Discriminant string for {@link RemoteRedoAction}. */
+    /**
+     * Discriminant string for {@link RemoteRedoAction}.
+     */
     export const KIND = "remoteRedo" as const;
 
     /**

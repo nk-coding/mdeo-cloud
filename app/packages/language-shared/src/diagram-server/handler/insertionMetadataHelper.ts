@@ -11,9 +11,13 @@ import { computeInsertIds, buildIdChangeMetadataEdits, mergeMetadataEdits } from
  * in the corresponding {@link InsertSpecification.elements}.
  */
 export interface InsertedElementMetadata {
-    /** The inserted AstNode (same reference as in the InsertSpecification). */
+    /**
+     * The inserted AstNode (same reference as in the InsertSpecification).
+     */
     readonly element: AstNode;
-    /** Metadata for a node element. */
+    /**
+     * Metadata for a node element.
+     */
     readonly node?: { type: string; meta?: object };
     /**
      * Metadata for an edge element. The {@link from} and {@link to} fields are

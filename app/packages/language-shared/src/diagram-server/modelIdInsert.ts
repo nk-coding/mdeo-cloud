@@ -22,11 +22,17 @@ interface InsertionEntry {
  * ```
  */
 export interface InsertSpecification {
-    /** The container AstNode that owns the array property. */
+    /**
+     * The container AstNode that owns the array property.
+     */
     readonly container: AstNode;
-    /** The name of the array property on the container where elements will be inserted. */
+    /**
+     * The name of the array property on the container where elements will be inserted.
+     */
     readonly property: string;
-    /** The AstNode elements to insert into the array property. */
+    /**
+     * The AstNode elements to insert into the array property.
+     */
     readonly elements: AstNode[];
     /**
      * The index at which to insert the elements. When omitted the elements are
@@ -40,9 +46,13 @@ export interface InsertSpecification {
  * (e.g. index shifts when inserting an element before existing siblings).
  */
 export interface IdChange {
-    /** The id before the insertion. */
+    /**
+     * The id before the insertion.
+     */
     readonly oldId: string;
-    /** The id after the insertion. */
+    /**
+     * The id after the insertion.
+     */
     readonly newId: string;
 }
 

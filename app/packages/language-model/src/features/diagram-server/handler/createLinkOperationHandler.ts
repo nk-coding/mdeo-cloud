@@ -1,7 +1,6 @@
 import type { GNode, ModelState, GModelIndex } from "@mdeo/language-shared";
 import { BaseCreateEdgeOperationHandler, sharedImport, type CreateEdgeResult } from "@mdeo/language-shared";
 import type { CreateEdgeOperation } from "@mdeo/protocol-common";
-import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
 import type { PartialObjectInstance } from "../../../grammar/modelPartialTypes.js";
 import { ObjectInstance, Link, LinkEnd } from "../../../grammar/modelTypes.js";
 import type { LinkType, LinkEndType } from "../../../grammar/modelTypes.js";
@@ -109,12 +108,7 @@ export class CreateLinkOperationHandler extends BaseCreateEdgeOperationHandler {
                 edge: {
                     type: ModelElementType.EDGE_LINK,
                     from: sourceObject as AstNode,
-                    to: targetObject as AstNode,
-                    meta: {
-                        routingPoints: operation.routingPoints ?? [],
-                        sourceAnchor: operation.sourceAnchor,
-                        targetAnchor: operation.targetAnchor
-                    } satisfies EdgeLayoutMetadata
+                    to: targetObject as AstNode
                 }
             }
         };

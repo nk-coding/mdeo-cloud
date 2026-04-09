@@ -62,13 +62,9 @@ export class EdgeRouter {
             return this.computeCreateEdgeRoute(edge, createData);
         }
 
-        const sourceBounds = (edge.index.getById(edge.sourceId) as BoundsAware | undefined)?.bounds;
-        const targetBounds = (edge.index.getById(edge.targetId) as BoundsAware | undefined)?.bounds;
+        const sourceBounds = (edge.index.getById(edge.sourceId) as BoundsAware | undefined)?.bounds ?? Bounds.ZERO;
+        const targetBounds = (edge.index.getById(edge.targetId) as BoundsAware | undefined)?.bounds ?? Bounds.ZERO;
         const meta = edge.meta;
-
-        if (sourceBounds == undefined || targetBounds == undefined) {
-            throw new Error("Cannot compute route: source or target bounds are undefined.");
-        }
 
         const routingPoints = meta?.routingPoints ?? [];
         let sourceAnchor = meta?.sourceAnchor;
@@ -132,7 +128,8 @@ export class EdgeRouter {
             targetAnchor = this.cleanupAnchor(targetAnchor, route.at(-1)!, route.at(-2)!);
         }
 
-        const defineAnchorInMeta = meta.sourceAnchor != undefined || meta.targetAnchor != undefined || route.length > 3;
+        const defineAnchorInMeta =
+            meta?.sourceAnchor != undefined || meta?.targetAnchor != undefined || route.length > 3;
 
         return {
             route,
@@ -221,28 +218,51 @@ export class EdgeRouter {
             fixedAnchor = fixedProjection.anchor;
             fixedPoint = this.anchorToPoint(fixedAnchor, fixedEndBounds);
             movingPoint = reconnectData.position;
-            movingAnchor = { side: fixedAnchor.side, value: 0.5 };
+            const fixedOrientation = Orientation.fromSide(fixedAnchor.side);
+            if (fixedOrientation === "horizontal") {
+                movingAnchor = { side: movingPoint.y < fixedPoint.y ? "bottom" : "top", value: 0.5 };
+            } else {
+                movingAnchor = { side: movingPoint.x < fixedPoint.x ? "right" : "left", value: 0.5 };
+            }
         } else {
             throw new Error("Invalid reconnect data: must have either position or anchor");
         }
 
+        const startPoint = isReconnectingSource ? movingPoint : fixedPoint;
+        const startSide = isReconnectingSource ? movingAnchor.side : fixedAnchor.side;
+        const endPoint = isReconnectingSource ? fixedPoint : movingPoint;
+        const endSide = isReconnectingSource ? fixedAnchor.side : movingAnchor.side;
+
+        let reconnectIntermediatePoints: Point[] = [];
+        const reconnectStartOrientation = Orientation.fromSide(startSide);
+        const reconnectEndOrientation = Orientation.fromSide(endSide);
+        if (reconnectStartOrientation === reconnectEndOrientation) {
+            if (reconnectStartOrientation === "horizontal") {
+                const midX = (startPoint.x + endPoint.x) / 2;
+                reconnectIntermediatePoints = [{ x: midX, y: startPoint.y }];
+            } else {
+                const midY = (startPoint.y + endPoint.y) / 2;
+                reconnectIntermediatePoints = [{ x: startPoint.x, y: midY }];
+            }
+        }
+
         const normalizedPoints = this.normalizeRoutingPoints(
-            isReconnectingSource ? movingPoint : fixedPoint,
-            isReconnectingSource ? movingAnchor.side : fixedAnchor.side,
-            [],
-            isReconnectingSource ? fixedPoint : movingPoint,
-            isReconnectingSource ? fixedAnchor.side : movingAnchor.side
+            startPoint,
+            startSide,
+            reconnectIntermediatePoints,
+            endPoint,
+            endSide
         );
 
-        const route = this.simplifyRoutingPoints([
-            isReconnectingSource ? movingPoint : fixedPoint,
-            ...normalizedPoints,
-            isReconnectingSource ? fixedPoint : movingPoint
-        ]);
+        const route = this.simplifyRoutingPoints([startPoint, ...normalizedPoints, endPoint]);
 
         return {
             route,
-            meta: edge.meta,
+            meta: {
+                routingPoints: this.routingPointsFromRoute(route),
+                sourceAnchor: isReconnectingSource ? movingAnchor : fixedAnchor,
+                targetAnchor: isReconnectingSource ? fixedAnchor : movingAnchor
+            },
             sourceAnchor: isReconnectingSource ? movingAnchor : fixedAnchor,
             targetAnchor: isReconnectingSource ? fixedAnchor : movingAnchor
         };
@@ -270,6 +290,7 @@ export class EdgeRouter {
         const sourcePoint = this.anchorToPoint(sourceAnchor, sourceBounds);
         let targetAnchor: EdgeAnchor;
         let targetPoint: Point;
+        let intermediatePoints: Point[] = [];
 
         if (createData.anchor && createData.targetId) {
             const targetBounds = (edge.index.getById(createData.targetId) as BoundsAware | undefined)?.bounds;
@@ -279,9 +300,26 @@ export class EdgeRouter {
 
             targetAnchor = createData.anchor;
             targetPoint = this.anchorToPoint(targetAnchor, targetBounds);
+
+            const sourceOrientation = Orientation.fromSide(sourceAnchor.side);
+            const targetOrientation = Orientation.fromSide(targetAnchor.side);
+            if (sourceOrientation === targetOrientation) {
+                if (sourceOrientation === "horizontal") {
+                    const midX = (sourcePoint.x + targetPoint.x) / 2;
+                    intermediatePoints = [{ x: midX, y: sourcePoint.y }];
+                } else {
+                    const midY = (sourcePoint.y + targetPoint.y) / 2;
+                    intermediatePoints = [{ x: sourcePoint.x, y: midY }];
+                }
+            }
         } else if (createData.position) {
             targetPoint = createData.position;
-            targetAnchor = { side: sourceAnchor.side, value: 0.5 };
+            const sourceOrientation = Orientation.fromSide(sourceAnchor.side);
+            if (sourceOrientation === "horizontal") {
+                targetAnchor = { side: targetPoint.y < sourcePoint.y ? "bottom" : "top", value: 0.5 };
+            } else {
+                targetAnchor = { side: targetPoint.x < sourcePoint.x ? "right" : "left", value: 0.5 };
+            }
         } else {
             throw new Error("Invalid create-edge data: must have either position or anchor with targetId.");
         }
@@ -289,7 +327,7 @@ export class EdgeRouter {
         const normalizedPoints = this.normalizeRoutingPoints(
             sourcePoint,
             sourceAnchor.side,
-            [],
+            intermediatePoints,
             targetPoint,
             targetAnchor.side
         );
@@ -298,7 +336,11 @@ export class EdgeRouter {
 
         return {
             route,
-            meta: edge.meta,
+            meta: {
+                routingPoints: this.routingPointsFromRoute(route),
+                sourceAnchor,
+                targetAnchor
+            },
             sourceAnchor,
             targetAnchor
         };
@@ -360,6 +402,18 @@ export class EdgeRouter {
 
         let sourceAnchor: EdgeAnchor;
         let targetAnchor: EdgeAnchor;
+
+        if (
+            sourceBounds.width === 0 ||
+            sourceBounds.height === 0 ||
+            targetBounds.width === 0 ||
+            targetBounds.height === 0
+        ) {
+            return {
+                source: this.projectAnchor(edge, sourceCenter, sourceBounds),
+                target: this.projectAnchor(edge, targetCenter, targetBounds)
+            };
+        }
 
         if (xOverlap > yOverlap) {
             let xMiddle = (xOverlapStart + xOverlapEnd) / 2;
@@ -473,6 +527,13 @@ export class EdgeRouter {
         }
 
         const snapped = this.snapper.snap(chosen.snapCoord, edge);
+
+        if (bounds.width === 0 || bounds.height === 0) {
+            return {
+                anchor: { side: chosen.side, value: 0.5 },
+                isDirect
+            };
+        }
 
         let value: number;
         if (chosen.side === "top" || chosen.side === "bottom") {

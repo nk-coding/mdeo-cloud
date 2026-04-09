@@ -1,6 +1,6 @@
 import type { GNode, CreateEdgeResult } from "@mdeo/language-shared";
 import { sharedImport } from "@mdeo/language-shared";
-import type { CreateEdgeOperation, EdgeLayoutMetadata } from "@mdeo/protocol-common";
+import type { CreateEdgeOperation } from "@mdeo/protocol-common";
 import type { AstNode } from "langium";
 import {
     ClassExtension,
@@ -31,16 +31,16 @@ export class CreateInheritanceOperationHandler extends MetamodelBaseCreateEdgeOp
         targetElement: GNode
     ): Promise<CreateEdgeResult | undefined> {
         const sourceClass = this.resolveClass(sourceElement);
-        if (!sourceClass) {
+        if (sourceClass == undefined) {
             return undefined;
         }
 
         const targetClass = this.resolveClass(targetElement);
-        if (!targetClass) {
+        if (targetClass == undefined) {
             return undefined;
         }
 
-        return this.createExtensionEdge(sourceClass, targetClass, operation);
+        return this.createExtensionEdge(sourceClass, targetClass);
     }
 
     /**
@@ -48,13 +48,11 @@ export class CreateInheritanceOperationHandler extends MetamodelBaseCreateEdgeOp
      *
      * @param sourceClass The source class AST node
      * @param targetClass The target class AST node
-     * @param operation The originating create-edge operation
      * @returns A CreateEdgeResult with the workspace edit to apply, or undefined on failure
      */
     private async createExtensionEdge(
         sourceClass: ClassType,
         targetClass: ClassType,
-        operation: CreateEdgeOperation
     ): Promise<CreateEdgeResult | undefined> {
         const classCstNode = sourceClass.$cstNode;
         if (!classCstNode) {
@@ -126,12 +124,7 @@ export class CreateInheritanceOperationHandler extends MetamodelBaseCreateEdgeOp
                 edge: {
                     type: MetamodelElementType.EDGE_INHERITANCE,
                     from: sourceClass as unknown as AstNode,
-                    to: targetClass as unknown as AstNode,
-                    meta: {
-                        routingPoints: operation.routingPoints ?? [],
-                        sourceAnchor: operation.sourceAnchor,
-                        targetAnchor: operation.targetAnchor
-                    } satisfies EdgeLayoutMetadata
+                    to: targetClass as unknown as AstNode
                 }
             }
         };

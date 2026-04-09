@@ -41,7 +41,7 @@ export class MetamodelRequestClipboardDataActionHandler extends BaseRequestClipb
      * Classes are transformed so that extensions referencing non-selected classes
      * are removed.
      *
-     * @param selectedAstNodes - The raw AST nodes from the selected graph elements.
+     * @param selectedAstNodes The raw AST nodes from the selected graph elements.
      * @returns The filtered and transformed top-level nodes for clipboard serialization.
      */
     protected override getTopLevelAstNodes(selectedAstNodes: AstNode[]): AstNode[] {
@@ -76,7 +76,7 @@ export class MetamodelRequestClipboardDataActionHandler extends BaseRequestClipb
      * information from the current model metadata and includes them in the
      * clipboard data so they can be restored (with mouse-position offset) on paste.
      *
-     * @param selectedAstNodes - The raw selected AST nodes.
+     * @param selectedAstNodes The raw selected AST nodes.
      * @returns An array of edge metadata entries, one per association with metadata.
      */
     protected override getClipboardEdgeData(selectedAstNodes: AstNode[]): ClipboardEdgeMetadata[] {
@@ -119,8 +119,8 @@ export class MetamodelRequestClipboardDataActionHandler extends BaseRequestClipb
      * is set to {@code undefined}. If some remain, a new {@link ClassExtensions}
      * wrapper is created with only the retained extensions.
      *
-     * @param cls - The original class node.
-     * @param selectedClasses - Names of classes included in the clipboard selection.
+     * @param cls The original class node.
+     * @param selectedClasses Names of classes included in the clipboard selection.
      * @returns A shallow copy of the class with filtered extensions.
      */
     private transformClass(cls: ClassType, selectedClasses: Set<string>): ClassType {

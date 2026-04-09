@@ -10,7 +10,9 @@ import type { Action } from "@eclipse-glsp/protocol";
  */
 export interface RevealSourceAction extends Action {
     kind: typeof RevealSourceAction.KIND;
-    /** ID of the graphical element whose textual source should be revealed. */
+    /**
+     * ID of the graphical element whose textual source should be revealed.
+     */
     elementId: string;
 }
 
@@ -18,7 +20,9 @@ export interface RevealSourceAction extends Action {
  * Namespace for {@link RevealSourceAction}.
  */
 export namespace RevealSourceAction {
-    /** Discriminant string for {@link RevealSourceAction}. */
+    /**
+     * Discriminant string for {@link RevealSourceAction}.
+     */
     export const KIND = "revealSource" as const;
 
     /**

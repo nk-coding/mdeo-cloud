@@ -47,19 +47,33 @@ export interface ClipboardPositionData {
  * after paste, even when source or target classes have been renamed.
  */
 export interface ClipboardEdgeMetadata {
-    /** Original (pre-rename) source class name as written in the source text. */
+    /**
+     * Original (pre-rename) source class name as written in the source text.
+     */
     sourceClass: string;
-    /** Source-end property name on the association (not subject to rename). */
+    /**
+     * Source-end property name on the association (not subject to rename).
+     */
     sourceProperty: string;
-    /** Original (pre-rename) target class name as written in the source text. */
+    /**
+     * Original (pre-rename) target class name as written in the source text.
+     */
     targetClass: string;
-    /** Target-end property name on the association (not subject to rename). */
+    /**
+     * Target-end property name on the association (not subject to rename).
+     */
     targetProperty: string;
-    /** Routing points of the edge in diagram coordinates at the time of copy. */
+    /**
+     * Routing points of the edge in diagram coordinates at the time of copy.
+     */
     routingPoints: Point[];
-    /** Optional anchor at the source end of the edge. */
+    /**
+     * Optional anchor at the source end of the edge.
+     */
     sourceAnchor?: { side: string; value: number };
-    /** Optional anchor at the target end of the edge. */
+    /**
+     * Optional anchor at the target end of the edge.
+     */
     targetAnchor?: { side: string; value: number };
 }
 
@@ -67,11 +81,17 @@ export interface ClipboardEdgeMetadata {
  * Root container of clipboard data, holding a list of serialized top-level AST nodes.
  */
 export interface ClipboardAstData {
-    /** Identifies the clipboard format. Must equal {@link CLIPBOARD_AST_FORMAT}. */
+    /**
+     * Identifies the clipboard format. Must equal {@link CLIPBOARD_AST_FORMAT}.
+     */
     format: typeof CLIPBOARD_AST_FORMAT;
-    /** Data format version. */
+    /**
+     * Data format version.
+     */
     version: number;
-    /** The serialized top-level AST nodes. */
+    /**
+     * The serialized top-level AST nodes.
+     */
     nodes: SerializedClipboardNode[];
 }
 
@@ -81,9 +101,13 @@ export interface ClipboardAstData {
  * ({@code $container}, {@code $cstNode}, etc.).
  */
 export interface SerializedClipboardNode {
-    /** The AST node type discriminator. */
+    /**
+     * The AST node type discriminator.
+     */
     $type: string;
-    /** Additional serialized properties. */
+    /**
+     * Additional serialized properties.
+     */
     [key: string]: SerializedClipboardEntry | SerializedClipboardEntry[];
 }
 
@@ -107,9 +131,13 @@ export type SerializedClipboardEntry =
  * names are adjusted for uniqueness.
  */
 export interface ClipboardReference {
-    /** When {@code true}, the reference target is included in the clipboard data. */
+    /**
+     * When {@code true}, the reference target is included in the clipboard data.
+     */
     $internal?: true;
-    /** The reference text (name) used when serializing back to source text. */
+    /**
+     * The reference text (name) used when serializing back to source text.
+     */
     $refText: string;
 }
 
@@ -118,9 +146,13 @@ export interface ClipboardReference {
  * Contains multiple reference items, each of which can be internal or external.
  */
 export interface ClipboardMultiReference {
-    /** The individual reference items. */
+    /**
+     * The individual reference items.
+     */
     $refs: ClipboardReference[];
-    /** The combined reference text. */
+    /**
+     * The combined reference text.
+     */
     $refText: string;
 }
 
@@ -133,7 +165,7 @@ const IGNORE_PROPERTIES = new Set(["$container", "$containerProperty", "$contain
 /**
  * Type guard that checks whether an object is a {@link ClipboardReference}.
  *
- * @param obj - The value to test.
+ * @param obj The value to test.
  * @returns {@code true} when the value has a {@code $refText} property and no {@code $refs} array.
  */
 export function isClipboardReference(obj: unknown): obj is ClipboardReference {
@@ -143,7 +175,7 @@ export function isClipboardReference(obj: unknown): obj is ClipboardReference {
 /**
  * Type guard that checks whether an object is a {@link ClipboardMultiReference}.
  *
- * @param obj - The value to test.
+ * @param obj The value to test.
  * @returns {@code true} when the value has both {@code $refs} and {@code $refText} properties.
  */
 export function isClipboardMultiReference(obj: unknown): obj is ClipboardMultiReference {
@@ -153,7 +185,7 @@ export function isClipboardMultiReference(obj: unknown): obj is ClipboardMultiRe
 /**
  * Type guard that checks whether an object is a {@link SerializedClipboardNode}.
  *
- * @param obj - The value to test.
+ * @param obj The value to test.
  * @returns {@code true} when the value has a {@code $type} property.
  */
 export function isSerializedClipboardNode(obj: unknown): obj is SerializedClipboardNode {
@@ -172,8 +204,8 @@ export function isSerializedClipboardNode(obj: unknown): obj is SerializedClipbo
  * clipboard data). Internal references are tagged with {@code $internal: true} so that
  * their {@code $refText} can be updated during paste when names are changed for uniqueness.
  *
- * @param nodes - The top-level AST nodes to serialize.
- * @param includedNodes - The complete set of top-level AST nodes in the clipboard selection.
+ * @param nodes The top-level AST nodes to serialize.
+ * @param includedNodes The complete set of top-level AST nodes in the clipboard selection.
  *   Used to determine whether a reference target is internal or external.
  * @returns The serialized clipboard data ready for JSON stringification.
  */
@@ -190,7 +222,7 @@ export function serializeForClipboard(nodes: AstNode[], includedNodes: Set<AstNo
  * Deserializes clipboard JSON text into a {@link ClipboardAstData} structure.
  * Validates the format identifier and version number before returning.
  *
- * @param json - The JSON string from the clipboard.
+ * @param json The JSON string from the clipboard.
  * @returns The parsed clipboard data, or {@code undefined} if the data is invalid.
  */
 export function deserializeClipboardData(json: string): ClipboardAstData | undefined {
@@ -213,8 +245,8 @@ export function deserializeClipboardData(json: string): ClipboardAstData | undef
  * <p>When a name needs to change, all <em>internal</em> references
  * ({@code $internal: true}) that match the old name are updated to the new name.
  *
- * @param data - The clipboard data whose nodes will be renamed in place.
- * @param existingNames - Set of names already present in the target document.
+ * @param data The clipboard data whose nodes will be renamed in place.
+ * @param existingNames Set of names already present in the target document.
  * @returns A map from old names to new names (only entries where names changed).
  */
 export function resolveUniqueNames(data: ClipboardAstData, existingNames: Set<string>): Map<string, string> {
@@ -251,8 +283,8 @@ export function resolveUniqueNames(data: ClipboardAstData, existingNames: Set<st
 /**
  * Recursively serializes a single AST node for clipboard storage.
  *
- * @param node - The AST node to serialize.
- * @param includedNodes - Top-level nodes included in the clipboard selection.
+ * @param node The AST node to serialize.
+ * @param includedNodes Top-level nodes included in the clipboard selection.
  * @returns The serialized clipboard node.
  */
 function serializeClipboardNode(node: AstNode, includedNodes: Set<AstNode>): SerializedClipboardNode {
@@ -278,8 +310,8 @@ function serializeClipboardNode(node: AstNode, includedNodes: Set<AstNode>): Ser
  * Serializes a single property value, dispatching to the appropriate handler
  * based on the value's type (primitive, array, reference, AST node).
  *
- * @param value - The property value to serialize.
- * @param includedNodes - Top-level nodes included in the clipboard selection.
+ * @param value The property value to serialize.
+ * @param includedNodes Top-level nodes included in the clipboard selection.
  * @returns The serialized value, or {@code undefined} when the value cannot be serialized.
  */
 function serializeValue(
@@ -313,8 +345,8 @@ function serializeValue(
  * Serializes a single Langium {@link Reference} to a clipboard reference.
  * Marks the reference as internal when its resolved target is among the clipboard nodes.
  *
- * @param ref - The Langium reference to serialize.
- * @param includedNodes - Top-level nodes included in the clipboard selection.
+ * @param ref The Langium reference to serialize.
+ * @param includedNodes Top-level nodes included in the clipboard selection.
  * @returns The serialized clipboard reference.
  */
 function serializeReference(ref: Reference, includedNodes: Set<AstNode>): ClipboardReference {
@@ -331,8 +363,8 @@ function serializeReference(ref: Reference, includedNodes: Set<AstNode>): Clipbo
 /**
  * Serializes a Langium {@link MultiReference} to a clipboard multi-reference.
  *
- * @param multiRef - The Langium multi-reference to serialize.
- * @param includedNodes - Top-level nodes included in the clipboard selection.
+ * @param multiRef The Langium multi-reference to serialize.
+ * @param includedNodes Top-level nodes included in the clipboard selection.
  * @returns The serialized clipboard multi-reference.
  */
 function serializeMultiReference(multiRef: MultiReference, includedNodes: Set<AstNode>): ClipboardMultiReference {
@@ -353,8 +385,8 @@ function serializeMultiReference(multiRef: MultiReference, includedNodes: Set<As
  * Determines whether an AST node (or one of its ancestors) is among the
  * included top-level clipboard nodes.
  *
- * @param node - The AST node to check.
- * @param includedNodes - The set of included top-level nodes.
+ * @param node The AST node to check.
+ * @param includedNodes The set of included top-level nodes.
  * @returns {@code true} when the node or an ancestor is in the set.
  */
 function isNodeIncluded(node: AstNode, includedNodes: Set<AstNode>): boolean {
@@ -371,7 +403,7 @@ function isNodeIncluded(node: AstNode, includedNodes: Set<AstNode>): boolean {
 /**
  * Extracts the name from a serialized clipboard node, if it has one.
  *
- * @param node - The serialized node.
+ * @param node The serialized node.
  * @returns The name string, or {@code undefined} if the node has no {@code name} property.
  */
 function getNodeName(node: SerializedClipboardNode): string | undefined {
@@ -382,8 +414,8 @@ function getNodeName(node: SerializedClipboardNode): string | undefined {
 /**
  * Finds a unique name by appending a numeric suffix when needed.
  *
- * @param baseName - The desired name.
- * @param usedNames - Names already in use (both existing and previously assigned).
+ * @param baseName The desired name.
+ * @param usedNames Names already in use (both existing and previously assigned).
  * @returns A name not present in {@code usedNames}.
  */
 function findUniqueName(baseName: string, usedNames: Set<string>): string {
@@ -401,8 +433,8 @@ function findUniqueName(baseName: string, usedNames: Set<string>): string {
  * Updates the node's own {@code name} property and any internal references
  * whose {@code $refText} matches a renamed name.
  *
- * @param node - The serialized node to update in place.
- * @param renameMap - Mapping from old names to new names.
+ * @param node The serialized node to update in place.
+ * @param renameMap Mapping from old names to new names.
  */
 function applyRenames(node: SerializedClipboardNode, renameMap: Map<string, string>): void {
     const name = getNodeName(node);
@@ -422,10 +454,10 @@ function applyRenames(node: SerializedClipboardNode, renameMap: Map<string, stri
  * Applies renames within a single property value (which may be a reference,
  * a nested node, an array, or a primitive).
  *
- * @param owner - The owning serialized node.
- * @param key - The property key.
- * @param value - The property value.
- * @param renameMap - Mapping from old names to new names.
+ * @param owner The owning serialized node.
+ * @param key The property key.
+ * @param value The property value.
+ * @param renameMap Mapping from old names to new names.
  */
 function applyRenamesInValue(
     owner: SerializedClipboardNode,
@@ -466,7 +498,7 @@ function applyRenamesInValue(
  * suitable for the AST text serializer. References are converted to
  * {@code { $refText, ref: undefined }} format expected by Langium serializers.
  *
- * @param node - The serialized clipboard node to convert.
+ * @param node The serialized clipboard node to convert.
  * @returns A plain object with the shape of an AST node.
  */
 export function toAstNodeLike(node: SerializedClipboardNode): Record<string, unknown> {
@@ -487,7 +519,7 @@ export function toAstNodeLike(node: SerializedClipboardNode): Record<string, unk
 /**
  * Converts a single serialized clipboard entry back to an AST-compatible value.
  *
- * @param value - The serialized entry.
+ * @param value The serialized entry.
  * @returns The converted value.
  */
 function convertValue(value: SerializedClipboardEntry | SerializedClipboardEntry[]): unknown {

@@ -51,13 +51,21 @@ const { AstUtils, GrammarUtils } = sharedImport("langium");
  * for a new control-flow statement.
  */
 interface StatementInsertResult {
-    /** The workspace edit that inserts the statement text. */
+    /**
+     * The workspace edit that inserts the statement text.
+     */
     edit: WorkspaceEdit;
-    /** The AstNode container whose array property the statement will appear in after re-parsing. */
+    /**
+     * The AstNode container whose array property the statement will appear in after re-parsing.
+     */
     container: AstNode;
-    /** The name of the array property on the container (typically {@code "statements"}). */
+    /**
+     * The name of the array property on the container (typically {@code "statements"}).
+     */
     property: string;
-    /** The index within the array at which the new statement will appear. */
+    /**
+     * The index within the array at which the new statement will appear.
+     */
     index: number;
 }
 

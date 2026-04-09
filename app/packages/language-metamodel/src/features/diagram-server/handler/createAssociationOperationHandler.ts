@@ -12,8 +12,6 @@ import {
 import { MetamodelElementType } from "@mdeo/protocol-metamodel";
 import { MetamodelBaseCreateEdgeOperationHandler } from "./metamodelBaseCreateEdgeOperationHandler.js";
 
-import type { EdgeLayoutMetadata } from "@mdeo/protocol-common";
-
 const { injectable } = sharedImport("inversify");
 
 /**
@@ -51,12 +49,12 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
         targetElement: GNode
     ): Promise<CreateEdgeResult | undefined> {
         const sourceClass = this.resolveClass(sourceElement);
-        if (!sourceClass) {
+        if (sourceClass == undefined) {
             return undefined;
         }
 
         const targetClass = this.resolveClass(targetElement);
-        if (!targetClass) {
+        if (targetClass == undefined) {
             return undefined;
         }
 
@@ -64,11 +62,11 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
         const edgeType = params.edgeType;
         const operator = edgeType ? EDGE_TYPE_TO_OPERATOR[edgeType] : undefined;
 
-        if (!operator) {
+        if (operator === undefined) {
             return undefined;
         }
 
-        return this.createAssociationEdge(sourceClass, targetClass, operator, params, operation);
+        return this.createAssociationEdge(sourceClass, targetClass, operator, params);
     }
 
     /**
@@ -91,8 +89,7 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
         sourceClass: ClassType,
         targetClass: ClassType,
         operator: MetamodelAssociationOperators,
-        params: MetamodelCreateEdgeParams,
-        operation: CreateEdgeOperation
+        params: MetamodelCreateEdgeParams
     ): Promise<CreateEdgeResult | undefined> {
         if (!sourceClass.name || !targetClass.name) {
             return undefined;
@@ -143,12 +140,7 @@ export class CreateAssociationOperationHandler extends MetamodelBaseCreateEdgeOp
                 edge: {
                     type: MetamodelElementType.EDGE_ASSOCIATION,
                     from: sourceClass,
-                    to: targetClass,
-                    meta: {
-                        routingPoints: operation.routingPoints ?? [],
-                        sourceAnchor: operation.sourceAnchor,
-                        targetAnchor: operation.targetAnchor
-                    } satisfies EdgeLayoutMetadata
+                    to: targetClass
                 }
             }
         };

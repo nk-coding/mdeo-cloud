@@ -29,7 +29,7 @@ export class BaseCutOperationHandler extends BaseOperationHandler {
      * Creates a command for the cut operation by dispatching a delete
      * operation for the selected elements.
      *
-     * @param operation - The cut operation containing the editor context with selected element IDs.
+     * @param operation The cut operation containing the editor context with selected element IDs.
      * @returns Always {@code undefined} since the delete operation handles the actual model change.
      */
     createCommand(operation: CutOperation): MaybePromise<Command | undefined> {

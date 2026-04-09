@@ -1,5 +1,5 @@
 import type { Action, GModelElement, IActionDispatcher, IModelFactory } from "@eclipse-glsp/sprotty";
-import type { Point } from "@eclipse-glsp/protocol";
+import type { Bounds, Point } from "@eclipse-glsp/protocol";
 import type { EdgeAnchor, CreateEdgeOperation, CreateEdgeSchema } from "@mdeo/protocol-common";
 import { sharedImport } from "../../sharedImport.js";
 import { EdgeRouter } from "../edge-routing/edgeRouter.js";
@@ -376,7 +376,7 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         const candidateEdge = this.getFeedbackEdge(target) ?? this.tool.createEdgeFromSchema(this.schema);
         const node = this.findConnectableNode(actualTarget, "target", candidateEdge);
 
-        if (node != undefined && candidateEdge && this.source && this.schema && node.id !== this.source.id) {
+        if (node != undefined && candidateEdge && this.source && this.schema) {
             const position = this.getRelativePositionForNode(node, event);
 
             const anchor = this.tool.edgeRouter.projectAnchor(candidateEdge, position, node.bounds).anchor;
@@ -471,7 +471,7 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
         const candidateEdge = this.getFeedbackEdge(target) ?? this.tool.createEdgeFromSchema(this.schema);
         const node = this.findConnectableNode(actualTarget, "target", candidateEdge);
 
-        if (node == undefined || node.id === this.source.id) {
+        if (node == undefined) {
             return this.cancelCreation();
         }
 
@@ -629,10 +629,11 @@ class CreateEdgeMouseListener extends DragAwareMouseListener {
      * @param bounds The target node bounds
      * @returns The projected nearest anchor
      */
-    private computeNearestAnchor(
-        point: Point,
-        bounds: { x: number; y: number; width: number; height: number }
-    ): EdgeAnchor {
+    private computeNearestAnchor(point: Point, bounds: Bounds): EdgeAnchor {
+        if (bounds.width === 0 || bounds.height === 0) {
+            return { side: "top", value: 0.5 };
+        }
+
         const dLeft = Math.abs(point.x - bounds.x);
         const dRight = Math.abs(point.x - (bounds.x + bounds.width));
         const dTop = Math.abs(point.y - bounds.y);

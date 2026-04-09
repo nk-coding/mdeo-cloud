@@ -49,7 +49,7 @@ export abstract class BaseRequestClipboardDataActionHandler {
      * elements, extracting their AST nodes, serializing them, and returning
      * the serialized data as a {@link SetClipboardDataAction}.
      *
-     * @param action - The incoming request clipboard data action.
+     * @param action The incoming request clipboard data action.
      * @returns An array containing a single {@link SetClipboardDataAction}.
      */
     execute(action: RequestClipboardDataAction): MaybePromise<Action[]> {
@@ -95,7 +95,7 @@ export abstract class BaseRequestClipboardDataActionHandler {
      * in the current model index are included. Entries for nodes without a
      * recorded position are silently omitted.
      *
-     * @param selectedAstNodes - The original selected AST nodes (before any
+     * @param selectedAstNodes The original selected AST nodes (before any
      *   transformation by {@link getTopLevelAstNodes}).
      * @returns The clipboard position data object.
      */
@@ -127,7 +127,7 @@ export abstract class BaseRequestClipboardDataActionHandler {
      * Resolves graph element IDs to their corresponding AST nodes using
      * the model index.
      *
-     * @param selectedIds - The IDs of the selected graph elements.
+     * @param selectedIds The IDs of the selected graph elements.
      * @returns An array of resolved AST nodes (elements without a mapping are skipped).
      */
     protected resolveSelectedAstNodes(selectedIds: string[]): AstNode[] {
@@ -155,7 +155,7 @@ export abstract class BaseRequestClipboardDataActionHandler {
      *   <li>Transform nodes as needed (e.g., strip non-selected extensions from classes)</li>
      * </ul>
      *
-     * @param selectedAstNodes - The AST nodes corresponding to the selected graph elements.
+     * @param selectedAstNodes The AST nodes corresponding to the selected graph elements.
      * @returns The filtered/transformed list of top-level AST nodes for clipboard serialization.
      */
     protected abstract getTopLevelAstNodes(selectedAstNodes: AstNode[]): AstNode[];

@@ -156,29 +156,7 @@ export abstract class GEdgeView implements IView {
      * @returns The rendered VNode or undefined if rendering is not possible
      */
     render(model: Readonly<GEdge>, context: RenderingContext): VNode | undefined {
-        let routeResult: RouteComputationResult;
-        if (context.targetKind !== "hidden") {
-            routeResult = this.edgeRouter.computeRoute(model);
-        } else {
-            routeResult = {
-                route: [
-                    { x: 0, y: 0 },
-                    { x: 0, y: 0 }
-                ],
-                meta: {
-                    routingPoints: []
-                },
-                sourceAnchor: {
-                    side: "top",
-                    value: 0
-                },
-                targetAnchor: {
-                    side: "top",
-                    value: 0
-                }
-            };
-        }
-
+        const routeResult = this.edgeRouter.computeRoute(model);
         const route = routeResult.route;
 
         const sourceMarkerData = this.renderSourceMarker(model, context);
@@ -299,7 +277,6 @@ export abstract class GEdgeView implements IView {
             return [];
         }
 
-        // Place the badge at the midpoint of the middle route segment.
         const midIndex = Math.floor(route.length / 2);
         const midPoint = PointUtil.linear(route[midIndex - 1], route[midIndex], 0.5);
 

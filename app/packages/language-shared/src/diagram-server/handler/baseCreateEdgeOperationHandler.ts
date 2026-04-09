@@ -61,11 +61,26 @@ export abstract class BaseCreateEdgeOperationHandler extends BaseOperationHandle
             return undefined;
         }
 
+        const insertedElement: InsertedElementMetadata =
+            result.insertedElement.edge != undefined
+                ? {
+                      ...result.insertedElement,
+                      edge: {
+                          ...result.insertedElement.edge,
+                          meta: {
+                              routingPoints: operation.routingPoints ?? [],
+                              sourceAnchor: operation.sourceAnchor,
+                              targetAnchor: operation.targetAnchor
+                          }
+                      }
+                  }
+                : result.insertedElement;
+
         const metadata = computeInsertionMetadata(
             this.modelState.sourceModel!,
             this.idProvider,
             [result.insertSpecification],
-            [result.insertedElement],
+            [insertedElement],
             this.modelState.metadata
         );
         return new OperationHandlerCommand(this.modelState, result.workspaceEdit, metadata);

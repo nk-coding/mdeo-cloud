@@ -13,9 +13,13 @@ import type { IAsyncClipboardService } from "@eclipse-glsp/client";
  * during the copy event acts as a staleness check on paste.
  */
 export class BrowserClipboardService implements IAsyncClipboardService {
-    /** The current clipboard data identifier. */
+    /**
+     * The current clipboard data identifier.
+     */
     private currentId?: string;
-    /** The in-memory copy of the stored clipboard data. */
+    /**
+     * The in-memory copy of the stored clipboard data.
+     */
     private data?: ClipboardData;
 
     clear(): void {

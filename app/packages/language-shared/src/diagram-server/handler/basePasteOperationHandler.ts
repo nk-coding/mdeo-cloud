@@ -30,11 +30,17 @@ const { PasteOperation: PasteOperationKind } = sharedImport("@eclipse-glsp/proto
  * each unresolved cross-reference encountered while preparing pasted nodes.
  */
 export interface ReferenceResolutionContext {
-    /** The property name on the owner node that holds this reference. */
+    /**
+     * The property name on the owner node that holds this reference.
+     */
     readonly propertyName: string;
-    /** The immediate owner of this reference. */
+    /**
+     * The immediate owner of this reference.
+     */
     readonly ownerNode: AstNode;
-    /** All top-level nodes being pasted in the same operation (resolved refs already present). */
+    /**
+     * All top-level nodes being pasted in the same operation (resolved refs already present).
+     */
     readonly allPastedNodes: AstNode[];
 }
 
@@ -58,7 +64,7 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * data, resolving unique names, resolving cross-references, validating nodes,
      * and delegating insertion to the subclass.
      *
-     * @param operation - The paste operation with clipboard data.
+     * @param operation The paste operation with clipboard data.
      * @returns A command that applies the paste, or {@code undefined} if the
      *   clipboard data is invalid or empty.
      */
@@ -115,10 +121,10 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * entry are updated to the post-rename names using the provided
      * {@code renameMap}, so that callers can directly derive the new element ID.
      *
-     * @param rawClipboardData - The raw clipboard data map from the paste operation.
-     * @param renameMap - Map from original node names to their final names after
+     * @param rawClipboardData The raw clipboard data map from the paste operation.
+     * @param renameMap Map from original node names to their final names after
      *   uniqueness resolution.
-     * @param mousePosition - The last known mouse position in diagram coordinates,
+     * @param mousePosition The last known mouse position in diagram coordinates,
      *   or {@code undefined} when not available.
      * @returns Node positions keyed by final name, and edge data with offset routing
      *   points and renamed class names.
@@ -240,8 +246,8 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * optional references (e.g. enum-type properties in a class) but should
      * cause {@link validateNode} to reject edges whose required ends are missing.
      *
-     * @param refText - The reference text (name) to resolve.
-     * @param context - Contextual information about where the reference appears.
+     * @param refText The reference text (name) to resolve.
+     * @param context Contextual information about where the reference appears.
      * @returns The resolved AST node, or {@code undefined} if not found.
      */
     protected abstract resolveReference(refText: string, context: ReferenceResolutionContext): AstNode | undefined;
@@ -250,7 +256,7 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * Validates and optionally transforms a single pasted AST node after
      * reference resolution.
      *
-     * @param node - The resolved AST node to validate.
+     * @param node The resolved AST node to validate.
      * @returns The node to include (possibly modified), or {@code undefined} to skip it.
      */
     protected validateNode(node: AstNode): AstNode | undefined {
@@ -266,11 +272,11 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * guaranteed to have both ends resolved; their {@code .ref} fields are safe
      * to access without additional null-checks.
      *
-     * @param astNodes - The prepared AST nodes ready for serialization and insertion.
-     * @param operation - The original paste operation, providing editor context.
-     * @param offsetPositions - Map from final node name to its computed target
+     * @param astNodes The prepared AST nodes ready for serialization and insertion.
+     * @param operation The original paste operation, providing editor context.
+     * @param offsetPositions Map from final node name to its computed target
      *   position in diagram coordinates.
-     * @param offsetEdgeData - Edge routing metadata with renamed and offset routing points.
+     * @param offsetEdgeData Edge routing metadata with renamed and offset routing points.
      * @returns An object containing the workspace edit and optional metadata edits,
      *   or {@code undefined} if no insertion is possible.
      */
@@ -285,11 +291,11 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * Finds the {@link ClipboardEdgeMetadata} entry that matches the given source
      * and target endpoint identifiers.
      *
-     * @param sourceEndName - The name of the source end (object / class name).
-     * @param sourceEndProperty - The property name on the source end (empty string if none).
-     * @param targetEndName - The name of the target end.
-     * @param targetEndProperty - The property name on the target end (empty string if none).
-     * @param offsetEdgeData - The list of clipboard edge metadata entries to search.
+     * @param sourceEndName The name of the source end (object / class name).
+     * @param sourceEndProperty The property name on the source end (empty string if none).
+     * @param targetEndName The name of the target end.
+     * @param targetEndProperty The property name on the target end (empty string if none).
+     * @param offsetEdgeData The list of clipboard edge metadata entries to search.
      * @returns The matching entry, or {@code undefined} if none is found.
      */
     protected findEdgeMetadata(
@@ -312,9 +318,9 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
      * Builds an {@link InsertedElementMetadata} descriptor for a diagram node
      * (non-edge) element.
      *
-     * @param element - The AST node being inserted.
-     * @param type - The diagram element type identifier.
-     * @param position - The target position in diagram coordinates.
+     * @param element The AST node being inserted.
+     * @param type The diagram element type identifier.
+     * @param position The target position in diagram coordinates.
      * @returns The metadata descriptor.
      */
     protected buildNodeElementMetadata(element: AstNode, type: string, position: Point): InsertedElementMetadata {
@@ -324,11 +330,11 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
     /**
      * Builds an {@link InsertedElementMetadata} descriptor for a diagram edge element.
      *
-     * @param element - The AST node being inserted.
-     * @param type - The diagram element type identifier.
-     * @param from - The AST node of the source end.
-     * @param to - The AST node of the target end.
-     * @param edgeMeta - The clipboard edge metadata carrying routing points and anchors.
+     * @param element The AST node being inserted.
+     * @param type The diagram element type identifier.
+     * @param from The AST node of the source end.
+     * @param to The AST node of the target end.
+     * @param edgeMeta The clipboard edge metadata carrying routing points and anchors.
      * @returns The metadata descriptor.
      */
     protected buildEdgeElementMetadata(
@@ -358,8 +364,12 @@ export abstract class BasePasteOperationHandler extends BaseOperationHandler {
  * Result of inserting pasted nodes into the document.
  */
 export interface PasteInsertionResult {
-    /** The workspace edit that inserts the serialized node text into the document. */
+    /**
+     * The workspace edit that inserts the serialized node text into the document.
+     */
     workspaceEdit: WorkspaceEdit;
-    /** Optional metadata edits for the newly created nodes (positions, types, etc.). */
+    /**
+     * Optional metadata edits for the newly created nodes (positions, types, etc.).
+     */
     metadataEdits?: MetadataEdits;
 }
