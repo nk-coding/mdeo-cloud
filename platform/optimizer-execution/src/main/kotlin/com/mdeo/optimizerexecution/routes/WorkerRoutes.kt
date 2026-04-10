@@ -50,6 +50,10 @@ fun Route.workerRoutes(workerService: WorkerService, orchestratorRegistry: Orche
         orchestratorWsRoute(workerService)
     }
 
+    route("/ws/worker/executions/{id}/peer-solutions") {
+        peerSolutionFetchWsRoute(workerService)
+    }
+
     route("/ws/subprocess/executions/{executionId}/{nodeId}") {
         subprocessWsRoute(orchestratorRegistry)
     }
@@ -144,7 +148,7 @@ private fun Route.cleanupRoute(workerService: WorkerService) {
  * The orchestrator connects here after successful HTTP allocation and keeps this
  * connection open for the entire execution. Binary CBOR frames carry [WorkerWsMessage]
  * values encoding unified per-generation work batches ([NodeWorkBatchRequest]) and
- * solution fetch requests ([SolutionFetchRequest]).
+ * solution batch fetch requests ([SolutionBatchFetchRequest]).
  *
  * @param workerService The worker service that drives the session.
  */
@@ -156,6 +160,27 @@ private fun Route.orchestratorWsRoute(workerService: WorkerService) {
             return@webSocket
         }
         workerService.handleOrchestratorSession(executionId, this)
+    }
+}
+
+
+/**
+ * WebSocket `/ws/worker/executions/{id}/peer-solutions` — persistent peer solution fetch session.
+ *
+ * Peer worker subprocesses connect here to fetch model data for solutions they are
+ * importing during rebalancing. The connection is kept alive for the execution duration
+ * so that multiple generation rounds can reuse it without reconnect overhead.
+ *
+ * @param workerService The worker service that serves solution data from its byte store.
+ */
+private fun Route.peerSolutionFetchWsRoute(workerService: WorkerService) {
+    webSocket {
+        val executionId = call.parameters["id"]
+        if (executionId == null) {
+            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Missing execution ID"))
+            return@webSocket
+        }
+        workerService.handlePeerSolutionFetchSession(executionId, this)
     }
 }
 

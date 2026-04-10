@@ -27,14 +27,17 @@ data class NodeBatch(
 )
 
 /**
- * Inline serialized model for a solution being imported into a node during rebalancing.
+ * Reference to a solution being imported into a node during rebalancing.
+ *
+ * The orchestrator provides the source node ID; the federated evaluator resolves it
+ * to the peer-solutions WebSocket URL before passing it to the destination worker.
  *
  * @param solutionId The identifier the solution should be registered under.
- * @param serializedModel The serialized model graph to reconstitute on arrival.
+ * @param sourceNodeId The node ID of the worker that currently owns this solution.
  */
 data class SolutionImportData(
     val solutionId: String,
-    val serializedModel: SerializedModel
+    val sourceNodeId: String
 )
 
 /**

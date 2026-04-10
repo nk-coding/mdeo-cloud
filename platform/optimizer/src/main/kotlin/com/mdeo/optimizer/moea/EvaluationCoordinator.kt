@@ -63,7 +63,6 @@ class EvaluationCoordinator(
         val liveRefs = currentPopulation.mapNotNull { it.getWorkerRef() }.toSet()
         val discarded = allKnownRefs - liveRefs
         if (discarded.isNotEmpty()) {
-            logger.info("Queuing {} solutions for deferred discard", discarded.size)
             pendingDiscards.addAll(discarded)
             allKnownRefs.removeAll(discarded)
         }
@@ -73,13 +72,6 @@ class EvaluationCoordinator(
             nodeIds = evaluator.getNodeIds().toList(),
             lastBatchPerNode = lastBatchPerNode
         )
-        if (pendingRebalancePlan.isNotEmpty()) {
-            logger.info(
-                "Rebalancing plan: {} transfers, {} solutions total",
-                pendingRebalancePlan.size,
-                pendingRebalancePlan.sumOf { it.solutionIds.size }
-            )
-        }
     }
 
     /**
@@ -213,7 +205,13 @@ class EvaluationCoordinator(
         val discards = pendingDiscards.toList()
         pendingDiscards.clear()
 
-        val batches = buildNodeBatches(mutationTasks, evaluationTasks, importsByDestNode, rebalanceDiscardsByNode, discards)
+        for ((srcNodeId, solutionIds) in rebalanceDiscardsByNode) {
+            for (solutionId in solutionIds) {
+                pendingDiscards.add(WorkerSolutionRef(srcNodeId, solutionId))
+            }
+        }
+
+        val batches = buildNodeBatches(mutationTasks, evaluationTasks, importsByDestNode, emptyMap(), discards)
         val results = runBlocking { evaluator.executeNodeBatches(batches) }
 
         val evaluationFailure = results.firstOrNull { it.errorMessage != null }
@@ -283,12 +281,13 @@ class EvaluationCoordinator(
     }
 
     /**
-     * Pre-fetches serialized models for all solutions in the rebalance plan and organises the
-     * results into per-destination import lists and per-source discard lists.
+     * Builds per-destination import reference lists and per-source discard lists from the
+     * rebalance plan, without fetching any model data.
      *
-     * Solutions are fetched using [MutationEvaluator.getSolutionDataBatch], which groups them
-     * by source node and issues one batched request per worker — reducing the number of
-     * round trips compared to individual fetches.
+     * The destination workers are responsible for pulling model data directly from their
+     * source peers via the peer-solutions WebSocket endpoint. The orchestrator only passes
+     * the [SolutionImportData] reference (solution ID + source peer URL) along with the
+     * normal work batch, keeping itself off the data path.
      *
      * @param rebalancePlan The transfers planned by [PopulationRebalancer].
      * @return Pair of (importsByDestNode, rebalanceDiscardsByNode).
@@ -301,19 +300,10 @@ class EvaluationCoordinator(
         val importsByDestNode = mutableMapOf<String, MutableList<SolutionImportData>>()
         val rebalanceDiscardsByNode = mutableMapOf<String, MutableList<String>>()
 
-        val allRefs = rebalancePlan.flatMap { transfer ->
-            transfer.solutionIds.map { solutionId ->
-                WorkerSolutionRef(transfer.sourceNodeId, solutionId)
-            }
-        }
-        val fetchedModels = runBlocking { evaluator.getSolutionDataBatch(allRefs) }
-
         for (transfer in rebalancePlan) {
             for (solutionId in transfer.solutionIds) {
-                val serializedModel = fetchedModels[solutionId]
-                    ?: error("Missing fetched model for solution $solutionId")
                 importsByDestNode.getOrPut(transfer.destinationNodeId) { mutableListOf() }
-                    .add(SolutionImportData(solutionId, serializedModel))
+                    .add(SolutionImportData(solutionId, transfer.sourceNodeId))
             }
             rebalanceDiscardsByNode.getOrPut(transfer.sourceNodeId) { mutableListOf() }
                 .addAll(transfer.solutionIds)

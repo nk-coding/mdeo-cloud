@@ -379,11 +379,15 @@ class OptimizerExecutionService(
             val result = try {
                 orchestrator.run { generation ->
                     val approxEvaluations = generation * config.solver.parameters.population
-                    updateProgress(
-                        executionId,
-                        "Generation $generation (~$approxEvaluations evaluations)",
-                        jwtToken
-                    )
+                    // Fire-and-forget: state persistence and backend notification must not
+                    // block the optimization loop from advancing to the next generation.
+                    executionScope.launch {
+                        updateProgress(
+                            executionId,
+                            "Generation $generation (~$approxEvaluations evaluations)",
+                            jwtToken
+                        )
+                    }
                     checkCancelled(executionId)
                 }
             } catch (e: CancellationException) {

@@ -1,6 +1,5 @@
 package com.mdeo.optimizer.worker
 
-import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.GoalConfig
@@ -124,18 +123,22 @@ data class BatchResult(
 )
 
 /**
- * A single solution with its serialized model, used for rebalancing imports
- * embedded inline in a [com.mdeo.optimizer.worker.NodeWorkBatchRequest].
+ * Reference used in a [com.mdeo.optimizer.worker.NodeWorkBatchRequest] to tell the
+ * destination worker which solution to fetch and from which peer.
  *
- * @param solutionId Identifier of the solution being transferred.
- * @param serializedModel Serialized model graph for reconstitution on the receiving worker.
+ * The destination worker opens (or reuses) a persistent WebSocket connection to
+ * [sourcePeerWsUrl] and requests the model data directly, without the orchestrator
+ * acting as an intermediary data proxy.
+ *
+ * @param solutionId Identifier of the solution being imported.
+ * @param sourcePeerWsUrl Full WebSocket URL of the peer-solutions endpoint on the
+ *   source worker, e.g. `ws://node-1:8080/ws/worker/executions/{id}/peer-solutions`.
  */
 @Serializable
-data class SolutionTransferItem(
+data class SolutionImportRef(
     val solutionId: String,
-    val serializedModel: SerializedModel
+    val sourcePeerWsUrl: String
 )
-
 /**
  * Metadata describing a worker node's capabilities and resource availability.
  *

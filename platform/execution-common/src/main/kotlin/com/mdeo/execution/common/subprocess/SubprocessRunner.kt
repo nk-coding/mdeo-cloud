@@ -194,7 +194,6 @@ class SubprocessRunner(
                 val id = executionId
                 if (id != null) {
                     val cancelled = cancellationCheck(id)
-                    logger.debug("Cancellation check for execution {}: cancelled={}", id, cancelled)
                     if (cancelled) {
                         if (destroyed.compareAndSet(false, true)) {
                             logger.info("Execution {} cancelled, destroying subprocess", id)

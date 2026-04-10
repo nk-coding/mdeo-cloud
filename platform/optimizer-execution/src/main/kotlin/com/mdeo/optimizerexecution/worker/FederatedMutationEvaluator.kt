@@ -208,7 +208,13 @@ class FederatedMutationEvaluator(
         return try {
             val response = worker.executeNodeBatch(
                 executionId,
-                imports = batch.imports.map { SolutionTransferItem(it.solutionId, it.serializedModel) },
+                importRefs = batch.imports.map { importData ->
+                    val sourceWorker = requireWorker(importData.sourceNodeId)
+                    SolutionImportRef(
+                        solutionId = importData.solutionId,
+                        sourcePeerWsUrl = sourceWorker.peerSolutionsWsUrl(executionId)
+                    )
+                },
                 tasks = batch.tasks.map { BatchTask(it.solutionId) },
                 evaluationTasks = batch.evaluationTasks.map { BatchEvaluationTask(it.solutionId) },
                 discards = batch.discards

@@ -241,6 +241,57 @@ class WorkerService(
 
 
     /**
+     * Services a long-lived WebSocket connection from a peer worker node that needs to
+     * fetch solution model data for rebalancing imports.
+     *
+     * The peer sends [SolutionBatchFetchRequest] messages; this method responds with one
+     * [SolutionBatchFetchResponse] per request carrying all models at once, reading model
+     * bytes directly from the parent-process byte store. The connection is kept alive until the peer closes it
+     * so that multiple fetch rounds can reuse the same session without reconnect overhead.
+     *
+     * @param executionId The execution identifier whose solutions may be requested.
+     * @param session The established WebSocket session opened by the peer.
+     */
+    suspend fun handlePeerSolutionFetchSession(executionId: String, session: DefaultWebSocketSession) {
+        val state = executions[executionId]
+        if (state == null) {
+            logger.warn("Peer solution fetch session for unknown execution {}", executionId)
+            return
+        }
+        logger.info("Peer solution fetch session opened for execution {}", executionId)
+        try {
+            for (frame in session.incoming) {
+                if (frame !is Frame.Binary) continue
+                val msg = try {
+                    cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
+                } catch (e: Exception) {
+                    logger.warn("Malformed peer fetch frame for execution {}: {}", executionId, e.message)
+                    continue
+                }
+                if (msg is SolutionBatchFetchRequest) {
+                    val solutions = mutableListOf<SolutionData>()
+                    val notFoundIds = mutableListOf<String>()
+                    for (solutionId in msg.solutionIds) {
+                        val bytes = state.solutions[solutionId]
+                        if (bytes == null) {
+                            logger.warn("Peer fetch: solution {} not found in execution {}", solutionId, executionId)
+                            notFoundIds.add(solutionId)
+                            continue
+                        }
+                        val serializedModel = cbor.decodeFromByteArray<SerializedModel>(bytes)
+                        solutions.add(SolutionData(solutionId, serializedModel))
+                    }
+                    session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(
+                        SolutionBatchFetchResponse(msg.requestId, solutions, notFoundIds)
+                    )))
+                }
+            }
+        } finally {
+            logger.info("Peer solution fetch session closed for execution {}", executionId)
+        }
+    }
+
+    /**
      * Services a long-lived WebSocket connection from the orchestrator.
      *
      * **Legacy mode**: Each incoming [WorkerWsMessage] is dispatched via
@@ -388,8 +439,10 @@ class WorkerService(
         return { payload, _ ->
             try {
                 when (val msg = cbor.decodeFromByteArray<SubprocessChannelMessage>(payload)) {
-                    is SubprocessChannelMessage.SolutionStored -> {
-                        solutions[msg.solutionId] = msg.modelBytes
+                    is SubprocessChannelMessage.SolutionsStored -> {
+                        for (solution in msg.solutions) {
+                            solutions[solution.solutionId] = solution.modelBytes
+                        }
                     }
                     is SubprocessChannelMessage.SolutionsDiscarded -> {
                         for (id in msg.solutionIds) {
@@ -569,11 +622,6 @@ class WorkerService(
             }
             val cancelled = state == null || state == ExecutionState.CANCELLED
             logger.warn("Cancellation check for execution {}: {} (dbState={})", executionId, if (cancelled) { "CANCELLED" } else { "not cancelled" }, state)
-            if (cancelled) {
-                logger.info("Cancellation check for execution {}: CANCELLED (dbState={})", executionId, state)
-            } else {
-                logger.debug("Cancellation check for execution {}: not cancelled (dbState={})", executionId, state)
-            }
             cancelled
         } catch (e: Exception) {
             logger.warn("Cancellation check for execution {} failed: {}", executionId, e.message)

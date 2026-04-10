@@ -146,7 +146,7 @@ class WorkerSubprocessLocalChannelTest {
                         responseLatch.countDown()
                     }
                 } catch (_: Exception) {
-                    // Ignore non-orchestrator channel messages (e.g. SolutionStored)
+                    // Ignore non-orchestrator channel messages (e.g. SolutionsStored)
                 }
             }
         )
@@ -166,7 +166,7 @@ class WorkerSubprocessLocalChannelTest {
 
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "test-req-1",
-                imports = emptyList(),
+                importRefs = emptyList(),
                 tasks = listOf(BatchTask(initialSolutionId)),
                 discards = emptyList()
             )
@@ -226,7 +226,7 @@ class WorkerSubprocessLocalChannelTest {
                             discardedIds.addAll(msg.solutionIds)
                             discardedLatch.countDown()
                         }
-                        else -> { /* other channel messages (SolutionStored, …) */ }
+                        else -> { /* other channel messages (SolutionsStored, …) */ }
                     }
                 } catch (_: Exception) {}
             }
@@ -247,7 +247,7 @@ class WorkerSubprocessLocalChannelTest {
             // Send a batch with no tasks but with a discard
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "req-discard",
-                imports = emptyList(),
+                importRefs = emptyList(),
                 tasks = emptyList(),
                 discards = listOf(initialId)
             )
@@ -264,6 +264,93 @@ class WorkerSubprocessLocalChannelTest {
 
             assertEquals(1, discardedIds.size)
             assertEquals(initialId, discardedIds[0])
+        } finally {
+            runner.destroy()
+        }
+    }
+
+    /**
+     * Verifies that setup does not redundantly mirror initial solutions over the channel,
+     * and that mutation offspring are mirrored back in one batched store message.
+     */
+    @Test
+    @Timeout(60)
+    fun `subprocess batches stored solution updates in local-channel mode`() {
+        val objPath = "test://obj.fn"
+        val objFn = "objective"
+        val scriptAstJsons = mapOf(objPath to scriptJson.encodeToString(constantDoubleAst(objFn)))
+        val goalConfig = GoalConfig(
+            objectives = listOf(ObjectiveConfig(ObjectiveTendency.MINIMIZE, objPath, objFn)),
+            constraints = emptyList()
+        )
+
+        val responses = CopyOnWriteArrayList<WorkerWsMessage>()
+        val storedBatches = CopyOnWriteArrayList<SubprocessChannelMessage.SolutionsStored>()
+        val responseLatch = CountDownLatch(1)
+        val storedLatch = CountDownLatch(1)
+
+        val runner = SubprocessRunner(
+            mainClass = WorkerSubprocessMain::class.java.name,
+            onChannelMessage = { payload, _ ->
+                try {
+                    when (val msg = cbor.decodeFromByteArray<SubprocessChannelMessage>(payload)) {
+                        is SubprocessChannelMessage.OrchestratorResponses -> {
+                            for (p in msg.payloads) {
+                                responses.add(cbor.decodeFromByteArray<WorkerWsMessage>(p))
+                            }
+                            responseLatch.countDown()
+                        }
+                        is SubprocessChannelMessage.SolutionsStored -> {
+                            storedBatches.add(msg)
+                            storedLatch.countDown()
+                        }
+                        else -> { /* ignore */ }
+                    }
+                } catch (_: Exception) {}
+            }
+        )
+
+        try {
+            assertTrue(runner.start(startupTimeoutMs = 30_000L), "Subprocess failed to start")
+
+            val setup = buildSetup(scriptAstJsons = scriptAstJsons, goalConfig = goalConfig)
+            val setupResult = runner.sendCommand(cbor.encodeToByteArray<WorkerSubprocessRequest>(setup))
+            val setupOk = cbor.decodeFromByteArray<WorkerSubprocessResponse>(
+                (setupResult as com.mdeo.execution.common.subprocess.SubprocessResult.Success).data
+            ) as? WorkerSubprocessResponse.SetupOk
+            requireNotNull(setupOk) { "Expected SetupOk but got $setupResult" }
+            assertEquals(1, setupOk.solutions.size, "Expected one initial solution")
+            assertTrue(storedBatches.isEmpty(), "Setup should not emit redundant SolutionsStored messages")
+
+            val initialSolutionId = setupOk.solutions[0].solutionId
+            val batchRequest = NodeWorkBatchRequest(
+                requestId = "req-batched-store",
+                importRefs = emptyList(),
+                tasks = listOf(BatchTask(initialSolutionId), BatchTask(initialSolutionId)),
+                discards = emptyList()
+            )
+            runner.sendChannelMessage(
+                cbor.encodeToByteArray<SubprocessChannelMessage>(
+                    SubprocessChannelMessage.OrchestratorRequest(
+                        cbor.encodeToByteArray<WorkerWsMessage>(batchRequest)
+                    )
+                )
+            )
+
+            assertTrue(responseLatch.await(30, TimeUnit.SECONDS), "Timed out waiting for batch response")
+            assertTrue(storedLatch.await(30, TimeUnit.SECONDS), "Timed out waiting for SolutionsStored signal")
+
+            val batchResponse = responses.singleOrNull() as? NodeWorkBatchResponse
+            requireNotNull(batchResponse) { "Expected NodeWorkBatchResponse but got $responses" }
+            assertEquals(2, batchResponse.results.size)
+
+            assertEquals(1, storedBatches.size, "Expected one batched SolutionsStored message")
+            val storedBatch = storedBatches.single()
+            assertEquals(2, storedBatch.solutions.size)
+            val storedSolutionIds = storedBatch.solutions.map { it.solutionId }.toSet()
+            val resultSolutionIds = batchResponse.results.map { it.newSolutionId }.toSet()
+            assertEquals(resultSolutionIds, storedSolutionIds)
+            assertTrue(storedBatch.solutions.all { it.modelBytes.isNotEmpty() })
         } finally {
             runner.destroy()
         }

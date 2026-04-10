@@ -107,10 +107,22 @@ class DistributedOptimizationTest {
          * processing imports, mutations, and discards atomically.
          */
         override suspend fun executeNodeBatches(batches: List<NodeBatch>): List<EvaluationResult> {
+            // Pre-fetch all imports before any batch executes, to avoid racing with discards.
+            for (batch in batches) {
+                val destEvaluator = evaluatorByNodeId[batch.nodeId]
+                    ?: error("No evaluator for nodeId: ${batch.nodeId}")
+                for (importData in batch.imports) {
+                    val sourceEvaluator = evaluatorByNodeId[importData.sourceNodeId]
+                        ?: error("No evaluator for sourceNodeId: ${importData.sourceNodeId}")
+                    val ref = WorkerSolutionRef(nodeId = importData.sourceNodeId, solutionId = importData.solutionId)
+                    val serializedModel = sourceEvaluator.getSolutionData(ref)
+                    destEvaluator.receiveSolution(importData.solutionId, serializedModel)
+                }
+            }
             return batches.flatMap { batch ->
                 val evaluator = evaluatorByNodeId[batch.nodeId]
                     ?: error("No evaluator for nodeId: ${batch.nodeId}")
-                evaluator.executeNodeBatches(listOf(batch))
+                evaluator.executeNodeBatches(listOf(batch.copy(imports = emptyList())))
             }
         }
 

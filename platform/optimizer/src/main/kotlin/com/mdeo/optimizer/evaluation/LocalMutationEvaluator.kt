@@ -9,6 +9,7 @@ import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy
 import com.mdeo.optimizer.solution.Solution
+import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -36,6 +37,7 @@ class LocalMutationEvaluator(
     private val graphBackendType: GraphBackendType = GraphBackendType.MDEO
 ) : MutationEvaluator {
 
+    private val logger = LoggerFactory.getLogger(LocalMutationEvaluator::class.java)
     private val solutions: ConcurrentHashMap<String, Solution> = ConcurrentHashMap()
 
     override fun getNodeIds(): Set<String> = setOf(nodeId)
@@ -61,8 +63,11 @@ class LocalMutationEvaluator(
     override suspend fun executeNodeBatches(batches: List<NodeBatch>): List<EvaluationResult> {
         val batch = batches.firstOrNull { it.nodeId == nodeId } ?: return emptyList()
 
-        for (import in batch.imports) {
-            receiveSolution(import.solutionId, import.serializedModel)
+        // In federated mode the subprocess handles peer fetching before calling this
+        // method, so imports arrive here as an empty list. In local (single-node) mode
+        // rebalancing never triggers, so imports are always empty as well.
+        if (batch.imports.isNotEmpty()) {
+            logger.warn("LocalMutationEvaluator received {} import reference(s) — cannot fetch from peer; imports skipped", batch.imports.size)
         }
 
         val mutationResults = batch.tasks.map { task -> evaluateSingle(task) }

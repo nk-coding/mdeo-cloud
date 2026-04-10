@@ -9,14 +9,12 @@ import com.mdeo.expression.ast.statements.TypedReturnStatement
 import com.mdeo.expression.ast.statements.TypedStatement
 import com.mdeo.expression.ast.statements.TypedWhileStatement
 import com.mdeo.expression.ast.types.ClassTypeRef
-import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.*
 import com.mdeo.optimizer.worker.BatchTask
 import com.mdeo.optimizer.worker.NodeWorkBatchRequest
 import com.mdeo.optimizer.worker.NodeWorkBatchResponse
-import com.mdeo.optimizer.worker.SolutionTransferItem
 import com.mdeo.optimizer.worker.WorkerAllocationRequest
 import com.mdeo.optimizerexecution.routes.workerRoutes
 import com.mdeo.optimizerexecution.service.OrchestratorRegistry
@@ -174,7 +172,7 @@ class WorkerServiceTest {
             val parentId = allocResponse.initialSolutions[0].solutionId
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "req-1",
-                imports = emptyList(),
+                importRefs = emptyList(),
                 tasks = listOf(BatchTask(parentId)),
                 discards = emptyList()
             )
@@ -202,8 +200,8 @@ class WorkerServiceTest {
      * Verifies that a per-mutation timeout kills an infinite-loop constraint script.
      *
      * The constraint is defined as `while (true) {}` (loops forever). Allocation is done
-     * with [initialSolutionCount] = 0 so the constraint is NOT evaluated during setup.
-     * A seed is imported, then mutation triggers the infinite loop. The child-process
+     * with [initialSolutionCount] = 1 and initialization does not invoke guidance functions,
+     * so setup completes normally. Mutation then triggers the infinite loop. The child-process
      * watchdog fires, the subprocess halts, and [dispatchToSubprocess] returns an empty
      * list (no valid response) once the process-exit callback cancels the pending deferred.
      */
@@ -225,26 +223,15 @@ class WorkerServiceTest {
                 buildRequest(
                     scriptAstJsons = scriptAstJsons,
                     goalConfig = goalConfig,
-                    initialSolutionCount = 0
+                    initialSolutionCount = 1
                 )
             )
-            assertEquals(0, allocResponse.initialSolutions.size)
+            assertEquals(1, allocResponse.initialSolutions.size)
 
-            val seedModel = SerializedModel.AsModelData(
-                ModelData(metamodelPath = "", instances = emptyList(), links = emptyList())
-            )
-            val seedId = "seed-solution"
-            val importBatch = NodeWorkBatchRequest(
-                requestId = "import-req",
-                imports = listOf(SolutionTransferItem(seedId, seedModel)),
-                tasks = emptyList(),
-                discards = emptyList()
-            )
-            service.dispatchToSubprocess("test-exec", importBatch)
-
+            val seedId = allocResponse.initialSolutions[0].solutionId
             val mutateBatch = NodeWorkBatchRequest(
                 requestId = "mutate-req",
-                imports = emptyList(),
+                importRefs = emptyList(),
                 tasks = listOf(BatchTask(seedId)),
                 discards = emptyList()
             )
@@ -324,22 +311,18 @@ class WorkerServiceTest {
                 scriptAstJsons = scriptAstJsons,
                 goalConfig = goalConfig,
                 solverConfig = SolverConfig(),
-                initialSolutionCount = 0,
+                initialSolutionCount = 1,
                 useLocalChannel = true,
                 threadsPerNode = 1
             )
-            client.allocate(allocRequest)
-
-            val seedId = "seed-1"
-            val seedModel = SerializedModel.AsModelData(
-                ModelData(metamodelPath = "", instances = emptyList(), links = emptyList())
-            )
+            val allocResponse = client.allocate(allocRequest)
+            val seedId = allocResponse.initialSolutions.first().solutionId
 
             val exception = assertThrows<WorkerShutdownException> {
                 runBlocking {
                     client.executeNodeBatch(
                         executionId,
-                        imports = listOf(SolutionTransferItem(seedId, seedModel)),
+                        importRefs = emptyList(),
                         tasks = listOf(BatchTask(seedId)),
                         evaluationTasks = emptyList(),
                         discards = emptyList()

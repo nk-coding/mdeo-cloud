@@ -27,14 +27,19 @@ sealed class WorkerWsMessage {
 /**
  * Orchestrator → Worker: execute one generation of work atomically.
  *
- * Combines solution imports (from rebalancing), mutation tasks, evaluation-only tasks,
- * and discards into a single message so that the orchestrator requires exactly one
- * round trip per worker per generation. The worker processes these in order: store
- * imports, execute mutations, execute evaluations, drop discards.
+ * Combines solution import references (for rebalancing), mutation tasks, evaluation-only
+ * tasks, and discards into a single message so that the orchestrator requires exactly one
+ * round trip per worker per generation. The worker processes these in order: fetch and
+ * store imports from peer nodes, execute mutations, execute evaluations, drop discards.
+ *
+ * Import model data is NOT pre-fetched by the orchestrator. Instead, the worker opens
+ * (or reuses) a persistent WebSocket connection to each source peer and pulls the data
+ * directly, keeping the orchestrator off the data path.
  *
  * @param requestId Correlation identifier echoed in [NodeWorkBatchResponse].
- * @param imports Solutions being transferred to this node from other nodes;
- *   model data is pre-fetched by the orchestrator and embedded inline.
+ * @param importRefs References to solutions being imported from other nodes;
+ *   each entry carries only a solution ID and the source peer WebSocket URL — the
+ *   worker fetches the actual model data from the peer itself.
  * @param tasks Existing solutions on this node to mutate and evaluate.
  * @param evaluationTasks Solutions on this node to evaluate without mutation
  *   (e.g. newly initialized solutions needing fitness computation).
@@ -45,7 +50,7 @@ sealed class WorkerWsMessage {
 @SerialName("node_work_batch_request")
 data class NodeWorkBatchRequest(
     override val requestId: String,
-    val imports: List<SolutionTransferItem>,
+    val importRefs: List<SolutionImportRef>,
     val tasks: List<BatchTask>,
     val evaluationTasks: List<BatchEvaluationTask> = emptyList(),
     val discards: List<String>
@@ -67,31 +72,13 @@ data class NodeWorkBatchResponse(
 
 
 /**
- * Orchestrator → Worker: retrieve the full model data for a specific solution.
- *
- * Used when the orchestrator needs to pre-fetch model data for solutions that are
- * being rebalanced to another node (to embed inline in the destination's batch).
- * Also used at the end of an execution to fetch final population model data.
- *
- * @param requestId Correlation identifier echoed in [SolutionFetchResponse].
- * @param solutionId Identifier of the solution whose model data is requested.
- */
-@OptIn(ExperimentalSerializationApi::class)
-@Serializable
-@SerialName("solution_fetch_request")
-data class SolutionFetchRequest(
-    override val requestId: String,
-    val solutionId: String
-) : WorkerWsMessage()
-
-/**
  * Orchestrator → Worker: retrieve model data for multiple solutions in one request.
  *
- * Batches several solution IDs into a single message to reduce round-trip overhead
- * during rebalancing. The worker responds with one [SolutionFetchResponse] per
- * requested solution, all sharing the same [requestId].
+ * Batches several solution IDs into a single message to reduce round-trip overhead.
+ * The worker responds with a single [SolutionBatchFetchResponse] carrying all
+ * requested models (and any not-found IDs) at once.
  *
- * @param requestId Correlation identifier echoed in each [SolutionFetchResponse].
+ * @param requestId Correlation identifier echoed in [SolutionBatchFetchResponse].
  * @param solutionIds Identifiers of the solutions whose model data is requested.
  */
 @OptIn(ExperimentalSerializationApi::class)
@@ -103,21 +90,36 @@ data class SolutionBatchFetchRequest(
 ) : WorkerWsMessage()
 
 /**
- * Worker → Orchestrator: serialized model for a requested solution.
+ * Worker → Orchestrator/Peer: all solution models for a [SolutionBatchFetchRequest].
  *
- * @param requestId Matches [SolutionFetchRequest.requestId] or [SolutionBatchFetchRequest.requestId].
- * @param solutionId The solution this response carries data for.
- * @param serializedModel Serialized model graph for the solution.
+ * Carries every available serialized model together with a list of IDs that were
+ * requested but not found, all in a single frame so no separate completion signal
+ * is required.
+ *
+ * @param requestId Matches [SolutionBatchFetchRequest.requestId].
+ * @param solutions The fetched solutions with their serialized models.
+ * @param notFoundIds Solution IDs that were requested but not present on this node.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@SerialName("solution_fetch_response")
-data class SolutionFetchResponse(
+@SerialName("solution_batch_fetch_response")
+data class SolutionBatchFetchResponse(
     override val requestId: String,
-    val solutionId: String,
-    val serializedModel: SerializedModel
+    val solutions: List<SolutionData>,
+    val notFoundIds: List<String> = emptyList()
 ) : WorkerWsMessage()
 
+/**
+ * A single solution's data within a [SolutionBatchFetchResponse].
+ *
+ * @param solutionId Identifier of the solution.
+ * @param serializedModel Serialized model graph for the solution.
+ */
+@Serializable
+data class SolutionData(
+    val solutionId: String,
+    val serializedModel: SerializedModel
+)
 
 /**
  * Worker → Orchestrator: the worker subprocess is about to shut down.

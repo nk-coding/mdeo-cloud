@@ -463,6 +463,25 @@ class MdeoModelGraphTest {
         assertTrue(foundDifferentOrder, "Expected vertex order to change after resetNondeterminism")
     }
 
+    @Test
+    fun resetNondeterminism_shufflesLabelFilteredVertexOrder() {
+        var foundDifferentOrder = false
+        val originalOrder = mdeoGraph.traversal().V().hasLabel("Room").id().toList()
+        val expectedIds = originalOrder.sortedBy { it.toString() }
+
+        for (i in 0 until 20) {
+            mdeoGraph.resetNondeterminism()
+            val newOrder = mdeoGraph.traversal().V().hasLabel("Room").id().toList()
+            assertEquals(expectedIds, newOrder.sortedBy { it.toString() })
+            if (newOrder != originalOrder) {
+                foundDifferentOrder = true
+                break
+            }
+        }
+
+        assertTrue(foundDifferentOrder, "Expected label-filtered vertex order to change after resetNondeterminism")
+    }
+
     // ========================================================================
     // ModelData Round-trip
     // ========================================================================

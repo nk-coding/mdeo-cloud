@@ -120,11 +120,6 @@ class WorkerClient(
         private set
 
     /**
-     * Pending multi-response correlation: requestId → collector aggregating individual responses.
-     */
-    private val pendingMultiRequests = ConcurrentHashMap<String, MultiResponseCollector>()
-
-    /**
      * The active WebSocket session (resolved once the connection is established).
      *
      * In registry mode this is a [DefaultWebSocketSession] from the server side;
@@ -160,6 +155,18 @@ class WorkerClient(
             baseUrl
         }
     }
+
+    /**
+     * Returns the full WebSocket URL of this worker's peer-solutions endpoint for the given execution.
+     *
+     * Destination workers connect to this URL to fetch solution model data directly from
+     * this peer, without routing through the orchestrator.
+     *
+     * @param executionId The execution identifier shared by all nodes in the run.
+     * @return Full WS URL, e.g. `ws://host:8080/ws/worker/executions/{id}/peer-solutions`.
+     */
+    fun peerSolutionsWsUrl(executionId: String): String =
+        "$wsBaseUrl/ws/worker/executions/$executionId/peer-solutions"
 
     /**
      * Allocates resources on the worker for a new optimization execution.
@@ -255,15 +262,16 @@ class WorkerClient(
     }
 
     /**
-     * Sends a unified work batch to the worker: solution imports (rebalancing), mutation tasks,
-     * evaluation-only tasks, and solution discards, all in a single [NodeWorkBatchRequest] message.
+     * Sends a unified work batch to the worker: solution import references (for peer-fetching),
+     * mutation tasks, evaluation-only tasks, and solution discards, all in a single
+     * [NodeWorkBatchRequest] message.
      *
-     * The worker processes the phases atomically — imports first, then mutations, then evaluations,
-     * then discards — and returns a [NodeWorkBatchResponse] with evaluation results for each task.
+     * The worker resolves each [SolutionImportRef] by connecting directly to the source peer's
+     * WebSocket endpoint and pulling the model data itself. The orchestrator is not involved
+     * in the data transfer.
      *
-     * @param executionId The execution identifier on the worker (used for logging/tracing only; the
-     *        WebSocket session is already scoped to this execution).
-     * @param imports Solutions to import onto this worker (inline model data from the orchestrator).
+     * @param executionId The execution identifier on the worker (used for logging/tracing only).
+     * @param importRefs References to solutions to import from peer nodes (solution ID + source WS URL).
      * @param tasks Mutation tasks referencing existing (or just-imported) solutions.
      * @param evaluationTasks Evaluation-only tasks for solutions that need fitness computation without mutation.
      * @param discards Solution IDs to discard after processing the batch.
@@ -271,23 +279,19 @@ class WorkerClient(
      */
     suspend fun executeNodeBatch(
         executionId: String,
-        imports: List<SolutionTransferItem>,
+        importRefs: List<SolutionImportRef>,
         tasks: List<BatchTask>,
         evaluationTasks: List<BatchEvaluationTask> = emptyList(),
         discards: List<String>
     ): NodeWorkBatchResponse {
         val requestId = newRequestId()
-        if (imports.isNotEmpty()) {
-            logger.info(
-                "[node={}] Sending NodeWorkBatch with {} model import(s), {} task(s), {} eval task(s), {} discard(s) (execution {})",
-                nodeId, imports.size, tasks.size, evaluationTasks.size, discards.size, executionId
-            )
-        }
-        return sendAndReceive(NodeWorkBatchRequest(requestId, imports, tasks, evaluationTasks, discards)) as NodeWorkBatchResponse
+        return sendAndReceive(NodeWorkBatchRequest(requestId, importRefs, tasks, evaluationTasks, discards)) as NodeWorkBatchResponse
     }
 
     /**
      * Retrieves the serialized model for a specific solution from the worker.
+     *
+     * Delegates to [getSolutionDataBatch] with a single-element list.
      *
      * @param executionId The execution identifier on the worker.
      * @param solutionId The identifier of the solution whose model is requested.
@@ -295,16 +299,15 @@ class WorkerClient(
      */
     suspend fun getSolutionData(executionId: String, solutionId: String): SerializedModel {
         logger.info("[node={}] Fetching model for solution {} (execution {})", nodeId, solutionId, executionId)
-        val requestId = newRequestId()
-        val response = sendAndReceive(SolutionFetchRequest(requestId, solutionId)) as SolutionFetchResponse
-        return response.serializedModel
+        return getSolutionDataBatch(executionId, listOf(solutionId))[solutionId]
+            ?: throw IllegalStateException("Solution $solutionId not found on node $nodeId (execution $executionId)")
     }
 
     /**
      * Retrieves serialized models for multiple solutions in a single batched request.
      *
-     * Sends one [SolutionBatchFetchRequest] and collects individual [SolutionFetchResponse]
-     * messages until all requested solutions have been received.
+     * Sends one [SolutionBatchFetchRequest] and receives a single [SolutionBatchFetchResponse]
+     * carrying all requested models at once.
      *
      * @param executionId The execution identifier on the worker.
      * @param solutionIds The solution identifiers to fetch.
@@ -320,13 +323,8 @@ class WorkerClient(
             nodeId, solutionIds.size, executionId
         )
         val requestId = newRequestId()
-        val responses = sendAndReceiveMultiple(
-            SolutionBatchFetchRequest(requestId, solutionIds),
-            expectedCount = solutionIds.size
-        )
-        return responses
-            .filterIsInstance<SolutionFetchResponse>()
-            .associate { it.solutionId to it.serializedModel }
+        val response = sendAndReceive(SolutionBatchFetchRequest(requestId, solutionIds)) as SolutionBatchFetchResponse
+        return response.solutions.associate { it.solutionId to it.serializedModel }
     }
 
     /**
@@ -386,15 +384,7 @@ class WorkerClient(
                         }
                         val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
                         if (handleUnsolicitedMessage(msg, this)) continue
-                        val multi = pendingMultiRequests[msg.requestId]
-                        if (multi != null) {
-                            multi.add(msg)
-                            if (multi.deferred.isCompleted) {
-                                pendingMultiRequests.remove(msg.requestId)
-                            }
-                        } else {
-                            pendingRequests.remove(msg.requestId)?.complete(msg)
-                        }
+                        pendingRequests.remove(msg.requestId)?.complete(msg)
                     }
                     logger.info("Worker WS disconnected from {} (execution {})", baseUrl, executionId)
                     drainPendingRequests(IllegalStateException("WS session closed (node $nodeId, execution $executionId)"))
@@ -429,15 +419,7 @@ class WorkerClient(
                     }
                     val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
                     if (handleUnsolicitedMessage(msg, session)) continue
-                    val multi = pendingMultiRequests[msg.requestId]
-                    if (multi != null) {
-                        multi.add(msg)
-                        if (multi.deferred.isCompleted) {
-                            pendingMultiRequests.remove(msg.requestId)
-                        }
-                    } else {
-                        pendingRequests.remove(msg.requestId)?.complete(msg)
-                    }
+                    pendingRequests.remove(msg.requestId)?.complete(msg)
                 }
                 logger.info("Subprocess WS disconnected for node {} (execution {})", nodeId, executionId)
                 drainPendingRequests(IllegalStateException("WS session closed (node $nodeId, execution $executionId)"))
@@ -502,33 +484,6 @@ class WorkerClient(
     }
 
     /**
-     * Sends a [WorkerWsMessage] and collects [expectedCount] individual responses sharing the same request ID.
-     *
-     * Used for batch requests where the worker replies with multiple messages (one per solution).
-     *
-     * @param msg The batch request message to send.
-     * @param expectedCount Number of individual response messages expected.
-     * @param timeoutMs Maximum time to wait for all responses (default [OPERATION_TIMEOUT_MS]).
-     * @return The collected response messages.
-     */
-    private suspend fun sendAndReceiveMultiple(
-        msg: WorkerWsMessage,
-        expectedCount: Int,
-        timeoutMs: Long = OPERATION_TIMEOUT_MS
-    ): List<WorkerWsMessage> {
-        val session = withTimeout(SESSION_READY_TIMEOUT_MS) { wsSessionDeferred.await() }
-        val collector = MultiResponseCollector(expectedCount)
-        pendingMultiRequests[msg.requestId] = collector
-        try {
-            session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(msg)))
-        } catch (e: Exception) {
-            pendingMultiRequests.remove(msg.requestId)
-            throw e
-        }
-        return withTimeout(timeoutMs) { collector.deferred.await() }
-    }
-
-    /**
      * Completes all pending request deferreds exceptionally and clears the map.
      *
      * Called both on error paths and on normal WS close so that callers never
@@ -545,16 +500,6 @@ class WorkerClient(
         for (key in keys) {
             pendingRequests.remove(key)?.completeExceptionally(cause)
         }
-        val multiKeys = pendingMultiRequests.keys.toList()
-        if (multiKeys.isNotEmpty()) {
-            logger.warn(
-                "[node={}] Draining {} pending multi-request(s) due to WS close: {}",
-                nodeId, multiKeys.size, cause.message
-            )
-        }
-        for (key in multiKeys) {
-            pendingMultiRequests.remove(key)?.deferred?.completeExceptionally(cause)
-        }
     }
 
     /**
@@ -563,36 +508,5 @@ class WorkerClient(
      * @return A new random UUID string.
      */
     private fun newRequestId() = UUID.randomUUID().toString()
-
-    /**
-     * Aggregates multiple response messages sharing the same request ID.
-     *
-     * Thread-safe: the WS read loop may call [add] from any coroutine context.
-     *
-     * @param expectedCount The number of individual responses to collect before completing.
-     */
-    private class MultiResponseCollector(private val expectedCount: Int) {
-        /**
-         * Deferred completed when all [expectedCount] responses have been collected. 
-         */
-        val deferred = CompletableDeferred<List<WorkerWsMessage>>()
-        /**
-         * Accumulator for received response messages. 
-         */
-        private val responses = mutableListOf<WorkerWsMessage>()
-
-        /**
-         * Adds a response message and completes [deferred] once all expected responses arrive.
-         *
-         * @param msg The incoming response message.
-         */
-        @Synchronized
-        fun add(msg: WorkerWsMessage) {
-            responses.add(msg)
-            if (responses.size >= expectedCount) {
-                deferred.complete(responses.toList())
-            }
-        }
-    }
 }
 

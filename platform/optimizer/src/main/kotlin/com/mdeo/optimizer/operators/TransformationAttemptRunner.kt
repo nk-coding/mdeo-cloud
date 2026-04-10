@@ -46,10 +46,7 @@ class TransformationAttemptRunner(
             when (result) {
                 is TransformationExecutionResult.Success -> true
                 is TransformationExecutionResult.Stopped -> result.isNormalStop
-                is TransformationExecutionResult.Failure -> {
-                    logger.warn("Transformation $transformationPath failed: ${result.reason}")
-                    false
-                }
+                is TransformationExecutionResult.Failure -> false
             }
         } catch (e: Exception) {
             logger.warn("Transformation $transformationPath threw exception: ${e.message}")

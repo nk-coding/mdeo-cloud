@@ -12,6 +12,7 @@ import com.mdeo.modeltransformation.runtime.match.MatchResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
+import org.apache.tinkerpop.gremlin.structure.VertexProperty
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -275,6 +276,53 @@ class ListLiteralPropertyAssignmentTest {
         }
         
         assertEquals(42, intValue, "values list should contain [42]")
+    }
+
+    @Test
+    @Timeout(value = 40, unit = TimeUnit.SECONDS)
+    fun `list equality in match should match existing node`() {
+        val existingNode = g.addV("Node")
+            .property(VertexProperty.Cardinality.list, "values", 10)
+            .property(VertexProperty.Cardinality.list, "values", 20)
+            .next()
+
+        val pattern = TypedPattern(
+            elements = listOf(
+                TypedPatternObjectInstanceElement(
+                    objectInstance = TypedPatternObjectInstance(
+                        name = "node",
+                        className = "Node",
+                        modifier = null,
+                        properties = listOf(
+                            TypedPatternPropertyAssignment(
+                                propertyName = "values",
+                                operator = "==",
+                                value = TypedListLiteralExpression(
+                                    evalType = 5,
+                                    elements = listOf(
+                                        TypedIntLiteralExpression(
+                                            evalType = 6,
+                                            value = "10"
+                                        ),
+                                        TypedIntLiteralExpression(
+                                            evalType = 6,
+                                            value = "20"
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        val context = TransformationExecutionContext.empty()
+        val result = executor.executeMatch(pattern, context, engine)
+
+        assertTrue(result is MatchResult.Matched, "Match should succeed for list-valued property equality")
+        result as MatchResult.Matched
+        assertEquals(existingNode.id(), result.instanceMappings["node"]?.rawId)
     }
     
     @Test

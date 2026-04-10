@@ -52,7 +52,7 @@ export class CreateInheritanceOperationHandler extends MetamodelBaseCreateEdgeOp
      */
     private async createExtensionEdge(
         sourceClass: ClassType,
-        targetClass: ClassType,
+        targetClass: ClassType
     ): Promise<CreateEdgeResult | undefined> {
         const classCstNode = sourceClass.$cstNode;
         if (!classCstNode) {

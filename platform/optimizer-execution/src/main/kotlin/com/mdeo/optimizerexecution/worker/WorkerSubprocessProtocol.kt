@@ -144,21 +144,37 @@ data class WorkerInitialSolution(
 sealed class SubprocessChannelMessage {
 
     /**
-     * Subprocess → Parent: a new solution was created (initial or mutation offspring).
+     * CBOR-encoded model bytes for one stored solution.
      *
-     * @param solutionId The identifier of the new solution.
+     * Used by [SolutionsStored] to batch multiple solution-store updates into a single
+     * channel message.
+     *
+     * @param solutionId The identifier of the stored solution.
      * @param modelBytes CBOR-encoded [com.mdeo.metamodel.SerializedModel].
      */
     @Serializable
-    @SerialName("solution_stored")
-    data class SolutionStored(
+    data class StoredSolutionPayload(
         val solutionId: String,
         val modelBytes: ByteArray
-    ) : SubprocessChannelMessage() {
+    ) {
         override fun equals(other: Any?) =
-            other is SolutionStored && solutionId == other.solutionId && modelBytes.contentEquals(other.modelBytes)
+            other is StoredSolutionPayload && solutionId == other.solutionId && modelBytes.contentEquals(other.modelBytes)
         override fun hashCode() = 31 * solutionId.hashCode() + modelBytes.contentHashCode()
     }
+
+    /**
+     * Subprocess → Parent: multiple solutions were stored as part of one worker batch.
+     *
+     * Used to amortize subprocess-channel overhead when a worker batch imports many
+     * solutions or produces many offspring.
+     *
+     * @param solutions Stored solution payloads to merge into the parent's byte store.
+     */
+    @Serializable
+    @SerialName("solutions_stored")
+    data class SolutionsStored(
+        val solutions: List<StoredSolutionPayload>
+    ) : SubprocessChannelMessage()
 
     /**
      * Subprocess → Parent: solutions were discarded.
