@@ -101,29 +101,35 @@ class DistributedOptimizationTest {
 
         /**
          * Delegates each [NodeBatch] to the matching [LocalMutationEvaluator].
-         *
-         * Since each local evaluator was constructed with its canonical nodeId, it will
-         * find the batch by nodeId in [LocalMutationEvaluator.executeNodeBatches],
-         * processing imports, mutations, and discards atomically.
          */
         override suspend fun executeNodeBatches(batches: List<NodeBatch>): List<EvaluationResult> {
-            // Pre-fetch all imports before any batch executes, to avoid racing with discards.
-            for (batch in batches) {
-                val destEvaluator = evaluatorByNodeId[batch.nodeId]
-                    ?: error("No evaluator for nodeId: ${batch.nodeId}")
-                for (importData in batch.imports) {
-                    val sourceEvaluator = evaluatorByNodeId[importData.sourceNodeId]
-                        ?: error("No evaluator for sourceNodeId: ${importData.sourceNodeId}")
-                    val ref = WorkerSolutionRef(nodeId = importData.sourceNodeId, solutionId = importData.solutionId)
-                    val serializedModel = sourceEvaluator.getSolutionData(ref)
-                    destEvaluator.receiveSolution(importData.solutionId, serializedModel)
-                }
-            }
             return batches.flatMap { batch ->
                 val evaluator = evaluatorByNodeId[batch.nodeId]
                     ?: error("No evaluator for nodeId: ${batch.nodeId}")
-                evaluator.executeNodeBatches(listOf(batch.copy(imports = emptyList())))
+                evaluator.executeNodeBatches(listOf(batch))
             }
+        }
+
+        /**
+         * Transfers solutions between in-process evaluators, mirroring the orchestrator push.
+         */
+        override suspend fun pushRebalanceSolutions(
+            transfers: List<com.mdeo.optimizer.moea.RebalanceTransfer>
+        ): Map<String, List<String>> {
+            val discardsBySource = mutableMapOf<String, MutableList<String>>()
+            for (transfer in transfers) {
+                val srcEvaluator = evaluatorByNodeId[transfer.sourceNodeId]
+                    ?: error("No evaluator for sourceNodeId: ${transfer.sourceNodeId}")
+                val destEvaluator = evaluatorByNodeId[transfer.destinationNodeId]
+                    ?: error("No evaluator for destinationNodeId: ${transfer.destinationNodeId}")
+                for (solutionId in transfer.solutionIds) {
+                    val ref = WorkerSolutionRef(nodeId = transfer.sourceNodeId, solutionId = solutionId)
+                    val serializedModel = srcEvaluator.getSolutionData(ref)
+                    destEvaluator.receiveSolution(solutionId, serializedModel)
+                }
+                discardsBySource.getOrPut(transfer.sourceNodeId) { mutableListOf() }.addAll(transfer.solutionIds)
+            }
+            return discardsBySource
         }
 
         override suspend fun getSolutionData(ref: WorkerSolutionRef): SerializedModel {

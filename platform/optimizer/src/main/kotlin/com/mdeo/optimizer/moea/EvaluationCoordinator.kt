@@ -6,7 +6,6 @@ import com.mdeo.optimizer.evaluation.EvaluationTask
 import com.mdeo.optimizer.evaluation.MutationEvaluator
 import com.mdeo.optimizer.evaluation.MutationTask
 import com.mdeo.optimizer.evaluation.NodeBatch
-import com.mdeo.optimizer.evaluation.SolutionImportData
 import com.mdeo.optimizer.evaluation.WorkerSolutionRef
 import kotlinx.coroutines.runBlocking
 import org.moeaframework.core.Solution
@@ -178,7 +177,7 @@ class EvaluationCoordinator(
                 pendingDiscards.clear()
                 runBlocking {
                     val emptyBatches = evaluator.getNodeIds().map { nodeId ->
-                        NodeBatch(nodeId, emptyList(), emptyList(), emptyList(),
+                        NodeBatch(nodeId, emptyList(), emptyList(),
                             discards.filter { it.nodeId == nodeId }.map { it.solutionId })
                     }
                     evaluator.executeNodeBatches(emptyBatches)
@@ -200,18 +199,20 @@ class EvaluationCoordinator(
 
         val rebalancePlan = pendingRebalancePlan
         pendingRebalancePlan = emptyList()
-        val (importsByDestNode, rebalanceDiscardsByNode) = fetchRebalanceData(rebalancePlan)
+
+        // Push solutions between nodes before dispatching the batch so that destination
+        // subprocesses receive model data asynchronously while local tasks are already running.
+        // The push returns the source-node discard map; those discards are included in the
+        // current batch (no deferral needed because the push has already delivered the data).
+        val rebalanceDiscardsByNode = runBlocking { evaluator.pushRebalanceSolutions(rebalancePlan) }
 
         val discards = pendingDiscards.toList()
         pendingDiscards.clear()
 
-        for ((srcNodeId, solutionIds) in rebalanceDiscardsByNode) {
-            for (solutionId in solutionIds) {
-                pendingDiscards.add(WorkerSolutionRef(srcNodeId, solutionId))
-            }
-        }
+        val allDiscards = discards +
+            rebalanceDiscardsByNode.entries.flatMap { (nodeId, ids) -> ids.map { WorkerSolutionRef(nodeId, it) } }
 
-        val batches = buildNodeBatches(mutationTasks, evaluationTasks, importsByDestNode, emptyMap(), discards)
+        val batches = buildNodeBatches(mutationTasks, evaluationTasks, allDiscards)
         val results = runBlocking { evaluator.executeNodeBatches(batches) }
 
         val evaluationFailure = results.firstOrNull { it.errorMessage != null }
@@ -281,63 +282,26 @@ class EvaluationCoordinator(
     }
 
     /**
-     * Builds per-destination import reference lists and per-source discard lists from the
-     * rebalance plan, without fetching any model data.
-     *
-     * The destination workers are responsible for pulling model data directly from their
-     * source peers via the peer-solutions WebSocket endpoint. The orchestrator only passes
-     * the [SolutionImportData] reference (solution ID + source peer URL) along with the
-     * normal work batch, keeping itself off the data path.
-     *
-     * @param rebalancePlan The transfers planned by [PopulationRebalancer].
-     * @return Pair of (importsByDestNode, rebalanceDiscardsByNode).
-     */
-    private fun fetchRebalanceData(
-        rebalancePlan: List<RebalanceTransfer>
-    ): Pair<Map<String, List<SolutionImportData>>, Map<String, List<String>>> {
-        if (rebalancePlan.isEmpty()) return Pair(emptyMap(), emptyMap())
-
-        val importsByDestNode = mutableMapOf<String, MutableList<SolutionImportData>>()
-        val rebalanceDiscardsByNode = mutableMapOf<String, MutableList<String>>()
-
-        for (transfer in rebalancePlan) {
-            for (solutionId in transfer.solutionIds) {
-                importsByDestNode.getOrPut(transfer.destinationNodeId) { mutableListOf() }
-                    .add(SolutionImportData(solutionId, transfer.sourceNodeId))
-            }
-            rebalanceDiscardsByNode.getOrPut(transfer.sourceNodeId) { mutableListOf() }
-                .addAll(transfer.solutionIds)
-        }
-        return Pair(importsByDestNode, rebalanceDiscardsByNode)
-    }
-
-    /**
      * Assembles one [NodeBatch] per worker node, combining mutation tasks, evaluation tasks,
-     * rebalance imports, and all pending discards (regular + rebalance-source).
+     * and all pending discards.
      *
      * @param mutationTasks Tasks to dispatch this generation.
      * @param evaluationTasks Evaluation-only tasks (e.g. initial population fitness evaluation).
-     * @param importsByDestNode Inline model data keyed by destination node.
-     * @param rebalanceDiscardsByNode Solution IDs to drop from source nodes after transfer.
-     * @param discards Regular discards (solutions removed from the population).
+     * @param discards All discards for this generation (regular + rebalance-source).
      * @return One [NodeBatch] per node in [MutationEvaluator.getNodeIds].
      */
     private fun buildNodeBatches(
         mutationTasks: List<MutationTask>,
         evaluationTasks: List<EvaluationTask>,
-        importsByDestNode: Map<String, List<SolutionImportData>>,
-        rebalanceDiscardsByNode: Map<String, List<String>>,
         discards: List<WorkerSolutionRef>
     ): List<NodeBatch> {
         val discardsByNode = discards.groupBy({ it.nodeId }, { it.solutionId })
         return evaluator.getNodeIds().map { nodeId ->
             NodeBatch(
                 nodeId = nodeId,
-                imports = importsByDestNode[nodeId] ?: emptyList(),
                 tasks = mutationTasks.filter { it.workerNodeId == nodeId },
                 evaluationTasks = evaluationTasks.filter { it.workerNodeId == nodeId },
-                discards = (discardsByNode[nodeId] ?: emptyList()) +
-                    (rebalanceDiscardsByNode[nodeId] ?: emptyList())
+                discards = discardsByNode[nodeId] ?: emptyList()
             )
         }
     }

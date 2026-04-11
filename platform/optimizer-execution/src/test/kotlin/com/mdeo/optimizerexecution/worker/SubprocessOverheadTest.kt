@@ -172,7 +172,6 @@ class SubprocessOverheadTest {
 
                 val batchRequest = NodeWorkBatchRequest(
                     requestId = "perf-$i",
-                    importRefs = emptyList(),
                     tasks = listOf(BatchTask(initialSolutionId)),
                     discards = emptyList()
                 )

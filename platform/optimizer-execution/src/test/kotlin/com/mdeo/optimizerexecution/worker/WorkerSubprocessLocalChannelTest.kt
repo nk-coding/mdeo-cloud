@@ -166,7 +166,6 @@ class WorkerSubprocessLocalChannelTest {
 
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "test-req-1",
-                importRefs = emptyList(),
                 tasks = listOf(BatchTask(initialSolutionId)),
                 discards = emptyList()
             )
@@ -200,16 +199,14 @@ class WorkerSubprocessLocalChannelTest {
 
     /**
      * Verifies that solution discard requests included in a [NodeWorkBatchRequest]
-     * are correctly processed in local-channel mode, and that a
-     * [SubprocessChannelMessage.SolutionsDiscarded] channel message is emitted.
+     * are correctly processed in local-channel mode (the batch response is empty,
+     * no errors occur, and the discarded solution is removed from the subprocess store).
      */
     @Test
     @Timeout(60)
-    fun `subprocess sends SolutionsDiscarded channel message in local-channel mode`() {
+    fun `subprocess processes discards in local-channel mode`() {
         val responses = CopyOnWriteArrayList<WorkerWsMessage>()
         val batchResponseLatch = CountDownLatch(1)
-        val discardedLatch = CountDownLatch(1)
-        val discardedIds = CopyOnWriteArrayList<String>()
 
         val runner = SubprocessRunner(
             mainClass = WorkerSubprocessMain::class.java.name,
@@ -222,11 +219,7 @@ class WorkerSubprocessLocalChannelTest {
                             }
                             batchResponseLatch.countDown()
                         }
-                        is SubprocessChannelMessage.SolutionsDiscarded -> {
-                            discardedIds.addAll(msg.solutionIds)
-                            discardedLatch.countDown()
-                        }
-                        else -> { /* other channel messages (SolutionsStored, …) */ }
+                        else -> { /* ignore other channel messages */ }
                     }
                 } catch (_: Exception) {}
             }
@@ -247,7 +240,6 @@ class WorkerSubprocessLocalChannelTest {
             // Send a batch with no tasks but with a discard
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "req-discard",
-                importRefs = emptyList(),
                 tasks = emptyList(),
                 discards = listOf(initialId)
             )
@@ -260,22 +252,22 @@ class WorkerSubprocessLocalChannelTest {
             )
 
             assertTrue(batchResponseLatch.await(30, TimeUnit.SECONDS), "Timed out waiting for batch response")
-            assertTrue(discardedLatch.await(5, TimeUnit.SECONDS), "Timed out waiting for SolutionsDiscarded signal")
 
-            assertEquals(1, discardedIds.size)
-            assertEquals(initialId, discardedIds[0])
+            val batchResponse = responses.singleOrNull() as? NodeWorkBatchResponse
+            requireNotNull(batchResponse) { "Expected NodeWorkBatchResponse but got $responses" }
+            assertEquals("req-discard", batchResponse.requestId)
+            assertEquals(0, batchResponse.results.size, "Discard-only batch should produce no mutation results")
         } finally {
             runner.destroy()
         }
     }
 
     /**
-     * Verifies that setup does not redundantly mirror initial solutions over the channel,
-     * and that mutation offspring are mirrored back in one batched store message.
+     * Verifies that mutation offspring are returned correctly via the batch response.
      */
     @Test
     @Timeout(60)
-    fun `subprocess batches stored solution updates in local-channel mode`() {
+    fun `subprocess returns mutation results in batch response local-channel mode`() {
         val objPath = "test://obj.fn"
         val objFn = "objective"
         val scriptAstJsons = mapOf(objPath to scriptJson.encodeToString(constantDoubleAst(objFn)))
@@ -285,9 +277,7 @@ class WorkerSubprocessLocalChannelTest {
         )
 
         val responses = CopyOnWriteArrayList<WorkerWsMessage>()
-        val storedBatches = CopyOnWriteArrayList<SubprocessChannelMessage.SolutionsStored>()
         val responseLatch = CountDownLatch(1)
-        val storedLatch = CountDownLatch(1)
 
         val runner = SubprocessRunner(
             mainClass = WorkerSubprocessMain::class.java.name,
@@ -299,10 +289,6 @@ class WorkerSubprocessLocalChannelTest {
                                 responses.add(cbor.decodeFromByteArray<WorkerWsMessage>(p))
                             }
                             responseLatch.countDown()
-                        }
-                        is SubprocessChannelMessage.SolutionsStored -> {
-                            storedBatches.add(msg)
-                            storedLatch.countDown()
                         }
                         else -> { /* ignore */ }
                     }
@@ -320,12 +306,10 @@ class WorkerSubprocessLocalChannelTest {
             ) as? WorkerSubprocessResponse.SetupOk
             requireNotNull(setupOk) { "Expected SetupOk but got $setupResult" }
             assertEquals(1, setupOk.solutions.size, "Expected one initial solution")
-            assertTrue(storedBatches.isEmpty(), "Setup should not emit redundant SolutionsStored messages")
 
             val initialSolutionId = setupOk.solutions[0].solutionId
             val batchRequest = NodeWorkBatchRequest(
-                requestId = "req-batched-store",
-                importRefs = emptyList(),
+                requestId = "req-mutations",
                 tasks = listOf(BatchTask(initialSolutionId), BatchTask(initialSolutionId)),
                 discards = emptyList()
             )
@@ -338,19 +322,12 @@ class WorkerSubprocessLocalChannelTest {
             )
 
             assertTrue(responseLatch.await(30, TimeUnit.SECONDS), "Timed out waiting for batch response")
-            assertTrue(storedLatch.await(30, TimeUnit.SECONDS), "Timed out waiting for SolutionsStored signal")
 
             val batchResponse = responses.singleOrNull() as? NodeWorkBatchResponse
             requireNotNull(batchResponse) { "Expected NodeWorkBatchResponse but got $responses" }
             assertEquals(2, batchResponse.results.size)
-
-            assertEquals(1, storedBatches.size, "Expected one batched SolutionsStored message")
-            val storedBatch = storedBatches.single()
-            assertEquals(2, storedBatch.solutions.size)
-            val storedSolutionIds = storedBatch.solutions.map { it.solutionId }.toSet()
-            val resultSolutionIds = batchResponse.results.map { it.newSolutionId }.toSet()
-            assertEquals(resultSolutionIds, storedSolutionIds)
-            assertTrue(storedBatch.solutions.all { it.modelBytes.isNotEmpty() })
+            assertTrue(batchResponse.results.all { it.succeeded }, "All mutations should succeed")
+            assertTrue(batchResponse.results.all { it.newSolutionId.isNotEmpty() }, "All results must have new solution IDs")
         } finally {
             runner.destroy()
         }

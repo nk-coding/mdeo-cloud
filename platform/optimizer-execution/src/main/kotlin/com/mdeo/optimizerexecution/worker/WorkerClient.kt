@@ -157,19 +157,16 @@ class WorkerClient(
     }
 
     /**
-     * Returns the full WebSocket URL of this worker's peer-solutions endpoint for the given execution.
-     *
-     * Destination workers connect to this URL to fetch solution model data directly from
-     * this peer, without routing through the orchestrator.
+     * Returns the full WebSocket URL of this worker's legacy session endpoint for the given execution.
      *
      * @param executionId The execution identifier shared by all nodes in the run.
-     * @return Full WS URL, e.g. `ws://host:8080/ws/worker/executions/{id}/peer-solutions`.
+     * @return Full WS URL, e.g. `ws://host:8080/ws/worker/executions/{id}`.
      */
-    fun peerSolutionsWsUrl(executionId: String): String =
-        "$wsBaseUrl/ws/worker/executions/$executionId/peer-solutions"
+    fun wsUrl(executionId: String): String =
+        "$wsBaseUrl/ws/worker/executions/$executionId"
 
     /**
-     * Allocates resources on the worker for a new optimization execution.
+     * Retrieves the serialized model for a specific solution from the worker.
      *
      * In **registry mode** ([orchestratorRegistry] set and [useLocalChannel] = `false`): the
      * orchestrator WS URL is passed in the HTTP request so the worker can forward it to its
@@ -262,30 +259,28 @@ class WorkerClient(
     }
 
     /**
-     * Sends a unified work batch to the worker: solution import references (for peer-fetching),
-     * mutation tasks, evaluation-only tasks, and solution discards, all in a single
-     * [NodeWorkBatchRequest] message.
-     *
-     * The worker resolves each [SolutionImportRef] by connecting directly to the source peer's
-     * WebSocket endpoint and pulling the model data itself. The orchestrator is not involved
-     * in the data transfer.
+     * Sends a unified work batch to the worker: mutation tasks, evaluation-only tasks,
+     * solution discards, and any pending solution relocations — all in a single
+     * [NodeWorkBatchRequest] message. The subprocess handles the relocations by
+     * opening (or reusing) a direct WebSocket to each destination worker and pushing
+     * the model bytes there, without involving the orchestrator.
      *
      * @param executionId The execution identifier on the worker (used for logging/tracing only).
-     * @param importRefs References to solutions to import from peer nodes (solution ID + source WS URL).
-     * @param tasks Mutation tasks referencing existing (or just-imported) solutions.
-     * @param evaluationTasks Evaluation-only tasks for solutions that need fitness computation without mutation.
+     * @param tasks Mutation tasks referencing existing solutions.
+     * @param evaluationTasks Evaluation-only tasks for fitness computation without mutation.
      * @param discards Solution IDs to discard after processing the batch.
+     * @param relocations Solutions to push to other nodes before or during mutation.
      * @return The batch response with evaluation results for each task.
      */
     suspend fun executeNodeBatch(
         executionId: String,
-        importRefs: List<SolutionImportRef>,
         tasks: List<BatchTask>,
         evaluationTasks: List<BatchEvaluationTask> = emptyList(),
-        discards: List<String>
+        discards: List<String>,
+        relocations: List<SolutionRelocation> = emptyList()
     ): NodeWorkBatchResponse {
         val requestId = newRequestId()
-        return sendAndReceive(NodeWorkBatchRequest(requestId, importRefs, tasks, evaluationTasks, discards)) as NodeWorkBatchResponse
+        return sendAndReceive(NodeWorkBatchRequest(requestId, tasks, evaluationTasks, discards, relocations)) as NodeWorkBatchResponse
     }
 
     /**

@@ -25,6 +25,26 @@ sealed class WorkerWsMessage {
 
 
 /**
+ * Identifies a set of solutions that a source worker subprocess should push directly to
+ * a destination worker node during population rebalancing.
+ *
+ * Carried inside [NodeWorkBatchRequest.relocations] so the source subprocess learns at
+ * batch dispatch time where to send the models. The subprocess opens (or reuses) a
+ * persistent WebSocket to [destinationWorkerBaseUrl] and pushes the solutions via
+ * [SolutionPushRequest] without any orchestrator involvement.
+ *
+ * @param destinationWorkerBaseUrl HTTP base URL of the destination worker (e.g. `http://worker-2:8080`).
+ * @param executionId The execution identifier on the destination worker.
+ * @param solutionIds Identifiers of the solutions to push to the destination.
+ */
+@Serializable
+data class SolutionRelocation(
+    val destinationWorkerBaseUrl: String,
+    val executionId: String,
+    val solutionIds: List<String>
+)
+
+/**
  * Orchestrator → Worker: execute one generation of work atomically.
  *
  * Combines solution import references (for rebalancing), mutation tasks, evaluation-only
@@ -32,28 +52,27 @@ sealed class WorkerWsMessage {
  * round trip per worker per generation. The worker processes these in order: fetch and
  * store imports from peer nodes, execute mutations, execute evaluations, drop discards.
  *
- * Import model data is NOT pre-fetched by the orchestrator. Instead, the worker opens
- * (or reuses) a persistent WebSocket connection to each source peer and pulls the data
- * directly, keeping the orchestrator off the data path.
+ * Import model data is NOT pre-fetched by the orchestrator. Instead, the source worker
+ * subprocess opens (or reuses) a persistent WebSocket to each destination worker and
+ * pushes the data directly, keeping the orchestrator off the data path.
  *
  * @param requestId Correlation identifier echoed in [NodeWorkBatchResponse].
- * @param importRefs References to solutions being imported from other nodes;
- *   each entry carries only a solution ID and the source peer WebSocket URL — the
- *   worker fetches the actual model data from the peer itself.
  * @param tasks Existing solutions on this node to mutate and evaluate.
  * @param evaluationTasks Solutions on this node to evaluate without mutation
  *   (e.g. newly initialized solutions needing fitness computation).
  * @param discards Solution IDs on this node to release after evaluation.
+ * @param relocations Solutions on this node that must be pushed to other nodes before
+ *   (or concurrently with) the mutation work. The subprocess handles the direct transfer.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @SerialName("node_work_batch_request")
 data class NodeWorkBatchRequest(
     override val requestId: String,
-    val importRefs: List<SolutionImportRef>,
     val tasks: List<BatchTask>,
     val evaluationTasks: List<BatchEvaluationTask> = emptyList(),
-    val discards: List<String>
+    val discards: List<String>,
+    val relocations: List<SolutionRelocation> = emptyList()
 ) : WorkerWsMessage()
 
 /**
@@ -159,5 +178,36 @@ data class WorkerShutdownNotice(
 @Serializable
 @SerialName("worker_shutdown_ack")
 data class WorkerShutdownAck(
+    override val requestId: String
+) : WorkerWsMessage()
+
+/**
+ * Orchestrator → Worker: push solution model data for rebalanced solutions.
+ *
+ * Sent by the orchestrator before dispatching a [NodeWorkBatchRequest] that contains
+ * tasks referencing solutions transferred from another node. The subprocess stores
+ * each solution and signals any waiting tasks.
+ *
+ * @param requestId Correlation identifier echoed in [SolutionPushAck].
+ * @param solutions The solutions being pushed; each carries its ID and model data.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+@SerialName("solution_push_request")
+data class SolutionPushRequest(
+    override val requestId: String,
+    val solutions: List<SolutionData>
+) : WorkerWsMessage()
+
+/**
+ * Worker → Orchestrator: acknowledgement that all solutions in a [SolutionPushRequest]
+ * have been stored and are ready for use by incoming mutation tasks.
+ *
+ * @param requestId Matches [SolutionPushRequest.requestId].
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+@SerialName("solution_push_ack")
+data class SolutionPushAck(
     override val requestId: String
 ) : WorkerWsMessage()

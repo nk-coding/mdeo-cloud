@@ -123,23 +123,6 @@ data class BatchResult(
 )
 
 /**
- * Reference used in a [com.mdeo.optimizer.worker.NodeWorkBatchRequest] to tell the
- * destination worker which solution to fetch and from which peer.
- *
- * The destination worker opens (or reuses) a persistent WebSocket connection to
- * [sourcePeerWsUrl] and requests the model data directly, without the orchestrator
- * acting as an intermediary data proxy.
- *
- * @param solutionId Identifier of the solution being imported.
- * @param sourcePeerWsUrl Full WebSocket URL of the peer-solutions endpoint on the
- *   source worker, e.g. `ws://node-1:8080/ws/worker/executions/{id}/peer-solutions`.
- */
-@Serializable
-data class SolutionImportRef(
-    val solutionId: String,
-    val sourcePeerWsUrl: String
-)
-/**
  * Metadata describing a worker node's capabilities and resource availability.
  *
  * Returned by the `GET /api/worker/metadata` endpoint so that orchestrators can make

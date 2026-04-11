@@ -144,48 +144,25 @@ data class WorkerInitialSolution(
 sealed class SubprocessChannelMessage {
 
     /**
-     * CBOR-encoded model bytes for one stored solution.
+     * Parent → Subprocess: a solution model pushed by a peer subprocess during rebalancing.
      *
-     * Used by [SolutionsStored] to batch multiple solution-store updates into a single
-     * channel message.
+     * Sent by [com.mdeo.optimizerexecution.worker.WorkerService] when a peer subprocess
+     * delivers a [com.mdeo.optimizer.worker.SolutionPushRequest] to the peer WS endpoint.
+     * The subprocess stores the model and signals any mutation task waiting on this ID.
      *
-     * @param solutionId The identifier of the stored solution.
+     * @param solutionId The identifier under which the solution should be registered.
      * @param modelBytes CBOR-encoded [com.mdeo.metamodel.SerializedModel].
      */
     @Serializable
-    data class StoredSolutionPayload(
+    @SerialName("solution_injected")
+    data class SolutionInjected(
         val solutionId: String,
         val modelBytes: ByteArray
-    ) {
+    ) : SubprocessChannelMessage() {
         override fun equals(other: Any?) =
-            other is StoredSolutionPayload && solutionId == other.solutionId && modelBytes.contentEquals(other.modelBytes)
+            other is SolutionInjected && solutionId == other.solutionId && modelBytes.contentEquals(other.modelBytes)
         override fun hashCode() = 31 * solutionId.hashCode() + modelBytes.contentHashCode()
     }
-
-    /**
-     * Subprocess → Parent: multiple solutions were stored as part of one worker batch.
-     *
-     * Used to amortize subprocess-channel overhead when a worker batch imports many
-     * solutions or produces many offspring.
-     *
-     * @param solutions Stored solution payloads to merge into the parent's byte store.
-     */
-    @Serializable
-    @SerialName("solutions_stored")
-    data class SolutionsStored(
-        val solutions: List<StoredSolutionPayload>
-    ) : SubprocessChannelMessage()
-
-    /**
-     * Subprocess → Parent: solutions were discarded.
-     *
-     * @param solutionIds The identifiers of solutions removed from the subprocess.
-     */
-    @Serializable
-    @SerialName("solutions_discarded")
-    data class SolutionsDiscarded(
-        val solutionIds: List<String>
-    ) : SubprocessChannelMessage()
 
     /**
      * Parent → Subprocess (local-channel mode): a CBOR-encoded [WorkerWsMessage] request

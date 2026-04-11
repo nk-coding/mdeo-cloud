@@ -11,6 +11,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import org.slf4j.LoggerFactory
 
@@ -50,8 +51,8 @@ fun Route.workerRoutes(workerService: WorkerService, orchestratorRegistry: Orche
         orchestratorWsRoute(workerService)
     }
 
-    route("/ws/worker/executions/{id}/peer-solutions") {
-        peerSolutionFetchWsRoute(workerService)
+    route("/ws/peer/executions/{id}") {
+        peerWsRoute(workerService)
     }
 
     route("/ws/subprocess/executions/{executionId}/{nodeId}") {
@@ -99,8 +100,7 @@ private fun Route.allocateRoute(workerService: WorkerService) {
  * GET `/api/worker/executions/{id}/solutions/{solutionId}` — returns model data as CBOR.
  *
  * The orchestrator calls this to pre-fetch model data for solutions it needs to transfer
- * to another node during rebalancing, before embedding the data inline in that node's
- * [NodeWorkBatchRequest].
+ * to another node during rebalancing.
  *
  * @param workerService The worker service to retrieve solution data from.
  */
@@ -143,6 +143,27 @@ private fun Route.cleanupRoute(workerService: WorkerService) {
 }
 
 /**
+ * WebSocket `/ws/peer/executions/{id}` — peer-subprocess push session.
+ *
+ * Source worker subprocesses connect here to push relocated solution models directly
+ * to this node's subprocess, bypassing the orchestrator entirely. Each
+ * [SolutionPushRequest] frame is forwarded into the subprocess via a
+ * [SubprocessChannelMessage.SolutionInjected] channel message.
+ *
+ * @param workerService The worker service that injects solutions into its subprocess.
+ */
+private fun Route.peerWsRoute(workerService: WorkerService) {
+    webSocket {
+        val executionId = call.parameters["id"]
+        if (executionId == null) {
+            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Missing execution ID"))
+            return@webSocket
+        }
+        workerService.handlePeerSession(executionId, this)
+    }
+}
+
+/**
  * WebSocket `/ws/worker/executions/{id}` — long-lived orchestrator session.
  *
  * The orchestrator connects here after successful HTTP allocation and keeps this
@@ -160,27 +181,6 @@ private fun Route.orchestratorWsRoute(workerService: WorkerService) {
             return@webSocket
         }
         workerService.handleOrchestratorSession(executionId, this)
-    }
-}
-
-
-/**
- * WebSocket `/ws/worker/executions/{id}/peer-solutions` — persistent peer solution fetch session.
- *
- * Peer worker subprocesses connect here to fetch model data for solutions they are
- * importing during rebalancing. The connection is kept alive for the execution duration
- * so that multiple generation rounds can reuse it without reconnect overhead.
- *
- * @param workerService The worker service that serves solution data from its byte store.
- */
-private fun Route.peerSolutionFetchWsRoute(workerService: WorkerService) {
-    webSocket {
-        val executionId = call.parameters["id"]
-        if (executionId == null) {
-            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Missing execution ID"))
-            return@webSocket
-        }
-        workerService.handlePeerSolutionFetchSession(executionId, this)
     }
 }
 

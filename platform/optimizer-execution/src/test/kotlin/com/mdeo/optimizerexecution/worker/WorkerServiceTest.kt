@@ -172,7 +172,6 @@ class WorkerServiceTest {
             val parentId = allocResponse.initialSolutions[0].solutionId
             val batchRequest = NodeWorkBatchRequest(
                 requestId = "req-1",
-                importRefs = emptyList(),
                 tasks = listOf(BatchTask(parentId)),
                 discards = emptyList()
             )
@@ -231,7 +230,6 @@ class WorkerServiceTest {
             val seedId = allocResponse.initialSolutions[0].solutionId
             val mutateBatch = NodeWorkBatchRequest(
                 requestId = "mutate-req",
-                importRefs = emptyList(),
                 tasks = listOf(BatchTask(seedId)),
                 discards = emptyList()
             )
@@ -322,7 +320,6 @@ class WorkerServiceTest {
                 runBlocking {
                     client.executeNodeBatch(
                         executionId,
-                        importRefs = emptyList(),
                         tasks = listOf(BatchTask(seedId)),
                         evaluationTasks = emptyList(),
                         discards = emptyList()

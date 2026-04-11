@@ -1,18 +1,17 @@
 package com.mdeo.optimizer.evaluation
 
 import com.mdeo.metamodel.SerializedModel
+import com.mdeo.optimizer.moea.RebalanceTransfer
 
 /**
  * Work to be executed on a single worker node in one generation.
  *
- * Combines imports (solutions arriving from other nodes due to rebalancing),
- * mutation tasks, evaluation-only tasks, and discards into a single per-node request
- * so that the orchestrator can communicate with every worker using exactly one message
- * per generation.
+ * Combines mutation tasks, evaluation-only tasks, and discards into a single per-node
+ * request so that the orchestrator can communicate with every worker using exactly one
+ * message per generation. Solution relocation between nodes is handled separately via
+ * [MutationEvaluator.pushRebalanceSolutions] before batches are dispatched.
  *
  * @param nodeId The worker node that should process this batch.
- * @param imports Solutions being transferred to this node from other nodes;
- *   the orchestrator pre-fetches their serialized models and embeds them inline.
  * @param tasks Parent solutions on this node to mutate and evaluate.
  * @param evaluationTasks Solutions on this node to evaluate without mutation
  *   (e.g. newly initialized solutions that only need fitness computation).
@@ -20,24 +19,9 @@ import com.mdeo.metamodel.SerializedModel
  */
 data class NodeBatch(
     val nodeId: String,
-    val imports: List<SolutionImportData>,
     val tasks: List<MutationTask>,
     val evaluationTasks: List<EvaluationTask> = emptyList(),
     val discards: List<String>
-)
-
-/**
- * Reference to a solution being imported into a node during rebalancing.
- *
- * The orchestrator provides the source node ID; the federated evaluator resolves it
- * to the peer-solutions WebSocket URL before passing it to the destination worker.
- *
- * @param solutionId The identifier the solution should be registered under.
- * @param sourceNodeId The node ID of the worker that currently owns this solution.
- */
-data class SolutionImportData(
-    val solutionId: String,
-    val sourceNodeId: String
 )
 
 /**
@@ -63,18 +47,29 @@ interface MutationEvaluator {
     /**
      * Executes one generation of work across all nodes in a single coordinated call.
      *
-     * Each [NodeBatch] carries the imports (solutions arriving via rebalancing),
-     * mutation tasks, and discards for one worker node. The orchestrator sends one
-     * message per node and collects all mutation results in a flat list.
-     *
-     * Import model data is pre-fetched by the orchestrator via [getSolutionData]
-     * and embedded inline so that each node can store the arriving solutions before
-     * executing mutations.
+     * Each [NodeBatch] carries mutation tasks and discards for one worker node.
+     * Solution relocation is handled separately via [pushRebalanceSolutions] before
+     * this method is called; any relocated solutions arrive asynchronously in worker
+     * subprocesses and are awaited on demand.
      *
      * @param batches One [NodeBatch] per node (nodes with nothing to do receive an empty batch).
      * @return A flat list of [EvaluationResult] entries, one per task across all nodes.
      */
     suspend fun executeNodeBatches(batches: List<NodeBatch>): List<EvaluationResult>
+
+    /**
+     * Actively pushes solutions between nodes according to the rebalance plan, so that
+     * destination nodes receive the model data before their next batch is dispatched.
+     *
+     * In a single-node setup this is a no-op. In federated setups the orchestrator
+     * fetches each solution from the source node and injects it into the destination
+     * node's subprocess, which can then start mutating it without any cross-node fetch.
+     *
+     * @param transfers The list of transfers computed by [com.mdeo.optimizer.moea.PopulationRebalancer].
+     * @return A map from source node ID to the list of solution IDs that were pushed away
+     *   (and should therefore be discarded from the source in the next batch).
+     */
+    suspend fun pushRebalanceSolutions(transfers: List<RebalanceTransfer>): Map<String, List<String>> = emptyMap()
 
     /**
      * Fetches the serialized model for a solution stored on a worker node.

@@ -40,7 +40,40 @@ class LocalMutationEvaluator(
     private val logger = LoggerFactory.getLogger(LocalMutationEvaluator::class.java)
     private val solutions: ConcurrentHashMap<String, Solution> = ConcurrentHashMap()
 
+    /**
+     * Staged incoming [SerializedModel]s pending lazy materialization.
+     *
+     * When a peer subprocess pushes a solution via [receiveSolution], the raw bytes are
+     * stored here rather than immediately creating a full [ModelGraph].  This keeps the
+     * subprocess command-loop fast (no blocking graph construction) so that the stdin
+     * pipe drains quickly and [SolutionInjected] channel messages are processed without
+     * back-pressure.  The graph is built lazily inside [requireSolution], which runs on
+     * the task-dispatcher thread when the mutation actually needs the solution.
+     */
+    private val incomingSerializedModels: ConcurrentHashMap<String, SerializedModel> = ConcurrentHashMap()
+
+    /**
+     * Optional callback invoked immediately after a solution has been materialised and
+     * placed into [solutions].  The subprocess wires this to its [incomingSolutionSignals]
+     * so that any task thread that entered [awaitSolutionAvailable] while materialization
+     * was in progress (i.e., the solution had already been removed from
+     * [incomingSerializedModels] but not yet written to [solutions]) gets unblocked
+     * promptly instead of waiting for the full 60-second timeout.
+     */
+    var onSolutionMaterialized: ((String) -> Unit)? = null
+
     override fun getNodeIds(): Set<String> = setOf(nodeId)
+
+    /**
+     * Returns `true` when [solutionId] is present in this evaluator's solution store
+     * or has been staged for lazy materialization via [receiveSolution].
+     * Thread-safe; may be called from any thread.
+     */
+    fun hasSolution(solutionId: String): Boolean {
+        val ready = solutions.containsKey(solutionId)
+        val staged = incomingSerializedModels.containsKey(solutionId)
+        return ready || staged
+    }
 
     override suspend fun initialize(count: Int): List<InitialSolutionResult> {
         return (0 until count).map {
@@ -63,19 +96,16 @@ class LocalMutationEvaluator(
     override suspend fun executeNodeBatches(batches: List<NodeBatch>): List<EvaluationResult> {
         val batch = batches.firstOrNull { it.nodeId == nodeId } ?: return emptyList()
 
-        // In federated mode the subprocess handles peer fetching before calling this
-        // method, so imports arrive here as an empty list. In local (single-node) mode
-        // rebalancing never triggers, so imports are always empty as well.
-        if (batch.imports.isNotEmpty()) {
-            logger.warn("LocalMutationEvaluator received {} import reference(s) — cannot fetch from peer; imports skipped", batch.imports.size)
-        }
-
         val mutationResults = batch.tasks.map { task -> evaluateSingle(task) }
 
         val evaluationResults = batch.evaluationTasks.map { task -> evaluateExisting(task) }
 
         for (solutionId in batch.discards) {
             solutions.remove(solutionId)?.close()
+            // Also remove staged-but-unmaterialised models: if a solution was pushed here
+            // (arriving in incomingSerializedModels) but discarded before any task could
+            // materialise it, the staged bytes would otherwise leak indefinitely.
+            incomingSerializedModels.remove(solutionId)
         }
 
         return mutationResults + evaluationResults
@@ -91,6 +121,7 @@ class LocalMutationEvaluator(
             solution.close()
         }
         solutions.clear()
+        incomingSerializedModels.clear()
     }
 
     /**
@@ -98,13 +129,17 @@ class LocalMutationEvaluator(
      *
      * Requires that a non-null [metamodel] was provided at construction time.
      */
+    /**
+     * Stages [serializedModel] for lazy [ModelGraph] construction under [solutionId].
+     *
+     * Rather than building the graph inline (which is expensive and would block the
+     * subprocess command-loop thread), the bytes are kept in [incomingSerializedModels]
+     * until [requireSolution] materialises them on the first access by a task thread.
+     * [hasSolution] returns `true` as soon as this method returns, so waiting tasks can
+     * be signalled and unblocked without delay.
+     */
     fun receiveSolution(solutionId: String, serializedModel: SerializedModel) {
-        val mm = checkNotNull(metamodel) { "Cannot receive solutions without a metamodel" }
-        val modelGraph = when (graphBackendType) {
-            GraphBackendType.MDEO -> MdeoModelGraph.create(serializedModel, mm)
-            GraphBackendType.Tinker -> TinkerModelGraph.create(serializedModel.toModelData(mm), mm)
-        }
-        solutions[solutionId] = Solution(modelGraph)
+        incomingSerializedModels[solutionId] = serializedModel
     }
 
     /**
@@ -215,14 +250,40 @@ class LocalMutationEvaluator(
         constraints.map { it.computeFitness(solution) }
 
     /**
-     * Looks up a solution by ID, throwing if not found.
+     * Looks up a solution by ID, materialising it from [incomingSerializedModels] if
+     * necessary, and throwing if neither store contains it.
+     *
+     * [ConcurrentHashMap.computeIfAbsent] guarantees that only one thread builds the
+     * graph for a given [solutionId]; concurrent callers for the same key wait for the
+     * first thread to finish and then return the cached result.
      *
      * @param solutionId The solution identifier to look up.
-     * @return The stored [Solution].
+     * @return The stored (or freshly materialised) [Solution].
      * @throws IllegalArgumentException if no solution with that ID exists.
      */
-    private fun requireSolution(solutionId: String): Solution =
-        solutions[solutionId] ?: throw IllegalArgumentException("Solution not found: $solutionId")
+    private fun requireSolution(solutionId: String): Solution {
+        val result = solutions.computeIfAbsent(solutionId) { id ->
+            val stagedModel = incomingSerializedModels[id]
+            if (stagedModel == null) {
+                throw IllegalArgumentException("Solution not found: $id")
+            }
+            val serializedModel = incomingSerializedModels.remove(id)
+            if (serializedModel == null) {
+                throw IllegalArgumentException("Solution not found (concurrent removal): $id")
+            }
+            val mm = checkNotNull(metamodel) { "Cannot materialise solution without a metamodel" }
+            val modelGraph = when (graphBackendType) {
+                GraphBackendType.MDEO -> MdeoModelGraph.create(serializedModel, mm)
+                GraphBackendType.Tinker -> TinkerModelGraph.create(serializedModel.toModelData(mm), mm)
+            }
+            Solution(modelGraph)
+        }
+        // Notify any task thread that entered awaitSolutionAvailable during the materialization
+        // window (i.e., after the staged bytes were removed but before the solution was placed
+        // into `solutions`). Without this signal that thread would wait for the full 60 s timeout.
+        onSolutionMaterialized?.invoke(solutionId)
+        return result
+    }
 
     /**
      * Generates a unique identifier for a new solution, scoped to this node.

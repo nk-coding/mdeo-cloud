@@ -15,7 +15,6 @@ import com.mdeo.optimizer.evaluation.EvaluationTask
 import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
 import com.mdeo.optimizer.evaluation.MutationTask
 import com.mdeo.optimizer.evaluation.NodeBatch
-import com.mdeo.optimizer.evaluation.WorkerSolutionRef
 import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategyFactory
 import com.mdeo.optimizer.solution.Solution
@@ -270,106 +269,135 @@ class WorkerSubprocessMain : SubprocessMain() {
         }
     }
 
-    /**
-     * Maintains a persistent WebSocket connection to the peer-solutions endpoint of one
-     * source worker node. Created lazily on first use; kept open for the subprocess lifetime
-     * so that subsequent rebalancing rounds can reuse the same session without reconnect overhead.
-     *
-     * Thread-safe: [fetchBatch] may be called from the orchestrator dispatch thread while
-     * the background read loop runs on the [readThread].
-     *
-     * @param peerWsUrl Full WebSocket URL of the peer's endpoint, e.g.
-     *   `ws://node-1:8080/ws/worker/executions/{id}/peer-solutions`.
-     */
-    private inner class PeerFetchChannel(private val peerWsUrl: String) {
-        private val peerCbor = Cbor { ignoreUnknownKeys = true }
-        private val httpClient = HttpClient(CIO) { install(WebSockets) }
-        private val sessionDeferred = CompletableDeferred<DefaultClientWebSocketSession>()
-        private val pendingResponses = ConcurrentHashMap<String, LinkedBlockingQueue<SolutionBatchFetchResponse>>()
-        @Volatile
-        private var closed = false
+    private val logger by lazy { LoggerFactory.getLogger(WorkerSubprocessMain::class.java) }
 
-        private val readThread = Thread {
+    /**
+     * Coroutine scope used for outgoing peer WebSocket connections.
+     *
+     * Lives for the lifetime of this subprocess instance. All [PeerPushChannel] jobs are
+     * children of this scope; cancelling the scope (on shutdown) closes all peer connections.
+     */
+    private val peerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /**
+     * Cached outgoing peer connections keyed by `"$destBaseUrl/$executionId"`.
+     *
+     * Connections are created on demand in [getOrCreatePeerChannel] and reused for all
+     * subsequent relocations within the same optimization run.
+     */
+    private val peerChannels = ConcurrentHashMap<String, PeerPushChannel>()
+
+    /**
+     * Returns an existing [PeerPushChannel] to [destBaseUrl]/[executionId], or creates and
+     * caches a new one. The channel's WS connection is established lazily in a background
+     * coroutine of [peerScope].
+     */
+    private fun getOrCreatePeerChannel(destBaseUrl: String, executionId: String): PeerPushChannel {
+        val key = "$destBaseUrl/$executionId"
+        return peerChannels.getOrPut(key) { PeerPushChannel(destBaseUrl, executionId) }
+    }
+
+    /**
+     * Closes all open peer push channels and cancels their background coroutines.
+     */
+    private fun closePeerChannels() {
+        for ((_, ch) in peerChannels) ch.close()
+        peerChannels.clear()
+    }
+
+    /**
+     * Persistent outgoing WebSocket connection from this subprocess to a destination
+     * worker's `/ws/peer/executions/{id}` endpoint.
+     *
+     * A single background coroutine (launched in [peerScope]) keeps the connection alive
+     * and processes queued [SolutionPushRequest] frames sequentially. Each [push] call
+     * enqueues a request and suspends until the matching [SolutionPushAck] is received.
+     *
+     * @param destBaseUrl HTTP base URL of the destination worker (e.g. `http://worker-2:8080`).
+     * @param destExecutionId The execution identifier on the destination worker.
+     */
+    private inner class PeerPushChannel(
+        destBaseUrl: String,
+        destExecutionId: String
+    ) {
+        private val wsUrl = destBaseUrl
+            .replace("https://", "wss://")
+            .replace("http://", "ws://") +
+            "/ws/peer/executions/$destExecutionId"
+
+        /** Pending acks keyed by requestId. */
+        private val pendingAcks = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+
+        /** Queue of encoded frames to send. */
+        private val sendQueue = kotlinx.coroutines.channels.Channel<ByteArray>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+
+        @Volatile
+        private var failed = false
+
+        private val peerClient = HttpClient(CIO) { install(WebSockets) }
+
+        val job: Job = peerScope.launch {
             try {
-                runBlocking {
-                    httpClient.webSocket(peerWsUrl) {
-                        sessionDeferred.complete(this)
-                        for (frame in incoming) {
+                peerClient.webSocket(wsUrl) {
+                    val readerJob = launch {
+                            for (frame in incoming) {
                             if (frame !is Frame.Binary) continue
-                            val msg = peerCbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
-                            when (msg) {
-                                is SolutionBatchFetchResponse -> pendingResponses[msg.requestId]?.offer(msg)
-                                else -> Unit
+                            val msg = runCatching {
+                                cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
+                            }.getOrNull() ?: continue
+                            if (msg is SolutionPushAck) {
+                                pendingAcks.remove(msg.requestId)?.complete(Unit)
                             }
                         }
                     }
+                    for (payload in sendQueue) {
+        
+                        send(Frame.Binary(true, payload))
+                    }
+
+                    readerJob.cancelAndJoin()
                 }
             } catch (_: CancellationException) {
-                // Normal shutdown
+                // Expected when shutting down
             } catch (e: Exception) {
-                if (!sessionDeferred.isCompleted) {
-                    sessionDeferred.completeExceptionally(e)
-                }
+                logger.error("[PeerPushChannel] FAILED to {}: {}", wsUrl, e.message, e)
+                failed = true
+                pendingAcks.values.forEach { it.completeExceptionally(e) }
+            } finally {
+                peerClient.close()
             }
-        }.also {
-            it.isDaemon = true
-            it.name = "peer-fetch-$peerWsUrl"
-            it.start()
         }
 
         /**
-         * Fetches model data for [solutionIds] from the peer in a single batch request.
+         * Pushes [solutions] to the destination worker and suspends until the ack arrives.
          *
-         * Blocks until the server sends a [SolutionBatchFetchResponse] (a single frame
-         * carrying all models at once). Uses [OPERATION_TIMEOUT_MS] as the overall budget.
-         *
-         * @param solutionIds Solution IDs to fetch.
-         * @param timeoutMs Maximum time to wait for the peer session to be ready.
-         * @return Map from solution ID to its [SerializedModel].
+         * @return `true` on success, `false` if the channel has already failed.
          */
-        fun fetchBatch(
-            solutionIds: List<String>,
-            timeoutMs: Long = PEER_CONNECT_TIMEOUT_MS
-        ): Map<String, SerializedModel> {
-            if (solutionIds.isEmpty()) return emptyMap()
+        suspend fun push(solutions: List<SolutionData>): Boolean {
+
+            if (failed) {
+                logger.warn("[PeerPushChannel.push] FAILED channel already failed to {}", wsUrl)
+                return false
+            }
             val requestId = UUID.randomUUID().toString()
-            val queue = LinkedBlockingQueue<SolutionBatchFetchResponse>(1)
-            pendingResponses[requestId] = queue
-            try {
-                val sess = runBlocking { withTimeout(timeoutMs) { sessionDeferred.await() } }
-                runBlocking {
-                    sess.send(Frame.Binary(true, peerCbor.encodeToByteArray<WorkerWsMessage>(
-                        SolutionBatchFetchRequest(requestId, solutionIds)
-                    )))
-                }
-                val response = queue.poll(OPERATION_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                    ?: return emptyMap()
-                return response.solutions.associate { it.solutionId to it.serializedModel }
-            } finally {
-                pendingResponses.remove(requestId)
+            val payload = cbor.encodeToByteArray<WorkerWsMessage>(SolutionPushRequest(requestId, solutions))
+            val ack = CompletableDeferred<Unit>()
+            pendingAcks[requestId] = ack
+            sendQueue.send(payload)
+            return try {
+                withTimeout(PEER_PUSH_TIMEOUT_MS) { ack.await() }
+                true
+            } catch (e: Exception) {
+                pendingAcks.remove(requestId)
+                false
             }
         }
 
         fun close() {
-            closed = true
-            httpClient.close()
-            readThread.join(1000L)
+            sendQueue.close()
+            job.cancel()
         }
     }
-
-    /**
-     * Lazy pool of persistent peer WebSocket connections, keyed by peer WS URL.
-     * Connections are created on first use and kept open for the subprocess lifetime.
-     */
-    private val peerChannels = ConcurrentHashMap<String, PeerFetchChannel>()
-
-    /**
-     * Returns the [PeerFetchChannel] for [peerWsUrl], creating it on first access.
-     */
-    private fun getOrCreatePeerChannel(peerWsUrl: String): PeerFetchChannel =
-        peerChannels.getOrPut(peerWsUrl) { PeerFetchChannel(peerWsUrl) }
-
-    private val logger by lazy { LoggerFactory.getLogger(WorkerSubprocessMain::class.java) }
 
     /**
      * The active [LocalMutationEvaluator] for this subprocess, or `null` before [handleSetup] runs. 
@@ -425,6 +453,16 @@ class WorkerSubprocessMain : SubprocessMain() {
      */
     private var numGuidanceFunctions: Int = 0
 
+    /**
+     * Per-solution arrival signals for push-rebalanced solutions. When a peer subprocess
+     * delivers a [SolutionPushRequest] to this node's [WorkerService], the parent injects
+     * the model via [SubprocessChannelMessage.SolutionInjected]; this map lets mutation tasks
+     * block on their specific signal until the data arrives. Registered by
+     * [awaitSolutionAvailable] before checking [LocalMutationEvaluator.hasSolution] to
+     * avoid the lost-update race condition.
+     */
+    private val incomingSolutionSignals = ConcurrentHashMap<String, LinkedBlockingQueue<Unit>>()
+
     override fun handleCommand(payload: ByteArray): ByteArray {
         return when (val request = cbor.decodeFromByteArray<WorkerSubprocessRequest>(payload)) {
             is WorkerSubprocessRequest.Setup -> { handleSetup(request) }
@@ -449,6 +487,10 @@ class WorkerSubprocessMain : SubprocessMain() {
 
         val (localEvaluator, initialSolutions) = buildEvaluatorAndInitialize(request)
         evaluator = localEvaluator
+        
+        localEvaluator.onSolutionMaterialized = { solutionId ->
+            incomingSolutionSignals[solutionId]?.offer(Unit)
+        }
 
         val channel: OrchestratorChannel? = when {
             request.useLocalChannel && !request.skipInitialization -> {
@@ -519,7 +561,7 @@ class WorkerSubprocessMain : SubprocessMain() {
 
         val initialSolutions: List<WorkerInitialSolution> = if (!request.skipInitialization) {
             runBlocking { localEvaluator.initialize(request.initialSolutionCount) }.map { result ->
-                val ref = WorkerSolutionRef(LocalMutationEvaluator.DEFAULT_NODE_ID, result.solutionId)
+                val ref = com.mdeo.optimizer.evaluation.WorkerSolutionRef(LocalMutationEvaluator.DEFAULT_NODE_ID, result.solutionId)
                 val serializedModel = runBlocking { localEvaluator.getSolutionData(ref) }
                 WorkerInitialSolution(
                     solutionId = result.solutionId,
@@ -559,12 +601,22 @@ class WorkerSubprocessMain : SubprocessMain() {
      */
     override fun handleChannelMessage(payload: ByteArray) {
         try {
-            val msg = cbor.decodeFromByteArray<SubprocessChannelMessage>(payload)
-            if (msg is SubprocessChannelMessage.OrchestratorRequest) {
-                (activeOrchestratorChannel as? StdioOrchestratorChannel)?.enqueue(msg.payload)
+            when (val msg = cbor.decodeFromByteArray<SubprocessChannelMessage>(payload)) {
+                is SubprocessChannelMessage.OrchestratorRequest -> {
+                    (activeOrchestratorChannel as? StdioOrchestratorChannel)?.enqueue(msg.payload)
+                }
+                is SubprocessChannelMessage.SolutionInjected -> {
+                    val ev = evaluator ?: return
+                    val model = cbor.decodeFromByteArray<SerializedModel>(msg.modelBytes)
+                    ev.receiveSolution(msg.solutionId, model)
+                    incomingSolutionSignals[msg.solutionId]?.offer(Unit)
+                }
+                else -> {
+                    // Ignore messages not directed at the subprocess
+                }
             }
-        } catch (_: Exception) {
-            // Malformed or unrecognised channel message — ignore
+        } catch (e: Exception) {
+            logger.error("[handleChannelMessage] EXCEPTION: {}", e.message, e)
         }
     }
 
@@ -628,47 +680,88 @@ class WorkerSubprocessMain : SubprocessMain() {
     }
 
     /**
-     * Processes a unified work batch entirely in-process: imports, mutations with
-     * per-mutation watchdog timeouts, evaluation-only tasks with timeouts, and discards.
+     * Blocks until the solution for [solutionId] arrives in the evaluator, or [timeoutMs] elapses.
      *
-     * When a multi-thread [taskDispatcher] is configured (set during [handleSetup] from
-     * [WorkerSubprocessRequest.Setup.workerThreads]), mutation and evaluation tasks are
-     * dispatched in parallel — each task runs on its own thread, independently of the
-     * others. Each task registers its own timeout on the child-process watchdog; if any
-     * single task exceeds its budget the watchdog notifies the parent and halts the
-     * entire subprocess.
+     * Registers a [LinkedBlockingQueue] signal BEFORE checking [LocalMutationEvaluator.hasSolution]
+     * to avoid the lost-update race: if the parent delivers a
+     * [SubprocessChannelMessage.SolutionInjected] between the check and the register,
+     * the offer will complete the queue and the poll returns immediately.
+     *
+     * @param solutionId The solution to wait for.
+     * @param timeoutMs Maximum wait in milliseconds.
+     * @return `true` if the solution arrived within the timeout, `false` otherwise.
+     */
+    private fun awaitSolutionAvailable(solutionId: String, timeoutMs: Long): Boolean {
+        val signal = LinkedBlockingQueue<Unit>(1)
+        incomingSolutionSignals[solutionId] = signal
+        
+        // Re-check after registering — injection may have arrived between the caller's first check and now
+        if (evaluator?.hasSolution(solutionId) == true) {
+            incomingSolutionSignals.remove(solutionId)
+            return true
+        }
+        
+        val arrived = signal.poll(timeoutMs, TimeUnit.MILLISECONDS) != null
+        incomingSolutionSignals.remove(solutionId)
+        return arrived
+    }
+
+    /**
+     * Processes a unified work batch entirely in-process: mutations with per-mutation
+     * watchdog timeouts, evaluation-only tasks with timeouts, discards, and outgoing
+     * solution relocations.
+     *
+     * Relocations are launched concurrently in [peerScope] as soon as model bytes are
+     * captured from the local evaluator, so that the destination receives them while
+     * mutations are still running. Incoming solutions (transferred here from another node)
+     * are awaited on demand inside [processSingleMutationTask]: a task blocks until the
+     * matching [SubprocessChannelMessage.SolutionInjected] has been processed by the
+     * parent and forwarded to this subprocess, or until [INCOMING_SOLUTION_TIMEOUT_MS].
+     *
+     * When a multi-thread [taskDispatcher] is configured, mutation and evaluation tasks are
+     * dispatched in parallel — each task runs on its own thread, independently of the others.
+     * Each task registers its own timeout on the child-process watchdog.
      */
     private fun handleWsNodeWorkBatch(msg: NodeWorkBatchRequest): NodeWorkBatchResponse {
         val ev = requireEvaluator()
         val nodeId = LocalMutationEvaluator.DEFAULT_NODE_ID
-
-        // Group import refs by source peer WS URL so we can issue one batch fetch per peer.
-        val importedSolutions = mutableListOf<SubprocessChannelMessage.StoredSolutionPayload>()
-        if (msg.importRefs.isNotEmpty()) {
-            val byPeer = msg.importRefs.groupBy { it.sourcePeerWsUrl }
-            for ((peerWsUrl, refs) in byPeer) {
-                val channel = getOrCreatePeerChannel(peerWsUrl)
-                val solutionIds = refs.map { it.solutionId }
-                val fetched = channel.fetchBatch(solutionIds)
-                for (ref in refs) {
-                    val serializedModel = fetched[ref.solutionId]
-                    if (serializedModel == null) {
-                        logger.warn("Peer fetch: model for solution {} not received from {}", ref.solutionId, peerWsUrl)
-                        continue
-                    }
-                    ev.receiveSolution(ref.solutionId, serializedModel)
-                    importedSolutions.add(SubprocessChannelMessage.StoredSolutionPayload(
-                        ref.solutionId,
-                        cbor.encodeToByteArray<SerializedModel>(serializedModel)
-                    ))
-                }
-            }
-        }
-        sendStoredSolutions(importedSolutions)
-
         val dispatcher = taskDispatcher
         val allTasks = msg.tasks.size + msg.evaluationTasks.size
-        val mutationOutcomes: List<MutationTaskOutcome> = if (dispatcher != null && allTasks > 1) {
+
+        val pushJobs = mutableListOf<Deferred<Boolean>>()
+        for (relocation in msg.relocations) {
+            val solutions = relocation.solutionIds.mapNotNull { solId ->
+                try {
+                    val ref = com.mdeo.optimizer.evaluation.WorkerSolutionRef(
+                        nodeId = LocalMutationEvaluator.DEFAULT_NODE_ID,
+                        solutionId = solId
+                    )
+                    val model = runBlocking { ev.getSolutionData(ref) }
+                    SolutionData(solutionId = solId, serializedModel = model)
+                } catch (e: Exception) {
+                    logger.warn("[handleWsNodeWorkBatch] RELOCATION_FAIL solId={}: {}", solId, e.message)
+                    null
+                }
+            }
+            if (solutions.isNotEmpty()) {
+                val channel = getOrCreatePeerChannel(relocation.destinationWorkerBaseUrl, relocation.executionId)
+                val job = peerScope.async {
+                    try {
+                        val success = channel.push(solutions)
+                        if (!success) {
+                            logger.error("[handleWsNodeWorkBatch] RELOCATION_PUSH_FAILED for {} (channel timed out or failed)", relocation.destinationWorkerBaseUrl)
+                        }
+                        success
+                    } catch (e: Exception) {
+                        logger.error("[handleWsNodeWorkBatch] RELOCATION_PUSH_ERROR: {}", e.message, e)
+                        false
+                    }
+                }
+                pushJobs.add(job)
+            }
+        }
+
+        val mutationResults: List<BatchResult> = if (dispatcher != null && allTasks > 1) {
             runBlocking {
                 msg.tasks.map { task ->
                     async(dispatcher) { processSingleMutationTask(task, ev, nodeId) }
@@ -677,8 +770,6 @@ class WorkerSubprocessMain : SubprocessMain() {
         } else {
             msg.tasks.map { task -> processSingleMutationTask(task, ev, nodeId) }
         }
-        sendStoredSolutions(mutationOutcomes.mapNotNull { it.storedSolution })
-        val mutationResults = mutationOutcomes.map { it.result }
 
         val evaluationResults: List<BatchResult> = if (dispatcher != null && allTasks > 1) {
             runBlocking {
@@ -690,20 +781,25 @@ class WorkerSubprocessMain : SubprocessMain() {
             msg.evaluationTasks.map { task -> processSingleEvaluationTask(task, ev, nodeId) }
         }
 
+        if (pushJobs.isNotEmpty()) {
+            runBlocking {
+                try {
+                    pushJobs.awaitAll()
+                } catch (e: Exception) {
+                    logger.error("[handleWsNodeWorkBatch] PUSH_AWAIT_ERROR: {}", e.message)
+                }
+            }
+        }
+
         if (msg.discards.isNotEmpty()) {
             val batch = NodeBatch(
                 nodeId = nodeId,
-                imports = emptyList(),
                 tasks = emptyList(),
                 discards = msg.discards
             )
             runBlocking { ev.executeNodeBatches(listOf(batch)) }
-            sendChannelMessage(
-                cbor.encodeToByteArray<SubprocessChannelMessage>(
-                    SubprocessChannelMessage.SolutionsDiscarded(msg.discards)
-                )
-            )
         }
+
 
         return NodeWorkBatchResponse(requestId = msg.requestId, results = mutationResults + evaluationResults)
     }
@@ -711,9 +807,9 @@ class WorkerSubprocessMain : SubprocessMain() {
     /**
      * Evaluates a single [BatchTask] with a per-mutation watchdog timeout.
      *
-     * Registers a timeout covering the transformation and all guidance function
-     * evaluations. If the timeout fires, the child-process watchdog sends a
-     * [SubprocessMessage.Timeout] to the parent and halts the JVM.
+     * If the solution is not yet present in the evaluator (incoming from another node
+     * via push rebalancing), blocks until [SubprocessChannelMessage.SolutionInjected]
+     * has been processed and the signal offered, or [INCOMING_SOLUTION_TIMEOUT_MS] elapses.
      *
      * Thread-safe: relies on the synchronized [sendChannelMessage] for all parent-process
      * communication, and the [ChildProcessWatchdog] for concurrent timeout tracking.
@@ -722,7 +818,17 @@ class WorkerSubprocessMain : SubprocessMain() {
         task: BatchTask,
         ev: LocalMutationEvaluator,
         nodeId: String
-    ): MutationTaskOutcome {
+    ): BatchResult {
+        if (!ev.hasSolution(task.solutionId)) {
+            val arrived = awaitSolutionAvailable(task.solutionId, INCOMING_SOLUTION_TIMEOUT_MS)
+            if (!arrived) {
+                logger.warn(
+                    "[processSingleMutationTask] TIMEOUT solId={} did not arrive within {}ms — failing task (penalty)",
+                    task.solutionId, INCOMING_SOLUTION_TIMEOUT_MS
+                )
+                return failedResult(task.solutionId)
+            }
+        }
         val evalId = evalIdCounter.incrementAndGet()
         val mutationTimeoutMs = numGuidanceFunctions.toLong() * scriptTimeoutMs + transformationTimeoutMs
         if (mutationTimeoutMs > 0) {
@@ -731,7 +837,6 @@ class WorkerSubprocessMain : SubprocessMain() {
         return try {
             val batch = NodeBatch(
                 nodeId = nodeId,
-                imports = emptyList(),
                 tasks = listOf(MutationTask(task.solutionId, nodeId)),
                 discards = emptyList()
             )
@@ -739,43 +844,21 @@ class WorkerSubprocessMain : SubprocessMain() {
             val result = evalResults.firstOrNull()
 
             if (result != null && result.succeeded) {
-                val ref = WorkerSolutionRef(nodeId, result.newSolutionId)
-                val serializedModel = runBlocking { ev.getSolutionData(ref) }
-                MutationTaskOutcome(
-                    result = BatchResult(
-                        parentSolutionId = task.solutionId,
-                        newSolutionId = result.newSolutionId,
-                        objectives = result.objectives,
-                        constraints = result.constraints,
-                        succeeded = true
-                    ),
-                    storedSolution = SubprocessChannelMessage.StoredSolutionPayload(
-                        result.newSolutionId,
-                        cbor.encodeToByteArray<SerializedModel>(serializedModel)
-                    )
+                BatchResult(
+                    parentSolutionId = task.solutionId,
+                    newSolutionId = result.newSolutionId,
+                    objectives = result.objectives,
+                    constraints = result.constraints,
+                    succeeded = true
                 )
             } else {
-                MutationTaskOutcome(failedResult(task.solutionId, result?.errorMessage), null)
+                failedResult(task.solutionId, result?.errorMessage)
             }
-        } catch (_: Throwable) {
-            MutationTaskOutcome(failedResult(task.solutionId), null)
+        } catch (e: Throwable) {
+            failedResult(task.solutionId)
         } finally {
             cancelTimeout(evalId)
         }
-    }
-
-    /**
-     * Sends stored-solution updates to the parent process in one batched channel message.
-     */
-    private fun sendStoredSolutions(solutions: List<SubprocessChannelMessage.StoredSolutionPayload>) {
-        if (solutions.isEmpty()) {
-            return
-        }
-        sendChannelMessage(
-            cbor.encodeToByteArray<SubprocessChannelMessage>(
-                SubprocessChannelMessage.SolutionsStored(solutions)
-            )
-        )
     }
 
     /**
@@ -803,7 +886,6 @@ class WorkerSubprocessMain : SubprocessMain() {
         return try {
             val batch = NodeBatch(
                 nodeId = nodeId,
-                imports = emptyList(),
                 tasks = emptyList(),
                 evaluationTasks = listOf(EvaluationTask(task.solutionId, nodeId)),
                 discards = emptyList()
@@ -842,9 +924,9 @@ class WorkerSubprocessMain : SubprocessMain() {
         val notFoundIds = mutableListOf<String>()
         for (solutionId in msg.solutionIds) {
             try {
-                val ref = WorkerSolutionRef(LocalMutationEvaluator.DEFAULT_NODE_ID, solutionId)
+                val ref = com.mdeo.optimizer.evaluation.WorkerSolutionRef(LocalMutationEvaluator.DEFAULT_NODE_ID, solutionId)
                 val serializedModel = runBlocking { ev.getSolutionData(ref) }
-                solutions.add(SolutionData(solutionId, serializedModel))
+                solutions.add(SolutionData(solutionId = solutionId, serializedModel = serializedModel))
             } catch (_: Exception) {
                 notFoundIds.add(solutionId)
             }
@@ -868,12 +950,6 @@ class WorkerSubprocessMain : SubprocessMain() {
         errorMessage = errorMessage
     )
 
-    private data class MutationTaskOutcome(
-        val result: BatchResult,
-        val storedSolution: SubprocessChannelMessage.StoredSolutionPayload?
-    )
-
-
     /**
      * Resets all mutable state so the subprocess can be reused for a new execution.
      *
@@ -883,6 +959,7 @@ class WorkerSubprocessMain : SubprocessMain() {
     private fun handleReset(): ByteArray {
         closeOrchestratorChannel()
         closePeerChannels()
+        incomingSolutionSignals.clear()
         taskDispatcher?.close()
         taskDispatcher = null
         evaluator?.let { runBlocking { it.cleanup() } }
@@ -918,20 +995,11 @@ class WorkerSubprocessMain : SubprocessMain() {
         t?.join(1000L)
     }
 
-    /**
-     * Closes all active peer-solutions WebSocket connections and clears the channel map.
-     */
-    private fun closePeerChannels() {
-        val snapshot = peerChannels.values.toList()
-        peerChannels.clear()
-        for (channel in snapshot) {
-            try { channel.close() } catch (_: Exception) {}
-        }
-    }
-
     override fun cleanup() {
         closeOrchestratorChannel()
         closePeerChannels()
+        peerScope.cancel()
+        incomingSolutionSignals.clear()
         taskDispatcher?.close()
         taskDispatcher = null
         evaluator?.let { runBlocking { it.cleanup() } }
@@ -948,10 +1016,16 @@ class WorkerSubprocessMain : SubprocessMain() {
          */
         private const val SHUTDOWN_NOTICE_TIMEOUT_MS = 5_000L
 
-        /** Maximum time to wait for a peer WebSocket connection to be established. */
-        private const val PEER_CONNECT_TIMEOUT_MS = 30_000L
+        /**
+         * Maximum time to wait for an incoming (push-rebalanced) solution to arrive in the
+         * subprocess before treating the mutation task as failed.
+         */
+        private const val INCOMING_SOLUTION_TIMEOUT_MS = 60_000L
 
-        /** Maximum time to wait for a peer batch fetch response. */
+        /** Maximum time to wait for a [SolutionPushAck] from a peer worker. */
+        private const val PEER_PUSH_TIMEOUT_MS = 60_000L
+
+        /** Maximum time to wait for a batch fetch response. */
         private const val OPERATION_TIMEOUT_MS = 600_000L
 
         /**

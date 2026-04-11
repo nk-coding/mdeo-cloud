@@ -133,16 +133,15 @@ class WorkerService(
             request.threadsPerNode, orchestratorWsUrl != null, useLocalChannel
         )
 
-        val solutions = ConcurrentHashMap<String, ByteArray>()
         val dispatcher = Executors.newFixedThreadPool(effectiveThreads).asCoroutineDispatcher()
         val needsChannelHandler = orchestratorWsUrl != null || useLocalChannel
         val pooledRunner = subprocessPool.acquire()
         val runner: SubprocessRunner
         if (pooledRunner != null) {
             runner = pooledRunner
-            configureChannelHandler(runner, solutions, request.executionId, needsChannelHandler)
+            configureChannelHandler(runner, request.executionId, needsChannelHandler)
         } else {
-            runner = createSubprocessRunner(solutions, request.executionId, needsChannelHandler)
+            runner = createSubprocessRunner(request.executionId, needsChannelHandler)
             if (!runner.start()) {
                 dispatcher.close()
                 throw IllegalStateException("Failed to start worker subprocess for execution ${request.executionId}")
@@ -179,14 +178,9 @@ class WorkerService(
         val setupOk = cbor.decodeFromByteArray<WorkerSubprocessResponse>(setupResult.data) as? WorkerSubprocessResponse.SetupOk
             ?: throw IllegalStateException("Unexpected subprocess response type for execution ${request.executionId}")
 
-        for (initial in setupOk.solutions) {
-            solutions[initial.solutionId] = initial.modelBytes
-        }
-
         executions[request.executionId] = WorkerExecutionState(
             executionId = request.executionId,
             runner = runner,
-            solutions = solutions,
             dispatcher = dispatcher
         )
 
@@ -204,7 +198,7 @@ class WorkerService(
 
 
     /**
-     * Retrieves the serialised model for a specific solution from the parent's byte store.
+     * Retrieves the serialised model for a specific solution by fetching it from the subprocess.
      *
      * @param executionId The execution identifier.
      * @param solutionId The solution identifier to retrieve.
@@ -212,9 +206,65 @@ class WorkerService(
      */
     suspend fun getSolutionData(executionId: String, solutionId: String): SerializedModel {
         val state = requireExecution(executionId)
-        val bytes = state.solutions[solutionId]
-            ?: throw IllegalArgumentException("Solution not found: $solutionId (execution $executionId)")
-        return cbor.decodeFromByteArray<SerializedModel>(bytes)
+        return fetchSolutionFromSubprocess(state, solutionId)
+    }
+
+    /**
+     * Services a long-lived WebSocket connection from a peer subprocess delivering
+     * relocated solution models.
+     *
+     * Source worker subprocesses connect here during population rebalancing and send
+     * [SolutionPushRequest] frames. Each solution is injected into this node's subprocess
+     * via a [SubprocessChannelMessage.SolutionInjected] channel message, signalling any
+     * mutation task that is waiting for that solution ID.
+     *
+     * @param executionId The execution this node is running.
+     * @param session The incoming WebSocket session from the peer subprocess.
+     */
+    suspend fun handlePeerSession(executionId: String, session: DefaultWebSocketSession) {
+        val state = executions[executionId]
+        if (state == null) {
+            logger.error("[handlePeerSession] EXECUTION_NOT_FOUND executionId={}", executionId)
+            session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Execution not found: $executionId"))
+            return
+        }
+        logger.info("[handlePeerSession] CONNECTED executionId={}", executionId)
+        try {
+            for (frame in session.incoming) {
+                if (frame !is Frame.Binary) {
+                    throw IllegalStateException("Expected binary frame with solution data, but received: ${frame.frameType}")
+                }
+                val msg = cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
+                if (msg is SolutionPushRequest) {
+                    for ((idx, solution) in msg.solutions.withIndex()) {
+                        val modelBytes = cbor.encodeToByteArray<SerializedModel>(solution.serializedModel)
+                        val channelMsg = SubprocessChannelMessage.SolutionInjected(solution.solutionId, modelBytes)
+                        state.runner.sendChannelMessage(cbor.encodeToByteArray<SubprocessChannelMessage>(channelMsg))
+                    }
+                    session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(SolutionPushAck(msg.requestId))))
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("[handlePeerSession] ERROR executionId={}: {}", executionId, e.message, e)
+        } finally {
+            logger.info("[handlePeerSession] DISCONNECTED executionId={}", executionId)
+        }
+    }
+
+    /**
+     * Fetches a solution model from the subprocess via the local channel.
+     */
+    private suspend fun fetchSolutionFromSubprocess(state: WorkerExecutionState, solutionId: String): SerializedModel {
+        val requestId = java.util.UUID.randomUUID().toString()
+        val responses = sendViaLocalChannel(state, SolutionBatchFetchRequest(requestId, listOf(solutionId)))
+        val response = responses.firstOrNull()
+        if (response is SolutionBatchFetchResponse) {
+            val data = response.solutions.firstOrNull { it.solutionId == solutionId }
+            if (data != null) {
+                return data.serializedModel
+            }
+        }
+        throw IllegalArgumentException("Solution not found: $solutionId (execution ${state.executionId})")
     }
 
 
@@ -237,58 +287,6 @@ class WorkerService(
         }
         state.dispatcher.close()
         logger.info("Execution {} cleaned up", executionId)
-    }
-
-
-    /**
-     * Services a long-lived WebSocket connection from a peer worker node that needs to
-     * fetch solution model data for rebalancing imports.
-     *
-     * The peer sends [SolutionBatchFetchRequest] messages; this method responds with one
-     * [SolutionBatchFetchResponse] per request carrying all models at once, reading model
-     * bytes directly from the parent-process byte store. The connection is kept alive until the peer closes it
-     * so that multiple fetch rounds can reuse the same session without reconnect overhead.
-     *
-     * @param executionId The execution identifier whose solutions may be requested.
-     * @param session The established WebSocket session opened by the peer.
-     */
-    suspend fun handlePeerSolutionFetchSession(executionId: String, session: DefaultWebSocketSession) {
-        val state = executions[executionId]
-        if (state == null) {
-            logger.warn("Peer solution fetch session for unknown execution {}", executionId)
-            return
-        }
-        logger.info("Peer solution fetch session opened for execution {}", executionId)
-        try {
-            for (frame in session.incoming) {
-                if (frame !is Frame.Binary) continue
-                val msg = try {
-                    cbor.decodeFromByteArray<WorkerWsMessage>(frame.readBytes())
-                } catch (e: Exception) {
-                    logger.warn("Malformed peer fetch frame for execution {}: {}", executionId, e.message)
-                    continue
-                }
-                if (msg is SolutionBatchFetchRequest) {
-                    val solutions = mutableListOf<SolutionData>()
-                    val notFoundIds = mutableListOf<String>()
-                    for (solutionId in msg.solutionIds) {
-                        val bytes = state.solutions[solutionId]
-                        if (bytes == null) {
-                            logger.warn("Peer fetch: solution {} not found in execution {}", solutionId, executionId)
-                            notFoundIds.add(solutionId)
-                            continue
-                        }
-                        val serializedModel = cbor.decodeFromByteArray<SerializedModel>(bytes)
-                        solutions.add(SolutionData(solutionId, serializedModel))
-                    }
-                    session.send(Frame.Binary(true, cbor.encodeToByteArray<WorkerWsMessage>(
-                        SolutionBatchFetchResponse(msg.requestId, solutions, notFoundIds)
-                    )))
-                }
-            }
-        } finally {
-            logger.info("Peer solution fetch session closed for execution {}", executionId)
-        }
     }
 
     /**
@@ -325,8 +323,6 @@ class WorkerService(
                         continue
                     }
                     launch {
-                        // WorkerShutdownAck is a one-way forward: the subprocess will halt
-                        // immediately after processing it, so no response is expected.
                         if (msg is WorkerShutdownAck && state != null) {
                             forwardAckToSubprocess(state, bytes)
                             return@launch
@@ -423,32 +419,19 @@ class WorkerService(
     /**
      * Builds the channel message callback for a subprocess in WS or local-channel mode.
      *
-     * Synchronises the parent's solution byte store, routes [OrchestratorResponses] back
-     * to the pending [CompletableDeferred] registered by [sendViaLocalChannel], and
-     * forwards unsolicited [OrchestratorNotice] messages to the current orchestrator
-     * WebSocket session (if one is open).
+     * Routes [OrchestratorResponses] back to the pending [CompletableDeferred] registered
+     * by [sendViaLocalChannel] and forwards unsolicited [OrchestratorNotice] messages to
+     * the current orchestrator WebSocket session (if one is open).
      *
-     * @param solutions The parent-side solution byte store.
      * @param executionId Execution identifier for logging.
      * @return The channel message callback.
      */
     private fun buildChannelHandler(
-        solutions: ConcurrentHashMap<String, ByteArray>,
         executionId: String
     ): (ByteArray, (ByteArray) -> Unit) -> Unit {
         return { payload, _ ->
             try {
                 when (val msg = cbor.decodeFromByteArray<SubprocessChannelMessage>(payload)) {
-                    is SubprocessChannelMessage.SolutionsStored -> {
-                        for (solution in msg.solutions) {
-                            solutions[solution.solutionId] = solution.modelBytes
-                        }
-                    }
-                    is SubprocessChannelMessage.SolutionsDiscarded -> {
-                        for (id in msg.solutionIds) {
-                            solutions.remove(id)
-                        }
-                    }
                     is SubprocessChannelMessage.OrchestratorResponses -> {
                         val responses = msg.payloads.map { cbor.decodeFromByteArray<WorkerWsMessage>(it) }
                         val requestId = responses.firstOrNull()?.requestId
@@ -477,8 +460,11 @@ class WorkerService(
                             )
                         }
                     }
-                    is SubprocessChannelMessage.OrchestratorRequest -> {
-                        // Direction: parent→subprocess. Silently ignore if going the wrong way.
+                    else -> {
+                        logger.error(
+                            "Received unexpected channel message type from subprocess for execution {}: {}",
+                            executionId, msg::class.java.name
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -499,13 +485,12 @@ class WorkerService(
      */
     private fun configureChannelHandler(
         runner: SubprocessRunner,
-        solutions: ConcurrentHashMap<String, ByteArray>,
         executionId: String,
         wsMode: Boolean
     ) {
         logger.info("Configuring pooled subprocess for execution {} (cancellation check already set)", executionId)
         runner.executionId = executionId
-        runner.onChannelMessage = if (wsMode) buildChannelHandler(solutions, executionId) else null
+        runner.onChannelMessage = if (wsMode) buildChannelHandler(executionId) else null
         runner.onProcessExited = {
             localChannelPending.values.forEach { it.completeExceptionally(RuntimeException("Subprocess exited")) }
         }
@@ -514,12 +499,10 @@ class WorkerService(
     /**
      * Creates a new [SubprocessRunner] with channel message handling configured.
      *
-     * @param solutions The parent-side solution byte store to keep in sync.
      * @param executionId Execution identifier for logging.
      * @param wsMode Whether the subprocess operates in WebSocket or local-channel mode.
      */
     private fun createSubprocessRunner(
-        solutions: ConcurrentHashMap<String, ByteArray>,
         executionId: String,
         wsMode: Boolean
     ): SubprocessRunner {
@@ -528,7 +511,7 @@ class WorkerService(
             mainClass = WorkerSubprocessMain::class.java.name,
             cancellationCheck = { id -> isExecutionCancelled(id) },
             cancellationCheckIntervalMs = CANCELLATION_CHECK_INTERVAL_MS,
-            onChannelMessage = if (wsMode) buildChannelHandler(solutions, executionId) else null
+            onChannelMessage = if (wsMode) buildChannelHandler(executionId) else null
         )
         runner.executionId = executionId
         runner.onProcessExited = {
@@ -570,13 +553,11 @@ class WorkerService(
      *
      * @param executionId The execution identifier.
      * @param runner The subprocess runner.
-     * @param solutions Map from solution ID to CBOR-encoded [SerializedModel] bytes.
      * @param dispatcher Thread pool used for blocking subprocess I/O.
      */
     inner class WorkerExecutionState(
         val executionId: String,
         @Volatile var runner: SubprocessRunner,
-        val solutions: ConcurrentHashMap<String, ByteArray>,
         val dispatcher: ExecutorCoroutineDispatcher
     ) {
         /**

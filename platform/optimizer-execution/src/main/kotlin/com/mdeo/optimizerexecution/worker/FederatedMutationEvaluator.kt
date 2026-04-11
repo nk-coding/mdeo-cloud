@@ -2,6 +2,7 @@ package com.mdeo.optimizerexecution.worker
 
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.optimizer.evaluation.*
+import com.mdeo.optimizer.moea.RebalanceTransfer
 import com.mdeo.optimizer.worker.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -63,6 +64,14 @@ class FederatedMutationEvaluator(
      * Populated after [initialize] completes.
      */
     private val workerThreadCounts = ConcurrentHashMap<String, Int>()
+
+    /**
+     * Pending [SolutionRelocation] objects to include in each source node's next batch.
+     *
+     * Populated by [pushRebalanceSolutions] and consumed (then cleared) by [executeOnWorker].
+     * Keyed by source nodeId.
+     */
+    private val pendingRelocations = ConcurrentHashMap<String, MutableList<SolutionRelocation>>()
 
     override fun getNodeIds(): Set<String> = workerByNodeId.keys
 
@@ -128,6 +137,34 @@ class FederatedMutationEvaluator(
                 }
             }.awaitAll()
         }.fold(mutableMapOf()) { acc, map -> acc.apply { putAll(map) } }
+    }
+
+    /**
+     * Computes the relocation plan and stores it as pending per source node.
+     *
+     * No model data is fetched here. Instead, each transfer is converted into a
+     * [SolutionRelocation] that will be included in the source node's next
+     * [NodeWorkBatchRequest]. The source subprocess then reads the models locally
+     * and pushes them directly to the destination worker via a persistent WebSocket,
+     * keeping the orchestrator off the data path entirely.
+     *
+     * Returns the per-source-node list of solution IDs that were relocated (i.e. should
+     * be discarded from the source in the current batch).
+     */
+    override suspend fun pushRebalanceSolutions(transfers: List<RebalanceTransfer>): Map<String, List<String>> {
+        if (transfers.isEmpty()) return emptyMap()
+        val discardsBySource = mutableMapOf<String, MutableList<String>>()
+        for (transfer in transfers) {
+            val destWorker = requireWorker(transfer.destinationNodeId)
+            val relocation = SolutionRelocation(
+                destinationWorkerBaseUrl = destWorker.baseUrl,
+                executionId = executionId,
+                solutionIds = transfer.solutionIds
+            )
+            pendingRelocations.getOrPut(transfer.sourceNodeId) { mutableListOf() }.add(relocation)
+            discardsBySource.getOrPut(transfer.sourceNodeId) { mutableListOf() }.addAll(transfer.solutionIds)
+        }
+        return discardsBySource
     }
 
     /**
@@ -205,19 +242,14 @@ class FederatedMutationEvaluator(
      */
     private suspend fun executeOnWorker(batch: NodeBatch): List<EvaluationResult> {
         val worker = requireWorker(batch.nodeId)
+        val relocations = pendingRelocations.remove(batch.nodeId) ?: emptyList()
         return try {
             val response = worker.executeNodeBatch(
                 executionId,
-                importRefs = batch.imports.map { importData ->
-                    val sourceWorker = requireWorker(importData.sourceNodeId)
-                    SolutionImportRef(
-                        solutionId = importData.solutionId,
-                        sourcePeerWsUrl = sourceWorker.peerSolutionsWsUrl(executionId)
-                    )
-                },
                 tasks = batch.tasks.map { BatchTask(it.solutionId) },
                 evaluationTasks = batch.evaluationTasks.map { BatchEvaluationTask(it.solutionId) },
-                discards = batch.discards
+                discards = batch.discards,
+                relocations = relocations
             )
             response.results.map { result ->
                 EvaluationResult(
