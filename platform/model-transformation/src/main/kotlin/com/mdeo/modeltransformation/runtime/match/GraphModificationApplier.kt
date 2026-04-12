@@ -43,10 +43,13 @@ internal class GraphModificationApplier(
         return result
     }
 
-    // -------------------------------------------------------------------------
-    // Create vertices
-    // -------------------------------------------------------------------------
-
+    /**
+     * Adds `addV()` steps for each create instance and applies their property assignments.
+     *
+     * @param traversal The current traversal.
+     * @param matchedInstanceNames Names of already-bound instances (for expression resolution).
+     * @return The traversal with all create-vertex steps appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addCreateVertexSteps(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -63,6 +66,19 @@ internal class GraphModificationApplier(
         return result
     }
 
+    /**
+     * Adds `.property()` steps for all `=` properties on a newly created vertex.
+     *
+     * Simple scalar properties are set with `.property(key, value)` while collection-typed
+     * properties use a `.sideEffect()` approach with `list` cardinality.
+     *
+     * @param traversal The current traversal positioned at the new vertex.
+     * @param className The class name of the instance (for property key resolution).
+     * @param instanceName The name of the instance being created.
+     * @param instance The instance element containing property assignments.
+     * @param matchedInstanceNames Names of already-bound instances (for expression resolution).
+     * @return The traversal with property steps appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addVertexProperties(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -82,9 +98,11 @@ internal class GraphModificationApplier(
             val graphKey = expressionSupport.engine.resolvePropertyGraphKey(className, property.propertyName)
             val compiled = expressionSupport.compilePropertyExpression(property.value, matchedInstanceNames)!!
             result = if (compiled is CompilationResult.ValueResult) {
-                if (compiled.value != null)
+                if (compiled.value != null) {
                     result.property(graphKey, compiled.value) as GraphTraversal<Vertex, Map<String, Any>>
-                else result
+                } else {
+                    result
+                }
             } else {
                 result.property(graphKey, compiled.traversal) as GraphTraversal<Vertex, Map<String, Any>>
             }
@@ -108,10 +126,13 @@ internal class GraphModificationApplier(
         return result
     }
 
-    // -------------------------------------------------------------------------
-    // Property updates on matched instances
-    // -------------------------------------------------------------------------
-
+    /**
+     * Adds `.sideEffect(.property(...))` steps for `=` properties on matched instances.
+     *
+     * @param traversal The current traversal.
+     * @param matchedInstanceNames Names of already-bound instances (for expression resolution).
+     * @return The traversal with property update steps appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addPropertyUpdateSteps(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -119,12 +140,20 @@ internal class GraphModificationApplier(
     ): GraphTraversal<Vertex, Map<String, Any>> {
         var result = traversal
         for (instance in elements.matchableInstances) {
-            if (instance.objectInstance.modifier == "delete") continue
+            if (instance.objectInstance.modifier == "delete") { continue }
             result = addMatchedInstanceProperties(result, instance, matchedInstanceNames)
         }
         return result
     }
 
+    /**
+     * Adds property update steps for a single matched instance via `.sideEffect()`.
+     *
+     * @param traversal The current traversal.
+     * @param instance The matched instance with `=` property assignments.
+     * @param matchedInstanceNames Names of already-bound instances (for expression resolution).
+     * @return The traversal with the instance's property updates appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addMatchedInstanceProperties(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -137,13 +166,13 @@ internal class GraphModificationApplier(
         val stepLabel = VariableBinding.stepLabel(name)
 
         for (property in instance.objectInstance.properties) {
-            if (property.operator != "=") continue
+            if (property.operator != "=") { continue }
             val graphKey = expressionSupport.engine.resolvePropertyGraphKey(className, property.propertyName)
             val propType = expressionSupport.resolveExpressionType(property.value)
 
             if (expressionSupport.isCollectionType(propType)) {
                 val listResult = expressionSupport.compilePropertyExpression(property.value, matchedInstanceNames)
-                if (listResult != null) result = setListPropertyViaSideEffect(result, name, graphKey, listResult)
+                if (listResult != null) { result = setListPropertyViaSideEffect(result, name, graphKey, listResult) }
             } else {
                 val value = expressionSupport.getPropertyValue(property.value, matchedInstanceNames)
                 result = result.sideEffect(
@@ -154,6 +183,16 @@ internal class GraphModificationApplier(
         return result
     }
 
+    /**
+     * Replaces a list-typed property using a side-effect that drops existing values
+     * then re-adds them with `list` cardinality.
+     *
+     * @param traversal The current traversal.
+     * @param instanceName The instance owning the property.
+     * @param graphKey The resolved graph property key.
+     * @param listResult The compiled list expression result.
+     * @return The traversal with the list property replacement side-effects appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun setListPropertyViaSideEffect(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -181,10 +220,13 @@ internal class GraphModificationApplier(
         return result
     }
 
-    // -------------------------------------------------------------------------
-    // Create edges
-    // -------------------------------------------------------------------------
-
+    /**
+     * Adds `.sideEffect(addE(...).to(...))` steps for each create link.
+     *
+     * @param traversal The current traversal.
+     * @param currentPatternInstanceNames All instance names known in the current pattern.
+     * @return The traversal with edge creation side-effects appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addCreateEdgeSteps(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -206,10 +248,12 @@ internal class GraphModificationApplier(
         return result
     }
 
-    // -------------------------------------------------------------------------
-    // Delete
-    // -------------------------------------------------------------------------
-
+    /**
+     * Adds `.sideEffect(drop())` steps for delete links and delete instances.
+     *
+     * @param traversal The current traversal.
+     * @return The traversal with deletion side-effects appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addDeleteSteps(
         traversal: GraphTraversal<Vertex, Map<String, Any>>
@@ -226,6 +270,13 @@ internal class GraphModificationApplier(
         return result
     }
 
+    /**
+     * Adds a side-effect that drops the edge between two matched instances.
+     *
+     * @param traversal The current traversal.
+     * @param link The delete link element describing the edge to remove.
+     * @return The traversal with the edge deletion side-effect appended.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addDeleteEdgeStep(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,

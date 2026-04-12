@@ -6,6 +6,11 @@ import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationEngine
+import com.mdeo.modeltransformation.runtime.match.plan.BaseStep
+import com.mdeo.modeltransformation.runtime.match.plan.MatchPlan
+import com.mdeo.modeltransformation.runtime.match.plan.MatchPlanBuilder
+import com.mdeo.modeltransformation.runtime.match.plan.PostMatchFilter
+import org.apache.tinkerpop.gremlin.process.traversal.P
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.Vertex
 
@@ -13,9 +18,8 @@ import org.apache.tinkerpop.gremlin.structure.Vertex
  * Unified executor that combines pattern matching and modifications in a single Gremlin traversal.
  *
  * Delegates to specialised helpers:
- * - [MatchPlanBuilder] — base traversal construction and match()-clause generation.
- * - [IslandConstraintApplier] — late forbid/require island constraints.
- * - [PostMatchFilterApplier] — injective, property-equality and where-clause filters.
+ * - [MatchPlanBuilder] (plan package) — abstract plan construction (no traversal objects).
+ * - [MatchTraversalBuilder] — translates the [MatchPlan] into concrete Gremlin traversal steps.
  * - [GraphModificationApplier] — create-vertex, property-update, create-edge and delete steps.
  *
  * A single [SequentialLabelIdGenerator] is shared across all helpers via [ExpressionSupport]
@@ -60,7 +64,7 @@ class MatchExecutor {
         engine: TransformationEngine,
         limit: Long
     ): List<MatchResult.Matched> {
-        if (!engine.deterministic) engine.modelGraph.resetNondeterminism()
+        if (!engine.deterministic) { engine.modelGraph.resetNondeterminism() }
 
         val elements = PatternCategories.from(pattern)
         for (name in elements.allInstanceNames) {
@@ -71,10 +75,16 @@ class MatchExecutor {
         return executeUnifiedTraversal(elements, context, engine, limit)
     }
 
-    // -------------------------------------------------------------------------
-    // Internal orchestration
-    // -------------------------------------------------------------------------
-
+    /**
+     * Orchestrates the complete match pipeline: plan building, traversal assembly, execution,
+     * and result extraction.
+     *
+     * @param elements Categorised pattern elements.
+     * @param context The current transformation execution context.
+     * @param engine The transformation engine providing graph access and type information.
+     * @param limit Maximum number of results (-1 for unlimited).
+     * @return List of matched results (may be empty).
+     */
     private fun executeUnifiedTraversal(
         elements: PatternCategories,
         context: TransformationExecutionContext,
@@ -99,70 +109,123 @@ class MatchExecutor {
             .forEach { analyzer.analyzeLink(it) }
         val referencedInstances = analyzer.getReferencedInstances()
 
-        val matchPlan = MatchPlanBuilder(context, engine, compilationContext, expressionSupport)
-            .build(elements, referencedInstances)
-
         val allMatchable = elements.matchableInstances + elements.deleteInstances
         val matchableNames = allMatchable.map { it.objectInstance.name }.toSet()
 
-        val islandApplier = IslandConstraintApplier(matchableNames, expressionSupport)
-        val postFilters = PostMatchFilterApplier(expressionSupport)
+        val variableNames = elements.variables.map { it.variable.name }.toSet()
+        val nodeAnalyzer = ExpressionNodeAnalyzer(matchableNames + variableNames, context.variableScope.scopeIndex)
+
+        val matchPlan = MatchPlanBuilder(
+            getVertexId = { name ->
+                (context.variableScope.getVariable(name)
+                    as? VariableBinding.InstanceBinding)?.vertexId
+            },
+            nodeAnalyzer = nodeAnalyzer,
+            isCollectionExpression = { expr ->
+                expressionSupport.isCollectionType(expressionSupport.resolveExpressionType(expr))
+            }
+        ).build(elements, referencedInstances)
 
         val traversal = buildUnifiedTraversal(
-            elements, matchPlan, allMatchable, islandApplier, postFilters,
+            elements, matchPlan,
             expressionSupport, compilationContext, limit
         )
 
+        val planBoundNames = matchPlan.baseSteps.mapNotNull { step ->
+            when (step) {
+                is BaseStep.VertexScan -> step.instanceName
+                is BaseStep.EdgeWalk -> step.toInstanceName
+                else -> null
+            }
+        }
+        val allSelectNames = (elements.allInstanceNames + planBoundNames).distinct()
+
         val matchedInstanceNames = allMatchable.map { it.objectInstance.name }
-        return executeTraversalAndExtract(traversal, elements, context, engine, matchedInstanceNames)
+        return executeTraversalAndExtract(traversal, elements, context, engine, matchedInstanceNames, allSelectNames)
     }
 
+    /**
+     * Assembles the full Gremlin traversal from the match plan, applying limit, modifications,
+     * and the final select step.
+     *
+     * The traversal is fully imperative — no `match()` step is used. All constraints
+     * (island, property, injective, where-clauses, variables) are expressed as imperative
+     * steps and post-match filters.
+     *
+     * @param elements Categorised pattern elements.
+     * @param plan The abstract match plan produced by [MatchPlanBuilder].
+     * @param expressionSupport Shared expression compilation utilities.
+     * @param compilationContext The compilation context for unique label generation.
+     * @param limit Maximum number of results (-1 for unlimited).
+     * @return The fully assembled traversal ready for execution.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun buildUnifiedTraversal(
         elements: PatternCategories,
         plan: MatchPlan,
-        allMatchable: List<com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement>,
-        islandApplier: IslandConstraintApplier,
-        postFilters: PostMatchFilterApplier,
         expressionSupport: ExpressionSupport,
         compilationContext: com.mdeo.modeltransformation.compiler.CompilationContext,
         limit: Long
     ): GraphTraversal<Vertex, Any> {
-        var t: GraphTraversal<Vertex, Map<String, Any>> = if (plan.clauses.isEmpty()) {
-            plan.baseTraversal as GraphTraversal<Vertex, Map<String, Any>>
-        } else {
-            buildMatchStep(plan.baseTraversal, plan.clauses)
+        val traversalBuilder = MatchTraversalBuilder(expressionSupport, compilationContext, expressionSupport.engine)
+        var t: GraphTraversal<Vertex, Map<String, Any>> =
+            traversalBuilder.buildBaseTraversal(plan) as GraphTraversal<Vertex, Map<String, Any>>
+
+        // Apply post-match filters: injective constraints and cross-node where clauses.
+        for (filter in plan.postMatchFilters) {
+            @Suppress("UNCHECKED_CAST")
+            t = when (filter) {
+                is PostMatchFilter.InjectiveConstraint -> {
+                    val labelA = VariableBinding.stepLabel(filter.instanceNameA)
+                    val labelB = VariableBinding.stepLabel(filter.instanceNameB)
+                    t.where(labelA, P.neq(labelB)) as GraphTraversal<Vertex, Map<String, Any>>
+                }
+                is PostMatchFilter.CrossNodeWhereClause -> {
+                    val compiled = expressionSupport.compileToTraversal(filter.whereClause.whereClause.expression)
+                    t.where(compiled.`is`(true)) as GraphTraversal<Vertex, Map<String, Any>>
+                }
+            }
         }
 
-        t = islandApplier.apply(t, elements, plan.earlyConstraintPlan)
-        t = postFilters.applyPropertyWhereConstraints(t, allMatchable)
-        t = postFilters.applyWhereClauseConstraints(t, elements.whereClauses)
-        t = postFilters.applyInjectiveConstraints(t, allMatchable)
         t = applyLimit(t, limit)
 
         val matchedNames = elements.matchableInstances.map { it.objectInstance.name }
         t = GraphModificationApplier(elements, expressionSupport, compilationContext).apply(t, matchedNames)
 
+        val planBoundNames = plan.baseSteps.mapNotNull { step ->
+            when (step) {
+                is BaseStep.VertexScan -> step.instanceName
+                is BaseStep.EdgeWalk -> step.toInstanceName
+                else -> null
+            }
+        }
+        val allSelectNames = (elements.allInstanceNames + planBoundNames).distinct()
+
         val variableLabels = elements.variables.map { VariableBinding.variableLabel(it.variable.name) }
-        return addSelectStep(t, elements.allInstanceNames, variableLabels)
+        return addSelectStep(t, allSelectNames, variableLabels)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun buildMatchStep(
-        base: GraphTraversal<Vertex, Vertex>,
-        clauses: Array<GraphTraversal<Any, Any>>
-    ): GraphTraversal<Vertex, Map<String, Any>> = when {
-        clauses.size == 1 -> base.match<Any>(clauses[0])
-        else -> base.match<Any>(clauses[0], *clauses.drop(1).toTypedArray())
-    } as GraphTraversal<Vertex, Map<String, Any>>
-
+    /**
+     * Applies a `.limit()` step if [limit] is positive.
+     *
+     * @param traversal The traversal to limit.
+     * @param limit Maximum number of results; non-positive means unlimited.
+     * @return The traversal with or without the limit step.
+     */
     private fun applyLimit(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
         limit: Long
     ): GraphTraversal<Vertex, Map<String, Any>> =
-        if (limit <= 0) traversal
-        else traversal.limit(limit) as GraphTraversal<Vertex, Map<String, Any>>
+        if (limit <= 0) traversal else traversal.limit(limit) as GraphTraversal<Vertex, Map<String, Any>>
 
+    /**
+     * Appends a `.select()` step to extract all instance and variable bindings from the traversal.
+     *
+     * @param traversal The traversal to add the select step to.
+     * @param instanceNames Instance names whose step labels should be selected.
+     * @param variableLabels Variable labels to include in the selection.
+     * @return The traversal with the select step applied.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun addSelectStep(
         traversal: GraphTraversal<Vertex, Map<String, Any>>,
@@ -179,21 +242,30 @@ class MatchExecutor {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Result extraction
-    // -------------------------------------------------------------------------
-
+    /**
+     * Materialises the traversal and converts each raw result map into a [MatchResult.Matched].
+     *
+     * @param traversal The fully assembled traversal to execute.
+     * @param elements Categorised pattern elements.
+     * @param context The current transformation execution context.
+     * @param engine The transformation engine.
+     * @param matchedInstanceNames Names of matchable instances.
+     * @param allSelectNames All instance names included in the final select step (may include
+     *        referenced instances from outer scopes beyond allInstanceNames).
+     * @return List of extracted match results.
+     */
     @Suppress("UNCHECKED_CAST")
     private fun executeTraversalAndExtract(
         traversal: GraphTraversal<Vertex, Any>,
         elements: PatternCategories,
         context: TransformationExecutionContext,
         engine: TransformationEngine,
-        matchedInstanceNames: List<String>
+        matchedInstanceNames: List<String>,
+        allSelectNames: List<String>
     ): List<MatchResult.Matched> {
         val instanceNames = elements.allInstanceNames
         val variableLabels = elements.variables.map { VariableBinding.variableLabel(it.variable.name) }
-        val allLabels = instanceNames + variableLabels
+        val allLabels = allSelectNames + variableLabels
 
         return traversal.toList().map { rawResult ->
             val result: Map<String, Any> = when {
@@ -201,7 +273,7 @@ class MatchExecutor {
                 allLabels.size == 1 -> mapOf(allLabels[0] to rawResult)
                 else -> {
                     val rawMap = rawResult as Map<String, Any>
-                    instanceNames.associateWith { rawMap[VariableBinding.stepLabel(it)]!! } +
+                    allSelectNames.associateWith { rawMap[VariableBinding.stepLabel(it)]!! } +
                         variableLabels.associateWith { rawMap[it]!! }
                 }
             }
@@ -209,6 +281,17 @@ class MatchExecutor {
         }
     }
 
+    /**
+     * Converts a single raw result map into a [MatchResult.Matched], populating variable
+     * bindings and classifying each node as matched, created, or deleted.
+     *
+     * @param result The raw result map from the traversal.
+     * @param elements Categorised pattern elements.
+     * @param context The current transformation execution context.
+     * @param engine The transformation engine.
+     * @param matchedInstanceNames Names of matchable instances.
+     * @return The extracted match result.
+     */
     private fun extractMatchResult(
         result: Map<String, Any>,
         elements: PatternCategories,
@@ -240,6 +323,20 @@ class MatchExecutor {
         return MatchResult.Matched(bindings, instanceMappings, matchedNodeIds, createdNodeIds, deletedNodeIds)
     }
 
+    /**
+     * Classifies a single result node as matched, created, or deleted based on the pattern
+     * element sets and adds it to the appropriate output collections.
+     *
+     * @param name The instance name.
+     * @param value The raw vertex value from the result map (may be null or non-Vertex).
+     * @param createNames Names of create instances.
+     * @param deleteNames Names of delete instances.
+     * @param instanceMappings Output map of instance name to vertex reference.
+     * @param matchedNodeIds Output set of matched vertex IDs.
+     * @param createdNodeIds Output set of created vertex IDs.
+     * @param deletedNodeIds Output set of deleted vertex IDs.
+     * @param engine The transformation engine for vertex reference creation.
+     */
     private fun classifyNode(
         name: String,
         value: Any?,
@@ -251,7 +348,7 @@ class MatchExecutor {
         deletedNodeIds: MutableSet<Any>,
         engine: TransformationEngine
     ) {
-        if (value !is Vertex) return
+        if (value !is Vertex) { return }
         val rawId = value.id()
         instanceMappings[name] = engine.modelGraph.createVertexRef(rawId)
         when {

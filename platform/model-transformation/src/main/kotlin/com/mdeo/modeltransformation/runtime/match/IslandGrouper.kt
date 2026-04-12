@@ -96,6 +96,13 @@ object IslandGrouper {
         }
     }
 
+    /**
+     * Finds the root of the set containing element [i] with path compression.
+     *
+     * @param parent The parent array representing the union-find forest.
+     * @param i The element to find the root for.
+     * @return The root index of the set containing [i].
+     */
     private fun find(parent: IntArray, i: Int): Int {
         var node = i
         while (parent[node] != node) {
@@ -105,6 +112,14 @@ object IslandGrouper {
         return node
     }
 
+    /**
+     * Merges the sets containing elements [a] and [b] using union by rank.
+     *
+     * @param parent The parent array representing the union-find forest.
+     * @param rank The rank array for balancing.
+     * @param a First element.
+     * @param b Second element.
+     */
     private fun union(parent: IntArray, rank: IntArray, a: Int, b: Int) {
         val rootA = find(parent, a)
         val rootB = find(parent, b)

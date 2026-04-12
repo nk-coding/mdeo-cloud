@@ -23,8 +23,8 @@ internal object IslandTraversalUtils {
         for (link in links) {
             val source = link.link.source.objectName
             val target = link.link.target.objectName
-            if (source !in islandInstanceNames && source in matchableNames) anchors.add(source)
-            if (target !in islandInstanceNames && target in matchableNames) anchors.add(target)
+            if (source !in islandInstanceNames && source in matchableNames) { anchors.add(source) }
+            if (target !in islandInstanceNames && target in matchableNames) { anchors.add(target) }
         }
         return anchors
     }
@@ -83,7 +83,7 @@ internal object IslandTraversalUtils {
         for ((link, isReversed) in orderedLinks) {
             val from = if (isReversed) link.link.target.objectName else link.link.source.objectName
             val to = if (isReversed) link.link.source.objectName else link.link.target.objectName
-            if (from != current) needed.add(from)
+            if (from != current) { needed.add(from) }
             current = to
         }
         return needed
