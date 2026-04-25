@@ -60,7 +60,7 @@ internal class GraphModificationApplier(
             val className = instance.objectInstance.className
             val name = instance.objectInstance.name
             result = expressionSupport.engine.modelGraph.addVertexStep(
-                result, className!!, VariableBinding.stepLabel(name!!))
+                result, className!!, VariableBinding.stepLabel(name))
             result = addVertexProperties(result, className, name, instance, matchedInstanceNames)
         }
         return result

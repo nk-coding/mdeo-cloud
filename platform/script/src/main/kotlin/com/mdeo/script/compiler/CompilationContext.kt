@@ -307,6 +307,58 @@ class CompilationContext(
             ?: throw CompilationException("No compiler found for statement: ${statement.kind}")
         compiler.compile(statement, this, mv)
     }
+
+    /**
+     * Tracks the next free JVM local-variable slot available for temporary use.
+     * Initialised lazily from the scope tree on first call to [allocateTempSlot].
+     */
+    private var nextTempSlot: Int = -1
+
+    /**
+     * Allocates one or more consecutive JVM local-variable slots for temporary storage.
+     *
+     * Slots are allocated beyond all scope-declared variables. The counter only ever
+     * increases, so nested [ExtensionCallCompiler][com.mdeo.script.compiler.expressions.ExtensionCallCompiler]
+     * invocations receive non-overlapping slots while outer temporaries remain live.
+     *
+     * @param slotsNeeded Number of consecutive slots to allocate (2 for `long`/`double`,
+     *                    1 for everything else).
+     * @return The index of the first allocated slot.
+     */
+    fun allocateTempSlot(slotsNeeded: Int = 1): Int {
+        if (nextTempSlot < 0) {
+            nextTempSlot = computeNextFreeSlot()
+        }
+        val slot = nextTempSlot
+        nextTempSlot += slotsNeeded
+        return slot
+    }
+
+    /**
+     * Computes the first JVM local-variable slot that is not yet claimed by any
+     * scope-declared variable in the current method.
+     *
+     * Walks the entire statically-nested scope tree starting from
+     * [functionParamsScope]. Lambda sub-scopes ([isStaticallyNested] = false) are
+     * excluded because they are compiled as separate JVM methods with their own local
+     * variable tables.
+     */
+    private fun computeNextFreeSlot(): Int {
+        var max = 0
+        fun walk(scope: Scope) {
+            for (info in scope.declaredVariables.values) {
+                if (info.slotIndex >= 0) {
+                    val slotEnd = info.slotIndex + ASMUtil.getSlotsForType(info.type, info.isWrittenByLambda)
+                    if (slotEnd > max) max = slotEnd
+                }
+            }
+            for (child in scope.children) {
+                if (child.isStaticallyNested) walk(child)
+            }
+        }
+        functionParamsScope?.let { walk(it) }
+        return maxOf(max, 1)
+    }
 }
 
 /**

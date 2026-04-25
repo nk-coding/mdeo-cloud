@@ -908,6 +908,7 @@ class ReadonlyCollectionMethodsTest {
     @Test
     fun `flatMap preserves order`() {
         val list = ListImpl.of(1, 2, 3)
+        @Suppress("UNCHECKED_CAST")
         val result = list.flatMap(Func1 { ListImpl.of(it) }) as ReadonlyList<Int>
         assertEquals(1, result.at(0))
         assertEquals(2, result.at(1))

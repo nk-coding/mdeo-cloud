@@ -50,9 +50,8 @@ class SubprocessRunnerTest {
             },
             cancellationCheckIntervalMs = 200
         )
-        runner.executionId = "test-cancellation"
-
         assertTrue(runner.start(), "Subprocess should start")
+        runner.executionId = "test-cancellation"
         val result = runner.sendCommand("work".toByteArray())
         assertIs<SubprocessResult.Cancelled>(result)
     }

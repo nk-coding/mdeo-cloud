@@ -116,7 +116,7 @@ class InjectiveMatchTest {
     ): TransformationEngine {
         val metamodel = Metamodel.compile(metamodelData)
         val modelData = ModelData(
-            metamodelPath = metamodelData.path ?: "",
+            metamodelPath = metamodelData.path,
             instances = instances.map { (name, cls) ->
                 ModelDataInstance(name = name, className = cls, properties = emptyMap())
             },
@@ -126,7 +126,7 @@ class InjectiveMatchTest {
         openGraphs.add(graph)
         return TransformationEngine(
             modelGraph = graph,
-            ast = TypedAst(types = emptyList(), metamodelPath = metamodelData.path ?: "", statements = emptyList()),
+            ast = TypedAst(types = emptyList(), metamodelPath = metamodelData.path, statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )

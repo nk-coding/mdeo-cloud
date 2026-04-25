@@ -149,7 +149,6 @@ class InstanceNameRegistryIntegrationTest {
         val result = engine.executeStatement(statement, context)
         
         assertTrue(result is TransformationExecutionResult.Success)
-        result as TransformationExecutionResult.Success
         
         // Verify both nodes are in the name registry
         val p1Id = (context.variableScope.getVariable("p1") as? VariableBinding.InstanceBinding)?.vertexId
@@ -220,7 +219,6 @@ class InstanceNameRegistryIntegrationTest {
         val result = engine.executeStatement(statement, context)
         
         assertTrue(result is TransformationExecutionResult.Success)
-        result as TransformationExecutionResult.Success
         
         // Verify both nodes are in the registry
         assertEquals("existingPerson", engine.instanceNameRegistry.getName(inputVertex.id()))

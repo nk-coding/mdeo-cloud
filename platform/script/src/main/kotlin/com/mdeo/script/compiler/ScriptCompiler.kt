@@ -4,6 +4,8 @@ import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.script.ast.TypedAst
 import com.mdeo.script.ast.TypedFunction
+import com.mdeo.script.ast.TypedImport
+import com.mdeo.script.ast.TypedPluginAst
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.VoidType
@@ -18,6 +20,7 @@ import com.mdeo.script.compiler.expressions.IntLiteralCompiler
 import com.mdeo.script.compiler.expressions.LambdaCompiler
 import com.mdeo.script.compiler.expressions.LongLiteralCompiler
 import com.mdeo.script.compiler.expressions.NullLiteralCompiler
+import com.mdeo.script.compiler.expressions.ExtensionCallCompiler
 import com.mdeo.script.compiler.expressions.FunctionCallCompiler
 import com.mdeo.script.compiler.expressions.MemberAccessCompiler
 import com.mdeo.script.compiler.expressions.MemberCallCompiler
@@ -30,8 +33,13 @@ import com.mdeo.script.compiler.expressions.ListLiteralCompiler
 import com.mdeo.script.compiler.model.ScriptMetamodelTypeRegistrar
 import com.mdeo.script.compiler.util.toJvmBinaryName
 import com.mdeo.script.compiler.registry.function.FileFunctionRegistry
+import com.mdeo.script.compiler.registry.function.FunctionDefinition
+import com.mdeo.script.compiler.registry.function.FunctionDefinitionImpl
 import com.mdeo.script.compiler.registry.function.FunctionRegistry
 import com.mdeo.script.compiler.registry.function.GlobalFunctionRegistry
+import com.mdeo.script.compiler.registry.function.PluginFunctionParameter
+import com.mdeo.script.compiler.registry.function.PluginFunctionSignatureDefinition
+import com.mdeo.script.compiler.util.MethodDescriptorUtil
 import com.mdeo.script.compiler.registry.property.GlobalPropertyRegistry
 import com.mdeo.script.compiler.registry.type.TypeRegistry
 import com.mdeo.script.compiler.statements.AssignmentCompiler
@@ -77,6 +85,7 @@ class ScriptCompiler {
         FunctionCallCompiler(),
         MemberCallCompiler(),
         ExpressionCallCompiler(),
+        ExtensionCallCompiler(),
         LambdaCompiler(),
         AssertNonNullCompiler(),
         TypeCastCompiler(),
@@ -140,7 +149,6 @@ class ScriptCompiler {
             TypeRegistries(TypeRegistry.GLOBAL, GlobalPropertyRegistry())
         }
 
-        // Pre-assign artificial JVM method names (fn0, fn1, …) across all files
         var counter = 0
         val mutableLookup = mutableMapOf<String, MutableMap<String, String>>()
         for ((filePath, ast) in input.files) {
@@ -152,16 +160,30 @@ class ScriptCompiler {
         }
         val functionLookup: Map<String, Map<String, String>> = mutableLookup
 
+        val pluginLookup = mutableMapOf<String, MutableMap<String, String>>()
+        input.pluginAst?.functions?.forEach { func ->
+            val overloadLookup = mutableMapOf<String, String>()
+            func.signatures.keys.forEach { overloadKey ->
+                overloadLookup[overloadKey] = "fn${counter++}"
+            }
+            pluginLookup[func.name] = overloadLookup
+        }
+
+        val pluginFunctionDefs = buildPluginFunctionDefs(input.pluginAst, pluginLookup)
+
+        val effectiveGlobalRegistry = buildEffectiveGlobalRegistry(pluginFunctionDefs)
+
         val fileRegistries = FileFunctionRegistry.createForCompilation(
             input.files,
-            GlobalFunctionRegistry.GLOBAL,
+            effectiveGlobalRegistry,
             CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME,
             functionLookup
         )
 
         val generatedInterfaces = mutableMapOf<String, ByteArray>()
         val programBytecode = compileSingleClass(
-            input, fileRegistries, typeRegistries, functionLookup, generatedInterfaces
+            input, fileRegistries, effectiveGlobalRegistry, typeRegistries, functionLookup,
+            pluginLookup, generatedInterfaces
         )
 
         allBytecodes[CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME] = programBytecode
@@ -202,8 +224,10 @@ class ScriptCompiler {
     private fun compileSingleClass(
         input: CompilationInput,
         fileRegistries: Map<String, FileFunctionRegistry>,
+        pluginRegistry: FunctionRegistry,
         typeRegistries: TypeRegistries,
         functionLookup: Map<String, Map<String, String>>,
+        pluginLookup: Map<String, Map<String, String>>,
         generatedInterfaces: MutableMap<String, ByteArray>
     ): ByteArray {
         val cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
@@ -237,6 +261,35 @@ class ScriptCompiler {
                     typeRegistries.fileScopePropertyRegistry,
                     sharedLambdaCounter, sharedLambdaInterfaceRegistry
                 )
+            }
+        }
+
+        input.pluginAst?.let { pluginAst ->
+            val pluginTypedAst = TypedAst(
+                types = pluginAst.types,
+                metamodelPath = null,
+                imports = emptyList(),
+                functions = emptyList()
+            )
+            for (func in pluginAst.functions) {
+                val overloadLookup = pluginLookup[func.name] ?: continue
+                for ((overloadKey, signature) in func.signatures) {
+                    val jvmMethodName = overloadLookup[overloadKey] ?: continue
+                    val syntheticFunc = TypedFunction(
+                        name = func.name,
+                        parameters = signature.parameters,
+                        returnType = signature.returnType,
+                        body = signature.body
+                    )
+                    compileFunction(
+                        syntheticFunc, pluginTypedAst, jvmMethodName,
+                        CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME,
+                        cw, generatedInterfaces,
+                        pluginRegistry, typeRegistries.typeRegistry,
+                        typeRegistries.fileScopePropertyRegistry,
+                        sharedLambdaCounter, sharedLambdaInterfaceRegistry
+                    )
+                }
             }
         }
 
@@ -387,6 +440,75 @@ class ScriptCompiler {
     private fun ensureReturn(returnType: ReturnType, mv: MethodVisitor) {
         if (returnType is VoidType) {
             mv.visitInsn(Opcodes.RETURN)
+        }
+    }
+
+    /**
+     * Builds [PluginFunctionSignatureDefinition]s for all plugin functions in [pluginAst].
+     *
+     * Returns an empty map when [pluginAst] is null.
+     *
+     * @param pluginAst Optional plugin AST to build definitions from.
+     * @param pluginLookup Pre-assigned JVM method names (funcName → overloadKey → jvmName).
+     * @return Map from function name to [FunctionDefinitionImpl] containing all overloads.
+     */
+    private fun buildPluginFunctionDefs(
+        pluginAst: TypedPluginAst?,
+        pluginLookup: Map<String, Map<String, String>>
+    ): Map<String, FunctionDefinitionImpl> {
+        if (pluginAst == null) return emptyMap()
+        val result = mutableMapOf<String, FunctionDefinitionImpl>()
+        for (func in pluginAst.functions) {
+            val funcDef = FunctionDefinitionImpl(
+                name = func.name,
+                ownerClass = CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME
+            )
+            val overloadLookup = pluginLookup[func.name] ?: continue
+            for ((overloadKey, signature) in func.signatures) {
+                val jvmName = overloadLookup[overloadKey] ?: continue
+                val namedParams = signature.parameters.map { param ->
+                    PluginFunctionParameter(
+                        name = param.name,
+                        type = pluginAst.types[param.type]
+                    )
+                }
+                val returnType = pluginAst.types[signature.returnType]
+                val paramTypes = namedParams.map { it.type }
+                val descriptor = MethodDescriptorUtil.buildDescriptor(paramTypes, returnType)
+                funcDef.addOverload(
+                    PluginFunctionSignatureDefinition(
+                        overloadKey = overloadKey,
+                        descriptor = descriptor,
+                        ownerClass = CompiledProgram.SCRIPT_PROGRAM_INTERNAL_NAME,
+                        jvmMethodName = jvmName,
+                        namedParameters = namedParams,
+                        returnType = returnType
+                    )
+                )
+            }
+            result[func.name] = funcDef
+        }
+        return result
+    }
+
+    /**
+     * Builds a [FunctionRegistry] that resolves plugin functions before falling back to
+     * [GlobalFunctionRegistry.GLOBAL].
+     *
+     * When [pluginFunctionDefs] is empty, returns [GlobalFunctionRegistry.GLOBAL] directly.
+     *
+     * @param pluginFunctionDefs Plugin function definitions to expose in the registry.
+     * @return A registry that contains both plugin and stdlib functions.
+     */
+    private fun buildEffectiveGlobalRegistry(
+        pluginFunctionDefs: Map<String, FunctionDefinitionImpl>
+    ): FunctionRegistry {
+        if (pluginFunctionDefs.isEmpty()) return GlobalFunctionRegistry.GLOBAL
+        return object : FunctionRegistry {
+            override fun lookupFunction(name: String): FunctionDefinition? =
+                pluginFunctionDefs[name] ?: GlobalFunctionRegistry.GLOBAL.lookupFunction(name)
+
+            override fun getParent(): FunctionRegistry = GlobalFunctionRegistry.GLOBAL
         }
     }
 

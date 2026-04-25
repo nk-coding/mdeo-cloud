@@ -189,3 +189,61 @@ class InstanceFunctionSignatureDefinition(
         )
     }
 }
+
+/**
+ * A single named parameter from a plugin-contributed function.
+ *
+ * Unlike [FunctionParameter], this carries the actual [ReturnType] object instead of
+ * looking it up through a type-index; this is necessary because plugin types live in
+ * a separate types array that is not accessible via the calling script's compilation
+ * context.
+ *
+ * @param name Parameter name as declared in the plugin function.
+ * @param type Resolved [ReturnType] for this parameter.
+ */
+data class PluginFunctionParameter(
+    val name: String,
+    val type: ReturnType
+)
+
+/**
+ * Signature definition for plugin-contributed functions compiled into the generated
+ * [com.mdeo.script.compiler.CompiledProgram.SCRIPT_PROGRAM_BINARY_NAME] class.
+ *
+ * Extends the instance-method calling convention ([Opcodes.INVOKEVIRTUAL]) of regular
+ * file-scope functions. The key difference is that each parameter carries both its
+ * **name** (needed to match named extension-call arguments) and its resolved
+ * [ReturnType] (needed for coercion and list-cardinality detection at call sites).
+ *
+ * @param overloadKey The overload identifier (typically `""` for extension-expression
+ *                    overloads, but may be any string for multi-overload contributions).
+ * @param descriptor The JVM method descriptor (does NOT include the receiver `this`).
+ * @param ownerClass The JVM internal class name that owns this method.
+ * @param jvmMethodName The JVM method name assigned during compilation (e.g. `fn0`).
+ * @param namedParameters Ordered list of parameters with names and resolved types.
+ * @param returnType Resolved return type of this overload.
+ */
+class PluginFunctionSignatureDefinition(
+    override val overloadKey: String,
+    override val descriptor: String,
+    override val ownerClass: String,
+    override val jvmMethodName: String,
+    val namedParameters: List<PluginFunctionParameter>,
+    override val returnType: ReturnType
+) : FunctionSignatureDefinition {
+
+    override val isVarArgs: Boolean = false
+
+    override val parameterTypes: List<ValueType> =
+        namedParameters.mapNotNull { it.type as? ValueType }
+
+    override fun emitInvocation(mv: MethodVisitor) {
+        mv.visitMethodInsn(
+            Opcodes.INVOKEVIRTUAL,
+            ownerClass,
+            jvmMethodName,
+            descriptor,
+            false
+        )
+    }
+}

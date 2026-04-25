@@ -21,7 +21,13 @@ subprojects {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
             freeCompilerArgs.add("-Xjsr305=strict")
             freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
+            allWarningsAsErrors.set(true)
         }
+    }
+
+    tasks.withType<JavaCompile> {
+        options.compilerArgs.add("-Xlint:all")
+        options.compilerArgs.add("-Werror")
     }
 
     tasks.withType<Test> {
