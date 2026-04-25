@@ -3,7 +3,7 @@ package com.mdeo.optimizer.solution
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 

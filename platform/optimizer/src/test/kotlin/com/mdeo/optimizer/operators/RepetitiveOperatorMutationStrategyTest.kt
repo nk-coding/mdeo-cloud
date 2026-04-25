@@ -5,7 +5,7 @@ import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.optimizer.solution.Solution
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test

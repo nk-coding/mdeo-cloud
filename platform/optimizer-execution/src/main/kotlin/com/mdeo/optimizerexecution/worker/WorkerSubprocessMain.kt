@@ -19,8 +19,8 @@ import com.mdeo.optimizer.guidance.ScriptGuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategyFactory
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.optimizer.worker.*
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.optimizer.config.ObjectiveTendency
 import com.mdeo.script.ast.TypedAst as ScriptTypedAst

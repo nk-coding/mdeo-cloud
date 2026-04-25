@@ -75,7 +75,7 @@ internal class MatchTraversalBuilder(
     ): GraphTraversal<Vertex, Vertex> {
         val scanned = when {
             step.vertexId != null -> t.V(step.vertexId)
-            step.className != null -> t.V().hasLabel(step.className)
+            step.className != null -> t.V().applyClassFilter(step.className)
             else -> throw IllegalStateException(
                 "VertexScan for '${step.instanceName}' has neither vertexId nor className"
             )
@@ -110,7 +110,8 @@ internal class MatchTraversalBuilder(
         if (step.toVertexId != null) {
             result = result.hasId(step.toVertexId)
         } else if (step.toClassName != null) {
-            result = result.hasLabel(step.toClassName)
+            @Suppress("UNCHECKED_CAST")
+            result = (result as GraphTraversal<Vertex, Vertex>).applyClassFilter(step.toClassName)
         }
         return result.`as`(VariableBinding.stepLabel(step.toInstanceName)) as GraphTraversal<Vertex, Vertex>
     }
@@ -352,7 +353,8 @@ internal class MatchTraversalBuilder(
             val className = instance.objectInstance.className ?: continue
             val predicate = if (step.isNegative) P.eq(0L) else P.gt(0L)
             var countTraversal: GraphTraversal<Any, Any> =
-                AnonymousTraversal.V<Any>().hasLabel(className) as GraphTraversal<Any, Any>
+                (AnonymousTraversal.V<Any>() as GraphTraversal<Vertex, Vertex>).applyClassFilter(className)
+                    as GraphTraversal<Any, Any>
             countTraversal = expressionSupport.applyPropertyEqualityConstraints(
                 countTraversal, instance.objectInstance.className, instance.objectInstance.properties
             )
@@ -410,7 +412,9 @@ internal class MatchTraversalBuilder(
             chain = if (isReversed) chain.`in`(edgeLabel) as GraphTraversal<Any, Any> else chain.out(edgeLabel) as GraphTraversal<Any, Any>
 
             islandClassMap[toNode]?.let { cls ->
-                chain = chain.hasLabel(cls) as GraphTraversal<Any, Any>
+                @Suppress("UNCHECKED_CAST")
+                chain = (chain as GraphTraversal<Vertex, Vertex>).applyClassFilter(cls)
+                    as GraphTraversal<Any, Any>
             }
             islandInstanceMap[toNode]?.let { inst ->
                 chain = expressionSupport.applyPropertyEqualityConstraints(
@@ -423,6 +427,34 @@ internal class MatchTraversalBuilder(
             current = toNode
         }
         return chain
+    }
+
+    /**
+     * Applies a class-membership filter to the traversal.
+     *
+     * For classes **without** subclasses, the cheap `hasLabel(className)` step is used.
+     *
+     * For classes **with** subclasses two conditions are combined with `or`:
+     * - `hasLabel(className)` — matches instances whose label IS exactly the class name
+     *   (e.g. direct `Room` vertices added without going through [ModelDataGraphLoader]).
+     * When the class has no subclasses the filter is `hasLabel(className)`. When it does have
+     * subclasses, all subtypes (including the class itself) are retrieved from
+     * [com.mdeo.metamodel.metadata.MetamodelMetadata.classHierarchy] and passed as a vararg to
+     * `hasLabel(...)`. Gremlin's `hasLabel` matches if the vertex label equals **any** of the
+     * given strings, so no separate property check is needed.
+     *
+     * @param className The metamodel class name to filter by.
+     * @return The traversal extended with the appropriate class filter.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun <S, E> GraphTraversal<S, E>.applyClassFilter(className: String): GraphTraversal<S, E> {
+        val subtypes = engine.metamodel.metadata.classHierarchy[className]
+        return if (subtypes != null && subtypes.size > 1) {
+            val labels = subtypes.toTypedArray()
+            hasLabel(labels[0], *labels.drop(1).toTypedArray()) as GraphTraversal<S, E>
+        } else {
+            hasLabel(className) as GraphTraversal<S, E>
+        }
     }
 }
 

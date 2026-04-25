@@ -59,8 +59,8 @@ internal class GraphModificationApplier(
         for (instance in elements.createInstances) {
             val className = instance.objectInstance.className
             val name = instance.objectInstance.name
-            result = result.addV(className).`as`(VariableBinding.stepLabel(name))
-                as GraphTraversal<Vertex, Map<String, Any>>
+            result = expressionSupport.engine.modelGraph.addVertexStep(
+                result, className!!, VariableBinding.stepLabel(name!!))
             result = addVertexProperties(result, className, name, instance, matchedInstanceNames)
         }
         return result

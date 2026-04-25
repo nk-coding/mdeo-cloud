@@ -5,7 +5,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine

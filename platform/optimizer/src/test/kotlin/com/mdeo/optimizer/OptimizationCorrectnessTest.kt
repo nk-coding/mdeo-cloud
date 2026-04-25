@@ -15,9 +15,9 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkEnd
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstance
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
 import com.mdeo.modeltransformation.graph.ModelGraph
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.expression.ast.statements.TypedIfStatement
 import com.mdeo.expression.ast.statements.TypedReturnStatement
 import com.mdeo.expression.ast.statements.TypedVariableDeclarationStatement

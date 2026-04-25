@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformation.graph
+package com.mdeo.modeltransformation.graph.mdeo
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.Model
@@ -6,9 +6,12 @@ import com.mdeo.metamodel.ModelBinarySerializer
 import com.mdeo.metamodel.ModelInstance
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.ModelData
-import com.mdeo.modeltransformation.graph.mdeo.MdeoGraph
+import com.mdeo.modeltransformation.graph.ModelGraph
+import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.structure.Vertex
 import java.lang.ref.WeakReference
 import java.util.IdentityHashMap
 
@@ -91,6 +94,14 @@ class MdeoModelGraph private constructor(
     }
 
     override fun toModel(): Model = graph.toModel(instanceNameRegistry)
+
+    @Suppress("UNCHECKED_CAST")
+    override fun addVertexStep(
+        traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        className: String,
+        stepLabel: String
+    ): GraphTraversal<Vertex, Map<String, Any>> =
+        traversal.addV(className).`as`(stepLabel) as GraphTraversal<Vertex, Map<String, Any>>
 
     override fun close() {
         graph.close()

@@ -6,7 +6,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType

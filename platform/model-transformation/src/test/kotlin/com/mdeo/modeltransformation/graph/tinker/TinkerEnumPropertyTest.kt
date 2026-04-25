@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformation.service
+package com.mdeo.modeltransformation.graph.tinker
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.ClassData
@@ -9,32 +9,28 @@ import com.mdeo.metamodel.data.PropertyData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.metamodel.data.ModelDataInstance
 import com.mdeo.metamodel.data.ModelDataPropertyValue
-import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-class ModelDataGraphLoaderEnumTest {
+/**
+ * Tests that TinkerModelGraph correctly stores enum property values as
+ * backtick-formatted strings in the underlying graph.
+ *
+ * Uses [TinkerModelGraph.create] as the entry point (the [ModelDataGraphLoader]
+ * is an internal detail of the tinker package, not part of the public API).
+ */
+class TinkerEnumPropertyTest {
 
-    private lateinit var graph: TinkerGraph
-    private lateinit var g: GraphTraversalSource
-    private lateinit var loader: ModelDataGraphLoader
-    private lateinit var nameRegistry: InstanceNameRegistry
+    private val openGraphs = mutableListOf<TinkerModelGraph>()
 
-    @BeforeEach
-    fun setUp() {
-        graph = TinkerGraph.open()
-        g = graph.traversal()
-        loader = ModelDataGraphLoader()
-        nameRegistry = InstanceNameRegistry()
-    }
+    private fun create(modelData: ModelData, metamodel: Metamodel): TinkerModelGraph =
+        TinkerModelGraph.create(modelData, metamodel).also { openGraphs.add(it) }
 
     @AfterEach
     fun tearDown() {
-        graph.close()
+        openGraphs.forEach { it.close() }
+        openGraphs.clear()
     }
 
     @Test
@@ -70,7 +66,8 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
+        val graph = create(modelData, Metamodel.compile(metamodelData))
+        val g = graph.traversal()
 
         // Property "status" is stored under graph key "prop_0"
         val statusValues = g.V().has("prop_0").values<String>("prop_0").toList()
@@ -118,7 +115,8 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
+        val graph = create(modelData, Metamodel.compile(metamodelData))
+        val g = graph.traversal()
 
         // Property "tags" is stored under graph key "prop_0"
         val tagValues = g.V().has("prop_0").values<String>("prop_0").toList()
@@ -165,7 +163,8 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
+        val graph = create(modelData, Metamodel.compile(metamodelData))
+        val g = graph.traversal()
 
         // Property "status" is stored under graph key "prop_0" (inherited from BaseOrder)
         val statusValues = g.V().has("prop_0").values<String>("prop_0").toList()
@@ -203,7 +202,8 @@ class ModelDataGraphLoaderEnumTest {
             links = emptyList()
         )
 
-        loader.load(g, modelData, nameRegistry, Metamodel.compile(metamodelData))
+        val graph = create(modelData, Metamodel.compile(metamodelData))
+        val g = graph.traversal()
 
         // Property "label" is stored under graph key "prop_0"
         val labelValues = g.V().has("prop_0").values<String>("prop_0").toList()

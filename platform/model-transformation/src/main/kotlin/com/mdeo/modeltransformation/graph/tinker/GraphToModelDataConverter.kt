@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformation.service
+package com.mdeo.modeltransformation.graph.tinker
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.ClassData

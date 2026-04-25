@@ -1,4 +1,4 @@
-package com.mdeo.modeltransformation.service
+package com.mdeo.modeltransformation.graph.tinker
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.ClassData
@@ -84,7 +84,7 @@ class ModelDataGraphLoader {
         metamodel: Metamodel
     ): Vertex {
         var traversal = g.addV(instance.className)
-        
+
         for ((propertyName, propertyValue) in instance.properties) {
             val graphKey = resolveGraphKey(metamodel, instance.className, propertyName)
             traversal = addPropertyValue(traversal, instance.className, propertyName, graphKey, propertyValue, classMap)
@@ -96,7 +96,7 @@ class ModelDataGraphLoader {
         
         return vertex
     }
-    
+
     /**
      * Adds property value(s) to a vertex traversal.
      * For list properties, adds each element separately with Cardinality.list.

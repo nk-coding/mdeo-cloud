@@ -4,7 +4,9 @@ import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.structure.Vertex
 
 /**
  * Graph-based representation of a model.
@@ -97,8 +99,7 @@ interface ModelGraph : AutoCloseable {
 
     /**
      * Converts the current graph state to a [SerializedModel] using the most efficient
-     * backing format available for this implementation.
-     *
+     * backing format available for this implementation.     *
      * [MdeoModelGraph] returns a [SerializedModel.AsBinary] produced by
      * [com.mdeo.metamodel.ModelBinarySerializer] for maximum speed.
      * [TinkerModelGraph] returns a [SerializedModel.AsModelData] wrapping
@@ -107,4 +108,23 @@ interface ModelGraph : AutoCloseable {
      * @return A [SerializedModel] representing the current graph state.
      */
     fun toSerializedModel(): SerializedModel
+
+    /**
+     * Appends an `addV(className)` step to [traversal] and labels it [stepLabel].
+     *
+     * This is the canonical way to create a new vertex during a transformation. Placing
+     * the logic here allows each backend to inject backend-specific post-creation steps
+     * without leaking implementation details into the transformation engine.
+     *
+     * @param traversal The current traversal that the creation step is appended to.
+     * @param className The metamodel class name of the vertex to create.
+     * @param stepLabel The Gremlin step-label used to reference the vertex in later steps.
+     * @return The traversal extended with the vertex creation step.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun addVertexStep(
+        traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        className: String,
+        stepLabel: String
+    ): GraphTraversal<Vertex, Map<String, Any>>
 }

@@ -10,7 +10,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkEnd
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.statements.MatchStatementExecutor
 import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph

@@ -13,7 +13,7 @@ import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableScope
 import com.mdeo.modeltransformation.compiler.expressions.EqualityCompilerUtil
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry

@@ -3,6 +3,8 @@ package com.mdeo.modeltransformation.graph
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.*
+import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals

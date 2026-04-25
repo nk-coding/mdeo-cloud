@@ -5,6 +5,8 @@ import com.mdeo.metamodel.data.AssociationEndData
 import com.mdeo.metamodel.data.ClassData
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
 import com.mdeo.metamodel.data.MultiplicityData
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
@@ -12,15 +14,13 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstance
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.ModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
-import com.mdeo.modeltransformation.runtime.statements.MatchStatementExecutor
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -39,20 +39,14 @@ import kotlin.test.assertTrue
  */
 class InjectiveMatchTest {
 
-    private lateinit var graph: TinkerGraph
-    private lateinit var context: TransformationExecutionContext
-    private lateinit var executor: MatchStatementExecutor
+    private val context = TransformationExecutionContext.empty()
 
-    @BeforeEach
-    fun setUp() {
-        graph = TinkerGraph.open()
-        context = TransformationExecutionContext.empty()
-        executor = MatchStatementExecutor()
-    }
+    private val openGraphs = mutableListOf<ModelGraph>()
 
     @AfterEach
     fun tearDown() {
-        graph.close()
+        openGraphs.forEach { it.close() }
+        openGraphs.clear()
     }
 
     // ========================================================================
@@ -110,17 +104,36 @@ class InjectiveMatchTest {
         importedMetamodelPaths = emptyList()
     )
 
-    private fun createEngine(metamodelData: MetamodelData = buildSimpleMetamodel()): TransformationEngine {
+    /**
+     * Creates a [TransformationEngine] backed by a [TinkerModelGraph] whose vertex set is
+     * determined by [instances] — a list of (instanceName, className) pairs. No properties
+     * or edges are created; this is sufficient for injective-match tests which only care
+     * about vertex identity.
+     */
+    private fun createEngine(
+        instances: List<Pair<String, String>>,
+        metamodelData: MetamodelData = buildSimpleMetamodel()
+    ): TransformationEngine {
+        val metamodel = Metamodel.compile(metamodelData)
+        val modelData = ModelData(
+            metamodelPath = metamodelData.path ?: "",
+            instances = instances.map { (name, cls) ->
+                ModelDataInstance(name = name, className = cls, properties = emptyMap())
+            },
+            links = emptyList()
+        )
+        val graph = TinkerModelGraph.create(modelData, metamodel)
+        openGraphs.add(graph)
         return TransformationEngine(
-            modelGraph = TinkerModelGraph.wrap(graph, Metamodel.compile(metamodelData)),
-            ast = TypedAst(types = emptyList(), metamodelPath = "", statements = emptyList()),
+            modelGraph = graph,
+            ast = TypedAst(types = emptyList(), metamodelPath = metamodelData.path ?: "", statements = emptyList()),
             expressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
             statementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry()
         )
     }
 
-    private fun matchInstance(name: String, className: String): TypedPatternObjectInstanceElement {
-        return TypedPatternObjectInstanceElement(
+    private fun matchInstance(name: String, className: String): TypedPatternObjectInstanceElement =
+        TypedPatternObjectInstanceElement(
             objectInstance = TypedPatternObjectInstance(
                 modifier = null,
                 name = name,
@@ -128,10 +141,9 @@ class InjectiveMatchTest {
                 properties = emptyList()
             )
         )
-    }
 
-    private fun deleteInstance(name: String, className: String): TypedPatternObjectInstanceElement {
-        return TypedPatternObjectInstanceElement(
+    private fun deleteInstance(name: String, className: String): TypedPatternObjectInstanceElement =
+        TypedPatternObjectInstanceElement(
             objectInstance = TypedPatternObjectInstance(
                 modifier = "delete",
                 name = name,
@@ -139,10 +151,9 @@ class InjectiveMatchTest {
                 properties = emptyList()
             )
         )
-    }
 
-    private fun forbidInstance(name: String, className: String): TypedPatternObjectInstanceElement {
-        return TypedPatternObjectInstanceElement(
+    private fun forbidInstance(name: String, className: String): TypedPatternObjectInstanceElement =
+        TypedPatternObjectInstanceElement(
             objectInstance = TypedPatternObjectInstance(
                 modifier = "forbid",
                 name = name,
@@ -150,7 +161,6 @@ class InjectiveMatchTest {
                 properties = emptyList()
             )
         )
-    }
 
     // ========================================================================
     // 1. Basic injective semantics – two nodes, same type
@@ -161,10 +171,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `two rooms exist - match succeeds with distinct bindings`() {
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room", "r2" to "Room"))
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("a", "Room"),
@@ -191,9 +198,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `one room - matching two rooms fails`() {
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room"))
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(
@@ -217,10 +222,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `matchable and delete instance bind to different vertices`() {
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room", "r2" to "Room"))
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("a", "Room"),
@@ -239,9 +241,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `one room - matchable and delete of same type fails`() {
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room"))
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(
@@ -265,10 +265,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `house and room match independently without neq constraint`() {
-            graph.addVertex("House")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("h1" to "House", "r1" to "Room"))
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(
@@ -292,10 +289,10 @@ class InjectiveMatchTest {
 
         @Test
         fun `two LargeRoom vertices with subtype metamodel - instances bind distinctly`() {
-            graph.addVertex("LargeRoom")
-            graph.addVertex("LargeRoom")
-
-            val engine = createEngine(buildSubtypeMetamodel())
+            val engine = createEngine(
+                listOf("lr1" to "LargeRoom", "lr2" to "LargeRoom"),
+                buildSubtypeMetamodel()
+            )
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("a", "LargeRoom"),
@@ -314,10 +311,10 @@ class InjectiveMatchTest {
 
         @Test
         fun `two Room vertices with subtype metamodel - injective still enforced`() {
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine(buildSubtypeMetamodel())
+            val engine = createEngine(
+                listOf("r1" to "Room", "r2" to "Room"),
+                buildSubtypeMetamodel()
+            )
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("a", "Room"),
@@ -344,9 +341,10 @@ class InjectiveMatchTest {
 
         @Test
         fun `only one LargeRoom - two LargeRoom instances cannot both match`() {
-            graph.addVertex("LargeRoom")
-
-            val engine = createEngine(buildSubtypeMetamodel())
+            val engine = createEngine(
+                listOf("lr1" to "LargeRoom"),
+                buildSubtypeMetamodel()
+            )
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(
@@ -370,11 +368,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `three rooms - all three instances bind to different vertices`() {
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room", "r2" to "Room", "r3" to "Room"))
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("a", "Room"),
@@ -407,10 +401,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `two rooms - matching three Room instances fails`() {
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room", "r2" to "Room"))
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(
@@ -435,11 +426,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `three rooms - executeMatchAll returns 6 distinct pairs`() {
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room", "r2" to "Room", "r3" to "Room"))
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("a", "Room"),
@@ -475,10 +462,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `house and room have no inheritance - no neq constraint`() {
-            graph.addVertex("House")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("h1" to "House", "r1" to "Room"))
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(
@@ -494,10 +478,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `single house and single room - both match since types are incompatible`() {
-            graph.addVertex("House")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("h1" to "House", "r1" to "Room"))
             val pattern = TypedPattern(
                 elements = listOf(
                     matchInstance("h", "House"),
@@ -521,11 +502,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `forbid does not share injective constraint with matchable`() {
-            // Two rooms: one matched, one should trigger forbid
-            graph.addVertex("Room")
-            graph.addVertex("Room")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("r1" to "Room", "r2" to "Room"))
 
             // Match a:Room and forbid b:Room (disconnected forbid island).
             // The forbid island should detect that a Room exists independently,
@@ -547,10 +524,7 @@ class InjectiveMatchTest {
 
         @Test
         fun `forbid room absent - match succeeds`() {
-            // Only a House, no Room at all
-            graph.addVertex("House")
-
-            val engine = createEngine()
+            val engine = createEngine(listOf("h1" to "House"))
             val statement = TypedMatchStatement(
                 pattern = TypedPattern(
                     elements = listOf(

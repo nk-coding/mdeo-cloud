@@ -6,7 +6,7 @@ import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
 import org.junit.jupiter.api.BeforeEach

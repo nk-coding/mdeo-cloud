@@ -10,7 +10,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternElementSerializer
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatementSerializer
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
 import com.mdeo.expression.ast.expressions.TypedExpression

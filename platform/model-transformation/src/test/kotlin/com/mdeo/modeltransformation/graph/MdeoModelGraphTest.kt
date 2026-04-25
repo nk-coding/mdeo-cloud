@@ -5,7 +5,9 @@ import com.mdeo.metamodel.ModelInstance
 import com.mdeo.metamodel.data.*
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.graph.mdeo.MdeoGraph
+import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
 import com.mdeo.modeltransformation.graph.mdeo.MdeoVertex
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach

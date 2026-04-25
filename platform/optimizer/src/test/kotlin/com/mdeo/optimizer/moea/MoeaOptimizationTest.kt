@@ -4,7 +4,7 @@ import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.*
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.optimizer.evaluation.LocalMutationEvaluator
 import com.mdeo.optimizer.guidance.GuidanceFunction
 import com.mdeo.optimizer.operators.MutationStrategy

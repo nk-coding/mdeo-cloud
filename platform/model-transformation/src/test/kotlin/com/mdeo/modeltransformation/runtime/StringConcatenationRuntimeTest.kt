@@ -5,7 +5,7 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.*
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.match.MatchResult
 import com.mdeo.modeltransformation.runtime.match.MatchExecutor
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource

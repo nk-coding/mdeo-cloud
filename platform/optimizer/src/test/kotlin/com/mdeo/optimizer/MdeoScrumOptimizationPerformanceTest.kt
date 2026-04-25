@@ -2,7 +2,7 @@ package com.mdeo.optimizer
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.ModelData
-import com.mdeo.modeltransformation.graph.MdeoModelGraph
+import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
 import com.mdeo.modeltransformation.graph.ModelGraph
 
 class MdeoScrumOptimizationPerformanceTest : ScrumOptimizationPerformanceTestBase() {

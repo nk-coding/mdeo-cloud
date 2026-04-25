@@ -8,7 +8,7 @@ import com.mdeo.modeltransformation.ast.statements.TypedWhileMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedStopStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
-import com.mdeo.modeltransformation.graph.TinkerModelGraph
+import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.modeltransformation.runtime.StatementExecutorRegistry
 import com.mdeo.modeltransformation.runtime.TransformationEngine
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext

@@ -83,6 +83,7 @@ class MdeoVertex(
 
     override fun <V : Any?> property(key: String): VertexProperty<V> {
         if (removed) return VertexProperty.empty()
+
         val meta = classMetadata ?: return VertexProperty.empty()
         val propertyName = resolvePropertyName(key) ?: return VertexProperty.empty()
         val mapping = meta.propertyFields[propertyName] ?: return VertexProperty.empty()
