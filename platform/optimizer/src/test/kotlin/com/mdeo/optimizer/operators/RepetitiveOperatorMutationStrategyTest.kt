@@ -93,7 +93,7 @@ class RepetitiveOperatorMutationStrategyTest {
         val strategy = RepetitiveOperatorMutationStrategy(
             transformations = transformations,
             stepSizeStrategy = FixedStepSize(3),
-            operatorSelectionStrategy = selection
+            operatorSelectionStrategyFactory = { selection }
         )
 
         val solution = createSolution()
@@ -112,7 +112,7 @@ class RepetitiveOperatorMutationStrategyTest {
         val strategy = RepetitiveOperatorMutationStrategy(
             transformations = transformations,
             stepSizeStrategy = FixedStepSize(1),
-            operatorSelectionStrategy = selection
+            operatorSelectionStrategyFactory = { selection }
         )
 
         val solution = createSolution()
@@ -130,7 +130,7 @@ class RepetitiveOperatorMutationStrategyTest {
         val strategy = RepetitiveOperatorMutationStrategy(
             transformations = transformations,
             stepSizeStrategy = FixedStepSize(5),
-            operatorSelectionStrategy = selection
+            operatorSelectionStrategyFactory = { selection }
         )
 
         val solution = createSolution()
@@ -150,7 +150,7 @@ class RepetitiveOperatorMutationStrategyTest {
         val strategy = RepetitiveOperatorMutationStrategy(
             transformations = transformations,
             stepSizeStrategy = FixedStepSize(3),
-            operatorSelectionStrategy = selection
+            operatorSelectionStrategyFactory = { selection }
         )
 
         val solution = createSolution()
@@ -166,7 +166,7 @@ class RepetitiveOperatorMutationStrategyTest {
         val strategy = RepetitiveOperatorMutationStrategy(
             transformations = transformations,
             stepSizeStrategy = FixedStepSize(2),
-            operatorSelectionStrategy = selection
+            operatorSelectionStrategyFactory = { selection }
         )
 
         val solution = createSolution()
@@ -183,7 +183,7 @@ class RepetitiveOperatorMutationStrategyTest {
         val strategy = RepetitiveOperatorMutationStrategy(
             transformations = transformations,
             stepSizeStrategy = FixedStepSize(0),
-            operatorSelectionStrategy = selection
+            operatorSelectionStrategyFactory = { selection }
         )
 
         val solution = createSolution()

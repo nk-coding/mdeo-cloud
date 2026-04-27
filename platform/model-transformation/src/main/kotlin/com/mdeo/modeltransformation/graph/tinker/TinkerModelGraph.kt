@@ -140,7 +140,7 @@ class TinkerModelGraph private constructor(
             vertexMap[vertex.id()] = newVertex
         }
 
-        graph.edges().forEachRemaining { edge ->
+        graph.edges().asSequence().toMutableList().shuffled().forEach { edge ->
             val fromVertex = vertexMap[edge.outVertex().id()]
                 ?: error("Source vertex ${edge.outVertex().id()} not found in copy")
             val toVertex = vertexMap[edge.inVertex().id()]

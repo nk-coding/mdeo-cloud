@@ -26,21 +26,21 @@ export const BidirectionalAssociationIcon: IconNode = [
 
 /**
  * Custom icon for a composition association.
- * Filled diamond at the top-right end (target/end), line to bottom-left.
+ * Filled diamond at the bottom-left end (source/start), line to top-right.
  */
 export const CompositionIcon: IconNode = [
-    ["path", { d: "M22.5 1.5L13.75 2.75L12.5 11.5L21.25 10.25Z", fill: "currentColor" }],
-    ["path", { d: "M12.5 11.5L1.5 22.5" }]
+    ["path", { d: "M1.5 22.5L10.25 21.25L11.5 12.5L2.75 13.75Z", fill: "currentColor" }],
+    ["path", { d: "M11.5 12.5L22.5 1.5" }]
 ];
 
 /**
  * Custom icon for a navigable composition association.
- * Filled diamond at the top-right end (target/end), arrowhead at bottom-left (source).
+ * Filled diamond at the bottom-left end (source/start), arrowhead at top-right (target).
  */
 export const NavigableCompositionIcon: IconNode = [
-    ["path", { d: "M22.5 1.5L13.75 2.75L12.5 11.5L21.25 10.25Z", fill: "currentColor" }],
-    ["path", { d: "M12.5 11.5L1.5 22.5" }],
-    ["path", { d: "M11.5 19.5L1.5 22.5L4.5 12.5" }]
+    ["path", { d: "M1.5 22.5L10.25 21.25L11.5 12.5L2.75 13.75Z", fill: "currentColor" }],
+    ["path", { d: "M11.5 12.5L22.5 1.5" }],
+    ["path", { d: "M12.5 4.5L22.5 1.5L19.5 11.5" }]
 ];
 
 /**

@@ -23,19 +23,19 @@ object MutationStrategyFactory {
     ): com.mdeo.optimizer.operators.MutationStrategy {
         val operatorPaths = transformations.keys.toList()
         val stepSizeStrategy = createStepSizeStrategy(params.step)
-        val selectionStrategy = RandomOperatorSelection(operatorPaths)
+        val selectionFactory: () -> OperatorSelectionStrategy = { RandomOperatorSelection(operatorPaths) }
 
         return when (params.strategy) {
             MutationStrategyEnum.RANDOM -> RandomOperatorMutationStrategy(
                 transformations = transformations,
                 stepSizeStrategy = stepSizeStrategy,
-                operatorSelectionStrategy = selectionStrategy
+                operatorSelectionStrategyFactory = selectionFactory
             )
             MutationStrategyEnum.REPETITIVE -> {
                 RepetitiveOperatorMutationStrategy(
                     transformations = transformations,
                     stepSizeStrategy = stepSizeStrategy,
-                    operatorSelectionStrategy = selectionStrategy
+                    operatorSelectionStrategyFactory = selectionFactory
                 )
             }
         }

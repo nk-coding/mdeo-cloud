@@ -173,13 +173,17 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
     /**
      * Returns true for edge types that require a label on the target AST end
      * (= property on the target-class, shown near the source graphically).
-     * COMPOSITION is excluded because with --* the property is on the source end only.
+     * COMPOSITION uses *-- which requires a property on the target end (= source class name).
      *
      * @param edgeType The edge creation type to check
      * @returns True if the edge type requires a label on the target AST end, false otherwise
      */
     private requiresTargetLabel(edgeType: EdgeCreationTypeValue): boolean {
-        return edgeType === EdgeCreationType.BIDIRECTIONAL || edgeType === EdgeCreationType.NAVIGABLE_COMPOSITION;
+        return (
+            edgeType === EdgeCreationType.BIDIRECTIONAL ||
+            edgeType === EdgeCreationType.COMPOSITION ||
+            edgeType === EdgeCreationType.NAVIGABLE_COMPOSITION
+        );
     }
 
     /**
@@ -337,6 +341,9 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
             sourceLabel = this.computePropertyName(targetClassName, sourceNames);
         }
         if (needsTarget && sourceClass.name) {
+            if (sourceLabel !== undefined && sourceElementId === targetElementId) {
+                targetNames.add(sourceLabel);
+            }
             targetLabel = this.computePropertyName(sourceClass.name, targetNames);
         }
 
@@ -392,7 +399,7 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
 
     /**
      * Returns true for edge types where the SOURCE end has a property.
-     * COMPOSITION uses --* which requires a property on the source end (= target class name).
+     * COMPOSITION is excluded because with *-- the property is on the target end only.
      *
      * @param edgeType The edge creation type to check
      * @returns True if the edge type requires a label on the source AST end, false otherwise
@@ -401,7 +408,6 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
         return (
             edgeType === EdgeCreationType.UNIDIRECTIONAL ||
             edgeType === EdgeCreationType.BIDIRECTIONAL ||
-            edgeType === EdgeCreationType.COMPOSITION ||
             edgeType === EdgeCreationType.NAVIGABLE_COMPOSITION
         );
     }
@@ -419,9 +425,9 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
             case EdgeCreationType.BIDIRECTIONAL:
                 return "<-->";
             case EdgeCreationType.COMPOSITION:
-                return "--*";
+                return "*--";
             case EdgeCreationType.NAVIGABLE_COMPOSITION:
-                return "<--*";
+                return "*-->";
             default:
                 return "-->";
         }
@@ -443,9 +449,9 @@ export class MetamodelCreateEdgeSchemaResolver extends CreateEdgeSchemaResolver 
             case EdgeCreationType.BIDIRECTIONAL:
                 return { sourceKind: AssociationEndKind.ARROW, targetKind: AssociationEndKind.ARROW };
             case EdgeCreationType.COMPOSITION:
-                return { sourceKind: AssociationEndKind.NONE, targetKind: AssociationEndKind.COMPOSITION };
+                return { sourceKind: AssociationEndKind.COMPOSITION, targetKind: AssociationEndKind.NONE };
             case EdgeCreationType.NAVIGABLE_COMPOSITION:
-                return { sourceKind: AssociationEndKind.ARROW, targetKind: AssociationEndKind.COMPOSITION };
+                return { sourceKind: AssociationEndKind.COMPOSITION, targetKind: AssociationEndKind.ARROW };
             default:
                 return { sourceKind: AssociationEndKind.NONE, targetKind: AssociationEndKind.ARROW };
         }

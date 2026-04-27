@@ -20,8 +20,8 @@ const { injectable } = sharedImport("inversify");
 const EDGE_TYPE_TO_OPERATOR: Record<string, MetamodelAssociationOperators> = {
     unidirectional: MetamodelAssociationOperators.NAVIGABLE_TO_TARGET,
     bidirectional: MetamodelAssociationOperators.BIDIRECTIONAL,
-    composition: MetamodelAssociationOperators.COMPOSITION_TARGET,
-    "navigable-composition": MetamodelAssociationOperators.COMPOSITION_TARGET_NAVIGABLE_SOURCE
+    composition: MetamodelAssociationOperators.COMPOSITION_SOURCE,
+    "navigable-composition": MetamodelAssociationOperators.COMPOSITION_SOURCE_NAVIGABLE_TARGET
 };
 
 /**

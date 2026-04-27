@@ -373,10 +373,29 @@ class MdeoGraph private constructor(
     internal fun getEdgesCount(): Int = edgeMap.size
 
     /**
-     * Shuffles the vertex iteration list to provide nondeterministic traversal order.
+     * Shuffles the vertex iteration list and all per-vertex edge adjacency sets to
+     * provide nondeterministic traversal order.
+     *
+     * Shuffling only the vertex list is insufficient: when a vertex has multiple outgoing
+     * edges with the same label (e.g. a Sprint with several committedItems), the
+     * adjacency set preserves its original insertion order and would always yield the
+     * same neighbour first during an edge-walk traversal.  Shuffling those sets ensures
+     * every edge in the neighbourhood has an equal chance of being the first hit.
      */
     internal fun shuffleVertices() {
         vertexList.shuffle()
+        for (vertex in vertexList) {
+            vertex.outEdges?.forEach { (_, edgeSet) ->
+                val shuffled = edgeSet.shuffled()
+                edgeSet.clear()
+                edgeSet.addAll(shuffled)
+            }
+            vertex.inEdges?.forEach { (_, edgeSet) ->
+                val shuffled = edgeSet.shuffled()
+                edgeSet.clear()
+                edgeSet.addAll(shuffled)
+            }
+        }
     }
 
     // ---- Model association management ----

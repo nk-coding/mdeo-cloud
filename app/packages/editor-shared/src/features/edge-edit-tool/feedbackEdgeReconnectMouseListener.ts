@@ -8,7 +8,7 @@ import {
 } from "./reconnectFeedback.js";
 import { SetEdgeEditHighlightAction } from "../create-edge-tool/createEdgeFeedback.js";
 import type { EdgeEditTool } from "./edgeEditTool.js";
-import type { EdgeAnchor, ReconnectEdgeOperation } from "@mdeo/protocol-common";
+import type { EdgeAnchor, ReconnectEdgeOperation, UpdateRoutingInformationOperation } from "@mdeo/protocol-common";
 import { GNode } from "../../model/node.js";
 import { GEdge, type ReconnectEnd } from "../../model/edge.js";
 import { isConnectable } from "../edge-routing/connectable.js";
@@ -54,6 +54,12 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
     protected initialTargetId?: string;
 
     /**
+     * The anchor resolved by the latest {@link findReconnectTarget} call.
+     * Stored so that same-node drops can dispatch the updated anchor position.
+     */
+    protected currentAnchor?: EdgeAnchor;
+
+    /**
      * Feedback emitter for cursor changes.
      */
     protected cursorFeedback;
@@ -79,6 +85,7 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
         this.edge = undefined;
         this.reconnectEnd = undefined;
         this.currentTarget = undefined;
+        this.currentAnchor = undefined;
         this.isTracking = false;
         this.initialTargetId = undefined;
     }
@@ -162,12 +169,14 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
                 SetEdgeEditHighlightAction.create(targetInfo.targetId, { type: "reconnect" })
             ];
             this.currentTarget = targetInfo.target;
+            this.currentAnchor = targetInfo.anchor;
         } else {
             actions = [
                 UpdateEdgeReconnectFeedbackAction.create(this.edge.id, position, undefined, undefined),
                 SetEdgeEditHighlightAction.create(undefined, undefined)
             ];
             this.currentTarget = undefined;
+            this.currentAnchor = undefined;
         }
 
         return actions;
@@ -183,6 +192,7 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
         const edge = this.edge;
 
         if (this.currentTarget != undefined && this.currentTarget.id !== this.initialTargetId) {
+            // Target changed — dispatch a full reconnect operation.
             const route = this.tool.edgeRouter.computeRoute(edge);
 
             const operation: ReconnectEdgeOperation = {
@@ -194,6 +204,28 @@ export class FeedbackEdgeReconnectMouseListener extends DragAwareMouseListener {
                 routingPoints: route.meta.routingPoints,
                 sourceAnchor: route.sourceAnchor,
                 targetAnchor: route.targetAnchor
+            };
+            result.push(operation);
+        } else if (this.currentTarget != undefined && this.currentAnchor != undefined) {
+            // Dropped on the same node but at a (potentially) different anchor position.
+            // edge.reconnectData is still populated from the last UpdateEdgeReconnectFeedbackAction,
+            // so computeRoute() delegates to computeReconnectRoute which properly handles L-bends
+            // and anchor projection — identical to how a normal reconnect computes its route.
+            // We do NOT dispatch StopEdgeReconnectFeedbackAction here: doing so would clear
+            // reconnectData synchronously, snapping the edge back to the old stored route before
+            // the server model update arrives (causing a flicker). The incoming model update from
+            // the server will replace the edge with the new meta, clearing the feedback naturally.
+            const route = this.tool.edgeRouter.computeRoute(edge);
+            const update = {
+                elementId: edge.id,
+                routingPoints: route.meta.routingPoints ?? [],
+                sourceAnchor: route.meta.sourceAnchor,
+                targetAnchor: route.meta.targetAnchor
+            };
+            const operation: UpdateRoutingInformationOperation = {
+                kind: "updateRoutingInformation",
+                isOperation: true,
+                updates: [update]
             };
             result.push(operation);
         } else {

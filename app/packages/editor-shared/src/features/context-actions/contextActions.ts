@@ -163,6 +163,19 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
     private currentVNode: VNode | undefined;
 
     /**
+     * Set of item IDs for which the submenu should open to the left (instead of
+     * the default right) because there is not enough viewport space on the right.
+     */
+    private readonly leftPositionedMenus = new Set<string>();
+
+    /**
+     * Set of item IDs (on horizontal rails) for which the submenu should be
+     * right-aligned (`right-0`) instead of left-aligned (`left-0`) because there
+     * is not enough viewport space to the right.
+     */
+    private readonly rightAlignedMenus = new Set<string>();
+
+    /**
      * Snabbdom patcher initialised with the modules required by the overlay VNodes.
      */
     private readonly patcher = init([classModule, propsModule, styleModule, eventListenersModule, attributesModule]);
@@ -787,16 +800,19 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
      */
     private renderMenuButton(item: ContextActionItem, orientation: ContextActionRailOrientation): VNode {
         const iconVNode = this.renderIcon(item);
-        const menuVNode = this.renderContextMenu(item.children ?? [], orientation);
+        const openLeft = orientation === "vertical" && this.leftPositionedMenus.has(item.id);
+        const menuVNode = this.renderContextMenu(item.children ?? [], orientation, item.id);
 
         const bridgeVNode = html("div", {
             class: {
                 absolute: true,
-                "left-full": orientation === "vertical",
+                "left-full": orientation === "vertical" && !openLeft,
+                "right-full": orientation === "vertical" && openLeft,
                 "top-0": orientation === "vertical",
                 "h-full": orientation === "vertical",
                 "w-3": orientation === "vertical",
-                "-ml-1": orientation === "vertical",
+                "-ml-1": orientation === "vertical" && !openLeft,
+                "-mr-1": orientation === "vertical" && openLeft,
                 "top-full": orientation === "horizontal",
                 "left-0": orientation === "horizontal",
                 "w-full": orientation === "horizontal",
@@ -808,8 +824,18 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
         return html(
             "div",
             {
-                class: { group: true, relative: true, flex: true, "items-center": true },
-                attrs: { "data-item-id": item.id }
+                class: {
+                    group: true,
+                    relative: true,
+                    flex: true,
+                    "items-center": true
+                },
+                key: item.id,
+                attrs: { "data-item-id": item.id },
+                on: {
+                    mouseenter: (event: MouseEvent) => this.onMenuButtonMouseEnter(event, item.id, orientation),
+                    mouseleave: (event: MouseEvent) => this.onMenuButtonMouseLeave(event)
+                }
             },
             html(
                 "button",
@@ -849,6 +875,92 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
     }
 
     /**
+     * Elevates the nearest inline-positioned ancestor of *el* (the per-rail
+     * overlay div) by setting its `z-index` to *zIndex*.  The ancestor is
+     * identified by walking up the DOM until a node with
+     * `style.position === "absolute"` is found.
+     *
+     * @param el      Starting element — typically the menu-button group.
+     * @param zIndex  The value to assign, e.g. `"100"` or `""` to reset.
+     */
+    private setOverlayZIndex(el: HTMLElement, zIndex: string): void {
+        let node: HTMLElement = el;
+        while (node.parentElement != null && node.style.position !== "absolute") {
+            node = node.parentElement;
+        }
+        if (node.style.position === "absolute") {
+            node.style.zIndex = zIndex;
+        }
+    }
+
+    /**
+     * Checks whether the submenu for *itemId* needs to be repositioned to avoid
+     * overflowing the viewport and updates the relevant positioning set when the
+     * required direction changes.  Triggers a rail re-render when the state changes.
+     *
+     * @param groupEl     The menu-button group element (used to measure its position).
+     * @param itemId      The ID of the menu item being examined.
+     * @param orientation The orientation of the parent rail.
+     */
+    private updateSubmenuFlip(groupEl: HTMLElement, itemId: string, orientation: ContextActionRailOrientation): void {
+        const submenuEl = groupEl.lastElementChild as HTMLElement | null;
+        const submenuWidth = submenuEl?.offsetWidth ?? 288;
+        const rect = groupEl.getBoundingClientRect();
+
+        if (orientation === "vertical") {
+            const needsLeft = rect.right + submenuWidth > window.innerWidth;
+            const wasLeft = this.leftPositionedMenus.has(itemId);
+            if (needsLeft !== wasLeft) {
+                if (needsLeft) {
+                    this.leftPositionedMenus.add(itemId);
+                } else {
+                    this.leftPositionedMenus.delete(itemId);
+                }
+                this.doUpdateRails();
+            }
+        } else {
+            // Horizontal rail — submenu opens below. Flip to right-aligned when there
+            // is not enough space to extend rightward from the button's left edge.
+            const needsRightAlign = rect.left + submenuWidth > window.innerWidth;
+            const wasRightAligned = this.rightAlignedMenus.has(itemId);
+            if (needsRightAlign !== wasRightAligned) {
+                if (needsRightAlign) {
+                    this.rightAlignedMenus.add(itemId);
+                } else {
+                    this.rightAlignedMenus.delete(itemId);
+                }
+                this.doUpdateRails();
+            }
+        }
+    }
+
+    /**
+     * `mouseenter` handler for the menu-button group element.
+     * Elevates the parent overlay div above sibling rails and updates the
+     * submenu's overflow direction if needed.
+     *
+     * @param event       The DOM mouseenter event.
+     * @param itemId      The ID of the menu item.
+     * @param orientation The orientation of the parent rail.
+     */
+    private onMenuButtonMouseEnter(event: MouseEvent, itemId: string, orientation: ContextActionRailOrientation): void {
+        const groupEl = event.currentTarget as HTMLElement;
+        this.setOverlayZIndex(groupEl, "100");
+        this.updateSubmenuFlip(groupEl, itemId, orientation);
+    }
+
+    /**
+     * `mouseleave` handler for the menu-button group element.
+     * Resets the parent overlay div's z-index elevation.
+     *
+     * @param event The DOM mouseleave event.
+     */
+    private onMenuButtonMouseLeave(event: MouseEvent): void {
+        const groupEl = event.currentTarget as HTMLElement;
+        this.setOverlayZIndex(groupEl, "");
+    }
+
+    /**
      * Builds a CSS-hover-driven dropdown menu VNode for the given sub-items.
      * The menu is hidden by default and revealed on `group-hover` of the
      * parent button wrapper.
@@ -858,11 +970,21 @@ export class ContextActionsUIExtension implements IVNodePostprocessor {
      *                    whether the menu opens to the right or below.
      * @returns A positioned dropdown `<div>` VNode.
      */
-    private renderContextMenu(items: ContextActionItem[], orientation: ContextActionRailOrientation): VNode {
+    private renderContextMenu(
+        items: ContextActionItem[],
+        orientation: ContextActionRailOrientation,
+        itemId: string
+    ): VNode {
+        const openLeft = orientation === "vertical" && this.leftPositionedMenus.has(itemId);
+        const rightAligned = orientation === "horizontal" && this.rightAlignedMenus.has(itemId);
         const positionClasses: Record<string, boolean> =
             orientation === "vertical"
-                ? { "left-full": true, "top-0": true, "ml-1": true }
-                : { "top-full": true, "left-0": true, "mt-1": true };
+                ? openLeft
+                    ? { "right-full": true, "top-0": true, "mr-1": true }
+                    : { "left-full": true, "top-0": true, "ml-1": true }
+                : rightAligned
+                  ? { "top-full": true, "right-0": true, "mt-1": true }
+                  : { "top-full": true, "left-0": true, "mt-1": true };
 
         const menuItems = items.map((item) => {
             const iconVNode = this.renderIcon(item);

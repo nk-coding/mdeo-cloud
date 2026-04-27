@@ -15,18 +15,21 @@ import org.slf4j.LoggerFactory
  *
  * @param transformations Map of transformation path to its compiled TypedAst.
  * @param stepSizeStrategy Strategy for determining how many operators to apply per mutation.
- * @param operatorSelectionStrategy Strategy for choosing which operator to try next.
+ * @param operatorSelectionStrategyFactory Factory that creates a fresh [OperatorSelectionStrategy] per
+ *   [mutate] call. A new instance is created on every invocation so that concurrent calls from
+ *   different threads each operate on independent, unshared selection state.
  */
 class RandomOperatorMutationStrategy(
     private val transformations: Map<String, TypedAst>,
     private val stepSizeStrategy: MutationStepSizeStrategy,
-    private val operatorSelectionStrategy: OperatorSelectionStrategy
+    private val operatorSelectionStrategyFactory: () -> OperatorSelectionStrategy
 ) : MutationStrategy {
 
     private val logger = LoggerFactory.getLogger(RandomOperatorMutationStrategy::class.java)
     private val attemptRunner = TransformationAttemptRunner(transformations)
 
     override fun mutate(solution: Solution): Solution {
+        val operatorSelectionStrategy = operatorSelectionStrategyFactory()
         val stepSize = stepSizeStrategy.getNextStepSize(solution)
         val stepTransformations = mutableListOf<String>()
 

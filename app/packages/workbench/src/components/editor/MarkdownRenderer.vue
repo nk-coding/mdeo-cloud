@@ -5,12 +5,25 @@
         <template v-for="embed in resolvedEmbeds" :key="embed.id">
             <Teleport :to="`#${embed.id}`" v-if="embed.mounted">
                 <div class="my-6 rounded-lg border overflow-hidden">
-                    <div class="flex items-center justify-between bg-muted/50 px-4 py-2 border-b">
-                        <span class="text-sm font-medium text-muted-foreground truncate">
-                            {{ embed.alt || embed.fileName }}
-                        </span>
+                    <div
+                        class="flex items-center bg-muted/50 px-4 py-2"
+                        :class="{ 'border-b': !embed.collapsed }"
+                    >
                         <button
-                            class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+                            class="flex-1 min-w-0 inline-flex items-center gap-2 text-left"
+                            @click="embed.collapsed = !embed.collapsed"
+                            :title="embed.collapsed ? 'Expand' : 'Collapse'"
+                        >
+                            <ChevronDown
+                                class="size-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                                :class="{ '-rotate-90': embed.collapsed }"
+                            />
+                            <span class="text-sm font-medium text-muted-foreground truncate">
+                                {{ embed.alt || embed.fileName }}
+                            </span>
+                        </button>
+                        <button
+                            class="shrink-0 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
                             @click="openInNewTab(embed.uri)"
                             title="Open in new tab"
                         >
@@ -18,23 +31,25 @@
                             <span>Open</span>
                         </button>
                     </div>
-                    <div v-if="embed.error" class="flex items-center gap-3 px-4 py-6 text-sm text-destructive">
-                        <AlertCircle class="size-5 shrink-0" />
-                        <span>{{ embed.error }}</span>
-                    </div>
-                    <div v-else-if="embed.languagePlugin" class="h-[400px] relative">
-                        <GraphicalEditor
-                            :tab="{ fileUri: embed.uri, temporary: true }"
-                            :language-plugin="<ResolvedWorkbenchLanguagePlugin>embed.languagePlugin"
-                            :editable="false"
-                            :is-active="isActive"
-                            capture-wheelscroll
-                        />
-                    </div>
-                    <div v-else class="flex items-center gap-3 px-4 py-6 text-sm text-muted-foreground">
-                        <AlertCircle class="size-5 shrink-0" />
-                        <span>No graphical editor available for this file type.</span>
-                    </div>
+                    <template v-if="!embed.collapsed">
+                        <div v-if="embed.error" class="flex items-center gap-3 px-4 py-6 text-sm text-destructive">
+                            <AlertCircle class="size-5 shrink-0" />
+                            <span>{{ embed.error }}</span>
+                        </div>
+                        <div v-else-if="embed.languagePlugin" class="h-[400px] relative">
+                            <GraphicalEditor
+                                :tab="{ fileUri: embed.uri, temporary: true }"
+                                :language-plugin="<ResolvedWorkbenchLanguagePlugin>embed.languagePlugin"
+                                :editable="false"
+                                :is-active="isActive"
+                                capture-wheelscroll
+                            />
+                        </div>
+                        <div v-else class="flex items-center gap-3 px-4 py-6 text-sm text-muted-foreground">
+                            <AlertCircle class="size-5 shrink-0" />
+                            <span>No graphical editor available for this file type.</span>
+                        </div>
+                    </template>
                 </div>
             </Teleport>
         </template>
@@ -66,7 +81,7 @@ import { FileCategory, parseUri } from "@mdeo/language-common";
 import { getFileExtension } from "@/data/filesystem/util";
 import GraphicalEditor from "./GraphicalEditor.vue";
 import PlotChart from "./PlotChart.vue";
-import { AlertCircle, ExternalLink } from "lucide-vue-next";
+import { AlertCircle, ChevronDown, ExternalLink } from "lucide-vue-next";
 import type { ResolvedWorkbenchLanguagePlugin } from "@/data/plugin/plugin";
 
 const props = defineProps<{
@@ -109,6 +124,10 @@ interface ResolvedEmbed {
      * Whether the Teleport target div has been mounted in the DOM.
      */
     mounted: boolean;
+    /**
+     * Whether the embed is collapsed (content hidden).
+     */
+    collapsed: boolean;
 }
 
 /**
@@ -260,7 +279,8 @@ watch(
                 fileName,
                 languagePlugin: plugin,
                 error,
-                mounted: false
+                mounted: false,
+                collapsed: resolved.length >= 3
             });
         }
 
