@@ -56,13 +56,26 @@ object MutationRuleNameGenerator {
         } else {
             forNode(action, spec.className)
         }
-        val suffix = when (spec.type) {
-            RepairSpecType.CREATE_LB_REPAIR       -> "_LBREPAIR"
-            RepairSpecType.CREATE_LB_REPAIR_MULTI -> "_LBREPAIR_MULTI"
-            RepairSpecType.DELETE_REPAIR_SINGLE   -> "_REPAIR_SG"
-            RepairSpecType.DELETE_REPAIR_MULTI    -> "_REPAIR_MN"
-            else -> ""
+        return baseName + repairSuffix(spec.type, includeEdge = false)
+    }
+
+    /**
+     * Builds the name for a merged multi-reference combination rule by appending one
+     * reference-qualified suffix per active repair to the supplied [baseName] (e.g.
+     * `CREATE_ClassA_roles_LBREPAIR_links_LBREPAIR_MULTI`). The suffixes are emitted in the order
+     * the repairs appear in [activeSpecs], so the same combination always yields the same name.
+     */
+    fun forCombination(baseName: String, activeSpecs: List<RepairSpec>): String =
+        baseName + activeSpecs.joinToString("") { spec ->
+            val edge = spec.edgeName?.let { "_$it" } ?: ""
+            edge + repairSuffix(spec.type, includeEdge = false)
         }
-        return baseName + suffix
+
+    private fun repairSuffix(type: RepairSpecType, includeEdge: Boolean): String = when (type) {
+        RepairSpecType.CREATE_LB_REPAIR       -> "_LBREPAIR"
+        RepairSpecType.CREATE_LB_REPAIR_MULTI -> "_LBREPAIR_MULTI"
+        RepairSpecType.DELETE_REPAIR_SINGLE   -> "_REPAIR_SG"
+        RepairSpecType.DELETE_REPAIR_MULTI    -> "_REPAIR_MN"
+        else -> ""
     }
 }

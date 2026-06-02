@@ -1695,6 +1695,85 @@ class NewCpoVariantTests {
             val types = result["DELETE"]!!.map { it.type }.toSet()
             assertEquals(setOf(RepairSpecType.DELETE), types, "Expected only plain DELETE for unidirectional ref")
         }
+
+        // ---------------------------------------------------------------------
+        // Gap 1: edge CHANGE selection aligned with the Java reference.
+        //
+        // Java (generateEdgeAddRules / generateEdgeRemoveRules):
+        //   - source fixed (lower == upper)                          -> SWAP
+        //   - opposite present, lower > 0, lower == upper (k = l)    -> CHANGE
+        //   - otherwise                                              -> ADD / REMOVE
+        // ---------------------------------------------------------------------
+
+        /** Builds a bidirectional A.ref --> B.back metamodel with the given multiplicities. */
+        private fun bidirectionalMeta(
+            srcLower: Int, srcUpper: Int,
+            tgtLower: Int, tgtUpper: Int
+        ): MetamodelInfo {
+            val a = ClassData(name = "EdgeA", isAbstract = false)
+            val b = ClassData(name = "EdgeB", isAbstract = false)
+            val assoc = AssociationData(
+                source = AssociationEndData("EdgeA", "ref",  MultiplicityData(lower = srcLower, upper = srcUpper)),
+                operator = "-->",
+                target  = AssociationEndData("EdgeB", "back", MultiplicityData(lower = tgtLower, upper = tgtUpper))
+            )
+            return MetamodelInfo(
+                MetamodelData(path = "/t/edge.mm", classes = listOf(a, b), associations = listOf(assoc))
+            )
+        }
+
+        private fun edgeTypes(info: MetamodelInfo, action: MutationAction, key: String): Set<RepairSpecType> {
+            val spec = MutationRuleSpec("EdgeA", edge = "ref", action = action)
+            return generator.getRepairsForRuleSpec(spec, info)[key]!!.map { it.type }.toSet()
+        }
+
+        @Test
+        fun `ADD with fixed opposite k=l=2 and non-fixed source produces CHANGE`() {
+            val info = bidirectionalMeta(srcLower = 0, srcUpper = -1, tgtLower = 2, tgtUpper = 2)
+            assertEquals(setOf(RepairSpecType.CHANGE), edgeTypes(info, MutationAction.ADD, "ADD"),
+                "Java treats fixed opposite k=l>0 (non-fixed source) as CHANGE")
+        }
+
+        @Test
+        fun `REMOVE with fixed opposite k=l=2 and non-fixed source produces CHANGE`() {
+            val info = bidirectionalMeta(srcLower = 0, srcUpper = -1, tgtLower = 2, tgtUpper = 2)
+            assertEquals(setOf(RepairSpecType.CHANGE), edgeTypes(info, MutationAction.REMOVE, "REMOVE"),
+                "Java treats fixed opposite k=l>0 (non-fixed source) as CHANGE for removal too")
+        }
+
+        @Test
+        fun `ADD with fixed opposite k=l=1 still produces CHANGE`() {
+            val info = bidirectionalMeta(srcLower = 0, srcUpper = -1, tgtLower = 1, tgtUpper = 1)
+            assertEquals(setOf(RepairSpecType.CHANGE), edgeTypes(info, MutationAction.ADD, "ADD"))
+        }
+
+        @Test
+        fun `ADD with opposite lower=1 but non-fixed (1, 3) produces ADD not CHANGE`() {
+            // Previously the Kotlin selected CHANGE whenever opposite.lower == 1; Java requires k = l.
+            val info = bidirectionalMeta(srcLower = 0, srcUpper = -1, tgtLower = 1, tgtUpper = 3)
+            assertEquals(setOf(RepairSpecType.ADD), edgeTypes(info, MutationAction.ADD, "ADD"),
+                "Opposite 1..3 is not fixed cardinality, so it must NOT map to CHANGE")
+        }
+
+        @Test
+        fun `ADD with opposite lower=1 unbounded (1, star) produces ADD not CHANGE`() {
+            val info = bidirectionalMeta(srcLower = 0, srcUpper = -1, tgtLower = 1, tgtUpper = -1)
+            assertEquals(setOf(RepairSpecType.ADD), edgeTypes(info, MutationAction.ADD, "ADD"),
+                "Opposite 1..* is not fixed cardinality, so it must NOT map to CHANGE")
+        }
+
+        @Test
+        fun `ADD with opposite lower=0 produces ADD not CHANGE`() {
+            val info = bidirectionalMeta(srcLower = 0, srcUpper = -1, tgtLower = 0, tgtUpper = 1)
+            assertEquals(setOf(RepairSpecType.ADD), edgeTypes(info, MutationAction.ADD, "ADD"))
+        }
+
+        @Test
+        fun `ADD with fixed source overrides fixed opposite and produces SWAP`() {
+            val info = bidirectionalMeta(srcLower = 2, srcUpper = 2, tgtLower = 2, tgtUpper = 2)
+            assertEquals(setOf(RepairSpecType.SWAP), edgeTypes(info, MutationAction.ADD, "ADD"),
+                "Fixed source (lower == upper) must win and select SWAP")
+        }
     }
 
     @Nested
@@ -1847,8 +1926,8 @@ class NewCpoVariantTests {
             val stmt = ast.statements[0] as TypedMatchStatement
 
             val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
-            // node (match) + node (delete) + 2 neighbours + 2 others = 6
-            assertEquals(6, objects.size, "Expected 6 objects")
+            // merged match+delete node + 2 neighbours + 2 others = 5
+            assertEquals(5, objects.size, "Expected 5 objects")
             assertEquals(2, objects.count { it.objectInstance.name.startsWith("neighbor_members_") }, "Expected 2 neighbours")
             assertEquals(2, objects.count { it.objectInstance.name.startsWith("other_members_") },    "Expected 2 others")
 
@@ -2190,6 +2269,155 @@ class NewCpoVariantTests {
             val instances = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
             assertNotNull(instances.find { it.objectInstance.name == "container" && it.objectInstance.className == "Plan" })
             assertNotNull(instances.find { it.objectInstance.name == "newNode" && it.objectInstance.className == "Sprint" && it.objectInstance.modifier == "create" })
+        }
+    }
+
+    // ========================================================================
+    // Gap 2: multi-reference repair combinations (cartesian product),
+    // aligned with the Java reference (SpecsGenerator.generateNodeRepairCombinations
+    // + CreateNodeRuleCommand / DeleteNodeRuleCommand applying a whole combination).
+    // ========================================================================
+    @Nested
+    inner class RepairCombinationTests {
+
+        private val generator = SpecsGenerator()
+
+        // Hub with TWO references that both require donor-based CREATE repair:
+        //   Hub.a 1..3 --> AClass.hubA 0..2   (lower=1 -> CREATE_LB_REPAIR)
+        //   Hub.b 2..4 --> BClass.hubB 0..2   (lower=2 -> CREATE_LB_REPAIR + _MULTI)
+        private fun createHubInfo(): MetamodelInfo {
+            val hub = ClassData(name = "Hub", isAbstract = false)
+            val ac  = ClassData(name = "AClass", isAbstract = false)
+            val bc  = ClassData(name = "BClass", isAbstract = false)
+            val aAssoc = AssociationData(
+                source = AssociationEndData("Hub", "a", MultiplicityData(lower = 1, upper = 3)),
+                operator = "-->",
+                target  = AssociationEndData("AClass", "hubA", MultiplicityData(lower = 0, upper = 2))
+            )
+            val bAssoc = AssociationData(
+                source = AssociationEndData("Hub", "b", MultiplicityData(lower = 2, upper = 4)),
+                operator = "-->",
+                target  = AssociationEndData("BClass", "hubB", MultiplicityData(lower = 0, upper = 2))
+            )
+            return MetamodelInfo(
+                MetamodelData(path = "/t/hub.mm", classes = listOf(hub, ac, bc), associations = listOf(aAssoc, bAssoc))
+            )
+        }
+
+        @Test
+        fun `CREATE combinations form the cartesian product across both references`() {
+            val info = createHubInfo()
+            val spec = MutationRuleSpec("Hub", action = MutationAction.CREATE)
+            val combos = generator.getRepairCombinationsForRuleSpec(spec, info)["CREATE"]!!
+
+            // edge a: {CREATE, LB_REPAIR};  edge b: {CREATE, LB_REPAIR, LB_REPAIR_MULTI}
+            // cartesian product => 2 * 3 = 6 combinations
+            assertEquals(6, combos.size, "Expected 2 x 3 = 6 CREATE combinations; got: $combos")
+
+            // The all-base combination and the two-active combinations are both present.
+            assertTrue(
+                combos.any { c -> c.all { it.type == RepairSpecType.CREATE } },
+                "Expected the all-base combination"
+            )
+            assertTrue(
+                combos.any { c ->
+                    c.any { it.edgeName == "a" && it.type == RepairSpecType.CREATE_LB_REPAIR } &&
+                        c.any { it.edgeName == "b" && it.type == RepairSpecType.CREATE_LB_REPAIR_MULTI }
+                },
+                "Expected a combination repairing BOTH references (a single + b multi)"
+            )
+        }
+
+        @Test
+        fun `generate produces a merged CREATE rule repairing two references at once`() {
+            val hub = ClassData(name = "Hub", isAbstract = false)
+            val ac  = ClassData(name = "AClass", isAbstract = false)
+            val bc  = ClassData(name = "BClass", isAbstract = false)
+            val aAssoc = AssociationData(
+                source = AssociationEndData("Hub", "a", MultiplicityData(lower = 1, upper = 3)),
+                operator = "-->",
+                target  = AssociationEndData("AClass", "hubA", MultiplicityData(lower = 0, upper = 2))
+            )
+            val bAssoc = AssociationData(
+                source = AssociationEndData("Hub", "b", MultiplicityData(lower = 1, upper = 3)),
+                operator = "-->",
+                target  = AssociationEndData("BClass", "hubB", MultiplicityData(lower = 0, upper = 2))
+            )
+            val meta = MetamodelData(path = "/t/hub.mm", classes = listOf(hub, ac, bc), associations = listOf(aAssoc, bAssoc))
+
+            val mutations = MutationRuleGenerator.generate(meta, listOf(MutationRuleSpec("Hub", action = MutationAction.CREATE)))
+            val names = mutations.map { it.name }.toSet()
+
+            // Single-reference repair rules still exist...
+            assertTrue(names.any { it.contains("_a_LBREPAIR") && !it.contains("_b_") }, "Expected single repair on a; got: $names")
+            assertTrue(names.any { it.contains("_b_LBREPAIR") && !it.contains("_a_") }, "Expected single repair on b; got: $names")
+
+            // ...and a NEW merged rule repairs both references in one operator.
+            val merged = mutations.find { it.name.contains("_a_LBREPAIR") && it.name.contains("_b_LBREPAIR") }
+            assertNotNull(merged, "Expected a merged CREATE rule repairing both a and b; got: $names")
+
+            val stmt = merged.typedAst.statements[0] as TypedMatchStatement
+            val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
+            // Exactly one created node, shared by both donor steals.
+            assertEquals(1, objects.count { it.objectInstance.modifier == "create" }, "Expected exactly one created node")
+            assertNotNull(objects.find { it.objectInstance.name == "donor_a" }, "Expected donor for a")
+            assertNotNull(objects.find { it.objectInstance.name == "donor_b" }, "Expected donor for b")
+
+            val links = stmt.pattern.elements.filterIsInstance<TypedPatternLinkElement>()
+            // Two donor steals => 2 delete links + 2 create links onto newNode + 2 match links.
+            assertEquals(2, links.count { it.link.modifier == "delete" }, "Expected 2 delete (steal) links")
+            assertEquals(2, links.count { it.link.modifier == "create" }, "Expected 2 create links onto newNode")
+        }
+
+        @Test
+        fun `generate produces a merged DELETE rule re-homing neighbours of two references`() {
+            // Hub.left 0..* --> LClass.hub 1..1  (k=l=1 -> DELETE_REPAIR_SINGLE)
+            // Hub.right 0..* --> RClass.hub 2..2 (k=l=2 -> DELETE_REPAIR_SINGLE + _MULTI)
+            val hub = ClassData(name = "DHub", isAbstract = false)
+            val lc  = ClassData(name = "LClass", isAbstract = false)
+            val rc  = ClassData(name = "RClass", isAbstract = false)
+            val leftAssoc = AssociationData(
+                source = AssociationEndData("DHub", "left", MultiplicityData(lower = 0, upper = -1)),
+                operator = "-->",
+                target  = AssociationEndData("LClass", "hub", MultiplicityData(lower = 1, upper = 1))
+            )
+            val rightAssoc = AssociationData(
+                source = AssociationEndData("DHub", "right", MultiplicityData(lower = 0, upper = -1)),
+                operator = "-->",
+                target  = AssociationEndData("RClass", "hub", MultiplicityData(lower = 2, upper = 2))
+            )
+            val meta = MetamodelData(path = "/t/dhub.mm", classes = listOf(hub, lc, rc), associations = listOf(leftAssoc, rightAssoc))
+
+            val mutations = MutationRuleGenerator.generate(meta, listOf(MutationRuleSpec("DHub", action = MutationAction.DELETE)))
+            val names = mutations.map { it.name }.toSet()
+
+            // Plain delete and single-reference repairs still exist.
+            assertTrue(names.contains("DELETE_DHub"), "Expected plain DELETE_DHub; got: $names")
+            assertTrue(names.any { it.contains("_left_REPAIR_SG") && !it.contains("_right_") }, "Expected single repair on left; got: $names")
+
+            // A merged DELETE re-homes BOTH references' neighbours.
+            val merged = mutations.find { it.name.contains("_left_REPAIR_SG") && it.name.contains("_right_REPAIR_MN") }
+            assertNotNull(merged, "Expected a merged DELETE rule for left + right; got: $names")
+
+            val stmt = merged.typedAst.statements[0] as TypedMatchStatement
+            val objects = stmt.pattern.elements.filterIsInstance<TypedPatternObjectInstanceElement>()
+            assertEquals(1, objects.count { it.objectInstance.modifier == "delete" }, "Expected exactly one deleted node")
+            // left: 1 neighbour + 1 other; right (k=2): 2 neighbours + 2 others.
+            assertNotNull(objects.find { it.objectInstance.name == "neighbor_left" }, "Expected left neighbour")
+            assertNotNull(objects.find { it.objectInstance.name == "neighbor_right_1" }, "Expected right neighbour 1")
+            assertNotNull(objects.find { it.objectInstance.name == "neighbor_right_2" }, "Expected right neighbour 2")
+        }
+
+        @Test
+        fun `single-reference node still yields no merged combination rule`() {
+            // metaWP: Worker.project 0..* --> Project.worker 1..1 (single repairable ref)
+            val mutations = MutationRuleGenerator.generate(metaWP, listOf(MutationRuleSpec("Worker", action = MutationAction.DELETE)))
+            val names = mutations.map { it.name }.toSet()
+            // No name should mention two distinct repaired edges.
+            assertTrue(
+                names.none { it.count { ch -> ch == '_' } > 0 && it.contains("REPAIR_SG") && it.contains("REPAIR_MN") },
+                "Single-reference node must not produce merged combinations; got: $names"
+            )
         }
     }
 }

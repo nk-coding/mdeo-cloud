@@ -54,8 +54,8 @@ object MutationAstBuilder {
         val guardBuilder = MultiplicityGuardBuilder(metamodelPath)
         val elements: List<TypedPatternElement> = when (spec.type) {
             RepairSpecType.CREATE              -> buildCreate(spec, info, guardBuilder, createContext)
-            RepairSpecType.CREATE_LB_REPAIR    -> buildCreateLbRepair(spec, info, guardBuilder)
-            RepairSpecType.CREATE_LB_REPAIR_MULTI -> buildCreateLbRepairMulti(spec, info, guardBuilder)
+            RepairSpecType.CREATE_LB_REPAIR    -> buildCreateLbRepair(spec, info, guardBuilder, createContext)
+            RepairSpecType.CREATE_LB_REPAIR_MULTI -> buildCreateLbRepairMulti(spec, info, guardBuilder, createContext)
             RepairSpecType.DELETE              -> buildDelete(spec, info, guardBuilder)
             RepairSpecType.DELETE_REPAIR_SINGLE -> buildDeleteRepairSingle(spec, info, guardBuilder)
             RepairSpecType.DELETE_REPAIR_MULTI  -> buildDeleteRepairMulti(spec, info, guardBuilder)
@@ -63,6 +63,38 @@ object MutationAstBuilder {
             RepairSpecType.REMOVE              -> buildRemove(spec, info, guardBuilder)
             RepairSpecType.CHANGE              -> buildChange(spec, info, guardBuilder)
             RepairSpecType.SWAP                -> buildSwap(spec, info, guardBuilder)
+        }
+        return TypedAst(
+            types = guardBuilder.getTypes(),
+            metamodelPath = metamodelPath,
+            statements = listOf(TypedMatchStatement(pattern = TypedPattern(elements = elements)))
+        )
+    }
+
+    /**
+     * Builds a single [TypedAst] that merges **several** repair specs from one combination into one
+     * rule (aligned with the Java reference, whose `CreateNodeRuleCommand` /`DeleteNodeRuleCommand`
+     * apply every [RepairSpec] in a combination to the same created/deleted node).
+     *
+     * The [activeSpecs] must all belong to the same family (all CREATE_LB_REPAIR(_MULTI) or all
+     * DELETE_REPAIR_SINGLE/MULTI) and act on distinct references of the same class. This entry point
+     * is used for genuine multi-reference combinations; single- and zero-repair combinations are
+     * built through the per-spec [build] above to preserve their exact structure.
+     */
+    fun buildCombination(
+        activeSpecs: List<RepairSpec>,
+        metamodelPath: String,
+        info: MetamodelInfo,
+        createContext: Pair<String, String>? = null
+    ): TypedAst {
+        require(activeSpecs.isNotEmpty()) { "buildCombination requires at least one repair spec" }
+        val guardBuilder = MultiplicityGuardBuilder(metamodelPath)
+        val isCreate = activeSpecs.first().type == RepairSpecType.CREATE_LB_REPAIR ||
+            activeSpecs.first().type == RepairSpecType.CREATE_LB_REPAIR_MULTI
+        val elements = if (isCreate) {
+            buildCreateLbRepairCombined(activeSpecs, info, guardBuilder, createContext)
+        } else {
+            buildDeleteRepairCombined(activeSpecs, info, guardBuilder)
         }
         return TypedAst(
             types = guardBuilder.getTypes(),
@@ -833,6 +865,241 @@ object MutationAstBuilder {
         )
 
         return elements
+    }
+
+    // =========================================================================
+    // Combined (multi-reference) repair builders
+    // =========================================================================
+
+    /**
+     * Merges several donor-based CREATE lower-bound repairs onto one created node, so that a single
+     * operator can satisfy positive lower bounds on multiple references at once (Java parity:
+     * `CreateNodeRuleCommand.applyRepairOperations` iterating over the combination's repair specs).
+     *
+     * Per-reference variable names are qualified by the reference name so that distinct references
+     * never collide.
+     */
+    private fun buildCreateLbRepairCombined(
+        specs: List<RepairSpec>,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder,
+        createContext: Pair<String, String>?
+    ): List<TypedPatternElement> {
+        val className = specs.first().className
+        val elements = mutableListOf<TypedPatternElement>()
+
+        // Create the new node (plus its containment context, if any) once.
+        appendCreatedNodeWithContext(elements, className, info, guardBuilder, createContext)
+
+        val repairedRefs = mutableSetOf<String>()
+        for (spec in specs) {
+            val refName = spec.edgeName ?: continue
+            val ref = info.referencesForNode(className).find { it.refName == refName } ?: continue
+            repairedRefs += refName
+            if (spec.type == RepairSpecType.CREATE_LB_REPAIR_MULTI && ref.lower > 1) {
+                appendCreateDonorStealMulti(elements, className, ref, info, guardBuilder)
+            } else {
+                appendCreateDonorStealSingle(elements, className, ref, info, guardBuilder)
+            }
+        }
+
+        // Remaining mandatory references (not donor-repaired) still need created children.
+        appendMandatoryOutgoingReferences(
+            elements = elements,
+            spec = RepairSpec(className, null, RepairSpecType.CREATE),
+            info = info,
+            guardBuilder = guardBuilder,
+            skipRefNames = repairedRefs
+        )
+
+        return elements
+    }
+
+    /** Adds the `newNode` (create) plus an optional matched `container` and containment link. */
+    private fun appendCreatedNodeWithContext(
+        elements: MutableList<TypedPatternElement>,
+        className: String,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder,
+        createContext: Pair<String, String>?
+    ) {
+        elements += objectInstance(modifier = "create", name = "newNode", className = className)
+        if (createContext != null) {
+            val (containerClass, refName) = createContext
+            elements += objectInstance(modifier = null, name = "container", className = containerClass)
+            elements += linkElement(
+                modifier = "create",
+                sourceObj = "container", sourceClassName = containerClass, sourceRef = refName,
+                targetObj = "newNode", info = info
+            )
+            val containerRef = info.referencesForNode(containerClass).find { it.refName == refName }
+            if (containerRef != null && containerRef.upper != -1) {
+                elements += guardBuilder.buildUpperBoundGuard(
+                    varName = "container",
+                    varClassName = containerClass,
+                    refName = refName,
+                    targetClassName = className,
+                    upperBound = containerRef.upper
+                )
+            }
+        }
+    }
+
+    /** Single-donor steal for [ref], using reference-qualified variable names. */
+    private fun appendCreateDonorStealSingle(
+        elements: MutableList<TypedPatternElement>,
+        className: String,
+        ref: ReferenceInfo,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder
+    ) {
+        val donor = "donor_${ref.refName}"
+        val target = "target_${ref.refName}"
+        elements += objectInstance(modifier = null, name = donor, className = className)
+        elements += objectInstance(modifier = null, name = target, className = ref.targetClass)
+        elements += linkElement(modifier = null, sourceObj = donor, sourceClassName = className, sourceRef = ref.refName, targetObj = target, info = info)
+        elements += linkElement(modifier = "delete", sourceObj = donor, sourceClassName = className, sourceRef = ref.refName, targetObj = target, info = info)
+        elements += linkElement(modifier = "create", sourceObj = "newNode", sourceClassName = className, sourceRef = ref.refName, targetObj = target, info = info)
+        if (ref.lower > 0) {
+            elements += guardBuilder.buildLowerBoundGuard(
+                varName = donor,
+                varClassName = className,
+                refName = ref.refName,
+                targetClassName = ref.targetClass,
+                lowerBound = ref.lower
+            )
+        }
+    }
+
+    /** Multi-donor steal for [ref] (n = ref.lower donors), using reference-qualified names. */
+    private fun appendCreateDonorStealMulti(
+        elements: MutableList<TypedPatternElement>,
+        className: String,
+        ref: ReferenceInfo,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder
+    ) {
+        val n = ref.lower
+        for (i in 1..n) {
+            elements += objectInstance(modifier = null, name = "donor_${ref.refName}_$i", className = className)
+            elements += objectInstance(modifier = null, name = "target_${ref.refName}_$i", className = ref.targetClass)
+            elements += linkElement(modifier = null, sourceObj = "donor_${ref.refName}_$i", sourceClassName = className, sourceRef = ref.refName, targetObj = "target_${ref.refName}_$i", info = info)
+        }
+        for (i in 1..n) {
+            elements += linkElement(modifier = "delete", sourceObj = "donor_${ref.refName}_$i", sourceClassName = className, sourceRef = ref.refName, targetObj = "target_${ref.refName}_$i", info = info)
+        }
+        for (i in 1..n) {
+            elements += linkElement(modifier = "create", sourceObj = "newNode", sourceClassName = className, sourceRef = ref.refName, targetObj = "target_${ref.refName}_$i", info = info)
+        }
+        for (i in 1..n) {
+            elements += guardBuilder.buildLowerBoundGuard(
+                varName = "donor_${ref.refName}_$i",
+                varClassName = className,
+                refName = ref.refName,
+                targetClassName = ref.targetClass,
+                lowerBound = n
+            )
+        }
+    }
+
+    /**
+     * Merges several neighbour-reconnection DELETE repairs onto one deleted node, so that a single
+     * operator can re-home the fixed-cardinality neighbours of multiple references at once (Java
+     * parity: `DeleteNodeRuleCommand` applying every repair spec in the combination).
+     */
+    private fun buildDeleteRepairCombined(
+        specs: List<RepairSpec>,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder
+    ): List<TypedPatternElement> {
+        val className = specs.first().className
+        val elements = mutableListOf<TypedPatternElement>()
+
+        elements += objectInstance(modifier = "delete", name = "node", className = className)
+
+        val repairedRefs = mutableSetOf<String>()
+        for (spec in specs) {
+            val refName = spec.edgeName ?: continue
+            val ref = info.referencesForNode(className).find { it.refName == refName } ?: continue
+            repairedRefs += refName
+            val backRef = info.referencesForNode(ref.targetClass)
+                .find { it.targetClass == className && it.isReverse == !ref.isReverse }
+            val k = backRef?.lower ?: 1
+            if (spec.type == RepairSpecType.DELETE_REPAIR_MULTI && k > 1) {
+                appendDeleteReconnectMulti(elements, className, ref, k, info, guardBuilder)
+            } else {
+                appendDeleteReconnectSingle(elements, className, ref, info, guardBuilder)
+            }
+        }
+
+        appendDeleteGuards(
+            elements = elements,
+            className = className,
+            nodeVarName = "node",
+            info = info,
+            guardBuilder = guardBuilder,
+            skipRefNames = repairedRefs
+        )
+
+        return elements
+    }
+
+    /** Re-homes ONE neighbour of [ref] to a replacement source (reference-qualified names). */
+    private fun appendDeleteReconnectSingle(
+        elements: MutableList<TypedPatternElement>,
+        className: String,
+        ref: ReferenceInfo,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder
+    ) {
+        val neighborName = "neighbor_${ref.refName}"
+        val otherName = "other_${ref.refName}"
+        elements += objectInstance(modifier = null, name = neighborName, className = ref.targetClass)
+        elements += linkElement(modifier = null, sourceObj = "node", sourceClassName = className, sourceRef = ref.refName, targetObj = neighborName, info = info)
+        elements += objectInstance(modifier = null, name = otherName, className = className)
+        elements += linkElement(modifier = "forbid", sourceObj = otherName, sourceClassName = className, sourceRef = ref.refName, targetObj = neighborName, info = info)
+        elements += linkElement(modifier = "create", sourceObj = otherName, sourceClassName = className, sourceRef = ref.refName, targetObj = neighborName, info = info)
+        if (ref.upper != -1) {
+            elements += guardBuilder.buildUpperBoundGuard(
+                varName = otherName,
+                varClassName = className,
+                refName = ref.refName,
+                targetClassName = ref.targetClass,
+                upperBound = ref.upper
+            )
+        }
+    }
+
+    /** Re-homes k neighbours of [ref], each to a distinct replacement source. */
+    private fun appendDeleteReconnectMulti(
+        elements: MutableList<TypedPatternElement>,
+        className: String,
+        ref: ReferenceInfo,
+        k: Int,
+        info: MetamodelInfo,
+        guardBuilder: MultiplicityGuardBuilder
+    ) {
+        for (i in 1..k) {
+            val neighborName = "neighbor_${ref.refName}_$i"
+            elements += objectInstance(modifier = null, name = neighborName, className = ref.targetClass)
+            elements += linkElement(modifier = null, sourceObj = "node", sourceClassName = className, sourceRef = ref.refName, targetObj = neighborName, info = info)
+        }
+        for (i in 1..k) {
+            val neighborName = "neighbor_${ref.refName}_$i"
+            val otherName = "other_${ref.refName}_$i"
+            elements += objectInstance(modifier = null, name = otherName, className = className)
+            elements += linkElement(modifier = "forbid", sourceObj = otherName, sourceClassName = className, sourceRef = ref.refName, targetObj = neighborName, info = info)
+            elements += linkElement(modifier = "create", sourceObj = otherName, sourceClassName = className, sourceRef = ref.refName, targetObj = neighborName, info = info)
+            if (ref.upper != -1) {
+                elements += guardBuilder.buildUpperBoundGuard(
+                    varName = otherName,
+                    varClassName = className,
+                    refName = ref.refName,
+                    targetClassName = ref.targetClass,
+                    upperBound = ref.upper
+                )
+            }
+        }
     }
 
     // =========================================================================

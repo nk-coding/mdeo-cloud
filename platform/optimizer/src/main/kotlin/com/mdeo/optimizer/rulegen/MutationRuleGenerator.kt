@@ -93,13 +93,114 @@ object MutationRuleGenerator {
                 continue
             }
 
-            val repairMap = specsGenerator.getRepairsForRuleSpec(spec, info)
+            val combinationMap = specsGenerator.getRepairCombinationsForRuleSpec(spec, info)
 
-            for ((_, repairSpecs) in repairMap) {
-                for (repairSpec in repairSpecs) {
+            for ((category, combinations) in combinationMap) {
+                for (combination in combinations) {
+                    emitCombination(category, combination, info, metamodelPath, prefix, accumulator)
+                }
+            }
+        }
+    }
+
+    /**
+     * Emits the rule(s) for a single repair-spec combination.
+     *
+     * For node CREATE/DELETE categories the combination is merged into a single operator (matching
+     * the Java reference). Combinations with zero or exactly one *active* repair are routed through
+     * the per-spec [emitMutation] so their names and ASTs are byte-for-byte identical to the
+     * pre-combination behaviour; combinations with two or more active repairs are emitted as new
+     * merged rules. Edge ADD/REMOVE categories are split into one rule per repair spec.
+     */
+    private fun emitCombination(
+        category: String,
+        combination: List<RepairSpec>,
+        info: MetamodelInfo,
+        metamodelPath: String,
+        prefix: String,
+        accumulator: MutableMap<String, GeneratedMutation>
+    ) {
+        when (category) {
+            "CREATE", "DELETE" -> {
+                val active = combination.filter { isActiveRepair(it) }
+                when {
+                    active.isEmpty() -> {
+                        val className = combination.firstOrNull()?.className ?: return
+                        val baseType = if (category == "CREATE") RepairSpecType.CREATE else RepairSpecType.DELETE
+                        emitMutation(RepairSpec(className, null, baseType), info, metamodelPath, prefix, accumulator)
+                    }
+                    active.size == 1 -> emitMutation(active.first(), info, metamodelPath, prefix, accumulator)
+                    else -> emitMergedCombination(category, active, info, metamodelPath, prefix, accumulator)
+                }
+            }
+            else -> {
+                for (repairSpec in combination) {
                     emitMutation(repairSpec, info, metamodelPath, prefix, accumulator)
                 }
             }
+        }
+    }
+
+    private fun isActiveRepair(spec: RepairSpec): Boolean = when (spec.type) {
+        RepairSpecType.CREATE_LB_REPAIR,
+        RepairSpecType.CREATE_LB_REPAIR_MULTI,
+        RepairSpecType.DELETE_REPAIR_SINGLE,
+        RepairSpecType.DELETE_REPAIR_MULTI -> true
+        else -> false
+    }
+
+    /**
+     * Emits a merged operator that applies two or more active repairs to the same created/deleted
+     * node. CREATE combinations are expanded across every containment context (as for single CREATE
+     * rules); DELETE combinations have no containment context.
+     */
+    private fun emitMergedCombination(
+        category: String,
+        active: List<RepairSpec>,
+        info: MetamodelInfo,
+        metamodelPath: String,
+        prefix: String,
+        accumulator: MutableMap<String, GeneratedMutation>
+    ) {
+        val className = active.first().className
+        if (category == "DELETE") {
+            val name = prefix + MutationRuleNameGenerator.forCombination(
+                MutationRuleNameGenerator.forNode("DELETE", className), active
+            )
+            addCombinationIfAbsent(name, active, metamodelPath, info, null, accumulator)
+            return
+        }
+
+        // CREATE: expand across containment contexts, mirroring emitMutation.
+        val contexts = info.containmentContextsFor(className)
+        if (contexts.isEmpty()) {
+            val name = prefix + MutationRuleNameGenerator.forCombination(
+                MutationRuleNameGenerator.forNode("CREATE", className), active
+            )
+            addCombinationIfAbsent(name, active, metamodelPath, info, null, accumulator)
+        } else {
+            for ((containerClass, refName) in contexts) {
+                val baseName = MutationRuleNameGenerator.forNodeCreate(className, containerClass, refName)
+                val name = prefix + MutationRuleNameGenerator.forCombination(baseName, active)
+                addCombinationIfAbsent(name, active, metamodelPath, info, containerClass to refName, accumulator)
+            }
+        }
+    }
+
+    private fun addCombinationIfAbsent(
+        name: String,
+        active: List<RepairSpec>,
+        metamodelPath: String,
+        info: MetamodelInfo,
+        createContext: Pair<String, String>?,
+        accumulator: MutableMap<String, GeneratedMutation>
+    ) {
+        if (accumulator.containsKey(name)) return
+        try {
+            val ast = MutationAstBuilder.buildCombination(active, metamodelPath, info, createContext)
+            accumulator[name] = GeneratedMutation(name, ast)
+        } catch (e: Exception) {
+            log.warn("MutationRuleGenerator: failed to build merged rule '$name': ${e.message}")
         }
     }
 
