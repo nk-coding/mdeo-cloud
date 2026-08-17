@@ -260,9 +260,11 @@ export interface TypedPatternApplicationCondition {
      */
     name?: string;
     /**
-     * The elements forming the condition graph.
+     * The elements forming the condition graph. Object instances and links describe the
+     * graph itself; where clauses constrain it and may read both the block's own nodes and
+     * everything the enclosing match binds.
      */
-    elements: (TypedPatternObjectInstanceElement | TypedPatternLinkElement)[];
+    elements: (TypedPatternObjectInstanceElement | TypedPatternLinkElement | TypedPatternWhereClauseElement)[];
 }
 
 /**

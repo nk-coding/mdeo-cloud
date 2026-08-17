@@ -1,6 +1,9 @@
 package com.mdeo.modeltransformation.ast.patterns
 
+import com.mdeo.expression.ast.expressions.TypedBinaryExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import com.mdeo.modeltransformation.ast.expressions.TypedExpressionSerializer
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
@@ -27,8 +30,8 @@ import kotlin.test.assertTrue
  *     patient: Patient { isMandatory == false }
  *     var patientDuration = patient.surgeryDuration
  *     forbid alreadyAdmitted { existingAdmission: Admission {}  existingAdmission.patient -- patient }
- *     forbid betterCandidate { betterPatient: Patient { isMandatory == false
- *                                                      surgeryDuration < patientDuration } }
+ *     forbid betterCandidate { betterPatient: Patient { isMandatory == false }
+ *                              where betterPatient.surgeryDuration < patientDuration }
  *     create admission: Admission { day = 1 }
  *     create admission.patient -- patient
  * }
@@ -83,9 +86,46 @@ class ApplicationConditionWireFormatTest {
         assertEquals(setOf("betterPatient"), better.instanceNames)
         assertTrue(better.links.isEmpty(), "This block is detached from the match")
         assertEquals(
-            listOf("isMandatory", "surgeryDuration"),
+            listOf("isMandatory"),
             better.instances.single().objectInstance.properties.map { it.propertyName },
-            "Both property constraints, including the '<' comparison, are carried over"
+            "The property constraint on the block's node is carried over"
+        )
+        assertEquals(
+            1, better.whereClauses.size,
+            "The clause of the block belongs to the block, not to the enclosing match"
+        )
+    }
+
+    @Test
+    fun `a where clause inside a block stays inside it`() {
+        val pattern = loadPattern()
+
+        assertTrue(
+            pattern.elements.none { it is TypedPatternWhereClauseElement },
+            "The clause must not be lifted out of its block into the match"
+        )
+
+        val betterCandidate = pattern.elements
+            .filterIsInstance<TypedPatternApplicationConditionElement>()
+            .single { it.condition.name == "betterCandidate" }
+        val clause = betterCandidate.condition.elements.filterIsInstance<TypedPatternWhereClauseElement>().single()
+        val comparison = clause.whereClause.expression as TypedBinaryExpression
+
+        assertEquals("<", comparison.operator)
+        val left = comparison.left as TypedMemberAccessExpression
+        assertEquals("surgeryDuration", left.member)
+        assertEquals(
+            "betterPatient", (left.expression as TypedIdentifierExpression).name,
+            "The clause reads the block's own node"
+        )
+        assertEquals(
+            "patientDuration", (comparison.right as TypedIdentifierExpression).name,
+            "…and compares it against a variable of the match"
+        )
+        assertEquals(
+            (left.expression as TypedIdentifierExpression).scope,
+            (comparison.right as TypedIdentifierExpression).scope,
+            "A block is not a scope of its own at run time: both names live in the match's scope"
         )
     }
 

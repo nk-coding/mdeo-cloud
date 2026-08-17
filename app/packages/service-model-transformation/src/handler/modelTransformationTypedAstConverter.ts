@@ -361,13 +361,16 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
      * Object instances declared inside the block keep their class, while references to
      * instances of the enclosing pattern are emitted without a class name — exactly as for
      * references in a main pattern — so the execution engine can tell condition-local nodes
-     * from the anchors that bind the condition to the match.
+     * from the anchors that bind the condition to the match. Where clauses are emitted as
+     * they are: they belong to the condition, not to the enclosing match.
      *
      * @param condition The PatternApplicationCondition AST node
      * @returns The TypedPatternApplicationCondition representation
      */
     private convertApplicationCondition(condition: PatternApplicationConditionType): TypedPatternApplicationCondition {
-        const elements: (TypedPatternObjectInstanceElement | TypedPatternLinkElement)[] = [];
+        const elements: (
+            TypedPatternObjectInstanceElement | TypedPatternLinkElement | TypedPatternWhereClauseElement
+        )[] = [];
 
         for (const element of condition.elements ?? []) {
             if (this.reflection.isInstance(element, PatternObjectInstance)) {
@@ -384,6 +387,11 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
                 elements.push({
                     kind: "objectInstance",
                     objectInstance: this.convertPatternObjectInstanceReference(element)
+                });
+            } else if (this.reflection.isInstance(element, WhereClause)) {
+                elements.push({
+                    kind: "whereClause",
+                    whereClause: this.convertWhereClause(element)
                 });
             } else {
                 throw new Error(`Unsupported application condition element type: ${element.$type}`);

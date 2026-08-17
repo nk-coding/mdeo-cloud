@@ -69,6 +69,7 @@ export * from "./features/stdlib/primitives/float.js";
 export * from "./features/stdlib/primitives/int.js";
 export * from "./features/stdlib/primitives/long.js";
 export * from "./features/stdlib/primitives/string.js";
+export * from "./features/type-system/modelTransformationApplicationConditionScope.js";
 export * from "./features/type-system/modelTransformationLambdaScope.js";
 export * from "./features/type-system/modelTransformationPartialTypeSystem.js";
 export * from "./features/type-system/modelTransformationTypeSystem.js";

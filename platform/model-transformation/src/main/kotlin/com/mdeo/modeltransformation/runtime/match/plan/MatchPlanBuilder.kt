@@ -4,6 +4,7 @@ import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.graph.ModelStatistics
 import com.mdeo.modeltransformation.runtime.match.ExpressionNodeAnalyzer
@@ -918,10 +919,13 @@ internal class MatchPlanBuilder(
          * Attempts to emit all application conditions whose structural requirements are
          * now satisfied.
          *
-         * For each unemitted condition, [tryBuildCondition] is called.  If it
-         * returns a non-null result, the condition is added to [readyConditions].  All
+         * Every unemitted condition that [isConditionReady] accepts is compiled here. All
          * ready conditions are sorted by [computeConditionCost] (cheapest first) before
          * emission, so that less expensive checks execute before more expensive ones.
+         *
+         * Everything the ready blocks read from the enclosing match is bound *before* any of
+         * them is compiled: resolving a variable emits a step that moves the traverser, which
+         * would invalidate the `needsSelect` decision of a condition compiled earlier.
          *
          * The `needsSelect` flag of each emitted condition is derived from [currentNode]
          * at the time of emission: `select()` is inserted only when the Gremlin traverser
@@ -930,18 +934,22 @@ internal class MatchPlanBuilder(
          * @return `true` if at least one condition was emitted.
          */
         private fun tryInlineConditions(): Boolean {
-            val readyConditions = mutableListOf<Pair<Int, BaseStep.ApplicationCondition>>()
-            for ((index, pending) in graph.conditions.withIndex()) {
-                if (index in emittedConditionIndices) continue
-                val ac = tryBuildCondition(pending) ?: continue
-                readyConditions.add(index to ac)
+            val ready = graph.conditions.withIndex()
+                .filter { (index, pending) -> index !in emittedConditionIndices && isConditionReady(pending) }
+            if (ready.isEmpty()) return false
+
+            for ((_, pending) in ready) {
+                conditionExternalDependencies(pending.block).forEach { resolve(it) }
             }
-            readyConditions.sortBy { computeConditionCost(it.second) }
+
+            val readyConditions = ready
+                .map { (index, pending) -> index to buildApplicationCondition(pending.block) }
+                .sortedBy { computeConditionCost(it.second) }
             for ((index, ac) in readyConditions) {
                 baseSteps.add(ac)
                 emittedConditionIndices.add(index)
             }
-            return readyConditions.isNotEmpty()
+            return true
         }
 
         /**
@@ -1001,22 +1009,20 @@ internal class MatchPlanBuilder(
         }
 
         /**
-         * Tries to build an [BaseStep.ApplicationCondition] for [pending] if all
-         * required main-pattern nodes are currently in [coveredInstances].  Returns
-         * `null` if the condition is not yet ready.
+         * Reports whether [pending] can be compiled at the current point of the plan.
          *
-         * A condition is ready once every node listed by
-         * [MatchPlanGraph.pendingConditionRequiredNodes] is covered: the anchors its
-         * components attach to, the enclosing nodes it constrains, and the same-class nodes
-         * its injective constraints refer to.
+         * Two things have to hold: every main-pattern node the condition attaches to or
+         * constrains injectively must be covered ([MatchPlanGraph.pendingConditionRequiredNodes]),
+         * and everything its where clauses read from the enclosing match must be resolvable
+         * ([conditionExternalDependencies]) — a clause comparing a condition node against a
+         * pattern variable cannot be emitted before that variable is bound.
          *
-         * @param pending The condition to attempt to build.
-         * @return A fully constructed [BaseStep.ApplicationCondition], or `null` if not
-         *         ready.
+         * @param pending The condition to check.
+         * @return `true` when the condition can be compiled now.
          */
-        private fun tryBuildCondition(pending: PendingCondition): BaseStep.ApplicationCondition? {
-            if (!graph.pendingConditionRequiredNodes(pending).all { it in coveredInstances }) return null
-            return buildApplicationCondition(pending.block)
+        private fun isConditionReady(pending: PendingCondition): Boolean {
+            if (!graph.pendingConditionRequiredNodes(pending).all { it in coveredInstances }) return false
+            return conditionExternalDependencies(pending.block).all { canResolve(it) }
         }
 
         /**
@@ -1036,6 +1042,12 @@ internal class MatchPlanBuilder(
          * - If the destination belongs to the condition, its property constraints are
          *   appended via [buildConditionPropertySteps].
          *
+         * The block's where clauses are emitted by [emitReadyConditionWhereClauses] as soon
+         * as the chain has reached every condition node they read, so that a failing
+         * constraint prunes the walk early. Clauses that read nothing but the enclosing
+         * match — and any clause left over when the block has no graph at all — are appended
+         * once the walk is complete.
+         *
          * Injective constraints for the condition's nodes are computed by
          * [buildConditionInjectiveConstraints] and attached to the returned step.
          *
@@ -1048,6 +1060,7 @@ internal class MatchPlanBuilder(
             val referenceMap = block.references.associateBy { it.objectInstance.name }
             val innerSteps = mutableListOf<BaseStep>()
             val traversalOrder = mutableListOf<String>()
+            val pendingWhereClauses = block.whereClauses.toMutableList()
 
             var outerAnchor: String? = null
             var needsSelect = false
@@ -1072,6 +1085,7 @@ internal class MatchPlanBuilder(
                     traversalOrder.add(start)
                 }
                 referenceMap[start]?.let { innerSteps.addAll(buildConditionPropertySteps(it)) }
+                emitReadyConditionWhereClauses(block, pendingWhereClauses, traversalOrder, innerSteps)
 
                 val orderedLinks = ConditionTraversalUtils.orderLinksByBFS(
                     component.links, start, graph.metamodelData
@@ -1103,8 +1117,13 @@ internal class MatchPlanBuilder(
                         innerSteps.add(BaseStep.EqualityFilter(toName))
                         referenceMap[toName]?.let { innerSteps.addAll(buildConditionPropertySteps(it)) }
                     }
+                    emitReadyConditionWhereClauses(block, pendingWhereClauses, traversalOrder, innerSteps)
                     currentInner = toName
                 }
+            }
+
+            for (clause in pendingWhereClauses) {
+                innerSteps.add(BaseStep.WhereFilter(clause, conditionNodesOf(clause, block)))
             }
 
             return BaseStep.ApplicationCondition(
@@ -1137,6 +1156,71 @@ internal class MatchPlanBuilder(
             val isConstant = referencedNodes.isEmpty() && !graph.isCollectionExpression(property.value)
             BaseStep.InlinePropertyConstraint(instance.objectInstance.name, instance.objectInstance.className, property, isConstant)
         }
+
+        /**
+         * Emits every where clause of [block] whose condition-local dependencies are
+         * already reached by the chain built so far.
+         *
+         * A clause is emitted at the earliest point at which it can be evaluated, so that a
+         * failing constraint prunes the condition's walk instead of being checked only after
+         * the whole graph has been found. Names that belong to the enclosing match need no
+         * check here: a condition is only compiled once everything it reads from the match
+         * is bound (see [conditionExternalDependencies]).
+         *
+         * Emitted clauses are removed from [pendingWhereClauses].
+         *
+         * @param block The condition graph being compiled.
+         * @param pendingWhereClauses The clauses not yet emitted; mutated in place.
+         * @param reachedNodes The condition-local nodes the chain has reached so far.
+         * @param innerSteps The chain built so far; the ready clauses are appended to it.
+         */
+        private fun emitReadyConditionWhereClauses(
+            block: ApplicationConditionBlock,
+            pendingWhereClauses: MutableList<TypedPatternWhereClauseElement>,
+            reachedNodes: List<String>,
+            innerSteps: MutableList<BaseStep>
+        ) {
+            val iterator = pendingWhereClauses.iterator()
+            while (iterator.hasNext()) {
+                val clause = iterator.next()
+                val conditionNodes = conditionNodesOf(clause, block)
+                if (!reachedNodes.containsAll(conditionNodes)) continue
+                innerSteps.add(BaseStep.WhereFilter(clause, conditionNodes))
+                iterator.remove()
+            }
+        }
+
+        /**
+         * Returns the names of [block]'s own nodes that [clause] reads.
+         *
+         * @param clause The where clause to inspect.
+         * @param block The condition graph the clause belongs to.
+         * @return The condition-local node names read by the clause.
+         */
+        private fun conditionNodesOf(
+            clause: TypedPatternWhereClauseElement,
+            block: ApplicationConditionBlock
+        ): Set<String> =
+            graph.nodeAnalyzer.findReferencedNodes(clause.whereClause.expression)
+                .filter { it in block.instanceNames }
+                .toSet()
+
+        /**
+         * Returns everything a condition reads from outside its own graph: the instances and
+         * variables of the enclosing match that its where clauses refer to.
+         *
+         * These have to be bound before the condition is compiled, because the condition's
+         * sub-traversal reaches them with `select(label)` and a label only exists once the
+         * step producing it has been emitted.
+         *
+         * @param block The condition graph to inspect.
+         * @return The names the block's where clauses read from the enclosing match.
+         */
+        private fun conditionExternalDependencies(block: ApplicationConditionBlock): Set<String> =
+            block.whereClauses
+                .flatMap { graph.nodeAnalyzer.findReferencedNodes(it.whereClause.expression) }
+                .filter { it !in block.instanceNames }
+                .toSet()
 
         /**
          * Builds the injective-constraint map for the inner traversal of an application
@@ -1273,18 +1357,20 @@ internal class MatchPlanBuilder(
          * Emits all application conditions not emitted during the structural phase.
          *
          * By this point every main-pattern instance is covered, so each remaining condition
-         * can be compiled unconditionally by [buildApplicationCondition].  All remaining
-         * conditions are sorted by [computeConditionCost] before emission so that cheaper
-         * checks execute first.
+         * can be compiled unconditionally by [buildApplicationCondition] — only the
+         * variables its where clauses read may still be pending, and those are bound first.
+         * All remaining conditions are sorted by [computeConditionCost] before emission so
+         * that cheaper checks execute first.
          */
         private fun emitRemainingConditions() {
-            val remaining = mutableListOf<Pair<Int, BaseStep.ApplicationCondition>>()
-            for ((index, pending) in graph.conditions.withIndex()) {
-                if (index in emittedConditionIndices) continue
-                remaining.add(index to buildApplicationCondition(pending.block))
+            val pending = graph.conditions.withIndex().filter { (index, _) -> index !in emittedConditionIndices }
+            for ((_, condition) in pending) {
+                conditionExternalDependencies(condition.block).forEach { resolve(it) }
             }
-            remaining.sortBy { computeConditionCost(it.second) }
-            for ((_, ac) in remaining) baseSteps.add(ac)
+            val remaining = pending
+                .map { (_, condition) -> buildApplicationCondition(condition.block) }
+                .sortedBy { computeConditionCost(it) }
+            for (ac in remaining) baseSteps.add(ac)
         }
 
         /**

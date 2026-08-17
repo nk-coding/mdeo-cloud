@@ -17,6 +17,7 @@ import {
     PatternLink,
     PatternObjectInstance,
     PatternObjectInstanceReference,
+    WhereClause,
     type PatternApplicationConditionType,
     type PatternLinkType,
     type PatternObjectInstanceType,
@@ -34,6 +35,10 @@ const { AstUtils, GrammarUtils } = sharedImport("langium");
  * component it belongs to inside its current container is moved with it. Moving a node out of
  * a block while leaving its links behind would otherwise split one graph into two halves that
  * can no longer refer to each other.
+ *
+ * Where clauses move as well, and they move alone — a clause constrains a graph, it is not
+ * part of it. A clause that reads a node of its current block cannot leave the block, since
+ * that name means nothing anywhere else; the move is then not offered.
  */
 @injectable()
 export class MovePatternElementToConditionOperationHandler extends BaseOperationHandler implements ContextItemProvider {
@@ -67,6 +72,9 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
 
         const component = this.collectComponent(astNode, container);
         if (component.length === 0 || !this.isSelfContained(component)) {
+            return undefined;
+        }
+        if (this.readsBlockLocalNames(component, container)) {
             return undefined;
         }
 
@@ -111,7 +119,8 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
     getContextItems(element: GModelElement, _context: ContextActionRequestContext): ContextItem[] {
         if (
             element.type !== ModelTransformationElementType.NODE_PATTERN_INSTANCE &&
-            element.type !== ModelTransformationElementType.EDGE_PATTERN_LINK
+            element.type !== ModelTransformationElementType.EDGE_PATTERN_LINK &&
+            element.type !== ModelTransformationElementType.LABEL_WHERE_CLAUSE
         ) {
             return [];
         }
@@ -121,7 +130,8 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
             astNode == undefined ||
             (!this.reflection.isInstance(astNode, PatternObjectInstance) &&
                 !this.reflection.isInstance(astNode, PatternLink) &&
-                !this.reflection.isInstance(astNode, PatternObjectInstanceReference))
+                !this.reflection.isInstance(astNode, PatternObjectInstanceReference) &&
+                !this.reflection.isInstance(astNode, WhereClause))
         ) {
             return [];
         }
@@ -134,6 +144,9 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
 
         const component = this.collectComponent(astNode, container);
         if (component.length === 0 || !this.isSelfContained(component)) {
+            return [];
+        }
+        if (this.readsBlockLocalNames(component, container)) {
             return [];
         }
 
@@ -270,6 +283,9 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
      * the component of its endpoints. A link whose endpoints both live outside the container
      * (an anchor-only link) forms a component on its own.
      *
+     * A reference constrains a node of the enclosing pattern and a where clause constrains the
+     * graph as a whole; neither is part of the graph, so both move on their own.
+     *
      * @param start The selected element
      * @param container The container the element is declared in
      * @returns The elements to move, in declaration order
@@ -297,7 +313,6 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
                 }
             }
         } else {
-            // A reference only constrains a node of the enclosing pattern; it moves alone.
             return [start];
         }
 
@@ -387,6 +402,66 @@ export class MovePatternElementToConditionOperationHandler extends BaseOperation
             }
         }
         return true;
+    }
+
+    /**
+     * Checks whether the moved component reads a name that only exists in its current block.
+     *
+     * A where clause such as `where s.duration > 30` is meaningful only where `s` is
+     * declared. Moving it out of the block that declares `s` would leave an unresolvable
+     * reference behind, so such a move is refused rather than performed and then flagged.
+     *
+     * Identifiers in expressions are resolved by the type system rather than by a Langium
+     * cross-reference, so the names a clause reads are matched against the block by name,
+     * skipping names behind a dot: those are properties of the value in front of them.
+     *
+     * @param component The elements about to be moved
+     * @param container The container the component currently lives in
+     * @returns `true` when the component depends on a node declared in its current block
+     */
+    private readsBlockLocalNames(
+        component: AstNode[],
+        container: PatternType | PatternApplicationConditionType
+    ): boolean {
+        if (!this.reflection.isInstance(container, PatternApplicationCondition)) {
+            return false;
+        }
+
+        const blockInstances = new Set<AstNode>(
+            ((container as PatternApplicationConditionType).elements ?? []).filter((element) =>
+                this.reflection.isInstance(element, PatternObjectInstance)
+            ) as AstNode[]
+        );
+        const moved = new Set(component);
+
+        for (const node of component) {
+            for (const contained of [node, ...AstUtils.streamAllContents(node)]) {
+                for (const info of AstUtils.streamReferences(contained)) {
+                    const target = (info.reference as { ref?: AstNode }).ref;
+                    if (target != undefined && blockInstances.has(target) && !moved.has(target)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        const blockNames = new Set([...blockInstances].map((instance) => (instance as PatternObjectInstanceType).name));
+        for (const node of component) {
+            if (!this.reflection.isInstance(node, WhereClause)) {
+                continue;
+            }
+            const text = node.expression?.$cstNode?.text ?? "";
+            for (const match of text.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) {
+                if (match.index != undefined && text[match.index - 1] === ".") {
+                    continue;
+                }
+                if (blockNames.has(match[0])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

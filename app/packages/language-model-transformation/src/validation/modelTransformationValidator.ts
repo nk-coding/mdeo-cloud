@@ -16,7 +16,6 @@ import {
     PatternObjectInstance,
     PatternVariable,
     PatternApplicationCondition,
-    WhereClause,
     type ModelTransformationType,
     type PatternObjectInstanceType,
     type PatternObjectInstanceReferenceType,
@@ -361,6 +360,10 @@ export class ModelTransformationValidator extends BaseModelValidator {
      *   resolution already guarantees, and
      * - its name, when given, must be unique among the blocks of the same pattern.
      *
+     * Where clauses are allowed: a block is a graph plus the constraints on it, and a clause
+     * declared inside the block is part of the condition — it decides, together with the
+     * block's graph, whether the condition holds.
+     *
      * @param condition The application condition to validate
      * @param accept The validation acceptor
      */
@@ -391,13 +394,6 @@ export class ModelTransformationValidator extends BaseModelValidator {
                         property: "modifier"
                     });
                 }
-            } else if (this.reflection.isInstance(element, WhereClause)) {
-                accept(
-                    "error",
-                    `'where' clauses are not supported inside a '${kind}' block. ` +
-                        `Use property comparisons on the block's objects instead.`,
-                    { node: element }
-                );
             }
         }
 

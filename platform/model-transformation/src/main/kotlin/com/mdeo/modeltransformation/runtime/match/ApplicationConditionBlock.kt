@@ -3,6 +3,7 @@ package com.mdeo.modeltransformation.runtime.match
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternApplicationConditionElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
 
 /**
  * A single application condition — the graph of one `forbid` or `require` block.
@@ -26,13 +27,18 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceEleme
  *           pattern and only contribute the property constraints listed on them.
  * @property links The links of this condition graph. A link may connect two condition
  *           nodes, a condition node and an enclosing (anchor) node, or two anchor nodes.
+ * @property whereClauses Boolean expressions that further constrain this condition graph.
+ *           They may read the condition's own nodes as well as everything the enclosing
+ *           match has bound, and they are part of the condition: a `forbid` block only
+ *           rejects the match when its graph is found *and* its where clauses hold.
  */
 data class ApplicationConditionBlock(
     val name: String?,
     val isNegative: Boolean,
     val instances: List<TypedPatternObjectInstanceElement>,
     val references: List<TypedPatternObjectInstanceElement>,
-    val links: List<TypedPatternLinkElement>
+    val links: List<TypedPatternLinkElement>,
+    val whereClauses: List<TypedPatternWhereClauseElement> = emptyList()
 ) {
     /**
      * Names of the nodes that belong to this condition graph alone.
@@ -51,7 +57,8 @@ data class ApplicationConditionBlock(
          * Builds the condition graph described by a typed application condition element.
          *
          * Instances that carry a class name become condition-exclusive nodes, instances
-         * without one are references to nodes of the enclosing pattern.
+         * without one are references to nodes of the enclosing pattern. Where clauses are
+         * kept apart from the graph: they constrain it, but they contribute no node to walk.
          *
          * @param element The typed application-condition element to convert.
          * @return The condition graph described by [element].
@@ -63,6 +70,7 @@ data class ApplicationConditionBlock(
             val instances = mutableListOf<TypedPatternObjectInstanceElement>()
             val references = mutableListOf<TypedPatternObjectInstanceElement>()
             val links = mutableListOf<TypedPatternLinkElement>()
+            val whereClauses = mutableListOf<TypedPatternWhereClauseElement>()
 
             for (conditionElement in condition.elements) {
                 when (conditionElement) {
@@ -70,6 +78,7 @@ data class ApplicationConditionBlock(
                         if (conditionElement.objectInstance.className != null) instances.add(conditionElement)
                         else references.add(conditionElement)
                     is TypedPatternLinkElement -> links.add(conditionElement)
+                    is TypedPatternWhereClauseElement -> whereClauses.add(conditionElement)
                     else -> throw IllegalArgumentException(
                         "Unsupported element kind '${conditionElement.kind}' in application condition block"
                     )
@@ -81,7 +90,8 @@ data class ApplicationConditionBlock(
                 isNegative = condition.negative,
                 instances = instances,
                 references = references,
-                links = links
+                links = links,
+                whereClauses = whereClauses
             )
         }
     }

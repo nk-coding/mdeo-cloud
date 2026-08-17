@@ -166,12 +166,18 @@ internal sealed class BaseStep {
     ) : BaseStep()
 
     /**
-     * A where-clause filter applied after all instances and variables are bound.
+     * A where-clause filter applied after all instances and variables it reads are bound.
      *
      * Translated to `.where(compiledExpression.is(true))`.
+     *
+     * [conditionNodes] is empty for a where clause of the main pattern. For a clause
+     * declared inside a `forbid` / `require` block it holds the names of the block's own
+     * nodes that the expression reads: those nodes live only inside the condition chain,
+     * so they have to be labelled there before the filter can select them.
      */
     data class WhereFilter(
-        val whereClause: TypedPatternWhereClauseElement
+        val whereClause: TypedPatternWhereClauseElement,
+        val conditionNodes: Set<String> = emptySet()
     ) : BaseStep()
 
     /**

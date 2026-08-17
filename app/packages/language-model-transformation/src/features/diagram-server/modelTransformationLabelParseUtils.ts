@@ -155,16 +155,36 @@ export function parseModelTransformationPropertyLabel(
 }
 
 /**
+ * Removes the leading `\u00ab…\u00bb` stereotype from a label, if it carries one.
+ *
+ * A where clause of an application condition block is rendered with the block's stereotype in
+ * front of it, so that it is visible which condition the constraint belongs to. The
+ * stereotype is display-only: which block a clause belongs to is decided by moving it, not by
+ * typing, so it is dropped again when the label is read back.
+ *
+ * @param label The full label text
+ * @returns The label without its stereotype prefix
+ */
+export function stripConditionStereotype(label: string): string {
+    if (!label.startsWith("\u00ab")) {
+        return label;
+    }
+    const end = label.indexOf("\u00bb");
+    return end < 0 ? label : label.substring(end + 1).trimStart();
+}
+
+/**
  * Extracts the expression text from a where clause label.
- * Expected format: `where <expression>`
+ * Expected format: `where <expression>`, optionally preceded by a block stereotype.
  *
  * @param label The full label text
  * @returns The expression string, or undefined if the prefix is missing
  */
 export function extractWhereClauseExpression(label: string): string | undefined {
     const prefix = "where ";
-    if (!label.startsWith(prefix)) {
+    const text = stripConditionStereotype(label);
+    if (!text.startsWith(prefix)) {
         return undefined;
     }
-    return label.substring(prefix.length).trim();
+    return text.substring(prefix.length).trim();
 }

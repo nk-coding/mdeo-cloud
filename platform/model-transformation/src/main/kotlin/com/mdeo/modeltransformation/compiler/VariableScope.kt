@@ -175,6 +175,20 @@ class VariableScope(
     }
     
     /**
+     * Removes a binding declared in this scope.
+     *
+     * Parent scopes are left untouched: a name that is only bound further up stays visible.
+     * Used for bindings that exist for the duration of a single compilation, such as the
+     * nodes of an application condition, which are bound inside the condition's own
+     * sub-traversal and must not be visible to anything that follows.
+     *
+     * @param name The name to unbind.
+     */
+    fun removeBinding(name: String) {
+        bindings.remove(name)
+    }
+
+    /**
      * Creates a child scope with this scope as its parent.
      *
      * @param childScopeIndex The scope index for the child scope.

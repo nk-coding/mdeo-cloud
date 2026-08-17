@@ -152,10 +152,12 @@ data class TypedWhereClause(
  * match if *either* of them matches, whereas the elements of a single condition only
  * reject it when they *all* match together.
  *
- * The elements are restricted to object instances and links. An instance with a
- * `className` declares a node that belongs to the condition graph alone; an instance
- * without one references a node of the enclosing pattern (an *anchor*) and only
- * contributes the property constraints listed on it.
+ * The elements are restricted to object instances, links and where clauses. An instance
+ * with a `className` declares a node that belongs to the condition graph alone; an
+ * instance without one references a node of the enclosing pattern (an *anchor*) and only
+ * contributes the property constraints listed on it. A where clause constrains the
+ * condition graph as a whole and may read both the condition's own nodes and the nodes
+ * and variables bound by the enclosing match.
  *
  * @param negative `true` for a negative application condition (`forbid`), `false` for a
  *                 positive one (`require`).

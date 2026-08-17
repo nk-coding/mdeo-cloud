@@ -11,6 +11,7 @@ import {
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
 import type { ValidationProblemAcceptor, Type } from "typir";
+import type { AstNode } from "langium";
 import {
     LambdaExpression,
     PatternVariable,
@@ -368,11 +369,13 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
     }
 
     /**
-     * Validates that identifier expressions do not target instances declared inside an
-     * application condition block.
+     * Validates that identifier expressions do not reach into an application condition block
+     * from the outside.
      *
-     * A condition block is matched as a separate graph and its nodes are never bound in the
-     * enclosing match, so they cannot contribute a value to an expression.
+     * A condition block is matched as a separate graph, and its nodes are only bound while
+     * that graph is being matched: expressions of the same block — a where clause or a
+     * property comparison — may read them, expressions of the enclosing match, or of another
+     * block, may not.
      *
      * @param node The identifier expression node.
      * @param accept The validation problem acceptor.
@@ -393,16 +396,40 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
 
         const instance = entry.languageNode;
         const condition = instance.$container;
-        if (this.astReflection.isInstance(condition, PatternApplicationCondition)) {
-            const kind = condition.kind ?? "forbid";
-            accept({
-                languageNode: node,
-                message:
-                    `Identifier '${node.name}' cannot be used in expressions: it is declared inside a ` +
-                    `'${kind}' block and is not bound by the match.`,
-                severity: "error"
-            });
+        if (!this.astReflection.isInstance(condition, PatternApplicationCondition)) {
+            return;
         }
+
+        if (this.findContainingApplicationCondition(node) === condition) {
+            return;
+        }
+
+        const kind = condition.kind ?? "forbid";
+        accept({
+            languageNode: node,
+            message:
+                `Identifier '${node.name}' cannot be used in expressions outside its block: it is ` +
+                `declared inside the '${kind}' block and is not bound by the match.`,
+            severity: "error"
+        });
+    }
+
+    /**
+     * Returns the application condition block a node is declared in, if any.
+     *
+     * @param node The node to inspect.
+     * @returns The enclosing condition block, or `undefined` when the node belongs to the
+     *          match pattern itself.
+     */
+    private findContainingApplicationCondition(node: AstNode): AstNode | undefined {
+        let current: AstNode | undefined = node.$container;
+        while (current != undefined) {
+            if (this.astReflection.isInstance(current, PatternApplicationCondition)) {
+                return current;
+            }
+            current = current.$container;
+        }
+        return undefined;
     }
 
     /**

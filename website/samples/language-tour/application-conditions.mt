@@ -32,6 +32,14 @@ match {
         }
     }
 
+    // A `where` clause inside a block constrains that block: the condition only holds when its
+    // graph is found *and* the clause is satisfied. It may compare the block's own objects with
+    // each other and with everything the match has bound.
+    forbid noWiderRectangle {
+        wider: Rectangle { }
+        where wider.width > rectangle.width
+    }
+
     // the layer has to belong to a canvas
     require onCanvas {
         canvas: Canvas { }

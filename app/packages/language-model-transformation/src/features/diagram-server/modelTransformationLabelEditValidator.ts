@@ -16,7 +16,8 @@ import {
     parseInstanceLabel,
     parseVariableLabel,
     parseVariableReassignmentLabel,
-    parseModelTransformationPropertyLabel as parsePropertyLabel
+    parseModelTransformationPropertyLabel as parsePropertyLabel,
+    stripConditionStereotype
 } from "./modelTransformationLabelParseUtils.js";
 import { NEW_PROPERTY_COMPARISON_LABEL_PREFIX } from "./handler/addPropertyValueComparisonOperationHandler.js";
 import {
@@ -298,9 +299,9 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
     /**
      * Validates a where clause label.
      *
-     * Only checks that the text starts with the required `where ` prefix and
-     * that the expression is non-empty.  The expression itself is not further
-     * validated (parsing expressions is out of scope for now).
+     * Only checks that the text starts with the required `where ` prefix — after an optional
+     * block stereotype — and that the expression is non-empty.  The expression itself is not
+     * further validated (parsing expressions is out of scope for now).
      *
      * @param label The label text to validate
      * @returns A validation status if invalid, undefined if valid
@@ -310,10 +311,11 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
             return undefined;
         }
 
-        if (!label.startsWith("where ")) {
+        const text = stripConditionStereotype(label);
+        if (!text.startsWith("where ")) {
             return this.error("Where clause must start with 'where '.");
         }
-        const expression = label.substring("where ".length).trim();
+        const expression = text.substring("where ".length).trim();
         if (expression.length === 0) {
             return this.error("Where clause expression cannot be empty.");
         }

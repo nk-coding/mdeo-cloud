@@ -33,13 +33,13 @@
       "typeArgs": {}
     },
     {
-      "package": "class/home/devbox/.vmdev/tmp/claude-1000/-home-devbox-workspace/936ef791-9b5f-4a1a-8238-4446f8a2f4f3/scratchpad/ac/surgery.mm",
+      "package": "class/home/devbox/workspace/mdeo-cloud/app/.harness/ac/surgery.mm",
       "type": "Patient",
       "isNullable": false,
       "typeArgs": {}
     }
   ],
-  "metamodelPath": "/home/devbox/.vmdev/tmp/claude-1000/-home-devbox-workspace/936ef791-9b5f-4a1a-8238-4446f8a2f4f3/scratchpad/ac/surgery.mm",
+  "metamodelPath": "/home/devbox/workspace/mdeo-cloud/app/.harness/ac/surgery.mm",
   "statements": [
     {
       "kind": "match",
@@ -103,8 +103,7 @@
                       "propertyName": "patient"
                     },
                     "target": {
-                      "objectName": "patient",
-                      "propertyName": "admission"
+                      "objectName": "patient"
                     }
                   }
                 }
@@ -131,18 +130,36 @@
                           "evalType": 3,
                           "value": false
                         }
-                      },
-                      {
-                        "propertyName": "surgeryDuration",
-                        "operator": "<",
-                        "value": {
-                          "kind": "identifier",
-                          "evalType": 5,
-                          "name": "patientDuration",
-                          "scope": 1
-                        }
                       }
                     ]
+                  }
+                },
+                {
+                  "kind": "whereClause",
+                  "whereClause": {
+                    "expression": {
+                      "kind": "binary",
+                      "evalType": 3,
+                      "operator": "<",
+                      "left": {
+                        "kind": "memberAccess",
+                        "evalType": 5,
+                        "expression": {
+                          "kind": "identifier",
+                          "evalType": 6,
+                          "name": "betterPatient",
+                          "scope": 1
+                        },
+                        "member": "surgeryDuration",
+                        "isNullChaining": false
+                      },
+                      "right": {
+                        "kind": "identifier",
+                        "evalType": 5,
+                        "name": "patientDuration",
+                        "scope": 1
+                      }
+                    }
                   }
                 }
               ]
@@ -176,8 +193,7 @@
                 "propertyName": "patient"
               },
               "target": {
-                "objectName": "patient",
-                "propertyName": "admission"
+                "objectName": "patient"
               }
             }
           }

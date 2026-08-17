@@ -5,6 +5,10 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
 import com.mdeo.modeltransformation.ast.patterns.TypedWhereClause
 import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
+import com.mdeo.expression.ast.expressions.TypedExpression
+import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariable
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableElement
 import com.mdeo.modeltransformation.runtime.match.plan.BaseStep
 import com.mdeo.modeltransformation.runtime.match.plan.MatchPlanBuilder
 import org.junit.jupiter.api.Nested
@@ -14,6 +18,24 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+/**
+ * Builds a where-clause element around [expression].
+ *
+ * @param expression The constraint expression.
+ * @return The where-clause element.
+ */
+private fun whereClause(expression: TypedExpression) =
+    TypedPatternWhereClauseElement(whereClause = TypedWhereClause(expression))
+
+/**
+ * Builds an identifier expression reading [name] at the outermost scope.
+ *
+ * @param name The name the expression reads.
+ * @return The identifier expression.
+ */
+private fun identifier(name: String) =
+    TypedIdentifierExpression(evalType = 0, name = name, scope = 0)
 
 /**
  * Unit tests for [ApplicationConditionBlock] and for the way the planner turns blocks into
@@ -63,10 +85,27 @@ class ApplicationConditionBlockTest {
         }
 
         @Test
-        fun `elements that are not part of a condition graph are rejected`() {
+        fun `where clauses are kept apart from the graph`() {
+            val block = ApplicationConditionBlock.from(
+                forbidBlock(
+                    conditionNode("other", "Patient"),
+                    whereClause(TypedBooleanLiteralExpression(evalType = 0, value = true)),
+                    name = "constrained"
+                )
+            )
+
+            assertEquals(listOf("other"), block.instances.map { it.objectInstance.name })
+            assertEquals(1, block.whereClauses.size, "The clause constrains the graph, it is not part of it")
+        }
+
+        @Test
+        fun `elements that are not part of a condition are rejected`() {
             val invalid = forbidBlock(
-                TypedPatternWhereClauseElement(
-                    whereClause = TypedWhereClause(TypedBooleanLiteralExpression(evalType = 0, value = true))
+                TypedPatternVariableElement(
+                    variable = TypedPatternVariable(
+                        name = "x",
+                        value = TypedBooleanLiteralExpression(evalType = 0, value = true)
+                    )
                 )
             )
 
@@ -167,6 +206,85 @@ class ApplicationConditionBlockTest {
             assertEquals(
                 1, steps[0].innerSteps.count { it is BaseStep.SelectNode },
                 "The second component starts by jumping to its own anchor"
+            )
+        }
+
+        @Test
+        fun `a clause of a block is planned inside the condition, not next to it`() {
+            val steps = MatchPlanBuilder(
+                getVertexId = { null },
+                nodeAnalyzer = ExpressionNodeAnalyzer(setOf("patient", "a"), 0),
+                isCollectionExpression = { false },
+                metamodelData = MetamodelData.empty()
+            ).build(
+                PatternCategories.from(
+                    TypedPattern(
+                        elements = listOf(
+                            conditionNode("patient", "Patient"),
+                            forbidBlock(
+                                conditionNode("a", "Admission"),
+                                conditionLink("a", "patientId", "patient", null),
+                                whereClause(identifier("a")),
+                                name = "constrained"
+                            )
+                        )
+                    )
+                ),
+                emptySet()
+            ).baseSteps
+
+            assertTrue(
+                steps.none { it is BaseStep.WhereFilter },
+                "A clause of a block must not become a filter on the match"
+            )
+            val condition = steps.filterIsInstance<BaseStep.ApplicationCondition>().single()
+            val filter = condition.innerSteps.filterIsInstance<BaseStep.WhereFilter>().single()
+            assertEquals(
+                setOf("a"), filter.conditionNodes,
+                "The node the clause reads is recorded so the chain labels it"
+            )
+            val walkIndex = condition.innerSteps.indexOfFirst { it is BaseStep.EdgeWalk }
+            assertTrue(
+                condition.innerSteps.indexOf(filter) > walkIndex,
+                "The clause is only evaluated once the node it reads has been walked to"
+            )
+        }
+
+        @Test
+        fun `a condition is emitted after the variable its clause reads`() {
+            val steps = MatchPlanBuilder(
+                getVertexId = { null },
+                nodeAnalyzer = ExpressionNodeAnalyzer(setOf("patient", "limit"), 0),
+                isCollectionExpression = { false },
+                metamodelData = MetamodelData.empty()
+            ).build(
+                PatternCategories.from(
+                    TypedPattern(
+                        elements = listOf(
+                            conditionNode("patient", "Patient"),
+                            TypedPatternVariableElement(
+                                variable = TypedPatternVariable(
+                                    name = "limit",
+                                    value = TypedBooleanLiteralExpression(evalType = 0, value = true)
+                                )
+                            ),
+                            forbidBlock(
+                                conditionNode("a", "Admission"),
+                                whereClause(identifier("limit")),
+                                name = "readsVariable"
+                            )
+                        )
+                    )
+                ),
+                emptySet()
+            ).baseSteps
+
+            val variableIndex = steps.indexOfFirst { it is BaseStep.VariableBinding }
+            val conditionIndex = steps.indexOfFirst { it is BaseStep.ApplicationCondition }
+            assertTrue(variableIndex >= 0, "The variable is bound in the plan")
+            assertTrue(
+                variableIndex < conditionIndex,
+                "The condition reads the variable, so it cannot be checked before it is bound"
             )
         }
 

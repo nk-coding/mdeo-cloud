@@ -312,11 +312,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         }
 
         if (cfgMatchNode.pattern?.elements != undefined) {
-            const container = this.createConstraintCompartments(
-                cfgMatchNode.id,
-                cfgMatchNode.pattern.elements,
-                idRegistry
-            );
+            const container = this.createConstraintCompartments(cfgMatchNode.id, patternElements, idRegistry);
             if (container != undefined) {
                 node.children.push(container);
             }
@@ -651,28 +647,34 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * The container also includes horizontal dividers between compartments.
      * Returns undefined if there are no where-clauses or variables.
      *
+     * A where clause declared inside a `forbid` / `require` block is rendered like every
+     * other member of a block: with the block's stereotype in front of it, so that it is
+     * visible which condition the constraint belongs to.
+     *
      * @param nodeId The parent node ID
-     * @param elements The pattern elements
+     * @param patternElements The pattern elements, each with the condition block it belongs to
      * @param idRegistry The model ID registry
      * @returns A GMatchNodeCompartments container, or undefined if empty
      */
     private createConstraintCompartments(
         nodeId: string,
-        elements: unknown[],
+        patternElements: { element: any; condition?: PatternApplicationConditionType }[],
         idRegistry: ModelIdRegistry
     ): GMatchNodeCompartments | undefined {
         const whereClauseLabels: GModelElement[] = [];
-        for (const element of elements) {
+        for (const { element, condition } of patternElements) {
             if (this.reflection.isInstance(element, WhereClause)) {
                 const whereId = idRegistry.getId(element);
                 const exprText = element.expression?.$cstNode?.text ?? "?";
-                const label = GWhereClauseLabel.builder().id(whereId).text(`where ${exprText}`).build();
+                const stereotype = this.getConditionStereotype(condition);
+                const prefix = stereotype != undefined ? `\u00ab${stereotype}\u00bb ` : "";
+                const label = GWhereClauseLabel.builder().id(whereId).text(`${prefix}where ${exprText}`).build();
                 whereClauseLabels.push(label);
             }
         }
 
         const variableLabels: GModelElement[] = [];
-        for (const element of elements) {
+        for (const { element } of patternElements) {
             if (this.reflection.isInstance(element, PatternVariable)) {
                 const varId = idRegistry.getId(element);
                 const name = element.name ?? "?";

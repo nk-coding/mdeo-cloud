@@ -328,6 +328,8 @@ internal class MatchTraversalBuilder(
      * 2. It appears as a value in [injectiveConstraints] AND the label refers to an
      *    island-internal node (so the constraint `where(P.neq(label))` can resolve the
      *    label from the chain's own path rather than from the outer traversal scope).
+     * 3. It is read by a [BaseStep.WhereFilter] of the block AND refers to an
+     *    island-internal node, so that the compiled expression can `select(label)` it.
      *
      * Labels that refer to outer matched nodes are already present in the outer traversal
      * scope and do not need to be re-assigned inside the chain.
@@ -378,6 +380,19 @@ internal class MatchTraversalBuilder(
             }
         }
 
+        // (3) Where clauses of the block: an expression reading one of the condition's own
+        //     nodes compiles to select(label), which needs that node to be labeled.
+        for (step in innerSteps) {
+            if (step is BaseStep.WhereFilter) {
+                for (name in step.conditionNodes) {
+                    val label = VariableBinding.stepLabel(name)
+                    if (label in islandInternalLabels) {
+                        needed.add(label)
+                    }
+                }
+            }
+        }
+
         return needed
     }
 
@@ -385,8 +400,10 @@ internal class MatchTraversalBuilder(
      * Applies a single [BaseStep] to an anonymous traversal [chain] inside a condition.
      *
      * Supported step types: [BaseStep.EdgeWalk], [BaseStep.InlinePropertyConstraint],
-     * [BaseStep.SelectNode], [BaseStep.EqualityFilter]. After each [BaseStep.EdgeWalk] the
-     * injective constraints for the destination node are emitted.
+     * [BaseStep.SelectNode], [BaseStep.EqualityFilter], [BaseStep.WhereFilter]. After each
+     * [BaseStep.EdgeWalk] the injective constraints for the destination node are emitted. A
+     * [BaseStep.WhereFilter] filters without moving the traverser, so the walk continues from
+     * wherever the chain currently stands.
      *
      * @param neededLabels Labels that must be assigned with `.as()` — see [computeNeededLabels].
      */
@@ -435,6 +452,9 @@ internal class MatchTraversalBuilder(
                 // The destination node was NOT labeled in the chain (it is an outer matched
                 // node); reference its label from the outer traversal scope via P.eq().
                 chain.where(P.eq(VariableBinding.stepLabel(step.instanceName))) as GraphTraversal<Any, Any>
+            }
+            is BaseStep.WhereFilter -> {
+                applyWhereFilter(chain as GraphTraversal<Vertex, Vertex>, step) as GraphTraversal<Any, Any>
             }
             else -> throw IllegalStateException("Unsupported step type inside condition chain: ${step::class.simpleName}")
         }

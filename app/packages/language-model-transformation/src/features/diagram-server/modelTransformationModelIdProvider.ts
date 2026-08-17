@@ -19,6 +19,7 @@ import {
     PatternLinkEnd,
     PatternPropertyAssignment,
     WhereClause,
+    PatternApplicationCondition,
     PatternVariable,
     PatternVariableReassignment,
     ElseIfBranch,
@@ -29,6 +30,7 @@ import {
     type PatternLinkEndType,
     type PatternPropertyAssignmentType,
     type WhereClauseType,
+    type PatternApplicationConditionType,
     type PatternVariableType,
     type PatternVariableReassignmentType,
     type PatternType
@@ -325,22 +327,28 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
     /**
      * Generates a name for a {@link WhereClause} based on its index in the containing node.
      *
+     * A clause of an application condition block is qualified with the block it belongs to,
+     * so that the clauses of two blocks do not compete for the same index-based name.
+     *
      * @param node The where clause node
      * @returns The index-based name string, or "where" if the index cannot be determined
      */
     private getWhereClauseName(node: WhereClauseType): string {
         const container = node.$container;
+        const prefix = this.reflection.isInstance(container, PatternApplicationCondition)
+            ? `${BaseModelIdProvider.escapeIdPart((container as PatternApplicationConditionType).name ?? "condition")}_`
+            : "";
         if (container && "$containerProperty" in node) {
             const prop = node.$containerProperty as string;
             const containerValue = (container as unknown as Record<string, unknown>)[prop];
             if (Array.isArray(containerValue)) {
                 const index = containerValue.indexOf(node);
                 if (index >= 0) {
-                    return String(index);
+                    return `${prefix}${index}`;
                 }
             }
         }
-        return "where";
+        return `${prefix}where`;
     }
 
     /**

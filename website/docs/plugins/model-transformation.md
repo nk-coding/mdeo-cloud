@@ -39,7 +39,7 @@ any of the marked changes are applied. Elements can be:
 | Reference | `name { ... }` | Constrain or update an object matched in an *enclosing* scope |
 | Delete | `delete name` | Remove an object matched earlier |
 | Variable | `var name[: type] = expression` | Bind a value for later use in the pattern |
-| Condition | `where expression` | An arbitrary boolean condition on the match |
+| Condition | `where expression` | An arbitrary boolean condition on the match, or — inside a block — on that condition |
 | Application condition | `forbid [name] { ... }` / `require [name] { ... }` | A sub-pattern that must not / must be findable |
 
 Objects and links can carry a modifier:
@@ -81,14 +81,30 @@ name identifies the block in diagnostics, and in the graphical editor its elemen
 - refer to objects of the enclosing pattern, which anchors the condition to the match, and
 - constrain an object of the enclosing pattern through a reference — `patient { age > 60 }`.
 
-Objects declared inside a block are not bound by the match: they are invisible outside their block
-and cannot be used in expressions, created or deleted. `where` clauses belong to the pattern, not to
-a condition block.
+Objects declared inside a block are not bound by the match: they are invisible outside their block,
+and outside it they cannot be used in expressions, created or deleted.
+
+A block may also carry `where` clauses. A clause inside a block constrains that block — the block
+only holds when its graph is found *and* its clauses are satisfied — and it may compare the block's
+own objects with each other and with everything the match binds:
+
+```mt
+forbid betterCandidate {
+    better: Patient { isMandatory == false }
+    where better.surgeryDuration < patientDuration
+}
+```
+
+Since the clause belongs to the block, it is subject to the same grouping rule as everything else in
+it: the clause above only ever prevents *this* block from holding. Several clauses in one block are
+a conjunction, and a block that holds nothing but a clause is a plain guard on the match.
 
 ::: tip Moving elements between blocks
 In the graphical editor, an element created in *forbid* or *require* mode starts in a block of its
 own. Use **Move to Block** in the context rail to move it — together with everything connected to it
-— into another block, into a new one, or back into the match pattern.
+— into another block, into a new one, or back into the match pattern. Where clauses move the same
+way, unless they read an object of their block: such a clause means nothing outside it, so the move
+is not offered. **Add Where Clause** on a member of a block adds a clause to that block.
 :::
 
 Inside an object's braces, `=` assigns a property while `==`, `!=`, `<`, `>`, `<=` and `>=` constrain
