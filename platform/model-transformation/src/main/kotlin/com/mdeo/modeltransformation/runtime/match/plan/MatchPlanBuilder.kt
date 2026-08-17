@@ -7,8 +7,26 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceEleme
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.graph.ModelStatistics
 import com.mdeo.modeltransformation.runtime.match.ExpressionNodeAnalyzer
-import com.mdeo.modeltransformation.runtime.match.IslandTraversalUtils
+import com.mdeo.modeltransformation.runtime.match.ApplicationConditionBlock
+import com.mdeo.modeltransformation.runtime.match.ConditionTraversalUtils
 import com.mdeo.modeltransformation.runtime.match.PatternCategories
+
+/**
+ * One connected component of the graph of an application condition.
+ *
+ * A block is no longer required to be connected: `forbid { a: A {}  b: B {} }` demands
+ * that an `A` *and* a `B` exist, so both components have to be walked inside the same
+ * condition traversal.
+ *
+ * @property instances The condition-exclusive nodes of this component.
+ * @property links The links of this component.
+ * @property anchors The main-pattern nodes this component is attached to.
+ */
+private data class ConditionComponent(
+    val instances: List<TypedPatternObjectInstanceElement>,
+    val links: List<TypedPatternLinkElement>,
+    val anchors: Set<String>
+)
 
 /**
  * Compiles a [PatternCategories] description into an executable [MatchPlan].
@@ -698,22 +716,22 @@ internal class MatchPlanBuilder(
          * Estimates the Gremlin evaluation cost of [pending] for prioritisation purposes.
          *
          * Heuristic:
-         * - **Orphan-link island** (no condition-exclusive instances): cost = 1.
-         *   The check reduces to a single edge traversal inside `where(...)`.
-         * - **Anchored island** (has at least one anchor): cost = 10 × edge count.
-         *   Proportional to the number of edge steps inside the `where(...)` block.
-         * - **Disconnected island** (no anchors): cost = 1000 + 10 × edge count.
-         *   Expensive because the condition requires an uncorrelated vertex scan.
+         * - **Anchor-only block** (no condition-exclusive nodes): cost = 1.
+         *   The check reduces to a single edge traversal or property filter inside
+         *   `where(...)`.
+         * - **Anchored block** (every component is attached to the match): cost = 10 ×
+         *   edge count. Proportional to the number of edge steps inside the block.
+         * - **Block with an unanchored component**: cost = 1000 + 10 × edge count.
+         *   Expensive because such a component requires an uncorrelated vertex scan.
          *
          * @param pending The condition whose cost is to be estimated.
          * @return A non-negative integer; lower values represent cheaper conditions.
          */
         private fun estimatePendingConditionCost(pending: PendingCondition): Int {
-            val island = pending.island
-            if (island.instances.isEmpty()) return 1
-            val islandNames = island.instances.map { it.objectInstance.name }.toSet()
-            val anchors = IslandTraversalUtils.findAnchorNames(island.links, islandNames, graph.matchableNames)
-            return if (anchors.isEmpty()) 1000 + island.links.size * 10 else island.links.size * 10
+            val block = pending.block
+            if (block.instances.isEmpty()) return 1
+            val hasUnanchoredComponent = splitIntoComponents(block).any { it.anchors.isEmpty() }
+            return if (hasUnanchoredComponent) 1000 + block.links.size * 10 else block.links.size * 10
         }
 
         /**
@@ -900,7 +918,7 @@ internal class MatchPlanBuilder(
          * Attempts to emit all application conditions whose structural requirements are
          * now satisfied.
          *
-         * For each unemitted condition, [tryBuildIslandCondition] is called.  If it
+         * For each unemitted condition, [tryBuildCondition] is called.  If it
          * returns a non-null result, the condition is added to [readyConditions].  All
          * ready conditions are sorted by [computeConditionCost] (cheapest first) before
          * emission, so that less expensive checks execute before more expensive ones.
@@ -915,7 +933,7 @@ internal class MatchPlanBuilder(
             val readyConditions = mutableListOf<Pair<Int, BaseStep.ApplicationCondition>>()
             for ((index, pending) in graph.conditions.withIndex()) {
                 if (index in emittedConditionIndices) continue
-                val ac = tryBuildIslandCondition(pending) ?: continue
+                val ac = tryBuildCondition(pending) ?: continue
                 readyConditions.add(index to ac)
             }
             readyConditions.sortBy { computeConditionCost(it.second) }
@@ -927,120 +945,172 @@ internal class MatchPlanBuilder(
         }
 
         /**
+         * Splits the graph of [block] into its connected components.
+         *
+         * Nodes are the condition-exclusive instances plus every node name appearing on a
+         * link; two nodes belong to the same component when a link connects them. Instances
+         * without links, and references to enclosing nodes that carry only property
+         * constraints, each form a component of their own.
+         *
+         * @param block The condition graph to split.
+         * @return The components, anchored ones first, so that the cheap components are
+         *         walked before those needing an uncorrelated vertex scan.
+         */
+        private fun splitIntoComponents(block: ApplicationConditionBlock): List<ConditionComponent> {
+            val parent = mutableMapOf<String, String>()
+
+            fun find(name: String): String {
+                var root = name
+                while (parent[root] != null && parent[root] != root) root = parent[root]!!
+                return root
+            }
+
+            fun union(a: String, b: String) {
+                parent.putIfAbsent(a, a)
+                parent.putIfAbsent(b, b)
+                val rootA = find(a)
+                val rootB = find(b)
+                if (rootA != rootB) parent[rootB] = rootA
+            }
+
+            for (instance in block.instances) parent.putIfAbsent(instance.objectInstance.name, instance.objectInstance.name)
+            for (link in block.links) union(link.link.source.objectName, link.link.target.objectName)
+            for (reference in block.references) parent.putIfAbsent(reference.objectInstance.name, reference.objectInstance.name)
+
+            val instancesByRoot = block.instances.groupBy { find(it.objectInstance.name) }
+            val linksByRoot = block.links.groupBy { find(it.link.source.objectName) }
+            val roots = LinkedHashSet<String>()
+            for (instance in block.instances) roots.add(find(instance.objectInstance.name))
+            for (link in block.links) roots.add(find(link.link.source.objectName))
+            for (reference in block.references) roots.add(find(reference.objectInstance.name))
+
+            val components = roots.map { root ->
+                val links = linksByRoot[root] ?: emptyList()
+                val instances = instancesByRoot[root] ?: emptyList()
+                ConditionComponent(
+                    instances = instances,
+                    links = links,
+                    anchors = ConditionTraversalUtils.findAnchorNames(links, block.instanceNames, graph.matchableNames) +
+                        block.references.map { it.objectInstance.name }
+                            .filter { find(it) == root && it in graph.matchableNames }
+                            .toSet()
+                )
+            }
+
+            return components.sortedBy { if (it.anchors.isEmpty()) 1 else 0 }
+        }
+
+        /**
          * Tries to build an [BaseStep.ApplicationCondition] for [pending] if all
          * required main-pattern nodes are currently in [coveredInstances].  Returns
          * `null` if the condition is not yet ready.
          *
-         * Three cases:
-         * - **Empty-link island** (no edges in the island): requires only injective-
-         *   coverage nodes; emitted as a disconnected condition with no anchor.
-         * - **No-anchor island** (all links are internal to the island): treated
-         *   identically to the empty-link case.
-         * - **Anchored island**: all nodes in [MatchPlanGraph.pendingConditionRequiredNodes]
-         *   must be covered; the best anchor is chosen by
-         *   [IslandTraversalUtils.selectBestAnchor].
-         *
-         * The `needsSelect` flag is derived from [currentNode]: if the traverser is
-         * already positioned on the anchor, no `select()` step is needed.
+         * A condition is ready once every node listed by
+         * [MatchPlanGraph.pendingConditionRequiredNodes] is covered: the anchors its
+         * components attach to, the enclosing nodes it constrains, and the same-class nodes
+         * its injective constraints refer to.
          *
          * @param pending The condition to attempt to build.
          * @return A fully constructed [BaseStep.ApplicationCondition], or `null` if not
          *         ready.
          */
-        private fun tryBuildIslandCondition(pending: PendingCondition): BaseStep.ApplicationCondition? {
-            val island = pending.island
-            if (island.links.isEmpty()) {
-                if (!graph.computeInjectiveRequiredNodes(island).all { it in coveredInstances }) return null
-                return buildApplicationCondition(island, pending.isNegative, anchorName = null, needsSelect = false)
-            }
-            val islandNames = island.instances.map { it.objectInstance.name }.toSet()
-            val anchors = IslandTraversalUtils.findAnchorNames(island.links, islandNames, graph.matchableNames)
-            if (anchors.isEmpty()) {
-                if (!graph.computeInjectiveRequiredNodes(island).all { it in coveredInstances }) return null
-                return buildApplicationCondition(island, pending.isNegative, anchorName = null, needsSelect = false)
-            }
-            val required = graph.pendingConditionRequiredNodes(pending)
-            if (!required.all { it in coveredInstances }) return null
-            val bestAnchor = IslandTraversalUtils.selectBestAnchor(anchors, island.links, graph.metamodelData)
-                ?: return null
-            return buildApplicationCondition(island, pending.isNegative, bestAnchor, needsSelect = bestAnchor != this.currentNode)
+        private fun tryBuildCondition(pending: PendingCondition): BaseStep.ApplicationCondition? {
+            if (!graph.pendingConditionRequiredNodes(pending).all { it in coveredInstances }) return null
+            return buildApplicationCondition(pending.block)
         }
 
         /**
-         * Constructs a [BaseStep.ApplicationCondition] for [island] by building the
+         * Constructs a [BaseStep.ApplicationCondition] for [block] by building the
          * inner Gremlin traversal from scratch.
          *
-         * When [anchorName] is non-null the inner traversal starts from that main-pattern
-         * node and walks island links via BFS.  When [anchorName] is null (disconnected
-         * island) the traversal begins with a vertex scan for the first island instance.
+         * The whole block becomes a single traversal, so the condition only holds when all
+         * of its components match at once. The first component starts the chain — from an
+         * anchor of the enclosing match when it has one, otherwise from a vertex scan — and
+         * every further component is started by a [BaseStep.SelectNode] onto its anchor or
+         * by a mid-traversal [BaseStep.VertexScan].
          *
-         * For each BFS link:
+         * Within a component the links are walked in BFS order. For each walk:
          * - A [BaseStep.EdgeWalk] is emitted.
-         * - If the destination is an outer main-pattern node (not island-exclusive),
-         *   a [BaseStep.EqualityFilter] is appended to verify the traversal reached the
-         *   correct vertex.
-         * - If the destination is an island-exclusive node, its `==` property
-         *   constraints are appended via [buildConditionPropertySteps].
+         * - If the destination is a node of the enclosing match, a [BaseStep.EqualityFilter]
+         *   verifies that the walk reached exactly that bound vertex.
+         * - If the destination belongs to the condition, its property constraints are
+         *   appended via [buildConditionPropertySteps].
          *
-         * Injective constraints for island nodes are computed by
+         * Injective constraints for the condition's nodes are computed by
          * [buildConditionInjectiveConstraints] and attached to the returned step.
          *
-         * @param island The condition island describing the sub-pattern.
-         * @param isNegative `true` for NAC (forbid), `false` for PAC (require).
-         * @param anchorName The main-pattern instance from which the inner traversal
-         *        starts, or `null` for a disconnected island.
-         * @param needsSelect `true` when the Gremlin traverser must be repositioned to
-         *        [anchorName] via `select()` before following the first island link.
+         * @param block The condition graph to compile.
          * @return The fully assembled [BaseStep.ApplicationCondition].
          */
-        private fun buildApplicationCondition(
-            island: com.mdeo.modeltransformation.runtime.match.Island,
-            isNegative: Boolean,
-            anchorName: String?,
-            needsSelect: Boolean
-        ): BaseStep.ApplicationCondition {
-            val islandNames = island.instances.map { it.objectInstance.name }.toSet()
-            val islandInstanceMap = island.instances.associateBy { it.objectInstance.name }
+        private fun buildApplicationCondition(block: ApplicationConditionBlock): BaseStep.ApplicationCondition {
+            val conditionNames = block.instanceNames
+            val instanceMap = block.instances.associateBy { it.objectInstance.name }
+            val referenceMap = block.references.associateBy { it.objectInstance.name }
             val innerSteps = mutableListOf<BaseStep>()
+            val traversalOrder = mutableListOf<String>()
 
-            val startNode: String
-            if (anchorName == null) {
-                val startInst = island.instances.firstOrNull()
-                    ?: return BaseStep.ApplicationCondition(isNegative, null, false, emptyList())
-                startNode = startInst.objectInstance.name
-                innerSteps.add(BaseStep.VertexScan(startNode, startInst.objectInstance.className, null))
-                innerSteps.addAll(buildConditionPropertySteps(startInst))
-            } else {
-                startNode = anchorName
-            }
+            var outerAnchor: String? = null
+            var needsSelect = false
 
-            val orderedLinks = IslandTraversalUtils.orderLinksByBFS(island.links, startNode, graph.metamodelData)
-            var currentInner = startNode
+            for ((index, component) in splitIntoComponents(block).withIndex()) {
+                val start: String
+                if (component.anchors.isNotEmpty()) {
+                    start = ConditionTraversalUtils.selectBestAnchor(
+                        component.anchors, component.links, graph.metamodelData
+                    ) ?: component.anchors.first()
+                    if (index == 0) {
+                        outerAnchor = start
+                        needsSelect = start != this.currentNode
+                    } else {
+                        innerSteps.add(BaseStep.SelectNode(start))
+                    }
+                } else {
+                    val startInstance = component.instances.firstOrNull() ?: continue
+                    start = startInstance.objectInstance.name
+                    innerSteps.add(BaseStep.VertexScan(start, startInstance.objectInstance.className, null))
+                    innerSteps.addAll(buildConditionPropertySteps(startInstance))
+                    traversalOrder.add(start)
+                }
+                referenceMap[start]?.let { innerSteps.addAll(buildConditionPropertySteps(it)) }
 
-            for ((link, isReversed) in orderedLinks) {
-                val fromName = if (isReversed) link.link.target.objectName else link.link.source.objectName
-                val toName = if (isReversed) link.link.source.objectName else link.link.target.objectName
-                val toIsIslandNode = toName in islandNames
-                val toInst = if (toIsIslandNode) islandInstanceMap[toName] else null
+                val orderedLinks = ConditionTraversalUtils.orderLinksByBFS(
+                    component.links, start, graph.metamodelData
+                )
+                var currentInner = start
 
-                innerSteps.add(BaseStep.EdgeWalk(
-                    link = link,
-                    isReversed = isReversed,
-                    fromInstanceName = fromName,
-                    toInstanceName = toName,
-                    toClassName = toInst?.objectInstance?.className,
-                    toVertexId = null,
-                    needsSelect = fromName != currentInner
-                ))
+                for ((link, isReversed) in orderedLinks) {
+                    val fromName = if (isReversed) link.link.target.objectName else link.link.source.objectName
+                    val toName = if (isReversed) link.link.source.objectName else link.link.target.objectName
+                    val toIsConditionNode = toName in conditionNames
+                    val toInstance = if (toIsConditionNode) instanceMap[toName] else null
 
-                if (!toIsIslandNode && toName != anchorName) innerSteps.add(BaseStep.EqualityFilter(toName))
-                if (toIsIslandNode && toInst != null) innerSteps.addAll(buildConditionPropertySteps(toInst))
-                currentInner = toName
+                    innerSteps.add(BaseStep.EdgeWalk(
+                        link = link,
+                        isReversed = isReversed,
+                        fromInstanceName = fromName,
+                        toInstanceName = toName,
+                        toClassName = toInstance?.objectInstance?.className,
+                        toVertexId = null,
+                        needsSelect = fromName != currentInner
+                    ))
+
+                    if (toIsConditionNode && toInstance != null) {
+                        if (traversalOrder.none { it == toName }) traversalOrder.add(toName)
+                        innerSteps.addAll(buildConditionPropertySteps(toInstance))
+                    } else {
+                        // The walk left the condition graph and has to land on exactly the
+                        // vertex the enclosing match bound for that node.
+                        innerSteps.add(BaseStep.EqualityFilter(toName))
+                        referenceMap[toName]?.let { innerSteps.addAll(buildConditionPropertySteps(it)) }
+                    }
+                    currentInner = toName
+                }
             }
 
             return BaseStep.ApplicationCondition(
-                isNegative, anchorName, needsSelect, innerSteps,
-                buildConditionInjectiveConstraints(island, orderedLinks, startNode)
+                block.isNegative, outerAnchor, needsSelect, innerSteps,
+                buildConditionInjectiveConstraints(block, traversalOrder),
+                block.name
             )
         }
 
@@ -1056,7 +1126,7 @@ internal class MatchPlanBuilder(
          * expressions are included unconditionally because they are emitted inside a
          * `where(...)` block where the outer traversal state is already fixed.
          *
-         * @param instance An island instance element whose properties are to be emitted.
+         * @param instance A condition instance whose properties are to be emitted.
          * @return The list of inline property constraint steps for [instance].
          */
         private fun buildConditionPropertySteps(
@@ -1072,60 +1142,52 @@ internal class MatchPlanBuilder(
          * Builds the injective-constraint map for the inner traversal of an application
          * condition.
          *
-         * For each island node in BFS order (excluding the start node), the map records
-         * the Gremlin step labels of:
-         * 1. Every main-pattern instance of the same class (preventing the island node
+         * For each condition node in traversal order, the map records the Gremlin step
+         * labels of:
+         * 1. Every main-pattern instance of the same class (preventing the condition node
          *    from matching a vertex already bound in the main pattern).
-         * 2. Every earlier island node in BFS order of the same class (mutual injectivity
-         *    among island nodes).
+         * 2. Every earlier condition node of the same class (mutual injectivity among the
+         *    condition's own nodes, across component boundaries as well).
          *
-         * For single-node NAC islands, constraint (1) may be omitted for a specific
-         * main-pattern node when [MatchPlanGraph.canOmitNacInjectiveConstraint] returns
-         * `true` (see that method for the correctness argument).
+         * For a NAC whose graph has a single node, constraint (1) may be omitted for a
+         * specific main-pattern node when [MatchPlanGraph.canOmitNacInjectiveConstraint]
+         * returns `true` (see that method for the correctness argument).
          *
-         * The map is keyed by [VariableBinding.stepLabel] of the island node.
+         * The map is keyed by [VariableBinding.stepLabel] of the condition node.
          *
-         * @param island The condition island.
-         * @param orderedLinks The BFS-ordered link sequence from
-         *        [IslandTraversalUtils.orderLinksByBFS].
-         * @param startName The BFS start (anchor) node name.
-         * @return A map from island node step label to the list of step labels it must
+         * @param block The condition graph.
+         * @param traversalOrder The condition nodes in the order the chain reaches them.
+         * @return A map from condition node step label to the list of step labels it must
          *         differ from.
          */
         private fun buildConditionInjectiveConstraints(
-            island: com.mdeo.modeltransformation.runtime.match.Island,
-            orderedLinks: List<Pair<TypedPatternLinkElement, Boolean>>,
-            startName: String
+            block: ApplicationConditionBlock,
+            traversalOrder: List<String>
         ): Map<String, List<String>> {
             val constraints = mutableMapOf<String, MutableList<String>>()
-            val islandInstanceMap = island.instances.associateBy { it.objectInstance.name }
-            val isSingleNodeNac = island.instances.size == 1
+            val instanceMap = block.instances.associateBy { it.objectInstance.name }
+            val isSingleNodeNac = block.isNegative && block.instances.size == 1
 
-            val bfsOrder = mutableListOf<String>()
-            val visited = mutableSetOf(startName)
-            for ((link, isReversed) in orderedLinks) {
-                val toNode = if (isReversed) link.link.source.objectName else link.link.target.objectName
-                if (toNode in islandInstanceMap && visited.add(toNode)) bfsOrder.add(toNode)
-            }
-
-            for ((i, islandNode) in bfsOrder.withIndex()) {
-                val islandClass = islandInstanceMap[islandNode]?.objectInstance?.className ?: continue
-                val nodeLabel = VariableBinding.stepLabel(islandNode)
+            for ((i, conditionNode) in traversalOrder.withIndex()) {
+                val conditionClass = instanceMap[conditionNode]?.objectInstance?.className ?: continue
+                val nodeLabel = VariableBinding.stepLabel(conditionNode)
 
                 for (mainInst in graph.instances) {
                     val mainClass = mainInst.objectInstance.className ?: continue
-                    if (islandClass != mainClass) continue
-                    if (isSingleNodeNac && graph.canOmitNacInjectiveConstraint(islandNode, mainInst.objectInstance.name, island.links)) continue
+                    if (conditionClass != mainClass) continue
+                    if (isSingleNodeNac &&
+                        graph.canOmitNacInjectiveConstraint(conditionNode, mainInst.objectInstance.name, block.links)
+                    ) continue
                     constraints.getOrPut(nodeLabel) { mutableListOf() }
                         .add(VariableBinding.stepLabel(mainInst.objectInstance.name))
                 }
 
                 for (j in 0 until i) {
-                    val prevNode = bfsOrder[j]
-                    val prevClass = islandInstanceMap[prevNode]?.objectInstance?.className ?: continue
-                    if (islandClass == prevClass) {
+                    val previousNode = traversalOrder[j]
+                    val previousClass = instanceMap[previousNode]?.objectInstance?.className ?: continue
+                    if (conditionClass == previousClass) {
                         constraints.getOrPut(nodeLabel) { mutableListOf() }
-                            .add(VariableBinding.stepLabel(prevNode))
+                            .add(VariableBinding.stepLabel(previousNode))
                     }
                 }
             }
@@ -1136,8 +1198,9 @@ internal class MatchPlanBuilder(
          * Estimates the Gremlin evaluation cost of [condition] for ordering purposes.
          *
          * Scoring:
-         * - **Disconnected** (`anchorName == null`): 1000 + 10 × edge count.  Expensive
-         *   because an uncorrelated vertex scan is required inside `where(...)`.
+         * - **Contains an unanchored component** (a vertex scan inside the chain):
+         *   1000 + 10 × edge count.  Expensive because an uncorrelated vertex scan is
+         *   required inside `where(...)`.
          * - **Anchored**: 10 × edge count + 1 if `needsSelect`.  Proportional to the
          *   number of edge traversals, with a small penalty for needing `select()`.
          *
@@ -1145,8 +1208,9 @@ internal class MatchPlanBuilder(
          * @return A non-negative integer cost estimate; lower is cheaper.
          */
         private fun computeConditionCost(condition: BaseStep.ApplicationCondition): Int {
-            if (condition.anchorName == null) return 1000 + condition.innerSteps.count { it is BaseStep.EdgeWalk } * 10
             val edgeCount = condition.innerSteps.count { it is BaseStep.EdgeWalk }
+            val hasVertexScan = condition.innerSteps.any { it is BaseStep.VertexScan }
+            if (hasVertexScan) return 1000 + edgeCount * 10
             return edgeCount * 10 + if (condition.needsSelect) 1 else 0
         }
 
@@ -1208,25 +1272,16 @@ internal class MatchPlanBuilder(
         /**
          * Emits all application conditions not emitted during the structural phase.
          *
-         * For each unemitted condition the best available anchor is selected (or `null`
-         * for disconnected islands) and [buildApplicationCondition] is called.  All
-         * remaining conditions are sorted by [computeConditionCost] before emission so
-         * that cheaper checks execute first.
+         * By this point every main-pattern instance is covered, so each remaining condition
+         * can be compiled unconditionally by [buildApplicationCondition].  All remaining
+         * conditions are sorted by [computeConditionCost] before emission so that cheaper
+         * checks execute first.
          */
         private fun emitRemainingConditions() {
             val remaining = mutableListOf<Pair<Int, BaseStep.ApplicationCondition>>()
             for ((index, pending) in graph.conditions.withIndex()) {
                 if (index in emittedConditionIndices) continue
-                val island = pending.island
-                val ac = if (island.links.isEmpty()) {
-                    buildApplicationCondition(island, pending.isNegative, null, false)
-                } else {
-                    val islandNames = island.instances.map { it.objectInstance.name }.toSet()
-                    val anchors = IslandTraversalUtils.findAnchorNames(island.links, islandNames, graph.matchableNames)
-                    val anchor = IslandTraversalUtils.selectBestAnchor(anchors, island.links, graph.metamodelData)
-                    buildApplicationCondition(island, pending.isNegative, anchor, needsSelect = anchor != null)
-                }
-                remaining.add(index to ac)
+                remaining.add(index to buildApplicationCondition(pending.block))
             }
             remaining.sortBy { computeConditionCost(it.second) }
             for ((_, ac) in remaining) baseSteps.add(ac)

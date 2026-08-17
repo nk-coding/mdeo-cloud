@@ -336,7 +336,7 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
             return this.deleteCstNode(modifierNode.$cstNode);
         }
 
-        const validModifiers = ["create", "delete", "forbid", "require"];
+        const validModifiers = ["create", "delete"];
         if (!validModifiers.includes(modifierText)) {
             return undefined;
         }
@@ -377,7 +377,7 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
             return this.deleteCstNode(instanceModifier.$cstNode);
         }
 
-        const validModifiers = ["create", "delete", "forbid", "require"];
+        const validModifiers = ["create", "delete"];
         if (!validModifiers.includes(modifierText)) {
             return undefined;
         }

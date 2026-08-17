@@ -98,8 +98,12 @@ export enum ModelTransformationElementType {
 
 /**
  * Enum for pattern modifier kinds.
- * Represents the create/delete/forbid/require modifier on pattern elements.
- * Use NONE when there is no modifier (match-only element).
+ *
+ * `CREATE` and `DELETE` are element modifiers written in the source. `FORBID` and
+ * `REQUIRE` are not: they describe membership in an application condition block and are
+ * derived from the block an element is declared in, so that the diagram can render the
+ * element with the block's stereotype.
+ * Use NONE when the element belongs to the match pattern and carries no modifier.
  */
 export enum PatternModifierKind {
     /**
@@ -115,11 +119,11 @@ export enum PatternModifierKind {
      */
     DELETE = "delete",
     /**
-     * Forbid the element (negative application condition)
+     * The element belongs to a negative application condition block
      */
     FORBID = "forbid",
     /**
-     * Require the element (positive application condition)
+     * The element belongs to a positive application condition block
      */
     REQUIRE = "require"
 }

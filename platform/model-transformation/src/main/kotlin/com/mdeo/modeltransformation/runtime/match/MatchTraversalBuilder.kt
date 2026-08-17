@@ -53,6 +53,9 @@ internal class MatchTraversalBuilder(
                 is BaseStep.DeferredPropertyConstraint -> applyDeferredPropertyConstraint(t, step)
                 is BaseStep.WhereFilter -> applyWhereFilter(t, step)
                 is BaseStep.InjectiveConstraint -> applyInjectiveConstraint(t, step)
+                is BaseStep.SelectNode -> throw IllegalStateException(
+                    "SelectNode for '${step.instanceName}' is only valid inside a condition chain"
+                )
             }
         }
         return t
@@ -228,9 +231,10 @@ internal class MatchTraversalBuilder(
      * Builds an anonymous traversal chain from a list of [BaseStep]s for use inside a
      * [BaseStep.ApplicationCondition].
      *
-     * The first [BaseStep.VertexScan] step (if any) creates the root `__.V()...` traversal;
-     * all subsequent steps are appended using the same translation logic as for the main
-     * traversal. After each [BaseStep.EdgeWalk] step, any injective constraints registered
+     * A leading [BaseStep.VertexScan] creates the root `__.V()...` traversal, and a
+     * [BaseStep.VertexScan] in a later position continues the chain with a mid-traversal
+     * `V()` scan that starts a further component of the condition graph; all other steps
+     * are appended using the same translation logic as for the main traversal. After each [BaseStep.EdgeWalk] step, any injective constraints registered
      * for the destination node are emitted as `.where(P.neq(label))`.
      *
      * A node in the chain is labeled with `.as(label)` only when its label is genuinely
@@ -258,13 +262,14 @@ internal class MatchTraversalBuilder(
 
         for (step in innerSteps) {
             chain = when {
-                step is BaseStep.VertexScan && chain == null -> {
-                    // First step in an unanchored condition: start with a V() scan.
+                step is BaseStep.VertexScan -> {
+                    // Starts a component of the condition graph that has no anchor: either the
+                    // first one (the chain is still empty) or a further one, which continues
+                    // from the current traverser via a mid-traversal V() scan.
                     val v: GraphTraversal<Any, Any> = when {
-                        step.vertexId != null ->
-                            AnonymousTraversal.V<Any>(step.vertexId) as GraphTraversal<Any, Any>
+                        step.vertexId != null -> startVertexScan(chain, step.vertexId)
                         step.className != null ->
-                            (AnonymousTraversal.V<Any>() as GraphTraversal<Vertex, Vertex>)
+                            (startVertexScan(chain, null) as GraphTraversal<Vertex, Vertex>)
                                 .applyClassFilter(step.className) as GraphTraversal<Any, Any>
                         else -> throw IllegalStateException(
                             "VertexScan for '${step.instanceName}' has neither vertexId nor className"
@@ -279,11 +284,6 @@ internal class MatchTraversalBuilder(
                     // Apply injective constraints for this start node.
                     applyInjectiveConstraints(labeled, nodeLabel, injectiveConstraints)
                 }
-                step is BaseStep.VertexScan -> {
-                    throw IllegalStateException(
-                        "VertexScan for '${step.instanceName}' in non-first position of condition chain"
-                    )
-                }
                 chain == null -> {
                     // First step when the chain starts at the anchor via identity().
                     val base = AnonymousTraversal.identity<Any>() as GraphTraversal<Any, Any>
@@ -293,6 +293,28 @@ internal class MatchTraversalBuilder(
             }
         }
         return chain
+    }
+
+    /**
+     * Starts a vertex scan inside a condition chain, either as the root of the chain or as
+     * a mid-traversal scan continuing an existing one.
+     *
+     * A mid-traversal `V()` re-scans the graph for every incoming traverser, which is what
+     * a further, unanchored component of a condition graph needs: it is matched
+     * independently of the components walked before it, but within the same condition.
+     *
+     * @param chain The chain built so far, or `null` when this scan starts the chain.
+     * @param vertexId A concrete vertex ID to scan for, or `null` to scan all vertices.
+     * @return The extended traversal.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun startVertexScan(chain: GraphTraversal<Any, Any>?, vertexId: Any?): GraphTraversal<Any, Any> {
+        return when {
+            chain == null && vertexId != null -> AnonymousTraversal.V<Any>(vertexId) as GraphTraversal<Any, Any>
+            chain == null -> AnonymousTraversal.V<Any>() as GraphTraversal<Any, Any>
+            vertexId != null -> chain.V(vertexId) as GraphTraversal<Any, Any>
+            else -> chain.V() as GraphTraversal<Any, Any>
+        }
     }
 
     /**
@@ -363,8 +385,8 @@ internal class MatchTraversalBuilder(
      * Applies a single [BaseStep] to an anonymous traversal [chain] inside a condition.
      *
      * Supported step types: [BaseStep.EdgeWalk], [BaseStep.InlinePropertyConstraint],
-     * [BaseStep.EqualityFilter]. After each [BaseStep.EdgeWalk] the injective constraints
-     * for the destination node are emitted.
+     * [BaseStep.SelectNode], [BaseStep.EqualityFilter]. After each [BaseStep.EdgeWalk] the
+     * injective constraints for the destination node are emitted.
      *
      * @param neededLabels Labels that must be assigned with `.as()` — see [computeNeededLabels].
      */
@@ -403,6 +425,11 @@ internal class MatchTraversalBuilder(
                     chain as GraphTraversal<Vertex, Vertex>,
                     step
                 ) as GraphTraversal<Any, Any>
+            }
+            is BaseStep.SelectNode -> {
+                // Reposition onto an already-bound node to start the next component of the
+                // condition graph.
+                chain.select<Any>(VariableBinding.stepLabel(step.instanceName)) as GraphTraversal<Any, Any>
             }
             is BaseStep.EqualityFilter -> {
                 // The destination node was NOT labeled in the chain (it is an outer matched

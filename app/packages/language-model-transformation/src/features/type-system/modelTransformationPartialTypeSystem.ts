@@ -20,6 +20,7 @@ import {
     ElseIfBranch,
     WhileExpressionStatement,
     PatternObjectInstance,
+    PatternApplicationCondition,
     WhereClause,
     expressionTypes,
     type LambdaExpressionType,
@@ -358,7 +359,7 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
 
     /**
      * Registers the validation rule for identifier expressions.
-     * Prevents references to pattern object instances annotated with forbid/require.
+     * Prevents references to pattern object instances declared inside a condition block.
      */
     private registerIdentifierExpressionValidationRule(): void {
         this.registerValidationRule(expressionTypes.identifierExpressionType, (node, accept) => {
@@ -367,7 +368,11 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
     }
 
     /**
-     * Validates that identifier expressions do not target forbid/require pattern object instances.
+     * Validates that identifier expressions do not target instances declared inside an
+     * application condition block.
+     *
+     * A condition block is matched as a separate graph and its nodes are never bound in the
+     * enclosing match, so they cannot contribute a value to an expression.
      *
      * @param node The identifier expression node.
      * @param accept The validation problem acceptor.
@@ -387,11 +392,14 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
         }
 
         const instance = entry.languageNode;
-        const modifier = instance.modifier?.modifier;
-        if (modifier === "forbid" || modifier === "require") {
+        const condition = instance.$container;
+        if (this.astReflection.isInstance(condition, PatternApplicationCondition)) {
+            const kind = condition.kind ?? "forbid";
             accept({
                 languageNode: node,
-                message: `Identifier '${node.name}' cannot reference a '${modifier}' instance in expressions.`,
+                message:
+                    `Identifier '${node.name}' cannot be used in expressions: it is declared inside a ` +
+                    `'${kind}' block and is not bound by the match.`,
                 severity: "error"
             });
         }

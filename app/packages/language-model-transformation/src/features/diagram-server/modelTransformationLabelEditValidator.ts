@@ -578,16 +578,13 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
 
     /**
      * Checks whether a modifier string is one of the permitted values.
+     *
+     * `forbid` / `require` are not modifiers: they identify an application condition block,
+     * and an element joins one through the "Move to Block" action rather than by editing its
+     * stereotype label.
      */
     private isValidModifier(modifier: string): boolean {
-        return (
-            modifier === "" ||
-            modifier === "none" ||
-            modifier === "create" ||
-            modifier === "delete" ||
-            modifier === "forbid" ||
-            modifier === "require"
-        );
+        return modifier === "" || modifier === "none" || modifier === "create" || modifier === "delete";
     }
 
     /**

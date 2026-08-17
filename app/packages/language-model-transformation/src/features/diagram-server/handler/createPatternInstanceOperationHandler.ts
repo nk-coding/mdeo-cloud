@@ -34,7 +34,9 @@ import {
     type IfMatchStatementType,
     type WhileMatchStatementType,
     type UntilMatchStatementType,
-    type ForMatchStatementType
+    type ForMatchStatementType,
+    PatternApplicationCondition,
+    type PatternApplicationConditionType
 } from "../../../grammar/modelTransformationTypes.js";
 import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import type { ModelTransformationMetadataManager } from "../modelTransformationMetadataManager.js";
@@ -142,9 +144,14 @@ export class CreatePatternInstanceOperationHandler
             if (!className) {
                 return undefined;
             }
-            const modifierKind = this.modifierStringToKind(modifier);
+            const conditionKind = this.getConditionKind(modifier);
+            const modifierKind =
+                conditionKind != undefined ? PatternModifierKind.NONE : this.modifierStringToKind(modifier);
             const newInstance = await this.createPatternObjectInstanceAst(className, modifierKind);
-            workspaceEdit = await this.insertIntoPattern(pattern, newInstance);
+            workspaceEdit =
+                conditionKind != undefined
+                    ? await this.insertIntoNewCondition(pattern, conditionKind, newInstance)
+                    : await this.insertIntoPattern(pattern, newInstance);
             insertedNode = newInstance;
         }
 
@@ -459,6 +466,81 @@ export class CreatePatternInstanceOperationHandler
             $type: PatternObjectInstanceDelete.name,
             instance: { $refText: instanceName, ref: undefined }
         };
+    }
+
+    /**
+     * Returns the condition kind a creation mode stands for, or `undefined` for the modes
+     * that create an element of the match pattern itself.
+     *
+     * @param mode The creation mode from the toolbox
+     * @returns `"forbid"` / `"require"`, or `undefined`
+     */
+    private getConditionKind(mode: string | undefined): "forbid" | "require" | undefined {
+        if (mode === "forbid" || mode === "require") {
+            return mode;
+        }
+        return undefined;
+    }
+
+    /**
+     * Inserts a new instance into a freshly created application condition block.
+     *
+     * Every node created in `forbid` / `require` mode starts out in a block of its own, so
+     * that it rejects (or demands) a match independently of the other conditions. Blocks are
+     * merged afterwards through the "Move to Block" action, which is the only way to express
+     * that two elements must be found *together*.
+     *
+     * @param pattern The pattern receiving the new block
+     * @param conditionKind Whether a `forbid` or a `require` block is created
+     * @param element The instance the block holds
+     * @returns A workspace edit inserting the new block
+     * @throws {Error} If the pattern has no CST node
+     */
+    private async insertIntoNewCondition(
+        pattern: PatternType,
+        conditionKind: "forbid" | "require",
+        element: AstNode
+    ): Promise<WorkspaceEdit> {
+        const serialized = await this.serializeNode(element);
+        const patternCst = pattern.$cstNode as CompositeCstNode | undefined;
+        if (!patternCst) {
+            throw new Error("Pattern has no CST node; cannot insert element.");
+        }
+        const content = patternCst.content;
+        const openBrace = content[0]!;
+        const closeBrace = content[content.length - 1]!;
+        const hasContent = (pattern.elements?.length ?? 0) > 0;
+        const name = this.findFreeConditionName(pattern, conditionKind);
+        const body = serialized
+            .split("\n")
+            .map((line) => `    ${line}`)
+            .join("\n");
+        return this.insertIntoScope(openBrace, closeBrace, hasContent, `${conditionKind} ${name} {\n${body}\n}`);
+    }
+
+    /**
+     * Picks a condition block name that is not yet used within the pattern.
+     *
+     * @param pattern The pattern the new block belongs to
+     * @param conditionKind The kind of block being created
+     * @returns An unused block name
+     */
+    private findFreeConditionName(pattern: PatternType, conditionKind: "forbid" | "require"): string {
+        const reflection = this.modelState.languageServices.shared.AstReflection;
+        const used = new Set<string>();
+        for (const element of pattern.elements ?? []) {
+            if (reflection.isInstance(element, PatternApplicationCondition)) {
+                const name = (element as PatternApplicationConditionType).name;
+                if (name != undefined) {
+                    used.add(name);
+                }
+            }
+        }
+        let index = 1;
+        while (used.has(`${conditionKind}${index}`)) {
+            index++;
+        }
+        return `${conditionKind}${index}`;
     }
 
     /**

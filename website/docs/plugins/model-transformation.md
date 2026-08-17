@@ -40,6 +40,7 @@ any of the marked changes are applied. Elements can be:
 | Delete | `delete name` | Remove an object matched earlier |
 | Variable | `var name[: type] = expression` | Bind a value for later use in the pattern |
 | Condition | `where expression` | An arbitrary boolean condition on the match |
+| Application condition | `forbid [name] { ... }` / `require [name] { ... }` | A sub-pattern that must not / must be findable |
 
 Objects and links can carry a modifier:
 
@@ -48,8 +49,47 @@ Objects and links can carry a modifier:
 | *(none)* | The element must exist and is left untouched |
 | `create` | The element is added |
 | `delete` | The element is removed |
-| `forbid` | The match is rejected if the element exists |
-| `require` | The element must exist but is not bound to the rewrite |
+
+#### Application conditions
+
+A `forbid` block rejects the match as soon as **its whole sub-pattern** can be found; a `require`
+block demands that its whole sub-pattern is found. Each block is a graph of its own, matched
+independently of the pattern around it and of every other block:
+
+<<< @/../samples/language-tour/application-conditions.mt{mt}
+
+The grouping is what carries the meaning. Two blocks reject the match when *either* of them matches;
+the same elements inside one block reject it only when they *all* match together:
+
+```mt
+// rejected when the patient is admitted OR when a better candidate exists
+forbid { a: Admission {}   a.patient -- patient }
+forbid { better: Patient { surgeryDuration < duration } }
+
+// rejected only when the patient is admitted AND a better candidate exists
+forbid {
+    a: Admission {}   a.patient -- patient
+    better: Patient { surgeryDuration < duration }
+}
+```
+
+A block may name itself — `forbid alreadyAdmitted { ... }` — following Henshin's nested names. The
+name identifies the block in diagnostics, and in the graphical editor its elements are tagged with
+`«forbid alreadyAdmitted»`. Inside a block you may:
+
+- declare objects and links that belong to the condition graph alone,
+- refer to objects of the enclosing pattern, which anchors the condition to the match, and
+- constrain an object of the enclosing pattern through a reference — `patient { age > 60 }`.
+
+Objects declared inside a block are not bound by the match: they are invisible outside their block
+and cannot be used in expressions, created or deleted. `where` clauses belong to the pattern, not to
+a condition block.
+
+::: tip Moving elements between blocks
+In the graphical editor, an element created in *forbid* or *require* mode starts in a block of its
+own. Use **Move to Block** in the context rail to move it — together with everything connected to it
+— into another block, into a new one, or back into the match pattern.
+:::
 
 Inside an object's braces, `=` assigns a property while `==`, `!=`, `<`, `>`, `<=` and `>=` constrain
 the match:

@@ -9,6 +9,7 @@ import type { ContextActionRequestContext, ContextItemProvider } from "@mdeo/lan
 import type { ContextItem } from "@mdeo/protocol-common";
 import {
     PatternObjectInstance,
+    PatternApplicationCondition,
     PatternLink,
     type PatternObjectInstanceType,
     type PatternLinkType
@@ -20,7 +21,12 @@ const { GrammarUtils } = sharedImport("langium");
 const { TextEdit } = sharedImport("vscode-languageserver-types");
 
 /**
- * Handler for changing create/delete/forbid/require modifiers on pattern nodes and links.
+ * Handler for changing the create/delete modifier on pattern nodes and links.
+ *
+ * Negative and positive application conditions are not modifiers: they are blocks, and an
+ * element joins one by being moved into it — see
+ * {@link MovePatternElementToConditionOperationHandler}. Elements declared inside a block
+ * therefore have no modifier to change, and the action is not offered for them.
  */
 @injectable()
 export class ChangePatternElementModifierOperationHandler extends BaseOperationHandler implements ContextItemProvider {
@@ -80,10 +86,16 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
             if (astNode == undefined || !this.reflection.isInstance(astNode, PatternObjectInstance)) {
                 return [];
             }
+            if (this.isInsideApplicationCondition(astNode)) {
+                return [];
+            }
         } else if (element.type === ModelTransformationElementType.EDGE_PATTERN_LINK) {
             // Only offer the action for links whose both endpoints have no modifier.
             const linkAstNode = this.index.getAstNode(element);
             if (linkAstNode == undefined || !this.reflection.isInstance(linkAstNode, PatternLink)) {
+                return [];
+            }
+            if (this.isInsideApplicationCondition(linkAstNode)) {
                 return [];
             }
             const link = linkAstNode as PatternLinkType;
@@ -99,9 +111,7 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
         const modifierOptions = [
             { label: "None", modifier: PatternModifierKind.NONE, icon: "square" },
             { label: "Create", modifier: PatternModifierKind.CREATE, icon: "square-plus" },
-            { label: "Delete", modifier: PatternModifierKind.DELETE, icon: "square-x" },
-            { label: "Forbid", modifier: PatternModifierKind.FORBID, icon: "square-slash" },
-            { label: "Require", modifier: PatternModifierKind.REQUIRE, icon: "square-check" }
+            { label: "Delete", modifier: PatternModifierKind.DELETE, icon: "square-x" }
         ];
 
         return [
@@ -121,6 +131,16 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
                 }))
             }
         ];
+    }
+
+    /**
+     * Checks whether an element is declared inside an application condition block.
+     *
+     * @param node The AST node to check
+     * @returns `true` when the node belongs to a condition block
+     */
+    private isInsideApplicationCondition(node: { $container?: unknown }): boolean {
+        return this.reflection.isInstance(node.$container, PatternApplicationCondition);
     }
 
     /**

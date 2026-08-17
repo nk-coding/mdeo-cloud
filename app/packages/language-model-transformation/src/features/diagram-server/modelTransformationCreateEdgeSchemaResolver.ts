@@ -295,6 +295,10 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
     /**
      * Determines the modifier for a new edge given the effective modifiers of its two endpoints.
      *
+     * For elements of an application condition block the "modifier" is the block kind, so
+     * this also decides whether a link may join a condition node to a node of the match: it
+     * may, and the link then belongs to the condition.
+     *
      * @param sourceModifier The effective modifier of the source node
      * @param targetModifier The effective modifier of the target node
      * @param contextModifier The user-supplied context modifier (relevant for persist-persist pairs)
@@ -315,17 +319,9 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
             return sourceModifier;
         } else if (sourceModifier === targetModifier) {
             return sourceModifier;
-        } else if (
-            sourceModifier === PatternModifierKind.DELETE &&
-            (targetModifier === PatternModifierKind.REQUIRE || targetModifier === PatternModifierKind.FORBID)
-        ) {
-            return targetModifier;
-        } else if (
-            (sourceModifier === PatternModifierKind.REQUIRE || sourceModifier === PatternModifierKind.FORBID) &&
-            targetModifier === PatternModifierKind.DELETE
-        ) {
-            return sourceModifier;
         } else {
+            // A link between a created/deleted element and a condition node has no meaning:
+            // a condition never rewrites the model.
             return undefined;
         }
     }

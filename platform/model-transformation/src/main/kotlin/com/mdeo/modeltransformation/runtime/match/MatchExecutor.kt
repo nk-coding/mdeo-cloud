@@ -1,6 +1,8 @@
 package com.mdeo.modeltransformation.runtime.match
 
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternLinkElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.compiler.SequentialLabelIdGenerator
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.graph.VertexRef
@@ -110,9 +112,19 @@ class MatchExecutor {
         elements.whereClauses.forEach { analyzer.analyzeWhereClause(it) }
         (elements.matchableInstances + elements.createInstances + elements.deleteInstances)
             .forEach { analyzer.analyzeObjectInstance(it) }
-        (elements.matchableLinks + elements.createLinks + elements.deleteLinks +
-            elements.forbidLinks + elements.requireLinks)
+        (elements.matchableLinks + elements.createLinks + elements.deleteLinks)
             .forEach { analyzer.analyzeLink(it) }
+        // Condition links may reference nodes of the enclosing match as anchors; those
+        // anchors have to be part of the referenced set so the planner covers them before
+        // the condition is emitted.
+        elements.conditions
+            .flatMap { it.condition.elements }
+            .filterIsInstance<TypedPatternLinkElement>()
+            .forEach { analyzer.analyzeLink(it) }
+        elements.conditions
+            .flatMap { it.condition.elements }
+            .filterIsInstance<TypedPatternObjectInstanceElement>()
+            .forEach { analyzer.analyzeObjectInstance(it) }
         val referencedInstances = analyzer.getReferencedInstances()
 
         val allMatchable = elements.matchableInstances + elements.deleteInstances
@@ -198,8 +210,10 @@ class MatchExecutor {
         is BaseStep.InlinePropertyConstraint ->
             "prop   ${step.instanceName}.${step.property.propertyName}${if (step.isConstant) " (const)" else ""}"
         is BaseStep.DeferredPropertyConstraint -> "prop*  ${step.instanceName}.${step.property.propertyName}"
+        is BaseStep.SelectNode -> "select ${step.instanceName}"
         is BaseStep.ApplicationCondition ->
-            "${if (step.isNegative) "forbid" else "require"} anchor=${step.anchorName ?: "-"} " +
+            "${if (step.isNegative) "forbid" else "require"}${step.name?.let { " $it" } ?: ""} " +
+                "anchor=${step.anchorName ?: "-"} " +
                 "inner=[${step.innerSteps.joinToString("; ") { describeStep(it) }}]"
         is BaseStep.EqualityFilter -> "eq     ${step.instanceName}"
         is BaseStep.VariableBinding -> "var    ${step.variable.variable.name}"
@@ -212,7 +226,7 @@ class MatchExecutor {
      * and the final select step.
      *
      * The traversal is fully imperative — no `match()` step is used. All constraints
-     * (island, property, injective, where-clauses, variables) are expressed as imperative
+     * (application-condition, property, injective, where-clauses, variables) are expressed as imperative
      * steps and post-match filters.
      *
      * @param elements Categorised pattern elements.
