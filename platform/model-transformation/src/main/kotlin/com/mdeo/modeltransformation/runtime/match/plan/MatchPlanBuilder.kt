@@ -1081,10 +1081,10 @@ internal class MatchPlanBuilder(
                     val startInstance = component.instances.firstOrNull() ?: continue
                     start = startInstance.objectInstance.name
                     innerSteps.add(BaseStep.VertexScan(start, startInstance.objectInstance.className, null))
-                    innerSteps.addAll(buildConditionPropertySteps(startInstance))
+                    innerSteps.addAll(buildConditionPropertySteps(block, startInstance))
                     traversalOrder.add(start)
                 }
-                referenceMap[start]?.let { innerSteps.addAll(buildConditionPropertySteps(it)) }
+                referenceMap[start]?.let { innerSteps.addAll(buildConditionPropertySteps(block, it)) }
                 emitReadyConditionWhereClauses(block, pendingWhereClauses, traversalOrder, innerSteps)
 
                 val orderedLinks = ConditionTraversalUtils.orderLinksByBFS(
@@ -1110,12 +1110,12 @@ internal class MatchPlanBuilder(
 
                     if (toIsConditionNode && toInstance != null) {
                         if (traversalOrder.none { it == toName }) traversalOrder.add(toName)
-                        innerSteps.addAll(buildConditionPropertySteps(toInstance))
+                        innerSteps.addAll(buildConditionPropertySteps(block, toInstance))
                     } else {
                         // The walk left the condition graph and has to land on exactly the
                         // vertex the enclosing match bound for that node.
                         innerSteps.add(BaseStep.EqualityFilter(toName))
-                        referenceMap[toName]?.let { innerSteps.addAll(buildConditionPropertySteps(it)) }
+                        referenceMap[toName]?.let { innerSteps.addAll(buildConditionPropertySteps(block, it)) }
                     }
                     emitReadyConditionWhereClauses(block, pendingWhereClauses, traversalOrder, innerSteps)
                     currentInner = toName
@@ -1138,6 +1138,8 @@ internal class MatchPlanBuilder(
          * application condition.
          *
          * All comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`) are included.
+         * Names of the block's own nodes that the compared expression reads are recorded on
+         * the step, so that the condition chain labels them.
          * The assignment operator (`=`) is skipped — it is handled by the modification
          * applier, not by the match plan.
          * The [BaseStep.InlinePropertyConstraint.isConstant] flag is determined the same
@@ -1145,16 +1147,21 @@ internal class MatchPlanBuilder(
          * expressions are included unconditionally because they are emitted inside a
          * `where(...)` block where the outer traversal state is already fixed.
          *
+         * @param block The condition graph the instance belongs to.
          * @param instance A condition instance whose properties are to be emitted.
          * @return The list of inline property constraint steps for [instance].
          */
         private fun buildConditionPropertySteps(
+            block: ApplicationConditionBlock,
             instance: TypedPatternObjectInstanceElement
         ): List<BaseStep.InlinePropertyConstraint> = instance.objectInstance.properties.mapNotNull { property ->
             if (property.operator == "=") return@mapNotNull null
             val referencedNodes = graph.nodeAnalyzer.findReferencedNodes(property.value)
             val isConstant = referencedNodes.isEmpty() && !graph.isCollectionExpression(property.value)
-            BaseStep.InlinePropertyConstraint(instance.objectInstance.name, instance.objectInstance.className, property, isConstant)
+            BaseStep.InlinePropertyConstraint(
+                instance.objectInstance.name, instance.objectInstance.className, property, isConstant,
+                referencedNodes.filter { it in block.instanceNames }.toSet()
+            )
         }
 
         /**
@@ -1207,20 +1214,27 @@ internal class MatchPlanBuilder(
 
         /**
          * Returns everything a condition reads from outside its own graph: the instances and
-         * variables of the enclosing match that its where clauses refer to.
+         * variables of the enclosing match that its where clauses and the property
+         * constraints of its nodes refer to.
          *
          * These have to be bound before the condition is compiled, because the condition's
          * sub-traversal reaches them with `select(label)` and a label only exists once the
          * step producing it has been emitted.
          *
          * @param block The condition graph to inspect.
-         * @return The names the block's where clauses read from the enclosing match.
+         * @return The names the block reads from the enclosing match.
          */
-        private fun conditionExternalDependencies(block: ApplicationConditionBlock): Set<String> =
-            block.whereClauses
-                .flatMap { graph.nodeAnalyzer.findReferencedNodes(it.whereClause.expression) }
-                .filter { it !in block.instanceNames }
+        private fun conditionExternalDependencies(block: ApplicationConditionBlock): Set<String> {
+            val expressions = block.whereClauses.map { it.whereClause.expression } +
+                (block.instances + block.references)
+                    .flatMap { instance -> instance.objectInstance.properties }
+                    .filter { property -> property.operator != "=" }
+                    .map { property -> property.value }
+            return expressions
+                .flatMap { expression -> graph.nodeAnalyzer.findReferencedNodes(expression) }
+                .filter { name -> name !in block.instanceNames }
                 .toSet()
+        }
 
         /**
          * Builds the injective-constraint map for the inner traversal of an application

@@ -8,6 +8,7 @@ import com.mdeo.expression.ast.expressions.TypedBooleanLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedExpression
 import com.mdeo.expression.ast.expressions.TypedIdentifierExpression
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariable
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternPropertyAssignment
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableElement
 import com.mdeo.modeltransformation.runtime.match.plan.BaseStep
 import com.mdeo.modeltransformation.runtime.match.plan.MatchPlanBuilder
@@ -247,6 +248,40 @@ class ApplicationConditionBlockTest {
             assertTrue(
                 condition.innerSteps.indexOf(filter) > walkIndex,
                 "The clause is only evaluated once the node it reads has been walked to"
+            )
+        }
+
+        @Test
+        fun `a property constraint of a block records the block nodes it reads`() {
+            val steps = MatchPlanBuilder(
+                getVertexId = { null },
+                nodeAnalyzer = ExpressionNodeAnalyzer(setOf("patient", "a", "b"), 0),
+                isCollectionExpression = { false },
+                metamodelData = MetamodelData.empty()
+            ).build(
+                PatternCategories.from(
+                    TypedPattern(
+                        elements = listOf(
+                            conditionNode("patient", "Patient"),
+                            forbidBlock(
+                                conditionNode("a", "Admission"),
+                                conditionNode(
+                                    "b", "Admission",
+                                    listOf(TypedPatternPropertyAssignment("day", "==", identifier("a")))
+                                ),
+                                name = "twoAdmissionsOnOneDay"
+                            )
+                        )
+                    )
+                ),
+                emptySet()
+            ).baseSteps
+
+            val condition = steps.filterIsInstance<BaseStep.ApplicationCondition>().single()
+            val constraint = condition.innerSteps.filterIsInstance<BaseStep.InlinePropertyConstraint>().single()
+            assertEquals(
+                setOf("a"), constraint.conditionNodes,
+                "The block node the comparison reads is recorded so the chain labels it"
             )
         }
 

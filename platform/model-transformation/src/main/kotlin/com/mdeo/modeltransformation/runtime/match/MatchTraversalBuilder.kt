@@ -328,8 +328,9 @@ internal class MatchTraversalBuilder(
      * 2. It appears as a value in [injectiveConstraints] AND the label refers to an
      *    island-internal node (so the constraint `where(P.neq(label))` can resolve the
      *    label from the chain's own path rather than from the outer traversal scope).
-     * 3. It is read by a [BaseStep.WhereFilter] of the block AND refers to an
-     *    island-internal node, so that the compiled expression can `select(label)` it.
+     * 3. It is read by a constraint of the block — a [BaseStep.WhereFilter] or an
+     *    [BaseStep.InlinePropertyConstraint] — AND refers to an island-internal node, so
+     *    that the compiled expression can `select(label)` it.
      *
      * Labels that refer to outer matched nodes are already present in the outer traversal
      * scope and do not need to be re-assigned inside the chain.
@@ -380,15 +381,18 @@ internal class MatchTraversalBuilder(
             }
         }
 
-        // (3) Where clauses of the block: an expression reading one of the condition's own
+        // (3) Constraints of the block: an expression reading one of the condition's own
         //     nodes compiles to select(label), which needs that node to be labeled.
         for (step in innerSteps) {
-            if (step is BaseStep.WhereFilter) {
-                for (name in step.conditionNodes) {
-                    val label = VariableBinding.stepLabel(name)
-                    if (label in islandInternalLabels) {
-                        needed.add(label)
-                    }
+            val readNodes = when (step) {
+                is BaseStep.WhereFilter -> step.conditionNodes
+                is BaseStep.InlinePropertyConstraint -> step.conditionNodes
+                else -> emptySet()
+            }
+            for (name in readNodes) {
+                val label = VariableBinding.stepLabel(name)
+                if (label in islandInternalLabels) {
+                    needed.add(label)
                 }
             }
         }

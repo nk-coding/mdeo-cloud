@@ -20,6 +20,7 @@ import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternPropertyAssignment
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariable
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
@@ -145,6 +146,9 @@ class ConditionWhereClauseTest {
 
     private fun binary(operator: String, left: TypedExpression, right: TypedExpression) =
         TypedBinaryExpression(evalType = BOOL_IDX, operator = operator, left = left, right = right)
+
+    private fun property(name: String, operator: String, value: TypedExpression) =
+        TypedPatternPropertyAssignment(propertyName = name, operator = operator, value = value)
 
     private fun where(expression: TypedExpression) =
         TypedPatternWhereClauseElement(whereClause = TypedWhereClause(expression = expression))
@@ -470,7 +474,74 @@ class ConditionWhereClauseTest {
     }
 
     // =========================================================================
-    // 5. The clause does not leak out of the block
+    // 5. Property constraints of a block read the same names a clause can
+    // =========================================================================
+
+    /**
+     * A property constraint on a node of a block is compiled inside the condition, exactly
+     * like a clause of the block, and reads the same names: the variables and nodes of the
+     * match, and the block's own nodes.
+     */
+    @Nested
+    inner class PropertyConstraintsInBlocks {
+
+        @Test
+        fun `property constraint of a block reads a pattern variable`() {
+            addNode("small", size = 10)
+            addNode("big", size = 90)
+
+            // var limit = a.size ; forbid { other: Node { size > limit } }
+            val values = matchedValues(
+                conditionNode("a", "Node"),
+                varElement("limit", nodeSize("a")),
+                forbidBlock(
+                    conditionNode("other", "Node", listOf(property("size", ">", variable("limit")))),
+                    name = "largerThanLimit"
+                )
+            )
+
+            assertEquals(
+                listOf("big"), values,
+                "The variable is bound before the condition is evaluated, so the block reads it"
+            )
+        }
+
+        @Test
+        fun `property constraint of a block reads another node of the same block`() {
+            // a -> b -> c with equal sizes: the block holds and rejects a
+            val equalStart = addNode("start")
+            val equalMiddle = addNode("same", size = 7)
+            val equalEnd = addNode("same", size = 7)
+            link(equalStart, equalMiddle)
+            link(equalMiddle, equalEnd)
+
+            // d -> e -> f with differing sizes: the constraint fails, so d survives
+            val otherStart = addNode("other-start")
+            val otherMiddle = addNode("x", size = 1)
+            val otherEnd = addNode("y", size = 2)
+            link(otherStart, otherMiddle)
+            link(otherMiddle, otherEnd)
+
+            val values = matchedValues(
+                conditionNode("a", "Node"),
+                forbidBlock(
+                    conditionNode("b", "Node"),
+                    conditionNode("c", "Node", listOf(property("size", "==", nodeSize("b")))),
+                    conditionLink("a", "to", "b", "from"),
+                    conditionLink("b", "to", "c", "from"),
+                    name = "twoSuccessorsOfEqualSize"
+                )
+            )
+
+            assertEquals(
+                listOf("other-start", "same", "same", "x", "y"), values,
+                "Only the node whose two successors have the same size is rejected"
+            )
+        }
+    }
+
+    // =========================================================================
+    // 6. The clause does not leak out of the block
     // =========================================================================
 
     @Test

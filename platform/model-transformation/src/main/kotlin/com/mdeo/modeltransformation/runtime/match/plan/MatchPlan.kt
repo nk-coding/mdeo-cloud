@@ -61,12 +61,18 @@ internal sealed class BaseStep {
      *
      * Constant values are translated to `.has(key, value)`.
      * Non-constant expressions are translated to `.filter(equalityExpr.is(true))`.
+     *
+     * [conditionNodes] is empty for a constraint of the main pattern. For a constraint
+     * declared inside a `forbid` / `require` block it holds the names of the block's own
+     * nodes that the compared expression reads, which have to be labelled inside the
+     * condition chain before the expression can select them.
      */
     data class InlinePropertyConstraint(
         val instanceName: String,
         val className: String?,
         val property: TypedPatternPropertyAssignment,
-        val isConstant: Boolean
+        val isConstant: Boolean,
+        val conditionNodes: Set<String> = emptySet()
     ) : BaseStep()
 
     /**
