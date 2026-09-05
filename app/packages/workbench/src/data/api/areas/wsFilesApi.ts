@@ -9,6 +9,12 @@ import type { Project } from "../../project/project";
 import type { WebSocketApi, ProjectLoadCallbacks } from "./webSocketApi";
 
 /**
+ * Callback for files of the cached project changing outside this client,
+ * carrying the paths whose cached state was dropped as a result.
+ */
+export type CachedFilesInvalidatedCallback = (projectId: string, paths: string[]) => void;
+
+/**
  * Response from reading a file, including content and version
  */
 export interface FileReadResult {
@@ -37,13 +43,65 @@ interface CachedFileInfo {
 export class WsFilesApi {
     private cachedProjectId: string | undefined = undefined;
     private fileTreeCache: Map<string, CachedFileInfo> = new Map();
+    private readonly invalidationCallbacks: Set<CachedFilesInvalidatedCallback> = new Set();
 
     /**
      * Creates a new WsFilesApi instance
      *
      * @param websocket The WebSocket API providing the transport layer
      */
-    constructor(private readonly websocket: WebSocketApi) {}
+    constructor(private readonly websocket: WebSocketApi) {
+        // Subscribed here rather than by whoever consumes the event, so the
+        // cache is always dropped before anything reacts to the change: a
+        // listener that reloads a file has to read through to the server, not
+        // out of entries describing the state from before the push.
+        this.websocket.onFilesChanged((projectId) => this.handleFilesChanged(projectId));
+    }
+
+    /**
+     * Registers a callback for cached files being dropped because the project
+     * changed elsewhere, for instance because someone pushed to it over git.
+     *
+     * @param callback Called with the project and the file paths whose cached
+     *   state was dropped
+     */
+    onCachedFilesInvalidated(callback: CachedFilesInvalidatedCallback): void {
+        this.invalidationCallbacks.add(callback);
+    }
+
+    /**
+     * Unregisters a previously registered invalidation callback
+     *
+     * @param callback The callback function to unregister
+     */
+    offCachedFilesInvalidated(callback: CachedFilesInvalidatedCallback): void {
+        this.invalidationCallbacks.delete(callback);
+    }
+
+    /**
+     * Drops everything cached for a project that changed elsewhere.
+     *
+     * The notification is deliberately coarse - it says only that something
+     * changed - so the whole cache goes rather than any attempt to work out
+     * which entries are still good. Listeners are told which file paths were
+     * dropped so they can reload what they have open.
+     *
+     * @param projectId The project whose files changed
+     */
+    private handleFilesChanged(projectId: string): void {
+        if (this.cachedProjectId !== projectId) {
+            return;
+        }
+
+        const paths = [...this.fileTreeCache.entries()]
+            .filter(([, info]) => info.type === FileType.File)
+            .map(([path]) => path);
+        this.fileTreeCache.clear();
+
+        for (const callback of this.invalidationCallbacks) {
+            callback(projectId, paths);
+        }
+    }
 
     /**
      * Reads the contents of a file along with its version.
@@ -96,6 +154,15 @@ export class WsFilesApi {
         content: Uint8Array,
         opts: IFileWriteOptions
     ): Promise<ApiResult<void, FileSystemError>> {
+        const normalizedPath = this.normalizePath(path);
+        // The version this client last saw for the file, when it has seen one
+        // at all. Sending it is what turns a write from an unconditional
+        // overwrite into one that fails if the file moved on in the meantime -
+        // which is exactly what happens to a tab that has been open since
+        // before someone pushed to the project over git.
+        const expectedVersion =
+            this.cachedProjectId === projectId ? this.fileTreeCache.get(normalizedPath)?.version : undefined;
+
         try {
             const contentBase64 = uint8ArrayToBase64(content);
             await this.websocket.writeFile(
@@ -103,16 +170,22 @@ export class WsFilesApi {
                 path,
                 contentBase64,
                 opts.create ?? true,
-                opts.overwrite ?? false
+                opts.overwrite ?? false,
+                expectedVersion
             );
 
             if (this.cachedProjectId === projectId) {
-                this.updateWriteCache(path, content);
+                // An accepted conditional write leaves the file at exactly one
+                // version past the one it was conditioned on, so the chain of
+                // known versions carries across consecutive saves rather than
+                // needing a read between each. Without a version to go on the
+                // entry keeps none, and the next read fills it back in.
+                this.updateWriteCache(path, content, expectedVersion === undefined ? undefined : expectedVersion + 1);
             }
 
             return ApiResult.success(undefined);
         } catch (error) {
-            return this.handleWsError<void>(projectId, this.normalizePath(path), error);
+            return this.handleWsError<void>(projectId, normalizedPath, error);
         }
     }
 
@@ -446,6 +519,13 @@ export class WsFilesApi {
             this.fileTreeCache.set(normalizedPath, { exists: false });
         }
 
+        // A version conflict says this client's idea of the file is stale, so
+        // whatever is cached for it has to go: keeping it would send the same
+        // rejected version again on the next attempt.
+        if (this.cachedProjectId === projectId && code === FileSystemErrorCode.VersionConflict) {
+            this.fileTreeCache.delete(normalizedPath);
+        }
+
         return { success: false, error: { code: code as any, message } };
     }
 
@@ -477,13 +557,14 @@ export class WsFilesApi {
         return null;
     }
 
-    private updateWriteCache(path: string, content: Uint8Array): void {
+    private updateWriteCache(path: string, content: Uint8Array, version?: number): void {
         const normalizedPath = this.normalizePath(path);
         const existing = this.fileTreeCache.get(normalizedPath);
         this.fileTreeCache.set(normalizedPath, {
             exists: true,
             type: FileType.File,
             content: content,
+            version,
             metadata: existing?.metadata
         });
         this.invalidateParentDirCache(normalizedPath);

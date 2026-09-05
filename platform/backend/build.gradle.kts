@@ -43,6 +43,15 @@ dependencies {
     // Security
     implementation(libs.bcrypt)
     
+    // Git (project repositories served over smart HTTP and SSH)
+    implementation(libs.jgit)
+    implementation(libs.sshd.core)
+    // MINA SSHD's own EdDSA support only recognizes keys produced by a
+    // registered EdDSA-capable security provider, not plain JDK-native
+    // Ed25519 - without this, both the git-over-SSH host key and any
+    // client's ed25519 public key fail with "EdDSA provider not supported".
+    implementation(libs.bouncycastle.provider)
+    
     // Logging
     implementation(libs.logback)
     
@@ -60,4 +69,8 @@ tasks.shadowJar {
     archiveClassifier.set("")
     archiveVersion.set("")
     mergeServiceFiles()
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

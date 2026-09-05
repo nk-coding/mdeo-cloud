@@ -42,6 +42,7 @@ object DatabaseFactory {
                 ProjectsTable,
                 ProjectOwnersTable,
                 FilesTable,
+                FileVersionCountersTable,
                 FileMetadataTable,
                 PluginsTable,
                 ProjectPluginsTable,
@@ -52,7 +53,13 @@ object DatabaseFactory {
                 FileDependenciesTable,
                 DataDependenciesTable,
                 ExecutionsTable,
-                ExecutionFileMetadataTable
+                ExecutionFileMetadataTable,
+                GitPacksTable,
+                GitPackFilesTable,
+                GitRefsTable,
+                PersonalAccessTokensTable,
+                SshPublicKeysTable,
+                PersonalAccessTokenProjectsTable
             )
         }
         
