@@ -1,5 +1,12 @@
 package com.mdeo.backend.service
 
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.mdeo.backend.database.PluginManifestFingerprintsTable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.ConcurrentHashMap
 import com.mdeo.common.transport.CompressedResponses
 import com.mdeo.backend.database.ContributionPluginsTable
 import com.mdeo.backend.database.ContributionTargetsTable
@@ -26,6 +33,11 @@ import java.util.*
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
+
+/**
+ * Header every plugin service answers with, carrying a fingerprint of its current manifest.
+ */
+const val MANIFEST_FINGERPRINT_HEADER = "X-Mdeo-Manifest-Fingerprint"
 
 /**
  * Plugin manifest returned from plugin's GET / endpoint.
@@ -260,8 +272,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             )
         }
 
-        val manifest = try {
-            fetchPluginManifest(normalizedUrl)
+        val fetched = try {
+            fetchManifest(normalizedUrl)
         } catch (e: Exception) {
             logger.error("Failed to fetch plugin manifest from $normalizedUrl", e)
             return pluginFailure(
@@ -269,6 +281,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 "Failed to fetch plugin manifest: ${e.message}"
             )
         }
+        val manifest = fetched.manifest
 
         reservedExtensionClaim(manifest)?.let { languagePluginId ->
             return pluginFailure(
@@ -295,6 +308,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
 
             storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
+
+            storeManifestFingerprint(pluginId, fetched.fingerprint)
 
             success(
                 createBackendPlugin(
@@ -324,8 +339,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 ?.get(PluginsTable.url)
         } ?: return pluginFailure(ErrorCodes.PLUGIN_NOT_FOUND, "Plugin not found")
 
-        val manifest = try {
-            fetchPluginManifest(url)
+        val fetched = try {
+            fetchManifest(url)
         } catch (e: Exception) {
             logger.error("Failed to fetch plugin manifest from $url", e)
             return pluginFailure(
@@ -333,6 +348,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 "Failed to fetch plugin manifest: ${e.message}"
             )
         }
+        val manifest = fetched.manifest
 
         reservedExtensionClaim(manifest)?.let { languagePluginId ->
             // Refused rather than applied with the offending language
@@ -370,6 +386,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             }
         }
 
+        storeManifestFingerprint(pluginId, fetched.fingerprint)
         fileDataService.invalidatePluginData(pluginId)
         
         return success(Unit)
@@ -399,7 +416,15 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      * Fetches the plugin manifest from the plugin's GET / endpoint.
      * Uses the internal base URL for backend-to-plugin communication.
      */
-    private suspend fun fetchPluginManifest(url: String): PluginManifest {
+    /**
+     * A fetched manifest, and the fingerprint the plugin reported with it.
+     */
+    private class FetchedManifest(val manifest: PluginManifest, val fingerprint: String?)
+
+    /**
+     * Fetches the plugin manifest, together with the manifest fingerprint the plugin sends.
+     */
+    private suspend fun fetchManifest(url: String): FetchedManifest {
         return withContext(Dispatchers.IO) {
             val resolvedUrl = resolvePluginUrl(url, useInternal = true)
             val request = CompressedResponses.accept(HttpRequest.newBuilder())
@@ -414,7 +439,10 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 throw RuntimeException("Plugin returned status ${response.statusCode()}")
             }
 
-            json.decodeFromString<PluginManifest>(response.body())
+            FetchedManifest(
+                json.decodeFromString<PluginManifest>(response.body()),
+                response.headers().firstValue(MANIFEST_FINGERPRINT_HEADER).orElse(null)
+            )
         }
     }
 
@@ -442,6 +470,94 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             val extension = plugin.extension?.let { if (it.startsWith(".")) it else ".$it" }
             extension.equals(RESERVED_FILE_EXTENSION, ignoreCase = true)
         }?.id
+
+    /**
+     * Records the manifest fingerprint a plugin reported, or forgets it when the plugin sent none.
+     */
+    private fun storeManifestFingerprint(pluginId: UUID, fingerprint: String?) {
+        transaction {
+            PluginManifestFingerprintsTable.deleteWhere { PluginManifestFingerprintsTable.pluginId eq pluginId.toKotlinUuid() }
+            if (fingerprint != null) {
+                PluginManifestFingerprintsTable.insert {
+                    it[PluginManifestFingerprintsTable.pluginId] = pluginId.toKotlinUuid()
+                    it[PluginManifestFingerprintsTable.fingerprint] = fingerprint
+                }
+            }
+        }
+        if (fingerprint != null) knownFingerprints[pluginId] = fingerprint else knownFingerprints.remove(pluginId)
+    }
+
+    private val knownFingerprints = ConcurrentHashMap<UUID, String>()
+
+    private val manifestWatcher = ManifestWatcher(
+        recorded = { pluginId ->
+            knownFingerprints[pluginId] ?: transaction {
+                PluginManifestFingerprintsTable.selectAll()
+                    .where { PluginManifestFingerprintsTable.pluginId eq pluginId.toKotlinUuid() }
+                    .firstOrNull()
+                    ?.get(PluginManifestFingerprintsTable.fingerprint)
+            }?.also { knownFingerprints[pluginId] = it }
+        },
+        refresh = { pluginId ->
+            logger.info("Plugin $pluginId reports a changed manifest, refreshing it")
+            when (val result = refreshPluginData(pluginId)) {
+                is ApiResult.Success -> logger.info("Refreshed plugin $pluginId after its manifest changed")
+                is ApiResult.Failure -> logger.warn("Could not refresh plugin $pluginId: ${result.error.message}")
+            }
+        },
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    )
+
+    private val manifestCheckScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Asks every plugin for its manifest fingerprint at a fixed interval, refreshing plugins whose
+     * manifest changed.
+     *
+     * Answers to requests already carry the fingerprint, but a plugin redeployed with new static
+     * assets fails in the workbench before anything asks it for data. Checking on a schedule bounds
+     * how long such a plugin stays stale.
+     *
+     * @param intervalSeconds Seconds between checks; 0 disables them
+     */
+    fun startManifestChecks(intervalSeconds: Long) {
+        if (intervalSeconds <= 0) return
+        manifestCheckScope.launch {
+            while (isActive) {
+                delay(intervalSeconds * 1000)
+                val plugins = transaction {
+                    PluginsTable.selectAll().map { it[PluginsTable.id].toJavaUuid() to it[PluginsTable.url] }
+                }
+                for ((pluginId, url) in plugins) {
+                    try {
+                        val request = HttpRequest.newBuilder()
+                            .uri(URI.create(resolvePluginUrl(url, useInternal = true)))
+                            .GET()
+                            .timeout(Duration.ofSeconds(config.timeouts.manifestFetchSeconds))
+                            .build()
+                        observeManifestFingerprint(pluginId, httpClient.send(request, HttpResponse.BodyHandlers.discarding()))
+                    } catch (e: Exception) {
+                        logger.debug("Manifest check of plugin $pluginId failed: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Refreshes a plugin whose answer shows its manifest changed since it was last fetched.
+     *
+     * Every answer of a plugin service carries [MANIFEST_FINGERPRINT_HEADER]. When it differs from the
+     * fingerprint recorded at the last fetch — or none was recorded — the plugin was redeployed, and
+     * its manifest is fetched again in the background, so nobody has to refresh plugins by hand after
+     * an upgrade. A plugin that sends no fingerprint is left alone.
+     *
+     * @param pluginId The plugin that answered
+     * @param response Its answer
+     */
+    fun observeManifestFingerprint(pluginId: UUID, response: HttpResponse<*>) {
+        manifestWatcher.observe(pluginId, response.headers().firstValue(MANIFEST_FINGERPRINT_HEADER).orElse(null))
+    }
 
     /**
      * Stores language plugins in the database.
@@ -750,12 +866,13 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             if (!exists) {
                 logger.info("Initializing default plugin: $normalizedUrl")
                 
-                val manifest = try {
-                    fetchPluginManifest(normalizedUrl)
+                val fetched = try {
+                    fetchManifest(normalizedUrl)
                 } catch (e: Exception) {
                     logger.error("Failed to fetch plugin manifest from $normalizedUrl", e)
                     continue
                 }
+                val manifest = fetched.manifest
 
                 val reservedClaim = reservedExtensionClaim(manifest)
                 if (reservedClaim != null) {
@@ -785,6 +902,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
 
                     storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
                     storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
+                    storeManifestFingerprint(pluginId, fetched.fingerprint)
                 }
                 
                 logger.info("Successfully initialized default plugin: ${manifest.name}")

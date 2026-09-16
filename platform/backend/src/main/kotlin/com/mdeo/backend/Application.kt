@@ -106,6 +106,8 @@ fun Application.module(appConfig: AppConfig) {
     )
     gitSshServer.start()
 
+    services.pluginService.startManifestChecks(appConfig.plugin.manifestCheckSeconds)
+    
     monitor.subscribe(ApplicationStopped) {
         gitSshServer.stop()
         DatabaseFactory.close()
