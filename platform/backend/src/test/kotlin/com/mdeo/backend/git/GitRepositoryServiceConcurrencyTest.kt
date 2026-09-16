@@ -9,6 +9,7 @@ import com.mdeo.backend.config.GitConfig
 import com.mdeo.backend.config.JwtConfig
 import com.mdeo.backend.config.PluginConfig
 import com.mdeo.backend.config.SessionConfig
+import com.mdeo.backend.config.TimeoutConfig
 import com.mdeo.backend.database.DatabaseFactory
 import com.mdeo.backend.database.ProjectsTable
 import com.mdeo.backend.service.AuthRateLimiter
@@ -286,7 +287,8 @@ internal class TestServices : InjectedServices {
             maxPushPackSizeBytes = 100L * 1024 * 1024, maxProjectStorageBytes = 2L * 1024 * 1024 * 1024,
             sshPort = 2222, oauthClientId = "test", oauthCodeTtlSeconds = 300,
             oauthAuthorizePath = "/oauth/authorize", oauthTokenPath = "/api/oauth/token"
-        )
+        ),
+        timeouts = TimeoutConfig()
     )
     override val fileService: FileService by lazy { FileService(this) }
     override val pluginService: PluginService by lazy { PluginService(this) }
