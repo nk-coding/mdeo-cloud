@@ -59,7 +59,8 @@ export enum SessionErrorCode {
 export enum FileDataErrorCode {
     FileDataCircularDependency = "FileDataCircularDependency",
     FileDataComputationFailed = "FileDataComputationFailed",
-    FileDataNoPluginFound = "FileDataNoPluginFound"
+    FileDataNoPluginFound = "FileDataNoPluginFound",
+    DeadlineExceeded = "DeadlineExceeded"
 }
 
 /**
