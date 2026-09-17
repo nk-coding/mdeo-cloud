@@ -15,7 +15,8 @@ export enum CommonErrorCode {
     Forbidden = "Forbidden",
     NotFound = "NotFound",
     Conflict = "Conflict",
-    Internal = "Internal"
+    Internal = "Internal",
+    DeadlineExceeded = "DeadlineExceeded"
 }
 
 /**
@@ -66,8 +67,7 @@ export enum SessionErrorCode {
 export enum FileDataErrorCode {
     FileDataCircularDependency = "FileDataCircularDependency",
     FileDataComputationFailed = "FileDataComputationFailed",
-    FileDataNoPluginFound = "FileDataNoPluginFound",
-    DeadlineExceeded = "DeadlineExceeded"
+    FileDataNoPluginFound = "FileDataNoPluginFound"
 }
 
 /**

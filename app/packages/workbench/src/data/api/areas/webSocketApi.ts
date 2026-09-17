@@ -1,4 +1,5 @@
 import type { Execution, ExecutionFileEntry } from "../../execution/execution";
+import { CommonErrorCode } from "../apiResult";
 import { showSuccess, showError, showInfo, showWarning } from "@/lib/notifications";
 
 /**
@@ -777,7 +778,9 @@ export class WebSocketApi {
         const pending = this.pendingRequests.get(message.requestId);
         if (pending) {
             this.pendingRequests.delete(message.requestId);
-            pending.reject(message.error);
+            pending.reject(
+                message.error ?? { code: CommonErrorCode.Unknown, message: "The request failed without saying why" }
+            );
         }
     }
 
@@ -1187,7 +1190,9 @@ export class WebSocketApi {
         const pending = this.pendingRequests.get(message.requestId);
         if (pending) {
             this.pendingRequests.delete(message.requestId);
-            pending.reject(message.error);
+            pending.reject(
+                message.error ?? { code: CommonErrorCode.Unknown, message: "The request failed without saying why" }
+            );
         }
     }
 
