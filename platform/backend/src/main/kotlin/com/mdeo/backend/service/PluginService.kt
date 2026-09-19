@@ -284,6 +284,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             )
         }
         val manifest = fetched.manifest
+        manifestFailure(manifest)?.let { return it }
 
         reservedExtensionClaim(manifest)?.let { languagePluginId ->
             return pluginFailure(
@@ -351,6 +352,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             )
         }
         val manifest = fetched.manifest
+        manifestFailure(manifest)?.let { return it }
 
         reservedExtensionClaim(manifest)?.let { languagePluginId ->
             // Refused rather than applied with the offending language
@@ -471,6 +473,55 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         }?.id
 
     /**
+     * Refuses a manifest that declares something the platform cannot address.
+     *
+     * Contribution ids, and the ids of languages that declare sessions, become addresses
+     * (`contrib:<id>`, `lang:<id>`). A manifest where one of them cannot be carried by an address,
+     * or where a contribution id is declared twice, is refused as a whole rather than stored
+     * without the parts that do not fit.
+     *
+     * @param manifest The fetched manifest
+     * @return The failure to report, or null when the manifest can be stored
+     */
+    private fun manifestFailure(manifest: PluginManifest): ApiResult.Failure? {
+        val problems = mutableListOf<String>()
+        for (plugin in manifest.languagePlugins) {
+            if (plugin.sessions.isNotEmpty() && PluginTarget.ofOrNull(PluginTargetKind.LANGUAGE, plugin.id) == null) {
+                problems += "language '${plugin.id}' declares sessions, but its id cannot be used as an address"
+            }
+        }
+        val contributionIds = manifest.contributionPlugins
+            .flatMap { serverContributionPayloads(it) }
+            .mapNotNull { contributionIdOf(it) }
+        for (contributionId in contributionIds.distinct()) {
+            if (PluginTarget.ofOrNull(PluginTargetKind.CONTRIBUTION, contributionId) == null) {
+                problems += "contribution id '$contributionId' cannot be used as an address"
+            }
+            if (contributionIds.count { it == contributionId } > 1) {
+                problems += "contribution id '$contributionId' is declared more than once"
+            }
+        }
+        if (problems.isEmpty()) return null
+        return ApiResult.Failure(
+            ApiError(
+                ErrorCodes.PLUGIN_MANIFEST_INVALID,
+                "Invalid manifest of plugin '${manifest.id}': ${problems.joinToString("; ")}"
+            )
+        )
+    }
+
+    /**
+     * The server contribution payloads one contribution plugin of a manifest ships.
+     */
+    private fun serverContributionPayloads(contributionPlugin: JsonObject): List<JsonObject> =
+        contributionPlugin["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
+
+    /**
+     * The id a server contribution payload is addressed by, or null when it carries none.
+     */
+    private fun contributionIdOf(payload: JsonObject): String? = payload["id"]?.jsonPrimitive?.contentOrNull
+
+    /**
      * Records the manifest fingerprint a plugin reported, or forgets it when the plugin sent none.
      */
     private fun storeManifestFingerprint(pluginId: UUID, fingerprint: String?) {
@@ -516,7 +567,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 is ApiResult.Failure -> logger.warn("Could not refresh plugin $pluginId: ${result.error.message}")
             }
         },
-        scope = backgroundScope
+        scope = backgroundScope,
+        cooldownMillis = pluginConfig.manifestRefreshCooldownSeconds * 1000
     )
 
     /**
@@ -603,14 +655,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 it[updatedAt] = now
             }
 
-            val target = PluginTarget.parseOrNull("${PluginTargetKind.LANGUAGE.wire}:${plugin.id}")
-            if (target != null) {
-                storeSessions(pluginId, target, plugin.sessions)
-            } else if (plugin.sessions.isNotEmpty()) {
-                logger.warn(
-                    "Language '${plugin.id}' of plugin $pluginId declares sessions but its id " +
-                            "cannot be addressed; ignoring them"
-                )
+            if (plugin.sessions.isNotEmpty()) {
+                storeSessions(pluginId, PluginTarget.of(PluginTargetKind.LANGUAGE, plugin.id), plugin.sessions)
             }
         }
     }
@@ -633,8 +679,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                 it[targetId] = target.id
                 it[name] = sessionName
                 it[protocol] = sessionType.protocol
-                it[versions] = Json.encodeToString(sessionType.versions)
-                it[description] = sessionType.description
+                it[versions] = sessionType.versions
             }
         }
     }
@@ -649,7 +694,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             val description = plugin["description"]?.jsonPrimitive?.content ?: ""
             val additionalKeywords =
                 plugin["additionalKeywords"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-            val serverPlugins = plugin["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
+            val serverPlugins = serverContributionPayloads(plugin)
 
             ContributionPluginsTable.insert {
                 it[id] = UUID.randomUUID().toKotlinUuid()
@@ -672,7 +717,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      * The payload as a whole belongs to the receiving language, and the platform reads exactly
      * two things from it: the contribution's `id`, which is the address callers use, and its
      * `sessions`. A payload without an id is not addressable and contributes no rows; it still
-     * reaches its language, which may not need one.
+     * reaches its language, which may not need one. The ids were checked by [manifestFailure].
      *
      * @param pluginId The plugin that ships the contributions
      * @param languageId The language the contributions extend
@@ -680,23 +725,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      */
     private fun storeContributionTargets(pluginId: UUID, languageId: String, serverPlugins: List<JsonObject>) {
         for (payload in serverPlugins) {
-            val contributionId = payload["id"]?.jsonPrimitive?.contentOrNull ?: continue
-            val target = PluginTarget.parseOrNull("${PluginTargetKind.CONTRIBUTION.wire}:$contributionId")
-            if (target == null) {
-                logger.warn("Ignoring contribution with an unusable id '$contributionId' in plugin $pluginId")
-                continue
-            }
-
-            val alreadyStored = ContributionTargetsTable.selectAll()
-                .where {
-                    (ContributionTargetsTable.pluginId eq pluginId.toKotlinUuid()) and
-                            (ContributionTargetsTable.contributionId eq contributionId)
-                }
-                .count() > 0
-            if (alreadyStored) {
-                logger.warn("Plugin $pluginId ships contribution '$contributionId' more than once; keeping the first")
-                continue
-            }
+            val contributionId = contributionIdOf(payload) ?: continue
+            val target = PluginTarget.of(PluginTargetKind.CONTRIBUTION, contributionId)
 
             ContributionTargetsTable.insert {
                 it[ContributionTargetsTable.pluginId] = pluginId.toKotlinUuid()
@@ -893,6 +923,11 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
                     continue
                 }
                 val manifest = fetched.manifest
+                val failure = manifestFailure(manifest)
+                if (failure != null) {
+                    logger.error("Refusing default plugin $normalizedUrl: ${failure.error.message}")
+                    continue
+                }
 
                 val reservedClaim = reservedExtensionClaim(manifest)
                 if (reservedClaim != null) {
@@ -1057,7 +1092,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         } ?: return null
 
         val sessionType = transaction {
-            loadSessions(pluginId, target.kind, target.id)[sessionName]
+            loadSessions(pluginId, target)[sessionName]
         } ?: return null
 
         val pluginUrl = getPluginUrl(pluginId, useInternal = useInternalUrl) ?: return null
@@ -1220,26 +1255,20 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      * Reads back the session types one target declares.
      *
      * @param pluginId The plugin that ships the target
-     * @param kind Whether the target is a language or a contribution
-     * @param targetId The language or contribution id
+     * @param target The target whose sessions to read
      * @return The session types, keyed by session name; empty when the target declares none
      */
-    private fun loadSessions(
-        pluginId: UUID,
-        kind: PluginTargetKind,
-        targetId: String
-    ): Map<String, SessionType> {
+    private fun loadSessions(pluginId: UUID, target: PluginTarget): Map<String, SessionType> {
         return PluginSessionsTable.selectAll()
             .where {
                 (PluginSessionsTable.pluginId eq pluginId.toKotlinUuid()) and
-                        (PluginSessionsTable.targetKind eq kind.wire) and
-                        (PluginSessionsTable.targetId eq targetId)
+                        (PluginSessionsTable.targetKind eq target.kind.wire) and
+                        (PluginSessionsTable.targetId eq target.id)
             }
             .associate { row ->
                 row[PluginSessionsTable.name] to SessionType(
                     protocol = row[PluginSessionsTable.protocol],
-                    versions = json.decodeFromString<List<Int>>(row[PluginSessionsTable.versions]),
-                    description = row[PluginSessionsTable.description]
+                    versions = row[PluginSessionsTable.versions]
                 )
             }
     }
@@ -1276,12 +1305,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             },
             icon = json.parseToJsonElement(row[LanguagePluginsTable.icon]).jsonArray,
             isGenerated = row[LanguagePluginsTable.isGenerated],
-            documentationUrl = row[LanguagePluginsTable.documentationUrl],
-            sessions = loadSessions(
-                row[LanguagePluginsTable.pluginId].toJavaUuid(),
-                PluginTargetKind.LANGUAGE,
-                row[LanguagePluginsTable.id]
-            )
+            documentationUrl = row[LanguagePluginsTable.documentationUrl]
         )
     }
 
