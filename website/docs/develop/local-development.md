@@ -92,8 +92,9 @@ workbench needs, which is why plugin services should be reached through it rathe
 ## Everything on the host with `tools/run-dev.sh`
 
 Starts the whole stack in one tmux session: the databases in Docker, every watcher and plugin
-service, the backend, both execution services and three federated optimizer nodes. Needs Docker,
-Node, a JDK and tmux 3.2 or newer.
+service, the backend, both execution services and three federated optimizer nodes. Needs a Linux
+host with Docker, Node, a JDK, tmux 3.2 or newer, bash 4.3 or newer, and `flock` and `ss` from
+util-linux and iproute2; the scripts do not run on macOS as they are.
 
 ```bash
 tools/run-dev.sh

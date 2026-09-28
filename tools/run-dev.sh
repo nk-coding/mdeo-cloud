@@ -55,7 +55,7 @@ for arg in "$@"; do
         --no-build)   SKIP_BUILD=1 ;;
         --fresh)      FRESH=1 ;;
         --no-attach)  ATTACH=0 ;;
-        -h|--help)    sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^#\s\?//'; exit 0 ;;
+        -h|--help)    sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^#\s\?//'; exit 0 ;;
         *)            echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
     esac
 done

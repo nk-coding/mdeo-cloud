@@ -185,7 +185,9 @@ lands in a proxy's access log. A service implementing this endpoint itself verif
 against the keys at `<BACKEND_API_URL>/.well-known/jwks.json`, requires the configured issuer, and
 accepts it only when its `scope` contains `plugin:session:connect`, its `target` and `session` claims name
 exactly the addressed target and session, and it carries `projectId` and `executionId`. The caller lists the versions it can speak in `?v=2,1`, most preferred first,
-and the first one the plugin also declares wins.
+and the first one the plugin also declares wins. The service does not report which one that was,
+so `SessionClient` picks the version from what the connect endpoint declares and offers only that
+one; a plugin redeployed without it refuses with `4409` instead of silently speaking another.
 
 A connection that never becomes a session is closed with a code and a reason:
 

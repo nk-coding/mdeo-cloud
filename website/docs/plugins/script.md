@@ -87,12 +87,13 @@ val q = p.with(x = 3.0)             // Point(x=3.0, y=2.0, label=start)
 
 - Records are compared by content with `==`, and by identity with `===`. Two records are equal
   when they are of the same record and all their fields are equal, so equal records are one element
-  of a set. Changing a record that is an element of a set or a key of a map does not move it there.
+  of a set. Changing a record that is an element of a set or a key of a map does not move it there,
+  so it is no longer found; change a copy made with `with` instead.
 - `with` copies only the record itself: a list field of the copy is the same list as the original's.
 - A record can be used as a type anywhere a type is expected, including `Point?`, and checked with
   `is` and `as`.
-- A field cannot be named `with`, and a record cannot have the name of a function of its file or of
-  a class or enum of the metamodel.
+- A field cannot be named `with`, and a record cannot have the name of a function of its file, of
+  a builtin type such as `List`, or of a class or enum of the metamodel.
 
 Contributions can define records of their own, which scripts use the same way.
 

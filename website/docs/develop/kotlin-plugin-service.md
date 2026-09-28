@@ -17,9 +17,10 @@ A Kotlin plugin service provides **contribution plugins**. A language needs a La
 which only exists in TypeScript, so a plugin that adds a language is written with
 `@mdeo/service-common`.
 
-For the same reason the module serves no `/data`, `/request` or `/:languageId/executions`
-endpoints, so what the [service API](/develop/service-api) says about deadlines and contribution
-hashes on those endpoints does not apply to it.
+For the same reason the module serves no `/data` or `/:languageId/executions` endpoints. It does
+serve `/request` for its contributions, see [One-shot requests](#one-shot-requests); a request
+addressed at a contribution carries no contribution payloads or hashes, and the module does not
+read the caller's deadline header.
 :::
 
 ## Depending on the modules
@@ -345,7 +346,7 @@ or other Ktor plugins, install the plugin service into an application you config
 
 ```kotlin
 embeddedServer(Netty, port = config.port, host = config.host) {
-    pluginService(definition, JwksPluginTokenVerifier(config.backendApiUrl, config.jwtIssuer))
+    pluginService(definition, JwksPluginTokenVerifier(config.backendApiUrl, config.jwtIssuer), config.maxSessions)
     routing {
         get("/health") { call.respondText("ok") }
     }

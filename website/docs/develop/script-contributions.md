@@ -195,11 +195,13 @@ Signatures and fields refer to them as `{ "package": "contrib/<contribution id>"
 | `opaque` | Hold it and pass it back to the contribution's functions | Create one, access any member |
 
 A contributed record behaves exactly like a [record a script declares](/plugins/script#records),
-except that its fields have no default values. A record field holds a scalar, a string, a model
-instance or enum value, a record of the same contribution, or a collection of those, and no field
-may be named `with`. Anything else — an opaque class, a class of another contribution — is rejected
-when the contribution is resolved, and so is a signature that names a contributed class its
-contribution does not define, and a record with the name of another contributed function or record.
+including [default values](#default-values) for its fields. A record field holds a scalar, a string,
+a model instance or enum value, a record of the same contribution, or a collection of those; no
+field may be named `with`, and no two fields may share a name. Anything else — an opaque class, a
+class of another contribution — is rejected when the contribution is resolved. So is a signature
+that names a contributed class its contribution does not define, a class with the name of a builtin
+type or of a class another contribution defines, and a record with the name of a contributed
+function.
 
 #### Arguments are *in*
 
@@ -254,7 +256,7 @@ the user's own files:
 | Service | Fetches with | Hands to |
 | --- | --- | --- |
 | `script-execution` | `BackendApiService.getPluginAst` | `CompilationInput(files, pluginAst)` |
-| `optimizer-execution` | `OptimizerApiClient.getScriptPluginAst` | the same input, inside each worker subprocess |
+| `optimizer-execution` | `OptimizerApiClient.getPluginAst` | the same input, inside each worker subprocess |
 
 The compiler emits the contributed functions into the same generated class as the user's
 functions, so a call to a contributed function costs exactly what a call to a script function
