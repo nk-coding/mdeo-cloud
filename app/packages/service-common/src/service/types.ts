@@ -1,7 +1,7 @@
 import type { LangiumLanguagePluginProvider, LanguageServices, PartialLanguageServices } from "@mdeo/language-common";
 import type { Plugin, LanguagePlugin } from "@mdeo/plugin";
 import type { FastifyInstance } from "fastify";
-import type { FileDataHandler, FileDataResult, RequestHandler } from "../handler/types.js";
+import type { FileDataHandler, FileDataResult, RequestHandler, TargetRequestHandler } from "../handler/types.js";
 import type { ExecutionHandler } from "../execution/types.js";
 import type { SessionHandlers } from "../ws/sessionServer.js";
 import type { DeepPartial, Module } from "langium";
@@ -119,6 +119,16 @@ export interface ServiceConfig<T = object> {
     sessions?: SessionHandlers;
 
     /**
+     * One-shot request handlers for targets that own no Langium instance, keyed by target
+     * address and then by request key.
+     *
+     * This is how a contribution serves requests: `{ "contrib:my-contribution": { "info": … } }`.
+     * A language plugin registers its handlers in {@link LanguageServiceConfig.requestHandlers}
+     * instead, which also hands each one an instance of that language.
+     */
+    requests?: TargetRequestHandlers;
+
+    /**
      * Maximum number of Langium instances open sessions may hold at once, per language.
      *
      * Separate from {@link maxLangiumInstances}, because a session keeps its instance for the
@@ -159,6 +169,15 @@ export interface ServiceConfig<T = object> {
      */
     version?: string;
 }
+
+/**
+ * The instance-free request handlers a service registers, keyed by target address and then by
+ * request key.
+ *
+ * The address is the same `<kind>:<id>` string the plugin manifest and the backend's request
+ * endpoint use, so a registration is looked up with exactly what the caller asked for.
+ */
+export type TargetRequestHandlers = Record<string, Record<string, TargetRequestHandler>>;
 
 /**
  * Directory entry returned by listDirectory

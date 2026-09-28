@@ -2,6 +2,7 @@ package com.mdeo.pluginservice.session
 
 import com.mdeo.common.auth.Scopes
 import com.mdeo.common.model.PluginTarget
+import com.mdeo.pluginservice.PluginTokenVerifier
 import com.mdeo.pluginservice.ServedSession
 import io.ktor.http.*
 import io.ktor.server.routing.*
@@ -32,7 +33,7 @@ private val logger = LoggerFactory.getLogger("com.mdeo.pluginservice.session")
  */
 fun Route.sessionEndpoint(
     sessions: Map<PluginTarget, Map<String, ServedSession>>,
-    verifier: SessionTokenVerifier,
+    verifier: PluginTokenVerifier,
     maxSessions: Int
 ) {
     val open = AtomicInteger()

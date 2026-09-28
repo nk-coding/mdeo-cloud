@@ -72,7 +72,7 @@ by plugin and execution services start with `plugin:`; the others are checked by
 | `session:open` | Getting the token that opens a [session](/develop/sessions) | Backend |
 | `session:contributions:read` | Reading which contribution plugins a `lang:` session loads | Backend |
 | `plugin:file-data:compute` | `POST /data/:languageId/:key` | Plugin service |
-| `plugin:request:send` | `POST /request/:languageId/:key`, directly or through the backend | Backend, plugin service |
+| `plugin:request:send` | `POST /request/:kind/:targetId/:key`, directly or through the backend | Backend, plugin service |
 | `plugin:execution:start` | Starting an execution | Plugin service, execution service |
 | `plugin:execution:read` | An execution's summary and result files | Plugin service, execution service |
 | `plugin:execution:cancel` | Cancelling an execution | Plugin service, execution service |
@@ -177,9 +177,11 @@ Responses:
 | `503` | Every Langium instance stayed busy for `LANGIUM_ACQUIRE_TIMEOUT_MS` |
 | `504` | The caller's deadline passed |
 
-## `POST /request/:languageId/:key`
+## `POST /request/:kind/:targetId/:key`
 
-An arbitrary language-specific request. Registered only if the service has `requestHandlers`.
+An arbitrary request, addressed at a [plugin target](./sessions.md#addressing-a-target): `lang:<id>` or
+`contrib:<id>`, written into the path as two segments the same way a session address is. Both kinds
+answer on this one channel, so a contribution is called exactly like a language plugin.
 
 **Scope:** `plugin:request:send`
 
@@ -191,11 +193,37 @@ An arbitrary language-specific request. Registered only if the service has `requ
 }
 ```
 
+`contributionPlugins` carries the project's contributions for the addressed language. A request
+addressed at a contribution carries none: it is served by the plugin that ships that contribution,
+which already holds it.
+
 The response is `{ "data": … }`, or `{ "data": null }` when the handler produced nothing. It fails
 with the same statuses as `/data`.
 
 This is the channel the config language uses to talk to its contribution plugins: `config` to compute
 section data, and the `config-execution-*` keys to manage runs.
+
+A `lang:` request is served on a Langium instance of that language, registered in a language's
+`requestHandlers`. A target that owns no instance — every contribution — registers in the service's
+`requests` map instead, keyed by address and then by request key:
+
+```ts
+requests: {
+    "contrib:my-contribution": {
+        version: async ({ body, serverApi, signal }) => ({ version: "1.4.0" })
+    }
+}
+```
+
+In a Kotlin plugin service the same handlers are declared on the contribution itself, see
+[Kotlin plugin services](./kotlin-plugin-service.md#one-shot-requests).
+
+### When to use a request, and when a session
+
+A request is one call with one answer and nothing kept afterwards. A
+[session](./sessions.md) is a connection that stays open and may hold state between messages.
+Reach for a request when there is nothing to remember — asking a service what it offers, or for
+something the workbench needs before any run exists — and for a session when there is.
 
 ## `POST /:languageId/executions`
 

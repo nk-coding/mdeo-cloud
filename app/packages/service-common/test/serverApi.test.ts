@@ -48,3 +48,34 @@ describe("HttpServerApi file data batches", () => {
         assert.ok(results.every((result) => result.status === "rejected"));
     });
 });
+
+describe("HttpServerApi plugin requests", () => {
+    afterEach(() => {
+        globalThis.fetch = realFetch;
+    });
+
+    /**
+     * Records the URL the call went to and answers it.
+     */
+    function recordingBackend(): { url?: string } {
+        const seen: { url?: string } = {};
+        globalThis.fetch = (async (url: string) => {
+            seen.url = url;
+            return new Response(JSON.stringify({ data: "ok" }), { status: 200 });
+        }) as unknown as typeof fetch;
+        return seen;
+    }
+
+    it("addresses a language and a contribution on the same channel", async () => {
+        const api = new HttpServerApi("http://backend/api");
+        api.setContext("token", "project");
+
+        const forLanguage = recordingBackend();
+        await api.sendPluginRequest("script", "info", {});
+        assert.equal(forLanguage.url, "http://backend/api/projects/project/request/lang/script/info");
+
+        const forContribution = recordingBackend();
+        await api.sendTargetRequest({ kind: "contrib", id: "script-functions" }, "info", {});
+        assert.equal(forContribution.url, "http://backend/api/projects/project/request/contrib/script-functions/info");
+    });
+});

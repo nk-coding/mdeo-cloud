@@ -286,18 +286,19 @@ data class FileDataResponse(
 )
 
 /**
- * Request payload for language plugin requests.
+ * Request payload for one-shot plugin requests.
  * This is a general request mechanism that forwards the body to the plugin.
  *
  * @property project Project ID the request belongs to
  * @property body Arbitrary JSON body to be forwarded to the plugin
- * @property contributionPlugins Server contribution plugins associated with this language; left out
- *           when the service is sent [contributionHash] alone
+ * @property contributionPlugins Server contribution plugins of the addressed language; left out
+ *           when the service is sent [contributionHash] alone, and always absent on a request
+ *           addressed at a contribution, which is served by the plugin that ships it
  * @property contributionHash Identifies [contributionPlugins]. A service that already holds the set
  *           under this hash is sent the hash alone, see `ContributionDelivery` in the backend.
  */
 @Serializable
-data class LanguagePluginRequest(
+data class PluginRequest(
     val project: String,
     val body: JsonElement,
     val contributionPlugins: List<JsonObject>? = null,
@@ -305,11 +306,11 @@ data class LanguagePluginRequest(
 )
 
 /**
- * Response from language plugin request.
+ * Response from a one-shot plugin request.
  *
  * @property data Response data as JSON
  */
 @Serializable
-data class LanguagePluginResponse(
+data class PluginResponse(
     val data: JsonElement
 )

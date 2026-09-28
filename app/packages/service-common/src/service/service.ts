@@ -21,6 +21,7 @@ import type { LangiumInstance } from "../langium/langiumInstance.js";
 import {
     errorResponse,
     formatPluginTarget,
+    pluginTargetOf,
     Scopes,
     PluginTargetKind,
     type ServerContributionPlugin,
@@ -261,21 +262,28 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
         }
     );
 
-    const hasRequestHandlers = config.languages.some(
+    const hasLanguageRequestHandlers = config.languages.some(
         (lang) => lang.requestHandlers && Object.keys(lang.requestHandlers).length > 0
     );
+    const targetRequestHandlers = config.requests ?? {};
+    const hasTargetRequestHandlers = Object.keys(targetRequestHandlers).length > 0;
 
-    if (hasRequestHandlers) {
+    if (hasLanguageRequestHandlers || hasTargetRequestHandlers) {
+        /**
+         * One-shot requests, addressed at `<kind>/<targetId>/<key>` exactly as sessions are, so a
+         * contribution is reached the same way a language plugin is. A `lang:` request is served on
+         * an instance of that language; every other target has none and is served without one.
+         */
         fastify.post<{
-            Params: { languageId: string; key: string };
+            Params: { kind: string; targetId: string; key: string };
             Body: { project: string; body: unknown; contributionPlugins?: object[]; contributionHash?: string };
         }>(
-            "/request/:languageId/:key",
+            "/request/:kind/:targetId/:key",
             {
                 preHandler: jwtAuth.authenticate.bind(jwtAuth)
             },
             async (request, reply) => {
-                const { languageId, key } = request.params;
+                const { kind, targetId, key } = request.params;
                 const { project, body, contributionPlugins, contributionHash } = request.body;
 
                 if (!JwtAuthMiddleware.hasScope(request, Scopes.PluginRequestSend)) {
@@ -286,12 +294,45 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         );
                 }
 
-                const languageHandler = languageHandlers.get(languageId);
-                if (!languageHandler) {
-                    return reply.status(404).send(errorResponse(404, `Unknown language: ${languageId}`));
+                const target = pluginTargetOf(kind, targetId);
+                if (target == undefined) {
+                    return reply.status(404).send(errorResponse(404, `Not a plugin target: ${kind}:${targetId}`));
+                }
+                const address = formatPluginTarget(target);
+                const jwt = extractJwtFromRequest(request);
+
+                const targetHandler = targetRequestHandlers[address]?.[key];
+                if (targetHandler != undefined) {
+                    const limits = createRequestLimits(request, reply);
+                    const serverApi = new HttpServerApi(config.backendApiUrl);
+                    serverApi.setContext(jwt, project);
+                    serverApi.setRequestLimits(limits.signal, limits.deadline);
+                    try {
+                        const result = await targetHandler({
+                            body,
+                            jwt,
+                            projectId: project,
+                            target,
+                            key,
+                            serverApi,
+                            signal: limits.signal
+                        });
+                        return reply.send({ data: result ?? null });
+                    } finally {
+                        limits.dispose();
+                    }
                 }
 
-                const jwt = extractJwtFromRequest(request);
+                if (target.kind !== PluginTargetKind.LANGUAGE) {
+                    return reply
+                        .status(404)
+                        .send(errorResponse(404, `No request handler registered for ${address}/${key}`));
+                }
+
+                const languageHandler = languageHandlers.get(target.id);
+                if (!languageHandler) {
+                    return reply.status(404).send(errorResponse(404, `Unknown language: ${target.id}`));
+                }
 
                 const handler = languageHandler.config.requestHandlers?.[key];
                 if (handler == undefined) {

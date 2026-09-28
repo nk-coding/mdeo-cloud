@@ -1083,6 +1083,22 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
     }
 
     /**
+     * Resolves which plugin of a project serves a target.
+     *
+     * Both kinds are looked up here, which is the point of spelling the kind into the address:
+     * the caller writes `lang:script` or `contrib:script-functions` and this finds exactly the
+     * plugin that thing belongs to.
+     *
+     * @param projectId The UUID of the project
+     * @param target The target being addressed
+     * @return The plugin's UUID, or null when the project has no such target
+     */
+    fun findPluginForTarget(projectId: UUID, target: PluginTarget): UUID? = when (target.kind) {
+        PluginTargetKind.LANGUAGE -> findPluginByLanguage(projectId, target.id)?.first
+        PluginTargetKind.CONTRIBUTION -> findPluginByContribution(projectId, target.id)?.first
+    }
+
+    /**
      * Resolves one session of one target, within a project.
      *
      * Both target kinds are resolved the same way here, which is the point of spelling the kind
@@ -1103,10 +1119,7 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
         sessionName: String,
         useInternalUrl: Boolean = true
     ): ResolvedSession? {
-        val pluginId = when (target.kind) {
-            PluginTargetKind.LANGUAGE -> findPluginByLanguage(projectId, target.id)?.first
-            PluginTargetKind.CONTRIBUTION -> findPluginByContribution(projectId, target.id)?.first
-        } ?: return null
+        val pluginId = findPluginForTarget(projectId, target) ?: return null
 
         val sessionType = transaction {
             loadSessions(pluginId, target)[sessionName]

@@ -18,7 +18,7 @@ import com.mdeo.backend.service.FileDataService
 import com.mdeo.backend.service.FileService
 import com.mdeo.backend.service.InjectedServices
 import com.mdeo.backend.service.JwtService
-import com.mdeo.backend.service.LanguagePluginRequestService
+import com.mdeo.backend.service.PluginRequestService
 import com.mdeo.backend.service.MetadataService
 import com.mdeo.backend.service.OAuthCodeService
 import com.mdeo.backend.service.PersonalAccessTokenService
@@ -300,7 +300,7 @@ internal class TestServices : InjectedServices {
     override val fileDataService: FileDataService get() = error("not needed by this test")
     override val executionService: ExecutionService get() = error("not needed by this test")
     override val webSocketNotificationService: WebSocketNotificationService get() = error("not needed by this test")
-    override val languagePluginRequestService: LanguagePluginRequestService get() = error("not needed by this test")
+    override val pluginRequestService: PluginRequestService get() = error("not needed by this test")
     override val authRateLimiter: AuthRateLimiter get() = error("not needed by this test")
     override val personalAccessTokenService: PersonalAccessTokenService get() = error("not needed by this test")
     override val sshKeyService: SshKeyService get() = error("not needed by this test")

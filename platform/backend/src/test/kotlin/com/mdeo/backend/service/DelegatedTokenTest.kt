@@ -11,19 +11,19 @@ class DelegatedTokenTest {
 
     @Test
     fun `a request that does not delegate forwards no token`() {
-        assertNull(LanguagePluginRequestService.delegatedToken("Bearer run-token", null))
-        assertNull(LanguagePluginRequestService.delegatedToken("Bearer run-token", "false"))
-        assertNull(LanguagePluginRequestService.delegatedToken("Bearer run-token", "yes"))
+        assertNull(PluginRequestService.delegatedToken("Bearer run-token", null))
+        assertNull(PluginRequestService.delegatedToken("Bearer run-token", "false"))
+        assertNull(PluginRequestService.delegatedToken("Bearer run-token", "yes"))
     }
 
     @Test
     fun `a delegating request forwards the bearer token`() {
-        assertEquals("run-token", LanguagePluginRequestService.delegatedToken("Bearer run-token", "true"))
+        assertEquals("run-token", PluginRequestService.delegatedToken("Bearer run-token", "true"))
     }
 
     @Test
     fun `a delegating request without a bearer token forwards none`() {
-        assertNull(LanguagePluginRequestService.delegatedToken(null, "true"))
-        assertNull(LanguagePluginRequestService.delegatedToken("Basic abc", "true"))
+        assertNull(PluginRequestService.delegatedToken(null, "true"))
+        assertNull(PluginRequestService.delegatedToken("Basic abc", "true"))
     }
 }

@@ -304,6 +304,40 @@ numeric — there, once.
 A numeric variable set to something that is not a whole number in its range stops the service at
 startup. Pass a `PluginServiceConfig` instead to set them in code.
 
+## One-shot requests
+
+A contribution can also answer the platform's plain request/response channel, the same one a
+language plugin serves at `POST /request/lang/<id>/<key>`. Declare a handler per request key and it
+is reached at `contrib:<id>/<key>`:
+
+```kotlin
+val stats = scriptContribution("model-stats") {
+    description = "Statistics over the model"
+
+    request("version") { JsonPrimitive(BuildInfo.VERSION) }
+
+    request("describe") { context ->
+        buildJsonObject {
+            put("project", context.projectId)
+            put("operations", operationCount)
+        }
+    }
+}
+```
+
+The handler is given a `RequestContext`: the `projectId` the caller speaks for, the addressed
+`target`, the `key`, the `body` the caller sent as a `JsonElement`, and the `token` the request
+arrived with, to pass on to the backend. What travels in `body` and what comes back is between the
+two sides; the platform only carries it.
+
+A request is authorized on its own — the token must carry `plugin:request:send` and name the
+project in the body — and nothing is kept once it is answered. Reach for it when there is no state
+to remember between calls, and for a [session](/develop/sessions) when there is: a session stays
+open, negotiates a protocol version, and can hold a heap, a model or open handles across messages.
+
+An exception thrown by a handler is logged and answered with a generic `500`, so nothing internal
+reaches the caller; report an expected failure yourself by returning it in the answer.
+
 ## Adding routes of your own
 
 `runPluginService` starts a server that serves nothing but the plugin. To add routes, health checks
@@ -311,7 +345,7 @@ or other Ktor plugins, install the plugin service into an application you config
 
 ```kotlin
 embeddedServer(Netty, port = config.port, host = config.host) {
-    pluginService(definition, JwksSessionTokenVerifier(config.backendApiUrl, config.jwtIssuer))
+    pluginService(definition, JwksPluginTokenVerifier(config.backendApiUrl, config.jwtIssuer))
     routing {
         get("/health") { call.respondText("ok") }
     }
@@ -344,7 +378,7 @@ val answer = runBlocking {
 ```
 
 To test the whole service, `pluginService` runs inside Ktor's `testApplication`. Pass a
-`SessionTokenVerifier` that accepts a fixed token instead of verifying against a backend.
+`PluginTokenVerifier` that accepts a fixed token instead of verifying against a backend.
 
 ## See also
 

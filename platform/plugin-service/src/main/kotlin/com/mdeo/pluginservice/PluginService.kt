@@ -4,9 +4,9 @@ import com.mdeo.common.transport.MAX_SERVICE_WEBSOCKET_MESSAGE_BYTES
 import com.mdeo.common.transport.SESSION_PING_PERIOD_SECONDS
 import com.mdeo.common.transport.SESSION_PONG_TIMEOUT_SECONDS
 import com.mdeo.common.transport.installDeflate
+import com.mdeo.common.transport.installHttpCompression
 import com.mdeo.common.transport.respondError
-import com.mdeo.pluginservice.session.JwksSessionTokenVerifier
-import com.mdeo.pluginservice.session.SessionTokenVerifier
+import com.mdeo.pluginservice.request.requestEndpoint
 import com.mdeo.pluginservice.session.sessionEndpoint
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -31,7 +31,8 @@ const val MANIFEST_FINGERPRINT_HEADER = "X-Mdeo-Manifest-Fingerprint"
 private val logger = LoggerFactory.getLogger("com.mdeo.pluginservice.PluginService")
 
 /**
- * Installs everything a plugin service serves: the manifest at `GET /` and the session endpoint.
+ * Installs everything a plugin service serves: the manifest at `GET /`, the one-shot request
+ * endpoint and the session endpoint.
  *
  * Use this to add a plugin service to an application you configure yourself, for example to add
  * routes of your own. [runPluginService] starts a server with nothing else.
@@ -42,7 +43,7 @@ private val logger = LoggerFactory.getLogger("com.mdeo.pluginservice.PluginServi
  */
 fun Application.pluginService(
     definition: PluginDefinition,
-    verifier: SessionTokenVerifier,
+    verifier: PluginTokenVerifier,
     maxSessions: Int = PluginServiceConfig.DEFAULT_MAX_SESSIONS
 ) {
     val manifest = definition.manifest().toString()
@@ -50,6 +51,10 @@ fun Application.pluginService(
         .joinToString("") { "%02x".format(it) }
 
     installSessionWebSockets()
+
+    // Manifests, request bodies and answers are JSON, which compresses by an order of magnitude;
+    // a service that configured it itself keeps its own settings.
+    installHttpCompression()
 
     // A route that fails answers in the platform's error shape, like every other service.
     if (pluginOrNull(StatusPages) == null) {
@@ -74,6 +79,7 @@ fun Application.pluginService(
         get("/") {
             call.respondText(manifest, ContentType.Application.Json)
         }
+        requestEndpoint(definition.requests, verifier)
         sessionEndpoint(definition.sessions, verifier, maxSessions)
         // Matched only when no other route is, so an unknown route answers in the error shape too.
         route("{...}") {
@@ -120,7 +126,7 @@ fun runPluginService(
     config: PluginServiceConfig = PluginServiceConfig.fromEnvironment(),
     wait: Boolean = true
 ): EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> {
-    val verifier = JwksSessionTokenVerifier(config.backendApiUrl, config.jwtIssuer)
+    val verifier = JwksPluginTokenVerifier(config.backendApiUrl, config.jwtIssuer)
     val server = embeddedServer(Netty, port = config.port, host = config.host) {
         pluginService(definition, verifier, config.maxSessions)
     }

@@ -5,9 +5,10 @@ import com.mdeo.common.transport.respondError
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.CallerDeadline
 import com.mdeo.backend.service.JwtService
-import com.mdeo.backend.service.LanguagePluginRequestService
+import com.mdeo.backend.service.PluginRequestService
 import com.mdeo.backend.service.ProjectPermission
 import com.mdeo.backend.service.ProjectService
+import com.mdeo.common.model.PluginTarget
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -15,12 +16,23 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.JsonElement
 import java.util.*
 
-fun Route.languagePluginRequestRoutes(
-    languagePluginRequestService: LanguagePluginRequestService,
+/**
+ * Configures the one-shot plugin request endpoint.
+ *
+ * A request is addressed at `<kind>/<targetId>/<key>`, the same way a session is: language ids
+ * and contribution ids share one namespace — `config-mdeo` is both — so the id alone would not
+ * say what is being addressed.
+ *
+ * @param pluginRequestService Service forwarding the request to the plugin that serves the target
+ * @param projectService Service checking what a signed-in user may reach
+ * @param jwtService Service issuing the token the plugin is called with
+ */
+fun Route.pluginRequestRoutes(
+    pluginRequestService: PluginRequestService,
     projectService: ProjectService,
     jwtService: JwtService
 ) {
-    route("/api/projects/{projectId}/request/{languageId}/{key}") {
+    route("/api/projects/{projectId}/request/{kind}/{targetId}/{key}") {
         post {
             val session = call.getUserSession()
             val jwtPrincipal = call.getJwtPrincipal()
@@ -54,18 +66,20 @@ fun Route.languagePluginRequestRoutes(
                     call.respondError(HttpStatusCode.Forbidden, "Token missing required scope")
                     return@post
                 }
-                callerJwt = LanguagePluginRequestService.delegatedToken(
+                callerJwt = PluginRequestService.delegatedToken(
                     call.request.headers[HttpHeaders.Authorization],
-                    call.request.headers[LanguagePluginRequestService.DELEGATE_TOKEN_HEADER]
+                    call.request.headers[PluginRequestService.DELEGATE_TOKEN_HEADER]
                 )
             } else {
                 call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
                 return@post
             }
 
-            val languageId = call.parameters["languageId"]
-            if (languageId.isNullOrBlank()) {
-                call.respondError(HttpStatusCode.BadRequest, "Missing language ID")
+            val kind = call.parameters["kind"] ?: ""
+            val targetId = call.parameters["targetId"] ?: ""
+            val target = PluginTarget.ofOrNull(kind, targetId)
+            if (target == null) {
+                call.respondError(HttpStatusCode.BadRequest, "Not a plugin target: '$kind:$targetId'")
                 return@post
             }
 
@@ -82,9 +96,9 @@ fun Route.languagePluginRequestRoutes(
                 return@post
             }
 
-            val result = languagePluginRequestService.executeRequest(
+            val result = pluginRequestService.executeRequest(
                 projectId,
-                languageId,
+                target,
                 key,
                 body,
                 callerJwt,

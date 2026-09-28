@@ -9,6 +9,7 @@ import com.mdeo.expression.ast.types.ValueTypeSerializer
 import com.mdeo.expression.ast.types.VoidType
 import com.mdeo.pluginservice.Contribution
 import com.mdeo.pluginservice.ServedSession
+import com.mdeo.pluginservice.request.RequestHandler
 import com.mdeo.scriptfunctions.protocol.ContributionNames
 import com.mdeo.scriptfunctions.protocol.ScriptFunctionsProtocol
 import kotlinx.serialization.json.Json
@@ -47,6 +48,7 @@ const val DEFAULT_SCRIPT_FUNCTIONS_SESSION = "functions"
  * @property functions The contributed functions, by name
  * @property records The records the contribution defines, by name
  * @property opaqueClasses The opaque classes the contribution defines, by name
+ * @property requestHandlers One-shot requests this contribution answers, by request key
  */
 class ScriptContribution internal constructor(
     override val id: String,
@@ -55,7 +57,8 @@ class ScriptContribution internal constructor(
     val functions: Map<String, List<ScriptFunctionDeclaration>>,
     val records: Map<String, RecordType> = emptyMap(),
     val opaqueClasses: Map<String, OpaqueType> = emptyMap(),
-    private val fieldDefaults: Map<String, Map<String, Any?>> = emptyMap()
+    private val fieldDefaults: Map<String, Map<String, Any?>> = emptyMap(),
+    override val requestHandlers: Map<String, RequestHandler> = emptyMap()
 ) : Contribution {
 
     override val languageId: String = SCRIPT_LANGUAGE_ID
@@ -215,6 +218,7 @@ class ScriptContributionBuilder internal constructor(private val id: String) {
     var sessionName: String = DEFAULT_SCRIPT_FUNCTIONS_SESSION
 
     private val functions = LinkedHashMap<String, MutableList<ScriptFunctionDeclaration>>()
+    private val requestHandlers = LinkedHashMap<String, RequestHandler>()
     private val records = LinkedHashMap<String, RecordType>()
     private val opaqueClasses = LinkedHashMap<String, OpaqueType>()
     private val fieldDefaults = LinkedHashMap<String, Map<String, Any?>>()
@@ -288,6 +292,27 @@ class ScriptContributionBuilder internal constructor(private val id: String) {
         overloads += declaration
     }
 
+    /**
+     * Answers a one-shot request addressed at this contribution.
+     *
+     * Scripts call functions over the contribution's session; this is the other channel the
+     * platform offers, the plain request/response one a language plugin also serves, reached at
+     * `contrib:<id>/<key>`. Use it for a call that needs no state kept between messages — asking
+     * the service what it offers, or for something the workbench wants before a run exists.
+     *
+     * ```kotlin
+     * request("version") { JsonPrimitive("1.4.0") }
+     * ```
+     *
+     * @param key The request key, the last segment of the address
+     * @param handler Answers the request
+     */
+    fun request(key: String, handler: RequestHandler) {
+        require(requestHandlers.put(key, handler) == null) {
+            "Request key '$key' of contribution '$id' is answered more than once"
+        }
+    }
+
     internal fun build(): ScriptContribution {
         val all = functions.values.flatten()
         // Checked once everything is declared, so a record may name one declared after it.
@@ -310,7 +335,9 @@ class ScriptContributionBuilder internal constructor(private val id: String) {
         require(duplicate == null) {
             "Operation '${duplicate!!.key}' of contribution '$id' implements more than one signature"
         }
-        return ScriptContribution(id, description, sessionName, functions, records, opaqueClasses, fieldDefaults)
+        return ScriptContribution(
+            id, description, sessionName, functions, records, opaqueClasses, fieldDefaults, requestHandlers
+        )
     }
 }
 

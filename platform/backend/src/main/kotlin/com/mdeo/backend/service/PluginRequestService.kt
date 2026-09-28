@@ -16,11 +16,14 @@ import java.time.Duration
 import java.util.*
 
 /**
- * Service responsible for sending requests to language plugins and returning their responses.
+ * Service responsible for sending one-shot requests to plugin targets and returning their responses.
+ *
+ * A request is addressed at a [PluginTarget], so a language plugin and a contribution plugin are
+ * reached the same way; the kind in the address is what says which of the two an id names.
  *
  * @param services injected dependencies required by this service.
  */
-class LanguagePluginRequestService(services: InjectedServices) : BaseService(), InjectedServices by services {
+class PluginRequestService(services: InjectedServices) : BaseService(), InjectedServices by services {
     companion object {
         /**
          * Header a caller sets to `true` to hand its own token to the plugin, instead of the
@@ -40,7 +43,7 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
             authorization?.takeIf { delegate == "true" && it.startsWith("Bearer ") }?.removePrefix("Bearer ")
     }
 
-    private val logger = LoggerFactory.getLogger(LanguagePluginRequestService::class.java)
+    private val logger = LoggerFactory.getLogger(PluginRequestService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
 
     private val httpClient by lazy {
@@ -51,18 +54,21 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
     }
 
     /**
-     * Execute a request against the language plugin for the given language.
+     * Execute a request against the plugin that serves the given target.
      *
-     * This method locates the appropriate plugin for the language, prepares a JWT,
-     * and forwards the provided JSON body to the plugin endpoint. When a
-     * [callerJwt] is supplied — a plugin delegating its work with [DELEGATE_TOKEN_HEADER] — it is
-     * forwarded as it is, so that its full scope set (e.g. plugin:execution:start) reaches the
-     * plugin. Every other request gets a fresh plugin request token instead.
+     * This method locates the plugin the target belongs to, prepares a JWT, and forwards the
+     * provided JSON body to the plugin endpoint. When a [callerJwt] is supplied — a plugin
+     * delegating its work with [DELEGATE_TOKEN_HEADER] — it is forwarded as it is, so that its
+     * full scope set (e.g. plugin:execution:start) reaches the plugin. Every other request gets a
+     * fresh plugin request token instead.
      *
-     * Contribution plugin metadata is included in the request payload.
+     * A request addressed at a language carries the project's contribution plugins for that
+     * language, because the language service needs them to read what it is asked about. One
+     * addressed at a contribution carries none: it is served by the plugin that ships that
+     * contribution, which already has it.
      *
      * @param projectId the UUID of the project making the request.
-     * @param languageId the identifier of the language whose plugin should handle the request.
+     * @param target the language or contribution whose plugin should handle the request.
      * @param key the plugin route key to call.
      * @param body the JSON payload to forward to the plugin.
      * @param callerJwt the caller's JWT, when the caller delegates its work to the plugin.
@@ -72,27 +78,31 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
      */
     suspend fun executeRequest(
         projectId: UUID,
-        languageId: String,
+        target: PluginTarget,
         key: String,
         body: JsonElement,
         callerJwt: String? = null,
         deadline: CallerDeadline? = null,
         callerComputationId: UUID? = null
-    ): ApiResult<LanguagePluginResponse> {
-        val pluginInfo = pluginService.findPluginByLanguage(projectId, languageId)
-            ?: return languagePluginRequestFailure(
+    ): ApiResult<PluginResponse> {
+        val pluginId = pluginService.findPluginForTarget(projectId, target)
+            ?: return pluginRequestFailure(
                 ErrorCodes.FILE_DATA_NO_PLUGIN_FOUND,
-                "No plugin found for language: $languageId"
+                "No plugin in this project serves $target"
             )
 
-        val (pluginId, _) = pluginInfo
         val pluginUrl = pluginService.getPluginUrl(pluginId, useInternal = true)
-            ?: return languagePluginRequestFailure(
+            ?: return pluginRequestFailure(
                 ErrorCodes.PLUGIN_NOT_FOUND,
                 "Plugin URL not found"
             )
 
-        val contributions = ContributionSet(pluginService.getContributionPluginsForLanguage(projectId, languageId))
+        val contributions = ContributionSet(
+            when (target.kind) {
+                PluginTargetKind.LANGUAGE -> pluginService.getContributionPluginsForLanguage(projectId, target.id)
+                PluginTargetKind.CONTRIBUTION -> emptyList()
+            }
+        )
 
         return try {
             val token = callerJwt ?: jwtService.generatePluginRequestToken(projectId, callerComputationId)
@@ -100,7 +110,7 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
             val responseData = callPlugin(
                 pluginId,
                 pluginUrl,
-                languageId,
+                target,
                 key,
                 projectId,
                 body,
@@ -109,29 +119,29 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
                 deadline
             )
 
-            success(LanguagePluginResponse(data = responseData))
+            success(PluginResponse(data = responseData))
         } catch (e: CancellationException) {
             throw e
         } catch (e: DeadlineExceededException) {
-            languagePluginRequestFailure(ErrorCodes.DEADLINE_EXCEEDED, e.message ?: "Deadline exceeded")
+            pluginRequestFailure(ErrorCodes.DEADLINE_EXCEEDED, e.message ?: "Deadline exceeded")
         } catch (e: java.net.http.HttpTimeoutException) {
             // The wait is the shorter of the caller's deadline and the backend's maximum; only an
             // expired deadline makes it the caller's.
             if (deadline?.isExpired == true) {
-                languagePluginRequestFailure(
+                pluginRequestFailure(
                     ErrorCodes.DEADLINE_EXCEEDED,
-                    "The plugin did not answer $languageId:$key before the caller's deadline"
+                    "The plugin did not answer $target/$key before the caller's deadline"
                 )
             } else {
-                logger.error("Language plugin request $languageId:$key timed out", e)
-                languagePluginRequestFailure(
+                logger.error("Plugin request $target/$key timed out", e)
+                pluginRequestFailure(
                     ErrorCodes.UNAVAILABLE,
-                    "The plugin did not answer $languageId:$key within ${config.timeouts.pluginRequestSeconds} seconds"
+                    "The plugin did not answer $target/$key within ${config.timeouts.pluginRequestSeconds} seconds"
                 )
             }
         } catch (e: Exception) {
-            logger.error("Failed to execute language plugin request for $languageId:$key", e)
-            languagePluginRequestFailure(ErrorCodes.UNAVAILABLE, "The plugin could not answer $languageId:$key")
+            logger.error("Failed to execute plugin request for $target/$key", e)
+            pluginRequestFailure(ErrorCodes.UNAVAILABLE, "The plugin could not answer $target/$key")
         }
     }
 
@@ -140,7 +150,7 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
      *
      * @param pluginId the plugin, whose answer shows whether its manifest changed.
      * @param pluginUrl base URL of the plugin.
-     * @param languageId language identifier used to resolve the plugin route.
+     * @param target the addressed target, which the plugin route spells out.
      * @param key specific plugin route key.
      * @param project project UUID used in the request payload.
      * @param body JSON body forwarded to the plugin.
@@ -153,7 +163,7 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
     private suspend fun callPlugin(
         pluginId: UUID,
         pluginUrl: String,
-        languageId: String,
+        target: PluginTarget,
         key: String,
         project: UUID,
         body: JsonElement,
@@ -164,14 +174,14 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
         return withContext(Dispatchers.IO) {
             val timeout = CallerDeadline.effective(deadline, Duration.ofSeconds(config.timeouts.pluginRequestSeconds))
             if (timeout.isZero) {
-                throw DeadlineExceededException("The caller's deadline passed before $languageId:$key was sent to the plugin")
+                throw DeadlineExceededException("The caller's deadline passed before $target/$key was sent to the plugin")
             }
-            val requestUrl = URI.create(pluginUrl).resolve("request/$languageId/$key")
+            val requestUrl = URI.create(pluginUrl).resolve("request/${target.kind.wire}/${target.id}/$key")
 
             val response = ContributionDelivery.send(pluginUrl) { includePayloads ->
                 val requestBody = json.encodeToString(
-                    LanguagePluginRequest.serializer(),
-                    LanguagePluginRequest(
+                    PluginRequest.serializer(),
+                    PluginRequest(
                         project = project.toString(),
                         body = body,
                         contributionPlugins = contributions.plugins.takeIf { includePayloads },
@@ -196,17 +206,17 @@ class LanguagePluginRequestService(services: InjectedServices) : BaseService(), 
                 throw RuntimeException("Plugin returned ${describeErrorResponse(response.statusCode(), response.body())}")
             }
 
-            json.decodeFromString<LanguagePluginResponse>(response.body()).data
+            json.decodeFromString<PluginResponse>(response.body()).data
         }
     }
 
     /**
-     * Helper to create a failure ApiResult for language plugin requests.
+     * Helper to create a failure ApiResult for plugin requests.
      *
      * @param code error code.
      * @param message human-readable error message.
      */
-    private fun <T> languagePluginRequestFailure(code: String, message: String): ApiResult<T> {
+    private fun <T> pluginRequestFailure(code: String, message: String): ApiResult<T> {
         return ApiResult.Failure(ApiError(code = code, message = message))
     }
 }

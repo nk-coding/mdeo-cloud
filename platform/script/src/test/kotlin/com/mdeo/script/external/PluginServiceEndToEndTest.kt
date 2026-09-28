@@ -7,8 +7,8 @@ import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.pluginservice.PluginDefinition
 import com.mdeo.pluginservice.icon
 import com.mdeo.pluginservice.pluginService
-import com.mdeo.pluginservice.session.SessionTokenClaims
-import com.mdeo.pluginservice.session.SessionTokenVerifier
+import com.mdeo.pluginservice.PluginTokenClaims
+import com.mdeo.pluginservice.PluginTokenVerifier
 import com.mdeo.script.compiler.ExternalCallSpec
 import com.mdeo.script.stdlib.impl.collections.ListImpl
 import com.mdeo.scriptfunctions.service.scriptContribution
@@ -48,8 +48,8 @@ class PluginServiceEndToEndTest {
         }
     }
 
-    private val verifier = SessionTokenVerifier { token ->
-        if (token == "run-token") SessionTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget.of(PluginTargetKind.CONTRIBUTION, "stats"), "functions") else null
+    private val verifier = PluginTokenVerifier { token ->
+        if (token == "run-token") PluginTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget.of(PluginTargetKind.CONTRIBUTION, "stats"), "functions") else null
     }
 
     private lateinit var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>

@@ -1,4 +1,4 @@
-import type { ServerContributionPlugin } from "@mdeo/plugin";
+import { formatPluginTarget, PluginTargetKind, type PluginTarget, type ServerContributionPlugin } from "@mdeo/plugin";
 import { TIMEOUT_HEADER } from "../util/requestLimits.js";
 import type { DirectoryEntry } from "./types.js";
 import type { FileDependency, DataDependency, FileDataResult } from "../handler/types.js";
@@ -122,6 +122,25 @@ export interface ServerApi {
      * @returns The response data from the plugin request handler
      */
     sendPluginRequest(languageId: string, key: string, body: unknown, options?: PluginRequestOptions): Promise<unknown>;
+
+    /**
+     * Sends a request to any plugin target's request handler via the backend proxy.
+     *
+     * The same channel as {@link sendPluginRequest}, addressed at a target rather than a language,
+     * so a contribution is reached exactly like a language plugin is.
+     *
+     * @param target The language or contribution to call
+     * @param key The request handler key
+     * @param body The request body to forward
+     * @param options Whether to hand this request's token to the target plugin
+     * @returns The response data from the plugin request handler
+     */
+    sendTargetRequest(
+        target: PluginTarget,
+        key: string,
+        body: unknown,
+        options?: PluginRequestOptions
+    ): Promise<unknown>;
 
     /**
      * Updates execution metadata in the backend.
@@ -471,13 +490,23 @@ export class HttpServerApi implements ServerApi {
         body: unknown,
         options?: PluginRequestOptions
     ): Promise<unknown> {
-        const encodedLanguageId = encodeURIComponent(languageId);
+        return this.sendTargetRequest({ kind: PluginTargetKind.LANGUAGE, id: languageId }, key, body, options);
+    }
+
+    async sendTargetRequest(
+        target: PluginTarget,
+        key: string,
+        body: unknown,
+        options?: PluginRequestOptions
+    ): Promise<unknown> {
+        const address = formatPluginTarget(target);
         const encodedKey = encodeURIComponent(key);
         const headers: Record<string, string> = { ...(this.getAuthHeaders() as Record<string, string>) };
         if (options?.delegate) {
             headers[DELEGATE_TOKEN_HEADER] = "true";
         }
-        const response = await fetch(`${this.projectBackendUrl}/request/${encodedLanguageId}/${encodedKey}`, {
+        const path = `request/${target.kind}/${encodeURIComponent(target.id)}/${encodedKey}`;
+        const response = await fetch(`${this.projectBackendUrl}/${path}`, {
             method: "POST",
             headers,
             signal: this.signal,
@@ -485,9 +514,7 @@ export class HttpServerApi implements ServerApi {
         });
 
         if (!response.ok) {
-            throw new Error(
-                `Plugin request failed for ${languageId}/${key}: ${await describeFailedResponse(response)}`
-            );
+            throw new Error(`Plugin request failed for ${address}/${key}: ${await describeFailedResponse(response)}`);
         }
 
         const result = await response.json();

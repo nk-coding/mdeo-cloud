@@ -3,6 +3,7 @@ package com.mdeo.pluginservice
 import com.mdeo.common.model.PluginTarget
 import com.mdeo.common.model.PluginTargetKind
 import com.mdeo.common.model.SessionType
+import com.mdeo.pluginservice.request.RequestHandler
 import com.mdeo.pluginservice.session.SessionHandler
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -44,6 +45,12 @@ data class PluginDefinition(
      */
     val sessions: Map<PluginTarget, Map<String, ServedSession>>
         get() = contributions.associate { PluginTarget.of(PluginTargetKind.CONTRIBUTION, it.id) to it.sessions }
+
+    /**
+     * The one-shot requests this plugin answers, keyed by target and then by request key.
+     */
+    val requests: Map<PluginTarget, Map<String, RequestHandler>>
+        get() = contributions.associate { PluginTarget.of(PluginTargetKind.CONTRIBUTION, it.id) to it.requestHandlers }
 
     /**
      * Builds the manifest the backend reads from `GET /`.
@@ -121,6 +128,16 @@ interface Contribution {
      * The sessions this contribution accepts, by session name.
      */
     val sessions: Map<String, ServedSession>
+        get() = emptyMap()
+
+    /**
+     * The one-shot requests this contribution answers, by request key.
+     *
+     * The same channel a language plugin's request handlers serve, reached at `contrib:<id>`
+     * instead of `lang:<id>`. Use it for a plain call with an answer; a conversation that has to
+     * keep state across messages belongs in a session.
+     */
+    val requestHandlers: Map<String, RequestHandler>
         get() = emptyMap()
 
     /**

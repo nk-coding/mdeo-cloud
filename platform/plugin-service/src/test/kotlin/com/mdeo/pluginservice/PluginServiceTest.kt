@@ -5,8 +5,6 @@ import com.mdeo.common.model.PluginTargetKind
 import com.mdeo.common.model.SessionType
 import com.mdeo.pluginservice.session.SessionCloseCodes
 import com.mdeo.pluginservice.session.SessionPeer
-import com.mdeo.pluginservice.session.SessionTokenClaims
-import com.mdeo.pluginservice.session.SessionTokenVerifier
 import com.mdeo.pluginservice.session.closeReason
 import com.mdeo.pluginservice.session.negotiateVersion
 import com.mdeo.common.transport.MAX_SERVICE_WEBSOCKET_MESSAGE_BYTES
@@ -68,12 +66,12 @@ class PluginServiceTest {
     )
 
     /** Stands in for the backend: each token name maps to the claims a real token would carry. */
-    private val verifier = SessionTokenVerifier { token ->
+    private val verifier = PluginTokenVerifier { token ->
         when (token) {
-            "good" -> SessionTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget(PluginTargetKind.CONTRIBUTION, "echoes"), "echo")
-            "other" -> SessionTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget(PluginTargetKind.CONTRIBUTION, "other"), "echo")
-            "unserved" -> SessionTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget(PluginTargetKind.CONTRIBUTION, "echoes"), "nope")
-            "unscoped" -> SessionTokenClaims("p", "e", listOf("session:open"), PluginTarget(PluginTargetKind.CONTRIBUTION, "echoes"), "echo")
+            "good" -> PluginTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget(PluginTargetKind.CONTRIBUTION, "echoes"), "echo")
+            "other" -> PluginTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget(PluginTargetKind.CONTRIBUTION, "other"), "echo")
+            "unserved" -> PluginTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget(PluginTargetKind.CONTRIBUTION, "echoes"), "nope")
+            "unscoped" -> PluginTokenClaims("p", "e", listOf("session:open"), PluginTarget(PluginTargetKind.CONTRIBUTION, "echoes"), "echo")
             else -> null
         }
     }

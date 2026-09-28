@@ -66,7 +66,7 @@ fun Application.module(appConfig: AppConfig) {
         override val fileDataService: FileDataService by lazy { FileDataService(this) }
         override val executionService: ExecutionService by lazy { ExecutionService(this) }
         override val webSocketNotificationService: WebSocketNotificationService by lazy { WebSocketNotificationService() }
-        override val languagePluginRequestService: LanguagePluginRequestService by lazy { LanguagePluginRequestService(this) }
+        override val pluginRequestService: PluginRequestService by lazy { PluginRequestService(this) }
         override val authRateLimiter: AuthRateLimiter by lazy { AuthRateLimiter() }
         override val personalAccessTokenService: PersonalAccessTokenService by lazy { PersonalAccessTokenService(this) }
         override val sshKeyService: SshKeyService by lazy { SshKeyService(this) }
@@ -191,7 +191,7 @@ fun Application.module(appConfig: AppConfig) {
         authenticate(AUTH_SESSION, AUTH_JWT, optional = true) {
             fileRoutes(services.fileService, services.projectService)
             fileDataRoutes(services.fileDataService, services.projectService, services.jwtService, appConfig.fileData)
-            languagePluginRequestRoutes(services.languagePluginRequestService, services.projectService, services.jwtService)
+            pluginRequestRoutes(services.pluginRequestService, services.projectService, services.jwtService)
             executionStateRoutes(services.executionService, services.jwtService)
             sessionRoutes(services.pluginService, services.jwtService)
         }
