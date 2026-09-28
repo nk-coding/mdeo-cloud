@@ -374,6 +374,15 @@ export class ScriptPartialTypeSystem extends PartialTypeSystem<ScriptTypirSpecif
                 }
             }
 
+            if (this.typir.TypeDefinitions.getClassTypeIfExisting(node.name, "builtin") != undefined) {
+                accept({
+                    languageNode: node,
+                    languageProperty: "name",
+                    message: `Name conflict: '${node.name}' is a builtin type.`,
+                    severity: "error"
+                });
+            }
+
             const { packageMap } = this.typir.PackageMapCache.getDocumentPackageCache(AstUtils.getDocument(node));
             const metamodelPackages = [...(packageMap.get("class") ?? []), ...(packageMap.get("enum") ?? [])];
             if (

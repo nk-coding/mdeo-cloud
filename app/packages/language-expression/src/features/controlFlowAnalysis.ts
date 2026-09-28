@@ -204,7 +204,7 @@ export class ControlFlowAnalysis<Specifics extends TypirLangiumSpecifics> implem
         }
         const flow: BodyFlow = { before: new Map(), statements: [], completesNormally: true, valProblems: new Map() };
         this.bodies.set(body, flow);
-        const end = this.walk(body.statements, this.initialState(body), {
+        const end = this.walk((body as Partial<typeof body>).statements, this.initialState(body), {
             flow,
             loopDepth: 0,
             declarationLoopDepth: new Map()
@@ -238,10 +238,12 @@ export class ControlFlowAnalysis<Specifics extends TypirLangiumSpecifics> implem
     /**
      * Follows statements in execution order, recording the state before each one.
      *
+     * @param statements The statements, or undefined for a block the parser could not build yet,
+     *        as while `if (x)` is typed without its braces
      * @returns The state after the statements
      */
-    private walk(statements: BaseStatementType[], state: FlowState, context: WalkContext): FlowState {
-        for (const statement of statements) {
+    private walk(statements: BaseStatementType[] | undefined, state: FlowState, context: WalkContext): FlowState {
+        for (const statement of statements ?? []) {
             context.flow.statements.push(statement);
             context.flow.before.set(statement, copy(state));
 
@@ -266,7 +268,10 @@ export class ControlFlowAnalysis<Specifics extends TypirLangiumSpecifics> implem
                 if (statement.elseBlock != undefined) {
                     branches.push(statement.elseBlock);
                 }
-                const ends = branches.map((branch) => this.walk(branch.statements, copy(state), context));
+                // Blocks are typed as always present, but a document still being typed may lack one.
+                const ends = branches.map((branch) =>
+                    this.walk((branch as Partial<typeof branch> | undefined)?.statements, copy(state), context)
+                );
                 if (statement.elseBlock == undefined) {
                     ends.push(state);
                 }
@@ -277,7 +282,11 @@ export class ControlFlowAnalysis<Specifics extends TypirLangiumSpecifics> implem
             ) {
                 context.loopDepth++;
                 const bodyStart = context.flow.statements.length;
-                this.walk(statement.body.statements, copy(state), context);
+                this.walk(
+                    (statement.body as Partial<typeof statement.body> | undefined)?.statements,
+                    copy(state),
+                    context
+                );
                 context.loopDepth--;
                 // The body may run any number of times, including none, and may be left at any point.
                 for (const inBody of context.flow.statements.slice(bodyStart)) {

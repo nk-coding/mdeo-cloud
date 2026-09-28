@@ -20,6 +20,28 @@ import {
     GenericTypeRef,
     LambdaType,
     VoidType,
+    AnyType,
+    BagType,
+    booleanType,
+    CollectionType,
+    doubleType,
+    floatType,
+    intType,
+    IterableType,
+    ListType,
+    longType,
+    MapType,
+    OrderedCollectionType,
+    OrderedSetType,
+    ReadonlyBagType,
+    ReadonlyCollectionType,
+    ReadonlyListType,
+    ReadonlyMapType,
+    ReadonlyOrderedCollectionType,
+    ReadonlyOrderedSetType,
+    ReadonlySetType,
+    SetType,
+    stringType,
     type ClassType,
     type ReturnType
 } from "@mdeo/language-expression";
@@ -32,6 +54,37 @@ import { createRecordClassType, RECORD_COPY_METHOD } from "../features/records.j
  * this protocol, because that session is the only way the call can be answered.
  */
 export const SCRIPT_FUNCTIONS_PROTOCOL = "script-functions";
+
+/**
+ * The names of the builtin types. A contributed class named like one would make every use of that
+ * builtin type ambiguous.
+ */
+const BUILTIN_TYPE_NAMES = new Set(
+    [
+        AnyType,
+        booleanType,
+        intType,
+        longType,
+        floatType,
+        doubleType,
+        stringType,
+        IterableType,
+        CollectionType,
+        ReadonlyCollectionType,
+        OrderedCollectionType,
+        ReadonlyOrderedCollectionType,
+        ListType,
+        ReadonlyListType,
+        SetType,
+        ReadonlySetType,
+        BagType,
+        ReadonlyBagType,
+        OrderedSetType,
+        ReadonlyOrderedSetType,
+        MapType,
+        ReadonlyMapType
+    ].map((type) => type.name)
+);
 
 /**
  *  Resolves the contribution plugins into a unified structure.
@@ -89,19 +142,25 @@ export function resolvePlugins(
 
     const functions = resolveFunctions(plugins);
     const classes = resolveClasses(plugins);
-    const recordNames = new Set<string>();
+    // Scripts name a contributed class by its name alone, so it must be unique among every
+    // contribution's classes and must not hide a builtin type.
+    const classNames = new Set<string>();
     for (const contributed of classes) {
-        if (contributed.declaration.kind !== "record") {
-            continue;
+        const description = `Class '${contributed.name}' of contribution '${contributed.contributionId}'`;
+        if (BUILTIN_TYPE_NAMES.has(contributed.name)) {
+            throw new Error(`${description} has the name of a builtin type.`);
         }
+        if (classNames.has(contributed.name)) {
+            throw new Error(`${description} has the name of a class another contribution defines.`);
+        }
+        classNames.add(contributed.name);
         // A record's constructor is a global function named like the record.
-        if (functions.has(contributed.name) || recordNames.has(contributed.name)) {
+        if (contributed.declaration.kind === "record" && functions.has(contributed.name)) {
             throw new Error(
                 `Record '${contributed.name}' of contribution '${contributed.contributionId}' has the name of ` +
-                    `another contributed function or record.`
+                    `another contributed function.`
             );
         }
-        recordNames.add(contributed.name);
     }
 
     return {
@@ -278,7 +337,14 @@ function validateContribution(plugin: ScriptContributionPlugin): void {
         if (declaration.kind !== "record") {
             continue;
         }
+        const fieldNames = new Set<string>();
         for (const field of declaration.fields) {
+            if (fieldNames.has(field.name)) {
+                throw new Error(
+                    `Field '${field.name}' of record '${name}' in contribution '${plugin.id}' is declared twice.`
+                );
+            }
+            fieldNames.add(field.name);
             if (field.name === RECORD_COPY_METHOD) {
                 throw new Error(
                     `Field '${field.name}' of record '${name}' in contribution '${plugin.id}' has the name of the ` +

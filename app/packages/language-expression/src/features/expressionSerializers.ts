@@ -237,9 +237,40 @@ function printCallExpression(context: PrintContext<CallExpressionType>, types: E
         docs.push(path.call(print, "genericArgs"));
     }
 
-    docs.push(printCallArguments([...path.map(print, "arguments"), ...path.map(print, "namedArguments")]));
+    docs.push(
+        printCallArguments(argumentsInSourceOrder(ctx, path.map(print, "arguments"), path.map(print, "namedArguments")))
+    );
 
     return group(docs);
+}
+
+/**
+ * Prints the positional and named arguments of a call in the order they were written.
+ *
+ * The two kinds are kept in separate lists, so printing one list after the other would move a named
+ * argument written before a positional one behind it, which silently changes an invalid call into a
+ * valid one with a guessed meaning. A call built without source positions keeps the list order.
+ *
+ * @param call The call, whose argument nodes carry their source positions
+ * @param positional The printed positional arguments
+ * @param named The printed named arguments
+ * @returns The printed arguments
+ */
+function argumentsInSourceOrder(
+    call: { arguments: readonly unknown[]; namedArguments: readonly unknown[] },
+    positional: Doc[],
+    named: Doc[]
+): Doc[] {
+    const offsetOf = (node: unknown): number | undefined =>
+        (node as { $cstNode?: { offset: number } } | undefined)?.$cstNode?.offset;
+    const entries = [
+        ...positional.map((doc, index) => ({ doc, offset: offsetOf(call.arguments[index]) })),
+        ...named.map((doc, index) => ({ doc, offset: offsetOf(call.namedArguments[index]) }))
+    ];
+    if (entries.some((entry) => entry.offset == undefined)) {
+        return entries.map((entry) => entry.doc);
+    }
+    return entries.sort((a, b) => a.offset! - b.offset!).map((entry) => entry.doc);
 }
 
 /**
@@ -278,7 +309,9 @@ function printMemberCallExpression(context: PrintContext<MemberCallExpressionTyp
         docs.push(path.call(print, "genericArgs"));
     }
 
-    docs.push(printCallArguments([...path.map(print, "arguments"), ...path.map(print, "namedArguments")]));
+    docs.push(
+        printCallArguments(argumentsInSourceOrder(ctx, path.map(print, "arguments"), path.map(print, "namedArguments")))
+    );
 
     return group(docs);
 }
