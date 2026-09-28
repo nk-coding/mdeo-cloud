@@ -3,9 +3,13 @@ package com.mdeo.scriptfunctions.service
 import com.mdeo.pluginservice.session.SessionContext
 import com.mdeo.pluginservice.session.SessionHandler
 import com.mdeo.pluginservice.session.SessionPeer
+import com.mdeo.scriptfunctions.protocol.ClientMessage
 import com.mdeo.scriptfunctions.protocol.ScriptFunctionsProtocol
+import com.mdeo.scriptfunctions.protocol.ServiceMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 
 /**
  * The session handler answering the `script-functions` protocol.
@@ -24,12 +28,36 @@ class ScriptFunctionService(private val operations: Map<String, ScriptFunctionOp
     override fun open(context: SessionContext): SessionPeer {
         val state = ScriptFunctionsServiceSession(operations, context)
         return object : SessionPeer {
+            // Every call must be answered, or closed on: the execution waits for its answer with
+            // nothing else to wake it.
             override suspend fun onMessage(data: ByteArray) {
-                val answer = withContext(Dispatchers.Default) {
-                    state.handle(ScriptFunctionsProtocol.decodeClient(data))
+                val message = try {
+                    ScriptFunctionsProtocol.decodeClient(data)
+                } catch (e: Exception) {
+                    logger.error("Unreadable ${ScriptFunctionsProtocol.NAME} message", e)
+                    context.close("Unreadable ${ScriptFunctionsProtocol.NAME} message")
+                    return
                 }
-                if (answer != null) {
+                val answer = try {
+                    withContext(Dispatchers.Default) { state.handle(message) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error("Failed to handle a ${ScriptFunctionsProtocol.NAME} message", e)
+                    if (message !is ClientMessage.Call) {
+                        context.close("The service failed on a message")
+                        return
+                    }
+                    ServiceMessage.Failure(message.callId, "The service failed on this call")
+                }
+                if (answer == null) return
+                try {
                     context.send(ScriptFunctionsProtocol.encodeService(answer))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error("Could not send a ${ScriptFunctionsProtocol.NAME} answer", e)
+                    context.close("The service could not send its answer")
                 }
             }
 
@@ -39,3 +67,5 @@ class ScriptFunctionService(private val operations: Map<String, ScriptFunctionOp
         }
     }
 }
+
+private val logger = LoggerFactory.getLogger(ScriptFunctionService::class.java)

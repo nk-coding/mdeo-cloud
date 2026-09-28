@@ -36,11 +36,19 @@ class SessionDispatcher(
     private val resolve: suspend (contribution: String, session: String) -> SessionConnection
 ) : ExternalCallDispatcher, AutoCloseable {
 
-    private class Connection(val session: SessionClient, val client: ScriptFunctionsClient)
+    private class Connection(
+        val session: SessionClient,
+        val client: ScriptFunctionsClient,
+        val inbox: LinkedBlockingQueue<Result<ByteArray>>
+    )
 
     private val connections = ConcurrentHashMap<String, Connection>()
 
+    @Volatile
+    private var closed = false
+
     override fun call(callId: String, arguments: Array<Any?>, model: Model?, classLoader: ClassLoader): Any? {
+        if (closed) throw ExternalCallException("External calls are no longer answered: the execution's sessions were closed")
         val spec = specs[callId] ?: throw ExternalCallException("No external call '$callId' was compiled")
         val session = spec.session ?: throw ExternalCallException(
             "External function '${spec.functionName}' cannot be called: contribution " +
@@ -86,14 +94,21 @@ class SessionDispatcher(
         }
         val ownSpecs = specs.filterValues { it.contribution == contribution }
         val ownClasses = classes.values.filter { it.contribution == contribution }
-        return Connection(session, ScriptFunctionsClient(transport, ownSpecs, ownClasses))
+        return Connection(session, ScriptFunctionsClient(transport, ownSpecs, ownClasses), inbox)
     }
 
     /**
      * Closes every session this dispatcher opened.
+     *
+     * A call still waiting for its answer fails instead of waiting forever: a session closed here
+     * reports no drop of its own.
      */
     override fun close() {
-        connections.values.forEach { runCatching { it.session.close() } }
+        closed = true
+        for ((contribution, connection) in connections) {
+            runCatching { connection.session.close() }
+            connection.inbox.put(Result.failure(ExternalCallException("Session to '$contribution' was closed")))
+        }
         connections.clear()
     }
 }

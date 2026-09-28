@@ -229,7 +229,9 @@ class SessionClient(
         val reader = scope.launch {
             try {
                 client.webSocket(
-                    urlString = resolved.url + "?v=" + versions.joinToString(","),
+                    // Only the agreed version is offered: the plugin never says which one it picked,
+                    // so offering more could leave the two sides speaking different ones.
+                    urlString = resolved.url + "?v=" + agreed,
                     request = {
                         header(HttpHeaders.Authorization, "Bearer ${resolved.token}")
                     }

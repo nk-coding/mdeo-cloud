@@ -10,7 +10,9 @@ import com.mdeo.script.compiler.CompiledProgram
 import com.mdeo.script.external.ExternalSessionCheck
 import com.mdeo.script.external.SessionDispatcher
 import com.mdeo.script.runtime.ExternalCallDispatcher
+import com.mdeo.metamodel.Model
 import kotlinx.serialization.Serializable
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * What a process needs to open sessions for external calls.
@@ -47,7 +49,10 @@ class ExternalSessions(private val access: SessionAccess) : AutoCloseable {
     private val resolverDelegate = lazy { SessionResolver(access.backendApiUrl) }
     private val resolver by resolverDelegate
 
-    private val dispatchers = mutableListOf<SessionDispatcher>()
+    private val dispatchers = CopyOnWriteArrayList<SessionDispatcher>()
+
+    @Volatile
+    private var closed = false
 
     /**
      * Finds the first reason an external function of [pluginAst] could not be answered.
@@ -66,13 +71,28 @@ class ExternalSessions(private val access: SessionAccess) : AutoCloseable {
      * The dispatcher is closed together with this.
      *
      * @param program The compiled program whose calls to answer
+     * @param perThread Whether every thread calling gets sessions of its own. A session's service
+     *        holds one model at a time, together with the collections and handles that belong to
+     *        it, so threads evaluating different models at once must not share one.
      * @return The dispatcher, or [ExternalCallDispatcher.UNSUPPORTED] when the program makes no
      *         external call
      */
-    fun createDispatcher(program: CompiledProgram): ExternalCallDispatcher {
+    fun createDispatcher(program: CompiledProgram, perThread: Boolean = false): ExternalCallDispatcher {
         if (program.externalCalls.isEmpty()) {
             return ExternalCallDispatcher.UNSUPPORTED
         }
+        if (!perThread) {
+            return newDispatcher(program)
+        }
+        val local = ThreadLocal.withInitial { newDispatcher(program) }
+        return object : ExternalCallDispatcher {
+            override fun call(callId: String, arguments: Array<Any?>, model: Model?, classLoader: ClassLoader): Any? =
+                local.get().call(callId, arguments, model, classLoader)
+        }
+    }
+
+    private fun newDispatcher(program: CompiledProgram): SessionDispatcher {
+        check(!closed) { "The execution's sessions were closed" }
         val dispatcher = SessionDispatcher(
             program.externalCalls,
             program.contributedClasses,
@@ -100,6 +120,7 @@ class ExternalSessions(private val access: SessionAccess) : AutoCloseable {
      * Closes every session opened through this, and the resolver.
      */
     override fun close() {
+        closed = true
         dispatchers.forEach { runCatching { it.close() } }
         dispatchers.clear()
         if (resolverDelegate.isInitialized()) {

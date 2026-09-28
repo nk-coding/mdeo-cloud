@@ -563,7 +563,8 @@ class WorkerSubprocessMain : SubprocessMain() {
         val sessions = request.sessionAccess?.let { ExternalSessions(it) }
             ?: return ExternalCallDispatcher.UNSUPPORTED
         externalSessions = sessions
-        return sessions.createDispatcher(program)
+        // Evaluation threads work on different solutions at once, each its own model.
+        return sessions.createDispatcher(program, perThread = true)
     }
 
     private fun closeExternalSessions() {

@@ -142,6 +142,33 @@ class ScriptFunctionsServiceSessionTest {
     }
 
     @Test
+    fun `an operation's own collection returned twice in one result is one collection`() = runBlocking {
+        val shared = listOf(1, 2)
+        val service = session("pair" to ScriptFunctionOperation { listOf(shared, shared) })
+        val result = assertIs<ServiceMessage.Result>(service.handle(ClientMessage.Call(1, "pair", emptyList(), emptyList())))
+        val outer = result.objects.single { it.id == (result.value as WireValue.Ref).id }
+        val (first, second) = outer.elements!!
+        assertEquals(first, second)
+        assertEquals(2, result.objects.size)
+    }
+
+    @Test
+    fun `an operation's own collection returned by a later call is sent again with its content`() = runBlocking {
+        val constant = listOf(1, 2)
+        val service = session("constant" to ScriptFunctionOperation { constant })
+        val first = assertIs<ServiceMessage.Result>(service.handle(ClientMessage.Call(1, "constant", emptyList(), emptyList())))
+        val firstId = (first.value as WireValue.Ref).id
+
+        // The execution changes its copy and sends it back, then releases it.
+        service.handle(ClientMessage.Call(2, "constant", listOf(list(firstId, 1, 2, 3)), listOf(WireValue.Ref(firstId))))
+        service.handle(ClientMessage.Release(listOf(firstId)))
+
+        val again = assertIs<ServiceMessage.Result>(service.handle(ClientMessage.Call(3, "constant", emptyList(), emptyList())))
+        val sent = again.objects.single { it.id == (again.value as WireValue.Ref).id }
+        assertEquals(listOf(WireValue.IntValue(1), WireValue.IntValue(2)), sent.elements)
+    }
+
+    @Test
     fun `sets, bags and maps arrive readonly, in the order they were sent`() = runBlocking {
         val service = session("describe" to ScriptFunctionOperation { call ->
             val set = call.argument<Set<Any?>>(0)

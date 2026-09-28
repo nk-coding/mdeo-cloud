@@ -23,7 +23,10 @@ import com.mdeo.script.compiler.returnStmt
 import com.mdeo.script.compiler.stringLiteral
 import com.mdeo.script.compiler.varDecl
 import com.mdeo.script.runtime.ExecutionEnvironment
+import com.mdeo.script.runtime.ScriptRecord
 import com.mdeo.script.runtime.SimpleScriptContext
+import com.mdeo.script.stdlib.impl.collections.ListImpl
+import com.mdeo.script.stdlib.impl.collections.SetImpl
 import com.mdeo.scriptfunctions.service.RecordValue
 import com.mdeo.scriptfunctions.service.ScriptFunctionCall
 import org.junit.jupiter.api.Test
@@ -37,7 +40,8 @@ import kotlin.test.assertTrue
  * The contribution `geo` declares the records `Point(x: double, label: string)` and
  * `Route(name: string, stops: List<Point>)` with the external functions `nearest(): Point`,
  * `describe(p: Point): string`, `relabel(point: Point, label: string): Point`,
- * `summarize(route: Route): string`, `extend(route: Route): int` and `reverse(route: Route): Route`.
+ * `summarize(route: Route): string`, `extend(route: Route): int` and `reverse(route: Route): Route`,
+ * and `Tagged(tags: Set<string>, weights: List<double>)` with `tagged(): Tagged`.
  * Each script function is shown above the test that runs it. Arguments of external functions are
  * in-only: an operation sees them readonly, and a script never sees its values changed by a call.
  */
@@ -50,10 +54,15 @@ class ContributedRecordsTest {
     private val pointRef = ClassTypeRef("contrib/geo", "Point", false)
     private val routeRef = ClassTypeRef("contrib/geo", "Route", false)
     private val stopsRef = ClassTypeRef("builtin", "List", false, mapOf("T" to pointRef))
+    private val tagsRef = ClassTypeRef("builtin", "Set", false, mapOf("T" to stringRef))
+    private val weightsRef = ClassTypeRef("builtin", "List", false, mapOf("T" to doubleRef))
+    private val taggedRef = ClassTypeRef("contrib/geo", "Tagged", false)
 
     private val plugin = pluginAst("geo") {
         record("Point", "x" to doubleRef, "label" to stringRef)
         record("Route", "name" to stringRef, "stops" to stopsRef)
+        record("Tagged", "tags" to tagsRef, "weights" to weightsRef)
+        external("tagged", taggedRef)
         external("nearest", pointRef)
         external("describe", stringRef, "p" to pointRef)
         external("relabel", pointRef, "point" to pointRef, "label" to stringRef)
@@ -240,6 +249,12 @@ class ContributedRecordsTest {
             )
         )
 
+        // fun taggedFields(): Tagged {
+        //     return tagged()
+        // }
+        val tagged = addType(taggedRef)
+        function("taggedFields", tagged, body = listOf(returnStmt(functionCall("tagged", "", emptyList(), tagged))))
+
         // fun copiedRouteSharesStops(): int {
         //     val route = Route("r", listOf(Point(1.0, "a")))
         //     val copy = route.with(name = "copy")
@@ -341,6 +356,14 @@ class ContributedRecordsTest {
             RecordValue("Route", mapOf("name" to route["name"], "stops" to (route["stops"] as List<*>).reversed()))
         }
         assertEquals("back3b 2a", run(mapOf("reverse" to reverse), "returnedRouteIsUsable"))
+    }
+
+    @Test
+    fun `collections inside a returned record take their declared kind and number type`() {
+        val tagged: (ScriptFunctionCall) -> Any? = { RecordValue("Tagged", mapOf("tags" to setOf("a"), "weights" to listOf(1, 2))) }
+        val record = run(mapOf("tagged" to tagged), "taggedFields") as ScriptRecord
+        assertTrue(record.field(0) is SetImpl<*>, "got ${record.field(0)?.javaClass}")
+        assertEquals(listOf<Any?>(1.0, 2.0), (record.field(1) as ListImpl<*>).heapSnapshot())
     }
 
     @Test

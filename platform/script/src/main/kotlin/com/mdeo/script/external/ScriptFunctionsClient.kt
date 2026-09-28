@@ -464,7 +464,7 @@ class ScriptFunctionsClient(
             }
 
             val reshaped = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Any, Boolean>())
-            val value = conform(decode(result.value, spec.returnType), spec.returnType, reshaped)
+            val value = conform(decode(result.value, spec.returnType), spec.returnType, reshaped, java.util.IdentityHashMap())
 
             // What the execution holds is exactly what the service holds, except for collections
             // rebuilt as their declared kind: those are sent in full next time.
@@ -476,44 +476,67 @@ class ScriptFunctionsClient(
         }
 
         /**
-         * Rebuilds the collections this result created as the kinds the signature declares, at every
-         * level: a service may return a list where a `Set<List<int>>` is declared, and only the
-         * declaration says what the script expects.
+         * Brings what this result created to the types the signature declares, at every level: a
+         * service may return a list where a `Set<List<double>>` is declared, or `2` where a double
+         * is, and only the declaration says what the script expects. Record fields are conformed to
+         * their field types.
          *
-         * Collections the script already held keep their kind; they came from the script.
+         * Collections the script already held keep their kind and content; they came from the
+         * script.
          *
          * @param value A decoded value
          * @param declared Its declared type
          * @param reshaped Collects the created collections that were changed or replaced
-         * @return The value, as its declared kind
+         * @param conformed What each created collection visited so far became, so a collection
+         *        reachable more than once becomes one and the same collection everywhere
+         * @return The value, as its declared type
          */
-        private fun conform(value: Any?, declared: ReturnType, reshaped: MutableSet<Any>): Any? {
+        private fun conform(
+            value: Any?,
+            declared: ReturnType,
+            reshaped: MutableSet<Any>,
+            conformed: java.util.IdentityHashMap<Any, Any>
+        ): Any? {
+            if (value is Number) return coerceNumber(value, declared)
+            if (value is ScriptRecord) {
+                if (conformed.put(value, value) != null) return value
+                val recordClass = classesByJvmName[value.javaClass.name] ?: return value
+                recordClass.fieldTypes.forEachIndexed { index, fieldType ->
+                    val field = value.field(index)
+                    val fitted = conform(field, fieldType, reshaped, conformed)
+                    if (fitted !== field) ScriptRecord.set(value, fitted, index)
+                }
+                return value
+            }
             if (value !is HeapCollection && value !is HeapMap) return value
-            if (created.values.none { it === value } || value in reshaped) return value
-            // Marked before descending, so a collection that contains itself is visited once.
-            reshaped += value
+            if (created.values.none { it === value }) return value
+            conformed[value]?.let { return it }
+            // Registered before descending, so a collection that contains itself is visited once.
+            conformed[value] = value
 
             var contentChanged = false
             if (value is HeapMap) {
                 val entries = value.heapEntries()
-                val conformed = entries.map { (k, v) ->
-                    conform(k, DeclaredTypes.keyType(declared), reshaped) to conform(v, DeclaredTypes.valueType(declared), reshaped)
+                val fitted = entries.map { (k, v) ->
+                    conform(k, DeclaredTypes.keyType(declared), reshaped, conformed) to
+                            conform(v, DeclaredTypes.valueType(declared), reshaped, conformed)
                 }
-                if (conformed.indices.any { conformed[it].first !== entries[it].first || conformed[it].second !== entries[it].second }) {
-                    value.heapReplace(conformed)
+                if (fitted.indices.any { fitted[it].first !== entries[it].first || fitted[it].second !== entries[it].second }) {
+                    value.heapReplace(fitted)
                     contentChanged = true
                 }
             } else {
                 val elements = (value as HeapCollection).heapSnapshot()
-                val conformed = elements.map { conform(it, DeclaredTypes.elementType(declared), reshaped) }
-                if (conformed.indices.any { conformed[it] !== elements[it] }) {
-                    value.heapReplace(conformed)
+                val fitted = elements.map { conform(it, DeclaredTypes.elementType(declared), reshaped, conformed) }
+                if (fitted.indices.any { fitted[it] !== elements[it] }) {
+                    value.heapReplace(fitted)
                     contentChanged = true
                 }
             }
 
             val converted = convertToDeclared(value, declared)
-            if (converted === value && !contentChanged) reshaped -= value
+            if (converted !== value || contentChanged) reshaped += value
+            conformed[value] = converted!!
             return converted
         }
 

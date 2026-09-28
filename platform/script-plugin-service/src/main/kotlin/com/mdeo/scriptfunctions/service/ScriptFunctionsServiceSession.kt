@@ -47,6 +47,13 @@ class ScriptFunctionsServiceSession(
     private val ids = IdentityHashMap<Any, Long>()
     private var nextNewId = -1L
 
+    /**
+     * The operation's own collections adopted while encoding the current result. They map to their
+     * id only until the result is encoded: the execution may change or release the copy held under
+     * that id, so the same instance returned by a later call is sent again as a new collection.
+     */
+    private val adoptedOriginals = ArrayList<Any>()
+
     private val handles = HashMap<Long, OpaqueValue>()
     private val handleIds = IdentityHashMap<Any, Long>()
     private var nextHandleId = 1L
@@ -182,6 +189,9 @@ class ScriptFunctionsServiceSession(
         } catch (e: UnsupportedValueException) {
             created.forEach { forget(it.id) }
             failure("Operation '${call.operation}' ${e.message}")
+        } finally {
+            adoptedOriginals.forEach { ids.remove(it) }
+            adoptedOriginals.clear()
         }
     }
 
@@ -278,7 +288,8 @@ class ScriptFunctionsServiceSession(
         while (nextNewId in objects) nextNewId--
         val id = nextNewId--
         // The collection is held as a copy the execution's later sends can be filled into, since
-        // the operation's own may be immutable; returning the original again still finds the id.
+        // the operation's own may be immutable. Within this result, the original appearing again
+        // still finds the id, so aliasing survives the trip.
         hold(
             id,
             when (value) {
@@ -288,6 +299,7 @@ class ScriptFunctionsServiceSession(
             }
         )
         ids[value] = id
+        adoptedOriginals += value
         val kind = when (value) {
             is Map<*, *> -> HeapKind.MAP
             is Set<*> -> HeapKind.ORDERED_SET

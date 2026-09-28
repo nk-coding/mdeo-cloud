@@ -15,6 +15,10 @@ import com.mdeo.scriptfunctions.service.scriptContribution
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -46,7 +50,17 @@ class PluginServiceEndToEndTest {
         function("fail") {
             implementation { error("service says no") }
         }
+        function("slow") {
+            implementation {
+                slowEntered.countDown()
+                slowRelease.await(30, TimeUnit.SECONDS)
+                1.0
+            }
+        }
     }
+
+    private val slowEntered = CountDownLatch(1)
+    private val slowRelease = CountDownLatch(1)
 
     private val verifier = PluginTokenVerifier { token ->
         if (token == "run-token") PluginTokenClaims("p", "e", listOf("plugin:session:connect"), PluginTarget.of(PluginTargetKind.CONTRIBUTION, "stats"), "functions") else null
@@ -73,7 +87,11 @@ class PluginServiceEndToEndTest {
     )
 
     private fun dispatcher(token: String) = SessionDispatcher(
-        mapOf("normalize" to spec("normalize", listOfDouble, readonlyListOfDouble), "fail" to spec("fail", double))
+        mapOf(
+            "normalize" to spec("normalize", listOfDouble, readonlyListOfDouble),
+            "fail" to spec("fail", double),
+            "slow" to spec("slow", double)
+        )
     ) { contributionId, session ->
         val target = PluginTarget.of(PluginTargetKind.CONTRIBUTION, contributionId)
         SessionConnection(
@@ -118,6 +136,24 @@ class PluginServiceEndToEndTest {
             // The plugin's close code and reason are what tells the author why.
             assertTrue(error.message!!.contains("4401"), error.message)
             assertTrue(error.message!!.contains("Missing or invalid token"), error.message)
+        }
+    }
+
+    @Test
+    fun `a call waiting for its answer fails when the sessions are closed`() {
+        val dispatcher = dispatcher("run-token")
+        try {
+            val waiting = CompletableFuture.supplyAsync { dispatcher.call("slow", arrayOf(), null, javaClass.classLoader) }
+            assertTrue(slowEntered.await(10, TimeUnit.SECONDS), "the call never reached the service")
+
+            dispatcher.close()
+
+            val error = assertFailsWith<ExecutionException> { waiting.get(10, TimeUnit.SECONDS) }
+            assertTrue(error.cause is ExternalCallException, error.cause.toString())
+            assertFailsWith<ExternalCallException> { dispatcher.call("fail", arrayOf(), null, javaClass.classLoader) }
+        } finally {
+            slowRelease.countDown()
+            dispatcher.close()
         }
     }
 }

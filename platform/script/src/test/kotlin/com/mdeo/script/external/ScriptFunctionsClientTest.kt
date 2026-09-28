@@ -27,6 +27,7 @@ class ScriptFunctionsClientTest {
 
     private val int = ClassTypeRef("builtin", "int", false)
     private val string = ClassTypeRef("builtin", "string", false)
+    private val double = ClassTypeRef("builtin", "double", false)
     private val any = ClassTypeRef("builtin", "Any", true)
 
     private fun collection(type: String, vararg args: Pair<String, ValueType>) =
@@ -212,6 +213,37 @@ class ScriptFunctionsClientTest {
 
         // Passed back, the rebuilt sets reach the service with their new content.
         assertEquals(3, dispatcher.call("count", arrayOf(returned), null, javaClass.classLoader))
+    }
+
+    @Test
+    fun `numbers inside returned collections take their declared type`() {
+        val loopback = Loopback.ofArguments(
+            mapOf(
+                "weights" to { _ -> listOf(1, 2) },
+                "byName" to { _ -> mapOf("a" to 1) }
+            )
+        )
+        val weights = spec("weights", collection("List", "T" to double))
+        val byName = spec("byName", collection("Map", "K" to string, "V" to double))
+        val dispatcher = client(loopback, weights, byName)
+
+        val list = dispatcher.call("weights", arrayOf(), null, javaClass.classLoader) as ListImpl<*>
+        assertEquals(listOf<Any?>(1.0, 2.0), list.heapSnapshot())
+        val map = dispatcher.call("byName", arrayOf(), null, javaClass.classLoader) as MapImpl<*, *>
+        assertEquals(1.0, map.heapEntries().single().second)
+    }
+
+    @Test
+    fun `a collection returned twice becomes the same collection of its declared kind`() {
+        val loopback = Loopback.ofArguments(
+            mapOf("twice" to { _ -> mutableListOf(1).let { shared -> listOf(shared, shared) } })
+        )
+        val twice = spec("twice", collection("List", "T" to collection("Set", "T" to int)))
+        val dispatcher = client(loopback, twice)
+
+        val returned = dispatcher.call("twice", arrayOf(), null, javaClass.classLoader) as ListImpl<*>
+        assertTrue(returned.at(0) is SetImpl<*>, "got ${returned.at(0)?.javaClass}")
+        assertSame(returned.at(0), returned.at(1))
     }
 
     @Suppress("UNCHECKED_CAST")
