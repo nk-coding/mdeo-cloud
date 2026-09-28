@@ -1,6 +1,6 @@
 import type { IncomingMessage, Server } from "node:http";
 import { COMPRESSION_THRESHOLD_BYTES, MAX_SERVICE_WEBSOCKET_MESSAGE_BYTES } from "../util/compression.js";
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import {
     formatPluginTarget,
     pluginTargetOf,
@@ -62,6 +62,13 @@ const PING_INTERVAL_MS = 30_000;
  * How long a peer may go without answering a keepalive before the session is closed.
  */
 const PONG_TIMEOUT_MS = 90_000;
+
+/**
+ * How many messages a peer may send before its session is open. A client sends its first call and
+ * waits for the answer, so a handful is plenty; the bound only keeps an unauthorized peer from
+ * filling memory while its token is checked.
+ */
+const MAX_EARLY_MESSAGES = 64;
 
 /**
  * How many sessions may be open at once when the service does not say.
@@ -316,6 +323,19 @@ async function openSession(
     deps: SessionServerDeps,
     openSessions: OpenSessionCount
 ): Promise<void> {
+    // The peer may send as soon as the upgrade completes, while the token is still being checked;
+    // `ws` does not keep messages nobody listens for, so they are held until the handler is ready.
+    const early: Array<{ raw: RawData; isBinary: boolean }> = [];
+    const holdEarly = (raw: RawData, isBinary: boolean): void => {
+        if (early.length >= MAX_EARLY_MESSAGES) {
+            socket.off("message", holdEarly);
+            closeSocket(socket, 1008, "Too many messages before the session was open");
+            return;
+        }
+        early.push({ raw, isBinary });
+    };
+    socket.on("message", holdEarly);
+
     const url = new URL(request.url ?? "", "http://localhost");
     const address = parseSessionPath(url.pathname);
     if (!address) {
@@ -494,7 +514,7 @@ async function openSession(
         lastPong = Date.now();
     });
 
-    socket.on("message", (raw, isBinary) => {
+    const deliver = (raw: RawData, isBinary: boolean): void => {
         // Anything the handler fetches while serving this message has to go out under the
         // session's own authorization, which `configure` pinned once at the handshake.
         instance?.refreshContext(token!, projectId);
@@ -505,7 +525,12 @@ async function openSession(
                 `Session ${label} failed on a message: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`
             );
         }
-    });
+    };
+    socket.off("message", holdEarly);
+    socket.on("message", deliver);
+    for (const { raw, isBinary } of early.splice(0)) {
+        deliver(raw, isBinary);
+    }
 
     socket.on("error", (error) => {
         deps.log.warn(`Session ${label} connection error: ${String(error)}`);

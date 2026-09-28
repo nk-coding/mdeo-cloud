@@ -220,9 +220,15 @@ export class LangiumInstancePool<T> {
                     signal?.removeEventListener("abort", onAbort);
                     if (availableInstance.contributionPluginKey === key) {
                         resolve(availableInstance);
-                    } else {
-                        this.instances.delete(availableInstance.id);
+                        return;
+                    }
+                    this.instances.delete(availableInstance.id);
+                    // The timer and the abort listener are gone by now, so a failure here has to
+                    // reach this waiter directly; otherwise it would wait forever.
+                    try {
                         resolve(this.createInstance(contributionPlugins, key));
+                    } catch (error) {
+                        reject(error);
                     }
                 }
             };

@@ -284,7 +284,6 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
             },
             async (request, reply) => {
                 const { kind, targetId, key } = request.params;
-                const { project, body, contributionPlugins, contributionHash } = request.body;
 
                 if (!JwtAuthMiddleware.hasScope(request, Scopes.PluginRequestSend)) {
                     return reply
@@ -292,6 +291,20 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                         .send(
                             errorResponse(403, `Insufficient permissions: ${Scopes.PluginRequestSend} scope required`)
                         );
+                }
+
+                if (
+                    request.body == null ||
+                    typeof request.body !== "object" ||
+                    typeof request.body.project !== "string"
+                ) {
+                    return reply.status(400).send(errorResponse(400, "Request body must name its project"));
+                }
+                const { project, body, contributionPlugins, contributionHash } = request.body;
+                // The handler works on the body's project under the token's authority, so both
+                // must name the same one.
+                if (JwtAuthMiddleware.getClaims(request)?.projectId !== project) {
+                    return reply.status(403).send(errorResponse(403, "Token is not for this project"));
                 }
 
                 const target = pluginTargetOf(kind, targetId);
@@ -318,6 +331,11 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                             signal: limits.signal
                         });
                         return reply.send({ data: result ?? null });
+                    } catch (error) {
+                        if (limits.signal.aborted) {
+                            return answerUnserved(reply, limits, error, `Request ${address}/${key}`);
+                        }
+                        throw error;
                     } finally {
                         limits.dispose();
                     }
@@ -455,7 +473,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
                     fileVersion,
                     data: data ?? {},
                     jwt,
-                    contributionPlugins: contributionPlugins ?? [],
+                    contributionPlugins: serverContributionPlugins,
                     instance,
                     serverApi: instance.services.shared.ServerApi
                 };

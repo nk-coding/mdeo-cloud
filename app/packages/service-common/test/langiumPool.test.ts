@@ -44,4 +44,41 @@ describe("Langium instance pool", () => {
         const pool = fullPool(20, 0);
         assert.throws(() => pool.acquireForSession([], "jwt", "project"), LangiumPoolExhaustedError);
     });
+
+    it("fails a waiter whose instance cannot be built instead of leaving it waiting", async () => {
+        const pool = new LangiumInstancePool<unknown>({
+            maxInstances: 1,
+            maxSessionInstances: 1,
+            acquireTimeoutMs: 60_000,
+            languagePluginProvider: { create: () => ({}) }
+        } as unknown as ConstructorParameters<typeof LangiumInstancePool<unknown>>[0]);
+        // The first instance is a stand-in; building the second one fails.
+        let built = 0;
+        (pool as unknown as { createInstance: (plugins: unknown, key: string) => unknown }).createInstance = (
+            _plugins,
+            key
+        ) => {
+            if (built++ > 0) {
+                throw new Error("contributions do not build");
+            }
+            const instance = {
+                id: "first",
+                contributionPluginKey: key,
+                busy: false,
+                lastUsed: 0,
+                configure: () => {
+                    instance.busy = true;
+                },
+                reset: () => {
+                    instance.busy = false;
+                }
+            };
+            return instance;
+        };
+
+        const first = await pool.acquire([], "jwt", "project", "one");
+        const waiting = pool.acquire([], "jwt", "project", "two");
+        pool.release(first);
+        await assert.rejects(waiting, /contributions do not build/);
+    });
 });

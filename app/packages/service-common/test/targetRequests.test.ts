@@ -7,9 +7,10 @@ import { createLanguageService } from "../dist/service/service.js";
 /**
  * Claims a real token would carry, by token value; anything else fails authentication.
  */
-const tokens: Record<string, { scope: string[] }> = {
-    good: { scope: ["plugin:request:send"] },
-    unscoped: { scope: ["session:open"] }
+const tokens: Record<string, { scope: string[]; projectId: string }> = {
+    good: { scope: ["plugin:request:send"], projectId: "p" },
+    otherProject: { scope: ["plugin:request:send"], projectId: "q" },
+    unscoped: { scope: ["session:open"], projectId: "p" }
 };
 
 const realAuthenticate = JwtAuthMiddleware.prototype.authenticate;
@@ -41,12 +42,17 @@ async function contributionService(): Promise<FastifyInstance> {
     });
 }
 
-async function post(service: FastifyInstance, path: string, token: string | undefined) {
+async function post(
+    service: FastifyInstance,
+    path: string,
+    token: string | undefined,
+    payload: object | null = { project: "p", body: { hello: "world" } }
+) {
     return service.inject({
         method: "POST",
         url: path,
         headers: token == undefined ? {} : { authorization: `Bearer ${token}` },
-        payload: { project: "p", body: { hello: "world" } }
+        ...(payload == null ? {} : { payload })
     });
 }
 
@@ -94,5 +100,11 @@ describe("one-shot requests addressed at a target", () => {
         assert.equal((await post(service, "/request/contrib/echoes/nope", "good")).statusCode, 404);
         assert.equal((await post(service, "/request/contrib/echoes/echo", "unscoped")).statusCode, 403);
         assert.equal((await post(service, "/request/contrib/echoes/echo", undefined)).statusCode, 401);
+    });
+
+    it("refuses a body for another project than the token's, and a body naming none", async () => {
+        assert.equal((await post(service, "/request/contrib/echoes/echo", "otherProject")).statusCode, 403);
+        assert.equal((await post(service, "/request/contrib/echoes/echo", "good", { body: {} })).statusCode, 400);
+        assert.equal((await post(service, "/request/contrib/echoes/echo", "good", null)).statusCode, 400);
     });
 });

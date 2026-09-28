@@ -28,10 +28,13 @@ const tokens: Record<string, Record<string, unknown>> = {
 
 const logged: string[] = [];
 
-function deps(maxSessions: number): SessionServerDeps {
+function deps(maxSessions: number, verifyDelayMs = 0): SessionServerDeps {
     return {
         jwtAuth: {
             verifyToken: async (token: string | undefined) => {
+                if (verifyDelayMs > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, verifyDelayMs));
+                }
                 const claims = token == undefined ? undefined : tokens[token];
                 if (claims == undefined) {
                     throw new Error("invalid token");
@@ -169,5 +172,29 @@ describe("session server", () => {
             }
         }
         assert.equal(code, 1000);
+    });
+});
+
+describe("session server with a slow token check", () => {
+    let server: Server;
+    let port: number;
+
+    before(async () => {
+        server = createServer();
+        // Long enough that the first message arrives while the token is still being checked.
+        attachSessionServer(server, deps(1, 100));
+        await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+        port = (server.address() as AddressInfo).port;
+    });
+
+    after(() => {
+        server.closeAllConnections();
+        server.close();
+    });
+
+    it("answers a message sent before the session finished opening", async () => {
+        const served = await connect(port, "/ws/sessions/contrib/echoes/echo", "good");
+        assert.equal(served.code, 1000);
+        assert.deepEqual([...(served.echoed ?? [])], [7]);
     });
 });

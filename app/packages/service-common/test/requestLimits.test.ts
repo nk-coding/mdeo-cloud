@@ -52,4 +52,12 @@ describe("request limits", () => {
             assert.equal(raw.listenerCount("close"), 0);
         }
     });
+
+    it("keeps a deadline beyond a timer's range instead of failing at once", async () => {
+        const { reply: r } = reply();
+        const limits = createRequestLimits(request("3000000000"), r);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        assert.equal(limits.signal.aborted, false);
+        limits.dispose();
+    });
 });

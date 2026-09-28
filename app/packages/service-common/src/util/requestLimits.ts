@@ -30,6 +30,11 @@ export interface RequestLimits {
 }
 
 /**
+ * The longest delay a Node timer can wait, about 24.8 days.
+ */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/**
  * Watches one request for its deadline and for the caller going away.
  *
  * @param request The request, whose {@link TIMEOUT_HEADER} sets the deadline
@@ -39,7 +44,9 @@ export interface RequestLimits {
 export function createRequestLimits(request: FastifyRequest, reply: FastifyReply): RequestLimits {
     const controller = new AbortController();
     const header = request.headers[TIMEOUT_HEADER];
-    const timeoutMs = Number.parseInt(Array.isArray(header) ? (header[0] ?? "") : (header ?? ""), 10);
+    const requestedMs = Number.parseInt(Array.isArray(header) ? (header[0] ?? "") : (header ?? ""), 10);
+    // Node fires a timer set beyond its range at once, which would fail the request immediately.
+    const timeoutMs = Math.min(requestedMs, MAX_TIMER_MS);
     const hasDeadline = Number.isFinite(timeoutMs) && timeoutMs > 0;
     let timedOut = false;
 
