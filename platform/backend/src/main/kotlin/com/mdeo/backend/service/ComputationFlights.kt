@@ -7,6 +7,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -60,6 +61,9 @@ class ComputationFlights<K : Any, R>(private val scope: CoroutineScope) {
      */
     suspend fun run(key: K, caller: UUID?, compute: suspend (computationId: UUID) -> R): R {
         while (true) {
+            // Once the scope is cancelled no run starts, and a waiter would find the same dead
+            // flight again on every pass.
+            if (!scope.isActive) throw IllegalStateException("No computation can start: the service is stopping")
             val mine = Flight<R>(UUID.randomUUID())
             mine.result = scope.async(start = CoroutineStart.LAZY) {
                 try {
@@ -88,6 +92,8 @@ class ComputationFlights<K : Any, R>(private val scope: CoroutineScope) {
                 // This request was cancelled, or the run was: only the latter is worth a retry.
                 currentCoroutineContext().ensureActive()
                 if (started) throw IllegalStateException("The computation was cancelled", e)
+                // A run cancelled before its body ran never removed itself.
+                flights.remove(key, flight)
             } catch (e: Exception) {
                 if (started) throw e
             }

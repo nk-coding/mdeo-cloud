@@ -72,7 +72,7 @@ class WebSocketExecutionHandler(
             dispatch(request, projectId, executionId)
         } catch (e: Exception) {
             logger.error("Execution WS request $label failed", e)
-            sendError(request.requestId, ErrorCodes.INTERNAL, e.message ?: "Internal error")
+            sendError(request.requestId, ErrorCodes.INTERNAL, "Internal error")
         }
     }
 

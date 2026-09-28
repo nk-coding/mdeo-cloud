@@ -91,4 +91,33 @@ class ManifestProblemsTest {
                 manifestProblems(manifest(payloads = listOf(contribution("stats"), contribution("stats")))).single()
         )
     }
+
+    @Test
+    fun `malformed session declarations are refused rather than failing the refresh`() {
+        val notAnObject = buildJsonObject {
+            put("id", "stats")
+            putJsonArray("sessions") { add(JsonPrimitive("functions")) }
+        }
+        val notASessionType = buildJsonObject {
+            put("id", "geo")
+            putJsonObject("sessions") { put("functions", "script-functions") }
+        }
+        val unaddressableName = buildJsonObject {
+            put("id", "sets")
+            putJsonObject("sessions") {
+                putJsonObject("functions/v2") { put("protocol", "script-functions") }
+            }
+        }
+        val problems = manifestProblems(manifest(payloads = listOf(notAnObject, notASessionType, unaddressableName)))
+        assertEquals(3, problems.size, problems.toString())
+        assertTrue("not an object" in problems[0], problems[0])
+        assertTrue("without a protocol" in problems[1], problems[1])
+        assertTrue("cannot be used in an address" in problems[2], problems[2])
+    }
+
+    @Test
+    fun `a language session name must be usable in an address`() {
+        val problems = manifestProblems(manifest(languagePlugins = listOf(language("script", mapOf("a b" to functions)))))
+        assertTrue("cannot be used in an address" in problems.single(), problems.toString())
+    }
 }

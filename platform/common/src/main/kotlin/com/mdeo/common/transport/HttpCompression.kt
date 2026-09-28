@@ -30,6 +30,12 @@ const val MAX_DECODED_REQUEST_BYTES: Long = 64L * 1024 * 1024
 const val MAX_SERVICE_WEBSOCKET_MESSAGE_BYTES: Long = 512L * 1024 * 1024
 
 /**
+ * Largest response body inflated by [CompressedResponses]: the same bound as a message between
+ * services, since a response carries the same kind of data.
+ */
+const val MAX_DECODED_RESPONSE_BYTES: Int = 512 * 1024 * 1024
+
+/**
  * Compresses HTTP responses for every client that accepts it, and inflates compressed request bodies
  * up to [MAX_DECODED_REQUEST_BYTES].
  *
@@ -112,8 +118,8 @@ object CompressedResponses {
     private fun inflate(bytes: ByteArray, headers: HttpHeaders): ByteArray {
         val encoding = headers.firstValue("Content-Encoding").orElse("").trim().lowercase()
         return when (encoding) {
-            "gzip", "x-gzip" -> GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() }
-            "deflate" -> InflaterInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() }
+            "gzip", "x-gzip" -> GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBounded() }
+            "deflate" -> InflaterInputStream(ByteArrayInputStream(bytes)).use { it.readBounded() }
             "", "identity" -> bytes
             else -> throw IllegalStateException("Unsupported response encoding '$encoding'")
         }
@@ -126,4 +132,16 @@ object CompressedResponses {
             ?.substringAfter('=')?.trim('"')
         return declared?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: Charsets.UTF_8
     }
+}
+
+/**
+ * Reads what the stream inflates to, refusing more than [limit] bytes: without a bound, a few
+ * megabytes of compressed zeros inflate into gigabytes.
+ */
+internal fun java.io.InputStream.readBounded(limit: Int = MAX_DECODED_RESPONSE_BYTES): ByteArray {
+    val bytes = readNBytes(limit + 1)
+    if (bytes.size > limit) {
+        throw java.io.IOException("Response inflates to more than $limit bytes")
+    }
+    return bytes
 }

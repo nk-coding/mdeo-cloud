@@ -4,6 +4,8 @@ import com.mdeo.common.auth.Scopes
 import com.mdeo.common.model.PluginRequest
 import com.mdeo.common.model.PluginResponse
 import com.mdeo.common.model.PluginTarget
+import com.mdeo.common.transport.RequestBodyTooLargeException
+import com.mdeo.common.transport.receiveBoundedText
 import com.mdeo.common.transport.respondError
 import com.mdeo.pluginservice.PluginTokenVerifier
 import io.ktor.http.*
@@ -70,7 +72,10 @@ fun Route.requestEndpoint(
         }
 
         val payload = try {
-            requestJson.decodeFromString(PluginRequest.serializer(), call.receiveText())
+            requestJson.decodeFromString(PluginRequest.serializer(), call.receiveBoundedText())
+        } catch (e: RequestBodyTooLargeException) {
+            call.respondError(HttpStatusCode.PayloadTooLarge, e.message!!)
+            return@post
         } catch (e: Exception) {
             call.respondError(HttpStatusCode.BadRequest, "The request body could not be read")
             return@post

@@ -108,7 +108,7 @@ fun Application.module(appConfig: AppConfig) {
     gitSshServer.start()
 
     services.pluginService.startManifestChecks(appConfig.plugin.manifestCheckSeconds)
-    
+
     monitor.subscribe(ApplicationStopped) {
         gitSshServer.stop()
         // Background work stops first, so none of it reaches for a database that is already closed.

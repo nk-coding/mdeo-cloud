@@ -5,6 +5,7 @@ import com.mdeo.common.model.PluginTargetKind
 import com.mdeo.pluginservice.request.RequestHandler
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import com.mdeo.common.transport.MAX_DECODED_REQUEST_BYTES
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.json.Json
@@ -130,5 +131,11 @@ class RequestEndpointTest {
         val message = errorOf(failed.bodyAsText())["message"]!!.jsonPrimitive.content
         assertEquals("The request could not be answered", message)
         assertTrue("internal-host" !in message, "nothing internal reaches the caller")
+    }
+
+    @Test
+    fun `a body larger than a service accepts is refused before it is read whole`() = service {
+        val tooLarge = post("/request/contrib/echoes/echo", "good", body = "\"" + "x".repeat(MAX_DECODED_REQUEST_BYTES.toInt()) + "\"")
+        assertEquals(HttpStatusCode.PayloadTooLarge, tooLarge.status)
     }
 }

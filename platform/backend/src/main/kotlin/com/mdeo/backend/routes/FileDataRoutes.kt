@@ -1,8 +1,11 @@
 package com.mdeo.backend.routes
 
 import com.mdeo.common.auth.Scopes
+import com.mdeo.common.transport.RequestBodyTooLargeException
+import com.mdeo.common.transport.receiveBoundedText
 import com.mdeo.common.transport.respondError
 import com.mdeo.backend.config.FileDataConfig
+import com.mdeo.backend.config.appJson
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.CallerDeadline
 import com.mdeo.backend.service.FileDataService
@@ -126,7 +129,10 @@ fun Route.fileDataRoutes(
             val projectId = call.authorizeFileDataRead(projectService) ?: return@post
 
             val request = try {
-                call.receive<FileDataBatchRequest>()
+                appJson.decodeFromString<FileDataBatchRequest>(call.receiveBoundedText())
+            } catch (e: RequestBodyTooLargeException) {
+                call.respondError(HttpStatusCode.PayloadTooLarge, e.message!!)
+                return@post
             } catch (e: Exception) {
                 call.respondError(HttpStatusCode.BadRequest, "Invalid batch request")
                 return@post

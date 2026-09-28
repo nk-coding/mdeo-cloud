@@ -61,6 +61,16 @@ data class PluginTarget(
         private val ID_PATTERN = Regex("^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
         /**
+         * Whether a value can stand in one segment of a plugin address, as a target id, a session
+         * name or a request or file data key: the same characters, so it needs no escaping in a
+         * URL path and cannot step out of the path it is put in.
+         *
+         * @param value The id, name or key
+         * @return Whether it may be used
+         */
+        fun isAddressSegment(value: String): Boolean = ID_PATTERN.matches(value)
+
+        /**
          * Builds a target from its two parts, rejecting an id an address could not carry.
          *
          * @param kind The kind of target

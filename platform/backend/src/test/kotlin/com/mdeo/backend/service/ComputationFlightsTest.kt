@@ -6,6 +6,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -14,7 +15,9 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ComputationFlightsTest {
 
@@ -136,5 +139,18 @@ class ComputationFlightsTest {
             }
         }
         assertEquals("inner A", result)
+    }
+
+    @Test
+    fun `requests after the scope is cancelled fail instead of spinning`() = runBlocking {
+        val scope = supervisor()
+        val flights = ComputationFlights<String, Int>(scope)
+        scope.cancel()
+
+        repeat(2) {
+            val outcome = withTimeoutOrNull(5_000) { runCatching { flights.run("ast:/a.fn", caller = null) { 42 } } }
+            assertNotNull(outcome, "run() did not return")
+            assertTrue(outcome.isFailure)
+        }
     }
 }

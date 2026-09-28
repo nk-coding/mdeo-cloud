@@ -1,7 +1,10 @@
 package com.mdeo.backend.routes
 
 import com.mdeo.common.auth.Scopes
+import com.mdeo.common.transport.RequestBodyTooLargeException
+import com.mdeo.common.transport.receiveBoundedText
 import com.mdeo.common.transport.respondError
+import com.mdeo.backend.config.appJson
 import com.mdeo.backend.plugins.*
 import com.mdeo.backend.service.CallerDeadline
 import com.mdeo.backend.service.JwtService
@@ -13,7 +16,6 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.JsonElement
 import java.util.*
 
 /**
@@ -90,7 +92,10 @@ fun Route.pluginRequestRoutes(
             }
 
             val body = try {
-                call.receive<JsonElement>()
+                appJson.parseToJsonElement(call.receiveBoundedText())
+            } catch (e: RequestBodyTooLargeException) {
+                call.respondError(HttpStatusCode.PayloadTooLarge, e.message!!)
+                return@post
             } catch (e: Exception) {
                 call.respondError(HttpStatusCode.BadRequest, "Invalid JSON body")
                 return@post

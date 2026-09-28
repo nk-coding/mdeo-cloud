@@ -1,5 +1,6 @@
 package com.mdeo.scriptfunctions.service
 
+import com.mdeo.common.model.PluginTarget
 import com.mdeo.common.model.SessionType
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
@@ -308,12 +309,18 @@ class ScriptContributionBuilder internal constructor(private val id: String) {
      * @param handler Answers the request
      */
     fun request(key: String, handler: RequestHandler) {
+        require(PluginTarget.isAddressSegment(key)) {
+            "Request key '$key' of contribution '$id' cannot be used in an address"
+        }
         require(requestHandlers.put(key, handler) == null) {
             "Request key '$key' of contribution '$id' is answered more than once"
         }
     }
 
     internal fun build(): ScriptContribution {
+        require(PluginTarget.isAddressSegment(sessionName)) {
+            "Session name '$sessionName' of contribution '$id' cannot be used in an address"
+        }
         val all = functions.values.flatten()
         // Checked once everything is declared, so a record may name one declared after it.
         val rule = ContributionTypeRule(id, records.keys + opaqueClasses.keys)

@@ -91,6 +91,10 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
         callerComputationId: UUID? = null,
         deadline: CallerDeadline? = null
     ): ApiResult<RawFileData> {
+        // The key becomes a segment of the URL the plugin is called at.
+        if (!PluginTarget.isAddressSegment(key)) {
+            return fileDataFailure(ErrorCodes.BAD_REQUEST, "Not a file data key: '$key'")
+        }
         val normalizedPath = when {
             path != null -> normalizePath(path)
             languageId != null -> normalizePath("/")
@@ -253,11 +257,16 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
                 ErrorCodes.FILE_DATA_COMPUTATION_FAILED,
                 "The plugin did not compute $normalizedPath:$key within ${fileDataConfig.computationTimeoutSeconds} seconds"
             )
+        } catch (e: PluginAnswerException) {
+            logger.error("Failed to compute file data for $normalizedPath:$key: ${e.message}")
+            return fileDataFailure(ErrorCodes.FILE_DATA_COMPUTATION_FAILED, "Failed to compute file data: ${e.message}")
         } catch (e: Exception) {
             logger.error("Failed to compute file data for $normalizedPath:$key", e)
+            // Any other exception may name internal addresses or quote a plugin's raw answer; the log
+            // keeps it, the caller is told only what failed.
             return fileDataFailure(
                 ErrorCodes.FILE_DATA_COMPUTATION_FAILED,
-                "Failed to compute file data: ${e.message}"
+                "Failed to compute $key data for $normalizedPath"
             )
         } finally {
             endComputation(computationId)
@@ -398,7 +407,7 @@ class FileDataService(services: InjectedServices) : BaseService(), InjectedServi
             val responseText = String(response.body(), Charsets.UTF_8)
 
             if (response.statusCode() != 200) {
-                throw RuntimeException("Plugin returned ${describeErrorResponse(response.statusCode(), responseText)}")
+                throw PluginAnswerException("Plugin returned ${describeErrorResponse(response.statusCode(), responseText)}")
             }
 
             json.decodeFromString<FileDataComputeResponse>(responseText)
@@ -547,3 +556,9 @@ private val VALIDITY_QUERY = """
           )
       )
 """.trimIndent()
+
+/**
+ * A plugin answered a file data request with an error. The message holds only what
+ * [describeErrorResponse] lets through, so it may be passed on to the caller.
+ */
+private class PluginAnswerException(message: String) : RuntimeException(message)

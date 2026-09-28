@@ -255,5 +255,11 @@ class ScriptContributionTest {
                 function("f") { implementation { null } }
             }
         }
+        assertFailsWith<IllegalArgumentException> {
+            scriptContribution("x") { sessionName = "functions/v2" }
+        }.also { assertTrue(it.message!!.contains("cannot be used in an address")) }
+        assertFailsWith<IllegalArgumentException> {
+            scriptContribution("x") { request("../admin") { it.body } }
+        }.also { assertTrue(it.message!!.contains("cannot be used in an address")) }
     }
 }

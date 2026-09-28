@@ -34,6 +34,20 @@ fun errorCodeFor(status: HttpStatusCode): String = when (status) {
 }
 
 /**
+ * The HTTP status a failure is answered with when nothing more specific applies: the upstream
+ * failures get their gateway status, so a client or proxy does not take them for its own mistake,
+ * and everything else is the caller's.
+ *
+ * @param code One of [ErrorCodes]
+ * @return The status
+ */
+fun failureStatusFor(code: String): HttpStatusCode = when (code) {
+    ErrorCodes.DEADLINE_EXCEEDED -> HttpStatusCode.GatewayTimeout
+    ErrorCodes.UNAVAILABLE -> HttpStatusCode.ServiceUnavailable
+    else -> HttpStatusCode.BadRequest
+}
+
+/**
  * Answers the call with an error in the platform's error shape, `{"error": {"code", "message"}}`.
  *
  * @param status The HTTP status

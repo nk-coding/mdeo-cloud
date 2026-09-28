@@ -92,12 +92,18 @@ data class ManifestTextualEditorPlugin(
  * The server contribution payloads one contribution plugin of a manifest ships.
  */
 internal fun serverContributionPayloads(contributionPlugin: JsonObject): List<JsonObject> =
-    contributionPlugin["serverContributionPlugins"]?.jsonArray?.map { it.jsonObject } ?: emptyList()
+    (contributionPlugin["serverContributionPlugins"] as? JsonArray)?.filterIsInstance<JsonObject>() ?: emptyList()
 
 /**
  * The id a server contribution payload is addressed by, or null when it carries none.
  */
-internal fun contributionIdOf(payload: JsonObject): String? = payload["id"]?.jsonPrimitive?.contentOrNull
+internal fun contributionIdOf(payload: JsonObject): String? =
+    (payload["id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+/**
+ * Reads session types out of a manifest the way they are stored.
+ */
+private val manifestJson = Json { ignoreUnknownKeys = true }
 
 /**
  * What a manifest declares that the platform cannot address, as messages.
@@ -117,10 +123,37 @@ internal fun manifestProblems(manifest: PluginManifest): List<String> {
             problems += "language '${plugin.id}' declares sessions, but its id cannot be used as an address"
         }
     }
+    for (plugin in manifest.languagePlugins) {
+        for (name in plugin.sessions.keys.filterNot(PluginTarget::isAddressSegment)) {
+            problems += "language '${plugin.id}' declares session '$name', whose name cannot be used in an address"
+        }
+    }
+    for (contributionPlugin in manifest.contributionPlugins) {
+        val shipped = contributionPlugin["serverContributionPlugins"]
+        if (shipped != null && shipped !is JsonNull && (shipped !is JsonArray || shipped.any { it !is JsonObject })) {
+            problems += "a contribution's serverContributionPlugins is not a list of objects"
+        }
+    }
     val payloads = manifest.contributionPlugins.flatMap { serverContributionPayloads(it) }
     for (payload in payloads) {
-        if (contributionIdOf(payload) == null && payload["sessions"]?.jsonObject?.isNotEmpty() == true) {
+        val contributionId = contributionIdOf(payload)
+        val label = contributionId?.let { "contribution '$it'" } ?: "a contribution"
+        val sessions = payload["sessions"]
+        if (sessions == null || sessions is JsonNull) continue
+        if (sessions !is JsonObject) {
+            problems += "$label declares sessions that are not an object of session types"
+            continue
+        }
+        if (contributionId == null && sessions.isNotEmpty()) {
             problems += "a contribution declares sessions, but carries no id to be addressed by"
+        }
+        for ((name, type) in sessions) {
+            if (!PluginTarget.isAddressSegment(name)) {
+                problems += "$label declares session '$name', whose name cannot be used in an address"
+            }
+            if (runCatching { manifestJson.decodeFromJsonElement(SessionType.serializer(), type) }.isFailure) {
+                problems += "$label declares session '$name' without a protocol and versions"
+            }
         }
     }
     val contributionIds = payloads.mapNotNull { contributionIdOf(it) }
@@ -414,34 +447,66 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
             )
         }
 
-        transaction {
-            val now = Instant.now()
-
-            LanguagePluginsTable.deleteWhere { LanguagePluginsTable.pluginId eq pluginId.toKotlinUuid() }
-
-            ContributionPluginsTable.deleteWhere { ContributionPluginsTable.pluginId eq pluginId.toKotlinUuid() }
-
-            ContributionTargetsTable.deleteWhere { ContributionTargetsTable.pluginId eq pluginId.toKotlinUuid() }
-
-            PluginSessionsTable.deleteWhere { PluginSessionsTable.pluginId eq pluginId.toKotlinUuid() }
-
-            storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
-
-            storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
-
-            PluginsTable.update({ PluginsTable.id eq pluginId.toKotlinUuid() }) {
-                it[name] = manifest.name
-                it[description] = manifest.description
-                it[icon] = manifest.icon.toString()
-                it[updatedAt] = now
-            }
+        try {
+            transaction { storeRefreshedManifest(pluginId, manifest) }
+        } catch (e: ContributionIdConflictException) {
+            return pluginFailure(
+                ErrorCodes.PLUGIN_CONTRIBUTION_ID_CONFLICT,
+                "The refreshed manifest was not applied: contribution " +
+                        "${if (e.ids.size == 1) "id" else "ids"} ${e.ids.joinToString(", ") { "'$it'" }} " +
+                        "already provided by another plugin in a project that uses this one"
+            )
         }
 
         storeManifestFingerprint(pluginId, fetched.fingerprint)
         fileDataService.invalidatePluginData(pluginId)
-        
+
         return success(Unit)
     }
+
+    /**
+     * Replaces what is stored of a plugin with a freshly fetched manifest. Must run in a
+     * transaction, which a [ContributionIdConflictException] rolls back.
+     *
+     * The refreshed contributions are checked against every project that uses the plugin, as
+     * [addPluginToProject] checks them against one: a redeploy must not make a `contrib:` address
+     * ambiguous either.
+     */
+    private fun storeRefreshedManifest(pluginId: UUID, manifest: PluginManifest) {
+        val now = Instant.now()
+
+        LanguagePluginsTable.deleteWhere { LanguagePluginsTable.pluginId eq pluginId.toKotlinUuid() }
+
+        ContributionPluginsTable.deleteWhere { ContributionPluginsTable.pluginId eq pluginId.toKotlinUuid() }
+
+        ContributionTargetsTable.deleteWhere { ContributionTargetsTable.pluginId eq pluginId.toKotlinUuid() }
+
+        PluginSessionsTable.deleteWhere { PluginSessionsTable.pluginId eq pluginId.toKotlinUuid() }
+
+        storeLanguagePlugins(pluginId, manifest.languagePlugins, now)
+
+        storeContributionPlugins(pluginId, manifest.contributionPlugins, now)
+
+        val conflicts = ProjectPluginsTable.selectAll()
+            .where { ProjectPluginsTable.pluginId eq pluginId.toKotlinUuid() }
+            .map { it[ProjectPluginsTable.projectId].toJavaUuid() }
+            .flatMap { conflictingContributionIds(it, pluginId) }
+            .distinct()
+        if (conflicts.isNotEmpty()) throw ContributionIdConflictException(conflicts)
+
+        PluginsTable.update({ PluginsTable.id eq pluginId.toKotlinUuid() }) {
+            it[name] = manifest.name
+            it[description] = manifest.description
+            it[icon] = manifest.icon.toString()
+            it[updatedAt] = now
+        }
+    }
+
+    /**
+     * A refreshed manifest would give a contribution id that another plugin of the same project
+     * already provides.
+     */
+    private class ContributionIdConflictException(val ids: List<String>) : RuntimeException()
 
     /**
      * Refreshes all plugins by re-fetching each manifest and updating stored language plugins.
@@ -1053,8 +1118,8 @@ class PluginService(services: InjectedServices) : BaseService(), InjectedService
      * Finds the plugin that ships a contribution, within one project.
      *
      * Mirrors [findPluginByLanguage] for the other target kind. Contribution ids are unique
-     * within a project — [addPluginToProject] refuses a plugin that would break that — so at
-     * most one row can match.
+     * within a project — [addPluginToProject] and [refreshPluginData] refuse a plugin that would
+     * break that — so at most one row can match.
      *
      * @param projectId The UUID of the project
      * @param contributionId The contribution id, as addressed by `contrib:<id>`

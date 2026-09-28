@@ -2,8 +2,10 @@ package com.mdeo.common.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The address is written by one side and read by the other — a Kotlin execution node formats it
@@ -64,5 +66,14 @@ class PluginTargetTest {
     @Test
     fun `refuses an unusable id at construction`() {
         assertFailsWith<IllegalArgumentException> { PluginTarget.of(PluginTargetKind.LANGUAGE, "with space") }
+    }
+
+    @Test
+    fun `accepts a key as one address segment only`() {
+        assertTrue(PluginTarget.isAddressSegment("config-execution-get-file-tree"))
+        assertTrue(PluginTarget.isAddressSegment("typed-ast"))
+        for (key in listOf("", "..", "../admin", "a/b", "a?b", ".hidden", "a%2Fb")) {
+            assertFalse(PluginTarget.isAddressSegment(key), key)
+        }
     }
 }

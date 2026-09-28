@@ -85,6 +85,10 @@ class PluginRequestService(services: InjectedServices) : BaseService(), Injected
         deadline: CallerDeadline? = null,
         callerComputationId: UUID? = null
     ): ApiResult<PluginResponse> {
+        // The key becomes a segment of the URL the plugin is called at.
+        if (!PluginTarget.isAddressSegment(key)) {
+            return pluginRequestFailure(ErrorCodes.BAD_REQUEST, "Not a request key: '$key'")
+        }
         val pluginId = pluginService.findPluginForTarget(projectId, target)
             ?: return pluginRequestFailure(
                 ErrorCodes.FILE_DATA_NO_PLUGIN_FOUND,
