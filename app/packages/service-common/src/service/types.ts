@@ -45,7 +45,8 @@ export interface LanguageServiceConfig<T = object> {
     serviceModule?: Module<LanguageServices & T, PartialLanguageServices & DeepPartial<T>>;
 
     /**
-     * File data handlers keyed by data key (e.g., "ast", "diagram")
+     * File data handlers keyed by data key (e.g., "ast", "diagram").
+     * A "diagnostics" handler is provided for every language unless one is registered here.
      */
     fileDataHandlers: Record<string, FileDataHandler<unknown, T>>;
 

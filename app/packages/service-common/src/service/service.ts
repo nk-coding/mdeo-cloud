@@ -29,7 +29,8 @@ import {
 } from "@mdeo/plugin";
 import { URI } from "vscode-uri";
 import { buildManifest } from "./util.js";
-import type { FileInfo } from "../handler/types.js";
+import type { FileDataHandler, FileInfo } from "../handler/types.js";
+import { DIAGNOSTICS_HANDLER_KEY, diagnosticsHandler } from "../handler/diagnosticsHandler.js";
 import type { ExecutionContext, ExecutionMetadata, ExecutionRequestContext } from "../execution/types.js";
 import { JwtAuthMiddleware } from "../auth/jwtAuth.js";
 import { attachExecutionWebSocketServer } from "../ws/executionWsServer.js";
@@ -44,6 +45,13 @@ import { HttpServerApi } from "./serverApi.js";
  * 1 MiB default rejects any file above roughly a megabyte with a 413 before the handler ever runs.
  */
 export const DEFAULT_MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024;
+
+/**
+ * File data handlers every language has, unless its configuration registers its own for the key.
+ */
+const DEFAULT_FILE_DATA_HANDLERS: Record<string, FileDataHandler> = {
+    [DIAGNOSTICS_HANDLER_KEY]: diagnosticsHandler
+};
 
 /**
  * Internal structure for managing a language's pool and configuration.
@@ -217,7 +225,7 @@ export async function createLanguageService<T>(config: ServiceConfig<T>): Promis
 
             const jwt = extractJwtFromRequest(request);
 
-            const handler = languageHandler.config.fileDataHandlers[key];
+            const handler = languageHandler.config.fileDataHandlers[key] ?? DEFAULT_FILE_DATA_HANDLERS[key];
             if (handler == undefined) {
                 return reply.status(404).send(errorResponse(404, `No handler registered for key: ${key}`));
             }
