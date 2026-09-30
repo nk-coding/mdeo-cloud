@@ -1000,7 +1000,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      */
     private getNodeMetadata(validatedMetadata: GraphMetadata, nodeId: string): NodeLayoutMetadata {
         const metadata = validatedMetadata.nodes[nodeId]?.meta;
-        if (metadata != undefined && NodeLayoutMetadataUtil.isValid(metadata)) {
+        if (metadata != undefined && NodeLayoutMetadataUtil.isValidWithOptionalSize(metadata)) {
             return metadata;
         }
         return NodeLayoutMetadataUtil.create(0, 0, 250);

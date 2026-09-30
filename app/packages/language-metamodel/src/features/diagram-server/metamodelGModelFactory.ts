@@ -790,7 +790,7 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
         if (property != undefined) {
             const propertyMeta = validatedMetadata.nodes[associationEndId];
             const metadata =
-                propertyMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(propertyMeta.meta)
+                propertyMeta?.meta != undefined && NodeLayoutMetadataUtil.isValidWithOptionalSize(propertyMeta.meta)
                     ? propertyMeta.meta
                     : NodeLayoutMetadataUtil.create(0, 0);
 
@@ -813,7 +813,8 @@ export class MetamodelGModelFactory extends BaseGModelFactory<PartialMetaModel> 
             const multiplicityNodeId = `${associationEndId}__multiplicity`;
             const multiplicityMeta = validatedMetadata.nodes[multiplicityNodeId];
             const metadata =
-                multiplicityMeta?.meta != undefined && NodeLayoutMetadataUtil.isValid(multiplicityMeta.meta)
+                multiplicityMeta?.meta != undefined &&
+                NodeLayoutMetadataUtil.isValidWithOptionalSize(multiplicityMeta.meta)
                     ? multiplicityMeta.meta
                     : NodeLayoutMetadataUtil.create(0, 0);
 

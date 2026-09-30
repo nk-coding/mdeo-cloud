@@ -11,7 +11,7 @@ import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.expression.ast.types.ValueType
 import com.mdeo.script.compiler.registry.property.GlobalPropertyRegistry
 import com.mdeo.script.compiler.registry.property.StaticGlobalPropertyDefinition
-import com.mdeo.script.compiler.registry.type.DirectFieldPropertyDefinition
+import com.mdeo.script.compiler.registry.type.FieldGetterPropertyDefinition
 import com.mdeo.script.compiler.registry.type.MethodDefinition
 import com.mdeo.script.compiler.registry.type.PropertyDefinition
 import com.mdeo.script.compiler.registry.type.TypeDefinitionImpl
@@ -194,7 +194,9 @@ object ScriptMetamodelTypeRegistrar {
         metadata: MetamodelMetadata
     ) {
         val typePackage = "$CLASS_PACKAGE$metamodelPath"
-        val instanceClassName = Metamodel.getInstanceClassName(classData.name)
+        // The type interface, not the instance class: an instance of a class inheriting through a
+        // second superclass implements the interface but does not extend the class.
+        val typeInterfaceName = Metamodel.getInstanceInterfaceName(classData.name)
         val classMeta = metadata.classes[classData.name]
 
         val extendsRefs = classData.extends.map { superName ->
@@ -208,17 +210,17 @@ object ScriptMetamodelTypeRegistrar {
             typePackage = typePackage,
             typeName = classData.name,
             extends = extendsRefs,
-            jvmClassName = instanceClassName
+            jvmClassName = typeInterfaceName
         )
 
         for (property in classData.properties) {
             val fieldMapping = classMeta?.propertyFields?.get(property.name)
             if (fieldMapping != null) {
-                typeDef.addProperty(DirectFieldPropertyDefinition(
+                typeDef.addProperty(FieldGetterPropertyDefinition(
                     name = property.name,
                     descriptor = fieldMapping.fieldDescriptor,
-                    ownerClass = instanceClassName,
-                    fieldName = "prop_${fieldMapping.fieldIndex}",
+                    ownerClass = typeInterfaceName,
+                    getterName = Metamodel.getFieldGetterName(fieldMapping.fieldIndex),
                     fieldDescriptor = fieldMapping.fieldDescriptor,
                     upper = fieldMapping.upper
                 ))
@@ -230,16 +232,16 @@ object ScriptMetamodelTypeRegistrar {
                 val isOwnLink = isOwnLink(classData.name, roleName, metamodelData)
                 if (isOwnLink) {
                     val scriptLinkDescriptor = if (linkMapping.upper == 1) {
-                        val targetInternalName = Metamodel.getInstanceClassName(linkMapping.oppositeClassName)
+                        val targetInternalName = Metamodel.getInstanceInterfaceName(linkMapping.oppositeClassName)
                         "L$targetInternalName;"
                     } else {
                         "Ljava/util/Set;"
                     }
-                    typeDef.addProperty(DirectFieldPropertyDefinition(
+                    typeDef.addProperty(FieldGetterPropertyDefinition(
                         name = roleName,
                         descriptor = scriptLinkDescriptor,
-                        ownerClass = instanceClassName,
-                        fieldName = "prop_${linkMapping.fieldIndex}",
+                        ownerClass = typeInterfaceName,
+                        getterName = Metamodel.getFieldGetterName(linkMapping.fieldIndex),
                         fieldDescriptor = linkMapping.fieldDescriptor,
                         upper = linkMapping.upper
                     ))

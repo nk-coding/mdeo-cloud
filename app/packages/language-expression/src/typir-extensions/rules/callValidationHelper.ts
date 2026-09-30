@@ -923,6 +923,12 @@ export class GenericResolver<Specifics extends TypirSpecifics> {
             const result = findSuperTypeWithTypeArgs(actualType, declaredTypeDefinition);
             isAllowed = result != undefined;
             actualTypeArgs = result?.typeArgs;
+            if (!isAllowed && Object.keys(declaredType.typeArgs ?? {}).length === 0) {
+                // Not a subtype, but maybe implicitly convertible, like an int passed where a long is
+                // declared: an argument follows the same rules as an assignment.
+                const resolved = this.resolveType(declaredType);
+                return !Array.isArray(resolved) && this.assignabilityService.isAssignable(actualType, resolved);
+            }
         }
 
         if (!isAllowed) {
