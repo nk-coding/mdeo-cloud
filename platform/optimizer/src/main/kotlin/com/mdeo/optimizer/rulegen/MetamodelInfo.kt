@@ -54,11 +54,18 @@ data class ReferenceInfo(
 class MetamodelInfo private constructor(
     private val classes: Set<String>,
     private val referencesByClass: Map<String, List<ReferenceInfo>>,
-    private val containmentContextsByClass: Map<String, List<Pair<String, String>>>
+    private val containmentContextsByClass: Map<String, List<Pair<String, String>>>,
+    private val importedClassPaths: Map<String, String>
 ) {
 
     /** Returns the names of all non-abstract classes in the metamodel. */
     fun classNames(): List<String> = classes.toList()
+
+    /**
+     * Returns the path of the metamodel file declaring [className] when that is a file the
+     * metamodel imports, or `null` for a class of the metamodel file itself.
+     */
+    fun pathOf(className: String): String? = importedClassPaths[className]
 
     /**
      * Returns all navigable references for [className], including both forward references and the
@@ -192,7 +199,8 @@ class MetamodelInfo private constructor(
             return MetamodelInfo(
                 classes = classes,
                 referencesByClass = referencesByClass,
-                containmentContextsByClass = containmentContextsByClass
+                containmentContextsByClass = containmentContextsByClass,
+                importedClassPaths = metamodelData.classes.mapNotNull { c -> c.path?.let { c.name to it } }.toMap()
             )
         }
 

@@ -53,7 +53,7 @@ object MutationAstBuilder {
         info: MetamodelInfo,
         createContext: Pair<String, String>? = null
     ): TypedAst {
-        val guardBuilder = MultiplicityGuardBuilder(metamodelPath)
+        val guardBuilder = MultiplicityGuardBuilder(metamodelPath, info::pathOf)
         val elements: List<TypedPatternElement> = when (spec.type) {
             RepairSpecType.CREATE              -> buildCreate(spec, info, guardBuilder, createContext)
             RepairSpecType.CREATE_LB_REPAIR    -> buildCreateLbRepair(spec, info, guardBuilder)
