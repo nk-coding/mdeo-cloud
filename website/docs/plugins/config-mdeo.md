@@ -68,15 +68,59 @@ search {
 | Entry | Meaning |
 | --- | --- |
 | `using "path.mt"` | Use a hand-written model transformation as a mutation operator |
-| `create Class` | Generate an operator that adds an instance of the class |
-| `delete Class` | Generate an operator that removes an instance |
-| `mutate Class` | Generate an operator that changes an instance's properties |
-| `add Class.edge` | Generate an operator that adds a link |
-| `remove Class.edge` | Generate an operator that removes a link |
-| `mutate Class.edge` | Generate an operator that rewires a link |
+| `create Class` | Generate operators that add an object of the class, or of each concrete subclass |
+| `delete Class` | Generate an operator that removes an object of the class or of a subclass |
+| `add Class.edge` | Generate operators that link objects through the association end |
+| `remove Class.edge` | Generate operators that unlink them |
+| `mutate Class.edge` | Both of the above |
+| `mutate Class` | `create`, `delete` and `mutate Class.edge` for every association end of the class |
 
+`edge` is an association end of the class, declared on it or inherited; attributes are never changed.
 Entries may be mixed and repeated in any order. Generated operators are written into the result tree
 as `.mt_gen` files, so you can read exactly what the search was allowed to do.
+
+#### Generated operators
+
+Generated operators never break a multiplicity: applied to a model in which every object has an
+allowed number of links through each association end, they produce a model in which it still does.
+They follow Burdusel et al., [Automatic generation of atomic multiplicity-preserving search
+operators](https://doi.org/10.1007/s10270-021-00914-w) (SoSyM 2021). Refinements from the
+[goal section](/plugins/config-optimization#the-goal-section) count as part of the metamodel here, so
+the operators keep the refined bounds too.
+
+Below, the selected end is `A.e[n..m]`: each `A` links to between `n` and `m` objects `B`. Its
+opposite end allows each `B` between `k` and `l` objects `A`; an end without a name allows any number.
+
+| Multiplicities | Operators | What they do |
+| --- | --- | --- |
+| neither end fixed | `ADD_A_e`, `REMOVE_A_e` | Link or unlink an `A` and a `B` while both stay within their bounds |
+| `k = l` | `CHANGE_A_e` | Move a `B` from one `A` to another |
+| `n = m` | `SWAP_A_e`, `CHANGE_A_e` | Two `A`s exchange a `B`; an `A` replaces one of its `B`s by another one (only if `k < l`) |
+
+`add` asks for the first row's `ADD` and `remove` for its `REMOVE`; with a fixed end both get the
+`CHANGE` or `SWAP` operators of the other rows.
+
+**Creating** an object places it in each composition that can contain it (one operator per
+container) and links it through every end with `n > 0`. Each such end is satisfied in one of these
+ways, and there is an operator for every combination:
+
+| Suffix | How the `n` links are made | Offered when |
+| --- | --- | --- |
+| `_e_CONNECT` | Link `n` existing `B`s that still have room | `k < l` or `l = *` |
+| `_e_LBREPAIR` | Take all `n` from one other `A`, which keeps at least `n` | `n < m`, `l` is bounded, `m ≥ 2n` or `m = *` |
+| `_e_LBREPAIR_MULTI` | Take one each from `n` other `A`s, which keep at least `n` | `1 < n < m`, `l` is bounded |
+
+Required attributes of a new object are set to `""`, `0`, `false` or the first enum entry.
+
+**Deleting** an object (`DELETE_A`) only happens when every object linked to it keeps its lower bound.
+Objects whose number of `A`s is fixed are moved to another `A` with room, so they never lose one.
+
+Some operators cannot exist: an object can neither be created nor deleted when one of its ends and the
+opposite end are both fixed, since every change would have to be repaired by changing further objects.
+Such cases, and operators whose effect is limited, are listed in `generated-mutations/warnings.md` in
+the results. Operators that move objects within a composition whose parts may contain each other
+(`Node.children[*] *--> Node.parent[?]`) do not prevent an object from ending up inside one of its own
+descendants.
 
 ### The `solver` section
 

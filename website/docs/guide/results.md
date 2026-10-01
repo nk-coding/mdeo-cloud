@@ -26,7 +26,11 @@ batch_1/solution_0.m_gen
 batch_2/report.json
 batch_2/solution_0.m_gen
 generated-mutations/<rule>.mt_gen
+generated-mutations/warnings.md
 ```
+
+`generated-mutations/warnings.md` only appears when some requested operators could not be generated
+or are limited; see [Generated operators](/plugins/config-mdeo#generated-operators).
 
 ## `summary.md`
 
