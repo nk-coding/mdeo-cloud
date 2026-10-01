@@ -66,10 +66,17 @@ class SpecsGenerator(private val info: MetamodelInfo) {
     private fun edges(className: String, end: AssociationEnd, add: Boolean, remove: Boolean): List<OperatorSpec> {
         if (end.upper == 0) return emptyList()
         val opposite = end.opposite
+        // When one end has an upper bound and the other a lower bound, a model can be tight:
+        // every link that could be added would exceed an upper bound and every link that could
+        // be removed would fall below a lower one, although other linkings of the same objects
+        // are consistent. A swap keeps every object's number of links, so it is always possible
+        // and connects them.
+        val tight = (end.isBounded && opposite.lower > 0) || (opposite.isBounded && end.lower > 0)
+        val swap = EdgeKind.SWAP.takeIf { add && remove && tight }
         val kinds = when {
             end.isFixed -> listOfNotNull(EdgeKind.SWAP, EdgeKind.CHANGE_TARGET.takeUnless { opposite.isFixed })
-            opposite.isFixed -> listOf(EdgeKind.CHANGE_SOURCE)
-            else -> listOfNotNull(EdgeKind.ADD.takeIf { add }, EdgeKind.REMOVE.takeIf { remove })
+            opposite.isFixed -> listOfNotNull(EdgeKind.CHANGE_SOURCE, swap)
+            else -> listOfNotNull(EdgeKind.ADD.takeIf { add }, EdgeKind.REMOVE.takeIf { remove }, swap)
         }
         if (kinds.any { it != EdgeKind.REMOVE }) warnIfRecursive(end)
         return kinds.map { EdgeSpec(className, end, it) }
