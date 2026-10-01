@@ -10,6 +10,7 @@ import com.mdeo.expression.ast.expressions.TypedIntLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedLongLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedMemberAccessExpression
 import com.mdeo.expression.ast.expressions.TypedMemberCallExpression
+import com.mdeo.expression.ast.expressions.TypedNullLiteralExpression
 import com.mdeo.expression.ast.expressions.TypedStringLiteralExpression
 import com.mdeo.expression.ast.types.ClassTypeRef
 import com.mdeo.expression.ast.types.ReturnType
@@ -118,9 +119,38 @@ class RuleAstWriter(private val info: MetamodelInfo) {
     /** `where [expression]`. */
     fun where(expression: TypedExpression) = TypedPatternWhereClauseElement(whereClause = TypedWhereClause(expression = expression))
 
-    /** `[obj].[end].size() [operator] [bound]` for an object of [className] bound in [scope]. */
-    fun size(obj: String, className: String, scope: Int, end: AssociationEnd, operator: String, bound: Int): TypedExpression =
-        TypedBinaryExpression(
+    /**
+     * `[obj].[end].size() [operator] [bound]` for an object of [className] bound in [scope].
+     *
+     * The language types an end declared with an upper bound of 1 as one optional object, which
+     * has no `size()`: its count is 0 or 1, so the comparison becomes `== null`, `!= null` or a
+     * constant.
+     */
+    fun size(obj: String, className: String, scope: Int, end: AssociationEnd, operator: String, bound: Int): TypedExpression {
+        if (end.isSingle) {
+            val holds = listOf(0, 1).filter { count ->
+                when (operator) {
+                    "<" -> count < bound
+                    "<=" -> count <= bound
+                    ">" -> count > bound
+                    ">=" -> count >= bound
+                    else -> error("unsupported operator $operator")
+                }
+            }
+            if (holds.size != 1) return TypedBooleanLiteralExpression(evalType = booleanType, value = holds.isNotEmpty())
+            return TypedBinaryExpression(
+                evalType = booleanType,
+                operator = if (holds.single() == 0) "==" else "!=",
+                left = TypedMemberAccessExpression(
+                    evalType = typeIndex(ClassTypeRef(`package` = "class${info.pathOf(end.target)}", type = end.target, isNullable = true)),
+                    expression = TypedIdentifierExpression(evalType = classType(className), name = obj, scope = scope),
+                    member = end.name!!,
+                    isNullChaining = false
+                ),
+                right = TypedNullLiteralExpression(evalType = typeIndex(ClassTypeRef(`package` = "builtin", type = "Any", isNullable = true)))
+            )
+        }
+        return TypedBinaryExpression(
             evalType = booleanType,
             operator = operator,
             left = TypedMemberCallExpression(
@@ -138,6 +168,7 @@ class RuleAstWriter(private val info: MetamodelInfo) {
             ),
             right = TypedIntLiteralExpression(evalType = intType, value = bound.toString())
         )
+    }
 
     /** `[a] != [b]` for two objects with their classes and binding scopes. */
     fun distinct(a: String, aClass: String, aScope: Int, b: String, bClass: String, bScope: Int): TypedExpression =
