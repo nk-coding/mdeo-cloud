@@ -285,6 +285,20 @@ class MutationRuleGeneratorTest {
         }
 
         @Test
+        fun `a moved partner never becomes its own partner`() {
+            // a1's friend must be replaced when a2 goes: a3 can take it, a1 itself may not.
+            val metamodel = mm("A") { assoc("A.friend", "-->", "A") }
+            val delete = MutationRuleGenerator.generate(metamodel, listOf(spec("delete A"))).mutations.single()
+            val model = model("/test.mm", "a1:A a2:A a3:A", "a1.friend -- a2", "a2.friend -- a3", "a3.friend -- a1")
+            val runner = RuleRunner(metamodel)
+            repeat(30) {
+                val result = runner.apply(delete, model)
+                if (result is Applied.Yes) assertTrue(result.model.links.none { it.sourceName == it.targetName }, result.model.render())
+            }
+            applyUntil(metamodel, delete, model) { m -> m.instances.none { it.name == "a2" } }
+        }
+
+        @Test
         fun `an object needed through a fixed end is kept when nobody can take its partner`() {
             val metamodel = mm("A", "B") { assoc("A.b", "<-->", "B.a") }
             assertTrue(MutationRuleGenerator.generate(metamodel, listOf(spec("delete B"))).mutations.isEmpty())
@@ -322,6 +336,19 @@ class MutationRuleGeneratorTest {
             val metamodel = mm("Node") { assoc("Node.children[*]", "*-->", "Node.parent[?]") }
             val warnings = MutationRuleGenerator.generate(metamodel, listOf(spec("mutate Node.children"))).warnings
             assertTrue(warnings.single().contains("recursive composition"), "$warnings")
+        }
+
+        @Test
+        fun `an object of a subclass never plays two roles`() {
+            val metamodel = MetamodelBuilder("/test.mm").apply {
+                cls("abstract Item"); cls("Folder : Item"); cls("File : Item")
+                assoc("Folder.items[*]", "*-->", "Item.folder[?]")
+            }.build()
+            val add = MutationRuleGenerator.generate(metamodel, listOf(spec("add Item.folder"))).mutations.single()
+            // The only folder is the only item: it would have to become its own item.
+            val runner = RuleRunner(metamodel)
+            repeat(20) { assertEquals(Applied.No, runner.apply(add, model("/test.mm", "f1:Folder"))) }
+            assertTrue(runner.apply(add, model("/test.mm", "f1:Folder f2:File")) is Applied.Yes)
         }
 
         @Test

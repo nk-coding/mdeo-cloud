@@ -310,7 +310,8 @@ fun problemsOf(model: ModelData, info: MetamodelInfo): List<String> =
 
 /**
  * Checks that [after] differs from [before] only the way [spec] may change a model, and returns
- * what does not fit, or `null`. Attributes of objects that exist before and after never change.
+ * what does not fit, or `null`. Attributes of objects that exist before and after never change,
+ * and no object is linked to itself.
  *
  * - add / remove: one link of the end's association, held by an object of the selected class;
  * - change: one link moved to another partner, at the selected class's side or at the other one;
@@ -332,6 +333,7 @@ fun shapeProblem(spec: OperatorSpec, before: ModelData, after: ModelData, info: 
     val goneObjects = beforeObjects.keys - afterObjects.keys
     val added = after.linkSet - before.linkSet
     val removed = before.linkSet - after.linkSet
+    added.firstOrNull { it.source == it.target }?.let { return "linked ${it.source} to itself" }
     fun classOf(name: String) = (afterObjects[name] ?: beforeObjects.getValue(name)).className
     fun isA(name: String, className: String) = className in info.supertypesOf(classOf(name))
 
