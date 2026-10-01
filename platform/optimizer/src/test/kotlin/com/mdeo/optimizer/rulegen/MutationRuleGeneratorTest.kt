@@ -74,6 +74,20 @@ class MutationRuleGeneratorTest {
         }
 
         @Test
+        fun `ends that can be tight also get swap`() {
+            // an upper bound at one end and a lower bound at the other
+            assertEquals(setOf("ADD_A_e", "REMOVE_A_e", "SWAP_A_e"), names(pair("?", "+"), "mutate A.e"))
+            assertEquals(setOf("ADD_A_e", "REMOVE_A_e", "SWAP_A_e"), names(pair("1..2", "2..3"), "mutate A.e"))
+            assertEquals(setOf("CHANGE_A_e", "SWAP_A_e"), names(pair("?", "1"), "mutate A.e"))
+            // never tight: no upper bound opposite a lower one
+            assertEquals(setOf("ADD_A_e", "REMOVE_A_e"), names(pair("2..3", "*"), "mutate A.e"))
+            assertEquals(setOf("ADD_A_e", "REMOVE_A_e"), names(pair("+", "+"), "mutate A.e"))
+            assertEquals(setOf("CHANGE_A_e"), names(pair("*", "1"), "mutate A.e"))
+            // a swap neither adds nor removes
+            assertEquals(setOf("ADD_A_e"), names(pair("?", "+"), "add A.e"))
+        }
+
+        @Test
         fun `selecting an edge never creates or deletes objects`() {
             val all = names(pair("1..3", "0..2"), "mutate A.e")
             assertTrue(all.none { it.startsWith("CREATE") || it.startsWith("DELETE") }, "$all")
@@ -112,7 +126,7 @@ class MutationRuleGeneratorTest {
         @Test
         fun `a change keeps the old partner's lower bound`() {
             val metamodel = mm("Worker", "Task") { assoc("Worker.tasks[1..*]", "<-->", "Task.worker") }
-            val change = MutationRuleGenerator.generate(metamodel, listOf(spec("mutate Worker.tasks"))).mutations.single()
+            val change = MutationRuleGenerator.generate(metamodel, listOf(spec("mutate Worker.tasks"))).mutations.single { it.name == "CHANGE_Worker_tasks" }
             val model = model("/test.mm", "w1:Worker w2:Worker t1:Task t2:Task t3:Task",
                 "w1.tasks -- t1.worker", "w1.tasks -- t2.worker", "w2.tasks -- t3.worker")
             val runner = RuleRunner(metamodel)
