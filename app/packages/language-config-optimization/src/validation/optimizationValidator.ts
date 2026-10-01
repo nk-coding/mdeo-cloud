@@ -25,6 +25,7 @@ import {
     type FunctionFileImportType
 } from "../grammar/optimizationTypes.js";
 import { findProblemSection, getMetamodelUri } from "../features/util.js";
+import { multiplicityBounds, refinementBoundsProblem, repeatedRefinements } from "./refinementBounds.js";
 import type { Range } from "vscode-languageserver-types";
 import { Script, type ScriptType } from "@mdeo/language-script";
 
@@ -35,44 +36,6 @@ const { AstUtils, CstUtils, isLeafCstNode, GrammarUtils } = sharedImport("langiu
  * These correspond to the primitive types supported by the Script language.
  */
 const NUMERIC_TYPE_NAMES = new Set(["int", "double", "float", "long"]);
-
-/**
- * Lower and upper bound of a multiplicity of the metamodel or config language, -1 standing for
- * an unbounded upper bound. An omitted multiplicity means exactly one.
- *
- * @param multiplicity The multiplicity node, if any
- * @returns The bounds
- */
-function multiplicityBounds(multiplicity: { $type: string } | undefined): { lower: number; upper: number } {
-    if (multiplicity == undefined) {
-        return { lower: 1, upper: 1 };
-    }
-    if (multiplicity.$type.includes("Range")) {
-        const range = multiplicity as unknown as RangeMultiplicityType;
-        return { lower: range.lower, upper: range.upper === "*" ? -1 : (range.upperNumeric ?? 0) };
-    }
-    const single = multiplicity as unknown as SingleMultiplicityType;
-    switch (single.value) {
-        case "*":
-            return { lower: 0, upper: -1 };
-        case "+":
-            return { lower: 1, upper: -1 };
-        case "?":
-            return { lower: 0, upper: 1 };
-        default:
-            return { lower: single.numericValue ?? 1, upper: single.numericValue ?? 1 };
-    }
-}
-
-/**
- * Formats bounds as `[lower..upper]`.
- *
- * @param bounds The bounds to format
- * @returns The formatted bounds
- */
-function formatBounds(bounds: { lower: number; upper: number }): string {
-    return `[${bounds.lower}..${bounds.upper === -1 ? "*" : bounds.upper}]`;
-}
 
 /**
  * Interface mapping for optimization AST types used in validation checks.
@@ -150,23 +113,12 @@ export class OptimizationValidator {
         if (refinement.multiplicity == undefined) {
             return;
         }
-        const bounds = multiplicityBounds(refinement.multiplicity);
-        const base = multiplicityBounds(end.multiplicity);
-        if (bounds.upper === 0) {
-            accept("error", "A refined end must allow at least one link.", {
-                node: refinement,
-                property: "multiplicity"
-            });
-            return;
-        }
-        const withinLower = bounds.lower >= base.lower;
-        const withinUpper = base.upper === -1 || (bounds.upper !== -1 && bounds.upper <= base.upper);
-        if (!withinLower || !withinUpper) {
-            accept(
-                "error",
-                `A refinement can only tighten bounds: ${formatBounds(bounds)} does not lie within the metamodel's ${formatBounds(base)}.`,
-                { node: refinement, property: "multiplicity" }
-            );
+        const problem = refinementBoundsProblem(
+            multiplicityBounds(refinement.multiplicity),
+            multiplicityBounds(end.multiplicity)
+        );
+        if (problem != undefined) {
+            accept("error", problem, { node: refinement, property: "multiplicity" });
         }
     }
 
@@ -202,6 +154,22 @@ export class OptimizationValidator {
         this.validateAtLeastOneObjective(goal, accept);
         this.validateObjectiveFunctions(goal, accept);
         this.validateConstraintFunctions(goal, accept);
+        this.validateDistinctRefinements(goal, accept);
+    }
+
+    /**
+     * Checks that no end is refined twice: the optimizer would reject the run.
+     *
+     * @param goal The goal section to check
+     * @param accept The validation acceptor
+     */
+    private validateDistinctRefinements(goal: GoalSectionType, accept: ValidationAcceptor): void {
+        const ends = goal.refinements.map((r) => `${r.class?.$refText}.${r.field?.$refText}`);
+        for (const i of repeatedRefinements(ends)) {
+            accept("error", `'${ends[i]}' is already refined; keep one refinement per end.`, {
+                node: goal.refinements[i]
+            });
+        }
     }
 
     /**
