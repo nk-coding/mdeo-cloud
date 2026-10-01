@@ -97,7 +97,7 @@ least one objective is required.
 
 **Refinements** tighten the multiplicity of an association end for the search only, without changing
 the metamodel that other files share. `refine Canvas.layers[1..4]` makes every
-[generated mutation operator](/plugins/config-mdeo#generated-operators) keep each canvas between one and
+[generated mutation operator](/guide/generated-operators#refinements) keep each canvas between one and
 four layers. A refinement names the class that declares the end and can only narrow its bounds. The
 initial model must already satisfy it, or the run fails before it starts; hand-written `using`
 operators are not affected.
