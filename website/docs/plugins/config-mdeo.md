@@ -92,7 +92,7 @@ Which operators an entry produces depends on the multiplicities at both ends of 
 | --- | --- | --- |
 | `ADD_A_e`, `REMOVE_A_e` | ends where neither side is fixed | Link or unlink an `A` and a `B` |
 | `CHANGE_A_e` | a fixed end, or a fixed opposite | Move a link to another partner |
-| `SWAP_A_e` | a fixed end | Two `A`s exchange a partner |
+| `SWAP_A_e` | a fixed end, or ends whose bounds can all be reached at once | Two `A`s exchange a partner |
 | `CREATE_A_…` | every container and combination of repairs | Add an object and link it as its bounds require |
 | `DELETE_A` | the class | Remove an object, moving partners that need a fixed number of links |
 

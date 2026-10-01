@@ -105,6 +105,13 @@ The pattern of the two ends decides which operators an end gets. Fixed ends take
 With a fixed end, adding or removing a single link would always break it, so both families consist of
 operators that move links instead.
 
+`mutate A.e` also gets `SWAP_A_e` when one end has an upper bound and the other a lower bound above
+zero (`m` finite and `k > 0`, or `l` finite and `n > 0`). Such ends can be **tight**: with
+`Sprint.committedItems[+] <--> WorkItem.isPlannedFor[?]`, two sprints and two work items, each
+sprint must keep its one item and no item can take a second sprint, so no single link can be added
+or removed, although the two sprints could exchange their items. A swap keeps every object's number
+of links, so it is always possible, and it connects such states.
+
 ### Add and remove
 
 `ADD_A_e` links an `A` and a `B` that are not linked yet, provided neither is full. `REMOVE_A_e`
@@ -119,7 +126,7 @@ match {
         source.committedItems -- target.isPlannedFor
     }
     create source.committedItems -- target.isPlannedFor
-    where target.isPlannedFor.size() < 1
+    where target.isPlannedFor == null
 }
 
 // REMOVE_Sprint_committedItems
@@ -132,8 +139,9 @@ match {
 ```
 
 A guard appears only for a bound that can be violated: `ADD` checks `m` and `l` when they are finite,
-`REMOVE` checks `n` and `k` when they are not zero. Adding a link of a composition also requires that
-the part is not contained by another whole yet.
+`REMOVE` checks `n` and `k` when they are not zero. The language treats an end declared with an upper
+bound of 1 as a single object rather than a list, so its bound is checked with `== null`. Adding a
+link of a composition also requires that the part is not contained by another whole yet.
 
 ### Change
 
@@ -226,13 +234,18 @@ match {
 ```
 
 `CREATE_Sprint_in_Plan_via_sprints_committedItems_CONNECT` instead matches a work item with
-`isPlannedFor.size() < 1` and links it. A container's own upper bound is checked as well. Required
+`isPlannedFor == null` and links it. A container's own upper bound is checked as well. Required
 single-valued attributes of the new object get a default: `""`, `0`, `false` or the enum's first
 entry.
 
 When an end of the class and its opposite are both fixed (`n = m` and `k = l`), no repair exists:
 every candidate partner is already full, and making room would mean changing further objects in
 turn. The class then gets no create operator, and a warning says so.
+
+A whole whose end holds a fixed number of parts, such as `Plan.backlog[1]`, can never take another
+one, so no object is created inside it. If the new object may stand alone, it is then created
+without a container, like an object of a class no composition contains; if it must be contained and
+no other whole can take it, the class gets no create operator. Both cases come with a warning.
 
 ## Delete operators
 
@@ -249,14 +262,20 @@ it, that object loses one partner:
 ```mt
 // DELETE_Team: every person must stay in at least one team
 match {
-    delete node: Team { }
+    node: Team { }
     forbid teams_keepsLowerBound_0 {
         neighbour_0: Person { }
         node.members -- neighbour_0.teams
         where neighbour_0.teams.size() <= 1
     }
 }
+match {
+    delete node
+}
 ```
+
+The object is matched first and deleted by a second statement, since a `forbid` block may not refer
+to an object its own pattern deletes.
 
 With `refine WorkItem.isPlannedFor[1]`, deleting a sprint moves each of its work items to another
 sprint:
@@ -331,6 +350,12 @@ Operators choose their match at random, like every operator of the search. An op
 applicable in principle may still fail on a given model, for example when a delete cannot place all
 moved partners; the search then tries another operator.
 
+Matching is injective: the objects of one operator are distinct. So an operator never links an
+object to itself or removes such a link, and a create operator needs a different partner for each
+required end and a different donor for each repair, even where the metamodel would allow one object
+to play several of these roles. A model that has only one suitable object may therefore not offer a
+create that a larger one would.
+
 ## Differences from the papers and MDEOptimiser
 
 The papers describe the generation as prose, as case tables, and in the thesis also as pseudocode
@@ -355,11 +380,12 @@ where the platform allows something better.
 | --- | --- | --- | --- |
 | Refinements | Generate for the problem metamodel and the refined one, keep both rule sets | Same (`P_` and `S_` rules) | Refined metamodel only. Rules for the unrefined metamodel can break the refinements, so the search could leave the refined space it is meant to stay in. Instead the initial model must satisfy the refinements |
 | Fixed end, open opposite | Swap only | Swap only | Swap and change. Swap only exchanges partners, so it can never use a `B` nobody uses yet, and the operators would not be complete in the sense the SoSyM paper claims |
+| Ends that can be tight | Add and remove | Same | Add, remove and swap. Without the swap, a fixed set of objects can be stuck in one consistent linking while others exist; the papers rely on creating and deleting objects to get out, which a search that only selects an end cannot do |
 | Single-donor create repair | For every `n ≥ 1`, `m > n` | Same | Only when the donor can keep `n` after giving `n` (`m ≥ 2n`); otherwise the operator could never apply |
 | Delete | Removes `A` with the edges to exactly the `B`s in the rule; repairs assume exactly `n` attached `B`s | Henshin's dangling check: only objects with exactly the partners in the rule can be deleted | Guards cover every linked object, and every object needing exactly `k` partners is moved, so objects with any number of partners can be deleted. The papers' "all to one other `A`" and "each to a different `A`" repairs are both special cases |
 | Several constrained ends | Combinations of repairs, plus single-end rules | Combinations only | Combinations only; a single-end rule would break the other ends |
 | Ends without an opposite | Not covered | Treated as unconstrained, some cases crash | Unconstrained `[0..*]` |
-| Containment | Created objects are placed in a container; its bounds are not checked | One identical rule copy per container for edge operators; root classes crash | One create operator per container, container bounds checked, an object is never contained twice |
+| Containment | Created objects are placed in a container; its bounds are not checked | One identical rule copy per container for edge operators; root classes crash | One create operator per container that can take another part, container bounds checked, an object is never contained twice |
 | Inheritance | Not covered | Declared ends only; abstract classes are instantiated | Inherited ends count; abstract classes are created as their concrete subclasses |
 | Attributes of new objects | Shown as rule parameters in some figures | Bound to parameters that are never set | Defaults for required single-valued attributes |
 | Impossible cases | "N/A" in the tables | Silently no rules | No operator, with a warning |
@@ -382,6 +408,16 @@ The generator is in `platform/optimizer/src/main/kotlin/com/mdeo/optimizer/ruleg
 | `MultiplicityChecker.kt` | Checks a model against the bounds; used for the initial model and in tests |
 | `MutationRuleGenerator.kt` | Entry point used by the optimizer execution service |
 
-`RuleConsistencyTest` applies every generated operator to random consistent models, for every pair of
-end multiplicities and a range of metamodels, and fails when a result is inconsistent or an operator
-can never apply.
+The tests next to it, in `platform/optimizer/src/test/kotlin/com/mdeo/optimizer/rulegen/`, check the
+operators from several sides. Most run for every pair of the multiplicities `*`, `?`, `+`, `1`, `2`,
+`1..2`, `2..3` and `2..*`, and on both graph backends:
+
+| Test | Checks |
+| --- | --- |
+| `RuleConsistencyTest`, `ExampleMetamodelRuleTest` | Applied to random consistent models, every operator keeps them consistent (bounds, one container, no duplicate link), changes them only as its kind may, and applies to some model. Covers compositions, inheritance, self-associations, refinements and the metamodels of MDEOptimiser's examples |
+| `EdgeOperatorExactnessTest` | An edge operator produces exactly the models one consistent change of its kind leads to, found by brute force, and an end without add or remove admits none |
+| `EdgeOperatorCompletenessTest` | For a few objects, the edge operators of an end lead from any consistent linking to every other one |
+| `OperatorTableTest` | The operators for every pair of multiplicities match the reviewed table in `operator-table.txt` |
+| `GeneratedOperatorSearchTest` | In the optimizer's own mutation loop, every solution stays consistent and parents stay unchanged |
+| `GeneratedOperatorLanguageTest`, `GeneratedOperatorSerializationTest` | Operators are valid `.mt` transformations and reach the workers unchanged |
+| `MutationRuleGeneratorTest`, `MetamodelInfoTest`, `MultiplicityCheckerTest`, `PreparationTest` | Single behaviours, refinement errors and the check of the initial model |
