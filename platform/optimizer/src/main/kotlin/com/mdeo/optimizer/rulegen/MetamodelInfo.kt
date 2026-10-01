@@ -25,6 +25,8 @@ import com.mdeo.metamodel.data.PropertyData
  * @param isSourceSide Whether [owner] is the association's left-hand (source) class.
  * @param isContainment Whether [owner] is the whole of a composition, so this end holds its parts.
  * @param isContainer Whether [owner] is the part of a composition, so this end points at its whole.
+ * @param isSingle Whether the language types the end as one optional object rather than a list:
+ *   the metamodel declares it with an upper bound of 1. Refinements leave this unchanged.
  */
 class AssociationEnd internal constructor(
     val association: Int,
@@ -35,7 +37,8 @@ class AssociationEnd internal constructor(
     val upper: Int,
     val isSourceSide: Boolean,
     val isContainment: Boolean,
-    val isContainer: Boolean
+    val isContainer: Boolean,
+    val isSingle: Boolean = false
 ) {
     /** The other end of the same association. */
     lateinit var opposite: AssociationEnd
@@ -245,7 +248,8 @@ class MetamodelInfo private constructor(
                     },
                     isSourceSide = isSource,
                     isContainment = isWhole,
-                    isContainer = isPart
+                    isContainer = isPart,
+                    isSingle = name != null && own.multiplicity.upper == 1
                 )
             }
 

@@ -216,8 +216,8 @@ object MutationAstBuilder {
                 )
             )
         }
-        if (spec.rehomed.isEmpty()) {
-            return listOf(match(listOf(w.obj("node", c, "delete")) + guards))
+        if (spec.rehomed.isEmpty() && guards.isEmpty()) {
+            return listOf(match(listOf(w.obj("node", c, "delete"))))
         }
 
         val statements = mutableListOf<TypedTransformationStatement>()
