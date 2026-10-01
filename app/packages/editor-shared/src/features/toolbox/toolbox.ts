@@ -197,6 +197,17 @@ export class Toolbox extends ToolPalette {
     }
 
     /**
+     * Generates additional content shown right below the toolbar while the toolbox is open.
+     * Unlike {@link generateDetailsExtension}, the content stays visible whatever tool is
+     * active and in read-only mode. Override in subclasses to add such UI (e.g. a view switcher).
+     *
+     * @returns The VNode to render below the toolbar, undefined by default
+     */
+    generateToolbarExtension(): VNode | undefined {
+        return undefined;
+    }
+
+    /**
      * Generates additional content to be inserted before the search input in the details panel.
      * Override in subclasses to add extension UI (e.g., edge type selectors).
      *

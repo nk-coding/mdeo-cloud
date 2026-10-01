@@ -11,6 +11,8 @@ export * from "./features/change-bounds-tool/changeBoundsTool.js";
 export * from "./features/change-bounds-tool/changeBoundsToolFeedback.js";
 export * from "./features/change-bounds-tool/featureModule.js";
 export * from "./features/change-bounds-tool/feedbackMoveMouseListener.js";
+export * from "./features/choice-dialog/choiceDialog.js";
+export * from "./features/choice-dialog/featureModule.js";
 export * from "./features/context-actions/contextActions.js";
 export * from "./features/context-actions/contextItemsState.js";
 export * from "./features/context-actions/featureModule.js";

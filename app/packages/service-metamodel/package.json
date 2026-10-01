@@ -19,7 +19,8 @@
         "build:static": "vite build",
         "watch:static": "vite build --watch",
         "start": "node dist/index.js",
-        "watch": "tsx watch src/index.ts"
+        "watch": "tsx watch src/index.ts",
+        "test": "tsc -p test/tsconfig.json && node --test \"test/*.test.ts\""
     },
     "dependencies": {
         "@mdeo/editor-metamodel": "^0.2.11",
