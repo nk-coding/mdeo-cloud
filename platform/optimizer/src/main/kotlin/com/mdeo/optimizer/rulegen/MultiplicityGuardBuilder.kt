@@ -29,8 +29,13 @@ import com.mdeo.modeltransformation.ast.patterns.TypedWhereClause
  *
  * @param metamodelPath The metamodel path used as the `package` prefix for class types,
  *                      formatted as `"class$metamodelPath"`.
+ * @param pathOf The path of the metamodel file declaring a class, when that is a file the
+ *               metamodel imports: its types are named after that file instead.
  */
-class MultiplicityGuardBuilder(private val metamodelPath: String) {
+class MultiplicityGuardBuilder(
+    private val metamodelPath: String,
+    private val pathOf: (className: String) -> String? = { null }
+) {
 
     companion object {
         /** Index of the `boolean` type in the types array. */
@@ -58,7 +63,7 @@ class MultiplicityGuardBuilder(private val metamodelPath: String) {
      * [ClassTypeRef] if not already present.
      */
     fun getOrAddClassType(className: String): Int {
-        val pkg = "class$metamodelPath"
+        val pkg = "class${pathOf(className) ?: metamodelPath}"
         val existing = types.indexOfFirst {
             it is ClassTypeRef && it.type == className && it.`package` == pkg
         }

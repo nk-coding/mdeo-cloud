@@ -3,6 +3,7 @@ package com.mdeo.scriptexecution.service
 import com.mdeo.execution.common.api.ScriptBackendApiClient
 import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.load
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -19,14 +20,21 @@ import kotlinx.serialization.Serializable
 class BackendApiService(baseUrl: String) : ScriptBackendApiClient(baseUrl) {
 
     /**
-     * Fetches the metamodel data for a metamodel file from the backend API.
+     * Fetches the metamodel data for a metamodel file from the backend API, merged with the
+     * metamodel files it imports.
      *
      * @param projectId UUID of the project
      * @param filePath Path to the metamodel file
      * @param jwtToken JWT token to pass through to the backend
      * @return MetamodelData object or null if not found
      */
-    suspend fun getMetamodelData(projectId: String, filePath: String, jwtToken: String): MetamodelData? {
+    suspend fun getMetamodelData(projectId: String, filePath: String, jwtToken: String): MetamodelData? =
+        MetamodelData.load(filePath) { getMetamodelFileData(projectId, it, jwtToken) }
+
+    /**
+     * Fetches the metamodel data of one metamodel file, without the files it imports.
+     */
+    private suspend fun getMetamodelFileData(projectId: String, filePath: String, jwtToken: String): MetamodelData? {
         return try {
             logger.info("Fetching metamodel data for $filePath in project $projectId")
 

@@ -101,7 +101,8 @@ class TransformationEngine(
     val typeRegistry: TypeRegistry
 
     /**
-     * The class package prefix derived from the metamodel path.
+     * The class package prefix derived from the metamodel path. Classes of files the metamodel
+     * imports are named after their own files instead.
      * Example: if metamodelPath is "/project/models/house", classPackage is "class/project/models/house"
      */
     val classPackage: String = "class${ast.metamodelPath}"
@@ -230,6 +231,9 @@ class TransformationEngine(
      * - "enum/path/to/metamodel.EnumName" for enum value types (stored on properties)
      * - "enum-container/path/to/metamodel.EnumName" for enum container types (the singleton for accessing enum values)
      *
+     * The path is that of the metamodel file declaring the class or enum ([MetamodelData.pathOf]):
+     * for the classes and enums of a file the metamodel imports, that file's.
+     *
      * @param metamodelData The metamodel data containing class, enum, and association definitions.
      */
     private fun createTypeRegistry(metamodelData: MetamodelData): TypeRegistry {
@@ -239,11 +243,13 @@ class TransformationEngine(
 
         val classAssociations = buildClassAssociationsMap(metamodelData.associations)
 
+        val classMap = metamodelData.classes.associateBy { it.name }
         for (classData in metamodelData.classes) {
-            val builder = gremlinType(classPackage, classData.name)
+            val builder = gremlinType("class${metamodelData.pathOf(classData)}", classData.name)
 
             for (superClass in classData.extends) {
-                builder.extends(classPackage, superClass)
+                val superPath = classMap[superClass]?.let { metamodelData.pathOf(it) } ?: metamodelData.path
+                builder.extends("class$superPath", superClass)
             }
 
             for (property in classData.properties) {
@@ -290,15 +296,16 @@ class TransformationEngine(
     private fun registerEnumTypes(registry: TypeRegistry, metamodelData: MetamodelData) {
         for (enumData in metamodelData.enums) {
             val enumName = enumData.name
+            val enumPath = metamodelData.pathOf(enumData)
 
-            val containerBuilder = gremlinType(enumContainerPackage, enumName)
+            val containerBuilder = gremlinType("enum-container$enumPath", enumName)
             for (entryName in enumData.entries) {
                 val enumValueString = "`$enumName`.`$entryName`"
                 containerBuilder.enumEntry(entryName, enumValueString)
             }
             registry.register(containerBuilder.build())
 
-            val valueTypeBuilder = gremlinType(enumPackage, enumName)
+            val valueTypeBuilder = gremlinType("enum$enumPath", enumName)
             registry.register(valueTypeBuilder.build())
         }
     }

@@ -154,7 +154,7 @@ class ScriptCompiler {
 
         val baseRegistries = if (metamodelData != null && metamodelData.path.isNotBlank()) {
             metamodel = Metamodel.compile(metamodelData)
-            createTypeRegistries(metamodel, metamodelData.path)
+            createTypeRegistries(metamodel)
         } else {
             TypeRegistries(TypeRegistry.GLOBAL, GlobalPropertyRegistry())
         }
@@ -240,11 +240,10 @@ class ScriptCompiler {
      * Creates a [TypeRegistries] bundle from the given compiled metamodel.
      *
      * @param metamodel The compiled metamodel.
-     * @param metamodelPath The absolute path to the metamodel file.
      * @return The [TypeRegistries] for use during script compilation.
      */
-    private fun createTypeRegistries(metamodel: Metamodel, metamodelPath: String): TypeRegistries {
-        val compilationResult = ScriptMetamodelTypeRegistrar.createRegistry(metamodel, metamodelPath)
+    private fun createTypeRegistries(metamodel: Metamodel): TypeRegistries {
+        val compilationResult = ScriptMetamodelTypeRegistrar.createRegistry(metamodel)
         return TypeRegistries(compilationResult.typeRegistry, compilationResult.fileScopeRegistry)
     }
 

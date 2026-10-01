@@ -45,37 +45,36 @@ object ScriptMetamodelTypeRegistrar {
     /**
      * Creates a type registry and file-scope property registry enriched with metamodel types.
      *
+     * The types of a class or enum are named after the metamodel file declaring it
+     * ([MetamodelData.pathOf]), which is a file the metamodel imports for some of them, as in the
+     * script language's type system.
+     *
      * @param metamodel The compiled metamodel.
-     * @param metamodelPath The absolute path of the metamodel file.
      */
-    fun createRegistry(
-        metamodel: Metamodel,
-        metamodelPath: String
-    ): MetamodelCompilationResult {
+    fun createRegistry(metamodel: Metamodel): MetamodelCompilationResult {
         val registry = TypeRegistry(parent = TypeRegistry.GLOBAL)
         val metamodelData = metamodel.data
         val metadata = metamodel.metadata
 
         for (enumData in metamodelData.enums) {
-            registerEnumContainer(registry, enumData, metamodelPath)
-            registerEnumValueType(registry, enumData, metamodelPath)
+            val enumPath = metamodelData.pathOf(enumData)
+            registerEnumContainer(registry, enumData, enumPath)
+            registerEnumValueType(registry, enumData, enumPath)
         }
 
         val classMap = metamodelData.classes.associateBy { it.name }
         for (classData in metamodelData.classes) {
-            registerClassType(registry, classData, metamodelPath, classMap, metamodelData, metadata)
-            registerClassContainerType(registry, classData, metamodelPath)
+            val classPath = metamodelData.pathOf(classData)
+            registerClassType(registry, classData, classMap, metamodelData, metadata)
+            registerClassContainerType(registry, classData, classPath)
         }
 
-        val fileScopeRegistry = buildFileScopeRegistry(metamodelData, metamodelPath)
+        val fileScopeRegistry = buildFileScopeRegistry(metamodelData)
 
         return MetamodelCompilationResult(registry, fileScopeRegistry)
     }
 
-    private fun buildFileScopeRegistry(
-        metamodelData: MetamodelData,
-        metamodelPath: String
-    ): GlobalPropertyRegistry {
+    private fun buildFileScopeRegistry(metamodelData: MetamodelData): GlobalPropertyRegistry {
         val registry = GlobalPropertyRegistry()
 
         for (classData in metamodelData.classes) {
@@ -188,19 +187,19 @@ object ScriptMetamodelTypeRegistrar {
     private fun registerClassType(
         registry: TypeRegistry,
         classData: ClassData,
-        metamodelPath: String,
         classMap: Map<String, ClassData>,
         metamodelData: MetamodelData,
         metadata: MetamodelMetadata
     ) {
-        val typePackage = "$CLASS_PACKAGE$metamodelPath"
+        val typePackage = "$CLASS_PACKAGE${metamodelData.pathOf(classData)}"
         // The type interface, not the instance class: an instance of a class inheriting through a
         // second superclass implements the interface but does not extend the class.
         val typeInterfaceName = Metamodel.getInstanceInterfaceName(classData.name)
         val classMeta = metadata.classes[classData.name]
 
         val extendsRefs = classData.extends.map { superName ->
-            ClassTypeRef(`package` = typePackage, type = superName, isNullable = false)
+            val superPath = classMap[superName]?.let { metamodelData.pathOf(it) } ?: metamodelData.path
+            ClassTypeRef(`package` = "$CLASS_PACKAGE$superPath", type = superName, isNullable = false)
         }.let { refs ->
             if (refs.isEmpty()) listOf(ClassTypeRef(`package` = "builtin", type = "Any", isNullable = false))
             else refs
