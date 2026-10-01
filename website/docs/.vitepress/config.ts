@@ -42,7 +42,8 @@ export default defineConfig({
                     text: "Walkthrough",
                     items: [
                         { text: "Optimising a task allocation", link: "/guide/walkthrough" },
-                        { text: "Reading the results", link: "/guide/results" }
+                        { text: "Reading the results", link: "/guide/results" },
+                        { text: "Generated mutation operators", link: "/guide/generated-operators" }
                     ]
                 },
                 {

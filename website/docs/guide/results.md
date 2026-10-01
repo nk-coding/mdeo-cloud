@@ -30,7 +30,7 @@ generated-mutations/warnings.md
 ```
 
 `generated-mutations/warnings.md` only appears when some requested operators could not be generated
-or are limited; see [Generated operators](/plugins/config-mdeo#generated-operators).
+or are limited; see [Generated mutation operators](/guide/generated-operators#warnings-and-limitations).
 
 ## `summary.md`
 
