@@ -3,6 +3,7 @@ package com.mdeo.optimizer.rulegen
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.ast.statements.TypedForMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedIfMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
@@ -41,21 +42,36 @@ object MutationAstBuilder {
 
     private fun match(elements: List<TypedPatternElement>) = TypedMatchStatement(pattern = TypedPattern(elements = elements))
 
+    /** An object about to be linked to a whole through the composition [association]. */
+    private data class NewPart(val name: String, val className: String, val association: Int)
+
     /**
-     * Blocks rejecting the match when [part] already has a container through a composition other
-     * than [except], so that linking it to a new whole keeps it in at most one.
+     * Blocks rejecting the match when one of [parts] already has a container through a composition
+     * other than the one it is linked through, so that it stays in at most one.
+     *
+     * Matching is injective, so an object a block declares never stands for an object [pattern]
+     * binds: a container that is itself bound by the pattern, such as the very whole the part is
+     * linked to, gets a block of its own naming it.
      */
     private fun otherContainers(
-        part: String,
-        partClass: String,
-        except: Int,
+        parts: List<NewPart>,
+        pattern: List<TypedPatternElement>,
         info: MetamodelInfo,
         w: RuleAstWriter
-    ): List<TypedPatternElement> =
-        info.containerEndsCompatibleWith(partClass).filter { it.association != except }.mapIndexed { i, containerEnd ->
-            val whole = "${part}_container_$i"
-            w.forbid("${part}_uncontained_$i", listOf(w.obj(whole, containerEnd.target), w.link(containerEnd, part, whole)))
+    ): List<TypedPatternElement> {
+        val bound = pattern.filterIsInstance<TypedPatternObjectInstanceElement>()
+            .map { it.objectInstance }
+            .filter { it.className != null && it.modifier != "create" }
+            .map { it.name to it.className!! }
+        return parts.flatMap { part ->
+            info.containerEndsCompatibleWith(part.className).filter { it.association != part.association }.flatMapIndexed { i, containerEnd ->
+                val whole = "${part.name}_container_$i"
+                listOf(w.forbid("${part.name}_uncontained_$i", listOf(w.obj(whole, containerEnd.target), w.link(containerEnd, part.name, whole)))) +
+                    bound.filter { (name, className) -> name != part.name && info.compatible(className, containerEnd.target) }
+                        .map { (name, _) -> w.forbid("${part.name}_notIn_${name}_$i", listOf(w.link(containerEnd, part.name, name))) }
+            }
         }
+    }
 
     // =========================================================================
     // Edges
@@ -67,6 +83,7 @@ object MutationAstBuilder {
         val o = e.opposite
         val b = e.target
         val out = mutableListOf<TypedPatternElement>()
+        val parts = mutableListOf<NewPart>()
         when (spec.kind) {
             EdgeKind.ADD -> {
                 out += w.obj("source", a)
@@ -75,8 +92,8 @@ object MutationAstBuilder {
                 out += w.link(e, "source", "target", "create")
                 if (e.isBounded) out += w.where(w.size("source", a, TOP, e, "<", e.upper))
                 if (o.name != null && o.isBounded) out += w.where(w.size("target", b, TOP, o, "<", o.upper))
-                if (e.isContainment) out += otherContainers("target", b, e.association, info, w)
-                if (e.isContainer) out += otherContainers("source", a, e.association, info, w)
+                if (e.isContainment) parts += NewPart("target", b, e.association)
+                if (e.isContainer) parts += NewPart("source", a, e.association)
             }
             EdgeKind.REMOVE -> {
                 out += w.obj("source", a)
@@ -94,7 +111,7 @@ object MutationAstBuilder {
                 out += w.link(e, "newSource", "moved", "create")
                 if (e.lower > 0) out += w.where(w.size("oldSource", a, TOP, e, ">", e.lower))
                 if (e.isBounded) out += w.where(w.size("newSource", a, TOP, e, "<", e.upper))
-                if (e.isContainer) out += otherContainers("newSource", a, e.association, info, w)
+                if (e.isContainer) parts += NewPart("newSource", a, e.association)
             }
             EdgeKind.CHANGE_TARGET -> {
                 out += w.obj("source", a)
@@ -105,7 +122,7 @@ object MutationAstBuilder {
                 out += w.link(e, "source", "newTarget", "create")
                 if (o.name != null && o.lower > 0) out += w.where(w.size("oldTarget", b, TOP, o, ">", o.lower))
                 if (o.name != null && o.isBounded) out += w.where(w.size("newTarget", b, TOP, o, "<", o.upper))
-                if (e.isContainment) out += otherContainers("newTarget", b, e.association, info, w)
+                if (e.isContainment) parts += NewPart("newTarget", b, e.association)
             }
             EdgeKind.SWAP -> {
                 out += w.obj("source", a)
@@ -120,7 +137,7 @@ object MutationAstBuilder {
                 out += w.link(e, "otherSource", "target", "create")
             }
         }
-        return out
+        return out + otherContainers(parts, out, info, w)
     }
 
     // =========================================================================
@@ -129,6 +146,7 @@ object MutationAstBuilder {
 
     private fun create(spec: CreateSpec, info: MetamodelInfo, w: RuleAstWriter, warnings: MutableList<String>): List<TypedPatternElement> {
         val out = mutableListOf<TypedPatternElement>()
+        val parts = mutableListOf<NewPart>()
         val skipped = mutableListOf<com.mdeo.metamodel.data.PropertyData>()
         out += w.obj("newNode", spec.className, "create", w.defaultAttributes(spec.className, skipped))
         if (skipped.isNotEmpty()) {
@@ -156,7 +174,7 @@ object MutationAstBuilder {
                     out += w.obj(t, e.target)
                     out += w.link(e, "newNode", t, "create")
                     if (o.name != null && o.isBounded) out += w.where(w.size(t, e.target, TOP, o, "<", o.upper))
-                    if (e.isContainment) out += otherContainers(t, e.target, e.association, info, w)
+                    if (e.isContainment) parts += NewPart(t, e.target, e.association)
                 }
                 CreateRepair.LB_REPAIR -> {
                     val donor = "${e.name}_donor"
@@ -178,7 +196,7 @@ object MutationAstBuilder {
                 }
             }
         }
-        return out
+        return out + otherContainers(parts, out, info, w)
     }
 
     // =========================================================================
@@ -218,7 +236,9 @@ object MutationAstBuilder {
             if (nodeSide.name != null && nodeSide.isBounded) {
                 place += w.where(w.size(other, end.target, IF_PATTERN, nodeSide, "<", nodeSide.upper))
             }
-            if (end.isContainment) place += otherContainers(other, end.target, end.association, info, w)
+            if (end.isContainment) {
+                place += otherContainers(listOf(NewPart(other, end.target, end.association)), place + w.obj(neighbour, end.owner), info, w)
+            }
             statements += TypedForMatchStatement(
                 pattern = TypedPattern(elements = listOf(w.reference("node"), w.obj(neighbour, end.owner), w.link(end, neighbour, "node", "delete"))),
                 doBlock = listOf(

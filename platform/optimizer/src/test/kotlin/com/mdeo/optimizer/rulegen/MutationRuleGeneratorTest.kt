@@ -95,6 +95,21 @@ class MutationRuleGeneratorTest {
         }
 
         @Test
+        fun `a part already in a whole through another composition is not added to that whole again`() {
+            val metamodel = mm("Pair", "Part") {
+                assoc("Pair.left[?]", "*-->", "Part.leftOf[?]")
+                assoc("Pair.right[?]", "*-->", "Part.rightOf[?]")
+            }
+            val add = MutationRuleGenerator.generate(metamodel, listOf(spec("add Pair.left"))).mutations.single()
+            val model = model("/test.mm", "p:Pair x:Part", "p.right -- x.rightOf")
+            val runner = RuleRunner(metamodel)
+            repeat(20) { assertEquals(Applied.No, runner.apply(add, model)) }
+            // Nor can another pair take it; a free part can be added.
+            assertTrue(runner.apply(add, model("/test.mm", "p:Pair q:Pair x:Part", "p.right -- x.rightOf")) == Applied.No)
+            assertTrue(runner.apply(add, model("/test.mm", "p:Pair x:Part")) is Applied.Yes)
+        }
+
+        @Test
         fun `a change keeps the old partner's lower bound`() {
             val metamodel = mm("Worker", "Task") { assoc("Worker.tasks[1..*]", "<-->", "Task.worker") }
             val change = MutationRuleGenerator.generate(metamodel, listOf(spec("mutate Worker.tasks"))).mutations.single()
@@ -173,6 +188,21 @@ class MutationRuleGeneratorTest {
                 "p.sprints -- s1.plan", "s1.committedItems -- w1.isPlannedFor", "s1.committedItems -- w2.isPlannedFor")
             val after = applyUntil(metamodel, create, model) { it.instances.size == 5 }
             assertTrue(MultiplicityChecker.violations(after, MetamodelInfo(metamodel)).isEmpty(), after.render())
+        }
+
+        @Test
+        fun `a whole holding a fixed number of parts gets no new part`() {
+            val optional = MutationRuleGenerator.generate(
+                mm("Plan", "Backlog") { assoc("Plan.backlog[1]", "*-->", "Backlog.plan[?]") }, listOf(spec("create Backlog"))
+            )
+            assertEquals(listOf("CREATE_Backlog"), optional.mutations.map { it.name })
+            assertTrue(optional.warnings.single().contains("holds a fixed number of parts"), "${optional.warnings}")
+
+            val required = MutationRuleGenerator.generate(
+                mm("Plan", "Backlog") { assoc("Plan.backlog[1]", "*-->", "Backlog.plan") }, listOf(spec("create Backlog"))
+            )
+            assertTrue(required.mutations.isEmpty())
+            assertTrue(required.warnings.any { it.contains("No create operator for 'Backlog'") }, "${required.warnings}")
         }
 
         @Test

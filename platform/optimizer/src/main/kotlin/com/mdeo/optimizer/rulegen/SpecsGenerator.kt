@@ -115,9 +115,20 @@ class SpecsGenerator(private val info: MetamodelInfo) {
             acc.flatMap { prefix -> repairs.map { prefix + Requirement(end, it) } }
         }
         val requiredContainerEnds = info.endsOf(className).filter { it.isContainer && it.lower > 0 }
-        val contexts: List<ContainerContext?> = info.containerContextsOf(className)
-            .filter { ctx -> requiredContainerEnds.all { it === ctx.containerEnd } }
-            .ifEmpty { if (requiredContainerEnds.isEmpty()) listOf(null) else emptyList() }
+        val possible = info.containerContextsOf(className).filter { ctx -> requiredContainerEnds.all { it === ctx.containerEnd } }
+        // A whole that holds a fixed number of parts can never take another one.
+        val open = possible.filterNot { it.containmentEnd.isFixed }
+        for (ctx in possible - open.toSet()) {
+            warnings += "No '$className' is created inside a '${ctx.wholeClass}': '${ctx.containmentEnd}' holds a fixed number of parts."
+        }
+        val contexts: List<ContainerContext?> = when {
+            open.isNotEmpty() -> open
+            requiredContainerEnds.isEmpty() -> listOf(null)
+            else -> {
+                warnings += "No create operator for '$className': no composition it must be part of can take another part."
+                return emptyList()
+            }
+        }
         return contexts.flatMap { ctx -> combinations.map { CreateSpec(className, ctx, it) } }
     }
 
