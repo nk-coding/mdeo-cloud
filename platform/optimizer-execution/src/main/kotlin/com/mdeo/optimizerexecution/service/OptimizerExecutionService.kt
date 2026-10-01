@@ -24,11 +24,8 @@ import com.mdeo.optimizer.moea.SolutionResult
 import com.mdeo.optimizer.moea.getWorkerRef
 import com.mdeo.optimizer.metrics.OptimizationMetricsCollector
 import com.mdeo.optimizer.rulegen.GenerationResult
-import com.mdeo.optimizer.rulegen.MetamodelInfo
-import com.mdeo.optimizer.rulegen.MultiplicityChecker
-import com.mdeo.optimizer.rulegen.MultiplicityOverride
 import com.mdeo.optimizer.rulegen.MutationRuleGenerator
-import com.mdeo.optimizer.rulegen.RuleGenerationException
+import com.mdeo.optimizer.rulegen.Preparation
 import com.mdeo.optimizer.worker.WorkerAllocationRequest
 import com.mdeo.optimizerexecution.config.AppConfig
 import com.mdeo.optimizerexecution.database.OptimizerExecutionsTable
@@ -848,12 +845,12 @@ class OptimizerExecutionService(
                 }
             }
 
-            if (generationWarnings.isNotEmpty()) {
+            GenerationResult(emptyList(), generationWarnings).warningsReport()?.let { report ->
                 OptimizerResultFilesTable.insert {
                     it[id] = Uuid.random()
                     it[OptimizerResultFilesTable.executionId] = executionId.toKotlinUuid()
                     it[filePath] = "$GENERATED_MUTATIONS_DIR/$GENERATION_WARNINGS_FILE"
-                    it[content] = "# Mutation generation warnings\n\n" + generationWarnings.joinToString("\n") { w -> "- $w" } + "\n"
+                    it[content] = report
                     it[mimeType] = MIME_TYPE_MARKDOWN
                 }
             }
@@ -883,15 +880,11 @@ class OptimizerExecutionService(
         modelData: ModelData,
         jwtToken: String
     ): GenerationResult? {
-        val refinements = config.goal.refinements
-        val failure = try {
-            val generated = MutationRuleGenerator.generate(metamodelData, config.search.mutations.generate, refinements)
-            val info = MetamodelInfo(metamodelData, refinements.map { MultiplicityOverride(it.className, it.fieldName, it.lower, it.upper) })
-            val violations = MultiplicityChecker.violations(modelData, info, info.refinedEnds)
-            if (violations.isEmpty()) return generated
-            "The initial model violates the goal's refinements: " + violations.joinToString("; ")
-        } catch (e: RuleGenerationException) {
-            "Cannot generate mutation operators: ${e.message}"
+        val failure = when (val preparation = MutationRuleGenerator.prepare(
+            metamodelData, config.search.mutations.generate, config.goal.refinements, modelData
+        )) {
+            is Preparation.Ready -> return preparation.result
+            is Preparation.Rejected -> preparation.reason
         }
         storeError(executionId, failure)
         updateState(executionId, ExecutionState.FAILED, failure, jwtToken)
