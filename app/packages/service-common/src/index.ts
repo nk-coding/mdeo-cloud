@@ -15,7 +15,7 @@ export * from "./service/service.js";
 export * from "./service/types.js";
 export * from "./service/util.js";
 export * from "./util/config.js";
-export { hasErrors, hasParserErrors } from "@mdeo/language-common";
+export { collectDiagnostics, hasErrors, hasParserErrors, type DocumentDiagnostic } from "@mdeo/language-common";
 export * from "./util/pluginContext.js";
 export * from "./util/requestLimits.js";
 export * from "./util/contributionCache.js";

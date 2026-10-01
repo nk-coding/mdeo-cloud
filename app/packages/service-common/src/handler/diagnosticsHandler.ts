@@ -1,8 +1,9 @@
-import { URI } from "langium";
+import { URI, type LangiumCoreServices } from "langium";
 import { collectDiagnostics, hasErrors, type DocumentDiagnostic } from "@mdeo/language-common";
 import type { FileDataHandler } from "./types.js";
 import { AST_HANDLER_KEY } from "./astHandler.js";
 import type { AstData } from "../langium/jsonAstSerializer.js";
+import type { ServerApi } from "../service/serverApi.js";
 
 /**
  * Key for the diagnostics handler
@@ -48,6 +49,32 @@ export const diagnosticsHandler: FileDataHandler<DiagnosticsData> = async (conte
 
     const document = await instance.buildDocument(fileInfo.uri);
     const path = document.uri.path;
+
+    return {
+        data: {
+            path,
+            diagnostics: collectDiagnostics(document),
+            dependenciesWithErrors: await findDependenciesWithErrors(path, services, serverApi)
+        },
+        ...serverApi.getTrackedRequests()
+    };
+};
+
+/**
+ * Finds the files a just built document depends on, directly or transitively, that have errors
+ * themselves. The dependencies of a file that has errors are not looked into, as its own
+ * diagnostics name them.
+ *
+ * @param path The path of the built document
+ * @param services The services the document was built with
+ * @param serverApi The server API the document's dependencies were requested through
+ * @returns The paths of the dependencies with errors, sorted
+ */
+export async function findDependenciesWithErrors(
+    path: string,
+    services: LangiumCoreServices,
+    serverApi: ServerApi
+): Promise<string[]> {
     const dependenciesWithErrors: string[] = [];
     const checked = new Set<string>([path]);
 
@@ -87,12 +114,5 @@ export const diagnosticsHandler: FileDataHandler<DiagnosticsData> = async (conte
         toCheck = loaded.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
     }
 
-    return {
-        data: {
-            path,
-            diagnostics: collectDiagnostics(document),
-            dependenciesWithErrors: dependenciesWithErrors.sort()
-        },
-        ...serverApi.getTrackedRequests()
-    };
-};
+    return dependenciesWithErrors.sort();
+}
