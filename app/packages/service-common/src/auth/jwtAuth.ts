@@ -1,6 +1,6 @@
 import { errorResponse } from "@mdeo/plugin";
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import { createRemoteJWKSet, errors, jwtVerify, type JWTPayload } from "jose";
 
 /**
  * JWT claims expected in the token payload
@@ -46,9 +46,12 @@ export class JwtAuthMiddleware {
      *
      * @param backendUrl Base URL of the backend (e.g., "http://localhost:8080/api")
      * @param issuer Expected JWT issuer
+     * @param keyFetchCooldownMs Least time between two fetches of the backend's keys
      */
-    constructor(backendUrl: string, issuer: string) {
-        this.jwks = createRemoteJWKSet(new URL(`${backendUrl}/.well-known/jwks.json`));
+    constructor(backendUrl: string, issuer: string, keyFetchCooldownMs = 10_000) {
+        this.jwks = createRemoteJWKSet(new URL(`${backendUrl}/.well-known/jwks.json`), {
+            cooldownDuration: keyFetchCooldownMs
+        });
         this.issuer = issuer;
     }
 
@@ -76,12 +79,7 @@ export class JwtAuthMiddleware {
 
             const token = authHeader.substring(7);
 
-            const { payload } = await jwtVerify<JwtClaims>(token, this.jwks, {
-                issuer: this.issuer,
-                algorithms: ["RS256"]
-            });
-
-            (request as any).jwtClaims = payload;
+            (request as any).jwtClaims = await this.verify(token);
         } catch (error) {
             if (error instanceof Error) {
                 request.log.warn(`JWT verification failed: ${error.message}`);
@@ -109,6 +107,37 @@ export class JwtAuthMiddleware {
         if (!token) {
             throw new Error("Missing token");
         }
+        return this.verify(token);
+    }
+
+    /**
+     * Verifies a token against the backend's keys. A backend that is not configured with a key
+     * signs with a new one after every restart, under the same key id, so the cached key set
+     * does not notice the change by itself: a signature that fails fetches the keys again, at
+     * most once per cooldown of the key set, and checks the token once more.
+     *
+     * @param token The raw bearer token
+     * @returns The verified claims
+     */
+    private async verify(token: string): Promise<JwtClaims> {
+        try {
+            return await this.verifyWithCachedKeys(token);
+        } catch (error) {
+            if (!(error instanceof errors.JWSSignatureVerificationFailed) || this.jwks.coolingDown) {
+                throw error;
+            }
+            await this.jwks.reload();
+            return await this.verifyWithCachedKeys(token);
+        }
+    }
+
+    /**
+     * Verifies a token against the keys fetched last.
+     *
+     * @param token The raw bearer token
+     * @returns The verified claims
+     */
+    private async verifyWithCachedKeys(token: string): Promise<JwtClaims> {
         const { payload } = await jwtVerify<JwtClaims>(token, this.jwks, {
             issuer: this.issuer,
             algorithms: ["RS256"]
