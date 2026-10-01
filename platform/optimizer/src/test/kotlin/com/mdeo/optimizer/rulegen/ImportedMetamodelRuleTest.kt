@@ -44,8 +44,8 @@ class ImportedMetamodelRuleTest {
 
     @Test
     fun `rule types name each class after its file`() {
-        val spec = RepairSpec("House", "garages", RepairSpecType.ADD)
-        val ast = MutationAstBuilder.build("ADD_House_garages", spec, "/project/house.mm", MetamodelInfo(metamodelData))
+        val info = MetamodelInfo(metamodelData)
+        val ast = MutationAstBuilder.build(EdgeSpec("House", info.endOf("House", "garages")!!, EdgeKind.ADD), info)
         val packages = ast.types.filterIsInstance<ClassTypeRef>()
             .filter { it.type == "House" || it.type == "Garage" }
             .associate { it.type to it.`package` }

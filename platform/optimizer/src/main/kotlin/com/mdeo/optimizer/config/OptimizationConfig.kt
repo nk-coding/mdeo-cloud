@@ -29,11 +29,11 @@ data class ProblemConfig(
 )
 
 /**
- * Goal section: objectives, constraints, and optional multiplicty refinements.
+ * Goal section: objectives, constraints, and optional multiplicity refinements.
  *
  * @param objectives Objective functions to optimise.
  * @param constraints Constraint functions that must be satisfied.
- * @param refinements Optional metamodel refinements used for rule generation.
+ * @param refinements Tighter association end bounds the generated mutation operators keep.
  */
 @Serializable
 data class GoalConfig(
@@ -84,17 +84,13 @@ data class ConstraintConfig(
 )
 
 /**
- * Multiplicity refinement that tightens the lower or upper bound of a metamodel reference
- * for the purpose of rule generation.
+ * Multiplicity refinement that tightens the bounds of an association end for the search.
  *
- * When a non-empty list of refinements is passed to
- * [com.mdeo.optimizer.rulegen.MutationRuleGenerator.generate], a second generation pass is
- * performed using a modified [com.mdeo.optimizer.rulegen.MetamodelInfo] where the specified
- * reference multiplicities are replaced by the values declared here.  Rules produced in the
- * second pass are prefixed with `"S_"` to distinguish them from the base rules.
+ * The generated mutation operators are built against the metamodel with every refinement
+ * applied, so they keep the refined bounds; the initial model must already satisfy them.
  *
- * @param className The metamodel class that owns the reference.
- * @param fieldName The reference (field) name to refine.
+ * @param className The class declaring the association end.
+ * @param fieldName The association end to refine.
  * @param lower     The tightened lower bound (>= original lower).
  * @param upper     The tightened upper bound (<= original upper, or -1 for unbounded).
  */

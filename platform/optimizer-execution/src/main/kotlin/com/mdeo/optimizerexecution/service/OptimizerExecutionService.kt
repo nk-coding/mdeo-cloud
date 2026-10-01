@@ -23,7 +23,12 @@ import com.mdeo.optimizer.moea.SearchResult
 import com.mdeo.optimizer.moea.SolutionResult
 import com.mdeo.optimizer.moea.getWorkerRef
 import com.mdeo.optimizer.metrics.OptimizationMetricsCollector
+import com.mdeo.optimizer.rulegen.GenerationResult
+import com.mdeo.optimizer.rulegen.MetamodelInfo
+import com.mdeo.optimizer.rulegen.MultiplicityChecker
+import com.mdeo.optimizer.rulegen.MultiplicityOverride
 import com.mdeo.optimizer.rulegen.MutationRuleGenerator
+import com.mdeo.optimizer.rulegen.RuleGenerationException
 import com.mdeo.optimizer.worker.WorkerAllocationRequest
 import com.mdeo.optimizerexecution.config.AppConfig
 import com.mdeo.optimizerexecution.database.OptimizerExecutionsTable
@@ -144,6 +149,7 @@ class OptimizerExecutionService(
          * Directory prefix for auto-generated mutation transformation files.
          */
         private const val GENERATED_MUTATIONS_DIR = "generated-mutations"
+        private const val GENERATION_WARNINGS_FILE = "warnings.md"
         /**
          * File path for the markdown summary stored alongside solution files. 
          */
@@ -363,22 +369,25 @@ class OptimizerExecutionService(
         ) ?: return
 
         val generatedMutations = LinkedHashMap<String, TransformationTypedAst>()
+        var generationWarnings = emptyList<String>()
         val transformations: Map<String, TransformationTypedAst> =
             if (config.search.mutations.generate.isNotEmpty()) {
-                val generated = MutationRuleGenerator.generate(
-                    metamodelData = metamodelData,
-                    specs = config.search.mutations.generate
-                )
+                val generated = generateMutations(executionId, config, metamodelData, modelData, jwtToken)
+                    ?: return
+                generationWarnings = generated.warnings
+                generated.warnings.forEach { logger.warn("Mutation generation: {}", it) }
                 logger.info(
                     "Auto-generated {} mutation rule(s) from {} spec(s)",
-                    generated.size, config.search.mutations.generate.size
+                    generated.mutations.size, config.search.mutations.generate.size
                 )
                 updateState(
                     executionId, ExecutionState.INITIALIZING,
-                    "Auto-generated ${generated.size} mutation rule(s)...", jwtToken
+                    "Auto-generated ${generated.mutations.size} mutation rule(s)" +
+                        (if (generated.warnings.isEmpty()) "" else ", ${generated.warnings.size} warning(s)") + "...",
+                    jwtToken
                 )
                 val merged = LinkedHashMap<String, TransformationTypedAst>()
-                generated.forEach { m ->
+                generated.mutations.forEach { m ->
                     generatedMutations[m.name] = m.typedAst
                     merged[m.name] = m.typedAst
                 }
@@ -413,7 +422,7 @@ class OptimizerExecutionService(
             "Running federated ${config.solver.algorithm} optimizer across ${federated.workerCount} nodes...",
             jwtToken
         )
-        runWithEvaluator(executionId, config, metamodel, federated, generatedMutations, jwtToken)
+        runWithEvaluator(executionId, config, metamodel, federated, generatedMutations, generationWarnings, jwtToken)
     }
 
     /**
@@ -438,6 +447,7 @@ class OptimizerExecutionService(
         metamodel: Metamodel,
         evaluator: MutationEvaluator,
         generatedMutations: Map<String, TransformationTypedAst>,
+        generationWarnings: List<String>,
         jwtToken: String
     ) {
         val orchestrator = OptimizationOrchestrator(config = config, evaluator = evaluator)
@@ -500,7 +510,7 @@ class OptimizerExecutionService(
                 return
             }
 
-            storeResults(executionId, config, batchResults, generatedMutations, evaluator)
+            storeResults(executionId, config, batchResults, generatedMutations, generationWarnings, evaluator)
             updateState(executionId, ExecutionState.COMPLETED, "Completed successfully", jwtToken)
             logger.info("Optimizer execution $executionId completed")
         } finally {
@@ -764,6 +774,7 @@ class OptimizerExecutionService(
      * - `batch_{n}/report.json`
      * - `batch_{n}/solution_{i}.m_gen`
      * - `generated-mutations/{rule}.mt_gen` (for auto-generated mutations only)
+     * - `generated-mutations/warnings.md` (when generating them raised warnings)
      *
      * Special case: when there is exactly one batch and no auto-generated mutations,
      * this service flattens the output and stores `report.json` plus `solution_{i}.m_gen`
@@ -774,6 +785,7 @@ class OptimizerExecutionService(
         config: OptimizationConfig,
         batchResults: List<BatchResultArtifacts>,
         generatedMutations: Map<String, TransformationTypedAst>,
+        generationWarnings: List<String>,
         evaluator: MutationEvaluator
     ) {
         val backend = config.runtime.backend ?: GraphBackendType.MDEO
@@ -835,6 +847,16 @@ class OptimizerExecutionService(
                     it[mimeType] = MIME_TYPE_JSON
                 }
             }
+
+            if (generationWarnings.isNotEmpty()) {
+                OptimizerResultFilesTable.insert {
+                    it[id] = Uuid.random()
+                    it[OptimizerResultFilesTable.executionId] = executionId.toKotlinUuid()
+                    it[filePath] = "$GENERATED_MUTATIONS_DIR/$GENERATION_WARNINGS_FILE"
+                    it[content] = "# Mutation generation warnings\n\n" + generationWarnings.joinToString("\n") { w -> "- $w" } + "\n"
+                    it[mimeType] = MIME_TYPE_MARKDOWN
+                }
+            }
         }
     }
 
@@ -846,6 +868,35 @@ class OptimizerExecutionService(
         return sanitized.ifBlank { "mutation" }
     }
 
+
+    /**
+     * Generates the mutation operators the config asks for, against the metamodel with the goal's
+     * refinements applied. Fails the execution when a spec or refinement is invalid, or when the
+     * initial model violates a refinement: the operators only keep bounds a model already has.
+     *
+     * @return The generated operators, or `null` when the execution was failed.
+     */
+    private suspend fun generateMutations(
+        executionId: UUID,
+        config: OptimizationConfig,
+        metamodelData: MetamodelData,
+        modelData: ModelData,
+        jwtToken: String
+    ): GenerationResult? {
+        val refinements = config.goal.refinements
+        val failure = try {
+            val generated = MutationRuleGenerator.generate(metamodelData, config.search.mutations.generate, refinements)
+            val info = MetamodelInfo(metamodelData, refinements.map { MultiplicityOverride(it.className, it.fieldName, it.lower, it.upper) })
+            val violations = MultiplicityChecker.violations(modelData, info, info.refinedEnds)
+            if (violations.isEmpty()) return generated
+            "The initial model violates the goal's refinements: " + violations.joinToString("; ")
+        } catch (e: RuleGenerationException) {
+            "Cannot generate mutation operators: ${e.message}"
+        }
+        storeError(executionId, failure)
+        updateState(executionId, ExecutionState.FAILED, failure, jwtToken)
+        return null
+    }
 
     /**
      * Fetches metamodel data from the backend API.
