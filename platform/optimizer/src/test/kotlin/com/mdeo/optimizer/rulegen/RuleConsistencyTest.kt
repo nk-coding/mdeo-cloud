@@ -75,6 +75,32 @@ class RuleConsistencyTest {
             assoc("Sprint.committedItems[+]", "<-->", "WorkItem.isPlannedFor[?]")
             assoc("WorkItem.stakeholder", "<-->", "Stakeholder.workItems[*]")
         },
+        "self association, fixed" to mm("Root", "A") {
+            assoc("Root.as[*]", "*-->", "A.root")
+            assoc("A.next[1]", "<-->", "A.prev[1]")
+        },
+        "self association, optional" to mm("Root", "A") {
+            assoc("Root.as[*]", "*-->", "A.root")
+            assoc("A.next[?]", "<-->", "A.prev[?]")
+            assoc("A.friends[1..2]", "<-->", "A.friendOf[*]")
+        },
+        "self association, unidirectional" to mm("Root", "A") {
+            assoc("Root.as[*]", "*-->", "A.root")
+            assoc("A.boss[1]", "-->", "A")
+        },
+        "multiple inheritance" to MetamodelBuilder("/test.mm").apply {
+            cls("Root")
+            cls("abstract Named")
+            cls("abstract Owned")
+            cls("Item : Named, Owned")
+            cls("Owner")
+            cls("Label")
+            assoc("Root.items[*]", "*-->", "Item.root")
+            assoc("Root.owners[*]", "*-->", "Owner.root")
+            assoc("Root.labels[*]", "*-->", "Label.root")
+            assoc("Named.label", "<-->", "Label.named[*]")
+            assoc("Owned.owner[1..2]", "<-->", "Owner.owned[0..3]")
+        }.build(),
         "inheritance" to MetamodelBuilder("/test.mm").apply {
             cls("Root")
             cls("abstract Shape")
