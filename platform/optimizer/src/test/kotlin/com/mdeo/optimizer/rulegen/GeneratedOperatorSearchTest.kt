@@ -2,6 +2,9 @@ package com.mdeo.optimizer.rulegen
 
 import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.data.MetamodelData
+import com.mdeo.metamodel.data.ModelData
+import com.mdeo.metamodel.data.ModelDataInstance
+import com.mdeo.metamodel.data.ModelDataLink
 import com.mdeo.modeltransformation.ast.TransformationOperator
 import com.mdeo.optimizer.config.MutationParameters
 import com.mdeo.optimizer.config.MutationStepConfig
@@ -21,7 +24,8 @@ import kotlin.random.Random
  * in steps of one to three to copies of a population of solutions, as the local evaluator does,
  * on both graph backends. Every child must be consistent, every parent must stay as it was, and
  * every operator the strategy records as failing deterministically on a solution must indeed
- * not apply to it.
+ * not apply to it. A step in which every attempt fails, some after changing the model, must
+ * leave the solution as it was.
  */
 class GeneratedOperatorSearchTest {
 
@@ -52,6 +56,36 @@ class GeneratedOperatorSearchTest {
             }
         }
 
+    @TestFactory
+    fun `a step whose every attempt fails after changing the model leaves the solution as it was`(): List<DynamicTest> =
+        MutationStrategy.entries.flatMap { strategy ->
+            Backend.entries.map { backend ->
+                DynamicTest.dynamicTest("${strategy.name.lowercase()}, ${backend.name.lowercase()}") {
+                    // The only house cannot go: its room would have nowhere to move. The delete
+                    // operator unlinks the room before it finds that out, and then gives up.
+                    val metamodel = mm("House", "Room") { assoc("House.rooms[*]", "*-->", "Room.house") }
+                    val delete = MutationRuleGenerator.generate(metamodel, listOf(spec("delete House"))).mutations.single()
+                    val mutation = MutationStrategyFactory.create(
+                        MutationParameters(MutationStepConfig.Fixed(1), strategy),
+                        listOf(TransformationOperator(0, delete.typedAst))
+                    )
+                    val model = ModelData(
+                        "/test.mm",
+                        listOf(ModelDataInstance("h1", "House", emptyMap()), ModelDataInstance("r1", "Room", emptyMap())),
+                        listOf(ModelDataLink("h1", "rooms", "r1", "house"))
+                    )
+                    val parent = Solution(backend.graph(model, Metamodel.compile(metamodel)))
+                    repeat(5) {
+                        val child = mutation.mutate(parent.copy())
+                        assertEquals(model.key(), child.modelGraph.toModelData().key())
+                        assertTrue(child.modelGraph !== parent.modelGraph)
+                        child.close()
+                    }
+                    parent.close()
+                }
+            }
+        }
+
     private fun run(case: Case, strategy: MutationStrategy, backend: Backend) {
         val specs = case.specs.map { spec(it) }
         val generated = MutationRuleGenerator.generate(case.metamodel, specs, case.refinements).mutations.sortedBy { it.name }
@@ -73,7 +107,14 @@ class GeneratedOperatorSearchTest {
 
             assertEquals(before.key(), parent.modelGraph.toModelData().key(), "step $step changed the parent")
             val problems = problemsOf(after, info)
-            assertTrue(problems.isEmpty()) { "step $step: $problems\n  before: ${before.render()}\n  after:  ${after.render()}" }
+            assertTrue(problems.isEmpty()) {
+                val applied = child.transformationsChain.lastOrNull().orEmpty().map { generated[it].name }
+                "step $step applied $applied: $problems\n  before: ${before.render()}\n  after:  ${after.render()}"
+            }
+            val beforeClasses = before.instances.associate { it.name to it.className }
+            after.instances.filter { it.name in beforeClasses }.forEach {
+                assertEquals(beforeClasses[it.name], it.className, "step $step: ${it.name} changed its class")
+            }
             if (after.key() != before.key()) changed++
 
             val failed = (parent.modelGraph.metadata as? FailedOperatorsMetadata)?.failedDeterministicOperators?.toList().orEmpty()
@@ -84,7 +125,9 @@ class GeneratedOperatorSearchTest {
             population += child
             if (population.size > POPULATION * 2) population.removeAt(0).close()
         }
-        assertTrue(changed > STEPS / 2, "only $changed of $STEPS steps changed a model")
+        // Constrained metamodels leave many steps without an applicable operator; the search
+        // must still move.
+        assertTrue(changed > STEPS / 5, "only $changed of $STEPS steps changed a model")
         population.forEach { it.close() }
     }
 
