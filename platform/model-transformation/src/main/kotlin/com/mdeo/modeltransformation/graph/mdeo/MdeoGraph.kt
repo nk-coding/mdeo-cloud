@@ -167,6 +167,13 @@ class MdeoGraph private constructor(
     internal fun verticesWithLabel(label: String): List<MdeoVertex> =
         verticesByLabel[label] ?: emptyList()
 
+    /**
+     * Whether [shuffleVertices] has run on this graph, so that traversal order is meant to be
+     * random. A deep copy starts unshuffled.
+     */
+    internal var isShuffled: Boolean = false
+        private set
+
     /** Cached immutable view of [vertexLabelCounts] / [edgeLabelCounts]; see [labelStatistics]. */
     private var cachedStatistics: ModelStatistics? = null
 
@@ -473,7 +480,9 @@ class MdeoGraph private constructor(
      * The per-label buckets are shuffled independently of [vertexList] rather than rebuilt
      * from it: a label-restricted scan only needs its own bucket to be a uniformly random
      * permutation, which an independent shuffle gives just as well as filtering a shuffled
-     * whole, and at a fraction of the cost.
+     * whole, and at a fraction of the cost. A scan over several labels (a class with
+     * subclasses) joins their buckets and, once the graph [isShuffled], shuffles the result,
+     * so that the first candidate is not always of the first label.
      *
      * Shuffling only the vertex list is insufficient: when a vertex has multiple outgoing
      * edges with the same label (e.g. a Sprint with several committedItems), the
@@ -482,6 +491,7 @@ class MdeoGraph private constructor(
      * every edge in the neighbourhood has an equal chance of being the first hit.
      */
     internal fun shuffleVertices() {
+        isShuffled = true
         vertexList.shuffle()
         for (bucket in verticesByLabel.values) {
             bucket.shuffle()
