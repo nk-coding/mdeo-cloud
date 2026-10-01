@@ -42,6 +42,22 @@ object MutationAstBuilder {
 
     private fun match(elements: List<TypedPatternElement>) = TypedMatchStatement(pattern = TypedPattern(elements = elements))
 
+    /**
+     * `where a != b` for every two objects [pattern] matches whose classes differ but share
+     * objects through inheritance. The engine keeps apart only objects declared with the same
+     * class, so an object could otherwise play both roles, e.g. a folder be its own item.
+     */
+    private fun distinctRelatives(pattern: List<TypedPatternElement>, info: MetamodelInfo, w: RuleAstWriter): List<TypedPatternElement> {
+        val matched = pattern.filterIsInstance<TypedPatternObjectInstanceElement>()
+            .map { it.objectInstance }
+            .filter { it.className != null && it.modifier != "create" }
+        return matched.flatMapIndexed { i, a ->
+            matched.drop(i + 1)
+                .filter { b -> a.className != b.className && info.compatible(a.className!!, b.className!!) }
+                .map { b -> w.where(w.distinct(a.name, a.className!!, TOP, b.name, b.className!!, TOP)) }
+        }
+    }
+
     /** An object about to be linked to a whole through the composition [association]. */
     private data class NewPart(val name: String, val className: String, val association: Int)
 
@@ -137,7 +153,7 @@ object MutationAstBuilder {
                 out += w.link(e, "otherSource", "target", "create")
             }
         }
-        return out + otherContainers(parts, out, info, w)
+        return out + otherContainers(parts, out, info, w) + distinctRelatives(out, info, w)
     }
 
     // =========================================================================
@@ -196,7 +212,7 @@ object MutationAstBuilder {
                 }
             }
         }
-        return out + otherContainers(parts, out, info, w)
+        return out + otherContainers(parts, out, info, w) + distinctRelatives(out, info, w)
     }
 
     // =========================================================================
@@ -233,6 +249,11 @@ object MutationAstBuilder {
                 w.forbid("alreadyLinked_$i", listOf(w.link(end, neighbour, other))),
                 w.link(end, neighbour, other, "create")
             )
+            // The moved object was bound by the enclosing statement, so matching alone does not
+            // keep it from becoming its own new partner.
+            if (info.compatible(end.target, end.owner)) {
+                place += w.where(w.distinct(other, end.target, IF_PATTERN, neighbour, end.owner, FOR_PATTERN))
+            }
             if (nodeSide.name != null && nodeSide.isBounded) {
                 place += w.where(w.size(other, end.target, IF_PATTERN, nodeSide, "<", nodeSide.upper))
             }
