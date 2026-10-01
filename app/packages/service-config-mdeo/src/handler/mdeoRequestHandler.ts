@@ -1,5 +1,10 @@
-import type { RequestHandler } from "@mdeo/service-common";
-import { buildConfigPluginDocument, type ConfigPluginRequestResponse } from "@mdeo/service-config-common";
+import type { RequestContext, RequestHandler } from "@mdeo/service-common";
+import {
+    buildConfigPluginDocument,
+    createConfigDiagnosticsRequestHandler,
+    type ConfigPluginRequestBody,
+    type ConfigPluginRequestResponse
+} from "@mdeo/service-config-common";
 import { getWrapperInterfaceName } from "@mdeo/language-config";
 import { CONFIG_MDEO_LANGUAGE_KEY, MDEO_PLUGIN_NAME } from "@mdeo/language-config-mdeo";
 import type {
@@ -239,6 +244,49 @@ function extractRuntimeData(section: RuntimeSectionType): RuntimeSectionData {
 }
 
 /**
+ * Resolves the classes of the MDEO sections in the metamodel of the optimization plugin's problem
+ * section, which the config service passes along as dependency data.
+ *
+ * @param requestBody The partial config request
+ * @param context The request context
+ */
+function useProblemMetamodel(requestBody: ConfigPluginRequestBody, context: RequestContext<MdeoServices>): void {
+    const problemData = (requestBody.dependencyData?.["optimization"]?.["problem"] ?? {}) as {
+        metamodelPath?: string;
+    };
+    if (problemData.metamodelPath) {
+        resolver(context).setMetamodelData(URI.file(problemData.metamodelPath));
+    }
+}
+
+/**
+ * Undoes {@link useProblemMetamodel} once the request's document is built.
+ *
+ * @param context The request context
+ */
+function forgetProblemMetamodel(context: RequestContext<MdeoServices>): void {
+    resolver(context).clearMetamodelData();
+}
+
+/**
+ * The metamodel resolver of the request's MDEO services.
+ *
+ * @param context The request context
+ */
+function resolver(context: RequestContext<MdeoServices>): ServiceMdeoMetamodelResolver {
+    return context.services.MdeoMetamodelResolver as ServiceMdeoMetamodelResolver;
+}
+
+/**
+ * Request handler for the diagnostics of the MDEO sections of a config.
+ */
+export const mdeoDiagnosticsRequestHandler = createConfigDiagnosticsRequestHandler<MdeoServices>(
+    CONFIG_MDEO_LANGUAGE_KEY,
+    useProblemMetamodel,
+    forgetProblemMetamodel
+);
+
+/**
  * Request handler for the MDEO contribution plugin.
  * Receives a partial config text (containing only MDEO sections) and
  * parses the text using the MDEO language services, extracting structured data.
@@ -251,20 +299,11 @@ export const mdeoRequestHandler: RequestHandler<
     ConfigPluginRequestResponse<MdeoRequestResponse>,
     MdeoServices
 > = async (context): Promise<ConfigPluginRequestResponse<MdeoRequestResponse>> => {
-    const resolver = context.services.MdeoMetamodelResolver as ServiceMdeoMetamodelResolver;
-
     const result = await buildConfigPluginDocument(
         context,
         CONFIG_MDEO_LANGUAGE_KEY,
-        (requestBody) => {
-            const problemData = (requestBody.dependencyData?.["optimization"]?.["problem"] ?? {}) as {
-                metamodelPath?: string;
-            };
-            if (problemData.metamodelPath) {
-                resolver.setMetamodelData(URI.file(problemData.metamodelPath));
-            }
-        },
-        () => resolver.clearMetamodelData()
+        (requestBody) => useProblemMetamodel(requestBody, context),
+        () => forgetProblemMetamodel(context)
     );
 
     if (result.type === "empty") {
