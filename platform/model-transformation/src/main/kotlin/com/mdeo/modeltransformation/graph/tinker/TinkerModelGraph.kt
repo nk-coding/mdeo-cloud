@@ -179,15 +179,22 @@ class TinkerModelGraph private constructor(
 
     /**
      * Rebuilds the name registry with updated vertex IDs from a vertex ID mapping.
+     *
+     * The copy numbers its vertices afresh, so a deleted vertex's old ID may now belong to
+     * another vertex. Its name is kept under a [RetiredVertex] instead, so that it is neither
+     * given to that vertex nor reused for a new one, as with the other graph backend.
      */
     private fun rebuildNameRegistry(vertexIdMap: Map<Any, Any>): InstanceNameRegistry {
         val newRegistry = InstanceNameRegistry()
         for ((oldId, name) in nameRegistry.getAllMappings()) {
-            val newId = vertexIdMap[oldId] ?: oldId
+            val newId = vertexIdMap[oldId] ?: (oldId as? RetiredVertex ?: RetiredVertex())
             newRegistry.register(newId, name)
         }
         return newRegistry
     }
+
+    /** The registry key of a deleted vertex's name; never the ID of a vertex. */
+    private class RetiredVertex
 
     companion object {
 
