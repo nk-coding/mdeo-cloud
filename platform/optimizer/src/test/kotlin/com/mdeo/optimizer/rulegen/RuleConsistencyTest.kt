@@ -1,17 +1,14 @@
 package com.mdeo.optimizer.rulegen
 
 import com.mdeo.metamodel.data.MetamodelData
-import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.RefinementConfig
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.fail
-import kotlin.random.Random
 
 /**
  * Applies every generated operator to random consistent models and checks that the result is
- * consistent too, and that every operator can apply to some consistent model.
+ * consistent too, that it changed the model only the way the operator may, and that every
+ * operator can apply to some consistent model. See [ConsistencyOracle].
  */
 class RuleConsistencyTest {
 
@@ -55,7 +52,22 @@ class RuleConsistencyTest {
             assoc("Shelf.items[0..2]", "*-->", "Item.shelf[?]")
         },
         "folders need files" to mm("Folder", "File") { assoc("Folder.files[1..*]", "*-->", "File.folder") },
-        "recursive" to mm("Node") { assoc("Node.children[*]", "*-->", "Node.parent[?]") }
+        "recursive" to mm("Node") { assoc("Node.children[*]", "*-->", "Node.parent[?]") },
+        "recursive, bounded" to mm("Node") { assoc("Node.children[0..2]", "*-->", "Node.parent[?]") },
+        "recursive with a second container" to mm("ResourceEnvironment", "ResourceContainer") {
+            assoc("ResourceEnvironment.resourceContainer[*]", "*-->", "ResourceContainer.resourceEnvironment[?]")
+            assoc("ResourceContainer.nestedResourceContainers[*]", "*-->", "ResourceContainer.parentResourceContainer[?]")
+        },
+        "mutually recursive" to mm("Folder", "Archive") {
+            assoc("Folder.archives[*]", "*-->", "Archive.folder[?]")
+            assoc("Archive.folders[*]", "*-->", "Folder.archive[?]")
+        },
+        "recursive through a subclass" to MetamodelBuilder("/test.mm").apply {
+            cls("abstract Item")
+            cls("Folder : Item")
+            cls("File : Item")
+            assoc("Folder.items[*]", "*-->", "Item.folder[?]")
+        }.build()
     ).map { (name, metamodel) ->
         DynamicTest.dynamicTest(name) {
             check(metamodel, metamodel.classes.map { spec("mutate ${it.name}") })
@@ -148,57 +160,6 @@ class RuleConsistencyTest {
 
     // -------------------------------------------------------------------------
 
-    private fun check(metamodel: MetamodelData, specs: List<MutationRuleSpec>, refinements: List<RefinementConfig> = emptyList()) {
-        val generated = MutationRuleGenerator.generate(metamodel, specs, refinements)
-        val info = MetamodelInfo(metamodel, refinements.map { MultiplicityOverride(it.className, it.fieldName, it.lower, it.upper) })
-        val randomModels = RandomModels(info, metamodel, seed = 7)
-        val models = (1..MODELS).mapNotNull { randomModels.next() }
-        assertTrue(models.size == MODELS, "could not build $MODELS consistent models")
-
-        val runner = RuleRunner(metamodel)
-        val applied = mutableMapOf<String, Int>()
-        val problems = mutableListOf<String>()
-
-        fun step(mutation: GeneratedMutation, before: ModelData): ModelData? {
-            val after = try {
-                runner.apply(mutation, before)
-            } catch (e: Exception) {
-                problems += "${mutation.name} threw ${e::class.simpleName}: ${e.message}"
-                return null
-            }
-            if (after !is Applied.Yes) return null
-            applied.merge(mutation.name, 1, Int::plus)
-            val violations = MultiplicityChecker.violations(after.model, info)
-            if (violations.isNotEmpty()) {
-                problems += "${mutation.name} made ${violations.joinToString()}\n  before: ${before.render()}\n  after:  ${after.model.render()}"
-                return null
-            }
-            return after.model
-        }
-
-        for (mutation in generated.mutations) {
-            for (model in models) {
-                var current = model
-                repeat(REPEATS) { current = step(mutation, current) ?: return@repeat }
-            }
-        }
-        val random = Random(11)
-        for (model in models) {
-            var current = model
-            repeat(WALK) {
-                val mutation = generated.mutations.random(random)
-                current = step(mutation, current) ?: current
-            }
-        }
-
-        if (problems.isNotEmpty()) fail<Unit>(problems.distinct().take(5).joinToString("\n"))
-        val dead = generated.mutations.map { it.name }.filter { it !in applied }
-        assertTrue(dead.isEmpty(), "never applied: $dead\nwarnings: ${generated.warnings}")
-    }
-
-    private companion object {
-        const val MODELS = 12
-        const val REPEATS = 4
-        const val WALK = 40
-    }
+    private fun check(metamodel: MetamodelData, specs: List<MutationRuleSpec>, refinements: List<RefinementConfig> = emptyList()) =
+        ConsistencyOracle(metamodel, specs, refinements).check()
 }
