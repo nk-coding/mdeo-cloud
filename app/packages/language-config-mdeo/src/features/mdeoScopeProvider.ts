@@ -1,6 +1,6 @@
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
-import type { AstNode, AstNodeDescriptionProvider, LangiumDocuments, ReferenceInfo, Scope } from "langium";
+import type { AstNodeDescriptionProvider, LangiumDocuments, ReferenceInfo, Scope } from "langium";
 import { getScopeFromMetamodelFile, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import { AssociationEndCache } from "@mdeo/language-model";
 import { ClassMutation, EdgeMutation, type EdgeMutationType } from "../grammar/mdeoTypes.js";
@@ -101,10 +101,11 @@ export class MdeoScopeProvider extends DefaultScopeProvider {
 
     /**
      * Gets the scope for edge references in edge mutation operators.
-     * Returns properties and association ends from the referenced class.
+     * Returns the association ends of the referenced class, including inherited ones: operators
+     * are generated for links only, never for attributes.
      *
      * @param context The reference context
-     * @returns Scope with class properties and association ends
+     * @returns Scope with the class's association ends
      */
     private getEdgeScope(context: ReferenceInfo): Scope {
         const edgeMutation = context.container as EdgeMutationType;
@@ -115,14 +116,12 @@ export class MdeoScopeProvider extends DefaultScopeProvider {
         }
 
         const classChain = resolveClassChain(classRef, this.astReflection);
-        const properties = classChain.flatMap((cls) => cls.properties);
         const allAssociationEnds = classChain.flatMap((cls) => {
             return this.associationEndCache.getAssociationEndsForClass(cls);
         });
 
         const uniqueAssociationEnds = Array.from(new Map(allAssociationEnds.map((end) => [end.name, end])).values());
-        const allFields: AstNode[] = [...properties, ...uniqueAssociationEnds];
 
-        return this.createScopeForNodes(allFields);
+        return this.createScopeForNodes(uniqueAssociationEnds);
     }
 }

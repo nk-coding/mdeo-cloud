@@ -232,12 +232,18 @@ class MutationRuleGeneratorTest {
         }
 
         @Test
-        fun `an object pointed at by a unidirectional required end is kept`() {
+        fun `an object needed through a unidirectional end hands its partner to another object`() {
             val metamodel = mm("A", "B") { assoc("A.b", "-->", "B") }
             val delete = MutationRuleGenerator.generate(metamodel, listOf(spec("delete B"))).mutations.single()
             val model = model("/test.mm", "a1:A b1:B b2:B", "a1.b -- b2")
-            val after = applyUntil(metamodel, delete, model) { true }
-            assertTrue(after.instances.any { it.name == "b2" }, after.render())
+            val after = applyUntil(metamodel, delete, model) { m -> m.instances.none { it.name == "b2" } }
+            assertEquals(listOf("a1.b--b1."), after.links.map { "${it.sourceName}.${it.sourceProperty}--${it.targetName}.${it.targetProperty ?: ""}" })
+        }
+
+        @Test
+        fun `an object needed through a fixed end is kept when nobody can take its partner`() {
+            val metamodel = mm("A", "B") { assoc("A.b", "<-->", "B.a") }
+            assertTrue(MutationRuleGenerator.generate(metamodel, listOf(spec("delete B"))).mutations.isEmpty())
         }
     }
 
@@ -265,6 +271,13 @@ class MutationRuleGeneratorTest {
             val add = result.mutations.single { it.name == "ADD_A_y" }
             val after = applyUntil(metamodel, add, model) { true }
             assertTrue(after.links.any { it.sourceProperty == "y" && it.targetProperty == "yb" }, after.render())
+        }
+
+        @Test
+        fun `operators on a recursive composition warn about containment cycles`() {
+            val metamodel = mm("Node") { assoc("Node.children[*]", "*-->", "Node.parent[?]") }
+            val warnings = MutationRuleGenerator.generate(metamodel, listOf(spec("mutate Node.children"))).warnings
+            assertTrue(warnings.single().contains("recursive composition"), "$warnings")
         }
 
         @Test

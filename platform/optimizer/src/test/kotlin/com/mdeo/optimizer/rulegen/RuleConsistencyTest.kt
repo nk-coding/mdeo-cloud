@@ -54,7 +54,8 @@ class RuleConsistencyTest {
             assoc("Box.items[*]", "*-->", "Item.box[?]")
             assoc("Shelf.items[0..2]", "*-->", "Item.shelf[?]")
         },
-        "folders need files" to mm("Folder", "File") { assoc("Folder.files[1..*]", "*-->", "File.folder") }
+        "folders need files" to mm("Folder", "File") { assoc("Folder.files[1..*]", "*-->", "File.folder") },
+        "recursive" to mm("Node") { assoc("Node.children[*]", "*-->", "Node.parent[?]") }
     ).map { (name, metamodel) ->
         DynamicTest.dynamicTest(name) {
             check(metamodel, metamodel.classes.map { spec("mutate ${it.name}") })

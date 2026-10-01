@@ -71,7 +71,21 @@ class SpecsGenerator(private val info: MetamodelInfo) {
             opposite.isFixed -> listOf(EdgeKind.CHANGE_SOURCE)
             else -> listOfNotNull(EdgeKind.ADD.takeIf { add }, EdgeKind.REMOVE.takeIf { remove })
         }
+        if (kinds.any { it != EdgeKind.REMOVE }) warnIfRecursive(end)
         return kinds.map { EdgeSpec(className, end, it) }
+    }
+
+    /**
+     * Notes that operators linking existing objects through [end] can nest an object inside one
+     * of its own descendants when [end] belongs to a composition whose part may be its own whole:
+     * a pattern can only look a fixed number of levels up, so containment cycles are not ruled out.
+     */
+    private fun warnIfRecursive(end: AssociationEnd) {
+        if ((end.isContainment || end.isContainer) && info.compatible(end.owner, end.target)) {
+            val containment = if (end.isContainment) end else end.opposite
+            warnings += "Operators moving objects through the recursive composition '$containment' may place an " +
+                "object inside one of its own descendants."
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -96,6 +110,7 @@ class SpecsGenerator(private val info: MetamodelInfo) {
                 "fixed, so a new object can only be linked by changing other objects recursively."
             return emptyList()
         }
+        required.filter { it.isContainment }.forEach { warnIfRecursive(it) }
         val combinations = options.fold(listOf(emptyList<Requirement>())) { acc, (end, repairs) ->
             acc.flatMap { prefix -> repairs.map { prefix + Requirement(end, it) } }
         }
@@ -137,7 +152,12 @@ class SpecsGenerator(private val info: MetamodelInfo) {
                     "exactly ${end.lower} and no other object can take one more."
                 return emptyList()
             }
-            if (end.isFixed && !nodeSide.isFixed) rehomed += end else guarded += end
+            if (end.isFixed && !nodeSide.isFixed) {
+                rehomed += end
+                warnIfRecursive(end)
+            } else {
+                guarded += end
+            }
         }
         return listOf(DeleteSpec(className, guarded, rehomed))
     }
