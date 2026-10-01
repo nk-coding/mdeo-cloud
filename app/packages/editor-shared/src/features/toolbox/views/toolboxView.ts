@@ -77,6 +77,7 @@ function generateToolboxInternal(context: Toolbox): VNode {
                 }
             },
             generateToolbarView(context),
+            context.isOpen ? context.generateToolbarExtension() : undefined,
             hasItems &&
                 context.toolType !== ToolType.HAND &&
                 context.toolType !== ToolType.MARQUEE &&
