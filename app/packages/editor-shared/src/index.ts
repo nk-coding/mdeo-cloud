@@ -94,6 +94,8 @@ export * from "./features/toolbox/views/toolboxItemView.js";
 export * from "./features/toolbox/views/toolboxView.js";
 export * from "./features/toolbox/featureModule.js";
 export * from "./features/toolbox/layoutAction.js";
+export * from "./features/toolbox/layoutAlgorithmPreference.js";
+export * from "./features/toolbox/views/layoutPanelView.js";
 export * from "./features/toolbox/previewRenderer.js";
 export * from "./features/toolbox/toolbox.js";
 export * from "./features/toolbox/toolboxTypes.js";
