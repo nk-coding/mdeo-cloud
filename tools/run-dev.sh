@@ -91,7 +91,7 @@ DATABASES=(postgres-backend postgres-script postgres-model-transformation postgr
 # local-development.md), and with `restart: unless-stopped` those containers come back
 # on every boot and hold the ports the panes need. Stop everything but the databases.
 mapfile -t containers < <(docker compose -f "$COMPOSE_FILE" ps --services --status running \
-    | grep -vxF -f <(printf '%s\n' "${DATABASES[@]}") || true)
+    | grep -vxF -f <(printf '%s\n' "${DATABASES[@]}") | grep -v '^$' || true)
 if (( ${#containers[@]} )); then
     step "Stopping containerized services: ${containers[*]}"
     docker compose -f "$COMPOSE_FILE" stop "${containers[@]}"
