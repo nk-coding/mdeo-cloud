@@ -67,7 +67,7 @@ search {
 
 | Entry | Meaning |
 | --- | --- |
-| `using "path.mt"` | Use a hand-written model transformation as a mutation operator |
+| `using "path.mt"` | Use a hand-written model transformation as a mutation operator (it must not have required inputs) |
 | `create Class` | Generate operators that add an object of the class, or of each concrete subclass |
 | `delete Class` | Generate an operator that removes an object of the class or of a subclass |
 | `add Class.edge` | Generate operators that link objects through the association end |
@@ -76,6 +76,11 @@ search {
 | `mutate Class` | `create`, `delete` and `mutate Class.edge` for every association end of the class |
 
 `edge` is an association end of the class, declared on it or inherited; attributes are never changed.
+
+A `using` entry may name a transformation whose metamodel is the problem's metamodel or one the
+problem's metamodel imports. A [callable transformation](/plugins/model-transformation#callable-transformations)
+can be an operator only if all its inputs have defaults; list the transformation that calls the
+others, not the callees — each listed file is one operator, whatever it calls.
 Entries may be mixed and repeated in any order. Generated operators are written into the result tree
 as `.mt_gen` files, so you can read exactly what the search was allowed to do.
 

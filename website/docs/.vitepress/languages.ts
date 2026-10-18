@@ -192,6 +192,13 @@ const modelTransformation = createGrammar({
     aliases: ["mt", "mt_gen"],
     keywords: [
         "using",
+        "import",
+        "from",
+        "as",
+        "transformation",
+        "in",
+        "out",
+        "call",
         "match",
         "if",
         "then",
@@ -210,7 +217,7 @@ const modelTransformation = createGrammar({
         "stop"
     ],
     constants: ["true", "false", "null"],
-    operators: ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "??", "?.", "!!", "=>", "--"]
+    operators: ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "??", "?.", "!!", "=>", "->", "--"]
 });
 
 /**

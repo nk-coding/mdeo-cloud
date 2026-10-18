@@ -148,9 +148,98 @@ matched again.
 | `while (expr) { … }` | Ordinary loop on an expression |
 | `stop` | End the transformation successfully |
 | `kill` | Abort the transformation and discard the result |
+| `call name(arg = expr, …) -> (out: name, …)` | Run another transformation — see [Callable transformations](#callable-transformations) |
 
 Expressions use the same syntax as the [Script language](/plugins/script) — the two share an
 expression and type system.
+
+#### Callable transformations
+
+A transformation can call another one, in the style of the method calls of story diagrams: the
+callee declares a **signature** with typed `in` and `out` parameters, and the caller **imports** it
+and runs it with `call`.
+
+<<< @/../samples/callable-transformations/generic/move-component.mt{mt}
+
+The signature follows the `using` line and the imports. A parameter is either a **model element** —
+its type is a class of the metamodel — or a **scalar**: `int`, `long`, `float`, `double`, `string`,
+`boolean` or an enum of the metamodel.
+
+| Parameter | When the callee starts | Use in the callee |
+| --- | --- | --- |
+| `in name: Class` | bound to the element the caller passed | a bound node of every pattern: `name { … }`, `name.end -- other`, `delete name`, and in expressions |
+| `in name: int = 0` | bound to the argument, or to the default when the caller passes none | a value in expressions |
+| `out name: Class` / `out name: int` | `null` | assigned inside a pattern with `name = expression` |
+
+A callee whose element inputs are already bound repairs locally around them:
+
+<<< @/../samples/callable-transformations/sync/follow-reader.mt{mt}
+
+The caller imports the callee and names the arguments; after `->` it binds the outputs it needs to
+names of its own. They are bound exactly as if a `match` had bound them: an element output is an
+object that later patterns reference as `m { }`, a scalar output is a value.
+
+<<< @/../samples/callable-transformations/move-with-stores.mt{mt}
+
+**Semantics.**
+
+- The callee runs on the same model, with its own variables: only its inputs and outputs cross the
+  call.
+- A callee that **fails** — a `match` that finds nothing — fails the call, and so the caller, just as
+  a failing `match` does. During an optimisation the attempt is then discarded like any other failed
+  operator.
+- `stop` in the callee **returns from the callee**; the caller goes on with the next statement.
+  `kill` in the callee aborts the whole transformation.
+- A callee that succeeds without matching anything (a `for match` with no match, an `if match` that
+  takes no branch) is a success. Outputs it did not assign are `null`, which is why the validator
+  requires every non-nullable output to be assigned on every path that succeeds; declare an output
+  `T?` when that cannot be guaranteed. A nullable output can be compared with `null`, but it cannot
+  be a node of a pattern.
+- The engine does not undo the changes of a failed callee. Inside an optimisation that does not
+  matter, since the whole attempt is discarded.
+
+**Layered metamodels.** A callee's metamodel must be the caller's metamodel or one that the caller's
+metamodel imports (directly or not). A transformation written for a base metamodel — here
+`architecture.mm` — therefore runs inside a transformation of an extending metamodel —
+`microservices.mm` — and its patterns also match the subclasses that metamodel adds. The reverse is
+rejected.
+
+**Checks in the editor.** The validator reports, on the line concerned:
+
+- arguments that name no parameter of the callee, an output passed as an argument or an input bound
+  as an output, and arguments or outputs given twice;
+- missing required inputs (an `in` parameter without default);
+- argument types that are not assignable to the parameter's type (a subclass of an element
+  parameter's class is fine);
+- imports of files that do not exist, that have no signature or whose signature has another name;
+- callees of an incompatible metamodel;
+- import cycles: recursive calls are not supported;
+- outputs that are not assigned on every successful path (at the end and at every `stop`);
+- assignments to `in` parameters, and parameters or outputs used as pattern nodes although they are
+  scalars, unbound outputs or nullable.
+
+Parameter and output names take part in the file-wide uniqueness of names. Hover over a call, an
+import, an argument or an output shows the callee's signature or the parameter; *Go to definition*
+jumps into the callee.
+
+**As mutation operators.** A transformation listed in a [`search` block](/plugins/config-mdeo#the-search-section)
+must not have required inputs: the optimizer passes no arguments, so inputs take their defaults
+and outputs are ignored. List the wrapper (`move-with-stores.mt`), not its callees: the wrapper is
+one operator in the random choice of operators, so the move and its repair always happen together.
+
+A file with required inputs cannot be run on its own with the **Run** action either; it only runs
+when another transformation calls it.
+
+::: info Reserved words
+`transformation`, `in`, `out`, `call`, `import` and `from` are keywords of the language. A name that
+collides with one of them is written in backticks, e.g. `` `from` ``.
+:::
+
+::: info Not yet supported
+Collection parameters (`Set<T>`, `List<T>`), `if call … then … else …` and recursion are not
+supported yet. In the graphical editor a call is shown as a node with its text and is edited in the
+textual editor.
+:::
 
 ### The generated model transformation language
 
@@ -167,7 +256,7 @@ None.
 | File data key | Contents |
 | --- | --- |
 | `ast` | The serialised AST |
-| `typed-ast` | The type-annotated AST the execution service interprets |
+| `typed-ast` | The type-annotated AST the execution service interprets; the typed ASTs of the transformations it calls are bundled into it |
 | `model-transformation-text` | The textual rendering of a generated `.mt_gen` file |
 
 **Execution.** A transformation can be run against a model. The plugin forwards the request to the
@@ -177,4 +266,6 @@ None.
 ## Graphical editor
 
 Transformations have a diagram editor too. Pattern objects and links appear as nodes and edges, with
-their modifier reflected in the styling, so the effect of a rule can be read at a glance.
+their modifier reflected in the styling, so the effect of a rule can be read at a glance. Element
+parameters and call outputs appear as bound objects in the patterns that use them, and a call is a
+node on the control flow that shows the call's text.
