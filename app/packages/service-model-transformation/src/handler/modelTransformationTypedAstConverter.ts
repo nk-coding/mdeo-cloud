@@ -1,8 +1,8 @@
 import type { AstReflection } from "@mdeo/language-common";
 import { TypedAstConverter, type TypedExpression } from "@mdeo/language-expression";
 import { AssociationResolver, type ResolvedAssociation } from "@mdeo/language-model";
-import { resolveRelativePath } from "@mdeo/language-shared";
-import type { LangiumDocument } from "langium";
+import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
+import type { LangiumDocument, LangiumDocuments } from "langium";
 import {
     expressionTypes,
     type ModelTransformationTypirServices,
@@ -68,10 +68,18 @@ import {
     type PatternObjectInstanceReferenceType,
     PatternObjectInstanceReference,
     PatternApplicationCondition,
-    type PatternPropertyOperator
+    type PatternPropertyOperator,
+    CallStatement,
+    type CallStatementType,
+    type TypedCallStatement,
+    type TransformationSignatureType,
+    type TypedTransformationSignature,
+    TransformationDeclarationResolver
 } from "@mdeo/language-model-transformation";
 import { AssociationEnd, type AssociationEndType } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
+
+const { AstUtils } = sharedImport("langium");
 
 /**
  * Model Transformation-specific extension of ExpressionTypedAstConverter.
@@ -90,17 +98,25 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
     private readonly associationResolver: AssociationResolver;
 
     /**
+     * Resolver for the classes of parameters and call outputs.
+     */
+    private readonly declarations: TransformationDeclarationResolver;
+
+    /**
      * Creates a new ModelTransformationTypedAstConverter.
      *
      * @param typir The Typir services for type inference
      * @param reflection The AST reflection for type checking
+     * @param documents The Langium documents, for the metamodels of the transformations
      */
     constructor(
         protected override readonly typir: ModelTransformationTypirServices,
-        reflection: AstReflection
+        reflection: AstReflection,
+        documents: LangiumDocuments
     ) {
         super(typir, reflection);
         this.associationResolver = new AssociationResolver(reflection);
+        this.declarations = new TransformationDeclarationResolver(reflection, documents);
     }
 
     /**
@@ -118,10 +134,62 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
             this.convertTransformationStatement(stmt)
         );
 
+        const signature =
+            transformation.signature != undefined ? this.convertSignature(transformation.signature) : undefined;
+
         return {
             types: this.types,
             metamodelPath: resolveRelativePath(document, transformation.import.file).path,
-            statements
+            statements,
+            ...(signature != undefined ? { signature } : {})
+        };
+    }
+
+    /**
+     * Converts a signature.
+     *
+     * @param signature The TransformationSignature AST node
+     * @returns The TypedTransformationSignature representation
+     */
+    private convertSignature(signature: TransformationSignatureType): TypedTransformationSignature {
+        return {
+            name: signature.name,
+            parameters: (signature.parameters ?? []).map((parameter) => ({
+                name: parameter.name,
+                direction: parameter.direction === "out" ? "out" : "in",
+                type: this.getTypeIndex(parameter.type),
+                isElement: this.declarations.getParameterKind(parameter) === "element",
+                ...(parameter.defaultValue != undefined
+                    ? { defaultValue: this.convertExpression(parameter.defaultValue) }
+                    : {})
+            }))
+        };
+    }
+
+    /**
+     * Converts a call statement. The callee is named by the absolute path of its file, under
+     * which the typed AST handler bundles its typed AST.
+     *
+     * @param stmt The CallStatement AST node
+     * @returns The TypedCallStatement representation
+     */
+    private convertCallStatement(stmt: CallStatementType): TypedCallStatement {
+        const signature = stmt.callee?.ref;
+        if (signature == undefined) {
+            throw new Error(`Call of an unresolved transformation '${stmt.callee?.$refText}'`);
+        }
+        return {
+            kind: "call",
+            callee: AstUtils.getDocument(signature).uri.path,
+            name: signature.name,
+            arguments: (stmt.arguments ?? []).map((argument) => ({
+                name: argument.parameter?.$refText ?? "",
+                value: this.convertExpression(argument.value)
+            })),
+            outputs: (stmt.outputs ?? []).map((output) => ({
+                parameter: output.parameter?.$refText ?? "",
+                name: output.name
+            }))
         };
     }
 
@@ -156,6 +224,9 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
         }
         if (this.reflection.isInstance(stmt, StopStatement)) {
             return this.convertStopStatement(stmt);
+        }
+        if (this.reflection.isInstance(stmt, CallStatement)) {
+            return this.convertCallStatement(stmt);
         }
         throw new Error(`Unknown transformation statement type: ${stmt.$type}`);
     }
@@ -546,11 +617,7 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
      * @param targetObj The target PatternObjectInstance
      * @returns Object containing the resolved association and whether direction matches association direction
      */
-    private resolveAssociation(
-        link: PatternLinkType,
-        sourceObj: PatternObjectInstanceType,
-        targetObj: PatternObjectInstanceType
-    ): ResolvedAssociation {
+    private resolveAssociation(link: PatternLinkType, sourceObj: AstNode, targetObj: AstNode): ResolvedAssociation {
         const sourceClass = this.resolveObjectClass(sourceObj);
         const targetClass = this.resolveObjectClass(targetObj);
         const sourcePropertyRef = link.source.property?.ref;
@@ -581,15 +648,16 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
     }
 
     /**
-     * Resolves the class type for a pattern object instance.
+     * Resolves the class of an object declaration: a pattern object instance, an element
+     * parameter or an element output of a call.
      *
-     * @param obj The PatternObjectInstance AST node
+     * @param obj The declaration
      * @returns The ClassType
      */
-    private resolveObjectClass(obj: PatternObjectInstanceType) {
-        const classRef = obj.class?.ref;
+    private resolveObjectClass(obj: AstNode) {
+        const classRef = this.declarations.getDeclaredClass(obj);
         if (classRef == undefined) {
-            throw new Error(`PatternObjectInstance ${obj.name} has no class reference`);
+            throw new Error(`Object '${(obj as { name?: string }).name}' has no class`);
         }
         return classRef;
     }
