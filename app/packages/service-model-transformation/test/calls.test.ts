@@ -550,6 +550,44 @@ describe("callable transformations: language server", () => {
     });
 });
 
+describe("callable transformations: completion and run action", () => {
+    it("completes imported callees and the callee's parameters", async () => {
+        const text = `using "../metamodel/shop.mm"
+import { moveComponent } from "./generic/move-component.mt"
+
+call moveComponent()
+`;
+        const workspace = new TestWorkspace(layeredProject({ "/optimize/probe.mt": text }));
+        const { document, instance } = await workspace.build("/optimize/probe.mt");
+        const complete = async (offset: number) => {
+            const result = await instance.services.lsp.CompletionProvider.getCompletion(document, {
+                textDocument: { uri: document.uri.toString() },
+                position: document.textDocument.positionAt(offset)
+            });
+            return (result?.items ?? []).map((item: any) => item.label);
+        };
+        const call = text.indexOf("call moveComponent()");
+        assert.ok((await complete(call + "call ".length)).includes("moveComponent"));
+        const parameters = await complete(call + "call moveComponent(".length);
+        assert.ok(parameters.includes("maxCandidates"), parameters.join(", "));
+    });
+
+    it("refuses to run a transformation with required inputs on its own", async () => {
+        const { RunModelTransformationActionHandler } = await import("@mdeo/language-model-transformation");
+        const workspace = new TestWorkspace(layeredProject());
+        const { document, instance } = await workspace.build("/optimize/sync/follow-reader.mt");
+        // the workbench's document builder knows the dependencies of a document; this one has none
+        instance.services.shared.workspace.DocumentBuilder.getTransitiveDependencies = () => [];
+        const handler = new RunModelTransformationActionHandler(instance.services.shared);
+        const response: any = await handler.startAction({ data: { uri: document.uri.toString() } } as any);
+        assert.equal(response.kind, "page");
+        assert.equal(
+            response.page.description,
+            "'followReader' has required inputs 'moved', 'target', so it cannot run on its own. Call it from another transformation with 'call followReader(…)', or give these inputs defaults."
+        );
+    });
+});
+
 describe("callable transformations: helpers", () => {
     it("reports errors of documents built through the workspace", async () => {
         const workspace = new TestWorkspace(
