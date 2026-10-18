@@ -204,6 +204,20 @@ class CallStatementExecutionTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["tinker", "mdeo"])
+    fun `a callee returns a node it created`(backend: String) {
+        graph(backend).use { graph ->
+            val result = run(graph, "/optimize/scenarios/call-making.mt")
+
+            assertIs<TransformationExecutionResult.Success>(result, result.toString())
+            assertEquals(1, result.createdNodes.size, "the callee's creation is part of the call's result")
+            val after = graph.toModelData()
+            val made = after.instances.single { (it.properties["name"] as? ModelDataPropertyValue.StringValue)?.value == "fresh and used" }
+            assertEquals(made.name, after.hostOf("orders"), "the caller linked the service to the created container")
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
     fun `a callable transformation runs on its own with the defaults of its inputs`(backend: String) {
         graph(backend).use { graph ->
             val result = run(graph, "/optimize/generic/move-component.mt")

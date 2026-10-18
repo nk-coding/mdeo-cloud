@@ -1,6 +1,8 @@
 package com.mdeo.modeltransformation.runtime.match
 
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableElement
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableReassignmentElement
 import com.mdeo.modeltransformation.compiler.SequentialLabelIdGenerator
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.conditionScope
@@ -101,7 +103,7 @@ class MatchExecutor {
      * @return List of matched results (may be empty).
      */
     private fun executeUnifiedTraversal(
-        elements: PatternCategories,
+        allElements: PatternCategories,
         context: TransformationExecutionContext,
         engine: TransformationEngine,
         limit: Long
@@ -109,10 +111,21 @@ class MatchExecutor {
         val expressionSupport = ExpressionSupport(engine, context, labelIdGenerator)
         val compilationContext = expressionSupport.newCompilationContext()
 
-        for (varElement in elements.variables) {
+        for (varElement in allElements.variables) {
             val varLabel = VariableBinding.variableLabel(varElement.variable.name)
             context.variableScope.setBinding(varElement.variable.name, VariableBinding.LabelBinding(varLabel))
         }
+
+        // Variables and reassignments that read an object the pattern creates (e.g. an `out`
+        // parameter assigned `out = created`) can only be computed once the object exists:
+        // they are left out of the match plan and bound after the modifications.
+        val deferred = deferredBindings(allElements, context)
+        val elements = allElements.copy(
+            variables = allElements.variables.filter { it.variable.name !in deferred.variableNames },
+            variableReassignments = allElements.variableReassignments.filter {
+                it.reassignment.name !in deferred.reassignmentNames
+            }
+        )
 
         val analyzer = MatchAnalyzer(context.variableScope)
         elements.variables.forEach { analyzer.analyzeVariable(it) }
@@ -148,7 +161,7 @@ class MatchExecutor {
         // traversal flips them to label bindings (so within-block accesses see the new
         // value); on a successful match the extractor overwrites them with the computed
         // value, but on a no-match nothing is extracted, so the originals must be restored.
-        val reassignSnapshots = elements.variableReassignments.mapNotNull { el ->
+        val reassignSnapshots = allElements.variableReassignments.mapNotNull { el ->
             val name = el.reassignment.name
             context.variableScope.findDeclaringScope(name)?.let { scope ->
                 Triple(name, scope, scope.getLocalBinding(name))
@@ -159,7 +172,7 @@ class MatchExecutor {
 
         val traversal = buildUnifiedTraversal(
             elements, matchPlan,
-            expressionSupport, compilationContext, limit
+            expressionSupport, compilationContext, limit, deferred, allElements
         )
 
         val planBoundNames = matchPlan.baseSteps.mapNotNull { step ->
@@ -172,7 +185,7 @@ class MatchExecutor {
         val allSelectNames = (elements.allInstanceNames + planBoundNames).distinct()
 
         val matchedInstanceNames = allMatchable.map { it.objectInstance.name }
-        val results = executeTraversalAndExtract(traversal, elements, context, engine, matchedInstanceNames, allSelectNames)
+        val results = executeTraversalAndExtract(traversal, allElements, context, engine, matchedInstanceNames, allSelectNames)
         if (results.isEmpty()) {
             for ((name, scope, original) in reassignSnapshots) {
                 if (original != null) scope.setBinding(name, original)
@@ -268,7 +281,9 @@ class MatchExecutor {
         plan: MatchPlan,
         expressionSupport: ExpressionSupport,
         compilationContext: com.mdeo.modeltransformation.compiler.CompilationContext,
-        limit: Long
+        limit: Long,
+        deferred: DeferredBindings = DeferredBindings.NONE,
+        allElements: PatternCategories = elements
     ): GraphTraversal<Vertex, Any> {
         val traversalBuilder = MatchTraversalBuilder(expressionSupport, compilationContext, expressionSupport.engine)
         var t: GraphTraversal<Vertex, Map<String, Any>> =
@@ -278,6 +293,7 @@ class MatchExecutor {
 
         val matchedNames = elements.matchableInstances.map { it.objectInstance.name }
         t = GraphModificationApplier(elements, expressionSupport, compilationContext).apply(t, matchedNames)
+        t = applyDeferredBindings(t, deferred, expressionSupport, compilationContext)
 
         val planBoundNames = plan.baseSteps.mapNotNull { step ->
             when (step) {
@@ -288,8 +304,86 @@ class MatchExecutor {
         }
         val allSelectNames = (elements.allInstanceNames + planBoundNames).distinct()
 
-        val variableLabels = allVariableLabels(elements)
+        val variableLabels = allVariableLabels(allElements)
         return addSelectStep(t, allSelectNames, variableLabels)
+    }
+
+    /**
+     * The variables and reassignments of a pattern that read objects the pattern creates.
+     *
+     * @param variables The deferred variable declarations.
+     * @param reassignments The deferred reassignments.
+     */
+    private data class DeferredBindings(
+        val variables: List<TypedPatternVariableElement>,
+        val reassignments: List<TypedPatternVariableReassignmentElement>
+    ) {
+        val variableNames: Set<String> get() = variables.map { it.variable.name }.toSet()
+        val reassignmentNames: Set<String> get() = reassignments.map { it.reassignment.name }.toSet()
+
+        companion object {
+            val NONE = DeferredBindings(emptyList(), emptyList())
+        }
+    }
+
+    /**
+     * Finds the variables and reassignments whose value reads an object created by the pattern,
+     * directly or through another deferred variable.
+     */
+    private fun deferredBindings(elements: PatternCategories, context: TransformationExecutionContext): DeferredBindings {
+        val created = elements.createInstances.map { it.objectInstance.name }.toMutableSet()
+        if (created.isEmpty()) {
+            return DeferredBindings.NONE
+        }
+        val deferredVariables = mutableListOf<TypedPatternVariableElement>()
+        var changed = true
+        while (changed) {
+            changed = false
+            for (variable in elements.variables) {
+                if (variable in deferredVariables) continue
+                if (reads(variable.variable.value, created, context)) {
+                    deferredVariables += variable
+                    created += variable.variable.name
+                    changed = true
+                }
+            }
+        }
+        val deferredReassignments = elements.variableReassignments.filter { reads(it.reassignment.value, created, context) }
+        return DeferredBindings(deferredVariables, deferredReassignments)
+    }
+
+    /**
+     * Whether an expression reads one of [names].
+     */
+    private fun reads(expression: com.mdeo.expression.ast.expressions.TypedExpression, names: Set<String>, context: TransformationExecutionContext): Boolean {
+        val analyzer = ExpressionNodeAnalyzer(names, context.variableScope.scopeIndex)
+        return analyzer.findReferencedNodes(expression).isNotEmpty()
+    }
+
+    /**
+     * Binds the deferred variables and reassignments after the modifications, in pattern order,
+     * each to the step label the result extraction reads.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun applyDeferredBindings(
+        traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        deferred: DeferredBindings,
+        expressionSupport: ExpressionSupport,
+        compilationContext: com.mdeo.modeltransformation.compiler.CompilationContext
+    ): GraphTraversal<Vertex, Map<String, Any>> {
+        var t = traversal
+        val bindings = deferred.variables.map { it.variable.name to it.variable.value } +
+            deferred.reassignments.map { it.reassignment.name to it.reassignment.value }
+        for ((name, value) in bindings) {
+            val label = VariableBinding.variableLabel(name)
+            val compiled = expressionSupport.engine.expressionCompilerRegistry.compile(value, compilationContext)
+            t = t.map(compiled.traversal as GraphTraversal<Any, Any>).`as`(label) as GraphTraversal<Vertex, Map<String, Any>>
+            if (deferred.reassignmentNames.contains(name)) {
+                expressionSupport.context.variableScope.findDeclaringScope(name)
+                    ?.setBinding(name, VariableBinding.LabelBinding(label))
+            }
+        }
+        return t
     }
 
     /**

@@ -263,5 +263,31 @@ match {
     }
     where f == null && n == 0
 }
+`,
+    // a callee that creates a node and returns it
+    "/optimize/scenarios/make-container.mt": `using "../../metamodel/base.mm"
+
+transformation makeContainer(in label: string, out made: Container)
+
+match {
+    create c: Container {
+        name = label
+    }
+    made = c
+}
+`,
+    "/optimize/scenarios/call-making.mt": `using "../../metamodel/shop.mm"
+import { makeContainer } from "./make-container.mt"
+
+call makeContainer(label = "fresh") -> (made: f)
+match {
+    s: Service { }
+    old: Container { }
+    delete s.host -- old
+    create s.host -- f
+    f {
+        name = "fresh and used"
+    }
+}
 `
 };
