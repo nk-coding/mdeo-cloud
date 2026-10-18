@@ -1,4 +1,10 @@
-import { sharedImport, resolveRelativePath } from "@mdeo/language-shared";
+import {
+    sharedImport,
+    resolveRelativePath,
+    isImportReference,
+    getExportedEntitiesFromGlobalScope,
+    getImportedEntitiesFromCurrentFile
+} from "@mdeo/language-shared";
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import type {
     ReferenceInfo,
@@ -28,10 +34,20 @@ import {
     type PatternType,
     ModelTransformation,
     PatternObjectInstanceReference,
-    type PatternObjectInstanceReferenceType
+    type PatternObjectInstanceReferenceType,
+    ObjectInstanceDeclaration,
+    CallStatement,
+    CallArgument,
+    CallOutput,
+    transformationFileScopingConfig,
+    type CallStatementType,
+    type ModelTransformationType,
+    type TransformationParameterType,
+    type TransformationImportType
 } from "../grammar/modelTransformationTypes.js";
 import { getScopeFromMetamodelFile, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import { AssociationEndCache } from "@mdeo/language-model";
+import { TransformationDeclarationResolver } from "./transformationDeclarations.js";
 
 const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE } = sharedImport("langium");
 
@@ -61,6 +77,11 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
     private readonly associationEndCache: AssociationEndCache;
 
     /**
+     * Resolver for the classes of object declarations (instances, parameters, call outputs).
+     */
+    private readonly declarations: TransformationDeclarationResolver;
+
+    /**
      * Creates an instance of ModelTransformationLangiumScopeProvider.
      *
      * @param services The language services.
@@ -71,6 +92,7 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
         this.documents = services.shared.workspace.LangiumDocuments;
         this.descriptionProvider = services.workspace.AstNodeDescriptionProvider;
         this.associationEndCache = new AssociationEndCache(services);
+        this.declarations = new TransformationDeclarationResolver(this.astReflection, this.documents);
     }
 
     /**
@@ -82,6 +104,27 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
     override getScope(referenceInfo: ReferenceInfo): Scope {
         const document = AstUtils.getDocument(referenceInfo.container);
 
+        if (isImportReference(referenceInfo, transformationFileScopingConfig)) {
+            return getExportedEntitiesFromGlobalScope(
+                document,
+                referenceInfo,
+                transformationFileScopingConfig,
+                this.indexManager
+            );
+        }
+        if (
+            referenceInfo.property === "callee" &&
+            this.astReflection.isInstance(referenceInfo.container, CallStatement)
+        ) {
+            return this.getCalleeScope(referenceInfo.container);
+        }
+        if (
+            referenceInfo.property === "parameter" &&
+            (this.astReflection.isInstance(referenceInfo.container, CallArgument) ||
+                this.astReflection.isInstance(referenceInfo.container, CallOutput))
+        ) {
+            return this.getCalleeParameterScope(referenceInfo.container);
+        }
         if (
             referenceInfo.property === "class" &&
             this.astReflection.isInstance(referenceInfo.container, PatternObjectInstance)
@@ -137,16 +180,23 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
      * and if-match statements whose block contains the reassignment.
      *
      * The visibility rules mirror those of the type-system scope provider so that the value
-     * expression and the reassignment target resolve against the same set of variables.
+     * expression and the reassignment target resolve against the same set of variables. The
+     * parameters of the signature come last: an `out` parameter is assigned this way (the
+     * validator rejects assigning an `in` parameter).
      *
      * @param referenceInfo The reference context.
      * @returns A scope containing all reassignable variables, innermost declarations first.
      */
     private getReassignableVariableScope(referenceInfo: ReferenceInfo): Scope {
-        const variables = this.collectVisibleReassignmentVariables(referenceInfo.container);
+        const variables: (PatternVariableType | TransformationParameterType)[] =
+            this.collectVisibleReassignmentVariables(referenceInfo.container);
+        const root = AstUtils.getContainerOfType(referenceInfo.container, (node) =>
+            this.astReflection.isInstance(node, ModelTransformation)
+        ) as ModelTransformationType | undefined;
+        variables.push(...(root?.signature?.parameters ?? []));
 
         const seen = new Set<string>();
-        const deduped: PatternVariableType[] = [];
+        const deduped: (PatternVariableType | TransformationParameterType)[] = [];
         for (const variable of variables) {
             const name = variable.name;
             if (name != undefined && !seen.has(name)) {
@@ -318,7 +368,7 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
         if (this.astReflection.isInstance(objectInstance, PatternObjectInstance)) {
             classRef = objectInstance.class?.ref as ClassType | undefined;
         } else {
-            classRef = objectInstance.instance?.ref?.class?.ref as ClassType | undefined;
+            classRef = this.declarations.getDeclaredClass(objectInstance.instance?.ref);
         }
         if (classRef == undefined) {
             return EMPTY_SCOPE;
@@ -337,13 +387,7 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
      */
     private getLinkPropertyScope(referenceInfo: ReferenceInfo): Scope {
         const linkEnd = referenceInfo.container as PatternLinkEndType;
-        const objectRef = linkEnd.object?.ref as PatternObjectInstanceType | undefined;
-
-        if (objectRef == undefined) {
-            return EMPTY_SCOPE;
-        }
-
-        const classRef = objectRef.class?.ref as ClassType | undefined;
+        const classRef = this.declarations.getDeclaredClass(linkEnd.object?.ref);
         if (classRef == undefined) {
             return EMPTY_SCOPE;
         }
@@ -361,7 +405,8 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
 
     /**
      * Gets the scope for object instance references in pattern link ends.
-     * Returns all pattern object instances in the current pattern.
+     * Returns all object declarations visible at the reference: pattern object instances, the
+     * parameters of the signature and the outputs of calls.
      *
      * @param referenceInfo The reference context.
      * @returns The scope containing all pattern object instances.
@@ -376,7 +421,7 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
                     scopes.push(
                         localSymbols
                             .getStream(currentNode)
-                            .filter((desc) => this.reflection.isSubtype(desc.type, PatternObjectInstance.name))
+                            .filter((desc) => this.reflection.isSubtype(desc.type, ObjectInstanceDeclaration.name))
                     );
                 }
                 currentNode = currentNode.$container;
@@ -388,5 +433,46 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
             result = this.createScope(scopes[i], result);
         }
         return result ?? EMPTY_SCOPE;
+    }
+
+    /**
+     * Gets the scope for the callee of a call: the transformations imported into this file,
+     * under their alias when they have one.
+     *
+     * @param call The call statement
+     * @returns The imported signatures
+     */
+    private getCalleeScope(call: CallStatementType): Scope {
+        const root = AstUtils.getContainerOfType(call, (node) =>
+            this.astReflection.isInstance(node, ModelTransformation)
+        ) as ModelTransformationType | undefined;
+        if (root == undefined) {
+            return EMPTY_SCOPE;
+        }
+        return getImportedEntitiesFromCurrentFile<any>(
+            root.imports ?? [],
+            this.nameProvider,
+            this.descriptionProvider,
+            (entityImport: TransformationImportType) => entityImport.entity != undefined
+        );
+    }
+
+    /**
+     * Gets the scope for the parameter of a call argument or output: the parameters of the
+     * callee's signature.
+     *
+     * @param node The call argument or call output
+     * @returns The callee's parameters
+     */
+    private getCalleeParameterScope(node: AstNode): Scope {
+        const call = node.$container;
+        if (!this.astReflection.isInstance(call, CallStatement)) {
+            return EMPTY_SCOPE;
+        }
+        const signature = (call as CallStatementType).callee?.ref;
+        if (signature == undefined) {
+            return EMPTY_SCOPE;
+        }
+        return this.createScopeForNodes(signature.parameters ?? []);
     }
 }

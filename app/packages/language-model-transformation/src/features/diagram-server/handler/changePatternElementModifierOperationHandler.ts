@@ -1,4 +1,5 @@
 import { BaseOperationHandler, OperationHandlerCommand, sharedImport } from "@mdeo/language-shared";
+import { asPatternObjectInstance } from "../../transformationDeclarations.js";
 import type { Command, GModelElement } from "@eclipse-glsp/server";
 import {
     ChangePatternElementModifierOperation,
@@ -186,7 +187,10 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
             return false;
         }
         const link = astNode as PatternLinkType;
-        return link.source?.object?.ref?.modifier == undefined && link.target?.object?.ref?.modifier == undefined;
+        return (
+            asPatternObjectInstance(this.reflection, link.source?.object?.ref)?.modifier == undefined &&
+            asPatternObjectInstance(this.reflection, link.target?.object?.ref)?.modifier == undefined
+        );
     }
 
     /**

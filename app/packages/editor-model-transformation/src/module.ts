@@ -19,6 +19,7 @@ import { GPatternLinkEndLabel } from "./model/patternLinkEndLabel.js";
 import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GSplitNode } from "./model/splitNode.js";
+import { GCallNode } from "./model/callNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { GControlFlowEdge } from "./model/controlFlowEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
@@ -34,6 +35,7 @@ import { GPatternLinkEndLabelView } from "./views/patternLinkEndLabelView.js";
 import { GStartNodeView } from "./views/startNodeView.js";
 import { GEndNodeView } from "./views/endNodeView.js";
 import { GSplitNodeView } from "./views/splitNodeView.js";
+import { GCallNodeView } from "./views/callNodeView.js";
 import { GMergeNodeView } from "./views/mergeNodeView.js";
 import { GControlFlowEdgeView } from "./views/controlFlowEdgeView.js";
 import { GControlFlowLabelNodeView } from "./views/controlFlowLabelNodeView.js";
@@ -124,6 +126,7 @@ export const modelTransformationDiagramModule = new FeatureModule(
         configureModelElement(context, ModelTransformationElementType.NODE_END, GEndNode, GEndNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_SPLIT, GSplitNode, GSplitNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_MERGE, GMergeNode, GMergeNodeView);
+        configureModelElement(context, ModelTransformationElementType.NODE_CALL, GCallNode, GCallNodeView);
         configureModelElement(
             context,
             ModelTransformationElementType.EDGE_CONTROL_FLOW,

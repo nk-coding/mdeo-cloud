@@ -1,4 +1,5 @@
 import type { DiagramConfiguration, EdgeTypeHint, GModelElementConstructor, ShapeTypeHint } from "@eclipse-glsp/server";
+import { GCallNode } from "./model/callNode.js";
 import { sharedImport } from "@mdeo/language-shared";
 import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import { GStartNode } from "./model/startNode.js";
@@ -45,6 +46,7 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
         mapping.set(ModelTransformationElementType.NODE_MATCH, GMatchNode);
         mapping.set(ModelTransformationElementType.NODE_SPLIT, GSplitNode);
         mapping.set(ModelTransformationElementType.NODE_MERGE, GMergeNode);
+        mapping.set(ModelTransformationElementType.NODE_CALL, GCallNode);
 
         mapping.set(ModelTransformationElementType.EDGE_CONTROL_FLOW, GControlFlowEdge);
         mapping.set(ModelTransformationElementType.NODE_CONTROL_FLOW_LABEL, GControlFlowLabelNode);
@@ -82,7 +84,8 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                     ModelTransformationElementType.NODE_END,
                     ModelTransformationElementType.NODE_MATCH,
                     ModelTransformationElementType.NODE_SPLIT,
-                    ModelTransformationElementType.NODE_MERGE
+                    ModelTransformationElementType.NODE_MERGE,
+                    ModelTransformationElementType.NODE_CALL
                 ]
             },
             {
@@ -116,6 +119,14 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_MERGE,
+                repositionable: true,
+                deletable: false,
+                resizable: false,
+                reparentable: false
+            },
+            {
+                // Calls are edited in the textual editor (stage 1 of callable transformations).
+                elementTypeId: ModelTransformationElementType.NODE_CALL,
                 repositionable: true,
                 deletable: false,
                 resizable: false,

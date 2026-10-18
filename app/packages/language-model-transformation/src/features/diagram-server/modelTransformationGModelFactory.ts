@@ -1,4 +1,5 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
+import { declaredClassOf } from "../transformationDeclarations.js";
 import {
     sharedImport,
     BaseGModelFactory,
@@ -25,7 +26,8 @@ import {
     PatternVariableReassignment,
     PatternObjectInstanceReference,
     PatternObjectInstanceDelete,
-    type PatternApplicationConditionType
+    type PatternApplicationConditionType,
+    type ObjectInstanceDeclarationType
 } from "../../grammar/modelTransformationTypes.js";
 import {
     ModelTransformationControlFlowConverter,
@@ -40,6 +42,7 @@ import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GMatchNode } from "./model/matchNode.js";
 import { GSplitNode } from "./model/splitNode.js";
+import { GCallNode } from "./model/callNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { GControlFlowEdge } from "./model/controlFlowEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
@@ -167,6 +170,11 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
             case "merge": {
                 await this.createMergeNode(graph, node.id);
+                break;
+            }
+            case "call": {
+                const metadata = this.getNodeMetadata(validatedMetadata, node.id);
+                graph.children.push(GCallNode.builder().id(node.id).text(node.text).meta(metadata).build());
                 break;
             }
         }
@@ -413,7 +421,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry,
         reference?: PatternObjectInstanceReferenceType
     ): GPatternInstanceNode {
-        const resolvedClassForRef = reference?.instance?.ref?.class?.ref as ClassType | undefined;
+        const resolvedClassForRef = declaredClassOf(this.modelState.languageServices, reference?.instance?.ref);
         const classHierarchyForRef =
             resolvedClassForRef != undefined
                 ? resolveClassChain(resolvedClassForRef, this.reflection).map((c) => c.name)
@@ -485,7 +493,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         metadata: NodeLayoutMetadata,
         deleteElement?: PatternObjectInstanceDeleteType
     ): GPatternInstanceNode {
-        const resolvedClassForDel = deleteElement?.instance?.ref?.class?.ref as ClassType | undefined;
+        const resolvedClassForDel = declaredClassOf(this.modelState.languageServices, deleteElement?.instance?.ref);
         const classHierarchyForDel =
             resolvedClassForDel != undefined
                 ? resolveClassChain(resolvedClassForDel, this.reflection).map((c) => c.name)
@@ -793,8 +801,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             edgeBuilder.targetProperty(targetProperty);
         }
 
-        const sourceClassType = sourceInstanceRef?.class?.ref as ClassType | undefined;
-        const targetClassType = targetInstanceRef?.class?.ref as ClassType | undefined;
+        const sourceClassType = declaredClassOf(this.modelState.languageServices, sourceInstanceRef);
+        const targetClassType = declaredClassOf(this.modelState.languageServices, targetInstanceRef);
 
         // Navigable association ends may declare a role name in the metamodel. A pattern link doesn't have to repeat
         // that name explicitly, so when the link's own DSL omits it, fall back to the resolved association
@@ -854,7 +862,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @returns The resolved node ID or undefined
      */
     private resolveInstanceNodeId(
-        instanceRef: PatternObjectInstanceType | undefined,
+        instanceRef: ObjectInstanceDeclarationType | undefined,
         idRegistry: ModelIdRegistry
     ): string | undefined {
         if (instanceRef == undefined) return undefined;

@@ -21,6 +21,121 @@ export interface TypedAst {
      */
 
     statements: TypedTransformationStatement[];
+
+    /**
+     * The signature, when the transformation declares one.
+     */
+    signature?: TypedTransformationSignature;
+
+    /**
+     * The typed ASTs of every transformation this one calls, directly or through its callees,
+     * by absolute file path. Only the root of a bundle has callees; the bundled ASTs have none
+     * of their own, so the engine finds every callee in the root's map.
+     */
+    callees?: Record<string, TypedAst>;
+}
+
+/**
+ * The signature of a callable transformation.
+ */
+export interface TypedTransformationSignature {
+    /**
+     * The name the transformation is called by.
+     */
+    name: string;
+
+    /**
+     * The parameters, in declaration order.
+     */
+    parameters: TypedTransformationParameter[];
+}
+
+/**
+ * A parameter of a signature.
+ */
+export interface TypedTransformationParameter {
+    /**
+     * The parameter's name; the engine binds it at the transformation's own scope level (1).
+     */
+    name: string;
+
+    /**
+     * `in` or `out`.
+     */
+    direction: "in" | "out";
+
+    /**
+     * Index into the types array for the parameter's type.
+     */
+    type: number;
+
+    /**
+     * Whether the parameter is a model element (a metamodel class) rather than a scalar.
+     */
+    isElement: boolean;
+
+    /**
+     * The default value of an optional input, evaluated in the callee before its first statement.
+     */
+    defaultValue?: TypedExpression;
+}
+
+/**
+ * A named argument of a call.
+ */
+export interface TypedTransformationCallArgument {
+    /**
+     * The callee parameter the argument is passed to.
+     */
+    name: string;
+
+    /**
+     * The value, evaluated in the caller before the call.
+     */
+    value: TypedExpression;
+}
+
+/**
+ * The binding of a callee output to a name of the caller.
+ */
+export interface TypedTransformationCallOutput {
+    /**
+     * The callee's `out` parameter.
+     */
+    parameter: string;
+
+    /**
+     * The caller's name the output is bound to, in the scope of the call (like the objects of a
+     * match).
+     */
+    name: string;
+}
+
+/**
+ * Call of another transformation.
+ */
+export interface TypedCallStatement extends TypedTransformationStatement {
+    kind: "call";
+
+    /**
+     * Absolute path of the callee's file, the key of its typed AST in the root's callees.
+     */
+    callee: string;
+
+    /**
+     * The callee's name, for messages.
+     */
+    name: string;
+
+    /**
+     * The arguments passed.
+     */
+    arguments: TypedTransformationCallArgument[];
+
+    /**
+     * The outputs bound.
+     */
+    outputs: TypedTransformationCallOutput[];
 }
 
 /**

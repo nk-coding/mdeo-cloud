@@ -1,6 +1,7 @@
 import { createInterface, createType, Optional, Ref, type ASTType, type BaseType } from "@mdeo/language-common";
 import { ExpressionConfig, generateExpressionTypes, TypeConfig, generateTypeTypes } from "@mdeo/language-expression";
 import { Class, Property } from "@mdeo/language-metamodel";
+import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 
 /**
@@ -64,11 +65,12 @@ export type PatternVariableType = ASTType<typeof PatternVariable>;
  * Format: name = expression
  *
  * Unlike {@link PatternVariable}, this does not declare a new variable; it updates the
- * value of an already-declared one. Like declarations, the reassignment is performed as
+ * value of an already-declared one: a `var` of an enclosing scope or an `out` parameter of the
+ * transformation's signature. Like declarations, the reassignment is performed as
  * part of the match, before any access in that match block.
  */
 export const PatternVariableReassignment = createInterface("PatternVariableReassignment").attrs({
-    variable: Ref(() => PatternVariable),
+    variable: Ref(() => AssignableVariable),
     value: BaseExpression
 });
 
@@ -113,7 +115,7 @@ export type PatternObjectInstanceType = ASTType<typeof PatternObjectInstance>;
  * Contains the instance reference and optional property assignments for constraints.
  */
 export const PatternObjectInstanceReference = createInterface("PatternObjectInstanceReference").attrs({
-    instance: Ref(PatternObjectInstance),
+    instance: Ref(() => ObjectInstanceDeclaration),
     properties: [PatternPropertyAssignment]
 });
 
@@ -128,7 +130,7 @@ export type PatternObjectInstanceReferenceType = ASTType<typeof PatternObjectIns
  * Format: delete nameOfTheNode
  */
 export const PatternObjectInstanceDelete = createInterface("PatternObjectDelete").attrs({
-    instance: Ref(() => PatternObjectInstance)
+    instance: Ref(() => ObjectInstanceDeclaration)
 });
 
 /**
@@ -141,7 +143,7 @@ export type PatternObjectInstanceDeleteType = ASTType<typeof PatternObjectInstan
  * References an object instance with optional property.
  */
 export const PatternLinkEnd = createInterface("PatternLinkEnd").attrs({
-    object: Ref(() => PatternObjectInstance),
+    object: Ref(() => ObjectInstanceDeclaration),
     property: Optional(Ref(() => Property))
 });
 
@@ -424,6 +426,124 @@ export const StopStatement = createInterface("StopStatement").extends(BaseTransf
 export type StopStatementType = ASTType<typeof StopStatement>;
 
 /**
+ * A parameter of a transformation's signature.
+ * Format: `in name: Type [= default]` or `out name: Type`
+ *
+ * An `in` parameter is bound before the transformation's first statement: a model element
+ * (a metamodel class type) is a bound object that patterns reference as `name { }`, a scalar
+ * (`int`, `long`, `float`, `double`, `string`, `boolean` or an enum) is a value for
+ * expressions. An `out` parameter starts as `null` and is assigned with `name = expression`
+ * inside a pattern; the caller binds it after a successful call.
+ */
+export const TransformationParameter = createInterface("TransformationParameter").attrs({
+    direction: String,
+    name: String,
+    type: typeTypes.baseTypeType,
+    defaultValue: Optional(BaseExpression)
+});
+
+/**
+ * Type representing a TransformationParameter AST node.
+ */
+export type TransformationParameterType = ASTType<typeof TransformationParameter>;
+
+/**
+ * The signature of a callable transformation.
+ * Format: `transformation name(param, ...)`
+ *
+ * A file with a signature can be imported and called from another transformation. A file
+ * without one behaves exactly as before (and cannot be called).
+ */
+export const TransformationSignature = createInterface("TransformationSignature").attrs({
+    name: String,
+    parameters: [TransformationParameter]
+});
+
+/**
+ * Type representing a TransformationSignature AST node.
+ */
+export type TransformationSignatureType = ASTType<typeof TransformationSignature>;
+
+/**
+ * A named argument of a call.
+ * Format: `parameter = expression`
+ */
+export const CallArgument = createInterface("CallArgument").attrs({
+    parameter: Ref(() => TransformationParameter),
+    value: BaseExpression
+});
+
+/**
+ * Type representing a CallArgument AST node.
+ */
+export type CallArgumentType = ASTType<typeof CallArgument>;
+
+/**
+ * The binding of a callee's `out` parameter to a new name of the caller.
+ * Format: `parameter: name`
+ *
+ * The name is bound after the call as if a match had bound it: an element output is an
+ * object that later patterns reference as `name { }`, a scalar output is a value.
+ */
+export const CallOutput = createInterface("CallOutput").attrs({
+    parameter: Ref(() => TransformationParameter),
+    name: String
+});
+
+/**
+ * Type representing a CallOutput AST node.
+ */
+export type CallOutputType = ASTType<typeof CallOutput>;
+
+/**
+ * Call of another transformation.
+ * Format: `call name(argument, ...) [-> (output, ...)]`
+ *
+ * The callee runs on the same model with its inputs bound. A callee that fails (a `match`
+ * that does not match, or `kill`) fails the call, and so the calling transformation; `stop` in
+ * the callee only returns from the callee.
+ */
+export const CallStatement = createInterface("CallStatement")
+    .extends(BaseTransformationStatement)
+    .attrs({
+        callee: Ref(() => TransformationSignature),
+        arguments: [CallArgument],
+        outputs: [CallOutput]
+    });
+
+/**
+ * Type representing a CallStatement AST node.
+ */
+export type CallStatementType = ASTType<typeof CallStatement>;
+
+/**
+ * Everything a pattern can reference as an object (`name { }`, `delete name`, link ends):
+ * object instances of patterns, element parameters of the signature and element outputs of
+ * calls.
+ */
+export const ObjectInstanceDeclaration = createType("ObjectInstanceDeclaration").types(
+    PatternObjectInstance,
+    TransformationParameter,
+    CallOutput
+);
+
+/**
+ * Type representing an ObjectInstanceDeclaration AST node.
+ */
+export type ObjectInstanceDeclarationType = ASTType<typeof ObjectInstanceDeclaration>;
+
+/**
+ * Everything a reassignment (`name = expression`) can assign: pattern variables and the
+ * `out` parameters of the signature.
+ */
+export const AssignableVariable = createType("AssignableVariable").types(PatternVariable, TransformationParameter);
+
+/**
+ * Type representing an AssignableVariable AST node.
+ */
+export type AssignableVariableType = ASTType<typeof AssignableVariable>;
+
+/**
  * Union of all transformation statement types.
  */
 export const TransformationStatement: BaseType<AstNode> = createType("TransformationStatement").types(
@@ -434,7 +554,8 @@ export const TransformationStatement: BaseType<AstNode> = createType("Transforma
     ForMatchStatement,
     IfExpressionStatement,
     WhileExpressionStatement,
-    StopStatement
+    StopStatement,
+    CallStatement
 );
 
 /**
@@ -493,11 +614,39 @@ export const MetamodelFileImport = createInterface("MetamodelFileImport").attrs(
 export type MetamodelFileImportType = ASTType<typeof MetamodelFileImport>;
 
 /**
+ * File scoping configuration for transformations imported by other transformations.
+ */
+export const transformationFileScopingConfig = new FileScopingConfig<TransformationSignatureType>(
+    "Transformation",
+    TransformationSignature
+);
+
+/**
+ * Import types for transformations: `import { name [as alias], ... } from "./file.mt"`.
+ */
+export const { importType: TransformationImport, fileImportType: TransformationFileImport } = generateImportTypes(
+    transformationFileScopingConfig
+);
+
+/**
+ * Type representing a TransformationImport AST node.
+ */
+export type TransformationImportType = ASTType<typeof TransformationImport>;
+
+/**
+ * Type representing a TransformationFileImport AST node.
+ */
+export type TransformationFileImportType = ASTType<typeof TransformationFileImport>;
+
+/**
  * Model Transformation root interface.
- * Contains metamodel import and transformation statements.
+ * Contains the metamodel import, imports of other transformations, the optional signature and
+ * the transformation statements.
  */
 export const ModelTransformation = createInterface("ModelTransformation").attrs({
     import: MetamodelFileImport,
+    imports: [TransformationFileImport],
+    signature: Optional(TransformationSignature),
     statements: [TransformationStatement]
 });
 

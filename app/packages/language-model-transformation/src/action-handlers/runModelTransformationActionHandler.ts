@@ -15,6 +15,7 @@ import { sharedImport, type ActionHandler, resolveRelativePath, buildFileSelectT
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import type { ExtendedLangiumSharedServices } from "@mdeo/language-common";
 import type { ModelTransformationType } from "../grammar/modelTransformationTypes.js";
+import { requiredInputs } from "../features/transformationDeclarations.js";
 import type { ModelType } from "@mdeo/language-model";
 
 const { URI } = sharedImport("langium");
@@ -80,6 +81,11 @@ export class RunModelTransformationActionHandler implements ActionHandler {
         const validationError = this.checkValidationErrors(URI.parse(data.uri).toString());
         if (validationError != undefined) {
             return this.createErrorPage(validationError);
+        }
+
+        const requiredInputsError = this.checkRequiredInputs(data.uri);
+        if (requiredInputsError != undefined) {
+            return this.createErrorPage(requiredInputsError);
         }
 
         const metamodelUri = await this.getTransformationMetamodelUri(data.uri);
@@ -171,6 +177,27 @@ export class RunModelTransformationActionHandler implements ActionHandler {
      * @param uri URI of the transformation file
      * @returns Absolute URI of the metamodel, or undefined if not found
      */
+    /**
+     * Checks that the transformation can run on its own: a transformation with required inputs
+     * only runs when another transformation calls it with arguments.
+     *
+     * @param uri The transformation's URI
+     * @returns A message explaining why it cannot run, or undefined
+     */
+    private checkRequiredInputs(uri: string): string | undefined {
+        const document = this.sharedServices.workspace.LangiumDocuments.getDocument(URI.parse(uri));
+        const root = document?.parseResult.value as ModelTransformationType | undefined;
+        const required = requiredInputs(root?.signature);
+        if (required.length === 0) {
+            return undefined;
+        }
+        const names = required.map((p) => `'${p.name}'`).join(", ");
+        return (
+            `'${root?.signature?.name}' has required input${required.length > 1 ? "s" : ""} ${names}, so it cannot run on its own. ` +
+            `Call it from another transformation with 'call ${root?.signature?.name}(…)', or give ${required.length > 1 ? "these inputs defaults" : "the input a default"}.`
+        );
+    }
+
     private async getTransformationMetamodelUri(uri: string): Promise<string | undefined> {
         const parsedUri = URI.parse(uri);
         const document = this.sharedServices.workspace.LangiumDocuments.getDocument(parsedUri);

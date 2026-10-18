@@ -16,7 +16,7 @@ import {
 } from "@mdeo/language-common";
 import { generateExpressionRules, generateTypeRules, type BaseExpressionType } from "@mdeo/language-expression";
 import { Class, Property } from "@mdeo/language-metamodel";
-import { LeadingTrailing, manySep } from "@mdeo/language-shared";
+import { generateImportRules, LeadingTrailing, manySep } from "@mdeo/language-shared";
 import {
     ModelTransformation,
     MetamodelFileImport,
@@ -51,7 +51,17 @@ import {
     type ModelTransformationType,
     BaseTransformationStatement,
     PatternObjectInstanceReference,
-    PatternApplicationCondition
+    PatternApplicationCondition,
+    TransformationParameter,
+    TransformationSignature,
+    CallArgument,
+    CallOutput,
+    CallStatement,
+    TransformationImport,
+    TransformationFileImport,
+    transformationFileScopingConfig,
+    AssignableVariable,
+    ObjectInstanceDeclaration
 } from "./modelTransformationTypes.js";
 
 /**
@@ -137,7 +147,7 @@ export function generateModelTransformationRules(): {
      */
     const PatternVariableReassignmentRule = createRule("PatternVariableReassignmentRule")
         .returns(PatternVariableReassignment)
-        .as(({ set }) => [set("variable", ref(PatternVariable, ID)), "=", set("value", ExpressionRule)]);
+        .as(({ set }) => [set("variable", ref(AssignableVariable, ID)), "=", set("value", ExpressionRule)]);
 
     /**
      * Pattern property assignment rule.
@@ -186,7 +196,7 @@ export function generateModelTransformationRules(): {
     const PatternObjectInstanceReferenceRule = createRule("PatternObjectInstanceReferenceRule")
         .returns(PatternObjectInstanceReference)
         .as(({ set, add }) => [
-            set("instance", ref(PatternObjectInstance, ID)),
+            set("instance", ref(ObjectInstanceDeclaration, ID)),
             "{",
             many(or(add("properties", PatternPropertyAssignmentRule), NEWLINE)),
             "}"
@@ -199,7 +209,7 @@ export function generateModelTransformationRules(): {
      */
     const PatternObjectDeleteRule = createRule("PatternObjectDeleteRule")
         .returns(PatternObjectInstanceDelete)
-        .as(({ set }) => ["delete", set("instance", ref(PatternObjectInstance, ID))]);
+        .as(({ set }) => ["delete", set("instance", ref(ObjectInstanceDeclaration, ID))]);
 
     /**
      * Pattern link end rule.
@@ -208,7 +218,7 @@ export function generateModelTransformationRules(): {
     const PatternLinkEndRule = createRule("PatternLinkEndRule")
         .returns(PatternLinkEnd)
         .as(({ set }) => [
-            set("object", ref(PatternObjectInstance, ID)),
+            set("object", ref(ObjectInstanceDeclaration, ID)),
             optional(group(".", set("property", ref(Property, ID))))
         ]);
 
@@ -433,6 +443,37 @@ export function generateModelTransformationRules(): {
         .as(({ set }) => [or(set("keyword", "kill"), set("keyword", "stop"))]);
 
     /**
+     * Call argument rule.
+     * Format: parameter = expression
+     */
+    const CallArgumentRule = createRule("CallArgumentRule")
+        .returns(CallArgument)
+        .as(({ set }) => [set("parameter", ref(TransformationParameter, ID)), "=", set("value", ExpressionRule)]);
+
+    /**
+     * Call output rule.
+     * Format: parameter: name
+     */
+    const CallOutputRule = createRule("CallOutputRule")
+        .returns(CallOutput)
+        .as(({ set }) => [set("parameter", ref(TransformationParameter, ID)), ":", set("name", ID)]);
+
+    /**
+     * Call statement rule.
+     * Format: call name(argument, ...) [-> (output, ...)]
+     */
+    const CallStatementRule = createRule("CallStatementRule")
+        .returns(CallStatement)
+        .as(({ set, add }) => [
+            "call",
+            set("callee", ref(TransformationSignature, ID)),
+            "(",
+            ...manySep(add("arguments", CallArgumentRule), ",", LeadingTrailing.TRAILING),
+            ")",
+            optional(group("->", "(", ...manySep(add("outputs", CallOutputRule), ",", LeadingTrailing.TRAILING), ")"))
+        ]);
+
+    /**
      * Statement rule containing transformation statements.
      */
     const StatementRule = createRule("StatementRule")
@@ -446,9 +487,49 @@ export function generateModelTransformationRules(): {
                 ForMatchStatementRule,
                 IfExpressionStatementRule,
                 WhileExpressionStatementRule,
-                StopStatementRule
+                StopStatementRule,
+                CallStatementRule
             )
         ]);
+
+    /**
+     * Transformation parameter rule.
+     * Format: in name: Type [= default] | out name: Type
+     */
+    const TransformationParameterRule = createRule("TransformationParameterRule")
+        .returns(TransformationParameter)
+        .as(({ set }) => [
+            or(set("direction", "in"), set("direction", "out")),
+            set("name", ID),
+            ":",
+            set("type", TypeRule),
+            optional(group("=", set("defaultValue", ExpressionRule)))
+        ]);
+
+    /**
+     * Transformation signature rule.
+     * Format: transformation name(parameter, ...)
+     */
+    const TransformationSignatureRule = createRule("TransformationSignatureRule")
+        .returns(TransformationSignature)
+        .as(({ set, add }) => [
+            "transformation",
+            set("name", ID),
+            "(",
+            ...manySep(add("parameters", TransformationParameterRule), ",", LeadingTrailing.TRAILING),
+            ")"
+        ]);
+
+    /**
+     * Rule for imports of other transformations.
+     * Format: import { name [as alias], ... } from "./file.mt"
+     */
+    const { fileImportRule: TransformationFileImportRule } = generateImportRules(
+        transformationFileScopingConfig,
+        TransformationImport,
+        TransformationFileImport,
+        ID
+    );
 
     /**
      * Metamodel file import rule.
@@ -460,12 +541,16 @@ export function generateModelTransformationRules(): {
 
     /**
      * Root rule for Model Transformation language.
+     * Format: using "metamodel", then imports of other transformations, then the optional
+     * signature, then the statements.
      */
     const ModelTransformationRule = createRule("ModelTransformationRule")
         .returns(ModelTransformation)
         .as(({ add, set }) => [
             many(NEWLINE),
             set("import", MetamodelFileImportRule),
+            many(or(add("imports", TransformationFileImportRule), NEWLINE)),
+            optional(set("signature", TransformationSignatureRule)),
             many(or(add("statements", StatementRule), NEWLINE))
         ]);
 

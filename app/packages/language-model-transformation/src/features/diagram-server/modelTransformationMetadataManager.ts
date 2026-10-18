@@ -11,6 +11,7 @@ import {
     NodeLayoutMetadataUtil,
     EdgeLayoutMetadataUtil
 } from "@mdeo/language-shared";
+import { asPatternObjectInstance } from "../transformationDeclarations.js";
 import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import type {
     ModelTransformationType,
@@ -65,6 +66,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
             model.type === ModelTransformationElementType.NODE_END ||
             model.type === ModelTransformationElementType.NODE_SPLIT ||
             model.type === ModelTransformationElementType.NODE_MERGE ||
+            model.type === ModelTransformationElementType.NODE_CALL ||
             model.type === ModelTransformationElementType.NODE_PATTERN_INSTANCE
         ) {
             return NodeLayoutMetadataUtil.verify(model.meta, 250);
@@ -175,6 +177,9 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 break;
             case "merge":
                 nodes[node.id] = { type: ModelTransformationElementType.NODE_MERGE, attrs: {} };
+                break;
+            case "call":
+                nodes[node.id] = { type: ModelTransformationElementType.NODE_CALL, attrs: {} };
                 break;
         }
     }
@@ -324,7 +329,7 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
 
             for (const [instanceName, deleteElement] of deletedInstanceNodes) {
                 if (!localInstances.has(instanceName)) {
-                    const referencedInstance = deleteElement.instance?.ref;
+                    const referencedInstance = asPatternObjectInstance(this.reflection, deleteElement.instance?.ref);
                     const typeName = referencedInstance?.class?.$refText ?? referencedInstance?.class?.ref?.name;
 
                     const delNodeId = idRegistry.getId(deleteElement);

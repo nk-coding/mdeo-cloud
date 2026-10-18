@@ -1,4 +1,5 @@
 import type { GNode, ModelState, GModelIndex, CreateEdgeResult } from "@mdeo/language-shared";
+import { declaredClassOf } from "../../transformationDeclarations.js";
 import {
     BaseCreateEdgeOperationHandler,
     sharedImport,
@@ -251,7 +252,7 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
             const instance = ref.instance?.ref;
             if (!instance) return undefined;
             const name = registry?.getName(instance as AstNode) ?? instance.name;
-            const classType = instance.class?.ref as ClassType | undefined;
+            const classType = declaredClassOf(this.localModelState.languageServices, instance);
             const pattern = ref.$container as LinkContainer;
             if (!name || !classType) return undefined;
             return { name, classType, modifier: PatternModifierKind.NONE, pattern };
@@ -262,7 +263,7 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
             const instance = del.instance?.ref;
             if (!instance) return undefined;
             const name = registry?.getName(instance as AstNode) ?? instance.name;
-            const classType = instance.class?.ref as ClassType | undefined;
+            const classType = declaredClassOf(this.localModelState.languageServices, instance);
             const pattern = del.$container as LinkContainer;
             if (!name || !classType) return undefined;
             return { name, classType, modifier: PatternModifierKind.DELETE, pattern };

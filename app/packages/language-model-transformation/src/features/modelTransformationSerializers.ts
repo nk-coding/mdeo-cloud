@@ -2,7 +2,7 @@ import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
 import type { Doc } from "prettier";
 import { ID, STRING } from "@mdeo/language-common";
-import { serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
+import { registerImportSerializers, serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
 import {
     PatternModifier,
     StopStatement,
@@ -59,7 +59,19 @@ import {
     type PatternObjectInstanceReferenceType,
     PatternObjectInstanceReference,
     PatternApplicationCondition,
-    type PatternApplicationConditionType
+    type PatternApplicationConditionType,
+    TransformationParameter,
+    TransformationSignature,
+    CallArgument,
+    CallOutput,
+    CallStatement,
+    TransformationImport,
+    TransformationFileImport,
+    type TransformationParameterType,
+    type TransformationSignatureType,
+    type CallArgumentType,
+    type CallOutputType,
+    type CallStatementType
 } from "../grammar/modelTransformationTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -129,6 +141,13 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(LambdaParameter, (ctx) => printLambdaParameter(ctx));
     AstSerializer.registerNodeSerializer(LambdaParameters, (ctx) => printLambdaParameters(ctx));
     AstSerializer.registerNodeSerializer(LambdaExpression, (ctx) => printLambdaExpression(ctx));
+
+    AstSerializer.registerNodeSerializer(TransformationParameter, (ctx) => printTransformationParameter(ctx));
+    AstSerializer.registerNodeSerializer(TransformationSignature, (ctx) => printTransformationSignature(ctx));
+    AstSerializer.registerNodeSerializer(CallArgument, (ctx) => printCallArgument(ctx));
+    AstSerializer.registerNodeSerializer(CallOutput, (ctx) => printCallOutput(ctx));
+    AstSerializer.registerNodeSerializer(CallStatement, (ctx) => printCallStatement(ctx));
+    registerImportSerializers(services, doc.builders, TransformationImport, TransformationFileImport);
 
     AstSerializer.registerNodeSerializer(MetamodelFileImport, (ctx) => printMetamodelFileImport(ctx));
     AstSerializer.registerNodeSerializer(ModelTransformation, (ctx) => printModelTransformation(ctx));
@@ -537,12 +556,114 @@ function printMetamodelFileImport(context: PrintContext<MetamodelFileImportType>
  * @param context The print context.
  * @returns The formatted model transformation.
  */
+/**
+ * Prints a parameter of a signature.
+ *
+ * @param context The print context.
+ * @returns The formatted parameter, e.g. `in maxCandidates: int = 0`.
+ */
+function printTransformationParameter(context: PrintContext<TransformationParameterType>): Doc {
+    const { ctx, printPrimitive, getPrimitive, path, print } = context;
+    const docs: Doc[] = [ctx.direction ?? "in", " ", printPrimitive(getPrimitive(ctx, "name"), ID), ": "];
+    docs.push(path.call(print, "type"));
+    if (ctx.defaultValue != undefined) {
+        docs.push(" = ", path.call(print, "defaultValue"));
+    }
+    return docs;
+}
+
+/**
+ * Prints a signature, breaking the parameter list over lines when it does not fit.
+ *
+ * @param context The print context.
+ * @returns The formatted signature.
+ */
+function printTransformationSignature(context: PrintContext<TransformationSignatureType>): Doc {
+    const { ctx, printPrimitive, getPrimitive, path, print } = context;
+    return group([
+        "transformation ",
+        printPrimitive(getPrimitive(ctx, "name"), ID),
+        printParenthesizedList(path.map(print, "parameters"))
+    ]);
+}
+
+/**
+ * Prints a comma-separated list in parentheses that breaks one item per line when it does not
+ * fit on the line.
+ *
+ * @param items The printed items.
+ * @returns The formatted list.
+ */
+function printParenthesizedList(items: Doc[]): Doc {
+    if (items.length === 0) {
+        return "()";
+    }
+    return group(["(", indent([softline, join([",", line], items)]), softline, ")"]);
+}
+
+/**
+ * Prints a call argument.
+ *
+ * @param context The print context.
+ * @returns The formatted argument, e.g. `moved = m`.
+ */
+function printCallArgument(context: PrintContext<CallArgumentType>): Doc {
+    const { path, print, printReference } = context;
+    return [path.call((ref) => printReference(ref, ID), "parameter"), " = ", path.call(print, "value")];
+}
+
+/**
+ * Prints a call output.
+ *
+ * @param context The print context.
+ * @returns The formatted output, e.g. `moved: m`.
+ */
+function printCallOutput(context: PrintContext<CallOutputType>): Doc {
+    const { ctx, path, printReference, printPrimitive, getPrimitive } = context;
+    return [
+        path.call((ref) => printReference(ref, ID), "parameter"),
+        ": ",
+        printPrimitive(getPrimitive(ctx, "name"), ID)
+    ];
+}
+
+/**
+ * Prints a call statement.
+ *
+ * @param context The print context.
+ * @returns The formatted call, e.g. `call moveComponent(maxCandidates = 2) -> (moved: m)`.
+ */
+function printCallStatement(context: PrintContext<CallStatementType>): Doc {
+    const { ctx, path, print, printReference } = context;
+    const docs: Doc[] = [
+        "call ",
+        path.call((ref) => printReference(ref, ID), "callee"),
+        printParenthesizedList(path.map(print, "arguments"))
+    ];
+    if ((ctx.outputs ?? []).length > 0) {
+        docs.push(" -> ", printParenthesizedList(path.map(print, "outputs")));
+    }
+    return group(docs);
+}
+
 function printModelTransformation(context: PrintContext<ModelTransformationType>): Doc {
-    const { path, print } = context;
+    const { ctx, path, print } = context;
     const docs: Doc[] = [];
 
     docs.push(path.call(print, "import"));
     docs.push(hardline);
+
+    if ((ctx.imports ?? []).length > 0) {
+        docs.push(hardline);
+        docs.push(join(hardline, path.map(print, "imports")));
+        docs.push(hardline);
+    }
+
+    if (ctx.signature != undefined) {
+        docs.push(hardline);
+        docs.push(path.call(print, "signature"));
+        docs.push(hardline);
+    }
 
     const content = serializeNewlineSep(context, ["statements"], doc.builders);
     if (content.length > 0) {

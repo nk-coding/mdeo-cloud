@@ -1,4 +1,5 @@
 import type { CreateEdgeSchema } from "@mdeo/protocol-common";
+import { declaredClassOf } from "../transformationDeclarations.js";
 import type { ModelState, GModelIndex } from "@mdeo/language-shared";
 import {
     CreateEdgeSchemaResolver,
@@ -276,14 +277,14 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
 
         if (reflection.isInstance(astNode, PatternObjectInstanceReference)) {
             const ref = astNode as PatternObjectInstanceReferenceType;
-            const classType = ref.instance?.ref?.class?.ref as ClassType | undefined;
+            const classType = declaredClassOf(this.modelState.languageServices, ref.instance?.ref);
             if (!classType) return undefined;
             return { classType, modifier: effectivePatternModifier(ref, reflection), declaration: astNode };
         }
 
         if (reflection.isInstance(astNode, PatternObjectInstanceDelete)) {
             const del = astNode as PatternObjectInstanceDeleteType;
-            const classType = del.instance?.ref?.class?.ref as ClassType | undefined;
+            const classType = declaredClassOf(this.modelState.languageServices, del.instance?.ref);
             if (!classType) return undefined;
             return { classType, modifier: PatternModifierKind.DELETE, declaration: astNode };
         }

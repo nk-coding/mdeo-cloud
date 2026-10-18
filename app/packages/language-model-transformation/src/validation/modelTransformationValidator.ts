@@ -17,6 +17,9 @@ import {
     PatternObjectInstanceReference,
     PatternVariable,
     PatternApplicationCondition,
+    CallStatement,
+    type CallStatementType,
+    type PatternVariableReassignmentType,
     type ModelTransformationType,
     type PatternObjectInstanceType,
     type PatternObjectInstanceReferenceType,
@@ -34,6 +37,8 @@ import {
     type PatternApplicationConditionType
 } from "../grammar/modelTransformationTypes.js";
 import { climbsAboveProjectRoot, resolveRelativeDocument, sharedImport } from "@mdeo/language-shared";
+import { TransformationCallValidator } from "./transformationCallValidator.js";
+import { TransformationDeclarationResolver, asPatternObjectInstance } from "../features/transformationDeclarations.js";
 
 const { MultiMap, AstUtils } = sharedImport("langium");
 
@@ -51,7 +56,7 @@ export const ModelTransformationIssueCodes = {
 interface NamedElement {
     name: string;
     node: AstNode;
-    type: "object" | "variable";
+    type: "object" | "variable" | "parameter" | "call output";
 }
 
 /**
@@ -65,6 +70,8 @@ interface ModelTransformationAstTypes {
     PatternObjectDelete: PatternObjectInstanceDeleteType;
     PatternLink: PatternLinkType;
     StatementsScope: StatementsScopeType;
+    CallStatement: CallStatementType;
+    PatternVariableReassignment: PatternVariableReassignmentType;
 }
 
 /**
@@ -83,7 +90,9 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
         PatternObjectInstanceReference: validator.validateObjectInstanceReference.bind(validator),
         PatternObjectDelete: validator.validateObjectInstanceDelete.bind(validator),
         PatternLink: validator.validateLink.bind(validator),
-        StatementsScope: validator.validateStatementsScopeDeadCode.bind(validator)
+        StatementsScope: validator.validateStatementsScopeDeadCode.bind(validator),
+        CallStatement: validator.callValidator.validateCall.bind(validator.callValidator),
+        PatternVariableReassignment: validator.callValidator.validateReassignment.bind(validator.callValidator)
     };
 
     registry.register(checks, validator);
@@ -99,8 +108,23 @@ export class ModelTransformationValidator extends BaseModelValidator {
      *
      * @param services The extended Langium services providing workspace, reflection, and document access
      */
+    /**
+     * Validator for signatures, imports and calls.
+     */
+    readonly callValidator: TransformationCallValidator;
+
+    /**
+     * Resolver for the classes of parameters and call outputs.
+     */
+    private readonly declarations: TransformationDeclarationResolver;
+
     constructor(private readonly services: ExtendedLangiumServices) {
         super(services.shared.AstReflection);
+        this.callValidator = new TransformationCallValidator(services);
+        this.declarations = new TransformationDeclarationResolver(
+            services.shared.AstReflection,
+            services.shared.workspace.LangiumDocuments
+        );
     }
 
     /**
@@ -111,6 +135,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
      */
     validateTransformation(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
         this.validateMetamodelImport(transformation, accept);
+        this.callValidator.validateTransformation(transformation, accept);
 
         const allNames = new MultiMap<string, NamedElement>();
         this.collectAllNames(transformation, allNames);
@@ -179,6 +204,11 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * @param names The multimap to add collected names to
      */
     private collectAllNames(transformation: ModelTransformationType, names: MultiMapType<string, NamedElement>): void {
+        for (const parameter of transformation.signature?.parameters ?? []) {
+            if (parameter.name) {
+                names.add(parameter.name, { name: parameter.name, node: parameter, type: "parameter" });
+            }
+        }
         for (const statement of transformation.statements ?? []) {
             this.collectNamesFromStatement(statement, names);
         }
@@ -208,6 +238,12 @@ export class ModelTransformationValidator extends BaseModelValidator {
             this.collectNamesFromIfExpressionStatement(statement, names);
         } else if (this.reflection.isInstance(statement, WhileExpressionStatement)) {
             this.collectNamesFromWhileExpressionStatement(statement, names);
+        } else if (this.reflection.isInstance(statement, CallStatement)) {
+            for (const output of statement.outputs ?? []) {
+                if (output.name) {
+                    names.add(output.name, { name: output.name, node: output, type: "call output" });
+                }
+            }
         }
     }
 
@@ -655,8 +691,12 @@ export class ModelTransformationValidator extends BaseModelValidator {
     validateObjectInstanceReference(ref: PatternObjectInstanceReferenceType, accept: ValidationAcceptor): void {
         this.validateNoDuplicatePatternPropertyAssignments(ref.properties, accept);
 
-        const instance = ref.instance?.ref;
-        if (!instance) {
+        const declaration = ref.instance?.ref;
+        if (!declaration || this.callValidator.validateNodeReference(ref, "instance", declaration, accept)) {
+            return;
+        }
+        const instance = asPatternObjectInstance(this.reflection, declaration);
+        if (instance == undefined) {
             return;
         }
 
@@ -671,8 +711,12 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * @param accept The validation acceptor
      */
     validateObjectInstanceDelete(del: PatternObjectInstanceDeleteType, accept: ValidationAcceptor): void {
-        const instance = del.instance?.ref;
-        if (!instance) {
+        const declaration = del.instance?.ref;
+        if (!declaration || this.callValidator.validateNodeReference(del, "instance", declaration, accept)) {
+            return;
+        }
+        const instance = asPatternObjectInstance(this.reflection, declaration);
+        if (instance == undefined) {
             return;
         }
 
@@ -757,33 +801,36 @@ export class ModelTransformationValidator extends BaseModelValidator {
             return;
         }
 
-        const sourceObj = source.object.ref as PatternObjectInstanceType;
-        const targetObj = target.object.ref as PatternObjectInstanceType;
+        const sourceDeclaration = source.object.ref;
+        const targetDeclaration = target.object.ref;
+        const sourceIsParameter = this.callValidator.validateNodeReference(source, "object", sourceDeclaration, accept);
+        const targetIsParameter = this.callValidator.validateNodeReference(target, "object", targetDeclaration, accept);
 
-        this.validateLinkBase(link, sourceObj, targetObj, accept);
-        this.validateConditionalLinkEndpoints(link, sourceObj, targetObj, accept);
-    }
+        this.validateLinkBase(
+            link,
+            { class: { ref: this.declarations.getDeclaredClass(sourceDeclaration) } },
+            { class: { ref: this.declarations.getDeclaredClass(targetDeclaration) } },
+            accept
+        );
 
-    /**
-     * Validates that both endpoints of a pattern link have a modifier compatible with the link's own modifier.
-     *
-     * Rules:
-     * - A link with modifier X may only connect to instances that have no modifier or modifier X.
-     * - A link with no modifier may only connect to instances that have no modifier.
-     *
-     * @param link The pattern link being validated
-     * @param sourceObj The resolved source object instance
-     * @param targetObj The resolved target object instance
-     * @param accept The validation acceptor
-     */
-    private validateConditionalLinkEndpoints(
-        link: PatternLinkType,
-        sourceObj: PatternObjectInstanceType,
-        targetObj: PatternObjectInstanceType,
-        accept: ValidationAcceptor
-    ): void {
-        this.validateLinkEndpointModifierCompatibility(link, sourceObj, "source", accept);
-        this.validateLinkEndpointModifierCompatibility(link, targetObj, "target", accept);
+        // Parameters and call outputs are bound nodes without a modifier, like references to
+        // the objects of earlier matches.
+        if (!sourceIsParameter) {
+            this.validateLinkEndpointModifierCompatibility(
+                link,
+                sourceDeclaration as PatternObjectInstanceType,
+                "source",
+                accept
+            );
+        }
+        if (!targetIsParameter) {
+            this.validateLinkEndpointModifierCompatibility(
+                link,
+                targetDeclaration as PatternObjectInstanceType,
+                "target",
+                accept
+            );
+        }
     }
 
     /**

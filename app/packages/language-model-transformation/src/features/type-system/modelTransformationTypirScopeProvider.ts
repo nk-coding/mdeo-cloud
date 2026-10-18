@@ -41,7 +41,11 @@ import {
     PatternObjectInstance,
     PatternVariable,
     PatternApplicationCondition,
-    type PatternApplicationConditionType
+    type PatternApplicationConditionType,
+    CallStatement,
+    type CallStatementType,
+    type CallOutputType,
+    type TransformationParameterType
 } from "../../grammar/modelTransformationTypes.js";
 import { ModelTransformationLambdaScope } from "./modelTransformationLambdaScope.js";
 
@@ -151,7 +155,8 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
 
     /**
      * Creates a scope for the root ModelTransformation node.
-     * This scope contains all top-level pattern matches and their variables.
+     * This scope contains the parameters of the signature, all top-level pattern matches and
+     * their variables, and the outputs of top-level calls.
      *
      * @param node The ModelTransformation node.
      * @param parentScope The parent scope.
@@ -162,13 +167,19 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         parentScope: BoundScope<TypirLangiumSpecifics> | undefined
     ): Scope<TypirLangiumSpecifics> {
         const enumInfos = this.extractEnumInfos(node);
+        const parameters = node.signature?.parameters ?? [];
         return new DefaultScope<TypirLangiumSpecifics>(
             parentScope,
             (scope) => [
+                ...parameters.map((parameter) => this.createParameterEntry(parameter, scope)),
                 ...this.getStatementsScopeEntries(node, scope),
                 ...this.getEnumContainerScopeEntries(enumInfos, scope)
             ],
-            [...this.getStatementsScopeInitializations(node), ...this.getEnumContainerInitializations(enumInfos)],
+            [
+                ...parameters.map((parameter) => ({ name: parameter.name, position: -1 })),
+                ...this.getStatementsScopeInitializations(node),
+                ...this.getEnumContainerInitializations(enumInfos)
+            ],
             node
         );
     }
@@ -272,6 +283,10 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
                 this.reflection.isInstance(statement, UntilMatchStatement)
             ) {
                 this.collectPatternEntries(statement.pattern, i, scope, entries);
+            } else if (this.reflection.isInstance(statement, CallStatement)) {
+                for (const output of (statement as CallStatementType).outputs ?? []) {
+                    entries.push(this.createCallOutputEntry(output, i, scope));
+                }
             }
         }
         return entries;
@@ -295,6 +310,10 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
                 this.reflection.isInstance(statement, UntilMatchStatement)
             ) {
                 this.collectPatternInitializations(statement.pattern, i, initializations);
+            } else if (this.reflection.isInstance(statement, CallStatement)) {
+                for (const output of (statement as CallStatementType).outputs ?? []) {
+                    initializations.push({ name: output.name, position: i });
+                }
             }
         }
 
@@ -574,6 +593,51 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             languageNode: instance,
             definingScope: scope,
             inferType: () => this.inference.inferType(instance)
+        };
+    }
+
+    /**
+     * Creates a scope entry for a parameter of the signature. Parameters are visible in the
+     * whole transformation, at the transformation's own level (where the engine binds them
+     * before the first statement).
+     *
+     * @param parameter The parameter node.
+     * @param scope The transformation scope.
+     * @returns A scope entry for the parameter.
+     */
+    private createParameterEntry(
+        parameter: TransformationParameterType,
+        scope: Scope<TypirLangiumSpecifics>
+    ): ScopeEntry<TypirLangiumSpecifics> {
+        return {
+            name: parameter.name,
+            position: -1,
+            languageNode: parameter,
+            definingScope: scope,
+            inferType: () => this.inference.inferType(parameter)
+        };
+    }
+
+    /**
+     * Creates a scope entry for an output of a call. Like the objects of a match, an output is
+     * visible to the statements after the call.
+     *
+     * @param output The call output node.
+     * @param position The position of the call in its block.
+     * @param scope The block's scope.
+     * @returns A scope entry for the output.
+     */
+    private createCallOutputEntry(
+        output: CallOutputType,
+        position: number,
+        scope: Scope<TypirLangiumSpecifics>
+    ): ScopeEntry<TypirLangiumSpecifics> {
+        return {
+            name: output.name,
+            position,
+            languageNode: output,
+            definingScope: scope,
+            inferType: () => this.inference.inferType(output)
         };
     }
 

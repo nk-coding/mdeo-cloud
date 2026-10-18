@@ -23,7 +23,6 @@ import {
     registerTypeSerializers,
     generateExpressionRuleOverride,
     type DocumentPackageCacheService,
-    ExpressionHoverProvider,
     ExpressionReferenceDescriptionProvider
 } from "@mdeo/language-expression";
 import type { TypirLangiumSpecifics } from "typir-langium";
@@ -39,6 +38,8 @@ import { ModelTransformationTypeSystem } from "./features/type-system/modelTrans
 import { ModelTransformationTypirScopeProvider } from "./features/type-system/modelTransformationTypirScopeProvider.js";
 import { registerModelTransformationSerializers } from "./features/modelTransformationSerializers.js";
 import { ModelTransformationExternalReferenceCollector } from "./features/modelTransformationExternalReferenceCollector.js";
+import { ModelTransformationLinker } from "./features/modelTransformationLinker.js";
+import { ModelTransformationHoverProvider } from "./features/modelTransformationHoverProvider.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 import { RunModelTransformationActionHandler } from "./action-handlers/runModelTransformationActionHandler.js";
 import { ModelTransformationActionProvider } from "./features/modelTransformationActionProvider.js";
@@ -100,6 +101,7 @@ function createModelTransformationPlugin(languageJsUrl?: string): LangiumLanguag
             references: {
                 ScopeProvider: (services) => new ModelTransformationLangiumScopeProvider(services),
                 ScopeComputation: (services) => new ModelTransformationScopeComputation(services),
+                Linker: (services) => new ModelTransformationLinker(services),
                 ExternalReferenceCollector: () => new ModelTransformationExternalReferenceCollector()
             },
             typir: (outerServices) => {
@@ -126,7 +128,7 @@ function createModelTransformationPlugin(languageJsUrl?: string): LangiumLanguag
             lsp: {
                 CompletionProvider: (services) =>
                     new ModelTransformationCompletionProvider(services, expressionTypes, typeTypes),
-                HoverProvider: (services) => new ExpressionHoverProvider(services, expressionTypes, typeTypes),
+                HoverProvider: (services) => new ModelTransformationHoverProvider(services, expressionTypes, typeTypes),
                 Formatter: (services) => new SerializerFormatter(services),
                 CodeActionProvider: (services) => new ModelTransformationCodeActionProvider(services)
             },

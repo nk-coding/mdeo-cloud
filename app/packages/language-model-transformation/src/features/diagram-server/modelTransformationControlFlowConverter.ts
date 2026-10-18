@@ -8,7 +8,8 @@ import {
     ForMatchStatement,
     IfExpressionStatement,
     WhileExpressionStatement,
-    StopStatement
+    StopStatement,
+    CallStatement
 } from "../../grammar/modelTransformationTypes.js";
 import type {
     ModelTransformationType,
@@ -21,6 +22,7 @@ import type {
     IfExpressionStatementType,
     WhileExpressionStatementType,
     StopStatementType,
+    CallStatementType,
     PatternType,
     ElseIfBranchType
 } from "../../grammar/modelTransformationTypes.js";
@@ -124,8 +126,22 @@ export interface ControlFlowMergeNode {
 /**
  * Discriminated union of all supported control-flow node kinds.
  */
+/**
+ * A call of another transformation; the flow continues after it when the callee succeeds.
+ */
+export interface ControlFlowCallNode {
+    readonly kind: "call";
+    readonly id: string;
+    readonly text: string;
+}
+
 export type ControlFlowNode =
-    ControlFlowStartNode | ControlFlowEndNode | ControlFlowMatchNode | ControlFlowSplitNode | ControlFlowMergeNode;
+    | ControlFlowStartNode
+    | ControlFlowEndNode
+    | ControlFlowMatchNode
+    | ControlFlowSplitNode
+    | ControlFlowMergeNode
+    | ControlFlowCallNode;
 
 /**
  * A directed edge in the control-flow graph.
@@ -427,7 +443,37 @@ export class ModelTransformationControlFlowConverter {
                 incomingLabelElementId
             );
         }
+        if (this.reflection.isInstance(stmt, CallStatement)) {
+            return this.processCallStatement(
+                stmt as CallStatementType,
+                previousNodeId,
+                incomingLabel,
+                incomingLabelElementId
+            );
+        }
         return { lastNodeId: previousNodeId };
+    }
+
+    /**
+     * Processes a call of another transformation: one node showing the call, on the main flow.
+     *
+     * @param stmt The call statement.
+     * @param previousNodeId The predecessor node ID.
+     * @param incomingLabel Optional label for the incoming edge.
+     * @param incomingLabelElementId Optional GModel label element ID (factory-only).
+     * @returns Traversal result with the call node as the last node.
+     */
+    private processCallStatement(
+        stmt: CallStatementType,
+        previousNodeId: string,
+        incomingLabel: string | undefined,
+        incomingLabelElementId?: string
+    ): TraversalResult {
+        const nodeId = this.idRegistry.getId(stmt);
+        const text = (stmt.$cstNode?.text ?? `call ${stmt.callee?.$refText ?? ""}()`).replace(/\s+/g, " ").trim();
+        this.pushNode({ kind: "call", id: nodeId, text });
+        this.pushEdge(previousNodeId, nodeId, incomingLabel, incomingLabelElementId);
+        return { lastNodeId: nodeId };
     }
 
     /**

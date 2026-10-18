@@ -1,4 +1,5 @@
 import type { GEdge } from "@mdeo/language-shared";
+import { asPatternObjectInstance } from "../../transformationDeclarations.js";
 import {
     BaseReconnectEdgeOperationHandler,
     sharedImport,
@@ -189,10 +190,10 @@ export class ModelTransformationReconnectEdgeOperationHandler extends BaseReconn
             return node as PatternObjectInstanceType;
         }
         if (this.reflection.isInstance(node, PatternObjectInstanceReference)) {
-            return (node as PatternObjectInstanceReferenceType).instance?.ref;
+            return asPatternObjectInstance(this.reflection, (node as PatternObjectInstanceReferenceType).instance?.ref);
         }
         if (this.reflection.isInstance(node, PatternObjectInstanceDelete)) {
-            return (node as PatternObjectInstanceDeleteType).instance?.ref;
+            return asPatternObjectInstance(this.reflection, (node as PatternObjectInstanceDeleteType).instance?.ref);
         }
         return undefined;
     }

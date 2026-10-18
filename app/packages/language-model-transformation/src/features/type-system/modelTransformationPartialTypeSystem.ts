@@ -20,6 +20,9 @@ import {
     WhileExpressionStatement,
     PatternObjectInstance,
     WhereClause,
+    TransformationParameter,
+    CallOutput,
+    CallArgument,
     type LambdaExpressionType,
     type PatternPropertyAssignmentType
 } from "../../grammar/modelTransformationTypes.js";
@@ -91,6 +94,82 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
         this.registerControlFlowValidationRules();
         this.registerWhereClauseValidationRule();
         this.registerPatternObjectInstanceInferenceRule();
+        this.registerTransformationParameterRules();
+        this.registerCallRules();
+    }
+
+    /**
+     * Registers the rules for the parameters of a signature: a parameter has its declared type,
+     * and a default value must be assignable to it.
+     */
+    private registerTransformationParameterRules(): void {
+        this.registerInferenceRule(TransformationParameter, (node) => {
+            if (node.type != undefined) {
+                return node.type;
+            }
+            return {
+                $problem: this.inferenceProblem,
+                languageNode: node,
+                location: "Parameter has no type.",
+                subProblems: []
+            };
+        });
+
+        this.registerValidationRule(TransformationParameter, (node, accept) => {
+            if (node.defaultValue == undefined || node.type == undefined) {
+                return;
+            }
+            const valueType = this.inference.inferType(node.defaultValue);
+            const declaredType = this.inference.inferType(node.type);
+            if (Array.isArray(valueType) || Array.isArray(declaredType)) {
+                return;
+            }
+            if (!this.assignability.isAssignable(valueType, declaredType)) {
+                accept({
+                    languageNode: node.defaultValue,
+                    message: `Default value of type '${valueType.getName()}' is not assignable to parameter '${node.name}' of type '${declaredType.getName()}'.`,
+                    severity: "error"
+                });
+            }
+        });
+    }
+
+    /**
+     * Registers the rules for calls: an output has the type of the callee parameter it binds,
+     * and an argument must be assignable to the type of its parameter.
+     */
+    private registerCallRules(): void {
+        this.registerInferenceRule(CallOutput, (node) => {
+            const parameterType = node.parameter?.ref?.type;
+            if (parameterType != undefined) {
+                return parameterType;
+            }
+            return {
+                $problem: this.inferenceProblem,
+                languageNode: node,
+                location: "The output's parameter cannot be resolved.",
+                subProblems: []
+            };
+        });
+
+        this.registerValidationRule(CallArgument, (node, accept) => {
+            const parameter = node.parameter?.ref;
+            if (node.value == undefined || parameter?.type == undefined) {
+                return;
+            }
+            const valueType = this.inference.inferType(node.value);
+            const parameterType = this.inference.inferType(parameter.type);
+            if (Array.isArray(valueType) || Array.isArray(parameterType)) {
+                return;
+            }
+            if (!this.assignability.isAssignable(valueType, parameterType)) {
+                accept({
+                    languageNode: node.value,
+                    message: `Argument of type '${valueType.getName()}' is not assignable to parameter '${parameter.name}' of type '${parameterType.getName()}'.`,
+                    severity: "error"
+                });
+            }
+        });
     }
 
     /**

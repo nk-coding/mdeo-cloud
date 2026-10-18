@@ -11,6 +11,9 @@ import {
     IfExpressionStatement,
     WhileExpressionStatement,
     StopStatement,
+    CallStatement,
+    CallOutput,
+    TransformationParameter,
     Pattern,
     PatternObjectInstance,
     PatternObjectInstanceReference,
@@ -62,9 +65,14 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
             this.reflection.isInstance(node, ForMatchStatement) ||
             this.reflection.isInstance(node, IfExpressionStatement) ||
             this.reflection.isInstance(node, WhileExpressionStatement) ||
-            this.reflection.isInstance(node, StopStatement)
+            this.reflection.isInstance(node, StopStatement) ||
+            this.reflection.isInstance(node, CallStatement)
         ) {
             return this.getHierarchicalStatementName(node, registry);
+        }
+
+        if (this.reflection.isInstance(node, TransformationParameter) || this.reflection.isInstance(node, CallOutput)) {
+            return BaseModelIdProvider.escapeIdPart(node.name ?? "unnamed");
         }
 
         if (this.reflection.isInstance(node, Pattern)) {

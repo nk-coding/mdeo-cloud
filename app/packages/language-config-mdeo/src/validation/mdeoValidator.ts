@@ -19,7 +19,7 @@ import {
     type RuntimeTimeoutBlockType,
     type RuntimeResourcesBlockType
 } from "../grammar/mdeoTypes.js";
-import { ModelTransformation, type ModelTransformationType } from "@mdeo/language-model-transformation";
+import { ModelTransformation, requiredInputs, type ModelTransformationType } from "@mdeo/language-model-transformation";
 import { isMetamodelCompatible } from "@mdeo/language-metamodel";
 import type { MdeoMetamodelResolver } from "../features/mdeoMetamodelResolver.js";
 import type { Range } from "vscode-languageserver-types";
@@ -171,6 +171,36 @@ export class MdeoValidator {
         }
 
         this.validateTransformationMetamodelCompatibility(usingPath, document, targetDoc, documents, accept);
+        this.validateNoRequiredInputs(usingPath, root as ModelTransformationType, accept);
+    }
+
+    /**
+     * Validates that a transformation used as a mutation operator has no required inputs: the
+     * optimizer runs an operator without arguments, so every input needs a default. A
+     * transformation with required inputs is a callee; call it from an operator with `call`.
+     *
+     * @param usingPath The using path being validated
+     * @param transformation The model transformation the path points to
+     * @param accept The validation acceptor
+     */
+    private validateNoRequiredInputs(
+        usingPath: UsingPathType,
+        transformation: ModelTransformationType,
+        accept: ValidationAcceptor
+    ): void {
+        const required = requiredInputs(transformation.signature);
+        if (required.length === 0) {
+            return;
+        }
+        const names = required.map((p) => `'${p.name}'`).join(", ");
+        accept(
+            "error",
+            `The transformation '${transformation.signature?.name}' at '${usingPath.path}' has required input${required.length > 1 ? "s" : ""} ${names}, so it cannot be a mutation operator: the optimizer passes no arguments. Give ${required.length > 1 ? "them defaults" : "it a default"}, or call it from an operator with 'call'.`,
+            {
+                node: usingPath,
+                property: "path"
+            }
+        );
     }
 
     /**

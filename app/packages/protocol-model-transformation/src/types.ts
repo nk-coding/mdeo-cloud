@@ -23,6 +23,10 @@ export enum ModelTransformationElementType {
      */
     NODE_MERGE = "node:merge",
     /**
+     * Call node for a call of another transformation
+     */
+    NODE_CALL = "node:call",
+    /**
      * Control flow edge connecting nodes
      */
     EDGE_CONTROL_FLOW = "edge:control-flow",
