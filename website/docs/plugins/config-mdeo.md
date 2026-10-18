@@ -79,8 +79,9 @@ search {
 
 A `using` entry may name a transformation whose metamodel is the problem's metamodel or one the
 problem's metamodel imports. A [callable transformation](/plugins/model-transformation#callable-transformations)
-can be an operator only if all its inputs have defaults; list the transformation that calls the
-others, not the callees — each listed file is one operator, whatever it calls.
+can be an operator only if it has no required inputs (each input has a default or a nullable type);
+list the transformation that calls the others, not the callees — each listed file is one operator,
+whatever it calls.
 Entries may be mixed and repeated in any order. Generated operators are written into the result tree
 as `.mt_gen` files, so you can read exactly what the search was allowed to do.
 

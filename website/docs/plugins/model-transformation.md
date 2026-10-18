@@ -149,6 +149,9 @@ matched again.
 | `stop` | End the transformation successfully |
 | `kill` | Abort the transformation and discard the result |
 | `call name(arg = expr, …) -> (out: name, …)` | Run another transformation — see [Callable transformations](#callable-transformations) |
+| `if call name(…) -> (…) then { … } else { … }` | Run the first block, with the outputs, if the callee succeeds, the second if it fails |
+| `for x in collection do { … }` | Run the body once per element of a collection |
+| `name = expr`, `name += expr` | Assign a variable or an output, or add to a collection output |
 
 Expressions use the same syntax as the [Script language](/plugins/script) — the two share an
 expression and type system.
@@ -161,15 +164,18 @@ and runs it with `call`.
 
 <<< @/../samples/callable-transformations/generic/move-component.mt{mt}
 
-The signature follows the `using` line and the imports. A parameter is either a **model element** —
-its type is a class of the metamodel — or a **scalar**: `int`, `long`, `float`, `double`, `string`,
-`boolean` or an enum of the metamodel.
+The signature follows the `using` line and the imports. A parameter is a **model element** — its
+type is a class of the metamodel —, a **scalar** — `int`, `long`, `float`, `double`, `string`,
+`boolean` or an enum of the metamodel — or a **collection** of either, `List<T>` or `Set<T>`.
 
 | Parameter | When the callee starts | Use in the callee |
 | --- | --- | --- |
 | `in name: Class` | bound to the element the caller passed | a bound node of every pattern: `name { … }`, `name.end -- other`, `delete name`, and in expressions |
+| `in name: Class?` | bound to the passed element; when none (or null) is passed, the object `name` of the first pattern is matched freely | the object of the same name in the first pattern — see [Optional element inputs](#optional-element-inputs) |
 | `in name: int = 0` | bound to the argument, or to the default when the caller passes none | a value in expressions |
-| `out name: Class` / `out name: int` | `null` | assigned inside a pattern with `name = expression` |
+| `in name: List<Class>` / `Set<int>` | the collection the caller passed | in expressions (`name.size()`, `name.exists(…)`) and in `for x in name do { … }` |
+| `out name: Class` / `out name: int` | `null` | assigned with `name = expression`, in a pattern or as a statement |
+| `out name: List<Class>` / `Set<string>` | empty | grown with `name += expression`, in a pattern or as a statement |
 
 A callee whose element inputs are already bound repairs locally around them:
 
@@ -177,7 +183,7 @@ A callee whose element inputs are already bound repairs locally around them:
 
 The caller imports the callee and names the arguments; after `->` it binds the outputs it needs to
 names of its own. They are bound exactly as if a `match` had bound them: an element output is an
-object that later patterns reference as `m { }`, a scalar output is a value.
+object that later patterns reference as `m { }`, a scalar or collection output is a value.
 
 <<< @/../samples/callable-transformations/move-with-stores.mt{mt}
 
@@ -191,12 +197,69 @@ object that later patterns reference as `m { }`, a scalar output is a value.
 - `stop` in the callee **returns from the callee**; the caller goes on with the next statement.
   `kill` in the callee aborts the whole transformation.
 - A callee that succeeds without matching anything (a `for match` with no match, an `if match` that
-  takes no branch) is a success. Outputs it did not assign are `null`, which is why the validator
-  requires every non-nullable output to be assigned on every path that succeeds; declare an output
-  `T?` when that cannot be guaranteed. A nullable output can be compared with `null`, but it cannot
-  be a node of a pattern.
+  takes no branch) is a success. Outputs it did not assign are `null`, and collection outputs it did
+  not add to are empty. The validator therefore requires every non-nullable single output to be
+  assigned on every path that succeeds; declare an output `T?` when that cannot be guaranteed. A
+  nullable output can be compared with `null`, but it cannot be a node of a pattern.
 - The engine does not undo the changes of a failed callee. Inside an optimisation that does not
   matter, since the whole attempt is discarded.
+
+**Collections.** A `List` keeps its elements in the order they were added, a `Set` keeps one of
+equal elements (the same model element, or equal values). `name += value` adds a value to a
+collection output — or all elements of a collection value. Inside a pattern it is computed with the
+match, after its changes, so it can add an object the pattern creates; in a `for match` every match
+adds its value. Collections are values: they cannot be nodes of a pattern, and a callee never
+changes the collections it was passed.
+
+**Loops over collections.** `for x in collection do { … }` runs its block once per element. The
+collection — a collection parameter or output, a many-valued reference such as
+`placement.candidates`, or any collection expression — is evaluated once, before the first run. In
+the block, `x` is a bound object when the elements are model elements (`x { … }` in the block's
+patterns, `call repair(component = x)`) and a value otherwise, and it is visible in the block only,
+like the objects of a `for match`. An empty collection runs the block not at all, which is a success.
+
+**Assignments outside patterns.** `name = expression` assigns a variable of an enclosing scope or an
+output, and `name += expression` adds to a collection output, as statements of their own — in a
+loop's block, for instance. They count for the definite assignment of outputs like assignments in
+patterns.
+
+**`if call`.** `if call name(…) -> (…) then { … } else { … }` branches on the callee's result, as
+`if match` branches on a match: the outputs are bound in the `then` block only, and the `else` block
+runs when the callee fails. `stop` in the callee is a success; `kill` in the callee still aborts
+everything.
+
+<<< @/../samples/callable-transformations/move-service.mt{mt}
+
+Since the engine cannot undo changes, the `else` block must not run on a model the callee changed
+half-way. `if call` therefore only calls a transformation that **fails before it changes the
+model**, which the validator checks conservatively: following the callee's statements in order, on
+every path, every statement that may fail must come before every statement that may change the
+model.
+
+- A `match` may fail unless its pattern only creates objects and links, sets properties or deletes
+  bound objects, and declares or assigns variables — that is, has nothing to find.
+- A plain `call` may fail when its callee may fail; the callee must then satisfy the same rule.
+  An `if call` inside the callee does not fail.
+- A loop counts as running its block after the block's own changes, so a block that changes the
+  model and may fail is rejected.
+- `if match`, `for match`, `while match` and `stop` do not fail; `kill` is not a failure either.
+
+The error names the statement that may fail and the change before it, e.g. *`'unsafe' can fail at
+line 10 of unsafe.mt (a match that may find nothing) after the change at line 5 of unsafe.mt`*.
+Should a failing callee have changed the model anyway, the engine reports the failure instead of
+running the `else` block.
+
+<a id="optional-element-inputs"></a>
+
+**Optional element inputs.** A nullable element input `in placement: Placement?` whose name is that
+of an object of the **first pattern** — the pattern of the first statement, a `match`, `if match`,
+`for match` or `while match` — *pins* that object (story diagrams' "maybe-bound" objects): a caller
+that passes a placement binds the object to it, and when none is passed, or `null`, the pattern
+matches the object freely. The same file thus works as a mutation operator, where nothing is passed,
+and as a callee. The object's class must be the input's class or a superclass of it, the object
+cannot be one the pattern creates, and the input is optional: a call or a configuration may leave it
+out. A required (non-nullable) element input is bound when the transformation starts, so no pattern
+may declare an object of its name — reference it as `name { }`.
 
 **Layered metamodels.** A callee's metamodel must be the caller's metamodel or one that the caller's
 metamodel imports (directly or not). A transformation written for a base metamodel — here
@@ -208,24 +271,30 @@ rejected.
 
 - arguments that name no parameter of the callee, an output passed as an argument or an input bound
   as an output, and arguments or outputs given twice;
-- missing required inputs (an `in` parameter without default);
+- missing required inputs (an `in` parameter without default whose type is not nullable);
 - argument types that are not assignable to the parameter's type (a subclass of an element
-  parameter's class is fine);
+  parameter's class is fine, and so is a collection of a subclass);
 - imports of files that do not exist, that have no signature or whose signature has another name;
 - callees of an incompatible metamodel;
 - import cycles: recursive calls are not supported;
 - outputs that are not assigned on every successful path (at the end and at every `stop`);
-- assignments to `in` parameters, and parameters or outputs used as pattern nodes although they are
-  scalars, unbound outputs or nullable.
+- assignments to `in` parameters, `+=` on anything but a collection output, values of the wrong
+  type for `=` and `+=`, and parameters, outputs or loop variables used as pattern nodes although
+  they are scalars, collections, unbound outputs or nullable;
+- loops over expressions that are not collections;
+- `if call` of a transformation that may fail after it changed the model;
+- nullable element inputs that pin no object of the first pattern, or one of another class.
 
-Parameter and output names take part in the file-wide uniqueness of names. Hover over a call, an
-import, an argument or an output shows the callee's signature or the parameter; *Go to definition*
-jumps into the callee.
+Parameter, output and loop-variable names take part in the file-wide uniqueness of names (an
+optional element input shares its name with the object it pins). Hover over a call, an import, an
+argument or an output shows the callee's signature or the parameter; *Go to definition* jumps into
+the callee. Completion offers the callee's inputs inside the parentheses and its outputs after `->`.
 
 **As mutation operators.** A transformation listed in a [`search` block](/plugins/config-mdeo#the-search-section)
-must not have required inputs: the optimizer passes no arguments, so inputs take their defaults
-and outputs are ignored. List the wrapper (`move-with-stores.mt`), not its callees: the wrapper is
-one operator in the random choice of operators, so the move and its repair always happen together.
+must not have required inputs: the optimizer passes no arguments, so inputs take their defaults,
+optional inputs are null — optional element inputs leave their objects free — and outputs are
+ignored. List the wrapper (`move-with-stores.mt`), not its callees: the wrapper is one operator in
+the random choice of operators, so the move and its repair always happen together.
 
 A file with required inputs cannot be run on its own with the **Run** action either; it only runs
 when another transformation calls it.
@@ -236,9 +305,9 @@ collides with one of them is written in backticks, e.g. `` `from` ``.
 :::
 
 ::: info Not yet supported
-Collection parameters (`Set<T>`, `List<T>`), `if call … then … else …` and recursion are not
-supported yet. In the graphical editor a call is shown as a node with its text and is edited in the
-textual editor.
+Recursion, and passing arguments to a transformation from a configuration
+(`using "x.mt"(k = v)`), are not supported. There is no `try call` that undoes a failed callee's
+changes; `if call` is limited to callees that fail before changing the model instead.
 :::
 
 ### The generated model transformation language
@@ -267,5 +336,13 @@ None.
 
 Transformations have a diagram editor too. Pattern objects and links appear as nodes and edges, with
 their modifier reflected in the styling, so the effect of a rule can be read at a glance. Element
-parameters and call outputs appear as bound objects in the patterns that use them, and a call is a
-node on the control flow that shows the call's text.
+parameters, call outputs and loop variables appear as bound objects in the patterns that use them.
+
+A call is a node on the control flow, drawn with a double left edge, that shows the call's text.
+Double-click the text to edit the call's arguments and outputs. **Insert Statement** on a control
+flow edge offers **Call** and **If Call** for every imported transformation (inserted without
+arguments; the validator lists the inputs to pass), and deleting a call node deletes the call — for
+an `if call`, the whole statement with its blocks. An `if call` branches into *success* and
+*failure* edges like the *then* and *else* edges of `if match`. A `for … in` loop is a node with its
+body on an *each* edge, and an assignment outside a pattern is a node with its text. Loop heads and
+assignments are edited in the textual editor.
