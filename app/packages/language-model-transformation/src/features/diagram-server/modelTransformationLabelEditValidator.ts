@@ -72,6 +72,10 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
                 return this.validateModifierLabel(label) ?? ValidationStatus.NONE;
             case ModelTransformationElementType.LABEL_CONTROL_FLOW:
                 return this.validateControlFlowLabel(label) ?? ValidationStatus.NONE;
+            case ModelTransformationElementType.LABEL_CALL:
+                return label.trim().startsWith("call ")
+                    ? ValidationStatus.NONE
+                    : this.error("A call starts with 'call', e.g. call name(input = value) -> (output: name).");
             default:
                 return ValidationStatus.NONE;
         }

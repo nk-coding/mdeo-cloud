@@ -16,6 +16,8 @@ import {
     WhileExpressionStatement,
     BaseTransformationStatement,
     IfMatchConditionAndBlock,
+    CallStatement,
+    IfCallConditionAndBlock,
     type PatternType,
     type PatternLinkType,
     type PatternObjectInstanceType,
@@ -44,6 +46,8 @@ const { AstUtils } = sharedImport("langium");
  *   final stop node cannot be deleted
  * - Match pattern nodes (which deletes the entire containing statement block)
  * - Split nodes for if/while expression statements (which deletes the entire statement)
+ * - Call nodes, loop heads and assignments (the call of an `if call` deletes the whole
+ *   `if call` statement)
  *
  * Transitive closure rules:
  * - Deleting an instance also deletes all pattern links in the same pattern that reference
@@ -132,6 +136,19 @@ export class ModelTransformationDeleteElementOperationHandler extends BaseDelete
         const statementsToProcess = new Set<BaseTransformationStatementType>();
 
         for (const element of elements) {
+            // deleting the call of an `if call` deletes the whole statement
+            if (
+                this.reflection.isInstance(element, CallStatement) &&
+                this.reflection.isInstance(element.$container, IfCallConditionAndBlock)
+            ) {
+                const ifCall = element.$container.$container as BaseTransformationStatementType | undefined;
+                if (ifCall != undefined) {
+                    result.delete(element);
+                    result.add(ifCall);
+                    statementsToProcess.add(ifCall);
+                }
+                continue;
+            }
             if (this.reflection.isInstance(element, Pattern)) {
                 const stmt = this.findContainingStatement(element as PatternType);
                 if (stmt != undefined) {

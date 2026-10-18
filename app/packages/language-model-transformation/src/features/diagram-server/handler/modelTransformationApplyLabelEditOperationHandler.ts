@@ -13,6 +13,8 @@ import {
     IfExpressionStatement,
     WhileExpressionStatement,
     ElseIfBranch,
+    CallStatement,
+    type CallStatementType,
     type PatternObjectInstanceType,
     type PatternPropertyAssignmentType,
     type WhereClauseType,
@@ -88,7 +90,28 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
         if (this.reflection.isInstance(node, ElseIfBranch)) {
             return await this.createElseIfConditionEdit(node as ElseIfBranchType, operation.text);
         }
+        if (this.reflection.isInstance(node, CallStatement)) {
+            return await this.createCallEdit(node as CallStatementType, operation.text);
+        }
         return undefined;
+    }
+
+    /**
+     * Creates a workspace edit replacing the text of a call (`call name(...) -> (...)`) with the
+     * edited text, so arguments and outputs can be edited in the diagram. For the call of an
+     * `if call` only the call is replaced; its blocks stay.
+     *
+     * @param node The CallStatement AST node
+     * @param text The new call text
+     * @returns The workspace edit, or undefined when the call has no source text
+     */
+    private async createCallEdit(node: CallStatementType, text: string): Promise<WorkspaceEdit | undefined> {
+        const cst = node.$cstNode;
+        const trimmed = text.trim();
+        if (cst == undefined || !trimmed.startsWith("call")) {
+            return undefined;
+        }
+        return await this.replaceCstNode(cst, trimmed);
     }
 
     /**

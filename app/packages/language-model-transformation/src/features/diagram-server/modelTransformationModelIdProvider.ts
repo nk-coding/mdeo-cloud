@@ -14,6 +14,11 @@ import {
     CallStatement,
     CallOutput,
     TransformationParameter,
+    IfCallStatement,
+    IfCallConditionAndBlock,
+    ForInStatement,
+    ForInVariable,
+    AssignmentStatement,
     Pattern,
     PatternObjectInstance,
     PatternObjectInstanceReference,
@@ -66,12 +71,28 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
             this.reflection.isInstance(node, IfExpressionStatement) ||
             this.reflection.isInstance(node, WhileExpressionStatement) ||
             this.reflection.isInstance(node, StopStatement) ||
-            this.reflection.isInstance(node, CallStatement)
+            this.reflection.isInstance(node, CallStatement) ||
+            this.reflection.isInstance(node, IfCallStatement) ||
+            this.reflection.isInstance(node, ForInStatement) ||
+            this.reflection.isInstance(node, AssignmentStatement)
         ) {
+            // the call of an `if call` is named after the statement, apart from its blocks
+            if (
+                this.reflection.isInstance(node, CallStatement) &&
+                this.reflection.isInstance(node.$container, IfCallConditionAndBlock)
+            ) {
+                const ifCall = node.$container.$container;
+                const parentName = ifCall != undefined ? registry.getName(ifCall) : undefined;
+                return `${parentName ?? "0"}_call`;
+            }
             return this.getHierarchicalStatementName(node, registry);
         }
 
-        if (this.reflection.isInstance(node, TransformationParameter) || this.reflection.isInstance(node, CallOutput)) {
+        if (
+            this.reflection.isInstance(node, TransformationParameter) ||
+            this.reflection.isInstance(node, CallOutput) ||
+            this.reflection.isInstance(node, ForInVariable)
+        ) {
             return BaseModelIdProvider.escapeIdPart(node.name ?? "unnamed");
         }
 

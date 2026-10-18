@@ -27,6 +27,10 @@ export enum ModelTransformationElementType {
      */
     NODE_CALL = "node:call",
     /**
+     * Editable text of a call node: the call as written
+     */
+    LABEL_CALL = "label:call",
+    /**
      * Control flow edge connecting nodes
      */
     EDGE_CONTROL_FLOW = "edge:control-flow",

@@ -7,17 +7,22 @@ const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
 
 /**
- * View for call nodes: a box with a double left edge (a call, in the activity-diagram style of
- * story diagrams) holding the call's text.
+ * View for call nodes: a box holding the statement's text. A call has a double left edge (in
+ * the activity-diagram style of story diagrams) and an editable text; the head of a loop and an
+ * assignment are plain boxes.
  */
 @injectable()
 export class GCallNodeView extends GNodeView {
     protected override renderForeignElement(
         model: Readonly<GNode>,
-        _context: RenderingContext,
-        _children: readonly GModelElement[]
+        context: RenderingContext,
+        children: readonly GModelElement[]
     ): VNode {
         const callModel = model as GCallNode;
+        const isCall = (callModel.variant ?? "call") === "call";
+        const content = children
+            .map((child) => context.renderElement(child))
+            .filter((vnode): vnode is VNode => vnode !== undefined);
         return html(
             "div",
             {
@@ -29,8 +34,8 @@ export class GCallNodeView extends GNodeView {
                     "bg-background": true
                 },
                 style: {
-                    borderLeftWidth: "6px",
-                    borderLeftStyle: "double",
+                    borderLeftWidth: isCall ? "6px" : "2px",
+                    borderLeftStyle: isCall ? "double" : "solid",
                     borderRadius: "6px",
                     padding: "4px 10px",
                     fontFamily: "monospace",
@@ -38,7 +43,7 @@ export class GCallNodeView extends GNodeView {
                     whiteSpace: "nowrap"
                 }
             },
-            callModel.text ?? ""
+            ...(content.length > 0 ? content : [callModel.text ?? ""])
         );
     }
 }

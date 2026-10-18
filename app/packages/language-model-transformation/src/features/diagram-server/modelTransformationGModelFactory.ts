@@ -42,7 +42,7 @@ import { GStartNode } from "./model/startNode.js";
 import { GEndNode } from "./model/endNode.js";
 import { GMatchNode } from "./model/matchNode.js";
 import { GSplitNode } from "./model/splitNode.js";
-import { GCallNode } from "./model/callNode.js";
+import { GCallLabel, GCallNode } from "./model/callNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { GControlFlowEdge } from "./model/controlFlowEdge.js";
 import { GControlFlowLabelNode } from "./model/controlFlowLabelNode.js";
@@ -174,7 +174,16 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
             case "call": {
                 const metadata = this.getNodeMetadata(validatedMetadata, node.id);
-                graph.children.push(GCallNode.builder().id(node.id).text(node.text).meta(metadata).build());
+                const callNode = GCallNode.builder()
+                    .id(node.id)
+                    .text(node.text)
+                    .variant(node.variant)
+                    .meta(metadata)
+                    .build();
+                if (node.labelId != undefined) {
+                    callNode.children.push(GCallLabel.builder().id(node.labelId).text(node.text).build());
+                }
+                graph.children.push(callNode);
                 break;
             }
         }
