@@ -51,3 +51,57 @@ data class TypedTransformationCallOutput(
     val parameter: String,
     val name: String
 )
+
+/**
+ * Conditional call: `if call name(...) -> (...) then { ... } else { ... }`.
+ *
+ * The call runs one scope level below the statement; on success its outputs are bound there and
+ * the then block runs; on failure the else block runs. `kill` in the callee ends everything.
+ *
+ * @param call The call.
+ * @param thenBlock Statements run after a successful call.
+ * @param elseBlock Statements run after a failed call.
+ */
+@Serializable
+data class TypedIfCallStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    override val kind: String = "ifCall",
+    val call: TypedCallStatement,
+    val thenBlock: List<@Contextual TypedTransformationStatement> = emptyList(),
+    val elseBlock: List<@Contextual TypedTransformationStatement>? = null
+) : TypedTransformationStatement
+
+/**
+ * Loop over a collection: `for name in collection do { ... }`.
+ *
+ * The collection is evaluated once; the do block runs once per element with [variable] bound one
+ * scope level below the statement: a model element as a bound object, a scalar as a value.
+ *
+ * @param variable The loop variable.
+ * @param collection The collection.
+ * @param doBlock Statements run per element.
+ */
+@Serializable
+data class TypedForInStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    override val kind: String = "forIn",
+    val variable: String,
+    @Contextual val collection: TypedExpression,
+    val doBlock: List<@Contextual TypedTransformationStatement> = emptyList()
+) : TypedTransformationStatement
+
+/**
+ * Assignment outside a pattern: `name = value` or `name += value`.
+ *
+ * @param name The assigned variable or output.
+ * @param operator `=` (assign) or `+=` (add to a collection output).
+ * @param value The value.
+ */
+@Serializable
+data class TypedAssignmentStatement(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    override val kind: String = "assignment",
+    val name: String,
+    val operator: String = "=",
+    @Contextual val value: TypedExpression
+) : TypedTransformationStatement

@@ -3,6 +3,7 @@ package com.mdeo.modeltransformation.runtime.match
 import com.mdeo.modeltransformation.ast.patterns.TypedPattern
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableElement
 import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableReassignmentElement
+import com.mdeo.modeltransformation.compiler.CollectionValue
 import com.mdeo.modeltransformation.compiler.SequentialLabelIdGenerator
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.compiler.conditionScope
@@ -130,6 +131,7 @@ class MatchExecutor {
         val analyzer = MatchAnalyzer(context.variableScope)
         elements.variables.forEach { analyzer.analyzeVariable(it) }
         elements.variableReassignments.forEach { analyzer.analyzeExpression(it.reassignment.value) }
+        elements.collectionAppends.forEach { analyzer.analyzeExpression(it.append.value) }
         elements.whereClauses.forEach { analyzer.analyzeWhereClause(it) }
         (elements.matchableInstances + elements.createInstances + elements.deleteInstances)
             .forEach { analyzer.analyzeObjectInstance(it) }
@@ -294,6 +296,7 @@ class MatchExecutor {
         val matchedNames = elements.matchableInstances.map { it.objectInstance.name }
         t = GraphModificationApplier(elements, expressionSupport, compilationContext).apply(t, matchedNames)
         t = applyDeferredBindings(t, deferred, expressionSupport, compilationContext)
+        t = applyCollectionAppends(t, allElements, expressionSupport, compilationContext)
 
         val planBoundNames = plan.baseSteps.mapNotNull { step ->
             when (step) {
@@ -377,7 +380,8 @@ class MatchExecutor {
         for ((name, value) in bindings) {
             val label = VariableBinding.variableLabel(name)
             val compiled = expressionSupport.engine.expressionCompilerRegistry.compile(value, compilationContext)
-            t = t.map(compiled.traversal as GraphTraversal<Any, Any>).`as`(label) as GraphTraversal<Vertex, Map<String, Any>>
+            val mapped = MatchTraversalBuilder.collectedIfCollection(compiled.traversal, value, expressionSupport.engine)
+            t = t.map(mapped).`as`(label) as GraphTraversal<Vertex, Map<String, Any>>
             if (deferred.reassignmentNames.contains(name)) {
                 expressionSupport.context.variableScope.findDeclaringScope(name)
                     ?.setBinding(name, VariableBinding.LabelBinding(label))
@@ -387,12 +391,41 @@ class MatchExecutor {
     }
 
     /**
-     * Returns the Gremlin step labels for all bound variables — both declarations and
-     * reassignments — that must be included in the final `select()` and result extraction.
+     * Computes the values of the pattern's additions to collection outputs (`name += value`)
+     * after the modifications, so a value can be an object the pattern creates. Each value gets
+     * a label of its own, read by the result extraction.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun applyCollectionAppends(
+        traversal: GraphTraversal<Vertex, Map<String, Any>>,
+        elements: PatternCategories,
+        expressionSupport: ExpressionSupport,
+        compilationContext: com.mdeo.modeltransformation.compiler.CompilationContext
+    ): GraphTraversal<Vertex, Map<String, Any>> {
+        var t = traversal
+        for ((index, element) in elements.collectionAppends.withIndex()) {
+            val value = element.append.value
+            val compiled = expressionSupport.engine.expressionCompilerRegistry.compile(value, compilationContext)
+            val mapped = MatchTraversalBuilder.collectedIfCollection(compiled.traversal, value, expressionSupport.engine)
+            t = t.map(mapped).`as`(appendLabel(index, element.append.name)) as GraphTraversal<Vertex, Map<String, Any>>
+        }
+        return t
+    }
+
+    /**
+     * The step label of the value of the [index]-th addition of a pattern, to collection [name].
+     */
+    private fun appendLabel(index: Int, name: String): String = VariableBinding.variableLabel("+$index:$name")
+
+    /**
+     * Returns the Gremlin step labels for all bound variables — declarations, reassignments and
+     * the values added to collections — that must be included in the final `select()` and
+     * result extraction.
      */
     private fun allVariableLabels(elements: PatternCategories): List<String> =
         elements.variables.map { VariableBinding.variableLabel(it.variable.name) } +
-        elements.variableReassignments.map { VariableBinding.variableLabel(it.reassignment.name) }
+        elements.variableReassignments.map { VariableBinding.variableLabel(it.reassignment.name) } +
+        elements.collectionAppends.mapIndexed { index, it -> appendLabel(index, it.append.name) }
 
     /**
      * Applies a `.limit()` step if [limit] is positive.
@@ -491,7 +524,7 @@ class MatchExecutor {
         val bindings = mutableMapOf<String, Any?>()
         for (varElement in elements.variables) {
             val varName = varElement.variable.name
-            val value = result[VariableBinding.variableLabel(varName)]
+            val value = collectionOrValue(result[VariableBinding.variableLabel(varName)], varElement.variable.value, engine)
             bindings[varName] = value
             context.variableScope.setBinding(varName, VariableBinding.ValueBinding(value))
         }
@@ -502,9 +535,32 @@ class MatchExecutor {
         // added to `bindings`, which would otherwise shadow the variable in the current scope.
         for (reassignElement in elements.variableReassignments) {
             val varName = reassignElement.reassignment.name
-            val value = result[VariableBinding.variableLabel(varName)]
+            val value = collectionOrValue(
+                result[VariableBinding.variableLabel(varName)], reassignElement.reassignment.value, engine
+            )
             val declaringScope = context.variableScope.findDeclaringScope(varName) ?: context.variableScope
-            declaringScope.setBinding(varName, VariableBinding.ValueBinding(value))
+            // a model element is kept as a reference, which survives a rebuild of the graph
+            val binding = if (value is Vertex) {
+                VariableBinding.InstanceBinding(engine.modelGraph.createVertexRef(value.id()))
+            } else {
+                VariableBinding.ValueBinding(value)
+            }
+            declaringScope.setBinding(varName, binding)
+        }
+
+        // Additions go to the collection bound in the scope declaring it; every match of a
+        // for-match adds its value.
+        for ((index, appendElement) in elements.collectionAppends.withIndex()) {
+            val name = appendElement.append.name
+            val target = (context.variableScope.findDeclaringScope(name)?.getLocalBinding(name)
+                as? VariableBinding.ValueBinding)?.value as? CollectionValue
+                ?: throw IllegalStateException("'$name' is not a collection; '+=' adds to a collection output")
+            val value = result[appendLabel(index, name)]
+            if (engine.isCollectionType(appendElement.append.value.evalType) && value is Iterable<*>) {
+                value.forEach { target.add(CollectionValue.item(it, engine.modelGraph)) }
+            } else {
+                target.add(CollectionValue.item(value, engine.modelGraph))
+            }
         }
 
         val instanceMappings = mutableMapOf<String, VertexRef>()
@@ -522,6 +578,22 @@ class MatchExecutor {
         }
         return MatchResult.Matched(bindings, instanceMappings, matchedNodeIds, createdNodeIds, deletedNodeIds,
             edgesModified = elements.createLinks.isNotEmpty() || elements.deleteLinks.isNotEmpty())
+    }
+
+    /**
+     * Turns the value of a collection-typed expression (a list, see
+     * [MatchTraversalBuilder.collectedIfCollection]) into a [CollectionValue]; other values are
+     * returned as they are.
+     */
+    private fun collectionOrValue(
+        value: Any?,
+        expression: com.mdeo.expression.ast.expressions.TypedExpression,
+        engine: TransformationEngine
+    ): Any? {
+        if (value !is Iterable<*> || !engine.isCollectionType(expression.evalType)) {
+            return value
+        }
+        return CollectionValue.of(engine.isSetType(expression.evalType), value, engine.modelGraph)
     }
 
     /**

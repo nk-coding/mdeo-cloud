@@ -521,10 +521,12 @@ internal class MatchTraversalBuilder(
         step: BaseStep.VariableBinding
     ): GraphTraversal<Vertex, Vertex> {
         val anchorTraversal = AnonymousTraversal.`as`<Any>(anchorLabel)
+        val value = step.variable.variable.value
         val result: CompilationResult = engine.expressionCompilerRegistry.compile(
-            step.variable.variable.value, compilationContext, anchorTraversal
+            value, compilationContext, anchorTraversal
         )
-        val bound = t.map(result.traversal).`as`(step.variableLabel) as GraphTraversal<Vertex, Vertex>
+        val bound = t.map(collectedIfCollection(result.traversal, value, engine))
+            .`as`(step.variableLabel) as GraphTraversal<Vertex, Vertex>
         if (step.isReassignment) {
             val name = step.variable.variable.name
             expressionSupport.context.variableScope.findDeclaringScope(name)
@@ -708,6 +710,31 @@ internal class MatchTraversalBuilder(
                 "Unsupported property comparison operator: '$operator'. " +
                 "Expected one of: ==, !=, <, >, <=, >="
             )
+        }
+    }
+
+    companion object {
+        /**
+         * Wraps the compiled traversal of a collection-typed [expression] so that it yields the
+         * whole collection as one list (a `map` step keeps only the first result of its
+         * traversal); other traversals are returned as they are.
+         *
+         * @param traversal The compiled traversal.
+         * @param expression The expression it was compiled from.
+         * @param engine The engine, for the expression's type.
+         * @return The traversal to map with.
+         */
+        @Suppress("UNCHECKED_CAST")
+        fun collectedIfCollection(
+            traversal: GraphTraversal<*, *>,
+            expression: com.mdeo.expression.ast.expressions.TypedExpression,
+            engine: TransformationEngine
+        ): GraphTraversal<Any, Any> {
+            val compiled = traversal as GraphTraversal<Any, Any>
+            if (!engine.isCollectionType(expression.evalType)) {
+                return compiled
+            }
+            return compiled.unfold<Any>().fold() as GraphTraversal<Any, Any>
         }
     }
 }

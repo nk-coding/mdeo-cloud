@@ -39,8 +39,22 @@ class CallStatementExecutor : StatementExecutor {
         statement: TypedTransformationStatement,
         context: TransformationExecutionContext,
         engine: TransformationEngine
+    ): TransformationExecutionResult = call(statement as TypedCallStatement, context, engine)
+
+    /**
+     * Runs a call: evaluates the arguments in [context], runs the callee and, on success, binds
+     * the outputs in [context]'s current scope.
+     *
+     * @param call The call.
+     * @param context The caller's context.
+     * @param engine The caller's engine.
+     * @return The callee's result: Success (also after `stop`), Failure, or Stopped for `kill`.
+     */
+    fun call(
+        call: TypedCallStatement,
+        context: TransformationExecutionContext,
+        engine: TransformationEngine
     ): TransformationExecutionResult {
-        val call = statement as TypedCallStatement
         val location = "call ${call.name}"
 
         if (engine.callDepth >= MAX_CALL_DEPTH) {

@@ -46,6 +46,22 @@ data class TypedPatternVariableReassignment(
 )
 
 /**
+ * Addition of a value to a collection output within a transformation pattern (`name += value`).
+ *
+ * The value is computed with the match, after its modifications (so it can be an object the
+ * pattern creates), and added to the collection bound to [name] in the scope declaring it. In a
+ * `for match` every match adds its value. A collection-typed value adds all its elements.
+ *
+ * @param name Name of the collection output.
+ * @param value The value expression.
+ */
+@Serializable
+data class TypedPatternCollectionAppend(
+    val name: String,
+    @Contextual val value: TypedExpression
+)
+
+/**
  * Property assignment within a pattern object instance.
  *
  * Represents either an assignment (setting a property value) or a comparison

@@ -9,6 +9,7 @@ import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
 import com.mdeo.modeltransformation.ast.TypedTransformationParameter
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
+import com.mdeo.modeltransformation.compiler.CollectionValue
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
 import com.mdeo.modeltransformation.compiler.VariableBinding
 import com.mdeo.modeltransformation.runtime.statements.ExpressionValueEvaluator
@@ -250,14 +251,19 @@ class TransformationEngine(
         val scope = context.variableScope
         for (parameter in signature.parameters) {
             if (parameter.isOutput) {
-                scope.setBinding(parameter.name, VariableBinding.ValueBinding(null))
+                val initial = if (parameter.isCollection) CollectionValue(parameter.collection == "Set") else null
+                scope.setBinding(parameter.name, VariableBinding.ValueBinding(initial))
                 continue
             }
-            val passed = inputs[parameter.name]
+            val passed = inputs[parameter.name]?.takeUnless { parameter.pinsNode && it.isNull() }
             val binding = when {
                 passed != null -> passed
                 parameter.defaultValue != null ->
                     ExpressionValueEvaluator(this).evaluate(parameter.defaultValue, context)
+                // an input that pins an object of the first pattern stays unbound: the pattern
+                // then matches the object freely
+                parameter.pinsNode -> continue
+                parameter.optional -> VariableBinding.ValueBinding(null)
                 else -> return TransformationExecutionResult.Failure(
                     reason = "Required input '${parameter.name}' of '${signature.name}' was not passed",
                     failedAt = signature.name,
@@ -271,12 +277,58 @@ class TransformationEngine(
     }
 
     /**
+     * Whether a binding holds no element: a null value or an instance binding without a vertex.
+     */
+    private fun VariableBinding.isNull(): Boolean = when (this) {
+        is VariableBinding.ValueBinding -> value == null
+        is VariableBinding.InstanceBinding -> vertexRef == null
+        is VariableBinding.LabelBinding -> false
+    }
+
+    /**
+     * Whether the type at [typeIndex] of this engine's types is a collection (a type of list or
+     * set cardinality, as `List<T>`, `Set<T>` or `Collection<T>`).
+     *
+     * @param typeIndex An index into [types].
+     * @return True for collection types.
+     */
+    fun isCollectionType(typeIndex: Int): Boolean {
+        val type = getTypeOrNull(typeIndex) as? ClassTypeRef ?: return false
+        val cardinality = typeRegistry.getType(type)?.cardinality
+        return cardinality == org.apache.tinkerpop.gremlin.structure.VertexProperty.Cardinality.list ||
+            cardinality == org.apache.tinkerpop.gremlin.structure.VertexProperty.Cardinality.set
+    }
+
+    /**
+     * Whether the type at [typeIndex] is a set type (`Set<T>`, `OrderedSet<T>`).
+     *
+     * @param typeIndex An index into [types].
+     * @return True for set types.
+     */
+    fun isSetType(typeIndex: Int): Boolean {
+        val type = getTypeOrNull(typeIndex) as? ClassTypeRef ?: return false
+        return type.`package` == "builtin" && (type.type == "Set" || type.type == "OrderedSet" || type.type == "ReadonlySet")
+    }
+
+    /**
      * Converts a scalar input to the parameter's primitive type (an `int` argument of a `long`
      * parameter becomes a Long), so the callee compares values of the type it declares.
      */
     private fun coerce(binding: VariableBinding, parameter: TypedTransformationParameter): VariableBinding {
         if (binding !is VariableBinding.ValueBinding) {
             return binding
+        }
+        val collection = binding.value as? CollectionValue
+        if (parameter.isCollection) {
+            // a callee works on a collection of its own kind; it never changes its inputs
+            val isSet = parameter.collection == "Set"
+            return VariableBinding.ValueBinding(
+                when {
+                    collection == null -> CollectionValue(isSet)
+                    collection.isSet == isSet -> collection
+                    else -> collection.copy(isSet)
+                }
+            )
         }
         val value = binding.value as? Number ?: return binding
         val type = (getTypeOrNull(parameter.type) as? ClassTypeRef)?.takeIf { it.`package` == "builtin" }?.type
@@ -302,10 +354,10 @@ class TransformationEngine(
                 is VariableBinding.InstanceBinding -> VariableBinding.InstanceBinding(bound.vertexRef)
                 is VariableBinding.ValueBinding -> {
                     val value = bound.value
-                    if (value is Vertex) {
-                        VariableBinding.InstanceBinding(modelGraph.createVertexRef(value.id()))
-                    } else {
-                        VariableBinding.ValueBinding(value)
+                    when (value) {
+                        is Vertex -> VariableBinding.InstanceBinding(modelGraph.createVertexRef(value.id()))
+                        is CollectionValue -> VariableBinding.ValueBinding(value.copy())
+                        else -> VariableBinding.ValueBinding(value)
                     }
                 }
                 else -> VariableBinding.ValueBinding(null)
