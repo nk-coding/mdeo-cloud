@@ -204,6 +204,29 @@ class CallStatementExecutionTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["tinker", "mdeo"])
+    fun `a call chain passes outputs through a callee that calls others`(backend: String) {
+        graph(backend).use { graph ->
+            val ast = transformation("/optimize/scenarios/call-nested.mt")
+            assertEquals(
+                setOf(
+                    "/optimize/scenarios/move-and-sync.mt",
+                    "/optimize/generic/move-component.mt",
+                    "/optimize/sync/follow-reader.mt"
+                ),
+                ast.callees.keys
+            )
+            val result = TransformationEngine.create(graph, ast, deterministic = false).execute()
+
+            assertIs<TransformationExecutionResult.Success>(result, result.toString())
+            val after = graph.toModelData()
+            assertEquals("chosen", after.nameOf("b"), "the output of the inner call came out of the chain")
+            assertEquals("b", after.hostOf("orders"))
+            assertEquals("b", after.hostOf("ordersDb"))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
     fun `a callee returns a node it created`(backend: String) {
         graph(backend).use { graph ->
             val result = run(graph, "/optimize/scenarios/call-making.mt")

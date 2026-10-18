@@ -289,5 +289,29 @@ match {
         name = "fresh and used"
     }
 }
+`,
+    // a call chain: a callee that calls two other transformations and passes an output on
+    "/optimize/scenarios/move-and-sync.mt": `using "../../metamodel/shop.mm"
+import { moveComponent } from "../generic/move-component.mt"
+import { followReader } from "../sync/follow-reader.mt"
+
+transformation moveAndSync(out movedTo: Container)
+
+call moveComponent() -> (moved: m, target: b)
+call followReader(moved = m, target = b)
+match {
+    b { }
+    movedTo = b
+}
+`,
+    "/optimize/scenarios/call-nested.mt": `using "../../metamodel/shop.mm"
+import { moveAndSync } from "./move-and-sync.mt"
+
+call moveAndSync() -> (movedTo: t)
+match {
+    t {
+        name = "chosen"
+    }
+}
 `
 };
