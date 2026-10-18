@@ -68,7 +68,8 @@ class ExpressionValueEvaluator(private val engine: TransformationEngine) {
             )
         }
         val values = run(result.traversal, referenced, instances)
-        return toBinding(if (values.hasNext()) values.next() else null)
+        // arithmetic yields doubles; a value of an int type is an Int
+        return toBinding(engine.coerceNumber(if (values.hasNext()) values.next() else null, expression.evalType))
     }
 
     /**

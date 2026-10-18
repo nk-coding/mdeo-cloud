@@ -330,16 +330,30 @@ class TransformationEngine(
                 }
             )
         }
-        val value = binding.value as? Number ?: return binding
-        val type = (getTypeOrNull(parameter.type) as? ClassTypeRef)?.takeIf { it.`package` == "builtin" }?.type
-        val converted: Any = when (type) {
+        return VariableBinding.ValueBinding(coerceNumber(binding.value, parameter.type))
+    }
+
+    /**
+     * Converts a number to the primitive type at [typeIndex] (`int`, `long`, `float` or
+     * `double`): arithmetic yields doubles, while a value of an `int` type should be an Int.
+     * Other values are returned as they are.
+     *
+     * @param value The value.
+     * @param typeIndex An index into [types].
+     * @return The converted value.
+     */
+    fun coerceNumber(value: Any?, typeIndex: Int): Any? {
+        if (value !is Number) {
+            return value
+        }
+        val type = (getTypeOrNull(typeIndex) as? ClassTypeRef)?.takeIf { it.`package` == "builtin" }?.type
+        return when (type) {
             "int" -> value.toInt()
             "long" -> value.toLong()
             "float" -> value.toFloat()
             "double" -> value.toDouble()
             else -> value
         }
-        return VariableBinding.ValueBinding(converted)
     }
 
     /**
@@ -350,14 +364,14 @@ class TransformationEngine(
         val signature = ast.signature ?: return emptyMap()
         val scope = context.variableScope
         return signature.parameters.filter { it.isOutput }.associate { parameter ->
-            val binding = when (val bound = scope.getLocalBinding(parameter.name)) {
+            val binding: VariableBinding = when (val bound = scope.getLocalBinding(parameter.name)) {
                 is VariableBinding.InstanceBinding -> VariableBinding.InstanceBinding(bound.vertexRef)
                 is VariableBinding.ValueBinding -> {
                     val value = bound.value
                     when (value) {
                         is Vertex -> VariableBinding.InstanceBinding(modelGraph.createVertexRef(value.id()))
                         is CollectionValue -> VariableBinding.ValueBinding(value.copy())
-                        else -> VariableBinding.ValueBinding(value)
+                        else -> VariableBinding.ValueBinding(coerceNumber(value, parameter.type))
                     }
                 }
                 else -> VariableBinding.ValueBinding(null)

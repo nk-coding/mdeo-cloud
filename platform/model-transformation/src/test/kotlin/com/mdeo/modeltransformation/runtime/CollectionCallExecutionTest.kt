@@ -268,4 +268,36 @@ class CollectionCallExecutionTest {
             }
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
+    fun `loops run over many-valued references and filtered collections`(backend: String) {
+        graph(backend, shopModel(candidates = listOf("b", "c"))).use { graph ->
+            val result = run(graph, "/optimize/scenarios/call-looping.mt")
+
+            assertIs<TransformationExecutionResult.Success>(result, result.toString())
+            val after = graph.toModelData()
+            assertEquals("filtered", after.nameOf("c"))
+            assertEquals("candidate", after.nameOf("b"), "the second loop saw the renames of the first")
+            assertTrue("seen 2" in after.names(), "the callee counted both candidates: ${after.names()}")
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
+    fun `an element output assigned outside a pattern is a bound element`(backend: String) {
+        graph(backend, shopModel(candidates = listOf("b", "c"))).use { graph ->
+            val engine = TransformationEngine.create(graph, transformation("/optimize/scenarios/call-looping.mt"))
+            val callee = engine.calleeEngine("/optimize/scenarios/pick-candidate.mt")!!
+            val placement = graph.createVertexRef(graph.nameRegistry.getVertexId("placement")!!)
+            val outcome = callee.executeCall(mapOf("placement" to VariableBinding.InstanceBinding(placement)))
+
+            assertIs<TransformationExecutionResult.Success>(outcome.result)
+            val picked = outcome.outputs.getValue("picked")
+            assertIs<VariableBinding.InstanceBinding>(picked)
+            assertTrue(graph.nameRegistry.getName(picked.vertexRef!!.rawId) in setOf("b", "c"))
+            val seen = outcome.outputs.getValue("seen") as VariableBinding.ValueBinding
+            assertEquals(2, (seen.value as Number).toInt())
+        }
+    }
 }

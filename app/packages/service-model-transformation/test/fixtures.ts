@@ -485,5 +485,45 @@ match {
         name = "pinned target"
     }
 }
+`,
+    // loops over a many-valued reference and over a filtered collection; an element output
+    // assigned outside a pattern
+    "/optimize/scenarios/pick-candidate.mt": `using "../../metamodel/base.mm"
+
+transformation pickCandidate(in placement: Placement, out picked: Container?, out seen: int)
+
+seen = 0
+for candidate in placement.candidates do {
+    picked = candidate
+    seen = seen + 1
+}
+`,
+    "/optimize/scenarios/call-looping.mt": `using "../../metamodel/shop.mm"
+import { pickCandidate } from "./pick-candidate.mt"
+
+match {
+    p: Placement { }
+}
+for named in p.candidates.filter((c) => c.name == "c") do {
+    match {
+        named {
+            name = "filtered"
+        }
+    }
+}
+for candidate in p.candidates.filter((c) => c.name != "filtered") do {
+    match {
+        candidate {
+            name = "candidate"
+        }
+    }
+}
+call pickCandidate(placement = p) -> (picked: chosen, seen: n)
+match {
+    create log: Container {
+        name = "seen " + n
+    }
+    where chosen != null
+}
 `
 };
