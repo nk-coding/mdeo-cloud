@@ -1,22 +1,29 @@
 import { ExpressionHoverProvider } from "@mdeo/language-expression";
 import { sharedImport } from "@mdeo/language-shared";
-import type { AstNode, LangiumDocument, MaybePromise } from "langium";
+import type { AstNode, LangiumDocument, LangiumDocuments, MaybePromise } from "langium";
 import type { Hover, HoverParams } from "vscode-languageserver-protocol";
 import {
     CallArgument,
     CallOutput,
     CallStatement,
     PatternLinkEnd,
+    PatternObjectInstance,
     PatternObjectInstanceDelete,
     PatternObjectInstanceReference,
     TransformationImport,
     TransformationParameter,
     TransformationSignature,
     type CallOutputType,
+    type PatternObjectInstanceType,
     type TransformationParameterType,
     type TransformationSignatureType
 } from "../grammar/modelTransformationTypes.js";
-import { renderParameter, renderSignature } from "./transformationDeclarations.js";
+import {
+    TransformationDeclarationResolver,
+    getTransformationRoot,
+    renderParameter,
+    renderSignature
+} from "./transformationDeclarations.js";
 
 const { CstUtils, AstUtils, GrammarAST } = sharedImport("langium");
 
@@ -25,6 +32,13 @@ const { CstUtils, AstUtils, GrammarAST } = sharedImport("langium");
  * signatures of called and imported transformations and the parameters and outputs of calls.
  */
 export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
+    private readonly documents: LangiumDocuments;
+
+    constructor(...args: ConstructorParameters<typeof ExpressionHoverProvider>) {
+        super(...args);
+        this.documents = args[0].shared.workspace.LangiumDocuments;
+    }
+
     override getHoverContent(document: LangiumDocument, params: HoverParams): MaybePromise<Hover | undefined> {
         const hover = this.callHover(document, params);
         return hover ?? super.getHoverContent(document, params);
@@ -77,7 +91,34 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
         if (this.reflection.isInstance(astNode, PatternLinkEnd) && feature === "object") {
             return this.declarationHover(astNode.object?.ref);
         }
+        if (this.reflection.isInstance(astNode, PatternObjectInstance) && feature === "name") {
+            return this.pinnedObjectHover(astNode as PatternObjectInstanceType);
+        }
         return undefined;
+    }
+
+    /**
+     * Hover for an object of the first pattern that an optional element input pins.
+     */
+    private pinnedObjectHover(object: PatternObjectInstanceType): Hover | undefined {
+        const parameter = (getTransformationRoot(this.reflection, object)?.signature?.parameters ?? []).find(
+            (p) => p.name === object.name && this.declarations().getPinnedObject(p) === object
+        );
+        if (parameter == undefined) {
+            return undefined;
+        }
+        const signature = parameter.$container as TransformationSignatureType | undefined;
+        return markdownHover(
+            `${object.name}: ${object.class?.$refText ?? "?"}`,
+            `pinned by the optional input \`${renderParameter(parameter)}\` of \`${signature?.name ?? "?"}\`: bound to the element a caller passes, matched freely when none is passed`
+        );
+    }
+
+    /**
+     * A resolver for the declarations of the transformation.
+     */
+    private declarations(): TransformationDeclarationResolver {
+        return new TransformationDeclarationResolver(this.reflection, this.documents);
     }
 
     /**
@@ -112,11 +153,15 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
             return undefined;
         }
         const signature = parameter.$container as TransformationSignatureType | undefined;
+        const nullable = (parameter.type as { isNullable?: boolean } | undefined)?.isNullable === true;
+        const pinned = this.declarations().getPinnedObject(parameter);
         const role =
             parameter.direction === "in"
-                ? parameter.defaultValue != undefined
-                    ? "optional input"
-                    : "required input"
+                ? pinned != undefined
+                    ? `optional input that pins the object \`${pinned.name}\` of the first pattern (matched freely when not passed)`
+                    : parameter.defaultValue != undefined || nullable
+                      ? "optional input"
+                      : "required input"
                 : "output";
         return markdownHover(renderParameter(parameter), `${role} of \`${signature?.name ?? "?"}\``);
     }

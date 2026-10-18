@@ -540,6 +540,24 @@ match {
         ]);
     });
 
+    it("explains the pinning on hover", async () => {
+        const workspace = new TestWorkspace(layeredProject(ALL));
+        const { document, instance } = await workspace.build("/optimize/scenarios/move-placement.mt");
+        const hover = async (needle: string) => {
+            const text = document.textDocument.getText();
+            const result = await instance.services.lsp.HoverProvider.getHoverContent(document, {
+                textDocument: { uri: document.uri.toString() },
+                position: document.textDocument.positionAt(text.indexOf(needle) + 1)
+            });
+            return (result?.contents as any)?.value ?? "";
+        };
+        assert.match(
+            await hover("placement: Placement { }"),
+            /pinned by the optional input `in placement: Placement\?`/
+        );
+        assert.match(await hover("placement: Placement?"), /optional input that pins the object `placement`/);
+    });
+
     it("pins the object of a first if match, for match or while match too", async () => {
         for (const statement of ["if match", "for match", "while match"]) {
             const tail = statement === "if match" ? "then {\n}" : "do {\n}";
