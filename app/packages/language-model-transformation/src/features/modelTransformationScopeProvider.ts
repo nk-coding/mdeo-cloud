@@ -36,6 +36,10 @@ import {
     PatternObjectInstanceReference,
     type PatternObjectInstanceReferenceType,
     ObjectInstanceDeclaration,
+    PatternCollectionAppend,
+    AssignmentStatement,
+    Pattern,
+    TransformationParameter,
     CallStatement,
     CallArgument,
     CallOutput,
@@ -47,9 +51,9 @@ import {
 } from "../grammar/modelTransformationTypes.js";
 import { getScopeFromMetamodelFile, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import { AssociationEndCache } from "@mdeo/language-model";
-import { TransformationDeclarationResolver } from "./transformationDeclarations.js";
+import { TransformationDeclarationResolver, type TypeInference } from "./transformationDeclarations.js";
 
-const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE } = sharedImport("langium");
+const { DefaultScopeProvider, AstUtils, EMPTY_SCOPE, stream } = sharedImport("langium");
 
 /**
  * Langium scope provider for the Model Transformation language.
@@ -92,7 +96,11 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
         this.documents = services.shared.workspace.LangiumDocuments;
         this.descriptionProvider = services.workspace.AstNodeDescriptionProvider;
         this.associationEndCache = new AssociationEndCache(services);
-        this.declarations = new TransformationDeclarationResolver(this.astReflection, this.documents);
+        this.declarations = new TransformationDeclarationResolver(
+            this.astReflection,
+            this.documents,
+            () => (services as { typir?: { Inference: TypeInference } }).typir?.Inference
+        );
     }
 
     /**
@@ -163,7 +171,9 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
         }
         if (
             referenceInfo.property === "variable" &&
-            this.astReflection.isInstance(referenceInfo.container, PatternVariableReassignment)
+            (this.astReflection.isInstance(referenceInfo.container, PatternVariableReassignment) ||
+                this.astReflection.isInstance(referenceInfo.container, PatternCollectionAppend) ||
+                this.astReflection.isInstance(referenceInfo.container, AssignmentStatement))
         ) {
             return this.getReassignableVariableScope(referenceInfo);
         }
@@ -219,24 +229,28 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
     private collectVisibleReassignmentVariables(reassignment: AstNode): PatternVariableType[] {
         const result: PatternVariableType[] = [];
 
-        const pattern = reassignment.$container as PatternType | undefined;
-        if (pattern == undefined) {
+        const parent = reassignment.$container;
+        if (parent == undefined) {
             return result;
         }
 
-        // Variables declared earlier in the same pattern are already available.
-        for (const element of pattern.elements ?? []) {
-            if (element === reassignment) {
-                break;
+        // A statement-level assignment sees the variables of the statements before it; one in a
+        // pattern also sees the variables declared earlier in the same pattern.
+        let child: AstNode = reassignment;
+        if (this.astReflection.isInstance(parent, Pattern)) {
+            for (const element of (parent as PatternType).elements ?? []) {
+                if (element === reassignment) {
+                    break;
+                }
+                if (this.astReflection.isInstance(element, PatternVariable)) {
+                    result.push(element as PatternVariableType);
+                }
             }
-            if (this.astReflection.isInstance(element, PatternVariable)) {
-                result.push(element as PatternVariableType);
-            }
+            child = parent;
         }
 
         // Walk up the container chain, collecting variables from enclosing scopes.
-        let child: AstNode = pattern;
-        let container: AstNode | undefined = pattern.$container;
+        let container: AstNode | undefined = child.$container;
         while (container != undefined) {
             this.collectVariablesFromContainer(container, child, result);
             child = container;
@@ -418,11 +432,18 @@ export class ModelTransformationLangiumScopeProvider extends DefaultScopeProvide
             let currentNode: AstNode | undefined = referenceInfo.container;
             do {
                 if (localSymbols.has(currentNode)) {
-                    scopes.push(
-                        localSymbols
-                            .getStream(currentNode)
-                            .filter((desc) => this.reflection.isSubtype(desc.type, ObjectInstanceDeclaration.name))
-                    );
+                    // An optional element input that pins an object of the first pattern has
+                    // the object's name; the object comes first, so references resolve to it.
+                    const declarations = localSymbols
+                        .getStream(currentNode)
+                        .filter((desc) => this.reflection.isSubtype(desc.type, ObjectInstanceDeclaration.name))
+                        .toArray()
+                        .sort(
+                            (a, b) =>
+                                Number(a.type === TransformationParameter.name) -
+                                Number(b.type === TransformationParameter.name)
+                        );
+                    scopes.push(stream(declarations));
                 }
                 currentNode = currentNode.$container;
             } while (currentNode != undefined);

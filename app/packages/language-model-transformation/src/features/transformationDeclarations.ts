@@ -4,13 +4,22 @@ import { resolveRelativePath, sharedImport } from "@mdeo/language-shared";
 import type { AstNode, LangiumDocuments } from "langium";
 import {
     CallOutput,
+    ForInVariable,
+    ForMatchStatement,
+    IfMatchStatement,
+    MatchStatement,
     ModelTransformation,
     PatternObjectInstance,
     TransformationParameter,
+    WhileMatchStatement,
     typeTypes,
     type CallOutputType,
+    type ForInStatementType,
+    type ForInVariableType,
+    type IfMatchStatementType,
     type ModelTransformationType,
     type PatternObjectInstanceType,
+    type PatternType,
     type TransformationParameterType,
     type TransformationSignatureType
 } from "../grammar/modelTransformationTypes.js";
@@ -23,9 +32,41 @@ const { AstUtils } = sharedImport("langium");
  * - `element`: a class of the metamodel, so the parameter is a model element (a node of the
  *   model graph) that patterns can reference as `name { }`;
  * - `scalar`: a primitive type or an enum of the metamodel, so the parameter is a value;
- * - `unsupported`: anything else (collections, lambdas, `Any`), which stage 1 does not support.
+ * - `collection`: a `List<T>` or `Set<T>` of model elements or of scalars;
+ * - `unsupported`: anything else (other generic types, lambdas, `Any`).
  */
-export type ParameterKind = "element" | "scalar" | "unsupported";
+export type ParameterKind = "element" | "scalar" | "collection" | "unsupported";
+
+/**
+ * The collection types a collection parameter may have.
+ */
+export const COLLECTION_PARAMETER_TYPES: ReadonlySet<string> = new Set(["List", "Set"]);
+
+/**
+ * What a collection parameter holds.
+ */
+export interface CollectionShape {
+    /**
+     * `List` (ordered, duplicates allowed) or `Set` (no duplicates).
+     */
+    collection: "List" | "Set";
+    /**
+     * Whether the elements are model elements or scalars.
+     */
+    elementKind: "element" | "scalar";
+    /**
+     * The class of model elements.
+     */
+    elementClass?: ClassType;
+}
+
+/**
+ * The part of the Typir services the resolver uses to find the element type of the collection
+ * a `for … in` loop iterates over.
+ */
+export interface TypeInference {
+    inferType(node: AstNode): unknown;
+}
 
 /**
  * The primitive types a scalar parameter may have.
@@ -46,6 +87,10 @@ export interface ParameterTypeName {
     name: string;
     isNullable: boolean;
     hasTypeArgs: boolean;
+    /**
+     * The type arguments as written, e.g. `Component` of `List<Component>`.
+     */
+    typeArgs: ParameterTypeName[];
 }
 
 /**
@@ -60,18 +105,32 @@ export function parameterTypeName(
     reflection: AstReflection,
     parameter: TransformationParameterType
 ): ParameterTypeName | undefined {
-    const type = parameter.type as AstNode | undefined;
+    return typeNameOf(reflection, parameter.type as AstNode | undefined);
+}
+
+/**
+ * Reads the name of a written type (`Name`, `Name?`, `List<Name>`).
+ *
+ * @param reflection The AST reflection
+ * @param type The type node
+ * @returns The type name, or undefined for lambda types
+ */
+function typeNameOf(reflection: AstReflection, type: AstNode | undefined): ParameterTypeName | undefined {
     if (type == undefined || !reflection.isInstance(type, typeTypes.classTypeType)) {
         return undefined;
     }
-    const classType = type as unknown as { name?: string; isNullable?: boolean; typeArgs?: unknown[] };
+    const classType = type as unknown as { name?: string; isNullable?: boolean; typeArgs?: AstNode[] };
     if (classType.name == undefined) {
         return undefined;
     }
+    const typeArgs = (classType.typeArgs ?? [])
+        .map((arg) => typeNameOf(reflection, arg))
+        .filter((arg): arg is ParameterTypeName => arg != undefined);
     return {
         name: classType.name,
         isNullable: classType.isNullable === true,
-        hasTypeArgs: (classType.typeArgs?.length ?? 0) > 0
+        hasTypeArgs: (classType.typeArgs?.length ?? 0) > 0,
+        typeArgs
     };
 }
 
@@ -89,15 +148,19 @@ export class TransformationDeclarationResolver {
     /**
      * @param reflection The AST reflection
      * @param documents The Langium documents, for the metamodels of the transformations
+     * @param inference Returns the Typir inference, used for the element class of `for … in`
+     *   loops; without it a loop variable has no class
      */
     constructor(
         private readonly reflection: AstReflection,
-        private readonly documents: LangiumDocuments
+        private readonly documents: LangiumDocuments,
+        private readonly inference?: () => TypeInference | undefined
     ) {}
 
     /**
      * Returns the class of an object declaration: the class of a pattern object, the class an
-     * element parameter is typed with, or the class of the callee parameter a call output binds.
+     * element parameter is typed with, the class of the callee parameter a call output binds, or
+     * the element class of the collection a `for … in` loop variable iterates over.
      *
      * @param declaration The declaration (may be undefined)
      * @returns The class, or undefined when there is none
@@ -115,6 +178,143 @@ export class TransformationDeclarationResolver {
         if (this.reflection.isInstance(declaration, CallOutput)) {
             const parameter = (declaration as CallOutputType).parameter?.ref;
             return parameter != undefined ? this.getParameterClass(parameter) : undefined;
+        }
+        if (this.reflection.isInstance(declaration, ForInVariable)) {
+            return this.getLoopElementClass(declaration as ForInVariableType);
+        }
+        return undefined;
+    }
+
+    /**
+     * Returns the class of the elements a `for … in` loop iterates over, from the type of its
+     * collection expression (`List<T>`, `Set<T>` or any other collection of a class `T`).
+     *
+     * @param variable The loop variable
+     * @returns The class, or undefined for collections of scalars and untyped collections
+     */
+    getLoopElementClass(variable: ForInVariableType): ClassType | undefined {
+        const statement = variable.$container as ForInStatementType | undefined;
+        const inference = this.inference?.();
+        if (statement?.collection == undefined || inference == undefined) {
+            return undefined;
+        }
+        let type: unknown;
+        try {
+            type = inference.inferType(statement.collection);
+        } catch {
+            return undefined;
+        }
+        if (Array.isArray(type)) {
+            return undefined;
+        }
+        const definition = (type as { definition?: { typeArgs?: Record<string, unknown> } } | undefined)?.definition;
+        const element = definition?.typeArgs?.["T"] as { package?: string; type?: string } | undefined;
+        if (element?.package == undefined || element.type == undefined || !element.package.startsWith("class")) {
+            return undefined;
+        }
+        return this.findClass(variable, element.type, element.package.slice("class".length));
+    }
+
+    /**
+     * Whether the loop variable of a `for … in` loop is a model element.
+     *
+     * @param variable The loop variable
+     * @returns True when the loop iterates over model elements
+     */
+    isElementLoopVariable(variable: ForInVariableType): boolean {
+        return this.getLoopElementClass(variable) != undefined;
+    }
+
+    /**
+     * Returns the shape of a collection parameter: `List` or `Set`, and whether it holds model
+     * elements or scalars.
+     *
+     * @param parameter The parameter
+     * @returns The shape, or undefined when the parameter is not a supported collection
+     */
+    getCollectionShape(parameter: TransformationParameterType): CollectionShape | undefined {
+        const typeName = parameterTypeName(this.reflection, parameter);
+        if (
+            typeName == undefined ||
+            !COLLECTION_PARAMETER_TYPES.has(typeName.name) ||
+            typeName.typeArgs.length !== 1 ||
+            typeName.isNullable
+        ) {
+            return undefined;
+        }
+        const element = typeName.typeArgs[0];
+        if (element.hasTypeArgs || element.isNullable) {
+            return undefined;
+        }
+        const collection = typeName.name as "List" | "Set";
+        const entity = this.resolveTypeName(parameter, element.name);
+        if (entity?.kind === "class") {
+            return { collection, elementKind: "element", elementClass: entity.node };
+        }
+        if (entity?.kind === "enum" || SCALAR_PRIMITIVE_TYPES.has(element.name)) {
+            return { collection, elementKind: "scalar" };
+        }
+        return undefined;
+    }
+
+    /**
+     * Returns the pattern object an optional element input pins (proposal C, story diagrams'
+     * maybe-bound objects): a nullable element input whose name is that of an object of the
+     * transformation's first pattern. When the caller passes the input, the object is bound
+     * to it; when not (or when it passes null), the object is matched freely.
+     *
+     * The first pattern is the pattern of the first statement when that is a `match`,
+     * `if match`, `for match` or `while match`.
+     *
+     * @param parameter The parameter
+     * @returns The pinned object, or undefined when the parameter pins none
+     */
+    getPinnedObject(parameter: TransformationParameterType): PatternObjectInstanceType | undefined {
+        if (parameter.direction !== "in" || parameterTypeName(this.reflection, parameter)?.isNullable !== true) {
+            return undefined;
+        }
+        if (this.getParameterKind(parameter) !== "element") {
+            return undefined;
+        }
+        return this.firstPatternObjects(parameter).find((object) => object.name === parameter.name);
+    }
+
+    /**
+     * Returns the objects declared by the first pattern of the transformation containing a node
+     * (outside its `forbid` / `require` blocks).
+     *
+     * @param node Any node of the transformation
+     * @returns The objects of the first pattern
+     */
+    firstPatternObjects(node: AstNode): PatternObjectInstanceType[] {
+        const pattern = this.firstPattern(node);
+        return (pattern?.elements ?? []).filter((element): element is PatternObjectInstanceType =>
+            this.reflection.isInstance(element, PatternObjectInstance)
+        );
+    }
+
+    /**
+     * Returns the first pattern of the transformation containing a node: the pattern of its first
+     * statement, when that is a `match`, `if match`, `for match` or `while match`.
+     *
+     * @param node Any node of the transformation
+     * @returns The pattern, or undefined
+     */
+    firstPattern(node: AstNode): PatternType | undefined {
+        const root = getTransformationRoot(this.reflection, node);
+        const first = root?.statements?.[0];
+        if (first == undefined) {
+            return undefined;
+        }
+        if (this.reflection.isInstance(first, IfMatchStatement)) {
+            return (first as IfMatchStatementType).ifBlock?.pattern;
+        }
+        if (
+            this.reflection.isInstance(first, MatchStatement) ||
+            this.reflection.isInstance(first, ForMatchStatement) ||
+            this.reflection.isInstance(first, WhileMatchStatement)
+        ) {
+            return (first as { pattern?: PatternType }).pattern;
         }
         return undefined;
     }
@@ -138,8 +338,11 @@ export class TransformationDeclarationResolver {
      */
     getParameterKind(parameter: TransformationParameterType): ParameterKind {
         const typeName = parameterTypeName(this.reflection, parameter);
-        if (typeName == undefined || typeName.hasTypeArgs) {
+        if (typeName == undefined) {
             return "unsupported";
+        }
+        if (typeName.hasTypeArgs) {
+            return this.getCollectionShape(parameter) != undefined ? "collection" : "unsupported";
         }
         const entity = this.resolveParameterType(parameter);
         if (entity?.kind === "class") {
@@ -202,21 +405,55 @@ export class TransformationDeclarationResolver {
         if (typeName == undefined) {
             return undefined;
         }
-        const metamodelDocument = this.getMetamodelDocument(parameter);
+        return this.resolveTypeName(parameter, typeName.name);
+    }
+
+    /**
+     * Resolves a type name against the classes and enums of the metamodel of the transformation
+     * containing a node.
+     *
+     * @param node Any node of the transformation
+     * @param name The type name
+     * @returns The class or enum, if the name denotes one
+     */
+    private resolveTypeName(
+        node: AstNode,
+        name: string
+    ): { kind: "class"; node: ClassType } | { kind: "enum"; node: EnumType } | undefined {
+        const metamodelDocument = this.getMetamodelDocument(node);
         if (metamodelDocument == undefined) {
             return undefined;
         }
         for (const entities of getExportedEntitiesByPath(metamodelDocument, this.documents)) {
-            const cls = entities.classes.find((c) => c.name === typeName.name);
+            const cls = entities.classes.find((c) => c.name === name);
             if (cls != undefined) {
                 return { kind: "class", node: cls };
             }
-            const enm = entities.enums.find((e) => e.name === typeName.name);
+            const enm = entities.enums.find((e) => e.name === name);
             if (enm != undefined) {
                 return { kind: "enum", node: enm };
             }
         }
         return undefined;
+    }
+
+    /**
+     * Finds a class of the metamodel of the transformation containing a node, by its name and
+     * the path of the metamodel file declaring it.
+     *
+     * @param node Any node of the transformation
+     * @param name The class name
+     * @param path The absolute path of the declaring metamodel file
+     * @returns The class, if there is one
+     */
+    private findClass(node: AstNode, name: string, path: string): ClassType | undefined {
+        const metamodelDocument = this.getMetamodelDocument(node);
+        if (metamodelDocument == undefined) {
+            return undefined;
+        }
+        const byPath = getExportedEntitiesByPath(metamodelDocument, this.documents);
+        const exact = byPath.find((entities) => entities.absolutePath === path)?.classes.find((c) => c.name === name);
+        return exact ?? byPath.flatMap((entities) => entities.classes).find((c) => c.name === name);
     }
 }
 
@@ -250,13 +487,27 @@ export function getTransformationRoot(reflection: AstReflection, node: AstNode):
 
 /**
  * Lists the parameters of a signature that callers must pass: the `in` parameters without a
- * default value.
+ * default value whose type is not nullable. A nullable input without a default is optional: it
+ * is null when not passed (for an element input that pins an object of the first pattern, the
+ * object is then matched freely).
  *
  * @param signature The signature (may be undefined)
  * @returns The required input parameters
  */
 export function requiredInputs(signature: TransformationSignatureType | undefined): TransformationParameterType[] {
-    return (signature?.parameters ?? []).filter((p) => p.direction === "in" && p.defaultValue == undefined);
+    return (signature?.parameters ?? []).filter(
+        (p) => p.direction === "in" && p.defaultValue == undefined && !isNullableType(p)
+    );
+}
+
+/**
+ * Whether a parameter's type is written nullable (`T?`).
+ *
+ * @param parameter The parameter
+ * @returns True for a nullable type
+ */
+function isNullableType(parameter: TransformationParameterType): boolean {
+    return (parameter.type as { isNullable?: boolean } | undefined)?.isNullable === true;
 }
 
 /**
@@ -290,11 +541,12 @@ export interface DeclarationServices {
         AstReflection: AstReflection;
         workspace: { LangiumDocuments: LangiumDocuments };
     };
+    typir?: { Inference: TypeInference };
 }
 
 /**
- * Returns the class of an object declaration (pattern object, element parameter or call
- * output), for code that has the language services at hand but no resolver of its own.
+ * Returns the class of an object declaration (pattern object, element parameter, call output or
+ * loop variable), for code that has the language services at hand but no resolver of its own.
  *
  * @param services The language services
  * @param declaration The declaration
@@ -306,6 +558,7 @@ export function declaredClassOf(
 ): ClassType | undefined {
     return new TransformationDeclarationResolver(
         services.shared.AstReflection,
-        services.shared.workspace.LangiumDocuments
+        services.shared.workspace.LangiumDocuments,
+        () => services.typir?.Inference
     ).getDeclaredClass(declaration);
 }

@@ -70,7 +70,8 @@ export interface TypedTransformationParameter {
     type: number;
 
     /**
-     * Whether the parameter is a model element (a metamodel class) rather than a scalar.
+     * Whether the parameter is a model element (a metamodel class) rather than a scalar or a
+     * collection.
      */
     isElement: boolean;
 
@@ -78,6 +79,29 @@ export interface TypedTransformationParameter {
      * The default value of an optional input, evaluated in the callee before its first statement.
      */
     defaultValue?: TypedExpression;
+
+    /**
+     * For a collection parameter: `List` or `Set`. A collection output starts empty.
+     */
+    collection?: "List" | "Set";
+
+    /**
+     * For a collection parameter: whether its elements are model elements.
+     */
+    elementsAreElements?: boolean;
+
+    /**
+     * Whether the input may be left out: its type is nullable and it has no default. It is then
+     * null, or, when it pins an object (see {@link pinsNode}), unbound.
+     */
+    optional?: boolean;
+
+    /**
+     * Whether the input pins the object of the same name in the first pattern: when it is
+     * passed (and not null), the object is bound to it; otherwise the input is left unbound and
+     * the object is matched freely.
+     */
+    pinsNode?: boolean;
 }
 
 /**
@@ -136,6 +160,75 @@ export interface TypedCallStatement extends TypedTransformationStatement {
      * The outputs bound.
      */
     outputs: TypedTransformationCallOutput[];
+}
+
+/**
+ * Conditional call of another transformation: the then block runs, with the outputs bound,
+ * when the callee succeeds; the else block when it fails.
+ */
+export interface TypedIfCallStatement extends TypedTransformationStatement {
+    kind: "ifCall";
+
+    /**
+     * The call; its outputs are bound in the scope of the then block's parent (one level below
+     * the statement).
+     */
+    call: TypedCallStatement;
+
+    /**
+     * Statements run after a successful call.
+     */
+    thenBlock: TypedTransformationStatement[];
+
+    /**
+     * Statements run after a failed call.
+     */
+    elseBlock?: TypedTransformationStatement[];
+}
+
+/**
+ * Loop over the elements of a collection.
+ */
+export interface TypedForInStatement extends TypedTransformationStatement {
+    kind: "forIn";
+
+    /**
+     * The loop variable, bound one level below the statement to each element in turn.
+     */
+    variable: string;
+
+    /**
+     * The collection, evaluated once before the first iteration.
+     */
+    collection: TypedExpression;
+
+    /**
+     * Statements run per element.
+     */
+    doBlock: TypedTransformationStatement[];
+}
+
+/**
+ * Assignment outside a pattern: `name = value` assigns a variable or an output, `name += value`
+ * adds to a collection output.
+ */
+export interface TypedAssignmentStatement extends TypedTransformationStatement {
+    kind: "assignment";
+
+    /**
+     * The assigned variable or output.
+     */
+    name: string;
+
+    /**
+     * `=` or `+=`.
+     */
+    operator: "=" | "+=";
+
+    /**
+     * The value.
+     */
+    value: TypedExpression;
 }
 
 /**
@@ -324,6 +417,33 @@ export interface TypedPatternVariableReassignmentElement extends TypedPatternEle
 }
 
 /**
+ * Addition of a value to a collection output, computed with the match after its
+ * modifications.
+ */
+export interface TypedPatternCollectionAppend {
+    /**
+     * Name of the collection output.
+     */
+    name: string;
+
+    /**
+     * The value added (an element, or a collection whose elements are all added).
+     */
+    value: TypedExpression;
+}
+
+/**
+ * Pattern collection append element.
+ */
+export interface TypedPatternCollectionAppendElement extends TypedPatternElement {
+    kind: "collectionAppend";
+    /**
+     * The append.
+     */
+    append: TypedPatternCollectionAppend;
+}
+
+/**
  * Pattern object instance element.
  */
 export interface TypedPatternObjectInstanceElement extends TypedPatternElement {
@@ -403,6 +523,7 @@ export interface TypedPattern {
     elements: (
         | TypedPatternVariableElement
         | TypedPatternVariableReassignmentElement
+        | TypedPatternCollectionAppendElement
         | TypedPatternObjectInstanceElement
         | TypedPatternLinkElement
         | TypedPatternWhereClauseElement

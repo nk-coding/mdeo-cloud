@@ -80,6 +80,23 @@ export const PatternVariableReassignment = createInterface("PatternVariableReass
 export type PatternVariableReassignmentType = ASTType<typeof PatternVariableReassignment>;
 
 /**
+ * Addition of an element to a collection `out` parameter.
+ * Format: name += expression
+ *
+ * The value is computed with the match, after its modifications, so it can be an object the
+ * pattern creates. In a `for match` every match adds its value.
+ */
+export const PatternCollectionAppend = createInterface("PatternCollectionAppend").attrs({
+    variable: Ref(() => AssignableVariable),
+    value: BaseExpression
+});
+
+/**
+ * Type representing a PatternCollectionAppend AST node.
+ */
+export type PatternCollectionAppendType = ASTType<typeof PatternCollectionAppend>;
+
+/**
  * Property assignment in a pattern object instance.
  * Uses = for assignment or == for comparison.
  */
@@ -232,6 +249,7 @@ export type PatternApplicationConditionType = ASTType<typeof PatternApplicationC
 export const PatternElement: BaseType<AstNode> = createType("PatternElement").types(
     PatternVariable,
     PatternVariableReassignment,
+    PatternCollectionAppend,
     PatternObjectInstance,
     PatternObjectInstanceDelete,
     PatternLink,
@@ -517,14 +535,101 @@ export const CallStatement = createInterface("CallStatement")
 export type CallStatementType = ASTType<typeof CallStatement>;
 
 /**
+ * The call of an `if call` together with its then block, so that the call's outputs are
+ * visible in the then block and nowhere else.
+ * Format: `call name(...) [-> (...)] then { block }`
+ */
+export const IfCallConditionAndBlock = createInterface("IfCallConditionAndBlock").attrs({
+    call: CallStatement,
+    thenBlock: StatementsScope
+});
+
+/**
+ * Type representing an IfCallConditionAndBlock AST node.
+ */
+export type IfCallConditionAndBlockType = ASTType<typeof IfCallConditionAndBlock>;
+
+/**
+ * Conditional call of another transformation.
+ * Format: `if call name(...) [-> (...)] then { block } [else { block }]`
+ *
+ * When the callee succeeds its outputs are bound and the then block runs; when it fails the
+ * else block runs. `kill` in the callee still ends everything. The validator only accepts a
+ * callee that fails before it changes the model, since the engine cannot undo changes.
+ */
+export const IfCallStatement = createInterface("IfCallStatement")
+    .extends(BaseTransformationStatement)
+    .attrs({
+        ifBlock: IfCallConditionAndBlock,
+        elseBlock: Optional(StatementsScope)
+    });
+
+/**
+ * Type representing an IfCallStatement AST node.
+ */
+export type IfCallStatementType = ASTType<typeof IfCallStatement>;
+
+/**
+ * The loop variable of a `for x in collection` statement.
+ */
+export const ForInVariable = createInterface("ForInVariable").attrs({
+    name: String
+});
+
+/**
+ * Type representing a ForInVariable AST node.
+ */
+export type ForInVariableType = ASTType<typeof ForInVariable>;
+
+/**
+ * Loop over the elements of a collection.
+ * Format: `for name in expression do { block }`
+ *
+ * The block runs once per element, with the loop variable bound to it: an element of a
+ * collection of model elements is a bound object (`name { }` in the block's patterns), an
+ * element of a collection of scalars is a value.
+ */
+export const ForInStatement = createInterface("ForInStatement").extends(BaseTransformationStatement).attrs({
+    variable: ForInVariable,
+    collection: BaseExpression,
+    doBlock: StatementsScope
+});
+
+/**
+ * Type representing a ForInStatement AST node.
+ */
+export type ForInStatementType = ASTType<typeof ForInStatement>;
+
+/**
+ * Assignment outside a pattern.
+ * Format: `name = expression` or `name += expression`
+ *
+ * `=` assigns a variable of an enclosing scope or an `out` parameter, `+=` adds to a collection
+ * `out` parameter.
+ */
+export const AssignmentStatement = createInterface("AssignmentStatement")
+    .extends(BaseTransformationStatement)
+    .attrs({
+        variable: Ref(() => AssignableVariable),
+        operator: String,
+        value: BaseExpression
+    });
+
+/**
+ * Type representing an AssignmentStatement AST node.
+ */
+export type AssignmentStatementType = ASTType<typeof AssignmentStatement>;
+
+/**
  * Everything a pattern can reference as an object (`name { }`, `delete name`, link ends):
- * object instances of patterns, element parameters of the signature and element outputs of
- * calls.
+ * object instances of patterns, element parameters of the signature, element outputs of
+ * calls and the variables of `for … in` loops.
  */
 export const ObjectInstanceDeclaration = createType("ObjectInstanceDeclaration").types(
     PatternObjectInstance,
     TransformationParameter,
-    CallOutput
+    CallOutput,
+    ForInVariable
 );
 
 /**
@@ -555,7 +660,10 @@ export const TransformationStatement: BaseType<AstNode> = createType("Transforma
     IfExpressionStatement,
     WhileExpressionStatement,
     StopStatement,
-    CallStatement
+    CallStatement,
+    IfCallStatement,
+    ForInStatement,
+    AssignmentStatement
 );
 
 /**

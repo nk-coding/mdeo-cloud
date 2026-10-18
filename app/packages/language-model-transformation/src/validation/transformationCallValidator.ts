@@ -1,6 +1,6 @@
 import type { AstNode, LangiumDocument, ValidationAcceptor } from "langium";
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
-import { isMetamodelCompatible } from "@mdeo/language-metamodel";
+import { isMetamodelCompatible, resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import {
     climbsAboveProjectRoot,
     resolveRelativeDocument,
@@ -8,25 +8,37 @@ import {
     sharedImport
 } from "@mdeo/language-shared";
 import {
+    AssignmentStatement,
     CallOutput,
     CallStatement,
+    ForInStatement,
+    ForInVariable,
+    IfCallStatement,
+    PatternCollectionAppend,
     ForMatchStatement,
     IfExpressionStatement,
     IfMatchStatement,
     MatchStatement,
     ModelTransformation,
+    PatternObjectInstance,
     PatternVariableReassignment,
     StopStatement,
     TransformationParameter,
     UntilMatchStatement,
     WhileExpressionStatement,
     WhileMatchStatement,
+    type AssignmentStatementType,
     type BaseTransformationStatementType,
     type CallStatementType,
+    type ForInStatementType,
+    type ForInVariableType,
+    type IfCallStatementType,
+    type PatternCollectionAppendType,
     type ForMatchStatementType,
     type IfExpressionStatementType,
     type IfMatchStatementType,
     type ModelTransformationType,
+    type PatternObjectInstanceType,
     type PatternType,
     type PatternVariableReassignmentType,
     type StatementsScopeType,
@@ -41,34 +53,118 @@ import {
 import {
     TransformationDeclarationResolver,
     parameterTypeName,
-    requiredInputs
+    requiredInputs,
+    type TypeInference
 } from "../features/transformationDeclarations.js";
+import { CallSafetyAnalyzer } from "./callSafetyAnalyzer.js";
 
 const { AstUtils, UriUtils } = sharedImport("langium");
+
+/**
+ * Whether a class is a given class or one of its subclasses.
+ *
+ * @param subclass The candidate subclass
+ * @param superclass The class
+ * @param reflection The AST reflection
+ * @returns True if every instance of the subclass is one of the class
+ */
+function isSubclassOf(subclass: ClassType, superclass: ClassType, reflection: AstReflection): boolean {
+    return resolveClassChain(subclass, reflection).some((c) => c === superclass || c.name === superclass.name);
+}
 
 /**
  * Validates callable transformations: signatures, imports of other transformations, calls and
  * the references of patterns to parameters and call outputs.
  *
- * The rules (stage 1 of callable transformations):
- * - a parameter is a single model element (a metamodel class) or a scalar (`int`, `long`,
- *   `float`, `double`, `string`, `boolean`, an enum); an element input is not nullable and has
- *   no default;
+ * The rules:
+ * - a parameter is a single model element (a metamodel class), a scalar (`int`, `long`,
+ *   `float`, `double`, `string`, `boolean`, an enum) or a `List<T>` / `Set<T>` of either; an
+ *   element input has no default, and it is nullable only when it pins an object of the first
+ *   pattern (it is then optional: absent or null, the object is matched freely);
  * - an imported file must be a transformation with a signature, whose metamodel is this file's
  *   metamodel or one this file's metamodel imports; imports must not form a cycle;
  * - a call names each input at most once, passes every required input and binds only outputs;
- * - a non-nullable output is assigned on every path on which the transformation succeeds.
+ * - a non-nullable output is assigned on every path on which the transformation succeeds
+ *   (collection outputs start empty and need no assignment);
+ * - `+=` adds to a collection output only;
+ * - `if call` calls only transformations that fail before they change the model.
  */
 export class TransformationCallValidator {
     private readonly reflection: AstReflection;
     private readonly declarations: TransformationDeclarationResolver;
+    private readonly safety: CallSafetyAnalyzer;
 
     constructor(private readonly services: ExtendedLangiumServices) {
         this.reflection = services.shared.AstReflection;
         this.declarations = new TransformationDeclarationResolver(
             this.reflection,
-            services.shared.workspace.LangiumDocuments
+            services.shared.workspace.LangiumDocuments,
+            () => (services as { typir?: { Inference: TypeInference } }).typir?.Inference
         );
+        this.safety = new CallSafetyAnalyzer(this.reflection);
+    }
+
+    /**
+     * Validates an `if call`: the callee must fail before it changes the model, since the engine
+     * cannot undo changes and the else block would otherwise run on a partly changed model.
+     *
+     * @param ifCall The if-call statement
+     * @param accept The validation acceptor
+     */
+    validateIfCall(ifCall: IfCallStatementType, accept: ValidationAcceptor): void {
+        const call = ifCall.ifBlock?.call;
+        const signature = call?.callee?.ref;
+        if (call == undefined || signature == undefined) {
+            return;
+        }
+        const violation = this.safety.findUnsafeFailure(signature);
+        if (violation != undefined) {
+            accept(
+                "error",
+                `'if call' needs a transformation that fails before it changes the model, but '${signature.name}' ${violation}. The engine does not undo changes, so the else block would run on a changed model. Use a plain 'call', or move every match that can fail before the first change.`,
+                { node: call, property: "callee" }
+            );
+        }
+    }
+
+    /**
+     * Validates the target of an assignment outside a pattern (`name = value`, `name += value`)
+     * and of a `+=` inside a pattern: `+=` adds to a collection output, `=` assigns a variable
+     * or an output, and neither assigns an input.
+     *
+     * @param node The assignment statement or pattern append
+     * @param accept The validation acceptor
+     */
+    validateAssignmentTarget(
+        node: AssignmentStatementType | PatternCollectionAppendType,
+        accept: ValidationAcceptor
+    ): void {
+        const target = node.variable?.ref;
+        if (target == undefined) {
+            return;
+        }
+        const isAppend =
+            this.reflection.isInstance(node, PatternCollectionAppend) ||
+            (node as AssignmentStatementType).operator === "+=";
+        const isParameter = this.reflection.isInstance(target, TransformationParameter);
+        if (isParameter && (target as TransformationParameterType).direction === "in") {
+            accept(
+                "error",
+                `Cannot assign the input parameter '${target.name}'; only 'out' parameters and variables can be assigned.`,
+                { node, property: "variable" }
+            );
+            return;
+        }
+        if (
+            isAppend &&
+            (!isParameter || this.declarations.getParameterKind(target as TransformationParameterType) !== "collection")
+        ) {
+            accept(
+                "error",
+                `'+=' adds to a collection output; '${target.name}' is not an 'out' parameter of type List<…> or Set<…>.`,
+                { node, property: "variable" }
+            );
+        }
     }
 
     /**
@@ -190,6 +286,17 @@ export class TransformationCallValidator {
         declaration: AstNode,
         accept: ValidationAcceptor
     ): boolean {
+        if (this.reflection.isInstance(declaration, ForInVariable)) {
+            const variable = declaration as ForInVariableType;
+            if (!this.declarations.isElementLoopVariable(variable)) {
+                accept(
+                    "error",
+                    `'${variable.name}' runs over a collection of scalars (or of an unknown type), so it cannot be a node of a pattern. Use it in expressions instead.`,
+                    { node: referenceNode, property }
+                );
+            }
+            return true;
+        }
         const isParameter = this.reflection.isInstance(declaration, TransformationParameter);
         const isOutput = this.reflection.isInstance(declaration, CallOutput);
         if (!isParameter && !isOutput) {
@@ -202,7 +309,16 @@ export class TransformationCallValidator {
         if (parameter == undefined) {
             return true;
         }
-        if (this.declarations.getParameterKind(parameter) !== "element") {
+        const kind = this.declarations.getParameterKind(parameter);
+        if (kind === "collection") {
+            accept(
+                "error",
+                `'${name}' is a collection, not a model element, so it cannot be a node of a pattern. Loop over it with 'for x in ${name} do { … }'.`,
+                { node: referenceNode, property }
+            );
+            return true;
+        }
+        if (kind !== "element") {
             accept(
                 "error",
                 `'${name}' is a ${isParameter ? "scalar parameter" : "scalar output"}, not a model element, so it cannot be a node of a pattern. Use it in expressions instead.`,
@@ -219,6 +335,14 @@ export class TransformationCallValidator {
             return true;
         }
         if (parameterTypeName(this.reflection, parameter)?.isNullable === true) {
+            if (isParameter && this.declarations.getPinnedObject(parameter) != undefined) {
+                accept(
+                    "error",
+                    `'${name}' is only bound where the object '${name}' of the first pattern is visible: when no '${name}' is passed, that object is matched, and it is not bound here.`,
+                    { node: referenceNode, property }
+                );
+                return true;
+            }
             accept("error", `'${name}' may be null (its type is nullable), so it cannot be a node of a pattern.`, {
                 node: referenceNode,
                 property
@@ -241,8 +365,8 @@ export class TransformationCallValidator {
                 accept(
                     "error",
                     typeName?.hasTypeArgs === true
-                        ? `Collection parameters are not supported yet; '${parameter.name}' must be a single model element or a scalar.`
-                        : `The type of '${parameter.name}' must be a class or enum of the metamodel, or one of int, long, float, double, string and boolean.`,
+                        ? `The type of '${parameter.name}' must be List<T> or Set<T> of a class or enum of the metamodel or of int, long, float, double, string or boolean, not nullable and not nested.`
+                        : `The type of '${parameter.name}' must be a class or enum of the metamodel, one of int, long, float, double, string and boolean, or a List<…> or Set<…> of those.`,
                     { node: parameter, property: "type" }
                 );
                 continue;
@@ -253,13 +377,17 @@ export class TransformationCallValidator {
                     property: "defaultValue"
                 });
             }
+            if (kind === "collection" && parameter.direction === "in" && parameter.defaultValue != undefined) {
+                accept("error", `The collection input '${parameter.name}' cannot have a default value.`, {
+                    node: parameter,
+                    property: "defaultValue"
+                });
+            }
             if (kind === "element" && parameter.direction === "in") {
                 if (typeName?.isNullable === true) {
-                    accept(
-                        "error",
-                        `The element input '${parameter.name}' must not be nullable: it is a bound node of the transformation's patterns.`,
-                        { node: parameter, property: "type" }
-                    );
+                    this.validatePinningInput(parameter, accept);
+                } else {
+                    this.validateBoundInput(parameter, accept);
                 }
                 if (parameter.defaultValue != undefined) {
                     accept("error", `The element input '${parameter.name}' cannot have a default value.`, {
@@ -269,6 +397,87 @@ export class TransformationCallValidator {
                 }
             }
         }
+    }
+
+    /**
+     * Validates a nullable element input: it must pin an object of the first pattern with its
+     * name, whose class every passed value has (the parameter's class or a superclass).
+     *
+     * @param parameter The parameter
+     * @param accept The validation acceptor
+     */
+    private validatePinningInput(parameter: TransformationParameterType, accept: ValidationAcceptor): void {
+        const object = this.declarations.getPinnedObject(parameter);
+        if (object == undefined) {
+            const sameName = this.findPatternObject(parameter);
+            accept(
+                "error",
+                sameName != undefined
+                    ? `The nullable element input '${parameter.name}' can only pin an object of the first pattern (the pattern of the first statement, a match, if match, for match or while match); '${parameter.name}' is declared in a later pattern.`
+                    : `The element input '${parameter.name}' is nullable, so it must pin an object of the first pattern: declare '${parameter.name}: ${parameterTypeName(this.reflection, parameter)?.name ?? "Class"} { … }' in the pattern of the first statement. It is bound to the passed element, or matched freely when none (or null) is passed. Otherwise declare the input non-nullable.`,
+                { node: parameter, property: "name" }
+            );
+            return;
+        }
+        if (object.modifier?.modifier === "create") {
+            accept(
+                "error",
+                `The input '${parameter.name}' pins the object '${object.name}', which the pattern creates; only matched (or deleted) objects can be pinned.`,
+                { node: parameter, property: "name" }
+            );
+            return;
+        }
+        const parameterClass = this.declarations.getParameterClass(parameter);
+        const objectClass = object.class?.ref as ClassType | undefined;
+        if (
+            parameterClass != undefined &&
+            objectClass != undefined &&
+            !isSubclassOf(parameterClass, objectClass, this.reflection)
+        ) {
+            accept(
+                "error",
+                `The input '${parameter.name}' pins the object '${object.name}' of class '${objectClass.name}', so its type must be '${objectClass.name}' or a subclass of it ('${parameterClass.name}' is not): a pinned object is not checked against its class again.`,
+                { node: parameter, property: "type" }
+            );
+        }
+    }
+
+    /**
+     * Validates a non-nullable element input: it is already bound, so no pattern may declare an
+     * object of its name (the duplicate-name check reports it; this explains what to do).
+     *
+     * @param parameter The parameter
+     * @param accept The validation acceptor
+     */
+    private validateBoundInput(parameter: TransformationParameterType, accept: ValidationAcceptor): void {
+        const object = this.findPatternObject(parameter);
+        if (object != undefined) {
+            accept(
+                "error",
+                `The element input '${parameter.name}' is required, so it is bound when the transformation starts; reference it as '${parameter.name} { }' instead of declaring '${parameter.name}: ${object.class?.$refText ?? "Class"}'. To match it when no '${parameter.name}' is passed, declare the input nullable ('in ${parameter.name}: ${parameterTypeName(this.reflection, parameter)?.name ?? "Class"}?').`,
+                { node: object, property: "name" }
+            );
+        }
+    }
+
+    /**
+     * Finds a pattern object (outside condition blocks) with the name of a parameter, anywhere in
+     * the transformation.
+     */
+    private findPatternObject(parameter: TransformationParameterType): PatternObjectInstanceType | undefined {
+        const root = AstUtils.getContainerOfType(parameter, (n) => this.reflection.isInstance(n, ModelTransformation));
+        if (root == undefined) {
+            return undefined;
+        }
+        for (const node of AstUtils.streamAllContents(root)) {
+            if (
+                this.reflection.isInstance(node, PatternObjectInstance) &&
+                (node as PatternObjectInstanceType).name === parameter.name
+            ) {
+                return node as PatternObjectInstanceType;
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -439,7 +648,8 @@ export class TransformationCallValidator {
             (p) =>
                 p.direction === "out" &&
                 parameterTypeName(this.reflection, p)?.isNullable !== true &&
-                this.declarations.getParameterKind(p) !== "unsupported"
+                this.declarations.getParameterKind(p) !== "unsupported" &&
+                this.declarations.getParameterKind(p) !== "collection"
         );
         if (required.length === 0) {
             return;
@@ -555,6 +765,24 @@ export class TransformationCallValidator {
                 stops.push({ stop, assigned });
             }
             return undefined;
+        }
+        if (this.reflection.isInstance(statement, IfCallStatement)) {
+            const ifCall = statement as IfCallStatementType;
+            const thenResult = block(ifCall.ifBlock?.thenBlock, assigned);
+            const elseResult = ifCall.elseBlock != undefined ? block(ifCall.elseBlock, assigned) : assigned;
+            return this.intersect([thenResult, elseResult]);
+        }
+        if (this.reflection.isInstance(statement, ForInStatement)) {
+            block((statement as ForInStatementType).doBlock, assigned);
+            return assigned;
+        }
+        if (this.reflection.isInstance(statement, AssignmentStatement)) {
+            const assignment = statement as AssignmentStatementType;
+            const target = assignment.variable?.ref;
+            if (assignment.operator === "=" && this.reflection.isInstance(target, TransformationParameter)) {
+                return new Set([...assigned, target.name]);
+            }
+            return assigned;
         }
         if (this.reflection.isInstance(statement, CallStatement)) {
             return assigned;

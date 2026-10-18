@@ -61,7 +61,13 @@ import {
     TransformationFileImport,
     transformationFileScopingConfig,
     AssignableVariable,
-    ObjectInstanceDeclaration
+    ObjectInstanceDeclaration,
+    PatternCollectionAppend,
+    IfCallConditionAndBlock,
+    IfCallStatement,
+    ForInVariable,
+    ForInStatement,
+    AssignmentStatement
 } from "./modelTransformationTypes.js";
 
 /**
@@ -148,6 +154,16 @@ export function generateModelTransformationRules(): {
     const PatternVariableReassignmentRule = createRule("PatternVariableReassignmentRule")
         .returns(PatternVariableReassignment)
         .as(({ set }) => [set("variable", ref(AssignableVariable, ID)), "=", set("value", ExpressionRule)]);
+
+    /**
+     * Pattern collection append rule.
+     * Format: name += expression
+     *
+     * `name` must be a collection `out` parameter of the signature.
+     */
+    const PatternCollectionAppendRule = createRule("PatternCollectionAppendRule")
+        .returns(PatternCollectionAppend)
+        .as(({ set }) => [set("variable", ref(AssignableVariable, ID)), "+=", set("value", ExpressionRule)]);
 
     /**
      * Pattern property assignment rule.
@@ -281,6 +297,7 @@ export function generateModelTransformationRules(): {
                 or(
                     add("elements", PatternVariableRule),
                     add("elements", PatternVariableReassignmentRule),
+                    add("elements", PatternCollectionAppendRule),
                     add("elements", PatternObjectInstanceReferenceRule),
                     add("elements", PatternObjectInstanceRule),
                     add("elements", PatternLinkRule),
@@ -474,6 +491,65 @@ export function generateModelTransformationRules(): {
         ]);
 
     /**
+     * If-call condition rule (inner node for scoping: the outputs are visible in the then block).
+     * Format: call name(...) [-> (...)] then { block }
+     */
+    const IfCallConditionRule = createRule("IfCallConditionRule")
+        .returns(IfCallConditionAndBlock)
+        .as(({ set }) => [set("call", CallStatementRule), "then", set("thenBlock", () => StatementsScopeRule)]);
+
+    /**
+     * If-call statement rule.
+     * Format: if call name(...) [-> (...)] then { block } [else { block }]
+     */
+    const IfCallStatementRule = createRule("IfCallStatementRule")
+        .returns(IfCallStatement)
+        .as(({ set }) => [
+            "if",
+            set("ifBlock", IfCallConditionRule),
+            optional(
+                group(
+                    "else",
+                    set("elseBlock", () => StatementsScopeRule)
+                )
+            )
+        ]);
+
+    /**
+     * Loop variable rule of a for-in statement.
+     */
+    const ForInVariableRule = createRule("ForInVariableRule")
+        .returns(ForInVariable)
+        .as(({ set }) => [set("name", ID)]);
+
+    /**
+     * For-in statement rule.
+     * Format: for name in expression do { block }
+     */
+    const ForInStatementRule = createRule("ForInStatementRule")
+        .returns(ForInStatement)
+        .as(({ set }) => [
+            "for",
+            set("variable", ForInVariableRule),
+            "in",
+            set("collection", ExpressionRule),
+            "do",
+            set("doBlock", () => StatementsScopeRule)
+        ]);
+
+    /**
+     * Assignment statement rule.
+     * Format: name = expression | name += expression
+     */
+    const AssignmentStatementRule = createRule("AssignmentStatementRule")
+        .returns(AssignmentStatement)
+        .as(({ set }) => [
+            set("variable", ref(AssignableVariable, ID)),
+            or(set("operator", "+="), set("operator", "=")),
+            set("value", ExpressionRule)
+        ]);
+
+    /**
      * Statement rule containing transformation statements.
      */
     const StatementRule = createRule("StatementRule")
@@ -488,7 +564,10 @@ export function generateModelTransformationRules(): {
                 IfExpressionStatementRule,
                 WhileExpressionStatementRule,
                 StopStatementRule,
-                CallStatementRule
+                CallStatementRule,
+                IfCallStatementRule,
+                ForInStatementRule,
+                AssignmentStatementRule
             )
         ]);
 

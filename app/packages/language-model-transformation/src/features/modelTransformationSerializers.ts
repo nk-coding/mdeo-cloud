@@ -71,7 +71,19 @@ import {
     type TransformationSignatureType,
     type CallArgumentType,
     type CallOutputType,
-    type CallStatementType
+    type CallStatementType,
+    PatternCollectionAppend,
+    IfCallConditionAndBlock,
+    IfCallStatement,
+    ForInVariable,
+    ForInStatement,
+    AssignmentStatement,
+    type PatternCollectionAppendType,
+    type IfCallConditionAndBlockType,
+    type IfCallStatementType,
+    type ForInVariableType,
+    type ForInStatementType,
+    type AssignmentStatementType
 } from "../grammar/modelTransformationTypes.js";
 
 const { doc } = sharedImport("prettier");
@@ -147,6 +159,12 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(CallArgument, (ctx) => printCallArgument(ctx));
     AstSerializer.registerNodeSerializer(CallOutput, (ctx) => printCallOutput(ctx));
     AstSerializer.registerNodeSerializer(CallStatement, (ctx) => printCallStatement(ctx));
+    AstSerializer.registerNodeSerializer(PatternCollectionAppend, (ctx) => printPatternCollectionAppend(ctx));
+    AstSerializer.registerNodeSerializer(IfCallConditionAndBlock, (ctx) => printIfCallCondition(ctx));
+    AstSerializer.registerNodeSerializer(IfCallStatement, (ctx) => printIfCallStatement(ctx));
+    AstSerializer.registerNodeSerializer(ForInVariable, (ctx) => printForInVariable(ctx));
+    AstSerializer.registerNodeSerializer(ForInStatement, (ctx) => printForInStatement(ctx));
+    AstSerializer.registerNodeSerializer(AssignmentStatement, (ctx) => printAssignmentStatement(ctx));
     registerImportSerializers(services, doc.builders, TransformationImport, TransformationFileImport);
 
     AstSerializer.registerNodeSerializer(MetamodelFileImport, (ctx) => printMetamodelFileImport(ctx));
@@ -182,6 +200,87 @@ function printPatternVariableReassignment(context: PrintContext<PatternVariableR
     const name = path.call((ref) => printReference(ref, ID), "variable");
     const value = path.call(print, "value");
     return [name, " = ", value];
+}
+
+/**
+ * Prints an addition to a collection inside a pattern.
+ *
+ * @param context The print context.
+ * @returns The formatted append (`name += value`).
+ */
+function printPatternCollectionAppend(context: PrintContext<PatternCollectionAppendType>): Doc {
+    const { path, print, printReference } = context;
+    return [path.call((ref) => printReference(ref, ID), "variable"), " += ", path.call(print, "value")];
+}
+
+/**
+ * Prints the call and then block of an if-call statement.
+ *
+ * @param context The print context.
+ * @returns The formatted condition (`call f(...) then { ... }`).
+ */
+function printIfCallCondition(context: PrintContext<IfCallConditionAndBlockType>): Doc {
+    const { path, print } = context;
+    return [path.call(print, "call"), " then ", path.call(print, "thenBlock")];
+}
+
+/**
+ * Prints an if-call statement.
+ *
+ * @param context The print context.
+ * @returns The formatted statement.
+ */
+function printIfCallStatement(context: PrintContext<IfCallStatementType>): Doc {
+    const { ctx, path, print } = context;
+    const docs: Doc[] = ["if ", path.call(print, "ifBlock")];
+    if (ctx.elseBlock != undefined) {
+        docs.push(" else ", path.call(print, "elseBlock"));
+    }
+    return docs;
+}
+
+/**
+ * Prints the variable of a for-in loop.
+ *
+ * @param context The print context.
+ * @returns The variable's name.
+ */
+function printForInVariable(context: PrintContext<ForInVariableType>): Doc {
+    const { ctx, printPrimitive, getPrimitive } = context;
+    return printPrimitive(getPrimitive(ctx, "name"), ID);
+}
+
+/**
+ * Prints a for-in loop.
+ *
+ * @param context The print context.
+ * @returns The formatted loop (`for x in xs do { ... }`).
+ */
+function printForInStatement(context: PrintContext<ForInStatementType>): Doc {
+    const { path, print } = context;
+    return [
+        "for ",
+        path.call(print, "variable"),
+        " in ",
+        path.call(print, "collection"),
+        " do ",
+        path.call(print, "doBlock")
+    ];
+}
+
+/**
+ * Prints an assignment outside a pattern.
+ *
+ * @param context The print context.
+ * @returns The formatted assignment (`name = value` or `name += value`).
+ */
+function printAssignmentStatement(context: PrintContext<AssignmentStatementType>): Doc {
+    const { ctx, path, print, printReference } = context;
+    return [
+        path.call((ref) => printReference(ref, ID), "variable"),
+        ` ${ctx.operator ?? "="} `,
+        path.call(print, "value")
+    ];
 }
 
 /**

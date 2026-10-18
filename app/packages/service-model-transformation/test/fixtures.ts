@@ -315,3 +315,175 @@ match {
 }
 `
 };
+
+/**
+ * Scenarios of stage 2 (collections, `for … in`, assignments outside patterns, `if call`) and
+ * stage 3 (optional element inputs that pin an object of the first pattern), for the engine
+ * tests (platform/model-transformation, CollectionCallExecutionTest).
+ */
+export const COLLECTION_SCENARIOS: Record<string, string> = {
+    // collection outputs: += inside a for-match pattern and in its do block
+    "/optimize/scenarios/components-on.mt": `using "../../metamodel/base.mm"
+
+transformation componentsOn(in host: Container, out components: List<Component>, out names: Set<string>)
+
+for match {
+    host { }
+    c: Component { }
+    c.host -- host
+    components += c
+} do {
+    names += c.name
+}
+`,
+    // a local repair per element
+    "/optimize/scenarios/mark-component.mt": `using "../../metamodel/base.mm"
+
+transformation markComponent(in component: Component, in label: string)
+
+match {
+    component {
+        name = label
+    }
+}
+`,
+    // a collection input, a loop over it and assignments outside patterns
+    "/optimize/scenarios/rename-all.mt": `using "../../metamodel/base.mm"
+
+transformation renameAll(in components: List<Component>, in prefix: string, out renamed: int)
+
+renamed = 0
+for c in components do {
+    match {
+        c {
+            name = prefix
+        }
+    }
+    renamed = renamed + 1
+}
+`,
+    // a collection output assigned from a many-valued reference
+    "/optimize/scenarios/candidates-of.mt": `using "../../metamodel/base.mm"
+
+transformation candidatesOf(out options: Set<Container>)
+
+match {
+    p: Placement { }
+    options = p.candidates
+}
+`,
+    "/optimize/scenarios/call-collecting.mt": `using "../../metamodel/shop.mm"
+import { moveComponent } from "../generic/move-component.mt"
+import { componentsOn } from "./components-on.mt"
+import { markComponent } from "./mark-component.mt"
+import { renameAll } from "./rename-all.mt"
+import { candidatesOf } from "./candidates-of.mt"
+
+call moveComponent() -> (moved: m, source: a, target: b)
+call componentsOn(host = b) -> (components: here, names: hereNames)
+for x in here do {
+    call markComponent(component = x, label = "on b")
+}
+for n in hereNames do {
+    match {
+        create log: Container {
+            name = n
+        }
+    }
+}
+call componentsOn(host = a) -> (components: left, names: leftNames)
+call renameAll(components = left, prefix = "left") -> (renamed: k)
+call candidatesOf() -> (options: choices)
+for choice in choices do {
+    match {
+        choice {
+            name = "candidate"
+        }
+    }
+}
+match {
+    b { }
+    where k == left.size() && hereNames.size() == here.size() && leftNames.size() == 1
+}
+`,
+    // if call: the else block after a callee that fails before changing anything, outputs in then
+    "/optimize/scenarios/call-if.mt": `using "../../metamodel/shop.mm"
+import { moveComponent } from "../generic/move-component.mt"
+import { noPlacement } from "./no-placement.mt"
+
+if call noPlacement(wanted = "nobody") then {
+    match {
+        create c1: Container {
+            name = "then ran"
+        }
+    }
+} else {
+    match {
+        create c2: Container {
+            name = "else ran"
+        }
+    }
+}
+if call moveComponent() -> (moved: m, target: t) then {
+    match {
+        t {
+            name = "moved here"
+        }
+    }
+} else {
+    kill
+}
+`,
+    // kill in a callee of if call still ends everything
+    "/optimize/scenarios/call-if-killing.mt": `using "../../metamodel/shop.mm"
+import { killer } from "./killer.mt"
+
+if call killer() then {
+    match {
+        create c1: Container {
+            name = "then ran"
+        }
+    }
+} else {
+    match {
+        create c2: Container {
+            name = "else ran"
+        }
+    }
+}
+`,
+    // proposal C: an optional element input pins the object of the same name of the first
+    // pattern; the same file is an operator (placement matched freely) and a callee
+    "/optimize/scenarios/move-placement.mt": `using "../../metamodel/base.mm"
+
+transformation movePlacement(in placement: Placement?, out moved: Component, out target: Container)
+
+match {
+    placement: Placement { }
+    component: Component { }
+    current: Container { }
+    destination: Container { }
+    placement.component -- component
+    placement.candidates -- destination
+    delete component.host -- current
+    create component.host -- destination
+    moved = component
+    target = destination
+}
+`,
+    "/optimize/scenarios/call-pinned.mt": `using "../../metamodel/shop.mm"
+import { movePlacement } from "./move-placement.mt"
+
+match {
+    p: Placement { }
+    s: Service { }
+    p.component -- s
+}
+call movePlacement(placement = p) -> (moved: m, target: t)
+match {
+    t {
+        name = "pinned target"
+    }
+}
+`
+};

@@ -74,7 +74,21 @@ import {
     type TypedCallStatement,
     type TransformationSignatureType,
     type TypedTransformationSignature,
-    TransformationDeclarationResolver
+    TransformationDeclarationResolver,
+    IfCallStatement,
+    ForInStatement,
+    AssignmentStatement,
+    PatternCollectionAppend,
+    type IfCallStatementType,
+    type ForInStatementType,
+    type AssignmentStatementType,
+    type PatternCollectionAppendType,
+    type TypedIfCallStatement,
+    type TypedForInStatement,
+    type TypedAssignmentStatement,
+    type TypedPatternCollectionAppendElement,
+    type TransformationParameterType,
+    type TypedTransformationParameter
 } from "@mdeo/language-model-transformation";
 import { AssociationEnd, type AssociationEndType } from "@mdeo/language-metamodel";
 import type { AstNode } from "langium";
@@ -116,7 +130,7 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
     ) {
         super(typir, reflection);
         this.associationResolver = new AssociationResolver(reflection);
-        this.declarations = new TransformationDeclarationResolver(reflection, documents);
+        this.declarations = new TransformationDeclarationResolver(reflection, documents, () => typir.Inference);
     }
 
     /**
@@ -154,15 +168,97 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
     private convertSignature(signature: TransformationSignatureType): TypedTransformationSignature {
         return {
             name: signature.name,
-            parameters: (signature.parameters ?? []).map((parameter) => ({
-                name: parameter.name,
-                direction: parameter.direction === "out" ? "out" : "in",
-                type: this.getTypeIndex(parameter.type),
-                isElement: this.declarations.getParameterKind(parameter) === "element",
-                ...(parameter.defaultValue != undefined
-                    ? { defaultValue: this.convertExpression(parameter.defaultValue) }
-                    : {})
-            }))
+            parameters: (signature.parameters ?? []).map((parameter) => this.convertParameter(parameter))
+        };
+    }
+
+    /**
+     * Converts a parameter of a signature.
+     *
+     * @param parameter The TransformationParameter AST node
+     * @returns The TypedTransformationParameter representation
+     */
+    private convertParameter(parameter: TransformationParameterType): TypedTransformationParameter {
+        const shape = this.declarations.getCollectionShape(parameter);
+        const isNullable = (parameter.type as { isNullable?: boolean } | undefined)?.isNullable === true;
+        const optional = parameter.direction === "in" && parameter.defaultValue == undefined && isNullable;
+        const pinsNode = this.declarations.getPinnedObject(parameter) != undefined;
+        return {
+            name: parameter.name,
+            direction: parameter.direction === "out" ? "out" : "in",
+            type: this.getTypeIndex(parameter.type),
+            isElement: this.declarations.getParameterKind(parameter) === "element",
+            ...(parameter.defaultValue != undefined
+                ? { defaultValue: this.convertExpression(parameter.defaultValue) }
+                : {}),
+            ...(shape != undefined
+                ? { collection: shape.collection, elementsAreElements: shape.elementKind === "element" }
+                : {}),
+            ...(optional ? { optional: true } : {}),
+            ...(pinsNode ? { pinsNode: true } : {})
+        };
+    }
+
+    /**
+     * Converts an if-call statement.
+     *
+     * @param stmt The IfCallStatement AST node
+     * @returns The TypedIfCallStatement representation
+     */
+    private convertIfCallStatement(stmt: IfCallStatementType): TypedIfCallStatement {
+        return {
+            kind: "ifCall",
+            call: this.convertCallStatement(stmt.ifBlock.call),
+            thenBlock: stmt.ifBlock.thenBlock.statements.map((s) => this.convertTransformationStatement(s)),
+            elseBlock: stmt.elseBlock
+                ? stmt.elseBlock.statements.map((s) => this.convertTransformationStatement(s))
+                : undefined
+        };
+    }
+
+    /**
+     * Converts a for-in loop.
+     *
+     * @param stmt The ForInStatement AST node
+     * @returns The TypedForInStatement representation
+     */
+    private convertForInStatement(stmt: ForInStatementType): TypedForInStatement {
+        return {
+            kind: "forIn",
+            variable: stmt.variable.name,
+            collection: this.convertExpression(stmt.collection),
+            doBlock: stmt.doBlock.statements.map((s) => this.convertTransformationStatement(s))
+        };
+    }
+
+    /**
+     * Converts an assignment outside a pattern.
+     *
+     * @param stmt The AssignmentStatement AST node
+     * @returns The TypedAssignmentStatement representation
+     */
+    private convertAssignmentStatement(stmt: AssignmentStatementType): TypedAssignmentStatement {
+        return {
+            kind: "assignment",
+            name: stmt.variable?.$refText ?? "",
+            operator: stmt.operator === "+=" ? "+=" : "=",
+            value: this.convertExpression(stmt.value)
+        };
+    }
+
+    /**
+     * Converts an addition to a collection inside a pattern.
+     *
+     * @param element The PatternCollectionAppend AST node
+     * @returns The TypedPatternCollectionAppendElement representation
+     */
+    private convertPatternCollectionAppend(element: PatternCollectionAppendType): TypedPatternCollectionAppendElement {
+        return {
+            kind: "collectionAppend",
+            append: {
+                name: element.variable?.$refText ?? "",
+                value: this.convertExpression(element.value)
+            }
         };
     }
 
@@ -227,6 +323,15 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
         }
         if (this.reflection.isInstance(stmt, CallStatement)) {
             return this.convertCallStatement(stmt);
+        }
+        if (this.reflection.isInstance(stmt, IfCallStatement)) {
+            return this.convertIfCallStatement(stmt);
+        }
+        if (this.reflection.isInstance(stmt, ForInStatement)) {
+            return this.convertForInStatement(stmt);
+        }
+        if (this.reflection.isInstance(stmt, AssignmentStatement)) {
+            return this.convertAssignmentStatement(stmt);
         }
         throw new Error(`Unknown transformation statement type: ${stmt.$type}`);
     }
@@ -371,6 +476,7 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
         const elements: (
             | TypedPatternVariableElement
             | TypedPatternVariableReassignmentElement
+            | TypedPatternCollectionAppendElement
             | TypedPatternObjectInstanceElement
             | TypedPatternLinkElement
             | TypedPatternWhereClauseElement
@@ -388,6 +494,8 @@ export class ModelTransformationTypedAstConverter extends TypedAstConverter {
                     kind: "variableReassignment",
                     reassignment: this.convertPatternVariableReassignment(element)
                 });
+            } else if (this.reflection.isInstance(element, PatternCollectionAppend)) {
+                elements.push(this.convertPatternCollectionAppend(element));
             } else if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 elements.push({
                     kind: "objectInstance",

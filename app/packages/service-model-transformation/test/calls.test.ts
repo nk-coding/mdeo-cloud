@@ -305,10 +305,9 @@ transformation t(
 )
 `);
         assertErrors(errors, [
-            "The element input 'e' must not be nullable",
+            "The element input 'e' is nullable, so it must pin an object of the first pattern",
             "The element input 'f' cannot have a default value.",
             "Default value of type 'null' is not assignable to parameter 'f' of type 'Component'.",
-            "Collection parameters are not supported yet; 'many' must be a single model element or a scalar.",
             "The type of 'what' must be a class or enum of the metamodel",
             "Only 'in' parameters can have a default value.",
             "The output 'o' is not assigned on every path",

@@ -3,6 +3,7 @@ import type { LangiumDocument, AstNodeDescription, AstNode, MultiMap } from "lan
 import {
     CallOutput,
     CallStatement,
+    ForInVariable,
     MatchStatement,
     ModelTransformation,
     PatternApplicationCondition,
@@ -22,7 +23,9 @@ const { DefaultScopeComputation, AstUtils } = sharedImport("langium");
  *
  * Registers PatternObjectInstance nodes as local symbols
  * in the closest non-Pattern/MatchStatement container, the parameters of the signature on the
- * transformation root and the outputs of a call in the block containing the call.
+ * transformation root, the outputs of a call in the block containing the call (for `if call`, in
+ * the condition, so they are visible in the then block only) and the variable of a `for … in`
+ * loop on the loop.
  */
 export class ModelTransformationScopeComputation extends DefaultScopeComputation {
     /**
@@ -54,6 +57,7 @@ export class ModelTransformationScopeComputation extends DefaultScopeComputation
                     if (
                         this.astReflection.isInstance(node, PatternVariable) ||
                         this.astReflection.isInstance(node, PatternObjectInstance) ||
+                        this.astReflection.isInstance(node, ForInVariable) ||
                         this.astReflection.isInstance(node, TransformationSignature)
                     ) {
                         result.push(node);
@@ -92,6 +96,11 @@ export class ModelTransformationScopeComputation extends DefaultScopeComputation
             const call = node.$container;
             const container = this.astReflection.isInstance(call, CallStatement) ? call.$container : undefined;
             this.addSymbol(node, node.name, container, document, symbols);
+            return;
+        }
+        if (this.astReflection.isInstance(node, ForInVariable)) {
+            // visible in the loop's do block (the statement contains the block)
+            this.addSymbol(node, node.name, node.$container, document, symbols);
             return;
         }
         if (this.astReflection.isInstance(node, PatternObjectInstance)) {

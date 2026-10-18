@@ -18,7 +18,13 @@ import {
     PatternVariable,
     PatternApplicationCondition,
     CallStatement,
+    IfCallStatement,
+    ForInStatement,
     type CallStatementType,
+    type IfCallStatementType,
+    type ForInStatementType,
+    type AssignmentStatementType,
+    type PatternCollectionAppendType,
     type PatternVariableReassignmentType,
     type ModelTransformationType,
     type PatternObjectInstanceType,
@@ -38,7 +44,11 @@ import {
 } from "../grammar/modelTransformationTypes.js";
 import { climbsAboveProjectRoot, resolveRelativeDocument, sharedImport } from "@mdeo/language-shared";
 import { TransformationCallValidator } from "./transformationCallValidator.js";
-import { TransformationDeclarationResolver, asPatternObjectInstance } from "../features/transformationDeclarations.js";
+import {
+    TransformationDeclarationResolver,
+    asPatternObjectInstance,
+    type TypeInference
+} from "../features/transformationDeclarations.js";
 
 const { MultiMap, AstUtils } = sharedImport("langium");
 
@@ -56,7 +66,7 @@ export const ModelTransformationIssueCodes = {
 interface NamedElement {
     name: string;
     node: AstNode;
-    type: "object" | "variable" | "parameter" | "call output";
+    type: "object" | "variable" | "parameter" | "call output" | "loop variable";
 }
 
 /**
@@ -72,6 +82,9 @@ interface ModelTransformationAstTypes {
     StatementsScope: StatementsScopeType;
     CallStatement: CallStatementType;
     PatternVariableReassignment: PatternVariableReassignmentType;
+    IfCallStatement: IfCallStatementType;
+    AssignmentStatement: AssignmentStatementType;
+    PatternCollectionAppend: PatternCollectionAppendType;
 }
 
 /**
@@ -92,7 +105,10 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
         PatternLink: validator.validateLink.bind(validator),
         StatementsScope: validator.validateStatementsScopeDeadCode.bind(validator),
         CallStatement: validator.callValidator.validateCall.bind(validator.callValidator),
-        PatternVariableReassignment: validator.callValidator.validateReassignment.bind(validator.callValidator)
+        PatternVariableReassignment: validator.callValidator.validateReassignment.bind(validator.callValidator),
+        IfCallStatement: validator.callValidator.validateIfCall.bind(validator.callValidator),
+        AssignmentStatement: validator.callValidator.validateAssignmentTarget.bind(validator.callValidator),
+        PatternCollectionAppend: validator.callValidator.validateAssignmentTarget.bind(validator.callValidator)
     };
 
     registry.register(checks, validator);
@@ -123,7 +139,8 @@ export class ModelTransformationValidator extends BaseModelValidator {
         this.callValidator = new TransformationCallValidator(services);
         this.declarations = new TransformationDeclarationResolver(
             services.shared.AstReflection,
-            services.shared.workspace.LangiumDocuments
+            services.shared.workspace.LangiumDocuments,
+            () => (services as { typir?: { Inference: TypeInference } }).typir?.Inference
         );
     }
 
@@ -205,7 +222,8 @@ export class ModelTransformationValidator extends BaseModelValidator {
      */
     private collectAllNames(transformation: ModelTransformationType, names: MultiMapType<string, NamedElement>): void {
         for (const parameter of transformation.signature?.parameters ?? []) {
-            if (parameter.name) {
+            // an optional element input that pins an object of the first pattern shares its name
+            if (parameter.name && this.declarations.getPinnedObject(parameter) == undefined) {
                 names.add(parameter.name, { name: parameter.name, node: parameter, type: "parameter" });
             }
         }
@@ -239,10 +257,37 @@ export class ModelTransformationValidator extends BaseModelValidator {
         } else if (this.reflection.isInstance(statement, WhileExpressionStatement)) {
             this.collectNamesFromWhileExpressionStatement(statement, names);
         } else if (this.reflection.isInstance(statement, CallStatement)) {
-            for (const output of statement.outputs ?? []) {
-                if (output.name) {
-                    names.add(output.name, { name: output.name, node: output, type: "call output" });
-                }
+            this.collectNamesFromCall(statement, names);
+        } else if (this.reflection.isInstance(statement, IfCallStatement)) {
+            const ifCall = statement as IfCallStatementType;
+            if (ifCall.ifBlock?.call != undefined) {
+                this.collectNamesFromCall(ifCall.ifBlock.call, names);
+            }
+            this.collectNamesFromStatementsScope(ifCall.ifBlock?.thenBlock, names);
+            this.collectNamesFromStatementsScope(ifCall.elseBlock, names);
+        } else if (this.reflection.isInstance(statement, ForInStatement)) {
+            const forIn = statement as ForInStatementType;
+            if (forIn.variable?.name) {
+                names.add(forIn.variable.name, {
+                    name: forIn.variable.name,
+                    node: forIn.variable,
+                    type: "loop variable"
+                });
+            }
+            this.collectNamesFromStatementsScope(forIn.doBlock, names);
+        }
+    }
+
+    /**
+     * Collects the names of the outputs a call binds.
+     *
+     * @param call The call statement
+     * @param names The multimap to add collected names to
+     */
+    private collectNamesFromCall(call: CallStatementType, names: MultiMapType<string, NamedElement>): void {
+        for (const output of call.outputs ?? []) {
+            if (output.name) {
+                names.add(output.name, { name: output.name, node: output, type: "call output" });
             }
         }
     }
@@ -1002,6 +1047,16 @@ export class ModelTransformationValidator extends BaseModelValidator {
             return (
                 this.scopeDefinitelyTerminates(statement.ifBlock.thenBlock) &&
                 this.scopeDefinitelyTerminates(statement.elseBlock)
+            );
+        }
+        if (this.reflection.isInstance(statement, IfCallStatement)) {
+            const ifCall = statement as IfCallStatementType;
+            if (!ifCall.elseBlock) {
+                return false;
+            }
+            return (
+                this.scopeDefinitelyTerminates(ifCall.ifBlock?.thenBlock) &&
+                this.scopeDefinitelyTerminates(ifCall.elseBlock)
             );
         }
         return false;
