@@ -42,6 +42,7 @@ object TypedTransformationStatementSerializer : JsonContentPolymorphicSerializer
             "ifExpression" -> TypedIfExpressionStatement.serializer()
             "whileExpression" -> TypedWhileExpressionStatement.serializer()
             "stop" -> TypedStopStatement.serializer()
+            "call" -> TypedCallStatement.serializer()
             
             else -> throw IllegalArgumentException("Unknown transformation statement kind: $kindValue")
         }

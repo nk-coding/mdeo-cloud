@@ -7,8 +7,13 @@ import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.expression.ast.types.ReturnType
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.ast.TypedAst
+import com.mdeo.modeltransformation.ast.TypedTransformationParameter
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationStatement
 import com.mdeo.modeltransformation.compiler.ExpressionCompilerRegistry
+import com.mdeo.modeltransformation.compiler.VariableBinding
+import com.mdeo.modeltransformation.runtime.statements.ExpressionValueEvaluator
+import com.mdeo.expression.ast.types.ClassTypeRef
+import org.apache.tinkerpop.gremlin.structure.Vertex
 import com.mdeo.modeltransformation.compiler.registry.TypeRegistry
 import com.mdeo.modeltransformation.compiler.registry.gremlinType
 import com.mdeo.modeltransformation.graph.ModelGraph
@@ -39,14 +44,27 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
  *   is reset before each match (see [ModelGraph.resetNondeterminism]), so each single-match step
  *   still uses `limit(1)` but operates on a freshly shuffled traversal order. Set to false for
  *   search-based optimisation runs where variety across iterations is desired.
+ * @param callees The typed ASTs of the transformations [ast] may call, by absolute path. Defaults to
+ *   the callees bundled in [ast]; the engine of a callee gets the root's map.
+ * @param sharedTypeRegistry A type registry to reuse instead of building one. The registry depends
+ *   only on the model graph's metamodel, so a callee reuses its caller's.
+ * @param callDepth How many calls deep this engine runs (0 for the transformation that was started).
  */
 class TransformationEngine(
     val modelGraph: ModelGraph,
     val ast: TypedAst,
     val expressionCompilerRegistry: ExpressionCompilerRegistry = ExpressionCompilerRegistry.createDefaultRegistry(),
     val statementExecutorRegistry: StatementExecutorRegistry = StatementExecutorRegistry.createDefaultRegistry(),
-    val deterministic: Boolean = true
+    val deterministic: Boolean = true,
+    callees: Map<String, TypedAst>? = null,
+    sharedTypeRegistry: TypeRegistry? = null,
+    val callDepth: Int = 0
 ) {
+
+    /**
+     * The typed ASTs of every transformation this engine's transformation may call, by path.
+     */
+    val callees: Map<String, TypedAst> = callees ?: ast.callees
 
     /**
      * The Gremlin [GraphTraversalSource] obtained from [modelGraph] on each access.
@@ -120,7 +138,7 @@ class TransformationEngine(
     val enumContainerPackage: String = "enum-container${ast.metamodelPath}"
 
     init {
-        typeRegistry = createTypeRegistry(metamodelData)
+        typeRegistry = sharedTypeRegistry ?: createTypeRegistry(metamodelData)
     }
 
     /**
@@ -132,8 +150,75 @@ class TransformationEngine(
      *
      * @return The result of the transformation execution.
      */
-    fun execute(): TransformationExecutionResult {
-        var context = TransformationExecutionContext.emptyWithEnums(metamodelData.enums.map { it.name })
+    fun execute(): TransformationExecutionResult = run(emptyMap()).result
+
+    /**
+     * Runs this engine's transformation as a callee: with its inputs bound, and with `stop`
+     * returning from the callee (a success with the changes made up to the `stop`) instead of
+     * ending the caller.
+     *
+     * @param inputs The bindings of the inputs that were passed; the others take their defaults.
+     * @return The callee's result and, on success, the bindings of its outputs.
+     */
+    fun executeCall(inputs: Map<String, VariableBinding>): CallOutcome {
+        val run = run(inputs)
+        val result = when (val result = run.result) {
+            is TransformationExecutionResult.Stopped ->
+                if (result.isNormalStop) run.accumulated ?: TransformationExecutionResult.Success.empty() else result
+            else -> result
+        }
+        val outputs = if (result is TransformationExecutionResult.Success) readOutputs(run.context) else emptyMap()
+        return CallOutcome(result, outputs)
+    }
+
+    /**
+     * Creates the engine that runs the callee at [path] on the same model graph, or null when no
+     * callee of that path was bundled.
+     *
+     * @param path The absolute path of the callee's file.
+     * @return The callee's engine.
+     */
+    fun calleeEngine(path: String): TransformationEngine? {
+        val calleeAst = callees[path] ?: return null
+        return TransformationEngine(
+            modelGraph = modelGraph,
+            ast = calleeAst,
+            expressionCompilerRegistry = expressionCompilerRegistry,
+            statementExecutorRegistry = statementExecutorRegistry,
+            deterministic = deterministic,
+            callees = callees,
+            sharedTypeRegistry = typeRegistry,
+            callDepth = callDepth + 1
+        )
+    }
+
+    /**
+     * The result of a call: the callee's result and the bindings of its outputs.
+     *
+     * @param result Success (also after `stop`), Failure, or Stopped for `kill`.
+     * @param outputs The outputs by parameter name; empty unless the call succeeded.
+     */
+    data class CallOutcome(
+        val result: TransformationExecutionResult,
+        val outputs: Map<String, VariableBinding>
+    )
+
+    /**
+     * What one run of the statements left: its result, what the statements before an ending
+     * `stop` changed, and the root context with the parameters.
+     */
+    private data class Run(
+        val result: TransformationExecutionResult,
+        val accumulated: TransformationExecutionResult.Success?,
+        val context: TransformationExecutionContext
+    )
+
+    /**
+     * Runs the statements in a root context with the parameters bound.
+     */
+    private fun run(inputs: Map<String, VariableBinding>): Run {
+        val context = TransformationExecutionContext.emptyWithEnums(metamodelData.enums.map { it.name })
+        bindParameters(inputs, context)?.let { failure -> return Run(failure, null, context) }
         var accumulatedResult: TransformationExecutionResult.Success? = null
 
         for (statement in ast.statements) {
@@ -143,12 +228,90 @@ class TransformationEngine(
                 is TransformationExecutionResult.Success -> {
                     accumulatedResult = result.merge(accumulatedResult)
                 }
-                is TransformationExecutionResult.Failure -> return result.merge(accumulatedResult)
-                is TransformationExecutionResult.Stopped -> return result
+                is TransformationExecutionResult.Failure -> return Run(result.merge(accumulatedResult), accumulatedResult, context)
+                is TransformationExecutionResult.Stopped -> return Run(result, accumulatedResult, context)
             }
         }
 
-        return accumulatedResult ?: TransformationExecutionResult.Success.empty()
+        return Run(accumulatedResult ?: TransformationExecutionResult.Success.empty(), accumulatedResult, context)
+    }
+
+    /**
+     * Binds the parameters of the signature at the root scope: every input to its argument or,
+     * when none was passed, its default, and every output to null.
+     *
+     * @return A failure when a required input was not passed, else null.
+     */
+    private fun bindParameters(
+        inputs: Map<String, VariableBinding>,
+        context: TransformationExecutionContext
+    ): TransformationExecutionResult.Failure? {
+        val signature = ast.signature ?: return null
+        val scope = context.variableScope
+        for (parameter in signature.parameters) {
+            if (parameter.isOutput) {
+                scope.setBinding(parameter.name, VariableBinding.ValueBinding(null))
+                continue
+            }
+            val passed = inputs[parameter.name]
+            val binding = when {
+                passed != null -> passed
+                parameter.defaultValue != null ->
+                    ExpressionValueEvaluator(this).evaluate(parameter.defaultValue, context)
+                else -> return TransformationExecutionResult.Failure(
+                    reason = "Required input '${parameter.name}' of '${signature.name}' was not passed",
+                    failedAt = signature.name,
+                    isDeterministic = true,
+                    changesWereMade = false
+                )
+            }
+            scope.setBinding(parameter.name, coerce(binding, parameter))
+        }
+        return null
+    }
+
+    /**
+     * Converts a scalar input to the parameter's primitive type (an `int` argument of a `long`
+     * parameter becomes a Long), so the callee compares values of the type it declares.
+     */
+    private fun coerce(binding: VariableBinding, parameter: TypedTransformationParameter): VariableBinding {
+        if (binding !is VariableBinding.ValueBinding) {
+            return binding
+        }
+        val value = binding.value as? Number ?: return binding
+        val type = (getTypeOrNull(parameter.type) as? ClassTypeRef)?.takeIf { it.`package` == "builtin" }?.type
+        val converted: Any = when (type) {
+            "int" -> value.toInt()
+            "long" -> value.toLong()
+            "float" -> value.toFloat()
+            "double" -> value.toDouble()
+            else -> value
+        }
+        return VariableBinding.ValueBinding(converted)
+    }
+
+    /**
+     * Reads the outputs from the root scope after a successful run. An element output assigned
+     * with `out = node` holds the node's vertex, which becomes an instance binding.
+     */
+    private fun readOutputs(context: TransformationExecutionContext): Map<String, VariableBinding> {
+        val signature = ast.signature ?: return emptyMap()
+        val scope = context.variableScope
+        return signature.parameters.filter { it.isOutput }.associate { parameter ->
+            val binding = when (val bound = scope.getLocalBinding(parameter.name)) {
+                is VariableBinding.InstanceBinding -> VariableBinding.InstanceBinding(bound.vertexRef)
+                is VariableBinding.ValueBinding -> {
+                    val value = bound.value
+                    if (value is Vertex) {
+                        VariableBinding.InstanceBinding(modelGraph.createVertexRef(value.id()))
+                    } else {
+                        VariableBinding.ValueBinding(value)
+                    }
+                }
+                else -> VariableBinding.ValueBinding(null)
+            }
+            parameter.name to binding
+        }
     }
 
     /**
