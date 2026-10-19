@@ -301,7 +301,7 @@ internal class MatchPlanGraph(
             metamodelData: MetamodelData,
             statistics: ModelStatistics?
         ): MatchPlanGraph {
-            val pseudoCompositionDag = MetamodelClassPriority.computePseudoCompositionDag(metamodelData)
+            val pseudoCompositionDag = MetamodelClassPriority.pseudoCompositionDag(metamodelData)
             val instances = mergeInstancesByName(elements.matchableInstances + elements.deleteInstances)
             val links = elements.matchableLinks + elements.deleteLinks
 
