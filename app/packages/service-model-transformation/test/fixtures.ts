@@ -820,6 +820,9 @@ match {
     floats: float[0..*]
     doubles: double[0..*]
 }
+
+class Crate extends Bag {
+}
 `,
     "/optimize/scenarios/call-trap-numeric-lists.mt": `using "../../metamodel/numbers.mm"
 
@@ -862,5 +865,113 @@ match {
         doubles = [1, again.i, other.maybe]
     }
 }
+`,
+    // a reference (no class in the pattern) casts numeric values like an object with a class,
+    // against the class of its bound element: an element input and an earlier object
+    "/optimize/scenarios/fill-bag.mt": `using "../../metamodel/numbers.mm"
+
+transformation fillBag(in target: Crate)
+
+match {
+    source: Bag {
+        name == "other"
+    }
+    target {
+        i = source.i + 1
+        l = source.i
+        f = source.i
+        d = source.i
+        ints = [source.i, 2]
+        longs = [source.i]
+        floats = [source.i]
+        doubles = [source.i]
+        maybe = source.i
+    }
+}
+`,
+    "/optimize/scenarios/call-trap-reference-cast.mt": `using "../../metamodel/numbers.mm"
+import { fillBag } from "./fill-bag.mt"
+
+match {
+    seed: Crate {
+        name == "seed"
+    }
+    later: Bag {
+        name == "later"
+    }
+}
+call fillBag(target = seed)
+match {
+    other: Bag {
+        name == "other"
+    }
+    later {
+        i = other.i * 3
+        l = other.i
+        ints = [other.i]
+        doubles = [other.i, 1]
+    }
+}
+`,
+    // assigning null (an unset optional property, the literal, a ternary branch) unsets the
+    // property, on created and on matched objects, also on a reference; an unset list is empty
+    "/optimize/scenarios/fill-null.mt": `using "../../metamodel/numbers.mm"
+
+transformation fillNull(in target: Crate)
+
+match {
+    source: Bag {
+        name == "other"
+    }
+    target {
+        maybe = source.maybe
+        doubles = source.doubles
+    }
+}
+`,
+    "/optimize/scenarios/call-trap-null-assign.mt": `using "../../metamodel/numbers.mm"
+import { fillNull } from "./fill-null.mt"
+
+match {
+    seed: Bag {
+        name == "seed"
+        maybe = other.maybe
+        doubles = other.doubles
+    }
+    other: Bag {
+        name == "other"
+    }
+    lit: Bag {
+        name == "lit"
+        maybe = null
+    }
+    cond: Bag {
+        name == "cond"
+        maybe = cond.i > 100 ? 1.5 : null
+    }
+    kept: Bag {
+        name == "kept"
+        maybe = kept.i > 100 ? null : 2.5
+    }
+    sized: Bag {
+        name == "sized"
+        maybe = sized.ints.size() > 0 ? sized.ints.size() : null
+    }
+    create made: Bag {
+        name = "made"
+        i = 0
+        l = 0
+        f = 0
+        d = 0
+        maybe = other.maybe
+        doubles = other.doubles
+    }
+}
+match {
+    bound: Crate {
+        name == "bound"
+    }
+}
+call fillNull(target = bound)
 `
 };

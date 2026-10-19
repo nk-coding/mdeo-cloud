@@ -237,6 +237,105 @@ class LanguageTrapsExecutionTest {
         }
     }
 
+    private fun num(v: Double) = ModelDataPropertyValue.NumberValue(v)
+    private fun nums(vararg v: Double) = ModelDataPropertyValue.ListValue(v.map { num(it) })
+    /** A `numbers.mm` instance; the required numbers are 0 unless given. */
+    private fun bag(name: String, className: String, vararg props: Pair<String, ModelDataPropertyValue>) =
+        ModelDataInstance(
+            name, className,
+            mapOf("name" to ModelDataPropertyValue.StringValue(name)) + listOf("i", "l", "f", "d").associateWith { num(0.0) } + props
+        )
+
+    /**
+     * Runs [path] on a `numbers.mm` model of [instances] and returns, per instance and property,
+     * the raw graph values (their Java types are the cast's result).
+     */
+    private fun runNumbers(
+        backend: String,
+        path: String,
+        instances: List<ModelDataInstance>,
+        properties: List<String>
+    ): Map<String, Map<String, List<Any?>>> {
+        val numbers = json.decodeFromString(MetamodelData.serializer(), resource("metamodel__numbers.mm.json"))
+        val model = ModelData(metamodelPath = "/metamodel/numbers.mm", instances = instances, links = emptyList())
+        val metamodel = Metamodel.compile(numbers)
+        val inner = if (backend == "tinker") TinkerModelGraph.create(model, metamodel) else MdeoModelGraph.create(model, metamodel)
+        return LambdaFreeGraph(inner).use { graph ->
+            val result = TransformationEngine.create(graph, transformation(path), deterministic = false).execute()
+            assertIs<TransformationExecutionResult.Success>(result, result.toString())
+            fun key(className: String, property: String) =
+                "prop_${metamodel.metadata.classes.getValue(className).propertyFields.getValue(property).fieldIndex}"
+            fun vertex(name: String, className: String) =
+                graph.traversal().V().hasLabel(className).has(key(className, "name"), name)
+            val names = instances.map { it.name to it.className } + ("made" to "Bag")
+            names.filter { (name, className) -> vertex(name, className).hasNext() }.associate { (name, className) ->
+                name to properties.associateWith { property ->
+                    vertex(name, className).properties<Any>(key(className, property)).value<Any>().toList()
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
+    fun `a reference casts numeric values against its bound element's class`(backend: String) {
+        // `target { }` (an element input of the subclass Crate) and `later { }` (an object of an
+        // earlier match) have no class in the pattern; their computed values take the property's
+        // type as for an object with a class (the loader stores every number as a double)
+        val properties = listOf("i", "l", "f", "d", "maybe", "ints", "longs", "floats", "doubles")
+        val values = runNumbers(
+            backend, "/optimize/scenarios/call-trap-reference-cast.mt",
+            listOf(
+                bag("seed", "Crate", "i" to num(3.0), "l" to num(3.0), "f" to num(3.0), "d" to num(3.0)),
+                bag("later", "Bag", "i" to num(1.0), "l" to num(1.0), "f" to num(1.0), "d" to num(1.0)),
+                bag("other", "Bag", "i" to num(4.0))
+            ),
+            properties
+        )
+        assertEquals(
+            mapOf(
+                "i" to listOf(5), "l" to listOf(4L), "f" to listOf(4.0f), "d" to listOf(4.0), "maybe" to listOf(4.0),
+                "ints" to listOf(4, 2), "longs" to listOf(4L), "floats" to listOf(4.0f), "doubles" to listOf<Any?>(4.0)
+            ),
+            values.getValue("seed")
+        )
+        // the properties `later { }` assigns (the others keep the backend's loaded types)
+        val later = mapOf("i" to listOf(12), "l" to listOf(4L), "ints" to listOf(4), "doubles" to listOf<Any?>(4.0, 1.0))
+        assertEquals(later, values.getValue("later").filterKeys { it in later })
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
+    fun `assigning null unsets the property`(backend: String) {
+        // an unset optional property (`maybe = other.maybe`), the literal `null` and a null branch
+        // of a ternary unset `maybe` (a value branch sets it); an unset list (`doubles = other.doubles`) empties `doubles`;
+        // on matched, created and referenced (element input) objects
+        val values = runNumbers(
+            backend, "/optimize/scenarios/call-trap-null-assign.mt",
+            listOf(
+                bag("seed", "Bag", "maybe" to num(7.5), "doubles" to nums(1.0, 2.0)),
+                bag("other", "Bag"),
+                bag("lit", "Bag", "maybe" to num(1.0)),
+                bag("cond", "Bag", "maybe" to num(1.0)),
+                bag("kept", "Bag", "maybe" to num(1.0)),
+                bag("bound", "Crate", "maybe" to num(3.0), "doubles" to nums(5.0)),
+                bag("sized", "Bag", "ints" to nums(1.0, 2.0))
+            ),
+            listOf("maybe", "doubles")
+        )
+        val unset = mapOf("maybe" to listOf<Any?>(), "doubles" to listOf())
+        assertEquals(
+            mapOf(
+                "seed" to unset, "other" to unset, "lit" to unset, "cond" to unset,
+                "kept" to mapOf("maybe" to listOf<Any?>(2.5), "doubles" to listOf()),
+                "bound" to unset, "made" to unset,
+                // a nullable value that ends in a barrier (`size()`), cast to the property's double
+                "sized" to mapOf("maybe" to listOf<Any?>(2.0), "doubles" to listOf())
+            ),
+            values
+        )
+    }
+
     @Test
     fun `the graph of these tests rejects lambda steps`() {
         graph("tinker").use { graph ->

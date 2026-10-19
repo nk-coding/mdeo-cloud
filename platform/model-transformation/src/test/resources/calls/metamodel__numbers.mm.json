@@ -87,6 +87,14 @@
      "primitiveType": "double"
     }
    ]
+  },
+  {
+   "name": "Crate",
+   "isAbstract": false,
+   "extends": [
+    "Bag"
+   ],
+   "properties": []
   }
  ],
  "enums": [],

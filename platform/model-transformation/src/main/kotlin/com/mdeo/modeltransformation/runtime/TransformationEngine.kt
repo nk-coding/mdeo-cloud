@@ -558,18 +558,6 @@ class TransformationEngine(
     }
 
     /**
-     * Resolves the graph property key for a given class and property name.
-     *
-     * When the metamodel has metadata for the class, the graph key is `prop_X` where X
-     * is the field index from the compiled instance class. When [className] is null or
-     * not found in the metadata, falls back to a best-effort search across all classes
-     * and ultimately returns the property name unchanged.
-     *
-     * @param className The metamodel class name, or null for untyped instances.
-     * @param propertyName The logical property name.
-     * @return The graph key (e.g. "prop_2") or the original property name as fallback.
-     */
-    /**
      * Property names that different classes store under different graph keys: for these, a
      * property of an object without a class (a reference to a bound object) cannot be resolved
      * by name ([resolvePropertyGraphKey] would take the first class that has it).
@@ -585,6 +573,32 @@ class TransformationEngine(
     /** Whether [propertyName] maps to different graph keys in different classes. */
     fun isAmbiguousPropertyName(propertyName: String): Boolean = propertyName in ambiguousPropertyNames
 
+    /**
+     * Property names that are an int, long, float or double in some class: a value assigned to
+     * such a property is cast to the property's type, so for an object without a class (a
+     * reference to a bound object) the cast needs the bound element's class.
+     */
+    private val numericPropertyNames: Set<String> by lazy {
+        metamodelData.classes
+            .flatMap { classData -> classData.properties.filter { it.primitiveType in NUMERIC_TYPES }.map { it.name } }
+            .toSet()
+    }
+
+    /** Whether [propertyName] is a numeric property (int, long, float, double) of some class. */
+    fun isNumericPropertyName(propertyName: String): Boolean = propertyName in numericPropertyNames
+
+    /**
+     * Resolves the graph property key for a given class and property name.
+     *
+     * When the metamodel has metadata for the class, the graph key is `prop_X` where X
+     * is the field index from the compiled instance class. When [className] is null or
+     * not found in the metadata, falls back to a best-effort search across all classes
+     * and ultimately returns the property name unchanged.
+     *
+     * @param className The metamodel class name, or null for untyped instances.
+     * @param propertyName The logical property name.
+     * @return The graph key (e.g. "prop_2") or the original property name as fallback.
+     */
     fun resolvePropertyGraphKey(className: String?, propertyName: String): String {
         if (className != null) {
             val mapping = metamodel.metadata.classes[className]?.propertyFields?.get(propertyName)
@@ -598,6 +612,8 @@ class TransformationEngine(
     }
 
     companion object {
+        private val NUMERIC_TYPES = setOf("int", "long", "float", "double")
+
         /**
          * Creates a [TransformationEngine] with default registries.
          *

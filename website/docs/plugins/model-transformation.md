@@ -139,6 +139,14 @@ silently overwrite the first. Comparisons are not restricted: the same property 
 several times — `width > 10` together with `width < 100` — and a property that is compared may still
 be assigned in the same object.
 
+A value assigned to an `int`, `long`, `float` or `double` property takes the property's type
+(truncated toward zero for `int` and `long`), as do the elements of a list assigned to a numeric
+list property — on created objects, on matched ones and on references (`seed { count = n / 2 }`),
+whose property is that of the bound element's class. Assigning `null` leaves an optional property
+unset: `maybe = other.maybe` when `other.maybe` is unset, `maybe = null`, or a ternary whose branch
+is `null` removes the value of a matched object and sets nothing on a created one. A list assigned
+from an unset list property is empty, and `null` elements of a list add no value.
+
 ::: tip Names are file-global
 Object names must be unique across the whole `.mt` file, not just within one pattern. An object
 matched in an outer scope is referred to by name — `rectangle { visible = true }` — rather than

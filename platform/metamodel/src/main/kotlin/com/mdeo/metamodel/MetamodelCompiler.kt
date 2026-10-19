@@ -798,6 +798,31 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
             }
             // Boxed numeric fields (optional/nullable multiplicity) have the same
             // problem: coerce through Number, then re-box to the declared wrapper type.
+            // null (an unset optional value) is stored as is.
+            "Ljava/lang/Integer;", "Ljava/lang/Long;", "Ljava/lang/Float;", "Ljava/lang/Double;" -> {
+                val convert = Label()
+                mv.visitInsn(Opcodes.DUP)
+                mv.visitJumpInsn(Opcodes.IFNONNULL, convert)
+                mv.visitTypeInsn(Opcodes.CHECKCAST, fieldDescriptor.removePrefix("L").removeSuffix(";"))
+                mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, "prop_$fieldIndex", fieldDescriptor)
+                mv.visitInsn(Opcodes.RETURN)
+                mv.visitLabel(convert)
+                emitBoxedNumberCoercion(mv, fieldDescriptor)
+            }
+            "Ljava/lang/Object;" -> { /* no cast needed */ }
+            else -> {
+                val targetType = fieldDescriptor.removePrefix("L").removeSuffix(";")
+                mv.visitTypeInsn(Opcodes.CHECKCAST, targetType)
+            }
+        }
+        mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, "prop_$fieldIndex", fieldDescriptor)
+        mv.visitInsn(Opcodes.RETURN)
+        mv.visitLabel(nextLabel)
+    }
+
+    /** Coerces the non-null value on the stack through `Number` to the boxed field type [fieldDescriptor]. */
+    private fun emitBoxedNumberCoercion(mv: org.objectweb.asm.MethodVisitor, fieldDescriptor: String) {
+        when (fieldDescriptor) {
             "Ljava/lang/Integer;" -> {
                 mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Number")
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Number", "intValue", "()I", false)
@@ -818,15 +843,7 @@ internal class MetamodelCompiler(private val data: MetamodelData) {
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Number", "doubleValue", "()D", false)
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false)
             }
-            "Ljava/lang/Object;" -> { /* no cast needed */ }
-            else -> {
-                val targetType = fieldDescriptor.removePrefix("L").removeSuffix(";")
-                mv.visitTypeInsn(Opcodes.CHECKCAST, targetType)
-            }
         }
-        mv.visitFieldInsn(Opcodes.PUTFIELD, internalName, "prop_$fieldIndex", fieldDescriptor)
-        mv.visitInsn(Opcodes.RETURN)
-        mv.visitLabel(nextLabel)
     }
 
     /**

@@ -88,11 +88,13 @@ class MatchExecutor {
     /**
      * Gives a reference to a bound object (`pc { shape == "x" }`: no class in the pattern) the
      * class of the element it is bound to, when one of its properties is a name that classes
-     * store under different graph keys ([TransformationEngine.isAmbiguousPropertyName]).
+     * store under different graph keys ([TransformationEngine.isAmbiguousPropertyName]), or it
+     * assigns a property that is numeric in some class ([TransformationEngine.isNumericPropertyName]).
      * Otherwise such a property would be resolved by name across the whole metamodel and read
-     * or write another class's field. The class is the bound vertex's label (one `V(id).label()`
-     * query, only for such references); a bound object with a class is matched as that very
-     * element, as a pinned optional input is.
+     * or write another class's field, and an assigned value would not be cast to the property's
+     * int/long/float/double. The class is the bound vertex's label (one `V(id).label()` query,
+     * only for such references); a bound object with a class is matched as that very element, as
+     * a pinned optional input is.
      */
     private fun withReferenceClasses(
         elements: PatternCategories,
@@ -101,7 +103,11 @@ class MatchExecutor {
     ): PatternCategories {
         fun resolve(element: TypedPatternObjectInstanceElement): TypedPatternObjectInstanceElement {
             val instance = element.objectInstance
-            if (instance.className != null || instance.properties.none { engine.isAmbiguousPropertyName(it.propertyName) }) {
+            val needsClass = instance.properties.any {
+                engine.isAmbiguousPropertyName(it.propertyName) ||
+                    (it.operator == "=" && engine.isNumericPropertyName(it.propertyName))
+            }
+            if (instance.className != null || !needsClass) {
                 return element
             }
             val vertexId = (context.variableScope.getVariable(instance.name) as? VariableBinding.InstanceBinding)?.vertexId
