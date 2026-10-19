@@ -13,6 +13,7 @@ import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategies
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.FilterRankingStrategy
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.LazyBarrierStrategy
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathRetractionStrategy
 import org.apache.tinkerpop.gremlin.structure.T
@@ -200,13 +201,13 @@ class TinkerModelGraph private constructor(
     companion object {
 
         init {
-            // Remove LazyBarrierStrategy and PathRetractionStrategy globally for TinkerGraph to
+            // Remove LazyBarrierStrategy, PathRetractionStrategy and FilterRankingStrategy globally for TinkerGraph to
             // avoid the per-call overhead of withoutStrategies(). This mirrors the pattern used
             // in MdeoGraph.
             TraversalStrategies.GlobalCache.registerStrategies(
                 TinkerGraph::class.java,
                 TraversalStrategies.GlobalCache.getStrategies(TinkerGraph::class.java).clone()
-                    .removeStrategies(LazyBarrierStrategy::class.java, PathRetractionStrategy::class.java)
+                    .removeStrategies(LazyBarrierStrategy::class.java, PathRetractionStrategy::class.java, FilterRankingStrategy::class.java)
             )
         }
 

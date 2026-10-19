@@ -2,6 +2,7 @@ package com.mdeo.modeltransformation.graph
 
 import com.mdeo.modeltransformation.graph.mdeo.MdeoGraph
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategies
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.FilterRankingStrategy
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.LazyBarrierStrategy
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathRetractionStrategy
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
@@ -18,7 +19,11 @@ import kotlin.test.assertTrue
  * labels no later step reads: here every label is read by the final `select`, so it can retract
  * almost nothing, while its analysis of every step's referenced labels grows with the square of
  * the traversal's length (most of the strategies' time on a realisation's repair statements).
- * Like `LazyBarrierStrategy`, it is not registered.
+ * Like `LazyBarrierStrategy`, it is not registered. Nor is `FilterRankingStrategy`: it reorders
+ * runs of filter steps by a fixed rank, while the match planner already places every constraint
+ * where its nodes are bound and orders conditions by their estimated cost; on a realisation's
+ * repair statements the strategy took about a fifth of a match's time and the traversals' own
+ * execution under a tenth.
  */
 class TraversalStrategiesTest {
 
@@ -26,19 +31,21 @@ class TraversalStrategiesTest {
         TraversalStrategies.GlobalCache.getStrategies(graphClass).toList().map { it.javaClass.name }
 
     @Test
-    fun `MdeoGraph traversals apply no path retraction and no lazy barriers`() {
+    fun `MdeoGraph traversals apply no path retraction, no filter ranking and no lazy barriers`() {
         Class.forName(MdeoGraph::class.java.name) // registers its strategies
         val registered = strategies(MdeoGraph::class.java)
         assertFalse(PathRetractionStrategy::class.java.name in registered, "$registered")
         assertFalse(LazyBarrierStrategy::class.java.name in registered, "$registered")
+        assertFalse(FilterRankingStrategy::class.java.name in registered, "$registered")
         assertTrue(registered.isNotEmpty())
     }
 
     @Test
-    fun `TinkerGraph traversals of the model graph apply no path retraction and no lazy barriers`() {
+    fun `TinkerGraph traversals of the model graph apply no path retraction, no filter ranking and no lazy barriers`() {
         Class.forName(com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph::class.java.name)
         val registered = strategies(TinkerGraph::class.java)
         assertFalse(PathRetractionStrategy::class.java.name in registered, "$registered")
         assertFalse(LazyBarrierStrategy::class.java.name in registered, "$registered")
+        assertFalse(FilterRankingStrategy::class.java.name in registered, "$registered")
     }
 }
