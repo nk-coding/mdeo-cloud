@@ -14,6 +14,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategies
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.LazyBarrierStrategy
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathRetractionStrategy
 import org.apache.tinkerpop.gremlin.structure.T
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import org.apache.tinkerpop.gremlin.structure.VertexProperty
@@ -199,12 +200,13 @@ class TinkerModelGraph private constructor(
     companion object {
 
         init {
-            // Remove LazyBarrierStrategy globally for TinkerGraph to avoid the per-call
-            // overhead of withoutStrategies(). This mirrors the pattern used in MdeoGraph.
+            // Remove LazyBarrierStrategy and PathRetractionStrategy globally for TinkerGraph to
+            // avoid the per-call overhead of withoutStrategies(). This mirrors the pattern used
+            // in MdeoGraph.
             TraversalStrategies.GlobalCache.registerStrategies(
                 TinkerGraph::class.java,
                 TraversalStrategies.GlobalCache.getStrategies(TinkerGraph::class.java).clone()
-                    .removeStrategies(LazyBarrierStrategy::class.java)
+                    .removeStrategies(LazyBarrierStrategy::class.java, PathRetractionStrategy::class.java)
             )
         }
 

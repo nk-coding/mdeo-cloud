@@ -9,6 +9,7 @@ import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategies
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.LazyBarrierStrategy
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathRetractionStrategy
 import org.apache.tinkerpop.gremlin.structure.Edge
 import org.apache.tinkerpop.gremlin.structure.Graph
 import org.apache.tinkerpop.gremlin.structure.Transaction
@@ -77,11 +78,15 @@ class MdeoGraph private constructor(
         }
 
         init {
+            // Neither lazy barriers nor path retraction: a match traversal is built and run
+            // once, so a strategy is paid per match, and it selects every pattern label at its
+            // end, so path retraction can drop almost nothing while its label analysis grows
+            // with the square of the traversal's length (TraversalStrategiesTest).
             TraversalStrategies.GlobalCache.registerStrategies(
                 MdeoGraph::class.java,
                 TraversalStrategies.GlobalCache.getStrategies(Graph::class.java).clone()
                     .addStrategies(MdeoGraphStepStrategy.instance())
-                    .removeStrategies(LazyBarrierStrategy::class.java)
+                    .removeStrategies(LazyBarrierStrategy::class.java, PathRetractionStrategy::class.java)
             )
         }
 
