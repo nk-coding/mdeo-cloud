@@ -169,6 +169,39 @@ class LanguageTrapsExecutionTest {
         assertEquals(listOf("literals ok"), run(backend, "/optimize/scenarios/call-trap-literals.mt"))
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
+    fun `properties of a referenced object resolve against its class`(backend: String) {
+        // Access.shape and Call.shape have different field positions; a reference (`rc { }`)
+        // has no class in the pattern, and its properties used to resolve by name across the
+        // metamodel: `shape` of a Call read and wrote Call.built
+        val shapes = json.decodeFromString(MetamodelData.serializer(), resource("metamodel__shapes.mm.json"))
+        val model = ModelData(
+            metamodelPath = "/metamodel/shapes.mm",
+            instances = listOf(
+                ModelDataInstance("access", "Access", mapOf("shape" to ModelDataPropertyValue.StringValue("plain"))),
+                ModelDataInstance("call", "Call", mapOf(
+                    "built" to ModelDataPropertyValue.StringValue("plain"),
+                    "shape" to ModelDataPropertyValue.StringValue("composed")
+                ))
+            ),
+            links = emptyList()
+        )
+        val metamodel = Metamodel.compile(shapes)
+        val inner = if (backend == "tinker") TinkerModelGraph.create(model, metamodel) else MdeoModelGraph.create(model, metamodel)
+        LambdaFreeGraph(inner).use { graph ->
+            val result = TransformationEngine.create(
+                graph, transformation("/optimize/scenarios/call-trap-reference-properties.mt"), deterministic = false
+            ).execute()
+            assertIs<TransformationExecutionResult.Success>(result, result.toString())
+            val call = graph.toModelData().instances.single { it.name == "call" }
+            assertEquals(ModelDataPropertyValue.StringValue("redirect"), call.properties["shape"])
+            assertEquals(ModelDataPropertyValue.StringValue("composed"), call.properties["built"])
+            val access = graph.toModelData().instances.single { it.name == "access" }
+            assertEquals(ModelDataPropertyValue.StringValue("plain"), access.properties["shape"])
+        }
+    }
+
     @Test
     fun `the graph of these tests rejects lambda steps`() {
         graph("tinker").use { graph ->

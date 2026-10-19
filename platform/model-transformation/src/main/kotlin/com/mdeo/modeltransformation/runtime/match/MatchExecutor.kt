@@ -6,6 +6,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternVariableReassignmen
 import com.mdeo.modeltransformation.compiler.CollectionValue
 import com.mdeo.modeltransformation.compiler.SequentialLabelIdGenerator
 import com.mdeo.modeltransformation.compiler.VariableBinding
+import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceElement
 import com.mdeo.modeltransformation.compiler.conditionScope
 import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.runtime.TransformationExecutionContext
@@ -75,13 +76,43 @@ class MatchExecutor {
     ): List<MatchResult.Matched> {
         if (!engine.deterministic) { engine.modelGraph.resetNondeterminism() }
 
-        val elements = PatternCategories.from(pattern)
+        val elements = withReferenceClasses(PatternCategories.from(pattern), context, engine)
         for (name in elements.allInstanceNames) {
             if (context.variableScope.getVariable(name) == null) {
                 context.variableScope.setBinding(name, VariableBinding.InstanceBinding(vertexRef = null))
             }
         }
         return executeUnifiedTraversal(elements, context, engine, limit)
+    }
+
+    /**
+     * Gives a reference to a bound object (`pc { shape == "x" }`: no class in the pattern) the
+     * class of the element it is bound to, when one of its properties is a name that classes
+     * store under different graph keys ([TransformationEngine.isAmbiguousPropertyName]).
+     * Otherwise such a property would be resolved by name across the whole metamodel and read
+     * or write another class's field. The class is the bound vertex's label (one `V(id).label()`
+     * query, only for such references); a bound object with a class is matched as that very
+     * element, as a pinned optional input is.
+     */
+    private fun withReferenceClasses(
+        elements: PatternCategories,
+        context: TransformationExecutionContext,
+        engine: TransformationEngine
+    ): PatternCategories {
+        fun resolve(element: TypedPatternObjectInstanceElement): TypedPatternObjectInstanceElement {
+            val instance = element.objectInstance
+            if (instance.className != null || instance.properties.none { engine.isAmbiguousPropertyName(it.propertyName) }) {
+                return element
+            }
+            val vertexId = (context.variableScope.getVariable(instance.name) as? VariableBinding.InstanceBinding)?.vertexId
+                ?: return element
+            val label = engine.traversalSource.V(vertexId).label().tryNext().orElse(null) ?: return element
+            return element.copy(objectInstance = instance.copy(className = label))
+        }
+        if (elements.matchableInstances.none { it.objectInstance.className == null && it.objectInstance.properties.isNotEmpty() }) {
+            return elements
+        }
+        return elements.copy(matchableInstances = elements.matchableInstances.map(::resolve))
     }
 
     /**

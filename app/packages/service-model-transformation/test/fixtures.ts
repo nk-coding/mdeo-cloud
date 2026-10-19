@@ -750,6 +750,46 @@ if (!2.to(4).includes(3) || 2.to(4).indexOf(4) != 2 || [5, 6].indexOf(7) != -1) 
     kill
 }
 `,
+    // properties of a referenced object resolve against its class, not by name across the
+    // metamodel: Access.shape is the first field of Access, Call.shape the second of Call
+    "/metamodel/shapes.mm": `class Access {
+    shape: string
+}
+
+class Call {
+    built: string
+    shape: string
+}
+`,
+    "/optimize/scenarios/reshape.mt": `using "../../metamodel/shapes.mm"
+
+transformation reshape(in rc: Call)
+
+match {
+    rc {
+        shape == "composed"
+        built == "plain"
+        shape = "redirect"
+        built = "composed"
+    }
+}
+`,
+    "/optimize/scenarios/call-trap-reference-properties.mt": `using "../../metamodel/shapes.mm"
+import { reshape } from "./reshape.mt"
+
+match {
+    c: Call {
+        built == "plain"
+    }
+}
+call reshape(rc = c)
+match {
+    c {
+        shape == "redirect"
+        built == "composed"
+    }
+}
+`,
     // float literals with an exponent
     "/optimize/scenarios/call-trap-literals.mt": `using "../../metamodel/shop.mm"
 

@@ -569,6 +569,22 @@ class TransformationEngine(
      * @param propertyName The logical property name.
      * @return The graph key (e.g. "prop_2") or the original property name as fallback.
      */
+    /**
+     * Property names that different classes store under different graph keys: for these, a
+     * property of an object without a class (a reference to a bound object) cannot be resolved
+     * by name ([resolvePropertyGraphKey] would take the first class that has it).
+     */
+    private val ambiguousPropertyNames: Set<String> by lazy {
+        metamodel.metadata.classes.values
+            .flatMap { classMeta -> classMeta.propertyFields.map { (name, field) -> name to field.fieldIndex } }
+            .groupBy({ it.first }, { it.second })
+            .filterValues { it.toSet().size > 1 }
+            .keys
+    }
+
+    /** Whether [propertyName] maps to different graph keys in different classes. */
+    fun isAmbiguousPropertyName(propertyName: String): Boolean = propertyName in ambiguousPropertyNames
+
     fun resolvePropertyGraphKey(className: String?, propertyName: String): String {
         if (className != null) {
             val mapping = metamodel.metadata.classes[className]?.propertyFields?.get(propertyName)
