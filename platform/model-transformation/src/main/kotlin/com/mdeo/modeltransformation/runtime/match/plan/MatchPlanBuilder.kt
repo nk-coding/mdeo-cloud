@@ -923,9 +923,9 @@ internal class MatchPlanBuilder(
             var emitted = false
             val iterator = pendingInjectivePairs.iterator()
             while (iterator.hasNext()) {
-                val (nameA, nameB) = iterator.next()
-                if (nameA in coveredInstances && nameB in coveredInstances) {
-                    baseSteps.add(BaseStep.InjectiveConstraint(nameA, nameB))
+                val pair = iterator.next()
+                if (pair.nameA in coveredInstances && pair.nameB in coveredInstances) {
+                    baseSteps.add(BaseStep.InjectiveConstraint(pair.nameA, pair.nameB, pair.exactClassOfA))
                     iterator.remove()
                     emitted = true
                 }
@@ -1334,7 +1334,8 @@ internal class MatchPlanBuilder(
                 val nodeLabel = VariableBinding.stepLabel(conditionNode)
 
                 for (mainInst in graph.instances) {
-                    if (!graph.mayCoincide(mainInst, conditionClass)) continue
+                    val mainClass = mainInst.objectInstance.className ?: continue
+                    if (conditionClass != mainClass) continue
                     if (isSingleNodeNac &&
                         graph.canOmitNacInjectiveConstraint(conditionNode, mainInst.objectInstance.name, block.links)
                     ) continue
@@ -1345,7 +1346,7 @@ internal class MatchPlanBuilder(
                 for (j in 0 until i) {
                     val previousNode = traversalOrder[j]
                     val previousClass = instanceMap[previousNode]?.objectInstance?.className ?: continue
-                    if (graph.classesMayCoincide(conditionClass, previousClass)) {
+                    if (conditionClass == previousClass) {
                         constraints.getOrPut(nodeLabel) { mutableListOf() }
                             .add(VariableBinding.stepLabel(previousNode))
                     }

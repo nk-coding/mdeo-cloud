@@ -50,15 +50,17 @@ Objects and links can carry a modifier:
 | `create` | The element is added |
 | `delete` | The element is removed |
 
-**Injective matching.** The objects of a pattern are matched to pairwise *distinct* model elements, as
-in story diagrams and Henshin: two objects whose classes could describe the same element (the same
-class, one a subclass of the other) never match the same element, and neither does an object and a
-*bound* object the pattern references — an element input (`seed { }`), an object of an enclosing or
-earlier statement, a call output or a loop variable. So with `seed { }`, a new object `other:
-Component { }` never matches `seed` itself, and no `where other != seed` is needed. The objects of a
-`forbid` or `require` block are distinct from the pattern's objects in the same way. Bound objects are
-not compared with each other: two inputs may be the same element. A bound object that a pattern does
-not reference — only a `where` clause reads it — is just a value and does not take part.
+**Injective matching.** Two objects of a pattern with the same class never match the same model
+element, and neither do an object and a *bound* object the pattern references — an element input
+(`seed { }`), an object of an enclosing or earlier statement, a call output or a loop variable — when
+the bound element is of exactly the object's class. So with `seed { }` for an `AllocationContext`
+input, a new object `other: AllocationContext { }` never matches `seed` itself, and no `where other !=
+seed` is needed. Objects of different classes may match one element when one class is a subclass of
+the other (`unit: AbstractAction { }` may be the element `call: ExternalCallAction { }` matched);
+write `where a != b` to exclude that. Bound objects are not compared with each other: two inputs may be
+the same element. A bound object that the pattern does not reference — only a `where` clause reads
+it — is a value and takes no part. The objects of a `forbid` or `require` block are distinct from the
+pattern's objects of the same class, not from bound objects.
 
 To remove an object found in the same pattern, put the modifier on the object itself —
 `delete book: Book { }`. `delete name` only names objects of an earlier or enclosing statement; inside the pattern

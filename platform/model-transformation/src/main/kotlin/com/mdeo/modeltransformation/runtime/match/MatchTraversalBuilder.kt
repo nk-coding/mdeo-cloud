@@ -629,7 +629,15 @@ internal class MatchTraversalBuilder(
     ): GraphTraversal<Vertex, Vertex> {
         val labelA = VariableBinding.stepLabel(step.instanceNameA)
         val labelB = VariableBinding.stepLabel(step.instanceNameB)
-        return t.where(labelA, P.neq(labelB)) as GraphTraversal<Vertex, Vertex>
+        val exactClass = step.exactClassOfA
+            ?: return t.where(labelA, P.neq(labelB)) as GraphTraversal<Vertex, Vertex>
+        // A bound object: only an element of exactly A's class must differ from it.
+        return t.filter(
+            AnonymousTraversal.or<Any>(
+                AnonymousTraversal.select<Any, Any>(labelA).not(AnonymousTraversal.hasLabel<Any>(exactClass)),
+                AnonymousTraversal.where<Any>(labelA, P.neq(labelB))
+            )
+        ) as GraphTraversal<Vertex, Vertex>
     }
 
     /**

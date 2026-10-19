@@ -129,59 +129,51 @@ internal fun computeInstancePriorities(
 }
 
 /**
+ * A pair of main-pattern instances that must be bound to distinct vertices.
+ *
+ * @property exactClassOfA When set, [nameA] is a pattern object of this class and [nameB] a
+ *           bound object: the two must differ only when the bound element is of exactly this
+ *           class, as two pattern objects must differ only when they have the same class.
+ */
+internal data class InjectivePair(val nameA: String, val nameB: String, val exactClassOfA: String? = null)
+
+/**
  * Computes all pairs of main-pattern instances that must be bound to *distinct* graph
  * vertices (injective matching).
  *
- * Every two objects of a pattern are distinct, as in story diagrams and Henshin: the pattern's
- * own objects among each other, and each of them from every bound object the pattern references
- * (an element input, an earlier match's object, a call output or a loop variable — `seed { }`).
- * A pair is only emitted where the two could coincide at all: two classes that share an
- * instance class ([classesOverlap]: the same class, one a subclass of the other, or a common
- * subclass), or a bound object, whose class is the bound vertex's and not known to the
- * planner, together with any typed object. Two bound objects are not compared: they are
- * whatever the caller bound, and the pattern matches nothing for them.
+ * Two objects of the pattern form an injective pair when they share the same metamodel class.
+ * If both were allowed to match the same vertex, the match would be degenerate (one object
+ * playing two roles simultaneously), which is almost never the intended semantics. The same
+ * holds between a pattern object and a *bound* object the pattern references (an element
+ * input, an object of an earlier or enclosing statement, a call output or a loop variable —
+ * `seed { }`, without a class): the pattern object must not match the bound element when that
+ * element is of exactly the object's class. The bound element's class is only known at run
+ * time, so that pair carries the class ([InjectivePair.exactClassOfA]) and the traversal checks
+ * it. Two bound objects are not compared: they are whatever the caller bound.
  *
  * @param allMatchable All matchable instance elements in the main pattern.
- * @param subclassesOf Each class name mapped to itself and its transitive subclasses.
  * @param isBound Whether an instance without a class name is bound to a vertex.
- * @return A list of (nameA, nameB) pairs, each representing the required inequality
- *         nameA ≠ nameB.  Each unordered pair appears exactly once.
+ * @return The pairs; each unordered pair appears exactly once.
  */
 internal fun computeInjectivePairs(
     allMatchable: List<TypedPatternObjectInstanceElement>,
-    subclassesOf: Map<String, Set<String>>,
-    isBound: (String) -> Boolean
-): List<Pair<String, String>> {
-    val result = mutableListOf<Pair<String, String>>()
+    isBound: (String) -> Boolean = { false }
+): List<InjectivePair> {
+    val result = mutableListOf<InjectivePair>()
     for (i in allMatchable.indices) {
         for (j in i + 1 until allMatchable.size) {
             val a = allMatchable[i].objectInstance
             val b = allMatchable[j].objectInstance
             if (a.name == b.name) continue
-            val distinct = when {
-                a.className != null && b.className != null -> classesOverlap(a.className, b.className, subclassesOf)
-                a.className != null -> isBound(b.name)
-                b.className != null -> isBound(a.name)
-                else -> false
+            when {
+                a.className != null && b.className != null ->
+                    if (a.className == b.className) result.add(InjectivePair(a.name, b.name))
+                a.className != null && isBound(b.name) -> result.add(InjectivePair(a.name, b.name, a.className))
+                b.className != null && isBound(a.name) -> result.add(InjectivePair(b.name, a.name, b.className))
             }
-            if (distinct) result.add(a.name to b.name)
         }
     }
     return result
-}
-
-/**
- * Whether a vertex can be an instance of both [classA] and [classB]: the two classes, each
- * with its transitive subclasses, share a class.
- *
- * @param subclassesOf Each class name mapped to itself and its transitive subclasses; a class
- *        missing from it stands for itself only.
- */
-internal fun classesOverlap(classA: String, classB: String, subclassesOf: Map<String, Set<String>>): Boolean {
-    if (classA == classB) return true
-    val subA = subclassesOf[classA] ?: setOf(classA)
-    val subB = subclassesOf[classB] ?: setOf(classB)
-    return subA.any { it in subB }
 }
 
 /**

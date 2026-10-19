@@ -138,9 +138,12 @@ class LanguageTrapsExecutionTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["tinker", "mdeo"])
-    fun `bound objects take part in injective matching, subclasses included`(backend: String) {
+    fun `bound objects take part in injective matching, for objects of exactly their class`(backend: String) {
+        // matesOf(seed = ordersDb): the Component mate is never ordersDb itself; matesOf(seed =
+        // orders): orders is a Service, so a Component object may match it, as two pattern
+        // objects of a class and its subclass may match one element (the pairs below)
         assertEquals(
-            listOf("mates 1 1", "pair orders ordersDb", "svc mate ordersDb"),
+            listOf("mates 1 2", "pair orders orders", "pair orders ordersDb", "svc mate orders", "svc mate ordersDb"),
             run(backend, "/optimize/scenarios/call-trap-injective.mt")
         )
     }
