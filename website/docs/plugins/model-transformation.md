@@ -50,6 +50,16 @@ Objects and links can carry a modifier:
 | `create` | The element is added |
 | `delete` | The element is removed |
 
+**Injective matching.** The objects of a pattern are matched to pairwise *distinct* model elements, as
+in story diagrams and Henshin: two objects whose classes could describe the same element (the same
+class, one a subclass of the other) never match the same element, and neither does an object and a
+*bound* object the pattern references — an element input (`seed { }`), an object of an enclosing or
+earlier statement, a call output or a loop variable. So with `seed { }`, a new object `other:
+Component { }` never matches `seed` itself, and no `where other != seed` is needed. The objects of a
+`forbid` or `require` block are distinct from the pattern's objects in the same way. Bound objects are
+not compared with each other: two inputs may be the same element. A bound object that a pattern does
+not reference — only a `where` clause reads it — is just a value and does not take part.
+
 To remove an object found in the same pattern, put the modifier on the object itself —
 `delete book: Book { }`. `delete name` only names objects of an earlier or enclosing statement; inside the pattern
 that declares `name`, it is rejected.
@@ -154,7 +164,19 @@ matched again.
 | `name = expr`, `name += expr` | Assign a variable or an output, or add to a collection output |
 
 Expressions use the same syntax as the [Script language](/plugins/script) — the two share an
-expression and type system.
+expression and type system, including the number literals (`1.0e300`, `2.5E-3f`, `42L`). The
+engine compiles every expression to a Gremlin traversal without lambda steps, so the transformation
+language offers the part of the script language's library that compiles that way:
+
+| On | Methods |
+| --- | --- |
+| collections | `size()`, `isEmpty()`, `notEmpty()`, `sum()`, `first()`, `includes(x)` (an element `==` x), `filter`, `map`, `exists`, `all`, `none`, `one`, `find`, `reject` (with a lambda) |
+| lists and ordered sets | also `last()` and `indexOf(x)` (the first position of an element `==` x, or `-1`) |
+| numbers | `abs`, `floor`, `ceil`, `round`, `log`, `log10`, `pow`, `mod`, `max`, `min`; on `int` and `long` also `a.to(b)`: the `int`s from `a` to `b`, both included, counting down when `b < a` |
+
+They behave as in scripts, in patterns, `where` clauses and statements alike, and several lambdas
+may appear in one expression (`a.exists((x) => x == o) && !b.exists((y) => y == o)`). There is no
+`random()`: Gremlin has no step for it.
 
 #### Callable transformations
 

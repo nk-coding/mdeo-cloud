@@ -63,7 +63,7 @@ internal data class PendingCondition(
  *           as computed by [computeVariableVarDeps].
  * @property instancePriorities Greedy traversal-priority score per instance name, as
  *           computed by [computeInstancePriorities].  Higher = more selective.
- * @property injectivePairs All pairs of same-class main-pattern instances that must be
+ * @property injectivePairs All pairs of main-pattern instances that must be
  *           bound to distinct vertices, as computed by [computeInjectivePairs].
  * @property metamodelData The metamodel used for association lookups and BFS ordering
  *           inside application conditions.
@@ -169,12 +169,27 @@ internal class MatchPlanGraph(
         for (conditionInst in block.instances) {
             val conditionClass = conditionInst.objectInstance.className ?: continue
             for (mainInst in instances) {
-                if (mainInst.objectInstance.className == conditionClass)
+                if (mayCoincide(mainInst, conditionClass))
                     result.add(mainInst.objectInstance.name)
             }
         }
         return result
     }
+
+    /**
+     * Whether an object of [className] may be bound to the same vertex as the main-pattern
+     * instance [mainInst]: their classes overlap ([classesOverlap]), or [mainInst] is a bound
+     * object, whose class the planner does not know.
+     */
+    fun mayCoincide(mainInst: TypedPatternObjectInstanceElement, className: String): Boolean {
+        val mainClass = mainInst.objectInstance.className
+            ?: return getVertexId(mainInst.objectInstance.name) != null
+        return classesOverlap(mainClass, className, MetamodelIndex.of(metamodelData).subclassesOf)
+    }
+
+    /** Whether objects of [classA] and [classB] may be bound to the same vertex. */
+    fun classesMayCoincide(classA: String, classB: String): Boolean =
+        classesOverlap(classA, classB, MetamodelIndex.of(metamodelData).subclassesOf)
 
     /**
      * Computes the full set of main-pattern instance names that must be covered before
@@ -334,7 +349,10 @@ internal class MatchPlanGraph(
                 variableNodeDeps = computeVariableNodeDeps(variables, variableNames, nodeAnalyzer),
                 variableVarDeps = computeVariableVarDeps(variables, variableNames, nodeAnalyzer),
                 instancePriorities = computeInstancePriorities(instances, links, pseudoCompositionDag),
-                injectivePairs = computeInjectivePairs(instances),
+                injectivePairs = computeInjectivePairs(
+                    instances,
+                    MetamodelIndex.of(metamodelData).subclassesOf
+                ) { name -> getVertexId(name) != null },
                 metamodelData = metamodelData,
                 statistics = statistics,
                 getVertexId = getVertexId,

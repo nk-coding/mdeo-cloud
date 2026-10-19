@@ -146,6 +146,10 @@ for (task in Task.all()) {
 
 A `?` suffix makes a type nullable: `Shape?`, `(Int) => Int?`.
 
+Number literals are written as in Kotlin and Java: `42` is an `int`, `42L` a `long`, `1.5`, `1.0e300`,
+`2.5E-3` and `1e3` are `double`s (an optional `d` suffix), and the same with an `f` suffix — `1.5f`,
+`2e-3f` — are `float`s. The transformation language shares these literals.
+
 #### Statements and expressions
 
 <<< @/../samples/language-tour/expressions.fn{fn}

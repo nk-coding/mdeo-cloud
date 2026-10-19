@@ -1334,8 +1334,7 @@ internal class MatchPlanBuilder(
                 val nodeLabel = VariableBinding.stepLabel(conditionNode)
 
                 for (mainInst in graph.instances) {
-                    val mainClass = mainInst.objectInstance.className ?: continue
-                    if (conditionClass != mainClass) continue
+                    if (!graph.mayCoincide(mainInst, conditionClass)) continue
                     if (isSingleNodeNac &&
                         graph.canOmitNacInjectiveConstraint(conditionNode, mainInst.objectInstance.name, block.links)
                     ) continue
@@ -1346,7 +1345,7 @@ internal class MatchPlanBuilder(
                 for (j in 0 until i) {
                     val previousNode = traversalOrder[j]
                     val previousClass = instanceMap[previousNode]?.objectInstance?.className ?: continue
-                    if (conditionClass == previousClass) {
+                    if (graph.classesMayCoincide(conditionClass, previousClass)) {
                         constraints.getOrPut(nodeLabel) { mutableListOf() }
                             .add(VariableBinding.stepLabel(previousNode))
                     }

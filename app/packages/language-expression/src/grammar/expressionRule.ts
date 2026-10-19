@@ -34,18 +34,24 @@ export const LONG_LITERAL = createTerminal("LONG_LITERAL")
     .as(/[0-9]+[Ll]/);
 
 /**
+ * The digits of a floating point literal: a fraction (`1.5`), a fraction with an exponent
+ * (`1.0e300`, `2.5E-3`) or an exponent alone (`1e3`), as in the JVM languages.
+ */
+const FLOATING_POINT_DIGITS = /[0-9]+(?:\.[0-9]+(?:[eE][+-]?[0-9]+)?|[eE][+-]?[0-9]+)/.source;
+
+/**
  * Float token (32-bit floating point, suffixed with F or f) - returns string to preserve precision
  */
 export const FLOAT_LITERAL = createTerminal("FLOAT_LITERAL")
     .returns(String)
-    .as(/[0-9]+\.[0-9]+[Ff]/);
+    .as(new RegExp(`${FLOATING_POINT_DIGITS}[Ff]`));
 
 /**
  * Double token (64-bit floating point, optionally suffixed with D or d) - returns string to preserve precision
  */
 export const DOUBLE_LITERAL = createTerminal("DOUBLE_LITERAL")
     .returns(String)
-    .as(/[0-9]+\.[0-9]+[Dd]?/);
+    .as(new RegExp(`${FLOATING_POINT_DIGITS}[Dd]?`));
 
 /**
  * Boolean token (technically a data type rule)

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { TestWorkspace } from "./testWorkspace.ts";
-import { layeredProject, SCENARIOS, COLLECTION_SCENARIOS } from "./fixtures.ts";
+import { layeredProject, SCENARIOS, COLLECTION_SCENARIOS, TRAP_SCENARIOS } from "./fixtures.ts";
 
 const { typedAstHandler } = await import("../dist/handler/typedAstHandler.js");
 const { metamodelAstDataHandler } = await import("../../service-metamodel/dist/handler/metamodelAstDataHandler.js");
@@ -22,6 +22,7 @@ const TRANSFORMATIONS = [
     "/optimize/sync/follow-reader.mt",
     ...Object.keys(SCENARIOS).filter((path) => path.includes("/call-")),
     ...Object.keys(COLLECTION_SCENARIOS).filter((path) => path.includes("/call-")),
+    ...Object.keys(TRAP_SCENARIOS).filter((path) => path.includes("/call-")),
     "/optimize/scenarios/move-placement.mt"
 ];
 
@@ -44,7 +45,7 @@ function check(name: string, data: unknown): void {
 }
 
 describe("typed AST fixtures of the engine tests", () => {
-    const workspace = new TestWorkspace(layeredProject({ ...SCENARIOS, ...COLLECTION_SCENARIOS }));
+    const workspace = new TestWorkspace(layeredProject({ ...SCENARIOS, ...COLLECTION_SCENARIOS, ...TRAP_SCENARIOS }));
 
     for (const path of TRANSFORMATIONS) {
         it(`are up to date for ${path}`, async () => {

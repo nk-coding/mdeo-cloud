@@ -527,3 +527,243 @@ match {
 }
 `
 };
+
+/**
+ * Scenarios of the language traps found by the domain project's group operators (DESIGN.md G9
+ * there), for the engine tests (platform/model-transformation, LanguageTrapsExecutionTest): two
+ * collection lambdas in one expression, `isEmpty()`/`notEmpty()` as booleans, injectivity of
+ * bound objects, a `where` that reads an input the pattern does not reference, `to`, `indexOf`,
+ * `includes`, and exponent float literals.
+ */
+export const TRAP_SCENARIOS: Record<string, string> = {
+    // two lambdas in one where expression, and a ternary whose condition is a lambda
+    "/optimize/scenarios/call-trap-lambdas.mt": `using "../../metamodel/shop.mm"
+import { componentsOn } from "./components-on.mt"
+
+match {
+    hostA: Container {
+        name == "a"
+    }
+    hostB: Container {
+        name == "b"
+    }
+}
+call componentsOn(host = hostA) -> (components: onA)
+call componentsOn(host = hostB) -> (components: onB)
+for match {
+    x: Component { }
+    where onA.exists((p) => p == x) && !onB.exists((q) => q == x)
+} do {
+    match {
+        create log: Container {
+            name = "only a " + x.name
+        }
+    }
+}
+for match {
+    y: Component { }
+    where onB.exists((p) => p == y) || onA.exists((q) => q == y) && y.name == "nobody"
+} do {
+    match {
+        create log2: Container {
+            name = (onB.exists((r) => r == y) ? "on b " : "not on b ") + y.name
+        }
+    }
+}
+`,
+    // isEmpty() and notEmpty() are booleans, in conditions and as values
+    "/optimize/scenarios/call-trap-empty.mt": `using "../../metamodel/shop.mm"
+import { componentsOn } from "./components-on.mt"
+
+match {
+    hostA: Container {
+        name == "a"
+    }
+    hostC: Container {
+        name == "c"
+    }
+}
+call componentsOn(host = hostA) -> (components: onA)
+call componentsOn(host = hostC) -> (components: onC)
+match {
+    hostA { }
+    var emptyA = onA.isEmpty()
+    var fullC = onC.notEmpty()
+    where onC.isEmpty() && onA.notEmpty()
+    where !onA.isEmpty()
+    create log: Container {
+        name = "empty " + emptyA + " " + fullC
+    }
+}
+if (onA.isEmpty() || !onC.isEmpty()) {
+    kill
+}
+`,
+    // a bound input is distinct from the pattern's other objects (injective matching)
+    "/optimize/scenarios/mates-of.mt": `using "../../metamodel/base.mm"
+
+transformation matesOf(in seed: Component, out mates: List<Component>)
+
+for match {
+    seed { }
+    home: Container { }
+    mate: Component { }
+    seed.host -- home
+    mate.host -- home
+} do {
+    mates += mate
+}
+`,
+    "/optimize/scenarios/call-trap-injective.mt": `using "../../metamodel/shop.mm"
+import { matesOf } from "./mates-of.mt"
+
+match {
+    db: Component {
+        name == "ordersDb"
+    }
+    svc: Service {
+        name == "orders"
+    }
+}
+call matesOf(seed = db) -> (mates: dbMates)
+call matesOf(seed = svc) -> (mates: svcMates)
+for match {
+    svc { }
+    other: Component { }
+    other.host -- svcHost
+    svc.host -- svcHost
+    svcHost: Container { }
+} do {
+    match {
+        create seen: Container {
+            name = "svc mate " + other.name
+        }
+    }
+}
+for match {
+    s2: Service { }
+    c2: Component { }
+    s2.host -- h2
+    c2.host -- h2
+    h2: Container { }
+} do {
+    match {
+        create seen2: Container {
+            name = "pair " + s2.name + " " + c2.name
+        }
+    }
+}
+match {
+    create log: Container {
+        name = "mates " + dbMates.size() + " " + svcMates.size()
+    }
+}
+`,
+    // a where clause that reads an input the pattern does not reference
+    "/optimize/scenarios/count-others.mt": `using "../../metamodel/base.mm"
+
+transformation countOthers(in seed: Component, in home: Container, out others: int, out same: int, out near: int)
+
+others = 0
+same = 0
+near = 0
+for match {
+    other: Component { }
+    where other != seed
+} do {
+    others = others + 1
+}
+for match {
+    again: Component { }
+    where again == seed && seed.name == again.name
+} do {
+    same = same + 1
+}
+for match {
+    home { }
+    nearby: Component { }
+    nearby.host -- home
+    where nearby != seed
+} do {
+    near = near + 1
+}
+`,
+    "/optimize/scenarios/call-trap-unreferenced.mt": `using "../../metamodel/shop.mm"
+import { countOthers } from "./count-others.mt"
+
+match {
+    db: Component {
+        name == "ordersDb"
+    }
+    hostA: Container {
+        name == "a"
+    }
+}
+call countOthers(seed = db, home = hostA) -> (others: n, same: k, near: m)
+match {
+    create log: Container {
+        name = "others " + n + " " + k + " " + m
+    }
+}
+`,
+    // to, indexOf and includes as in the script language
+    "/optimize/scenarios/call-trap-functions.mt": `using "../../metamodel/shop.mm"
+import { componentsOn } from "./components-on.mt"
+
+match {
+    hostA: Container {
+        name == "a"
+    }
+}
+call componentsOn(host = hostA) -> (components: onA)
+for match {
+    x: Component { }
+    where onA.includes(x)
+} do {
+    match {
+        create log: Container {
+            name = "includes " + x.name
+        }
+    }
+}
+match {
+    hostA { }
+    var up = 1.to(4)
+    var down = 3.to(1)
+    var one = 5.to(5)
+    var big = 2L.to(3L)
+    where up.size() == 4 && up.sum() == 10 && down.first() == 3 && one.size() == 1
+    where [10, 20, 30].indexOf(20) == 1 && [10, 20].indexOf(5) == -1 && up.indexOf(3) == 2
+    where [1, 2].includes(2) && !up.includes(9)
+    create log2: Container {
+        name = "range " + up.size() + " " + down.size() + " " + down.last() + " " + big.size() + " " + up.indexOf(4)
+    }
+}
+for i in 2.to(4) do {
+    match {
+        create step: Container {
+            name = "step " + i
+        }
+    }
+}
+if (!2.to(4).includes(3) || 2.to(4).indexOf(4) != 2 || [5, 6].indexOf(7) != -1) {
+    kill
+}
+`,
+    // float literals with an exponent
+    "/optimize/scenarios/call-trap-literals.mt": `using "../../metamodel/shop.mm"
+
+match {
+    hostA: Container {
+        name == "a"
+    }
+    var huge = 1.0e300
+    var tiny = 2.5E-3
+    var plain = 1e3
+    where huge > 1.0e299 && tiny < 0.01 && plain == 1000.0
+    create log: Container {
+        name = "literals ok"
+    }
+}
+`
+};
