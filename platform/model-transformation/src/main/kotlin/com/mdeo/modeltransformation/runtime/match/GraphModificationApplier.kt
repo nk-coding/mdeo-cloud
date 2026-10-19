@@ -7,6 +7,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternObjectInstanceEleme
 import com.mdeo.modeltransformation.compiler.CompilationContext
 import com.mdeo.modeltransformation.compiler.CompilationResult
 import com.mdeo.modeltransformation.compiler.VariableBinding
+import org.apache.tinkerpop.gremlin.process.traversal.GType
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as AnonymousTraversal
 import org.apache.tinkerpop.gremlin.structure.Vertex
@@ -98,24 +99,17 @@ internal class GraphModificationApplier(
         for (property in simpleProps) {
             val graphKey = expressionSupport.engine.resolvePropertyGraphKey(className, property.propertyName)
             val compiled = expressionSupport.compilePropertyExpression(property.value, matchedInstanceNames)!!
-            val castFunction = getNumericCastFunction(className, property.propertyName)
+            val numericType = getNumericType(className, property.propertyName)
             
             result = if (compiled is CompilationResult.ValueResult) {
                 if (compiled.value != null) {
-                    val finalValue = if (castFunction != null && compiled.value is Number) castFunction(compiled.value) else compiled.value
-                    result.property(graphKey, finalValue) as GraphTraversal<Vertex, Map<String, Any>>
+                    result.property(graphKey, castConstant(compiled.value, numericType)) as GraphTraversal<Vertex, Map<String, Any>>
                 } else {
                     result
                 }
             } else {
                 @Suppress("UNCHECKED_CAST")
-                var propTraversal = compiled.traversal as GraphTraversal<Any, Any>
-                if (castFunction != null) {
-                    propTraversal = propTraversal.map { 
-                        val v = it.get()
-                        if (v is Number) castFunction(v) else v
-                    } as GraphTraversal<Any, Any>
-                }
+                val propTraversal = castTraversal(compiled.traversal as GraphTraversal<Any, Any>, numericType)
                 result.sideEffect(
                     AnonymousTraversal.select<Any, Any>(VariableBinding.stepLabel(instanceName))
                         .property(graphKey, propTraversal)
@@ -126,16 +120,10 @@ internal class GraphModificationApplier(
         for (property in listProps) {
             val graphKey = expressionSupport.engine.resolvePropertyGraphKey(className, property.propertyName)
             val listResult = expressionSupport.compilePropertyExpression(property.value, matchedInstanceNames)!!
-            val castFunction = getNumericCastFunction(className, property.propertyName)
+            val numericType = getNumericType(className, property.propertyName)
 
             @Suppress("UNCHECKED_CAST")
-            var listTraversal = listResult.traversal as GraphTraversal<Any, Any>
-            if (castFunction != null) {
-                listTraversal = listTraversal.map { 
-                    val v = it.get()
-                    if (v is Number) castFunction(v) else v 
-                } as GraphTraversal<Any, Any>
-            }
+            val listTraversal = castTraversal(listResult.traversal as GraphTraversal<Any, Any>, numericType)
 
             val valueLabel = compilationContext.getUniqueId()
             result = result.sideEffect(
@@ -197,29 +185,22 @@ internal class GraphModificationApplier(
             if (expressionSupport.isCollectionType(propType)) {
                 val listResult = expressionSupport.compilePropertyExpression(property.value, matchedInstanceNames)
                 if (listResult != null) { 
-                    result = setListPropertyViaSideEffect(result, name, graphKey, listResult, getNumericCastFunction(className, property.propertyName)) 
+                    result = setListPropertyViaSideEffect(result, name, graphKey, listResult, getNumericType(className, property.propertyName)) 
                 }
             } else {
                 val compiled = expressionSupport.compilePropertyExpression(property.value, matchedInstanceNames)!!
-                val castFunction = getNumericCastFunction(className, property.propertyName)
+                val numericType = getNumericType(className, property.propertyName)
                 result = if (compiled is CompilationResult.ValueResult) {
                     if (compiled.value != null) {
-                        val finalValue = if (castFunction != null && compiled.value is Number) castFunction(compiled.value) else compiled.value
                         result.sideEffect(
-                            AnonymousTraversal.select<Any, Any>(stepLabel).property(graphKey, finalValue)
+                            AnonymousTraversal.select<Any, Any>(stepLabel).property(graphKey, castConstant(compiled.value, numericType))
                         ) as GraphTraversal<Vertex, Map<String, Any>>
                     } else {
                         result
                     }
                 } else {
                     @Suppress("UNCHECKED_CAST")
-                    var propTraversal = compiled.traversal as GraphTraversal<Any, Any>
-                    if (castFunction != null) {
-                        propTraversal = propTraversal.map { 
-                            val v = it.get()
-                            if (v is Number) castFunction(v) else v 
-                        } as GraphTraversal<Any, Any>
-                    }
+                    val propTraversal = castTraversal(compiled.traversal as GraphTraversal<Any, Any>, numericType)
                     result.sideEffect(
                         AnonymousTraversal.select<Any, Any>(stepLabel).property(graphKey, propTraversal)
                     ) as GraphTraversal<Vertex, Map<String, Any>>
@@ -237,6 +218,7 @@ internal class GraphModificationApplier(
      * @param instanceName The instance owning the property.
      * @param graphKey The resolved graph property key.
      * @param listResult The compiled list expression result.
+     * @param numericType The property's numeric type the elements are cast to, if any.
      * @return The traversal with the list property replacement side-effects appended.
      */
     @Suppress("UNCHECKED_CAST")
@@ -245,7 +227,7 @@ internal class GraphModificationApplier(
         instanceName: String,
         graphKey: String,
         listResult: CompilationResult,
-        castFunction: ((Number) -> Number)?
+        numericType: GType?
     ): GraphTraversal<Vertex, Map<String, Any>> {
         val stepLabel = VariableBinding.stepLabel(instanceName)
         var result = traversal
@@ -254,13 +236,7 @@ internal class GraphModificationApplier(
         ) as GraphTraversal<Vertex, Map<String, Any>>
 
         @Suppress("UNCHECKED_CAST")
-        var listTraversal = listResult.traversal as GraphTraversal<Any, Any>
-        if (castFunction != null) {
-            listTraversal = listTraversal.map { 
-                val v = it.get()
-                if (v is Number) castFunction(v) else v 
-            } as GraphTraversal<Any, Any>
-        }
+        val listTraversal = castTraversal(listResult.traversal as GraphTraversal<Any, Any>, numericType)
 
         val valueLabel = compilationContext.getUniqueId()
         result = result.sideEffect(
@@ -290,16 +266,37 @@ internal class GraphModificationApplier(
         return find(className)
     }
 
-    private fun getNumericCastFunction(className: String?, propertyName: String): ((Number) -> Number)? {
+    /** The numeric type of a property (int, long, float, double), or null for other properties. */
+    private fun getNumericType(className: String?, propertyName: String): GType? {
         val propData = findPropertyInHierarchy(className, propertyName) ?: return null
         return when (propData.primitiveType) {
-            "int" -> { n: Number -> n.toInt() }
-            "long" -> { n: Number -> n.toLong() }
-            "float" -> { n: Number -> n.toFloat() }
-            "double" -> { n: Number -> n.toDouble() }
+            "int" -> GType.INT
+            "long" -> GType.LONG
+            "float" -> GType.FLOAT
+            "double" -> GType.DOUBLE
             else -> null
         }
     }
+
+    /** Casts a constant known at compile time to the property's numeric type, on the client. */
+    private fun castConstant(value: Any, numericType: GType?): Any {
+        if (numericType == null || value !is Number) return value
+        return when (numericType) {
+            GType.INT -> value.toInt()
+            GType.LONG -> value.toLong()
+            GType.FLOAT -> value.toFloat()
+            else -> value.toDouble()
+        }
+    }
+
+    /**
+     * Casts every value of [traversal] to the property's numeric type with Gremlin's `asNumber`
+     * step, not a lambda step: the engine compiles to pure Gremlin, so that it also runs against
+     * remote graph databases.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun castTraversal(traversal: GraphTraversal<Any, Any>, numericType: GType?): GraphTraversal<Any, Any> =
+        if (numericType == null) traversal else traversal.asNumber(numericType) as GraphTraversal<Any, Any>
 
     /**
      * Adds `.sideEffect(addE(...).to(...))` steps for each create link.

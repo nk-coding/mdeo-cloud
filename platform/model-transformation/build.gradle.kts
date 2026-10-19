@@ -19,6 +19,11 @@ tasks.jacocoTestReport {
 
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)
+    // MDEO_NO_LAMBDA_STEPS=1: every traversal of the suite rejects lambda steps (NoLambdaStepsEverywhere)
+    if (System.getenv("MDEO_NO_LAMBDA_STEPS") == "1") {
+        systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+        outputs.upToDateWhen { false }
+    }
 }
 
 dependencies {

@@ -805,5 +805,62 @@ match {
         name = "literals ok"
     }
 }
+`,
+    // numeric properties take the property's type (int/long/float/double), for computed values
+    // and the elements of lists, on created and on matched objects
+    "/metamodel/numbers.mm": `class Bag {
+    name: string
+    i: int
+    l: long
+    f: float
+    d: double
+    maybe: double[0..1]
+    ints: int[0..*]
+    longs: long[0..*]
+    floats: float[0..*]
+    doubles: double[0..*]
+}
+`,
+    "/optimize/scenarios/call-trap-numeric-lists.mt": `using "../../metamodel/numbers.mm"
+
+match {
+    seed: Bag {
+        name == "seed"
+    }
+    other: Bag {
+        name == "other"
+    }
+    create made: Bag {
+        name = "made"
+        i = seed.i + 1
+        l = seed.i
+        f = seed.i
+        d = seed.i
+        ints = [seed.i, 2]
+        longs = [seed.i, 5]
+        floats = [seed.i, 2]
+        doubles = [seed.i, 2]
+    }
+    create empty: Bag {
+        name = "empty"
+        i = 0
+        l = 0
+        f = 0
+        d = 0
+        ints = []
+        doubles = []
+    }
+}
+match {
+    again: Bag {
+        name == "seed"
+        l = again.i * 2
+        d = again.i
+        ints = [7, again.i]
+        longs = []
+        floats = [again.i]
+        doubles = [1, again.i, other.maybe]
+    }
+}
 `
 };

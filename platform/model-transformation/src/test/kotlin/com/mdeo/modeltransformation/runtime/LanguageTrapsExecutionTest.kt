@@ -20,10 +20,7 @@ import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.apache.tinkerpop.gremlin.process.traversal.Traversal
-import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategy
-import org.apache.tinkerpop.gremlin.process.traversal.step.LambdaHolder
-import org.apache.tinkerpop.gremlin.process.traversal.strategy.AbstractTraversalStrategy
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as AnonymousTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.VerificationException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -85,20 +82,6 @@ class LanguageTrapsExecutionTest {
             ModelDataLink("billing", "host", "b", null)
         )
     )
-
-    /**
-     * Rejects every lambda step ([LambdaHolder]). TinkerPop's `LambdaRestrictionStrategy` only
-     * rejects steps whose description contains "lambda", which misses Kotlin lambdas.
-     */
-    private class NoLambdaSteps :
-        AbstractTraversalStrategy<TraversalStrategy.VerificationStrategy>(),
-        TraversalStrategy.VerificationStrategy {
-        override fun apply(traversal: Traversal.Admin<*, *>) {
-            for (step in traversal.steps) {
-                if (step is LambdaHolder) throw VerificationException("lambda step $step", traversal)
-            }
-        }
-    }
 
     /** A graph whose traversals reject lambda steps. */
     private class LambdaFreeGraph(private val inner: ModelGraph) : ModelGraph by inner {
@@ -202,11 +185,66 @@ class LanguageTrapsExecutionTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["tinker", "mdeo"])
+    fun `numeric properties and list elements take the property's type without a lambda step`(backend: String) {
+        // computed values and list elements are cast to the property's int/long/float/double (by
+        // `asNumber`, not a lambda step), on created and on matched objects; also empty lists and a
+        // null list element
+        val numbers = json.decodeFromString(MetamodelData.serializer(), resource("metamodel__numbers.mm.json"))
+        fun num(v: Double) = ModelDataPropertyValue.NumberValue(v)
+        fun nums(vararg v: Double) = ModelDataPropertyValue.ListValue(v.map { num(it) })
+        fun bag(name: String, vararg props: Pair<String, ModelDataPropertyValue>) =
+            ModelDataInstance(name, "Bag", mapOf("name" to ModelDataPropertyValue.StringValue(name)) + props)
+        val model = ModelData(
+            metamodelPath = "/metamodel/numbers.mm",
+            instances = listOf(
+                bag(
+                    "seed", "i" to num(3.0), "l" to num(4.0), "f" to num(1.5), "d" to num(2.5),
+                    "ints" to nums(1.0), "longs" to nums(1.0), "floats" to nums(1.0), "doubles" to nums(1.0)
+                ),
+                bag("other", "i" to num(0.0), "l" to num(0.0), "f" to num(0.0), "d" to num(0.0))
+            ),
+            links = emptyList()
+        )
+        val metamodel = Metamodel.compile(numbers)
+        val fields = metamodel.metadata.classes.getValue("Bag").propertyFields
+        val inner = if (backend == "tinker") TinkerModelGraph.create(model, metamodel) else MdeoModelGraph.create(model, metamodel)
+        LambdaFreeGraph(inner).use { graph ->
+            val result = TransformationEngine.create(
+                graph, transformation("/optimize/scenarios/call-trap-numeric-lists.mt"), deterministic = false
+            ).execute()
+            assertIs<TransformationExecutionResult.Success>(result, result.toString())
+            fun key(property: String) = "prop_${fields.getValue(property).fieldIndex}"
+            fun raw(name: String, property: String): List<Any?> =
+                graph.traversal().V().has(key("name"), name).properties<Any>(key(property)).value<Any>().toList()
+            val made = mapOf(
+                "i" to listOf(4), "l" to listOf(3L), "f" to listOf(3.0f), "d" to listOf(3.0), "maybe" to listOf(),
+                "ints" to listOf(3, 2), "longs" to listOf(3L, 5L), "floats" to listOf(3.0f, 2.0f), "doubles" to listOf(3.0, 2.0)
+            )
+            val empty = mapOf(
+                "i" to listOf(0), "l" to listOf(0L), "f" to listOf(0.0f), "d" to listOf(0.0), "maybe" to listOf(),
+                "ints" to listOf(), "longs" to listOf(), "floats" to listOf(), "doubles" to listOf<Any?>()
+            )
+            // the null element (unset `other.maybe`) adds no value
+            val seed = mapOf(
+                "l" to listOf(6L), "d" to listOf(3.0), "maybe" to listOf(),
+                "ints" to listOf(7, 3), "longs" to listOf(), "floats" to listOf(3.0f), "doubles" to listOf<Any?>(1.0, 3.0)
+            )
+            for ((name, expected) in listOf("made" to made, "empty" to empty, "seed" to seed)) {
+                assertEquals(expected, expected.keys.associateWith { raw(name, it) }, name)
+            }
+        }
+    }
+
     @Test
     fun `the graph of these tests rejects lambda steps`() {
         graph("tinker").use { graph ->
             assertThrows<VerificationException> {
                 graph.traversal().inject<Any>(1).map<Any> { it.get() }.toList()
+            }
+            assertThrows<VerificationException> {
+                graph.traversal().inject<Any>(1).sideEffect(AnonymousTraversal.map<Any, Any> { it.get() }).toList()
             }
         }
     }

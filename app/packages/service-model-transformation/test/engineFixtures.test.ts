@@ -26,7 +26,7 @@ const TRANSFORMATIONS = [
     "/optimize/scenarios/move-placement.mt"
 ];
 
-const METAMODELS = ["/metamodel/shop.mm", "/metamodel/base.mm", "/metamodel/shapes.mm"];
+const METAMODELS = ["/metamodel/shop.mm", "/metamodel/base.mm", "/metamodel/shapes.mm", "/metamodel/numbers.mm"];
 
 function fixtureName(path: string): string {
     return path.replace(/^\//, "").replaceAll("/", "__") + ".json";
