@@ -60,11 +60,12 @@ internal class MatchPlanBuilder(
 
     companion object {
         /**
-         * A step must be estimated *strictly below* this to count as shrinking the
-         * partial-match set, which is the only case in which the cost model overrides the
-         * planner's pre-existing order; see [PlanExecution.candidateComparator].
+         * A step estimated *at most* this cannot enlarge the partial-match set (a scan of a class
+         * with a single instance, a to-one walk); such steps go before any step that fans out,
+         * which is the only case in which the cost model overrides the planner's pre-existing
+         * order; see [PlanExecution.candidateComparator].
          */
-        private const val SHRINKING_FACTOR = 1.0
+        private const val NON_INCREASING_FACTOR = 1.0
 
         /**
          * When this system property is set, the structural step order chosen by
@@ -454,7 +455,9 @@ internal class MatchPlanBuilder(
          *    so doing it earlier can only shrink what every later step processes — it weakly
          *    dominates every alternative regardless of the rest of the plan. This is what
          *    fixes the pathologies the cost model exists for: a constant guard on a singleton
-         *    class (factor 0.1), a class with no instances at all (factor 0), a to-one walk.
+         *    class (factor 0.1), a class with no instances at all (factor 0), a to-one walk, a
+         *    scan of a class with a single instance (factor 1: e.g. a model's root, which the
+         *    structural priority may otherwise rank below a large class next to it).
          * 2. **Between two candidates of the same kind, the smaller factor wins.** Two scans
          *    cost the same to run, as do two walks, so their output sizes are directly
          *    comparable — this is the classic model-sensitive rule, and it is what picks the
@@ -483,8 +486,9 @@ internal class MatchPlanBuilder(
          * the covered part of the pattern: walks can reach it, so scanning it now only forms the
          * cross product of the current partial matches with its whole class, which a later link
          * check then has to cut back to what the walks would have produced. Such a scan is taken
-         * ahead of a walk only when its estimate is clearly smaller (e.g. a singleton class whose
-         * link check is selective, against a large fan-out); otherwise the walk goes first. This
+         * ahead of a walk only when it cannot enlarge the partial matches (rule 1: a singleton
+         * class); a fan-out scan never goes ahead of a walk, even with a smaller estimate, since
+         * the estimate counts what the scan yields, not the cross product it forms. This
          * is what makes a plan search outward from its bound nodes — a pinned input, an object
          * bound by an earlier statement, or the first scanned instance — instead of scanning
          * class buckets next to them (and the "unlock a cheap application condition early"
@@ -500,11 +504,11 @@ internal class MatchPlanBuilder(
             if (costModel == null) return legacy
 
             return Comparator<TraversalCandidate> { a, b ->
-                val aShrinks = a.branchingFactor < SHRINKING_FACTOR
-                val bShrinks = b.branchingFactor < SHRINKING_FACTOR
+                val aShrinks = a.branchingFactor <= NON_INCREASING_FACTOR
+                val bShrinks = b.branchingFactor <= NON_INCREASING_FACTOR
                 when {
-                    // A step that strictly shrinks the result is taken ahead of one that
-                    // does not; among several, the one that shrinks it most.
+                    // A step that cannot enlarge the result is taken ahead of one that fans
+                    // out; among several, the one that shrinks it most.
                     aShrinks != bShrinks -> if (aShrinks) -1 else 1
                     !aShrinks -> anchoredScanAgainstWalk(costModel, a, b)
                     costModel.approximatelyEqual(a.branchingFactor, b.branchingFactor) -> 0
@@ -514,21 +518,20 @@ internal class MatchPlanBuilder(
         }
 
         /**
-         * The order of two non-shrinking candidates when one is an anchored scan and the other a
-         * walk (see [candidateComparator]): the scan first only if its estimate is clearly
-         * smaller, else the walk. `0` (no opinion) for any other pair.
+         * The order of two candidates that both fan out when one is an anchored scan and the
+         * other a walk (see [candidateComparator]): always the walk. No pattern link joins an
+         * anchored scan's instance to a covered one (it would be a walk target, not scannable),
+         * so the scan pairs every partial match with every candidate of its class, and the links
+         * that cut this back are checked only after the walks that reach them; a smaller
+         * estimate of the scan does not make that cross product cheaper than the walk. A scan
+         * that cannot enlarge the partial matches (a singleton class) is taken first by rule 1.
+         * `0` (no opinion) for any other pair.
          */
-        private fun anchoredScanAgainstWalk(costModel: MatchCostModel, a: TraversalCandidate, b: TraversalCandidate): Int {
-            val scanFirst = when {
-                a is ScanCandidate && a.anchored && b is WalkCandidate -> -1
-                b is ScanCandidate && b.anchored && a is WalkCandidate -> 1
-                else -> return 0
-            }
-            val scan = if (scanFirst < 0) a else b
-            val walk = if (scanFirst < 0) b else a
-            val scanCheaper = scan.branchingFactor < walk.branchingFactor &&
-                !costModel.approximatelyEqual(scan.branchingFactor, walk.branchingFactor)
-            return if (scanCheaper) scanFirst else -scanFirst
+        @Suppress("UNUSED_PARAMETER")
+        private fun anchoredScanAgainstWalk(costModel: MatchCostModel, a: TraversalCandidate, b: TraversalCandidate): Int = when {
+            a is ScanCandidate && a.anchored && b is WalkCandidate -> 1
+            b is ScanCandidate && b.anchored && a is WalkCandidate -> -1
+            else -> 0
         }
 
         /**
