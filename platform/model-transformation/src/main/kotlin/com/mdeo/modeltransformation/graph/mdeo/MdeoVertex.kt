@@ -34,14 +34,15 @@ class MdeoVertex(
 ) : MdeoElement(id, label), Vertex {
 
     /**
-     * Outgoing edges grouped by label. 
+     * Outgoing edges grouped by label. Read them through [MdeoHelper], which applies a pending
+     * shuffle first (see [MdeoGraph.shuffleVertices]).
      */
-    @JvmField var outEdges: MutableMap<String, MutableSet<Edge>>? = null
+    @JvmField var outEdges: MutableMap<String, MdeoEdgeSet>? = null
 
     /**
-     * Incoming edges grouped by label. 
+     * Incoming edges grouped by label; read like [outEdges].
      */
-    @JvmField var inEdges: MutableMap<String, MutableSet<Edge>>? = null
+    @JvmField var inEdges: MutableMap<String, MdeoEdgeSet>? = null
 
     override fun graph(): Graph = graph
 

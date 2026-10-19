@@ -18,8 +18,19 @@ import org.apache.tinkerpop.gremlin.structure.util.ElementHelper
 import org.apache.tinkerpop.gremlin.structure.util.StringFactory
 import org.apache.commons.configuration2.BaseConfiguration
 import org.apache.commons.configuration2.Configuration
+import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.LinkedHashMap
+import java.util.concurrent.ThreadLocalRandom
+
+/**
+ * The vertices of one label, in iteration order, with the shuffle epoch of their graph in which
+ * their order was last randomised; see [MdeoGraph.shuffleVertices].
+ */
+internal class VertexBucket(capacity: Int = 10) : ArrayList<MdeoVertex>(capacity) {
+    /** The [MdeoGraph] shuffle epoch whose permutation this bucket already has. */
+    @JvmField var shuffledIn: Long = 0
+}
 
 /**
  * A simplified in-memory graph implementation optimized for model transformation.
@@ -150,22 +161,22 @@ class MdeoGraph private constructor(
      * search that runs thousands of matches over the same graph dominates everything else.
      * The buckets hold the same vertex objects as [vertexList], not copies.
      *
-     * Iteration order within a bucket is shuffled by [shuffleVertices] together with
-     * [vertexList], so a label-restricted scan is as unbiased as a full one.
+     * Iteration order within a bucket is shuffled like [vertexList] (see [shuffleVertices]),
+     * so a label-restricted scan is as unbiased as a full one.
      */
-    private val verticesByLabel = HashMap<String, ArrayList<MdeoVertex>>()
+    private val verticesByLabel = HashMap<String, VertexBucket>()
 
     /**
      * Returns the vertices carrying [label], in current iteration order.
      *
      * The returned list is the live bucket — callers that iterate while the graph may be
-     * modified must snapshot it first.
+     * modified must snapshot it first. A pending shuffle is applied to it first.
      *
      * @param label The vertex label to look up.
      * @return The bucket for [label], or an empty list if no vertex carries it.
      */
     internal fun verticesWithLabel(label: String): List<MdeoVertex> =
-        verticesByLabel[label] ?: emptyList()
+        verticesByLabel[label]?.let { settle(it) } ?: emptyList()
 
     /**
      * Whether [shuffleVertices] has run on this graph, so that traversal order is meant to be
@@ -173,6 +184,61 @@ class MdeoGraph private constructor(
      */
     internal var isShuffled: Boolean = false
         private set
+
+    /**
+     * Counts the calls of [shuffleVertices]. Every ordered structure — [vertexList], each label
+     * bucket, each adjacency set — records the epoch whose permutation it has; one that is
+     * behind is shuffled the first time it is read or appended to.
+     */
+    private var shuffleEpoch: Long = 0
+
+    /** The epoch whose permutation [vertexList] has; see [shuffleEpoch]. */
+    private var vertexListShuffledIn: Long = 0
+
+    /**
+     * Gives [bucket] the pending shuffle of the current epoch, if it does not have it yet.
+     *
+     * @return [bucket], now in the epoch's order.
+     */
+    private fun settle(bucket: VertexBucket): VertexBucket {
+        if (isShuffled && bucket.shuffledIn != shuffleEpoch) {
+            Collections.shuffle(bucket, ThreadLocalRandom.current())
+            bucket.shuffledIn = shuffleEpoch
+        }
+        return bucket
+    }
+
+    /**
+     * Gives [edges] the pending shuffle of the current epoch, if it does not have it yet.
+     *
+     * @return [edges], now in the epoch's order.
+     */
+    internal fun settle(edges: MdeoEdgeSet): MdeoEdgeSet {
+        if (isShuffled && edges.shuffledIn != shuffleEpoch) {
+            if (edges.size > 1) {
+                val shuffled = ArrayList(edges)
+                Collections.shuffle(shuffled, ThreadLocalRandom.current())
+                edges.clear()
+                edges.addAll(shuffled)
+            }
+            edges.shuffledIn = shuffleEpoch
+        }
+        return edges
+    }
+
+    /** Gives [vertexList] the pending shuffle of the current epoch, if it does not have it yet. */
+    private fun settleVertexList() {
+        if (isShuffled && vertexListShuffledIn != shuffleEpoch) {
+            Collections.shuffle(vertexList, ThreadLocalRandom.current())
+            vertexListShuffledIn = shuffleEpoch
+        }
+    }
+
+    /** A new, empty bucket; it counts as shuffled in the current epoch, as an empty list would be. */
+    private fun newBucket(capacity: Int = 10) = VertexBucket(capacity).also { it.shuffledIn = shuffleEpoch }
+
+    /** A new, empty adjacency set; it counts as shuffled in the current epoch. */
+    private fun newEdgeSet() = MdeoEdgeSet().also { it.shuffledIn = shuffleEpoch }
 
     /** Cached immutable view of [vertexLabelCounts] / [edgeLabelCounts]; see [labelStatistics]. */
     private var cachedStatistics: ModelStatistics? = null
@@ -214,8 +280,9 @@ class MdeoGraph private constructor(
         val vertex = MdeoVertex(id, label, this, backingInstance, metadata)
 
         vertexMap[id] = vertex
+        settleVertexList()
         vertexList.add(vertex)
-        verticesByLabel.getOrPut(label) { ArrayList() }.add(vertex)
+        settle(verticesByLabel.getOrPut(label) { newBucket() }).add(vertex)
         vertexLabelCounts.merge(label, 1, Int::plus)
         invalidateStatistics()
 
@@ -235,8 +302,9 @@ class MdeoGraph private constructor(
         val metadata = metamodel.metadata.classes[className]
         val vertex = MdeoVertex(id, className, this, instance, metadata)
         vertexMap[id] = vertex
+        settleVertexList()
         vertexList.add(vertex)
-        verticesByLabel.getOrPut(className) { ArrayList() }.add(vertex)
+        settle(verticesByLabel.getOrPut(className) { newBucket() }).add(vertex)
         vertexLabelCounts.merge(className, 1, Int::plus)
         invalidateStatistics()
         return vertex
@@ -293,10 +361,10 @@ class MdeoGraph private constructor(
         invalidateStatistics()
 
         if (outVertex.outEdges == null) outVertex.outEdges = HashMap()
-        outVertex.outEdges!!.getOrPut(label) { mutableSetOf() }.add(edge)
+        settle(outVertex.outEdges!!.getOrPut(label) { newEdgeSet() }).add(edge)
 
         if (inVertex.inEdges == null) inVertex.inEdges = HashMap()
-        inVertex.inEdges!!.getOrPut(label) { mutableSetOf() }.add(edge)
+        settle(inVertex.inEdges!!.getOrPut(label) { newEdgeSet() }).add(edge)
 
         if (updateAssociations) {
             updateModelAssociationOnAdd(outVertex, inVertex, label)
@@ -320,6 +388,7 @@ class MdeoGraph private constructor(
      * directly to the primary constructor to avoid any resizing during population.
      */
     internal fun deepCopy(): MdeoGraph {
+        settleVertexList()
         val vertexCount = vertexMap.size
         val edgeCount = edgeMap.size
         val vertexCapacity = (vertexCount * 4 + 2) / 3
@@ -348,7 +417,7 @@ class MdeoGraph private constructor(
             newVertexMap[vertex.id] = copiedVertex
             newVertexList.add(copiedVertex)
             copy.verticesByLabel
-                .getOrPut(vertex.label) { ArrayList(vertexLabelCounts[vertex.label] ?: 0) }
+                .getOrPut(vertex.label) { VertexBucket(vertexLabelCounts[vertex.label] ?: 0) }
                 .add(copiedVertex)
         }
 
@@ -364,9 +433,9 @@ class MdeoGraph private constructor(
             val copiedEdge = MdeoEdge(edge.id, copiedOutVertex, edge.label, copiedInVertex)
             newEdgeMap[edge.id] = copiedEdge
             if (copiedOutVertex.outEdges == null) copiedOutVertex.outEdges = HashMap()
-            copiedOutVertex.outEdges!!.getOrPut(edge.label) { mutableSetOf() }.add(copiedEdge)
+            copiedOutVertex.outEdges!!.getOrPut(edge.label) { MdeoEdgeSet() }.add(copiedEdge)
             if (copiedInVertex.inEdges == null) copiedInVertex.inEdges = HashMap()
-            copiedInVertex.inEdges!!.getOrPut(edge.label) { mutableSetOf() }.add(copiedEdge)
+            copiedInVertex.inEdges!!.getOrPut(edge.label) { MdeoEdgeSet() }.add(copiedEdge)
         }
 
         return copy
@@ -387,6 +456,7 @@ class MdeoGraph private constructor(
      * @return A fully populated [Model] reflecting the current graph state.
      */
     internal fun toModel(registry: InstanceNameRegistry): Model {
+        settleVertexList()
         val newInstancesByName = LinkedHashMap<String, ModelInstance>(vertexList.size * 2)
         for (vertex in vertexList) {
             val logicalName = registry.getName(vertex.id) ?: vertex.id.toString()
@@ -397,6 +467,7 @@ class MdeoGraph private constructor(
 
     override fun vertices(vararg vertexIds: Any): Iterator<Vertex> {
         if (vertexIds.isEmpty()) {
+            settleVertexList()
             return ArrayList<Vertex>(vertexList).iterator()
         }
         return vertexIds.mapNotNull { id ->
@@ -477,6 +548,18 @@ class MdeoGraph private constructor(
      * Shuffles the vertex iteration list, the per-label buckets and all per-vertex edge
      * adjacency sets to provide nondeterministic traversal order.
      *
+     * The shuffle is lazy: this only starts a new epoch, in O(1). Each ordered structure —
+     * [vertexList], a label bucket, an adjacency set — gets its uniformly random permutation the
+     * first time in the epoch it is read (a scan of its label, a walk over its edges, a full
+     * vertex scan, [toModel], [deepCopy]) or appended to; one that is never touched is never
+     * shuffled. Each structure is shuffled independently, at most once per epoch, so everything a
+     * traversal can observe has exactly the distribution an eager shuffle of the whole graph would
+     * give it — every structure an independent uniform permutation, fixed until the next call —
+     * while a match pays only for what it touches instead of for the whole graph. (Shuffling at
+     * the first append keeps an element added later in the epoch at the end, as it would be after
+     * an eager shuffle; a removal needs nothing, as a uniform permutation of a set minus one
+     * element is a uniform permutation of the rest.)
+     *
      * The per-label buckets are shuffled independently of [vertexList] rather than rebuilt
      * from it: a label-restricted scan only needs its own bucket to be a uniformly random
      * permutation, which an independent shuffle gives just as well as filtering a shuffled
@@ -492,21 +575,22 @@ class MdeoGraph private constructor(
      */
     internal fun shuffleVertices() {
         isShuffled = true
-        vertexList.shuffle()
-        for (bucket in verticesByLabel.values) {
-            bucket.shuffle()
-        }
+        shuffleEpoch++
+    }
+
+    /**
+     * Applies the pending shuffle of the current epoch to every structure at once.
+     *
+     * Directly after [shuffleVertices] this is the eager whole-graph shuffle the engine used
+     * before the shuffle became lazy; tests use it as the reference the lazy version is compared
+     * with.
+     */
+    internal fun settleAll() {
+        settleVertexList()
+        verticesByLabel.values.forEach { settle(it) }
         for (vertex in vertexList) {
-            vertex.outEdges?.forEach { (_, edgeSet) ->
-                val shuffled = edgeSet.shuffled()
-                edgeSet.clear()
-                edgeSet.addAll(shuffled)
-            }
-            vertex.inEdges?.forEach { (_, edgeSet) ->
-                val shuffled = edgeSet.shuffled()
-                edgeSet.clear()
-                edgeSet.addAll(shuffled)
-            }
+            vertex.outEdges?.values?.forEach { settle(it) }
+            vertex.inEdges?.values?.forEach { settle(it) }
         }
     }
 
