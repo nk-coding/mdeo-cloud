@@ -364,6 +364,15 @@ None.
 `model-transformation-execution` service, configured through
 `MODEL_TRANSFORMATION_EXECUTION_SERVICE_URL`.
 
+**Environment variables.** The engine leaves TinkerPop's `PathRetractionStrategy` and
+`FilterRankingStrategy` out of its traversals: a match traversal selects every pattern label at its
+end, so path retraction frees almost nothing while its analysis grows with the square of the
+traversal's length, and the match planner already orders the constraints. Path labels then live
+until a traversal ends. Set `MDEO_MT_DEFAULT_STRATEGIES=1` (or the JVM system property
+`mdeo.mt.defaultStrategies=true`) on the services that run transformations
+(`model-transformation-execution` and the optimizer nodes) to keep both strategies, for example if
+memory per traverser matters more than match time. It is read once, at startup.
+
 ## Graphical editor
 
 Transformations have a diagram editor too. Pattern objects and links appear as nodes and edges, with

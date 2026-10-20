@@ -10,6 +10,7 @@ import com.mdeo.modeltransformation.graph.ModelMetadata
 import com.mdeo.modeltransformation.graph.ModelStatistics
 import com.mdeo.modeltransformation.graph.VertexRef
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
+import com.mdeo.modeltransformation.graph.ModelGraphStrategies
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategies
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -203,11 +204,11 @@ class TinkerModelGraph private constructor(
         init {
             // Remove LazyBarrierStrategy, PathRetractionStrategy and FilterRankingStrategy globally for TinkerGraph to
             // avoid the per-call overhead of withoutStrategies(). This mirrors the pattern used
-            // in MdeoGraph.
+            // in MdeoGraph; MDEO_MT_DEFAULT_STRATEGIES=1 keeps the last two (ModelGraphStrategies).
             TraversalStrategies.GlobalCache.registerStrategies(
                 TinkerGraph::class.java,
                 TraversalStrategies.GlobalCache.getStrategies(TinkerGraph::class.java).clone()
-                    .removeStrategies(LazyBarrierStrategy::class.java, PathRetractionStrategy::class.java, FilterRankingStrategy::class.java)
+                    .let { ModelGraphStrategies.configure(it) }
             )
         }
 
