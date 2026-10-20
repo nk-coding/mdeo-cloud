@@ -60,6 +60,36 @@ object ScriptFunctionsProtocol {
     fun decodeClient(bytes: ByteArray): ClientMessage = cbor.decodeFromByteArray(bytes)
 
     /**
+     * Encodes `ModelPut(modelId, model)` exactly as [encodeClient] does, for a model already
+     * encoded as [modelBytes] (`cbor.encodeToByteArray(model)`), without encoding it again: a
+     * message's fields are encoded one after the other, so the model's bytes appear unchanged
+     * inside the message's. The frame around them is taken from encoding a placeholder model.
+     *
+     * @param modelId The id the model is held under.
+     * @param modelBytes The CBOR encoding of the model.
+     * @return The encoded message.
+     */
+    fun encodeModelPut(modelId: Long, modelBytes: ByteArray): ByteArray {
+        val frame = encodeClient(ClientMessage.ModelPut(modelId, placeholderModel))
+        val at = indexOf(frame, placeholderBytes)
+        check(at >= 0) { "the placeholder model is not in its message" }
+        val out = ByteArray(frame.size - placeholderBytes.size + modelBytes.size)
+        System.arraycopy(frame, 0, out, 0, at)
+        System.arraycopy(modelBytes, 0, out, at, modelBytes.size)
+        val tail = at + placeholderBytes.size
+        System.arraycopy(frame, tail, out, at + modelBytes.size, frame.size - tail)
+        return out
+    }
+
+    private val placeholderModel = WireModel("\u0000placeholder\u0000")
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private val placeholderBytes: ByteArray by lazy { cbor.encodeToByteArray(placeholderModel) }
+
+    private fun indexOf(bytes: ByteArray, part: ByteArray): Int =
+        (0..bytes.size - part.size).firstOrNull { i -> part.indices.all { bytes[i + it] == part[it] } } ?: -1
+
+    /**
      * Encodes a message sent by the service.
      */
     @OptIn(ExperimentalSerializationApi::class)

@@ -21,11 +21,12 @@ import java.security.MessageDigest
 /**
  * A model as it is uploaded, and the digest that identifies its content.
  *
- * @property wire The model on the wire
- * @property digest SHA-256 of the encoded model. Two models with the same digest are the same model
- *           to a service, however they were built.
+ * @property bytes The CBOR encoding of the model on the wire ([WireModel]), which the upload
+ *           sends as it is
+ * @property digest SHA-256 of [bytes]. Two models with the same digest are the same model to a
+ *           service, however they were built.
  */
-internal class EncodedModel(val wire: WireModel, val digest: String)
+internal class EncodedModel(val bytes: ByteArray, val digest: String)
 
 /**
  * A metamodel as it is sent, and the digest that identifies its content.
@@ -75,8 +76,8 @@ internal object ModelEncoder {
             }
             WireInstance(name, className, attributes, references)
         }
-        val wire = WireModel(model.metamodelPath, instances)
-        return EncodedModel(wire, digest(ScriptFunctionsProtocol.cbor.encodeToByteArray(wire)))
+        val bytes = ScriptFunctionsProtocol.cbor.encodeToByteArray(WireModel(model.metamodelPath, instances))
+        return EncodedModel(bytes, digest(bytes))
     }
 
     /**

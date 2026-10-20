@@ -1,5 +1,7 @@
 package com.mdeo.scriptfunctions.protocol
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -7,7 +9,7 @@ import kotlin.test.assertEquals
  * Pins the bytes of the protocol, which services in other languages are written against. The
  * examples in the protocol documentation are these very messages.
  */
-@OptIn(ExperimentalStdlibApi::class)
+@OptIn(ExperimentalStdlibApi::class, ExperimentalSerializationApi::class)
 class WireFormatTest {
 
     @Test
@@ -24,6 +26,23 @@ class WireFormatTest {
                 "6e7472696573f6ffff64617267739f9f63726566bf62696401ffff9f646e756c6cbfffffff676d6f64656c4964f6ffff",
             ScriptFunctionsProtocol.encodeClient(call).toHexString()
         )
+    }
+
+    @Test
+    fun `a model message from encoded model bytes equals the encoded message`() {
+        val model = WireModel(
+            "/m.mm",
+            listOf(
+                WireInstance("a", "A", mapOf("x" to listOf(WireValue.DoubleValue(1.5)), "e" to emptyList()), mapOf("r" to listOf("b"))),
+                WireInstance("b", "B")
+            )
+        )
+        for (id in listOf(0L, 23L, 1_000_000_007L)) {
+            assertEquals(
+                ScriptFunctionsProtocol.encodeClient(ClientMessage.ModelPut(id, model)).toHexString(),
+                ScriptFunctionsProtocol.encodeModelPut(id, ScriptFunctionsProtocol.cbor.encodeToByteArray(model)).toHexString()
+            )
+        }
     }
 
     @Test

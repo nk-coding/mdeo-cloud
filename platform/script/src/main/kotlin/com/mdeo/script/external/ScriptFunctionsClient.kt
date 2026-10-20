@@ -266,7 +266,7 @@ class ScriptFunctionsClient(
         val encoded = encodedModels.getOrPut(model) { ModelEncoder.encode(model) }
         if (encoded.digest != heldModelDigest) {
             val modelId = nextModelId++
-            transport.send(ScriptFunctionsProtocol.encodeClient(ClientMessage.ModelPut(modelId, encoded.wire)))
+            transport.send(ScriptFunctionsProtocol.encodeModelPut(modelId, encoded.bytes))
             heldModelDigest = encoded.digest
             heldModelId = modelId
             // A new model replaces everything the service held.
