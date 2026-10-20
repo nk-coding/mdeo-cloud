@@ -1,5 +1,6 @@
 package com.mdeo.optimizer.guidance
 
+import com.mdeo.metamodel.Model
 import com.mdeo.optimizer.config.ObjectiveTendency
 import com.mdeo.optimizer.solution.Solution
 import com.mdeo.script.runtime.ExternalCallDispatcher
@@ -35,9 +36,11 @@ class ScriptGuidanceFunction(
 
     private val logger = LoggerFactory.getLogger(ScriptGuidanceFunction::class.java)
 
-    override fun computeFitness(solution: Solution): Double {
-        val model = solution.modelGraph.toModel()
-        val context = SimpleScriptContext(printStream, model, externalCalls)
+    override fun computeFitness(solution: Solution): Double =
+        computeFitness(solution, lazyOf(solution.modelGraph.toModel()))
+
+    override fun computeFitness(solution: Solution, model: Lazy<Model>): Double {
+        val context = SimpleScriptContext(printStream, model.value, externalCalls)
         val instance = clazz.getDeclaredConstructor(ScriptContext::class.java).newInstance(context)
         val method = clazz.methods.find { it.name == jvmMethodName && it.parameterCount == 0 }
             ?: error("JVM method '$jvmMethodName' not found in class '${clazz.name}'")

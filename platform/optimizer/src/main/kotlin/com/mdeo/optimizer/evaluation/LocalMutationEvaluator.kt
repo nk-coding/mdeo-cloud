@@ -1,6 +1,7 @@
 package com.mdeo.optimizer.evaluation
 
 import com.mdeo.metamodel.Metamodel
+import com.mdeo.metamodel.Model
 import com.mdeo.metamodel.SerializedModel
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
@@ -128,6 +129,12 @@ class LocalMutationEvaluator(
         return solution.modelGraph.toSerializedModel()
     }
 
+    /**
+     * The model of a stored solution, read in place (no serialisation), for in-process callers
+     * that only inspect it.
+     */
+    internal fun solutionModel(solutionId: String): Model = requireSolution(solutionId).modelGraph.toModel()
+
     override suspend fun cleanup() {
         for (solution in solutions.values) {
             solution.close()
@@ -226,8 +233,9 @@ class LocalMutationEvaluator(
         val objectives: List<Double>
         val constraints: List<Double>
         try {
-            objectives = evaluateObjectives(mutated)
-            constraints = evaluateConstraints(mutated)
+            val values = evaluateGuidance(mutated)
+            objectives = values.first
+            constraints = values.second
         } catch (e: Throwable) {
             solutions.remove(newId)?.close()
             return EvaluationResult(
@@ -268,8 +276,9 @@ class LocalMutationEvaluator(
         val objectives: List<Double>
         val constraints: List<Double>
         try {
-            objectives = evaluateObjectives(solution)
-            constraints = evaluateConstraints(solution)
+            val values = evaluateGuidance(solution)
+            objectives = values.first
+            constraints = values.second
         } catch (e: Throwable) {
             return EvaluationResult(
                 parentSolutionId = task.solutionId,
@@ -292,22 +301,19 @@ class LocalMutationEvaluator(
     }
 
     /**
-     * Evaluates all objective functions against the given solution.
+     * Evaluates all objective and constraint functions against the given solution. They share
+     * one [com.mdeo.metamodel.Model] of the solution (built on first use): a model per function
+     * would repeat every per-model cost, such as encoding it for external functions.
      *
      * @param solution The candidate solution to evaluate.
-     * @return Fitness values in the order the objectives were configured.
+     * @return Fitness values in the order the objectives were configured, and constraint
+     *   violation values in the order the constraints were configured.
      */
-    private fun evaluateObjectives(solution: Solution): List<Double> =
-        objectives.map { it.computeFitness(solution) }
-
-    /**
-     * Evaluates all constraint functions against the given solution.
-     *
-     * @param solution The candidate solution to evaluate.
-     * @return Constraint violation values in the order the constraints were configured.
-     */
-    private fun evaluateConstraints(solution: Solution): List<Double> =
-        constraints.map { it.computeFitness(solution) }
+    private fun evaluateGuidance(solution: Solution): Pair<List<Double>, List<Double>> {
+        val model = lazy(LazyThreadSafetyMode.NONE) { solution.modelGraph.toModel() }
+        return objectives.map { it.computeFitness(solution, model) } to
+            constraints.map { it.computeFitness(solution, model) }
+    }
 
     /**
      * Looks up a solution by ID, materialising it from [incomingSerializedModels] if
