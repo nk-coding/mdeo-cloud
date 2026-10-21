@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig, searchForWorkspaceRoot, type ProxyOptions } from "vite";
+import { defineConfig, type ProxyOptions } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -27,13 +27,6 @@ export default defineConfig({
     server: {
         port: 4242,
         host: "127.0.0.1",
-        // orthoflow is linked from a local checkout next to this repository
-        fs: {
-            allow: [
-                searchForWorkspaceRoot(process.cwd()),
-                fileURLToPath(new URL("../../../../orthoflow-js", import.meta.url))
-            ]
-        },
         headers: {
             "Cross-Origin-Opener-Policy": "same-origin",
             "Cross-Origin-Embedder-Policy": "require-corp"
