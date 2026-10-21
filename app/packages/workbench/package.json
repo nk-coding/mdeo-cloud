@@ -51,7 +51,7 @@
         "minisearch": "^7.2.0",
         "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@^25.0.1",
         "monaco-languageclient": "^10.7.0",
-        "orthoflow": "file:../../../../orthoflow-js",
+        "orthoflow": "0.1.0",
         "plotly.js-dist": "^3.7.0",
         "prettier": "^3.9.6",
         "reflect-metadata": "^0.2.2",
