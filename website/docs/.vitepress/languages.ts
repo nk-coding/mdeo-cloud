@@ -193,9 +193,7 @@ const modelTransformation = createGrammar({
     keywords: [
         "using",
         "import",
-        "from",
         "as",
-        "transformation",
         "in",
         "out",
         "call",
@@ -216,6 +214,7 @@ const modelTransformation = createGrammar({
         "kill",
         "stop"
     ],
+    types: ["int", "long", "float", "double", "string", "boolean", "model", "List", "Set"],
     constants: ["true", "false", "null"],
     operators: ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "??", "?.", "!!", "=>", "->", "--", "+="]
 });
