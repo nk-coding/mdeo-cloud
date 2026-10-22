@@ -290,7 +290,9 @@ const config = createGrammar({
         "minimize",
         "refine",
         "mutations",
+        "crossovers",
         "using",
+        "with",
         "create",
         "delete",
         "mutate",
@@ -300,6 +302,9 @@ const config = createGrammar({
         "parameters",
         "population",
         "variation",
+        "crossover",
+        "rate",
+        "parents",
         "mutation",
         "step",
         "strategy",
@@ -339,10 +344,11 @@ const config = createGrammar({
         "random",
         "repetitive",
         "genetic",
-        "probabilistic",
         "default",
         "fixed",
-        "interval"
+        "interval",
+        "true",
+        "false"
     ],
     operators: [".."]
 });
