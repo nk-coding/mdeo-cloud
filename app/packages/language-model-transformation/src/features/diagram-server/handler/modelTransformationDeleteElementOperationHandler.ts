@@ -3,6 +3,7 @@ import { BaseDeleteElementOperationHandler, type DeleteOperationResult, sharedIm
 import {
     Pattern,
     PatternApplicationCondition,
+    PatternModelScope,
     PatternLink,
     PatternObjectInstance,
     PatternObjectInstanceReference,
@@ -25,7 +26,8 @@ import {
     type PatternObjectInstanceDeleteType,
     type BaseTransformationStatementType,
     type IfExpressionStatementType,
-    type PatternApplicationConditionType
+    type PatternApplicationConditionType,
+    type PatternModelScopeType
 } from "../../../grammar/modelTransformationTypes.js";
 import { ModelTransformationIdGenerator } from "../modelTransformationIdGenerator.js";
 import { findContainingPattern } from "../modelTransformationPatternUtils.js";
@@ -249,12 +251,13 @@ export class ModelTransformationDeleteElementOperationHandler extends BaseDelete
     }
 
     /**
-     * Adds every application condition block whose elements are all being deleted.
+     * Adds every application condition block and model scope block whose elements are all being
+     * deleted.
      *
      * A block is not drawn as an element of its own - its members carry its stereotype - so an
      * emptied block could neither be selected nor deleted from the diagram, while an empty
-     * `forbid` / `require` block is not a valid condition. Deleting the last member therefore
-     * deletes the block with it.
+     * `forbid` / `require` block is not a valid condition (and an empty `in donor { }` says
+     * nothing). Deleting the last member therefore deletes the block with it.
      *
      * @param result The deletion set, extended in place
      */
@@ -264,13 +267,23 @@ export class ModelTransformationDeleteElementOperationHandler extends BaseDelete
             return;
         }
 
-        for (const node of AstUtils.streamAst(sourceModel)) {
-            if (!this.reflection.isInstance(node, PatternApplicationCondition) || result.has(node)) {
-                continue;
-            }
-            const elements = (node as PatternApplicationConditionType).elements ?? [];
-            if (elements.length > 0 && elements.every((element) => result.has(element as AstNode))) {
-                result.add(node);
+        // repeated until nothing changes: an emptied block may empty the block around it
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const node of AstUtils.streamAst(sourceModel)) {
+                if (
+                    (!this.reflection.isInstance(node, PatternApplicationCondition) &&
+                        !this.reflection.isInstance(node, PatternModelScope)) ||
+                    result.has(node)
+                ) {
+                    continue;
+                }
+                const elements = (node as PatternApplicationConditionType | PatternModelScopeType).elements ?? [];
+                if (elements.length > 0 && elements.every((element) => result.has(element as AstNode))) {
+                    result.add(node);
+                    changed = true;
+                }
             }
         }
     }
@@ -327,7 +340,8 @@ export class ModelTransformationDeleteElementOperationHandler extends BaseDelete
         for (const element of elements) {
             if (
                 this.reflection.isInstance(element, BaseTransformationStatement) ||
-                this.reflection.isInstance(element, PatternApplicationCondition)
+                this.reflection.isInstance(element, PatternApplicationCondition) ||
+                this.reflection.isInstance(element, PatternModelScope)
             ) {
                 deletedContainers.add(element);
             }

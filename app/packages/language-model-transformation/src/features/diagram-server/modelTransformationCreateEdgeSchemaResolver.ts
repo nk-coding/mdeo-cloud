@@ -31,6 +31,7 @@ import type { PatternLinkSchemaParams } from "./handler/createPatternLinkOperati
 import {
     effectivePatternModifier,
     findContainingCondition,
+    findContainingModelScope,
     findContainingPattern,
     patternModifierKind
 } from "./modelTransformationPatternUtils.js";
@@ -120,7 +121,9 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
         }
 
         const context = request.context as PatternLinkCreationContext | undefined;
-        const contextModifier = patternModifierKind(context?.mode);
+        const contextModifier = this.inInputModel(sourceInfo.declaration)
+            ? PatternModifierKind.NONE
+            : patternModifierKind(context?.mode);
         const modifier = this.determineEdgeModifier(sourceInfo.modifier, targetInfo.modifier, contextModifier);
         if (modifier === undefined) {
             return undefined;
@@ -297,7 +300,9 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
      *
      * They have to be declared in the same pattern, and an element of an application condition
      * block can only be linked within its own block or to the enclosing match: two blocks are
-     * matched independently of each other, so there is no graph that spans both.
+     * matched independently of each other, so there is no graph that spans both. Links never
+     * cross models either: two elements of an input model are linked only within one scope
+     * block.
      *
      * @param source The declaring node of the source endpoint
      * @param target The declaring node of the target endpoint
@@ -312,7 +317,23 @@ export class ModelTransformationCreateEdgeSchemaResolver extends CreateEdgeSchem
 
         const sourceCondition = findContainingCondition(source, reflection);
         const targetCondition = findContainingCondition(target, reflection);
-        return sourceCondition == undefined || targetCondition == undefined || sourceCondition === targetCondition;
+        if (sourceCondition != undefined && targetCondition != undefined && sourceCondition !== targetCondition) {
+            return false;
+        }
+        // links never cross models: both ends in the transformed model, or in one scope block
+        const sourceScope = findContainingModelScope(source, reflection);
+        const targetScope = findContainingModelScope(target, reflection);
+        return sourceScope === targetScope;
+    }
+
+    /**
+     * Whether a declaring node lies in a model scope block (an input model, which is read-only).
+     *
+     * @param node The declaring node of an endpoint
+     * @returns `true` for nodes of an input model
+     */
+    private inInputModel(node: AstNode): boolean {
+        return findContainingModelScope(node, this.modelState.languageServices.shared.AstReflection) != undefined;
     }
 
     /**

@@ -27,6 +27,7 @@ import {
     PatternObjectInstanceReference,
     PatternObjectInstanceDelete,
     type PatternApplicationConditionType,
+    type PatternModelScopeType,
     type ObjectInstanceDeclarationType
 } from "../../grammar/modelTransformationTypes.js";
 import {
@@ -65,7 +66,7 @@ import { ID } from "@mdeo/language-common";
 import { ModelTransformationIdGenerator } from "./modelTransformationIdGenerator.js";
 import { adaptGeneratedModelTransformationText } from "./generated/generatedModelTransformationAstAdapter.js";
 import {
-    conditionDisplayName,
+    blockStereotype,
     flattenPatternElements,
     patternModifierKind,
     type FlattenedPatternElement
@@ -190,21 +191,22 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     }
 
     /**
-     * Returns the stereotype text for an element of an application condition block, or
-     * `undefined` for elements of the match pattern itself.
+     * Returns the stereotype text for an element of an application condition block or of a
+     * model scope block, or `undefined` for elements of the match pattern itself.
      *
-     * The block is always named in the stereotype, an unnamed one by its number, so that
-     * the elements of two blocks drawn in the same match node stay distinguishable.
+     * A condition block is always named in the stereotype, an unnamed one by its number, so that
+     * the elements of two blocks drawn in the same match node stay distinguishable; a scope block
+     * is named by its model (`in donor`).
      *
      * @param condition The condition block an element belongs to, if any.
+     * @param scope The model scope block an element belongs to, if any.
      * @returns The stereotype text (without guillemets), or `undefined`.
      */
-    private getConditionStereotype(condition: PatternApplicationConditionType | undefined): string | undefined {
-        if (condition == undefined) {
-            return undefined;
-        }
-        const kind = condition.kind ?? "forbid";
-        return `${kind} ${conditionDisplayName(condition, this.reflection)}`;
+    private getBlockStereotype(
+        condition: PatternApplicationConditionType | undefined,
+        scope?: PatternModelScopeType
+    ): string | undefined {
+        return blockStereotype(condition, scope, this.reflection);
     }
 
     /**
@@ -228,13 +230,14 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         const localInstances = new Map<string, PatternObjectInstanceType>();
         const referencedInstanceNodes = new Map<string, PatternObjectInstanceReferenceType | null>();
+        const referenceScopes = new Map<string, PatternModelScopeType>();
         const deletedInstances = new Set<string>();
         const deletedInstanceNodes = new Map<string, PatternObjectInstanceDeleteType>();
 
         const patternElements = flattenPatternElements(cfgMatchNode.pattern, this.reflection);
 
         {
-            for (const { element } of patternElements) {
+            for (const { element, scope } of patternElements) {
                 if (this.reflection.isInstance(element, PatternObjectInstance)) {
                     const instance = element as PatternObjectInstanceType;
                     if (instance.name) {
@@ -247,6 +250,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                         const instanceRef = ref.instance.ref;
                         if (instanceRef.name) {
                             referencedInstanceNodes.set(instanceRef.name, ref);
+                            if (scope != undefined) {
+                                referenceScopes.set(instanceRef.name, scope);
+                            }
                         }
                     }
                 }
@@ -276,9 +282,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
         }
 
-        for (const { element, condition } of patternElements) {
+        for (const { element, condition, scope } of patternElements) {
             if (this.reflection.isInstance(element, PatternObjectInstance)) {
-                await this.addPatternInstanceNode(node, element, idRegistry, condition);
+                await this.addPatternInstanceNode(node, element, idRegistry, condition, scope);
             }
         }
 
@@ -289,7 +295,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                     instanceName,
                     cfgMatchNode.matchName,
                     reference ?? undefined,
-                    idRegistry
+                    idRegistry,
+                    referenceScopes.get(instanceName)
                 );
             }
         }
@@ -300,9 +307,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             }
         }
 
-        for (const { element, condition } of patternElements) {
+        for (const { element, condition, scope } of patternElements) {
             if (this.reflection.isInstance(element, PatternLink)) {
-                await this.createPatternLinkEdge(node, element, idRegistry, condition);
+                await this.createPatternLinkEdge(node, element, idRegistry, condition, scope);
             }
         }
 
@@ -333,6 +340,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param metadata The layout metadata for the node
      * @param idRegistry The ID registry for element ID generation
      * @param condition The application condition block the instance belongs to, if any
+     * @param scope The model scope block the instance belongs to, if any
      * @returns The constructed GPatternInstanceNode
      */
     createPatternInstanceNode(
@@ -340,11 +348,12 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         nodeId: string,
         metadata: NodeLayoutMetadata,
         idRegistry: ModelIdRegistry,
-        condition?: PatternApplicationConditionType
+        condition?: PatternApplicationConditionType,
+        scope?: PatternModelScopeType
     ): GPatternInstanceNode {
         const name = instance.name ?? "unnamed";
         const typeName = instance.class?.$refText ?? instance.class?.ref?.name ?? undefined;
-        const stereotype = this.getConditionStereotype(condition);
+        const stereotype = this.getBlockStereotype(condition, scope);
         const modifier =
             condition != undefined
                 ? patternModifierKind(condition.kind)
@@ -364,7 +373,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             node.classHierarchy = classHierarchy;
         }
 
-        if (modifier !== PatternModifierKind.NONE) {
+        if (modifier !== PatternModifierKind.NONE || stereotype != undefined) {
             const modifierCompartment = GPatternModifierTitleCompartment.builder()
                 .id(`${nodeId}__modifier-title`)
                 .build();
@@ -399,17 +408,19 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param instance The pattern object instance AST node to create the visual node for
      * @param idRegistry The model ID registry, used to obtain the unique node ID for the instance
      * @param condition The application condition block the instance belongs to, if any
+     * @param scope The model scope block the instance belongs to, if any
      */
     private async addPatternInstanceNode(
         parent: GMatchNode,
         instance: PatternObjectInstanceType,
         idRegistry: ModelIdRegistry,
-        condition?: PatternApplicationConditionType
+        condition?: PatternApplicationConditionType,
+        scope?: PatternModelScopeType
     ): Promise<void> {
         const nodeId = idRegistry.getId(instance);
         const validatedMetadata = await this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
-        parent.children.push(this.createPatternInstanceNode(instance, nodeId, metadata, idRegistry, condition));
+        parent.children.push(this.createPatternInstanceNode(instance, nodeId, metadata, idRegistry, condition, scope));
     }
 
     /**
@@ -421,6 +432,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param metadata Layout metadata for the node
      * @param idRegistry The ID registry for child element IDs
      * @param reference Optional PatternObjectInstanceReference AST node for class resolution and properties
+     * @param scope The model scope block the reference is declared in, if any; the node is then
+     *   tagged with the block's stereotype (`«in donor»`)
      * @returns A GPatternInstanceNode with NONE modifier
      */
     createReferenceInstanceNode(
@@ -428,7 +441,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         nodeId: string,
         metadata: NodeLayoutMetadata,
         idRegistry: ModelIdRegistry,
-        reference?: PatternObjectInstanceReferenceType
+        reference?: PatternObjectInstanceReferenceType,
+        scope?: PatternModelScopeType
     ): GPatternInstanceNode {
         const resolvedClassForRef = declaredClassOf(this.modelState.languageServices, reference?.instance?.ref);
         const classHierarchyForRef =
@@ -447,8 +461,23 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             node.classHierarchy = classHierarchyForRef;
         }
 
-        const headerChildren = this.createPatternInstanceHeader(nodeId, instanceName, undefined);
-        node.children.push(...headerChildren);
+        const stereotype = this.getBlockStereotype(undefined, scope);
+        if (stereotype != undefined) {
+            const modifierCompartment = GPatternModifierTitleCompartment.builder()
+                .id(`${nodeId}__modifier-title`)
+                .build();
+            modifierCompartment.children.push(
+                GPatternModifierLabel.builder()
+                    .id(`${nodeId}__modifier-label`)
+                    .text(stereotypeText(stereotype))
+                    .build(),
+                GPatternInstanceNameLabel.builder().id(`${nodeId}__name`).text(instanceName).build()
+            );
+            node.children.push(modifierCompartment);
+        } else {
+            const headerChildren = this.createPatternInstanceHeader(nodeId, instanceName, undefined);
+            node.children.push(...headerChildren);
+        }
 
         const propertyChildren = this.createPatternPropertyAssignments(nodeId, reference?.properties ?? [], idRegistry);
         if (propertyChildren.length > 0) {
@@ -466,13 +495,15 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param matchName     The name of the match that originally declared the instance.
      * @param reference     The `PatternObjectInstanceReference` AST node, or `undefined` if unresolved.
      * @param idRegistry    The model ID registry used to obtain the element's graph ID.
+     * @param scope         The model scope block the reference is declared in, if any.
      */
     private async createReferencedInstanceNode(
         parent: GMatchNode,
         instanceName: string,
         matchName: string,
         reference: PatternObjectInstanceReferenceType | undefined,
-        idRegistry: ModelIdRegistry
+        idRegistry: ModelIdRegistry,
+        scope?: PatternModelScopeType
     ): Promise<void> {
         const nodeId =
             reference != undefined
@@ -481,7 +512,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const validatedMetadata = await this.modelState.getValidatedMetadata();
         const metadata = this.getNodeMetadata(validatedMetadata, nodeId);
 
-        const node = this.createReferenceInstanceNode(instanceName, nodeId, metadata, idRegistry, reference);
+        const node = this.createReferenceInstanceNode(instanceName, nodeId, metadata, idRegistry, reference, scope);
         parent.children.push(node);
         this.referencedInstancesInCurrentMatch.set(instanceName, nodeId);
     }
@@ -642,9 +673,9 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * The container also includes horizontal dividers between compartments.
      * Returns undefined if there are no where-clauses or variables.
      *
-     * A where clause declared inside a `forbid` / `require` block is rendered like every
-     * other member of a block: with the block's stereotype in front of it, so that it is
-     * visible which condition the constraint belongs to.
+     * A where clause declared inside a `forbid` / `require` block or a model scope block is
+     * rendered like every other member of a block: with the block's stereotype in front of it,
+     * so that it is visible which condition or model the constraint belongs to.
      *
      * @param nodeId The parent node ID
      * @param patternElements The pattern elements, each with the condition block it belongs to
@@ -657,11 +688,11 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         idRegistry: ModelIdRegistry
     ): GMatchNodeCompartments | undefined {
         const whereClauseLabels: GModelElement[] = [];
-        for (const { element, condition } of patternElements) {
+        for (const { element, condition, scope } of patternElements) {
             if (this.reflection.isInstance(element, WhereClause)) {
                 const whereId = idRegistry.getId(element);
                 const exprText = element.expression?.$cstNode?.text ?? "?";
-                const stereotype = this.getConditionStereotype(condition);
+                const stereotype = this.getBlockStereotype(condition, scope);
                 const label = GWhereClauseLabel.builder()
                     .id(whereId)
                     .text(whereClauseLabelText(exprText, stereotype))
@@ -760,12 +791,14 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
      * @param link The pattern link
      * @param idRegistry The model ID registry
      * @param condition The application condition block the link belongs to, if any
+     * @param scope The model scope block the link belongs to, if any
      */
     private async createPatternLinkEdge(
         parent: GMatchNode,
         link: PatternLinkType,
         idRegistry: ModelIdRegistry,
-        condition?: PatternApplicationConditionType
+        condition?: PatternApplicationConditionType,
+        scope?: PatternModelScopeType
     ): Promise<void> {
         const edgeId = idRegistry.getId(link);
 
@@ -783,7 +816,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             return;
         }
 
-        const stereotype = this.getConditionStereotype(condition);
+        const stereotype = this.getBlockStereotype(condition, scope);
         const modifier =
             condition != undefined ? patternModifierKind(condition.kind) : patternModifierKind(link.modifier?.modifier);
         const sourceProperty = link.source?.property?.$refText;
@@ -841,7 +874,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
 
         await this.addPatternLinkLabels(edge, edgeId, effectiveSourceProperty, effectiveTargetProperty);
 
-        if (modifier !== PatternModifierKind.NONE) {
+        if (modifier !== PatternModifierKind.NONE || stereotype != undefined) {
             const modifierNodeId = `${edgeId}__modifier-node`;
             const modifierNodeMetadata = this.getNodeMetadata(validatedMetadata, modifierNodeId);
 

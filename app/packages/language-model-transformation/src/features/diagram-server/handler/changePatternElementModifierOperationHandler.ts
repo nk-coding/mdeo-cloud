@@ -21,13 +21,16 @@ import {
 } from "../../../grammar/modelTransformationTypes.js";
 import {
     conditionMoveOptions,
+    modelMoveOptions,
     containerBraces,
     movableComponent,
     removedCstNodes,
     type ConditionKind,
     type ConditionKindOptions,
-    type ConditionMoveOptions
+    type ConditionMoveOptions,
+    type ModelMoveOptions
 } from "../modelTransformationConditionMoves.js";
+import { findContainingModelScope } from "../modelTransformationPatternUtils.js";
 import type { AstNode } from "langium";
 import type { WorkspaceEdit } from "vscode-languageserver-types";
 
@@ -77,6 +80,10 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
         }
 
         let edit: WorkspaceEdit | undefined;
+        if (findContainingModelScope(node, this.reflection) != undefined) {
+            // an input model is read-only: its elements carry no modifier
+            return undefined;
+        }
         if (this.isInsideApplicationCondition(node)) {
             // Leaving a block without taking a modifier along is a plain move, and is
             // requested as one.
@@ -123,9 +130,12 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
         }
 
         const moves = conditionMoveOptions(astNode, this.reflection);
-        // A block member takes its modifier by leaving the block, so it needs a way out.
+        const modelMoves = modelMoveOptions(astNode, this.reflection);
+        // A block member takes its modifier by leaving the block, so it needs a way out. An
+        // element of an input model (in a scope block) never carries one: the model is read-only.
         const modifiable =
             this.canCarryModifier(element, astNode) &&
+            findContainingModelScope(astNode, this.reflection) == undefined &&
             (!this.isInsideApplicationCondition(astNode) || moves?.inBlock === true);
 
         const children: ContextItem[] = [];
@@ -146,6 +156,10 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
                     this.buildConditionItem(element, "require", moves.require)
                 ].filter((item): item is ContextItem => item != undefined)
             );
+        }
+        const modelItem = modelMoves != undefined ? this.buildModelItem(element, modelMoves) : undefined;
+        if (modelItem != undefined) {
+            children.push(modelItem);
         }
 
         if (children.length === 0) {
@@ -303,6 +317,52 @@ export class ChangePatternElementModifierOperationHandler extends BaseOperationH
             return { id, label, icon, action: children[0].action };
         }
         return { id, label, icon, children };
+    }
+
+    /**
+     * Builds the `In Model` entry: the element moves into a model scope block (`in donor { … }`)
+     * of the pattern, into a new one, or out of its scope block into the transformed model —
+     * the "Move to Block" of input models.
+     *
+     * @param element The selected element
+     * @param options The model destinations the element may move to
+     * @returns The entry, or `undefined` when the element has no model destination
+     */
+    private buildModelItem(element: GModelElement, options: ModelMoveOptions): ContextItem | undefined {
+        const id = `change-modifier-${element.id}-model`;
+        const icon = "database";
+        const move = (target: string): ContextItem["action"] =>
+            MovePatternElementToConditionOperation.create({ elementId: element.id, target });
+
+        const children: ContextItem[] = [];
+        if (options.canLeave) {
+            children.push({
+                id: `${id}-main`,
+                label: "Transformed Model",
+                icon: "square",
+                action: move(MAIN_PATTERN_TARGET)
+            });
+        }
+        for (const destination of options.blocks) {
+            children.push({
+                id: `${id}-${destination.target}`,
+                label: destination.model,
+                icon,
+                action: move(destination.target)
+            });
+        }
+        for (const destination of options.newBlocks) {
+            children.push({
+                id: `${id}-${destination.target}`,
+                label: `${destination.model} (New Block)`,
+                icon: "plus",
+                action: move(destination.target)
+            });
+        }
+        if (children.length === 0) {
+            return undefined;
+        }
+        return { id, label: "In Model", icon, children };
     }
 
     /**
