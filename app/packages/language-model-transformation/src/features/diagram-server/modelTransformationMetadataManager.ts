@@ -36,8 +36,31 @@ import {
 import { ModelTransformationIdGenerator } from "./modelTransformationIdGenerator.js";
 import { flattenPatternElements } from "./modelTransformationPatternUtils.js";
 import { adaptGeneratedModelTransformationText } from "./generated/generatedModelTransformationAstAdapter.js";
+import { HEADER_NODE_ID } from "./modelTransformationHeader.js";
+import type { NodeLayoutMetadata } from "@mdeo/protocol-common";
 
 const { injectable, inject } = sharedImport("inversify");
+
+/**
+ * Estimated height of the title of the header box, for placing a new header box.
+ */
+const HEADER_TITLE_HEIGHT = 40;
+
+/**
+ * Estimated height of one line of the header box.
+ */
+const HEADER_LINE_HEIGHT = 22;
+
+/**
+ * Vertical gap between a newly placed header box and the start node below it.
+ */
+const HEADER_START_GAP = 40;
+
+/**
+ * Horizontal offset of a newly placed header box to the left of the start node, about half the
+ * width of a header box, so that the start node sits below its middle.
+ */
+const HEADER_START_OFFSET_X = 100;
 
 /**
  * Manages metadata validation and synchronization for model transformation diagrams.
@@ -75,7 +98,11 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         // A match node is as large as the pattern it shows, so it has no default size to fall
         // back to: a preferred size on it means that the user dragged it to that size, and
         // supplying one here would both widen small matches and make "Reset Layout" a no-op.
-        if (model.type === ModelTransformationElementType.NODE_MATCH) {
+        // The header box is as large as its lines.
+        if (
+            model.type === ModelTransformationElementType.NODE_MATCH ||
+            model.type === ModelTransformationElementType.NODE_HEADER
+        ) {
             return NodeLayoutMetadataUtil.verify(model.meta);
         }
 
@@ -96,6 +123,47 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         }
 
         return undefined;
+    }
+
+    /**
+     * Whether the diagram shows the header box of the transformation above the start node, see
+     * {@link ModelTransformationGModelFactory.includesHeader}.
+     *
+     * @returns `true`; diagrams of transformations that have no header in source override this
+     */
+    protected includesHeader(): boolean {
+        return true;
+    }
+
+    /**
+     * Validates the metadata like every metadata manager does, and places a header box that
+     * appears in a diagram laid out before (an existing diagram of a file, or one whose `using`
+     * line was just added) above the start node instead of at the origin.
+     *
+     * @param sourceModel The source model to validate metadata for
+     * @param currentMetadata The current graph metadata
+     * @param lastValidMetadata The last valid graph metadata for an error-free model
+     * @returns Updated metadata or undefined if valid
+     */
+    override async validateMetadata(
+        sourceModel: ModelTransformationType,
+        currentMetadata: GraphMetadata,
+        lastValidMetadata: GraphMetadata
+    ): Promise<GraphMetadata | undefined> {
+        const result = await super.validateMetadata(sourceModel, currentMetadata, lastValidMetadata);
+        const header = result?.nodes[HEADER_NODE_ID];
+        const start = result?.nodes["start"]?.meta as NodeLayoutMetadata | undefined;
+        const known = currentMetadata.nodes[HEADER_NODE_ID]?.meta as NodeLayoutMetadata | undefined;
+        if (header == undefined || known?.position != undefined || start?.position == undefined) {
+            return result;
+        }
+        const lines = (sourceModel.imports?.length ?? 0) + Math.max(1, sourceModel.parameters?.length ?? 0);
+        const height = HEADER_TITLE_HEIGHT + lines * HEADER_LINE_HEIGHT;
+        header.meta = {
+            ...(header.meta as NodeLayoutMetadata | undefined),
+            position: { x: start.position.x - HEADER_START_OFFSET_X, y: start.position.y - height - HEADER_START_GAP }
+        };
+        return result;
     }
 
     /**
@@ -127,7 +195,8 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         const converter = new ModelTransformationControlFlowConverter(
             effectiveSourceModel,
             idRegistry,
-            this.reflection
+            this.reflection,
+            this.includesHeader()
         );
         const cfg = converter.convert();
 
@@ -158,6 +227,9 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
         idRegistry: ModelIdRegistry
     ): void {
         switch (node.kind) {
+            case "header":
+                nodes[node.id] = { type: ModelTransformationElementType.NODE_HEADER, attrs: {} };
+                break;
             case "start":
                 nodes[node.id] = { type: ModelTransformationElementType.NODE_START, attrs: {} };
                 break;

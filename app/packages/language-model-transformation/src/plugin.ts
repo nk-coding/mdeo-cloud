@@ -43,6 +43,8 @@ import { ModelTransformationHoverProvider } from "./features/modelTransformation
 import { ModelTransformationDefinitionProvider } from "./features/modelTransformationDefinitionProvider.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 import { RunModelTransformationActionHandler } from "./action-handlers/runModelTransformationActionHandler.js";
+import { ImportTransformationActionHandler } from "./action-handlers/importTransformationActionHandler.js";
+import { IMPORT_TRANSFORMATION_ACTION } from "./features/diagram-server/modelTransformationToolPaletteItemProvider.js";
 import { ModelTransformationActionProvider } from "./features/modelTransformationActionProvider.js";
 import { ModelTransformationCodeActionProvider } from "./features/modelTransformationCodeActionProvider.js";
 import { addExternalReferenceCollectionPhase } from "@mdeo/language-shared";
@@ -140,6 +142,7 @@ function createModelTransformationPlugin(languageJsUrl?: string): LangiumLanguag
                     const registry = new ActionHandlerRegistry();
                     registry.register("new-file", new NewFileActionHandler(services.shared));
                     registry.register("run", new RunModelTransformationActionHandler(services.shared));
+                    registry.register(IMPORT_TRANSFORMATION_ACTION, new ImportTransformationActionHandler(services));
                     return registry;
                 },
                 ActionProvider: () => new ModelTransformationActionProvider()

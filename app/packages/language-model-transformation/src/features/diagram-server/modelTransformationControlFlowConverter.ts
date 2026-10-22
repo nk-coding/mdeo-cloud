@@ -30,10 +30,36 @@ import type {
     ForInStatementType,
     AssignmentStatementType,
     PatternType,
-    ElseIfBranchType
+    ElseIfBranchType,
+    TransformationFileImportType,
+    TransformationParameterType
 } from "../../grammar/modelTransformationTypes.js";
 import type { AstNode } from "langium";
 import { ModelTransformationIdGenerator } from "./modelTransformationIdGenerator.js";
+import { HEADER_NODE_ID } from "./modelTransformationHeader.js";
+
+/**
+ * The header box of the transformation, drawn above the start node: the path imports and the
+ * `in` / `out` declarations of the file. It is not part of the control flow and has no edges.
+ */
+export interface ControlFlowHeaderNode {
+    /**
+     * Discriminant — always "header".
+     */
+    readonly kind: "header";
+    /**
+     * Unique node ID.
+     */
+    readonly id: string;
+    /**
+     * The path imports, in source order.
+     */
+    readonly imports: readonly TransformationFileImportType[];
+    /**
+     * The `in` / `out` declarations, in source order.
+     */
+    readonly parameters: readonly TransformationParameterType[];
+}
 
 /**
  * A start node marking the single entry point of the transformation.
@@ -153,6 +179,7 @@ export interface ControlFlowCallNode {
  * Discriminated union of all supported control-flow node kinds.
  */
 export type ControlFlowNode =
+    | ControlFlowHeaderNode
     | ControlFlowStartNode
     | ControlFlowEndNode
     | ControlFlowMatchNode
@@ -198,6 +225,7 @@ export interface ControlFlowEdge {
  * The control-flow graph extracted from a ModelTransformationType.
  *
  * The graph captures only the outer activity-diagram structure:
+ * - the header box (imports and declarations), which has no edges
  * - start / end nodes
  * - match nodes (with the raw pattern AST node for consumer-side rendering)
  * - split / merge nodes for expression-based branching
@@ -259,6 +287,7 @@ export class ModelTransformationControlFlowConverter {
     private readonly model: ModelTransformationType;
     private readonly idRegistry: ModelIdRegistry;
     private readonly reflection: AstReflection;
+    private readonly includeHeader: boolean;
 
     private nodes: ControlFlowNode[] = [];
     private edges: ControlFlowEdge[] = [];
@@ -267,11 +296,20 @@ export class ModelTransformationControlFlowConverter {
      * @param model The transformation AST root to convert.
      * @param idRegistry Registry that maps AST nodes to stable diagram IDs.
      * @param reflection AST reflection service used for isInstance type checks.
+     * @param includeHeader Whether the graph starts with the header box (see
+     *   {@link ControlFlowHeaderNode}); a transformation with a `using` line has one, unless it
+     *   is a generated transformation shown from its typed AST, which has no header in source.
      */
-    constructor(model: ModelTransformationType, idRegistry: ModelIdRegistry, reflection: AstReflection) {
+    constructor(
+        model: ModelTransformationType,
+        idRegistry: ModelIdRegistry,
+        reflection: AstReflection,
+        includeHeader: boolean = true
+    ) {
         this.model = model;
         this.idRegistry = idRegistry;
         this.reflection = reflection;
+        this.includeHeader = includeHeader;
     }
 
     /**
@@ -285,6 +323,15 @@ export class ModelTransformationControlFlowConverter {
     convert(): ControlFlowGraph {
         this.nodes = [];
         this.edges = [];
+
+        if (this.includeHeader && this.model.import != undefined) {
+            this.pushNode({
+                kind: "header",
+                id: HEADER_NODE_ID,
+                imports: (this.model.imports ?? []).filter((node) => node != undefined),
+                parameters: (this.model.parameters ?? []).filter((node) => node != undefined)
+            });
+        }
 
         const startNodeId = "start";
         this.pushNode({ kind: "start", id: startNodeId });

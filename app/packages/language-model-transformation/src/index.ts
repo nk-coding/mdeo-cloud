@@ -1,6 +1,8 @@
+export * from "./action-handlers/importTransformationActionHandler.js";
 export * from "./action-handlers/newFileActionHandler.js";
 export * from "./action-handlers/runModelTransformationActionHandler.js";
 export * from "./action-handlers/saveGeneratedModelTransformationActionHandler.js";
+export * from "./features/diagram-server/handler/addHeaderDeclarationOperationHandler.js";
 export * from "./features/diagram-server/handler/addPropertyValueComparisonOperationHandler.js";
 export * from "./features/diagram-server/handler/addVariableOperationHandler.js";
 export * from "./features/diagram-server/handler/addWhereClauseOperationHandler.js";
@@ -26,6 +28,7 @@ export * from "./features/diagram-server/model/controlFlowEdge.js";
 export * from "./features/diagram-server/model/controlFlowLabel.js";
 export * from "./features/diagram-server/model/controlFlowLabelNode.js";
 export * from "./features/diagram-server/model/endNode.js";
+export * from "./features/diagram-server/model/headerNode.js";
 export * from "./features/diagram-server/model/matchNode.js";
 export * from "./features/diagram-server/model/matchNodeCompartments.js";
 export * from "./features/diagram-server/model/mergeNode.js";
@@ -49,6 +52,7 @@ export * from "./features/diagram-server/modelTransformationCreateEdgeSchemaReso
 export * from "./features/diagram-server/modelTransformationDiagramConfiguration.js";
 export * from "./features/diagram-server/modelTransformationDiagramModule.js";
 export * from "./features/diagram-server/modelTransformationGModelFactory.js";
+export * from "./features/diagram-server/modelTransformationHeader.js";
 export * from "./features/diagram-server/modelTransformationIdGenerator.js";
 export * from "./features/diagram-server/modelTransformationLabelEditValidator.js";
 export * from "./features/diagram-server/modelTransformationLabelFormat.js";
