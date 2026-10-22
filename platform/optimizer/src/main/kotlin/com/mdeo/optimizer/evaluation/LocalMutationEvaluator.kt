@@ -8,6 +8,8 @@ import com.mdeo.modeltransformation.graph.mdeo.MdeoModelGraph
 import com.mdeo.modeltransformation.graph.tinker.TinkerModelGraph
 import com.mdeo.optimizer.config.GraphBackendType
 import com.mdeo.optimizer.guidance.GuidanceFunction
+import com.mdeo.optimizer.operators.CrossoverOutcome
+import com.mdeo.optimizer.operators.CrossoverStrategy
 import com.mdeo.optimizer.operators.MutationStrategy
 import com.mdeo.optimizer.solution.FailedOperatorsMetadata
 import com.mdeo.optimizer.solution.Solution
@@ -28,6 +30,8 @@ import java.util.concurrent.ConcurrentHashMap
  * @param metamodel The compiled metamodel used to reconstitute solutions from [ModelData].
  * @param nodeId Optional identifier for this evaluator node (defaults to [DEFAULT_NODE_ID]).
  * @param graphBackendType The graph backend to use when reconstituting imported solutions.
+ * @param crossoverStrategy The crossover strategy for [CrossoverTask]s, or `null` when the run
+ *   only mutates (`variation = mutation`); a crossover task then fails.
  */
 class LocalMutationEvaluator(
     private val initialSolutionProvider: () -> Solution,
@@ -36,7 +40,8 @@ class LocalMutationEvaluator(
     private val constraints: List<GuidanceFunction>,
     private val metamodel: Metamodel? = null,
     private val nodeId: String = DEFAULT_NODE_ID,
-    private val graphBackendType: GraphBackendType = GraphBackendType.MDEO
+    private val graphBackendType: GraphBackendType = GraphBackendType.MDEO,
+    private val crossoverStrategy: CrossoverStrategy? = null
 ) : MutationEvaluator {
 
     private val logger = LoggerFactory.getLogger(LocalMutationEvaluator::class.java)
@@ -114,14 +119,18 @@ class LocalMutationEvaluator(
 
         val mutationResults = batch.tasks.map { task -> evaluateSingle(task) }
 
+        val crossoverResults = batch.crossoverTasks.map { task -> evaluateCrossover(task) }
+
         val evaluationResults = batch.evaluationTasks.map { task -> evaluateExisting(task) }
 
-        for (solutionId in batch.discards) {
+        // Replicas were copied here as donors of this batch's crossovers only.
+        for (solutionId in batch.discards + batch.replicas) {
             solutions.remove(solutionId)?.close()
             incomingSerializedModels.remove(solutionId)
+            incomingFailedOperators.remove(solutionId)
         }
 
-        return mutationResults + evaluationResults
+        return mutationResults + crossoverResults + evaluationResults
     }
 
     override suspend fun getSolutionData(ref: WorkerSolutionRef): SerializedModel {
@@ -206,25 +215,86 @@ class LocalMutationEvaluator(
      * failure tracking from the parent's.
      *
      * @param task The mutation task identifying the parent solution.
-     * @return An [EvaluationResult] with [EvaluationResult.succeeded] set accordingly.
+     * @return An [EvaluationResult] with [EvaluationResult.status] set accordingly.
      */
     private fun evaluateSingle(task: MutationTask): EvaluationResult {
         val parent = requireSolution(task.solutionId)
-        val copy = parent.copy()
+        return mutateAndStore(task.taskId, task.solutionId, parent.copy(), ownGraph = false)
+    }
+
+    /**
+     * Makes the child of a [CrossoverTask]: copies the primary parent, applies a crossover with
+     * the donors as model inputs ([CrossoverStrategy.crossover]), then mutates, stores and
+     * evaluates the child exactly as a mutation offspring ([mutateAndStore]).
+     *
+     * A task that does not attempt a crossover is a mutation task of its primary: the same
+     * copy, the same mutation, the same failure sharing with the parent. A crossover that does
+     * not apply leaves an unchanged copy of the primary, which keeps sharing the primary's
+     * [FailedOperatorsMetadata] (same model state); one that applies gives the child its own.
+     *
+     * @param task The crossover task.
+     * @return An [EvaluationResult] carrying the task id and the crossover's outcome.
+     */
+    private fun evaluateCrossover(task: CrossoverTask): EvaluationResult {
+        val primary = requireSolution(task.primary.solutionId)
+        if (!task.attemptCrossover) {
+            return mutateAndStore(task.taskId, task.primary.solutionId, primary.copy(), ownGraph = false)
+        }
+        val strategy = checkNotNull(crossoverStrategy) { "No crossover operators configured on node $nodeId" }
+        val donors = task.donors.map { requireSolution(it.solutionId) }
+        val child = Solution(primary.modelGraph.deepCopy(), primary.transformationsChain.map { it.toList() }.toMutableList())
+        val outcome = try {
+            strategy.crossover(child, primary, donors)
+        } catch (e: Throwable) {
+            child.close()
+            throw e
+        }
+        return mutateAndStore(task.taskId, task.primary.solutionId, child, ownGraph = true, crossover = outcome)
+    }
+
+    /**
+     * Mutates [child], stores the result as a new solution, evaluates it, and returns the result
+     * of task [taskId].
+     *
+     * @param taskId The task the result answers.
+     * @param parentId The (primary) parent's id.
+     * @param child The solution to mutate: a shallow copy of the parent ([ownGraph] `false`), or
+     *   a solution with a graph of its own ([ownGraph] `true`), which is closed once the mutation
+     *   strategy has replaced it.
+     * @param crossover The crossover the child went through, or `null` for a mutation offspring.
+     */
+    private fun mutateAndStore(
+        taskId: String,
+        parentId: String,
+        child: Solution,
+        ownGraph: Boolean,
+        crossover: CrossoverOutcome? = null
+    ): EvaluationResult {
+        val unmutatedGraph = child.modelGraph
+        fun failure(status: ResultStatus, executed: Int = 0, skipped: Int = 0, message: String? = null) = EvaluationResult(
+            parentSolutionId = parentId,
+            newSolutionId = "",
+            workerNodeId = nodeId,
+            objectives = emptyList(),
+            constraints = emptyList(),
+            status = status,
+            executedTransformations = executed,
+            skippedOperatorSlots = skipped,
+            errorMessage = message,
+            taskId = taskId,
+            crossoverAttempted = crossover != null,
+            crossoverOperator = crossover?.appliedOperator
+        )
 
         val mutated = try {
-            mutationStrategy.mutate(copy)
+            mutationStrategy.mutate(child)
         } catch (e: Throwable) {
-            copy.close()
-            return EvaluationResult(
-                parentSolutionId = task.solutionId,
-                newSolutionId = "",
-                workerNodeId = nodeId,
-                objectives = emptyList(),
-                constraints = emptyList(),
-                status = ResultStatus.SOFT_FAILURE,
-                skippedOperatorSlots = 0
-            )
+            if (child.modelGraph !== unmutatedGraph) child.modelGraph.close()
+            if (ownGraph) unmutatedGraph.close()
+            return failure(ResultStatus.SOFT_FAILURE)
+        }
+        if (ownGraph && mutated.modelGraph !== unmutatedGraph) {
+            unmutatedGraph.close()
         }
         val executedTransformations = mutated.lastMutationAttempts
         val skippedOperatorSlots = mutated.lastSkipCount
@@ -238,27 +308,23 @@ class LocalMutationEvaluator(
             constraints = values.second
         } catch (e: Throwable) {
             solutions.remove(newId)?.close()
-            return EvaluationResult(
-                parentSolutionId = task.solutionId,
-                newSolutionId = "",
-                workerNodeId = nodeId,
-                objectives = emptyList(),
-                constraints = emptyList(),
-                status = ResultStatus.HARD_FAILURE,
-                executedTransformations = executedTransformations,
-                skippedOperatorSlots = skippedOperatorSlots,
-                errorMessage = "Guidance function evaluation failed: ${e.message}"
+            return failure(
+                ResultStatus.HARD_FAILURE, executedTransformations, skippedOperatorSlots,
+                "Guidance function evaluation failed: ${e.message}"
             )
         }
         return EvaluationResult(
-            parentSolutionId = task.solutionId,
+            parentSolutionId = parentId,
             newSolutionId = newId,
             workerNodeId = nodeId,
             objectives = objectives,
             constraints = constraints,
             status = ResultStatus.SUCCESS,
             executedTransformations = executedTransformations,
-            skippedOperatorSlots = skippedOperatorSlots
+            skippedOperatorSlots = skippedOperatorSlots,
+            taskId = taskId,
+            crossoverAttempted = crossover != null,
+            crossoverOperator = crossover?.appliedOperator
         )
     }
 
