@@ -40,6 +40,7 @@ import com.mdeo.modeltransformation.ast.patterns.TypedPatternWhereClauseElement
 import com.mdeo.modeltransformation.ast.patterns.TypedWhereClause
 import com.mdeo.modeltransformation.ast.statements.TypedCallStatement
 import com.mdeo.modeltransformation.ast.statements.TypedForInStatement
+import com.mdeo.modeltransformation.ast.statements.TypedForMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedIfCallStatement
 import com.mdeo.modeltransformation.ast.statements.TypedMatchStatement
 import com.mdeo.modeltransformation.ast.statements.TypedTransformationCallArgument
@@ -331,6 +332,37 @@ class ModelInputExecutionTest {
 
                 assertIs<TransformationExecutionResult.Success>(result, result.toString())
                 assertEquals(listOf("a", "b", "unique", "x"), graph.toModelData().labels().map { it!! }.sorted())
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["mdeo", "tinker"])
+    fun `a donor object bound by a for match is referenced in a scope block of its model`(backend: String) {
+        // for match { in donor { dc: Component {} } } do {
+        //     match { in donor { dc {}  dh: Container {}  dc.host -- dh }  create made: Container { name = dh.name } }
+        // }
+        val ast = transformation(
+            listOf(modelInput("donor")),
+            TypedForMatchStatement(
+                pattern = TypedPattern(listOf(obj("dc", "Component", "donor"))),
+                doBlock = listOf(
+                    match(
+                        obj("dc", null, "donor"),
+                        obj("dh", "Container", "donor"),
+                        host("dc", "dh"),
+                        obj("made", "Container", null, "create", set("name", nameOf("dh", CONTAINER, scope = 3)))
+                    )
+                )
+            )
+        )
+        graph(backend, implicitModel()).use { graph ->
+            graph(backend, donorModel()).use { donor ->
+                val result = run(graph, ast, mapOf("donor" to ModelArgument.of(donor)))
+
+                assertIs<TransformationExecutionResult.Success>(result, result.toString())
+                assertEquals(listOf("a", "a", "b", "b", "x", "y"), graph.toModelData().labels().map { it!! }.sorted(),
+                    "one container per donor component, named after its donor host")
             }
         }
     }
