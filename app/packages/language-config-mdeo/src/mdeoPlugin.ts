@@ -15,14 +15,13 @@ import {
     IdValueConverter,
     SerializerFormatter,
     registerDefaultTokenSerializers,
-    NewlineAwareTokenBuilder,
     addExternalReferenceCollectionPhase,
     ActionHandlerRegistry,
     type ActionHandlerRegistryAdditionalServices,
     DefaultActionProvider
 } from "@mdeo/language-shared";
-import { generateContributionPluginGrammar, ConfigTerminals } from "@mdeo/language-config";
-import { Class, Property } from "@mdeo/language-metamodel";
+import { generateContributionPluginGrammar, ConfigTerminals, ConfigTokenBuilder } from "@mdeo/language-config";
+import { Class, Enum, EnumEntry, Property } from "@mdeo/language-metamodel";
 import { ModelTransformation } from "@mdeo/language-model-transformation";
 import { MdeoScopeProvider } from "./features/mdeoScopeProvider.js";
 import { MdeoExternalReferenceCollector } from "./features/mdeoExternalReferenceCollector.js";
@@ -57,7 +56,7 @@ export type MdeoServices = ExternalReferenceAdditionalServices &
  * so the MDEO grammar can be deserialized from its serialized form.
  */
 const mdeoDeserializationContext = GrammarDeserializationContext.create(
-    [Class, Property, ModelTransformation],
+    [Class, Property, Enum, EnumEntry, ModelTransformation],
     [],
     [ID, NEWLINE, HIDDEN_NEWLINE, INT, FLOAT, STRING]
 );
@@ -77,7 +76,7 @@ const configMdeoPlugin: LangiumLanguagePlugin<MdeoServices> = {
     additionalTerminals: ConfigTerminals,
     module: {
         parser: {
-            TokenBuilder: () => new NewlineAwareTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
+            TokenBuilder: () => new ConfigTokenBuilder(new Set(["{"]), new Set(["("]), new Set(["}", ")"])),
             ValueConverter: () => new IdValueConverter(),
             ParserConfig: () => ({
                 maxLookahead: 4
