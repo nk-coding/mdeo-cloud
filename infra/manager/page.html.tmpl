@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{ if .Busy }}<meta http-equiv="refresh" content="5">{{ end }}
+<title>mdeo manager</title>
+<style>
+  :root { --fg:#1d232b; --muted:#5b6672; --bg:#f6f7f9; --card:#fff; --line:#d9dee4; --ok:#1d7a3a; --bad:#b3261e; --warn:#8a5a00; --accent:#1f5fae; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 4px 0 12px; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  section { background: var(--card); border:1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .grid section { margin:0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align:left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  code, pre { font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  pre { background:#f0f2f5; padding:8px; border-radius:6px; max-height: 320px; overflow:auto; white-space: pre-wrap; word-break: break-word; }
+  .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; } .warn { color: var(--warn); }
+  .banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; border:1px solid var(--line); }
+  .banner.ok { background:#e8f5ec; } .banner.bad { background:#fdecea; } .banner.busy { background:#fff6e0; color: var(--fg); font-weight: normal; }
+  label { display:block; margin: 6px 0 2px; color: var(--muted); font-size: 13.5px; }
+  input[type=number], input[type=text] { width: 100%; padding: 6px 8px; border:1px solid var(--line); border-radius: 6px; font-size: 15px; }
+  .confirm { display:flex; gap: 6px; align-items:center; margin: 10px 0 6px; color: var(--fg); }
+  .confirm input { margin:0; }
+  button { background: var(--accent); color:#fff; border:0; border-radius:6px; padding: 7px 14px; font-size: 14.5px; cursor:pointer; }
+  button.danger { background: var(--bad); }
+  button:disabled { background: #9aa4ae; cursor: not-allowed; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .actions { display:flex; flex-wrap: wrap; gap: 14px; }
+  .actions form { border:1px solid var(--line); border-radius: 8px; padding: 10px 12px; flex: 1 1 220px; }
+  dl { display:grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin:0; font-size: 14px; }
+  dt { color: var(--muted); } dd { margin:0; word-break: break-word; }
+</style>
+</head>
+<body>
+<main>
+<h1>mdeo manager</h1>
+
+{{ if .Err }}<div class="banner bad">{{ .Err }}</div>{{ end }}
+{{ if .Msg }}<div class="banner ok">{{ .Msg }}</div>{{ end }}
+{{ if .Busy }}<div class="banner busy"><strong>Running: {{ .Current.Action }}</strong> (since {{ ts .Current.Started }}). The page reloads every 5 s; every action is locked until it has finished.</div>{{ end }}
+
+<section>
+  <h2>Deployment</h2>
+  <dl>
+    <dt>Desired</dt><dd>{{ if .State.Running }}<span class="ok">up</span>{{ else }}<span class="warn">down</span>{{ end }}</dd>
+    <dt>Health</dt><dd>{{ if .Healthy }}<span class="ok">{{ .Health }}</span>{{ else }}<span class="{{ if .State.Running }}bad{{ else }}warn{{ end }}">{{ .Health }}</span>{{ end }}</dd>
+    <dt>mdeo version</dt><dd><code>{{ .State.Desired.MdeoTag }}</code>{{ with .State.LastKnownGood }} <span class="muted">(last known good: {{ .MdeoTag }})</span>{{ end }}</dd>
+    <dt>Simulator version</dt><dd><code>{{ .State.Desired.SimTag }}</code>{{ with .State.LastKnownGood }} <span class="muted">(last known good: {{ .SimTag }})</span>{{ end }}</dd>
+    <dt>Optimizer</dt><dd>{{ .State.Desired.OptimizerInstances }} instances × {{ .State.Desired.OptimizerThreads }} worker threads = {{ .OptimizerDemand }}; JVM options <code>{{ .OptimizerJava }}</code></dd>
+    <dt>Simulator</dt><dd>{{ .State.Desired.SimInstances }} instances × {{ .State.Desired.SimThreads }} threads = {{ .SimCapacity }} simulations at once; {{ .State.Desired.SimMaxSessions }} sessions, {{ .State.Desired.SimResultCacheSize }} cached evaluations / {{ .State.Desired.SimCacheMB }} MB, limit {{ .State.Desired.SimTimeoutSeconds }} s per instance</dd>
+    <dt>NUMA pinning</dt><dd>{{ if .State.Desired.NumaPinning }}{{ if .Pinning }}on, round robin over {{ len .Pinning }} nodes{{ else }}requested, but the host has fewer than 2 NUMA nodes: not applied{{ end }}{{ else }}off{{ end }}</dd>
+    <dt>Host</dt><dd>{{ .Host.CPUs }} CPUs, {{ gib .Host.MemBytes }} memory, {{ len .Host.Nodes }} NUMA node(s){{ range .Host.Nodes }} <span class="muted">[{{ .ID }}: {{ .CPUList }}]</span>{{ end }}</dd>
+    <dt>Plugin URL</dt><dd><code>http://palladio-sim:3022/</code> <span class="muted">(register the Palladio Simulation plugin under this URL in mdeo: Settings → Plugins)</span></dd>
+    <dt>Manager</dt><dd>{{ .Version }}</dd>
+  </dl>
+  {{ range .Problems }}<p class="bad">{{ . }}</p>{{ end }}
+  {{ range .Warnings }}<p class="warn">{{ . }}</p>{{ end }}
+</section>
+
+{{ with .State.LastResult }}
+<section>
+  <h2>Last action: {{ .Action }} — {{ if .OK }}<span class="ok">succeeded</span>{{ else }}<span class="bad">failed</span>{{ end }}</h2>
+  <p>{{ .Message }}</p>
+  <p class="muted">{{ ts .Started }} – {{ ts .Finished }}</p>
+  <details><summary>Steps</summary><pre>{{ range .Log }}{{ . }}
+{{ end }}</pre></details>
+</section>
+{{ end }}
+
+{{ if .Busy }}
+<section>
+  <h2>In progress: {{ .Current.Action }}</h2>
+  <pre>{{ range .Current.Log }}{{ . }}
+{{ end }}</pre>
+</section>
+{{ end }}
+
+<section>
+  <h2>Change</h2>
+  <p class="muted">Every change first validates the configuration and pulls missing images; nothing running is touched if that fails. It is then applied, and if the stack is not healthy within the time limit the manager goes back to the last known good settings by itself. Changing the optimizer or simulator settings recreates those containers: <strong>runs in progress are lost</strong>.</p>
+  <div class="grid">
+    <section>
+      <form method="post" action="/apply/versions">
+        <h2>Versions</h2>
+        <label for="mdeoTag">mdeo image tag (<code>mdeo-*:&lt;tag&gt;</code>)</label>
+        <input id="mdeoTag" name="mdeoTag" type="text" required pattern="[A-Za-z0-9_][A-Za-z0-9_.\-]{0,127}" value="{{ .State.Desired.MdeoTag }}">
+        <label for="simTag">Simulator image tag (<code>palladio-sim-service:&lt;tag&gt;</code>)</label>
+        <input id="simTag" name="simTag" type="text" required pattern="[A-Za-z0-9_][A-Za-z0-9_.\-]{0,127}" value="{{ .State.Desired.SimTag }}">
+        <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+        <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate the changed services</label>
+        <button {{ if $.Busy }}disabled{{ end }}>Change versions</button>
+      </form>
+    </section>
+    <section>
+      <form method="post" action="/apply/optimizer">
+        <h2>Optimizer</h2>
+        {{ range group "optimizer" }}
+        <label for="{{ .Key }}">{{ .Label }} ({{ .Min }}–{{ .Max }})</label>
+        <input id="{{ .Key }}" name="{{ .Key }}" type="number" required min="{{ .Min }}" max="{{ .Max }}" value="{{ val . $.State.Desired }}">
+        {{ end }}
+        <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+        <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate all optimizer nodes</label>
+        <button {{ if $.Busy }}disabled{{ end }}>Apply</button>
+      </form>
+    </section>
+    <section>
+      <form method="post" action="/apply/simulator">
+        <h2>Palladio simulator</h2>
+        {{ range group "sim" }}
+        <label for="{{ .Key }}">{{ .Label }} ({{ .Min }}–{{ .Max }})</label>
+        <input id="{{ .Key }}" name="{{ .Key }}" type="number" required min="{{ .Min }}" max="{{ .Max }}" value="{{ val . $.State.Desired }}">
+        {{ end }}
+        <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+        <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate all simulator instances</label>
+        <button {{ if $.Busy }}disabled{{ end }}>Apply</button>
+      </form>
+    </section>
+    <section>
+      <form method="post" action="/apply/placement">
+        <h2>CPU placement</h2>
+        <label class="confirm"><input type="checkbox" name="numaPinning" {{ if .State.Desired.NumaPinning }}checked{{ end }}> pin optimizer and simulator instances to NUMA nodes, round robin (instance i → node i mod {{ len .Host.Nodes }})</label>
+        <p class="muted">Each instance may use only the CPUs of its node, and its memory is then allocated there. Use simulator and optimizer instance counts that are multiples of the node count, so every node gets the same load. Databases, backend and plugin services are never pinned.</p>
+        <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+        <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate optimizer and simulator instances</label>
+        <button {{ if $.Busy }}disabled{{ end }}>Apply</button>
+      </form>
+    </section>
+  </div>
+</section>
+
+<section>
+  <h2>Operate</h2>
+  <div class="actions">
+    <form method="post" action="/action/restart">
+      <strong>Restart</strong>
+      <p class="muted">Recreates every container with the current settings (databases included; their data is kept).</p>
+      <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+      <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> restart everything</label>
+      <button class="danger" {{ if $.Busy }}disabled{{ end }}>Restart</button>
+    </form>
+    <form method="post" action="/action/down">
+      <strong>Down</strong>
+      <p class="muted">Stops and removes all containers. Volumes (database data) are kept. Stays down across reboots until Up.</p>
+      <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+      <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> take mdeo down</label>
+      <button class="danger" {{ if $.Busy }}disabled{{ end }}>Down</button>
+    </form>
+    <form method="post" action="/action/up">
+      <strong>Up</strong>
+      <p class="muted">Starts the stack with the current settings and waits until it is healthy.</p>
+      <input type="hidden" name="csrf" value="{{ $.CSRF }}">
+      <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> bring mdeo up</label>
+      <button {{ if $.Busy }}disabled{{ end }}>Up</button>
+    </form>
+  </div>
+</section>
+
+<section>
+  <h2>Containers</h2>
+  {{ if .PsError }}<p class="bad">{{ .PsError }}</p>{{ end }}
+  <div class="scroll">
+  <table>
+    <tr><th>Service</th><th>State</th><th>Health</th><th>Image</th><th>Status</th></tr>
+    {{ range .Containers }}
+    <tr><td>{{ .Service }}</td><td>{{ .State }}</td><td>{{ if eq .Health "healthy" }}<span class="ok">healthy</span>{{ else if .Health }}<span class="bad">{{ .Health }}</span>{{ end }}</td><td><code>{{ .Image }}</code></td><td class="muted">{{ .Status }}</td></tr>
+    {{ else }}
+    <tr><td colspan="5" class="muted">no containers</td></tr>
+    {{ end }}
+  </table>
+  </div>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# The mdeo manager, a compose project of its own: taking the mdeo stack down never stops it,
+# and it never changes itself. Put this file in a directory of its own on the server (e.g.
+# /opt/mdeo) with .env (see manager.env.example) and config/stack.env (stack.env.example), then
+#
+#   docker compose -f docker-compose.manager.yaml up -d
+#
+# The manager then runs the mdeo stack as the compose project STACK_PROJECT (default "mdeo").
+# See README.md.
+name: mdeo-manager
+
+services:
+  manager:
+    image: ${MANAGER_IMAGE:-ghcr.io/nk-coding/mdeo-manager}:${MANAGER_TAG:?set MANAGER_TAG in .env}
+    restart: always
+    # MANAGER_USER, MANAGER_PASSWORD_HASH, INITIAL_MDEO_TAG, INITIAL_SIM_TAG, ...
+    env_file: .env
+    ports:
+      - "${MANAGER_BIND:-0.0.0.0}:${MANAGER_PORT:-8090}:8090"
+    volumes:
+      # Full control over the host's Docker: whoever has the manager's password can only do what
+      # its page offers, but the container itself is root-equivalent on the host.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # state.json (settings, last known good, journal), the generated compose file, secrets.env.
+      - ./state:/state
+      # stack.env, read-only. A directory, not the file, so an edited file is seen.
+      - ./config:/config:ro
+      # Optional: config.json with credentials for ghcr.io, when the images are not public.
+      - ./docker-config:/root/.docker:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

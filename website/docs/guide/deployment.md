@@ -62,6 +62,28 @@ Images follow the naming scheme `${MDEO_IMAGE_PREFIX}/mdeo-<service>:${MDEO_IMAG
 
 The full list is in `infra/.env.example`.
 
+## One server, operated through the manager
+
+`infra/manager/` holds `mdeo-manager`, a small web page (basic auth) for running the production
+stack on a single Docker host without logging in to it. It generates the compose file of the
+whole stack from a handful of settings and can change exactly these: the number of
+`optimizer-execution` nodes and their worker threads and heap, the number and size of the Palladio
+simulation service instances (behind one load-balanced plugin URL, `http://palladio-sim:3022/`),
+the image versions of mdeo and of the simulator, NUMA pinning, restart, down and up.
+
+Every change is validated, checked with `docker compose config` and its images pulled before
+anything running is touched; it is then applied and must become healthy, otherwise the manager
+returns to the last settings the stack was healthy with. The manager runs as its own compose
+project with `restart: always`, keeps its state on disk and, after a crash or reboot, finishes or
+undoes an interrupted change. Volumes are never removed.
+
+```bash
+# on the server, in a directory with docker-compose.manager.yaml, .env and config/stack.env
+docker compose -f docker-compose.manager.yaml up -d
+```
+
+Setup, the settings and the sizing advice are in `infra/manager/README.md`.
+
 ## Kubernetes
 
 Manifests are under `infra/k8s/`. They provision the backend, the plugin services, the execution

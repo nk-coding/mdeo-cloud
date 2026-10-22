@@ -59,6 +59,9 @@ jobs:
             dockerfile: infra/docker/model-transformation-execution/Dockerfile
           - name: optimizer-execution
             dockerfile: infra/docker/optimizer-execution/Dockerfile
+          - name: manager
+            dockerfile: infra/manager/Dockerfile
+            version_arg: true
 
     steps:
       - name: Checkout repository
@@ -180,6 +183,9 @@ jobs:
             dockerfile: infra/docker/model-transformation-execution/Dockerfile
           - name: optimizer-execution
             dockerfile: infra/docker/optimizer-execution/Dockerfile
+          - name: manager
+            dockerfile: infra/manager/Dockerfile
+            version_arg: true
 
     steps:
       - name: Checkout repository
@@ -263,6 +269,7 @@ jobs:
           - name: script-execution
           - name: model-transformation-execution
           - name: optimizer-execution
+          - name: manager
 
     steps:
       - name: Download digests
