@@ -2,9 +2,9 @@ import type { Operation } from "@eclipse-glsp/protocol";
 import type { NewLabelOperation } from "@mdeo/protocol-common";
 
 /**
- * Operation adding a line to the header of a transformation: a path import
- * (`import "./x.mt" as x`) or an `in` / `out` declaration. It is the commit of a new row of
- * the header box, whose text is inserted as it was written.
+ * Operation adding a line to the header of a transformation: an `in` / `out` declaration (or a
+ * path import, `import "./x.mt" as x`). It is the commit of a new row of the start node (an
+ * input) or of an end node (an output), whose text is inserted as it was written.
  */
 export interface AddHeaderDeclarationOperation extends NewLabelOperation {
     /**
@@ -13,9 +13,9 @@ export interface AddHeaderDeclarationOperation extends NewLabelOperation {
     kind: "addHeaderDeclaration";
 
     /**
-     * Identifier of the header box.
+     * Identifier of the start or end node the row was added to.
      */
-    headerNodeId: string;
+    nodeId: string;
 }
 
 /**
@@ -28,7 +28,7 @@ export namespace AddHeaderDeclarationOperation {
     export const KIND = "addHeaderDeclaration";
 
     /**
-     * Identifier carried in `newLabelOperationKind` by a new row of the header box, by which
+     * Identifier carried in `newLabelOperationKind` by a new row of a start or end node, by which
      * the label view recognises a label it has to commit through this operation.
      */
     export const NEW_LABEL_KIND = "add-header-declaration";
@@ -38,9 +38,9 @@ export namespace AddHeaderDeclarationOperation {
      */
     export interface Options {
         /**
-         * Identifier of the header box.
+         * Identifier of the start or end node the row was added to.
          */
-        headerNodeId: string;
+        nodeId: string;
 
         /**
          * The line as written, e.g. `in maxLoad: int = 3` or `import "./move.mt" as move`.
@@ -58,8 +58,8 @@ export namespace AddHeaderDeclarationOperation {
         return {
             kind: KIND,
             isOperation: true,
-            headerNodeId: options.headerNodeId,
-            parentElementId: options.headerNodeId,
+            nodeId: options.nodeId,
+            parentElementId: options.nodeId,
             labelText: options.labelText ?? ""
         };
     }

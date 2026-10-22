@@ -54,9 +54,8 @@ import { GWhereClauseLabelView } from "./views/whereClauseLabelView.js";
 import { GVariableLabelView } from "./views/variableLabelView.js";
 import { GPatternModifierLabelView } from "./views/patternModifierLabelView.js";
 import { PatternLinkContextProvider } from "./features/create-edge/patternLinkContextProvider.js";
-import { GHeaderNode, GHeaderRowLabel, GHeaderTitleLabel } from "./model/headerNode.js";
-import { GHeaderNodeView } from "./views/headerNodeView.js";
-import { GHeaderRowLabelView, GHeaderTitleLabelView } from "./views/headerLabelViews.js";
+import { GDeclarationLabel } from "./model/declarationLabel.js";
+import { GDeclarationLabelView } from "./views/declarationLabelView.js";
 
 const { FeatureModule, configureModelElement } = sharedImport("@eclipse-glsp/sprotty");
 
@@ -125,24 +124,11 @@ export const modelTransformationDiagramModule = new FeatureModule(
             GPatternLinkEndLabelView
         );
 
-        configureModelElement(context, ModelTransformationElementType.NODE_HEADER, GHeaderNode, GHeaderNodeView);
         configureModelElement(
             context,
-            ModelTransformationElementType.LABEL_HEADER_TITLE,
-            GHeaderTitleLabel,
-            GHeaderTitleLabelView
-        );
-        configureModelElement(
-            context,
-            ModelTransformationElementType.LABEL_HEADER_IMPORT,
-            GHeaderRowLabel,
-            GHeaderRowLabelView
-        );
-        configureModelElement(
-            context,
-            ModelTransformationElementType.LABEL_HEADER_DECLARATION,
-            GHeaderRowLabel,
-            GHeaderRowLabelView
+            ModelTransformationElementType.LABEL_DECLARATION,
+            GDeclarationLabel,
+            GDeclarationLabelView
         );
         configureModelElement(context, ModelTransformationElementType.NODE_START, GStartNode, GStartNodeView);
         configureModelElement(context, ModelTransformationElementType.NODE_END, GEndNode, GEndNodeView);

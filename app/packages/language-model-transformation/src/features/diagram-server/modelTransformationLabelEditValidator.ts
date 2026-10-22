@@ -8,10 +8,8 @@ import {
     PatternPropertyAssignment,
     PatternVariable,
     PatternVariableReassignment,
-    TransformationFileImport,
     TransformationParameter,
     type ModelTransformationType,
-    type TransformationFileImportType,
     type TransformationParameterType,
     type PatternObjectInstanceType,
     type PatternPropertyAssignmentType,
@@ -36,7 +34,7 @@ import { TransformationDeclarationResolver } from "../transformationDeclarations
 import {
     checkHeaderLineParses,
     declaredNames,
-    NEW_HEADER_LABEL_PREFIX,
+    NEW_DECLARATION_LABEL_PREFIX,
     parseHeaderLine,
     unquotedName
 } from "./modelTransformationHeader.js";
@@ -85,9 +83,16 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
                 return this.validateModifierLabel(label) ?? ValidationStatus.NONE;
             case ModelTransformationElementType.LABEL_CONTROL_FLOW:
                 return this.validateControlFlowLabel(label) ?? ValidationStatus.NONE;
-            case ModelTransformationElementType.LABEL_HEADER_IMPORT:
-            case ModelTransformationElementType.LABEL_HEADER_DECLARATION:
-                return this.validateHeaderLine(label, this.headerLineOf(element)) ?? ValidationStatus.NONE;
+            case ModelTransformationElementType.LABEL_DECLARATION: {
+                const declaration = this.declarationOf(element);
+                return declaration != undefined
+                    ? (this.validateDeclarationRow(
+                          label,
+                          declaration.direction === "out" ? "out" : "in",
+                          declaration
+                      ) ?? ValidationStatus.NONE)
+                    : ValidationStatus.NONE;
+            }
             case ModelTransformationElementType.LABEL_CALL:
                 return label.trim().startsWith("call ")
                     ? ValidationStatus.NONE
@@ -109,15 +114,17 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      *   name uniqueness.
      * - {@link NEW_WHERE_CLAUSE_LABEL_PREFIX} — new where-clause placeholder; validates the
      *   {@code where } prefix and non-empty expression.
-     * - {@link NEW_HEADER_LABEL_PREFIX} — new row of the header box; validates the header line.
+     * - {@link NEW_DECLARATION_LABEL_PREFIX} — new row of the start node (an input) or of an end
+     *   node (an output); validates the declaration.
      *
      * @param text The label text currently being entered
      * @param modelElementId The temporary label element ID
      * @returns Validation status for the in-progress edit
      */
     override validateUnknown(text: string, modelElementId: string): ValidationStatusType {
-        if (modelElementId.startsWith(NEW_HEADER_LABEL_PREFIX)) {
-            return this.validateHeaderLine(text, undefined) ?? ValidationStatus.NONE;
+        if (modelElementId.startsWith(NEW_DECLARATION_LABEL_PREFIX)) {
+            const direction = modelElementId.slice(NEW_DECLARATION_LABEL_PREFIX.length) === "out" ? "out" : "in";
+            return this.validateDeclarationRow(text, direction, undefined) ?? ValidationStatus.NONE;
         }
         if (modelElementId.startsWith(NEW_PROPERTY_COMPARISON_LABEL_PREFIX)) {
             if (text.trim().length === 0) {
@@ -145,52 +152,49 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
     }
 
     /**
-     * Returns the import or declaration behind a row of the header box.
+     * Returns the declaration behind a row of the start node or of an end node.
      *
      * @param element The row
-     * @returns The import or declaration, or undefined when the row has none
+     * @returns The declaration, or undefined when the row has none
      */
-    private headerLineOf(
-        element: GModelElement
-    ): TransformationFileImportType | TransformationParameterType | undefined {
+    private declarationOf(element: GModelElement): TransformationParameterType | undefined {
         const astNode = this.index.getAstNode(element);
-        if (
-            astNode != undefined &&
-            (this.reflection.isInstance(astNode, TransformationFileImport) ||
-                this.reflection.isInstance(astNode, TransformationParameter))
-        ) {
-            return astNode as TransformationFileImportType | TransformationParameterType;
-        }
-        return undefined;
+        return astNode != undefined && this.reflection.isInstance(astNode, TransformationParameter)
+            ? (astNode as TransformationParameterType)
+            : undefined;
     }
 
     /**
-     * Validates a line of the header box: an import (`import "./x.mt" as x`) or a declaration
-     * (`in name: Type [= default]`, `out name: Type`).
+     * Validates a declaration row: the start node lists the inputs (`in name: Type [= default]`),
+     * the end nodes list the outputs (`out name: Type`).
      *
-     * The line has to have the shape of a header line, its name must not be declared anywhere
-     * else in the file (names are file-global), and the file must parse with the line in place;
-     * whether its type or path resolves is reported by the validation of the file afterwards.
+     * The row has to declare in the direction of its node, its name must not be declared
+     * anywhere else in the file (names are file-global), and the file must parse with the line
+     * in place; whether its type resolves is reported by the validation of the file afterwards.
      * An empty existing row deletes its line; an empty new row is discarded.
      *
      * @param text The edited line
-     * @param replaced The import or declaration the row holds, undefined for a new row
+     * @param direction The direction the node lists
+     * @param replaced The declaration the row holds, undefined for a new row
      * @returns A validation status if invalid, undefined if valid
      */
-    private validateHeaderLine(
+    private validateDeclarationRow(
         text: string,
-        replaced: TransformationFileImportType | TransformationParameterType | undefined
+        direction: "in" | "out",
+        replaced: TransformationParameterType | undefined
     ): ValidationStatusType | undefined {
         if (text.trim().length === 0) {
             return undefined;
         }
         const parsed = parseHeaderLine(text);
-        if (parsed == undefined) {
+        if (parsed == undefined || parsed.kind !== direction) {
             return this.error(
-                'Expected a header line: in name: Type [= default], out name: Type or import "./file.mt" as alias'
+                direction === "in"
+                    ? "The start node lists the inputs: in name: Type [= default]"
+                    : "An end node lists the outputs: out name: Type"
             );
         }
-        const nameValidation = this.validateRawIdentifier(parsed.name, parsed.kind === "import" ? "Alias" : "Name");
+        const nameValidation = this.validateRawIdentifier(parsed.name, "Name");
         if (nameValidation != undefined) {
             return nameValidation;
         }
@@ -227,7 +231,7 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
             text,
             replaced
         );
-        return syntaxError != undefined ? this.error(`Invalid header line: ${syntaxError}`) : undefined;
+        return syntaxError != undefined ? this.error(`Invalid declaration: ${syntaxError}`) : undefined;
     }
 
     /**

@@ -27,8 +27,8 @@ export * from "./features/diagram-server/handler/modelTransformationRequestClipb
 export * from "./features/diagram-server/model/controlFlowEdge.js";
 export * from "./features/diagram-server/model/controlFlowLabel.js";
 export * from "./features/diagram-server/model/controlFlowLabelNode.js";
+export * from "./features/diagram-server/model/declarationLabel.js";
 export * from "./features/diagram-server/model/endNode.js";
-export * from "./features/diagram-server/model/headerNode.js";
 export * from "./features/diagram-server/model/matchNode.js";
 export * from "./features/diagram-server/model/matchNodeCompartments.js";
 export * from "./features/diagram-server/model/mergeNode.js";

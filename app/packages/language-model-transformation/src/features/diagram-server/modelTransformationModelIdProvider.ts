@@ -14,7 +14,6 @@ import {
     CallStatement,
     CallOutput,
     TransformationParameter,
-    TransformationFileImport,
     IfCallStatement,
     IfCallConditionAndBlock,
     ForInStatement,
@@ -93,7 +92,6 @@ export class ModelTransformationModelIdProvider extends BaseModelIdProvider {
 
         if (
             this.reflection.isInstance(node, TransformationParameter) ||
-            this.reflection.isInstance(node, TransformationFileImport) ||
             this.reflection.isInstance(node, CallOutput) ||
             this.reflection.isInstance(node, ForInVariable)
         ) {

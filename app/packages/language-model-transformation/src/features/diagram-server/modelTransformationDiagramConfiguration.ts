@@ -18,7 +18,7 @@ import { GPatternLinkEndNode } from "./model/patternLinkEndNode.js";
 import { GPatternLinkEndLabel } from "./model/patternLinkEndLabel.js";
 import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GVariableLabel } from "./model/variableLabel.js";
-import { GHeaderNode, GHeaderRowLabel, GHeaderTitleLabel } from "./model/headerNode.js";
+import { GDeclarationLabel } from "./model/declarationLabel.js";
 
 const { injectable } = sharedImport("inversify");
 const { ServerLayoutKind, getDefaultMapping, DefaultTypes } = sharedImport("@eclipse-glsp/server");
@@ -42,11 +42,8 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
     get typeMapping(): Map<string, GModelElementConstructor> {
         const mapping = getDefaultMapping();
 
-        mapping.set(ModelTransformationElementType.NODE_HEADER, GHeaderNode);
-        mapping.set(ModelTransformationElementType.LABEL_HEADER_TITLE, GHeaderTitleLabel);
-        mapping.set(ModelTransformationElementType.LABEL_HEADER_IMPORT, GHeaderRowLabel);
-        mapping.set(ModelTransformationElementType.LABEL_HEADER_DECLARATION, GHeaderRowLabel);
         mapping.set(ModelTransformationElementType.NODE_START, GStartNode);
+        mapping.set(ModelTransformationElementType.LABEL_DECLARATION, GDeclarationLabel);
         mapping.set(ModelTransformationElementType.NODE_END, GEndNode);
         mapping.set(ModelTransformationElementType.NODE_MATCH, GMatchNode);
         mapping.set(ModelTransformationElementType.NODE_SPLIT, GSplitNode);
@@ -86,7 +83,6 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                 resizable: false,
                 reparentable: false,
                 containableElementTypeIds: [
-                    ModelTransformationElementType.NODE_HEADER,
                     ModelTransformationElementType.NODE_START,
                     ModelTransformationElementType.NODE_END,
                     ModelTransformationElementType.NODE_MATCH,
@@ -94,14 +90,6 @@ export class ModelTransformationDiagramConfiguration implements DiagramConfigura
                     ModelTransformationElementType.NODE_MERGE,
                     ModelTransformationElementType.NODE_CALL
                 ]
-            },
-            {
-                // The box itself stays; its rows (imports and declarations) are deleted one by one.
-                elementTypeId: ModelTransformationElementType.NODE_HEADER,
-                repositionable: true,
-                deletable: false,
-                resizable: false,
-                reparentable: false
             },
             {
                 elementTypeId: ModelTransformationElementType.NODE_START,
