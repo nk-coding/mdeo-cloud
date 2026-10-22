@@ -1,7 +1,7 @@
 /* eslint-disable no-console -- a command-line script */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { TestWorkspace } from "./testWorkspace.ts";
-import { layeredProject, SCENARIOS, COLLECTION_SCENARIOS, TRAP_SCENARIOS } from "./fixtures.ts";
+import { layeredProject, SCENARIOS, COLLECTION_SCENARIOS, TRAP_SCENARIOS, MODEL_SCENARIOS } from "./fixtures.ts";
 
 const { typedAstHandler } = await import("../dist/handler/typedAstHandler.js");
 const { metamodelAstDataHandler } = await import("../../service-metamodel/dist/handler/metamodelAstDataHandler.js");
@@ -9,7 +9,8 @@ const { metamodelAstDataHandler } = await import("../../service-metamodel/dist/h
 /**
  * Writes the typed ASTs of the fixtures (`fixtures.ts`) that the engine tests of callable
  * transformations (platform/model-transformation: CallStatementExecutionTest,
- * CollectionCallExecutionTest, LanguageTrapsExecutionTest) run, as this package's converter
+ * CollectionCallExecutionTest, LanguageTrapsExecutionTest, and the tests of model inputs) run,
+ * as this package's converter
  * produces them, together with the ASTs of the metamodels they use.
  *
  * Run it with `npm run generate:call-fixtures` (after `npm run build:packages` in `app/`) whenever
@@ -26,7 +27,8 @@ const TRANSFORMATIONS = [
     ...Object.keys(SCENARIOS).filter((path) => path.includes("/call-")),
     ...Object.keys(COLLECTION_SCENARIOS).filter((path) => path.includes("/call-")),
     ...Object.keys(TRAP_SCENARIOS).filter((path) => path.includes("/call-")),
-    "/optimize/scenarios/move-placement.mt"
+    "/optimize/scenarios/move-placement.mt",
+    ...Object.keys(MODEL_SCENARIOS)
 ];
 
 const METAMODELS = ["/metamodel/shop.mm", "/metamodel/base.mm", "/metamodel/shapes.mm", "/metamodel/numbers.mm"];
@@ -46,7 +48,9 @@ function write(name: string, data: unknown): void {
     writeFileSync(FIXTURE_DIR + name, JSON.stringify(data, null, 1) + "\n");
 }
 
-const workspace = new TestWorkspace(layeredProject({ ...SCENARIOS, ...COLLECTION_SCENARIOS, ...TRAP_SCENARIOS }));
+const workspace = new TestWorkspace(
+    layeredProject({ ...SCENARIOS, ...COLLECTION_SCENARIOS, ...TRAP_SCENARIOS, ...MODEL_SCENARIOS })
+);
 const failures: string[] = [];
 
 for (const path of TRANSFORMATIONS) {

@@ -47,13 +47,11 @@ export const OTHER_MM = `class Thing {
  */
 export const MOVE_COMPONENT = `using "../../metamodel/base.mm"
 
-transformation moveComponent(
-    in maxCandidates: int = 0,
-    out moved: Component,
-    out source: Container,
-    out target: Container,
-    out choices: int
-)
+in maxCandidates: int = 0
+out moved: Component
+out source: Container
+out target: Container
+out choices: int
 
 match {
     placement: Placement { }
@@ -79,7 +77,8 @@ match {
  */
 export const FOLLOW_READER = `using "../../metamodel/shop.mm"
 
-transformation followReader(in moved: Component, in target: Container)
+in moved: Component
+in target: Container
 
 for match {
     moved { }
@@ -102,8 +101,8 @@ for match {
  * Layer 3: the operator the configuration lists.
  */
 export const MOVE_WITH_STORES = `using "../metamodel/shop.mm"
-import { moveComponent } from "./generic/move-component.mt"
-import { followReader } from "./sync/follow-reader.mt"
+import "./generic/move-component.mt" as moveComponent
+import "./sync/follow-reader.mt" as followReader
 
 call moveComponent(maxCandidates = 4) -> (moved: m, source: a, target: b, choices: n)
 call followReader(moved = m, target = b)
@@ -138,7 +137,7 @@ export const SCENARIOS: Record<string, string> = {
     // a callee whose match fails: the call fails, and so the caller
     "/optimize/scenarios/no-placement.mt": `using "../../metamodel/base.mm"
 
-transformation noPlacement(in wanted: string)
+in wanted: string
 
 match {
     placement: Placement { }
@@ -149,7 +148,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-failing.mt": `using "../../metamodel/shop.mm"
-import { noPlacement } from "./no-placement.mt"
+import "./no-placement.mt" as noPlacement
 
 match {
     first: Container {
@@ -166,7 +165,9 @@ match {
     // stop returns from the callee only
     "/optimize/scenarios/rename-unless-skipped.mt": `using "../../metamodel/base.mm"
 
-transformation renameUnlessSkipped(in target: Container, in newName: string, out renamed: boolean)
+in target: Container
+in newName: string
+out renamed: boolean
 
 match {
     var no = false
@@ -188,7 +189,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-stopping.mt": `using "../../metamodel/shop.mm"
-import { renameUnlessSkipped } from "./rename-unless-skipped.mt"
+import "./rename-unless-skipped.mt" as renameUnlessSkipped
 
 match {
     c: Container {
@@ -206,8 +207,6 @@ match {
     // kill in a callee ends the whole transformation
     "/optimize/scenarios/killer.mt": `using "../../metamodel/base.mm"
 
-transformation killer()
-
 match {
     c: Container {
         name = "killed"
@@ -216,7 +215,7 @@ match {
 kill
 `,
     "/optimize/scenarios/call-killing.mt": `using "../../metamodel/shop.mm"
-import { killer } from "./killer.mt"
+import "./killer.mt" as killer
 
 call killer()
 match {
@@ -228,7 +227,9 @@ match {
     // a callee that matches nothing succeeds; its nullable output stays null
     "/optimize/scenarios/find-named.mt": `using "../../metamodel/base.mm"
 
-transformation findNamed(in wanted: string = "", out found: Container?, out count: int)
+in wanted: string = ""
+out found: Container?
+out count: int
 
 match {
     var zero = 0
@@ -254,7 +255,7 @@ if match {
 }
 `,
     "/optimize/scenarios/call-finding.mt": `using "../../metamodel/shop.mm"
-import { findNamed } from "./find-named.mt"
+import "./find-named.mt" as findNamed
 
 call findNamed(wanted = "nobody") -> (found: f, count: n)
 match {
@@ -267,7 +268,8 @@ match {
     // a callee that creates a node and returns it
     "/optimize/scenarios/make-container.mt": `using "../../metamodel/base.mm"
 
-transformation makeContainer(in label: string, out made: Container)
+in label: string
+out made: Container
 
 match {
     create c: Container {
@@ -277,7 +279,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-making.mt": `using "../../metamodel/shop.mm"
-import { makeContainer } from "./make-container.mt"
+import "./make-container.mt" as makeContainer
 
 call makeContainer(label = "fresh") -> (made: f)
 match {
@@ -292,10 +294,10 @@ match {
 `,
     // a call chain: a callee that calls two other transformations and passes an output on
     "/optimize/scenarios/move-and-sync.mt": `using "../../metamodel/shop.mm"
-import { moveComponent } from "../generic/move-component.mt"
-import { followReader } from "../sync/follow-reader.mt"
+import "../generic/move-component.mt" as moveComponent
+import "../sync/follow-reader.mt" as followReader
 
-transformation moveAndSync(out movedTo: Container)
+out movedTo: Container
 
 call moveComponent() -> (moved: m, target: b)
 call followReader(moved = m, target = b)
@@ -305,7 +307,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-nested.mt": `using "../../metamodel/shop.mm"
-import { moveAndSync } from "./move-and-sync.mt"
+import "./move-and-sync.mt" as moveAndSync
 
 call moveAndSync() -> (movedTo: t)
 match {
@@ -325,7 +327,9 @@ export const COLLECTION_SCENARIOS: Record<string, string> = {
     // collection outputs: += inside a for-match pattern and in its do block
     "/optimize/scenarios/components-on.mt": `using "../../metamodel/base.mm"
 
-transformation componentsOn(in host: Container, out components: List<Component>, out names: Set<string>)
+in host: Container
+out components: List<Component>
+out names: Set<string>
 
 for match {
     host { }
@@ -339,7 +343,8 @@ for match {
     // a local repair per element
     "/optimize/scenarios/mark-component.mt": `using "../../metamodel/base.mm"
 
-transformation markComponent(in component: Component, in label: string)
+in component: Component
+in label: string
 
 match {
     component {
@@ -350,7 +355,9 @@ match {
     // a collection input, a loop over it and assignments outside patterns
     "/optimize/scenarios/rename-all.mt": `using "../../metamodel/base.mm"
 
-transformation renameAll(in components: List<Component>, in prefix: string, out renamed: int)
+in components: List<Component>
+in prefix: string
+out renamed: int
 
 renamed = 0
 for c in components do {
@@ -365,7 +372,7 @@ for c in components do {
     // a collection output assigned from a many-valued reference
     "/optimize/scenarios/candidates-of.mt": `using "../../metamodel/base.mm"
 
-transformation candidatesOf(out options: Set<Container>)
+out options: Set<Container>
 
 match {
     p: Placement { }
@@ -373,11 +380,11 @@ match {
 }
 `,
     "/optimize/scenarios/call-collecting.mt": `using "../../metamodel/shop.mm"
-import { moveComponent } from "../generic/move-component.mt"
-import { componentsOn } from "./components-on.mt"
-import { markComponent } from "./mark-component.mt"
-import { renameAll } from "./rename-all.mt"
-import { candidatesOf } from "./candidates-of.mt"
+import "../generic/move-component.mt" as moveComponent
+import "./components-on.mt" as componentsOn
+import "./mark-component.mt" as markComponent
+import "./rename-all.mt" as renameAll
+import "./candidates-of.mt" as candidatesOf
 
 call moveComponent() -> (moved: m, source: a, target: b)
 call componentsOn(host = b) -> (components: here, names: hereNames)
@@ -408,8 +415,8 @@ match {
 `,
     // if call: the else block after a callee that fails before changing anything, outputs in then
     "/optimize/scenarios/call-if.mt": `using "../../metamodel/shop.mm"
-import { moveComponent } from "../generic/move-component.mt"
-import { noPlacement } from "./no-placement.mt"
+import "../generic/move-component.mt" as moveComponent
+import "./no-placement.mt" as noPlacement
 
 if call noPlacement(wanted = "nobody") then {
     match {
@@ -436,7 +443,7 @@ if call moveComponent() -> (moved: m, target: t) then {
 `,
     // kill in a callee of if call still ends everything
     "/optimize/scenarios/call-if-killing.mt": `using "../../metamodel/shop.mm"
-import { killer } from "./killer.mt"
+import "./killer.mt" as killer
 
 if call killer() then {
     match {
@@ -456,7 +463,9 @@ if call killer() then {
     // pattern; the same file is an operator (placement matched freely) and a callee
     "/optimize/scenarios/move-placement.mt": `using "../../metamodel/base.mm"
 
-transformation movePlacement(in placement: Placement?, out moved: Component, out target: Container)
+in placement: Placement?
+out moved: Component
+out target: Container
 
 match {
     placement: Placement { }
@@ -472,7 +481,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-pinned.mt": `using "../../metamodel/shop.mm"
-import { movePlacement } from "./move-placement.mt"
+import "./move-placement.mt" as movePlacement
 
 match {
     p: Placement { }
@@ -490,7 +499,9 @@ match {
     // assigned outside a pattern
     "/optimize/scenarios/pick-candidate.mt": `using "../../metamodel/base.mm"
 
-transformation pickCandidate(in placement: Placement, out picked: Container?, out seen: int)
+in placement: Placement
+out picked: Container?
+out seen: int
 
 seen = 0
 for candidate in placement.candidates do {
@@ -499,7 +510,7 @@ for candidate in placement.candidates do {
 }
 `,
     "/optimize/scenarios/call-looping.mt": `using "../../metamodel/shop.mm"
-import { pickCandidate } from "./pick-candidate.mt"
+import "./pick-candidate.mt" as pickCandidate
 
 match {
     p: Placement { }
@@ -538,7 +549,7 @@ match {
 export const TRAP_SCENARIOS: Record<string, string> = {
     // two lambdas in one where expression, and a ternary whose condition is a lambda
     "/optimize/scenarios/call-trap-lambdas.mt": `using "../../metamodel/shop.mm"
-import { componentsOn } from "./components-on.mt"
+import "./components-on.mt" as componentsOn
 
 match {
     hostA: Container {
@@ -573,7 +584,7 @@ for match {
 `,
     // isEmpty() and notEmpty() are booleans, in conditions and as values
     "/optimize/scenarios/call-trap-empty.mt": `using "../../metamodel/shop.mm"
-import { componentsOn } from "./components-on.mt"
+import "./components-on.mt" as componentsOn
 
 match {
     hostA: Container {
@@ -602,7 +613,8 @@ if (onA.isEmpty() || !onC.isEmpty()) {
     // a bound input is distinct from the pattern's other objects (injective matching)
     "/optimize/scenarios/mates-of.mt": `using "../../metamodel/base.mm"
 
-transformation matesOf(in seed: Component, out mates: List<Component>)
+in seed: Component
+out mates: List<Component>
 
 for match {
     seed { }
@@ -615,7 +627,7 @@ for match {
 }
 `,
     "/optimize/scenarios/call-trap-injective.mt": `using "../../metamodel/shop.mm"
-import { matesOf } from "./mates-of.mt"
+import "./mates-of.mt" as matesOf
 
 match {
     db: Component {
@@ -662,7 +674,11 @@ match {
     // a where clause that reads an input the pattern does not reference
     "/optimize/scenarios/count-others.mt": `using "../../metamodel/base.mm"
 
-transformation countOthers(in seed: Component, in home: Container, out others: int, out same: int, out near: int)
+in seed: Component
+in home: Container
+out others: int
+out same: int
+out near: int
 
 others = 0
 same = 0
@@ -689,7 +705,7 @@ for match {
 }
 `,
     "/optimize/scenarios/call-trap-unreferenced.mt": `using "../../metamodel/shop.mm"
-import { countOthers } from "./count-others.mt"
+import "./count-others.mt" as countOthers
 
 match {
     db: Component {
@@ -708,7 +724,7 @@ match {
 `,
     // to, indexOf and includes as in the script language
     "/optimize/scenarios/call-trap-functions.mt": `using "../../metamodel/shop.mm"
-import { componentsOn } from "./components-on.mt"
+import "./components-on.mt" as componentsOn
 
 match {
     hostA: Container {
@@ -763,7 +779,7 @@ class Call {
 `,
     "/optimize/scenarios/reshape.mt": `using "../../metamodel/shapes.mm"
 
-transformation reshape(in rc: Call)
+in rc: Call
 
 match {
     rc {
@@ -775,7 +791,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-trap-reference-properties.mt": `using "../../metamodel/shapes.mm"
-import { reshape } from "./reshape.mt"
+import "./reshape.mt" as reshape
 
 match {
     c: Call {
@@ -870,7 +886,7 @@ match {
     // against the class of its bound element: an element input and an earlier object
     "/optimize/scenarios/fill-bag.mt": `using "../../metamodel/numbers.mm"
 
-transformation fillBag(in target: Crate)
+in target: Crate
 
 match {
     source: Bag {
@@ -890,7 +906,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-trap-reference-cast.mt": `using "../../metamodel/numbers.mm"
-import { fillBag } from "./fill-bag.mt"
+import "./fill-bag.mt" as fillBag
 
 match {
     seed: Crate {
@@ -917,7 +933,7 @@ match {
     // property, on created and on matched objects, also on a reference; an unset list is empty
     "/optimize/scenarios/fill-null.mt": `using "../../metamodel/numbers.mm"
 
-transformation fillNull(in target: Crate)
+in target: Crate
 
 match {
     source: Bag {
@@ -930,7 +946,7 @@ match {
 }
 `,
     "/optimize/scenarios/call-trap-null-assign.mt": `using "../../metamodel/numbers.mm"
-import { fillNull } from "./fill-null.mt"
+import "./fill-null.mt" as fillNull
 
 match {
     seed: Bag {
@@ -973,5 +989,92 @@ match {
     }
 }
 call fillNull(target = bound)
+`
+};
+
+/**
+ * Scenarios of model inputs (`in donor: model`, `in donors: List<model>`, scope blocks
+ * `in donor { … }`), for the engine tests of crossover operators: a fixed-arity crossover, a
+ * variadic one, and a caller that passes its model inputs on to both.
+ */
+export const MODEL_SCENARIOS: Record<string, string> = {
+    // a crossover with one donor: every component moves to the container named like the host of
+    // its namesake in the donor; a donor host named "nowhere" is not followed
+    "/optimize/crossover/take-hosting.mt": `using "../../metamodel/base.mm"
+
+in donor: model
+
+for match {
+    in donor {
+        dc: Component { }
+        dh: Container { }
+        dc.host -- dh
+        forbid {
+            dh {
+                name == "nowhere"
+            }
+        }
+    }
+    c: Component {
+        name == dc.name
+    }
+    old: Container { }
+    h: Container {
+        name == dh.name
+    }
+    where old.name != h.name
+    delete c.host -- old
+    create c.host -- h
+} do {
+}
+`,
+    // a variadic crossover: counts, over all donors, the components hosted there that the
+    // transformed model has as well, and logs the count and the number of donors
+    "/optimize/crossover/vote.mt": `using "../../metamodel/base.mm"
+
+in donors: List<model>
+out seen: int
+
+seen = 0
+for d in donors do {
+    for match {
+        in d {
+            dc: Component { }
+            dh: Container { }
+            dc.host -- dh
+        }
+        c: Component {
+            name == dc.name
+        }
+    } do {
+        seen = seen + 1
+    }
+}
+match {
+    create log: Container {
+        name = "seen " + seen + " in " + donors.size()
+    }
+    where donors.notEmpty()
+}
+`,
+    // a caller that passes its model inputs on: a single model, each model of a list, and the
+    // list itself
+    "/optimize/crossover/call-crossover.mt": `using "../../metamodel/shop.mm"
+import "./take-hosting.mt" as takeHosting
+import "./vote.mt" as vote
+
+in first: model
+in others: List<model>
+
+call takeHosting(donor = first)
+for other in others do {
+    call takeHosting(donor = other)
+}
+call vote(donors = others) -> (seen: n)
+match {
+    create log: Container {
+        name = "votes " + n
+    }
+}
 `
 };

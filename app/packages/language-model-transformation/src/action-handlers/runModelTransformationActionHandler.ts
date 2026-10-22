@@ -18,7 +18,7 @@ import type { ModelTransformationType } from "../grammar/modelTransformationType
 import { requiredInputs } from "../features/transformationDeclarations.js";
 import type { ModelType } from "@mdeo/language-model";
 
-const { URI } = sharedImport("langium");
+const { URI, UriUtils } = sharedImport("langium");
 
 /**
  * Input data collected from the model selection dialog.
@@ -187,14 +187,15 @@ export class RunModelTransformationActionHandler implements ActionHandler {
     private checkRequiredInputs(uri: string): string | undefined {
         const document = this.sharedServices.workspace.LangiumDocuments.getDocument(URI.parse(uri));
         const root = document?.parseResult.value as ModelTransformationType | undefined;
-        const required = requiredInputs(root?.signature);
+        const required = requiredInputs(root);
         if (required.length === 0) {
             return undefined;
         }
         const names = required.map((p) => `'${p.name}'`).join(", ");
+        const fileName = UriUtils.basename(URI.parse(uri));
         return (
-            `'${root?.signature?.name}' has required input${required.length > 1 ? "s" : ""} ${names}, so it cannot run on its own. ` +
-            `Call it from another transformation with 'call ${root?.signature?.name}(…)', or give ${required.length > 1 ? "these inputs defaults" : "the input a default"}.`
+            `'${fileName}' has required input${required.length > 1 ? "s" : ""} ${names}, so it cannot run on its own. ` +
+            `Import it into another transformation and call it there ('import "./${fileName}" as name', then 'call name(…)'), or give ${required.length > 1 ? "these inputs defaults" : "the input a default"}.`
         );
     }
 

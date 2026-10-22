@@ -166,8 +166,7 @@ export class InsertControlFlowStatementOperationHandler extends BaseOperationHan
         // a call (and an if call) of every imported transformation
         const sourceModel = this.modelState.sourceModel as ModelTransformationType | undefined;
         const callees = (sourceModel?.imports ?? [])
-            .flatMap((fileImport) => fileImport.imports ?? [])
-            .map((entityImport) => entityImport.name ?? entityImport.entity?.$refText)
+            .map((fileImport) => fileImport.name)
             .filter((name): name is string => name != undefined && name !== "");
         const callKinds = callees.flatMap((callee) => [
             { label: `Call ${callee}`, kind: "call" as const, callee },
@@ -253,7 +252,7 @@ export class InsertControlFlowStatementOperationHandler extends BaseOperationHan
             };
         }
 
-        // Case 3: source is the start node; statements follow the imports and the signature
+        // Case 3: source is the start node; statements follow the imports and the declarations
         if (sourceNodeId === "start") {
             const importCst = this.headerEndCst(sourceModel);
             if (importCst != undefined) {
@@ -634,13 +633,18 @@ export class InsertControlFlowStatementOperationHandler extends BaseOperationHan
 
     /**
      * Returns the last CST node of the transformation's header, after which its first statement
-     * goes: the signature, else the last import of another transformation, else the `using` line.
+     * goes: the last `in` / `out` declaration, else the last import of another transformation,
+     * else the `using` line.
      *
      * @param root The transformation root AST node
      * @returns The CST node, if there is one
      */
     private headerEndCst(root: ModelTransformationType): CstNode | undefined {
-        return root.signature?.$cstNode ?? root.imports?.[root.imports.length - 1]?.$cstNode ?? root.import?.$cstNode;
+        return (
+            root.parameters?.[root.parameters.length - 1]?.$cstNode ??
+            root.imports?.[root.imports.length - 1]?.$cstNode ??
+            root.import?.$cstNode
+        );
     }
 
     /**

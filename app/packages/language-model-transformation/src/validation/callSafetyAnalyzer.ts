@@ -2,6 +2,7 @@ import type { AstNode } from "langium";
 import type { AstReflection } from "@mdeo/language-common";
 import { sharedImport } from "@mdeo/language-shared";
 import {
+    getCallee,
     CallStatement,
     ForInStatement,
     ForMatchStatement,
@@ -31,7 +32,6 @@ import {
     type PatternObjectInstanceType,
     type PatternType,
     type StatementsScopeType,
-    type TransformationSignatureType,
     type WhileExpressionStatementType
 } from "../grammar/modelTransformationTypes.js";
 
@@ -93,16 +93,12 @@ export class CallSafetyAnalyzer {
     /**
      * Describes the first failure of a transformation that may happen after it changed the model.
      *
-     * @param signature The signature of the transformation
+     * @param root The transformation
      * @returns A description such as `can fail at line 12 (a match that may find nothing) after
      *   the change at line 8`, or undefined when the transformation fails only before changing
      *   anything
      */
-    findUnsafeFailure(signature: TransformationSignatureType): string | undefined {
-        const root = signature.$container as ModelTransformationType | undefined;
-        if (root == undefined) {
-            return undefined;
-        }
+    findUnsafeFailure(root: ModelTransformationType): string | undefined {
         return this.summarize(root, new Map()).violation;
     }
 
@@ -286,7 +282,7 @@ export class CallSafetyAnalyzer {
         call: CallStatementType | undefined,
         memo: Map<ModelTransformationType, TransformationSummary>
     ): TransformationSummary | undefined {
-        const root = call?.callee?.ref?.$container as ModelTransformationType | undefined;
+        const root = getCallee(call);
         return root != undefined ? this.summarize(root, memo) : undefined;
     }
 
@@ -367,7 +363,7 @@ export class CallSafetyAnalyzer {
                 }
                 return true;
             }
-            // where clauses and forbid / require blocks
+            // where clauses, forbid / require blocks and model scope blocks (which only find)
             return true;
         }
         return false;

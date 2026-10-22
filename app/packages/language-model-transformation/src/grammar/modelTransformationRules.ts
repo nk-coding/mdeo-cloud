@@ -16,7 +16,7 @@ import {
 } from "@mdeo/language-common";
 import { generateExpressionRules, generateTypeRules, type BaseExpressionType } from "@mdeo/language-expression";
 import { Class, Property } from "@mdeo/language-metamodel";
-import { generateImportRules, LeadingTrailing, manySep } from "@mdeo/language-shared";
+import { LeadingTrailing, manySep } from "@mdeo/language-shared";
 import {
     ModelTransformation,
     MetamodelFileImport,
@@ -53,13 +53,10 @@ import {
     PatternObjectInstanceReference,
     PatternApplicationCondition,
     TransformationParameter,
-    TransformationSignature,
     CallArgument,
     CallOutput,
     CallStatement,
-    TransformationImport,
     TransformationFileImport,
-    transformationFileScopingConfig,
     AssignableVariable,
     ObjectInstanceDeclaration,
     PatternCollectionAppend,
@@ -67,7 +64,10 @@ import {
     IfCallStatement,
     ForInVariable,
     ForInStatement,
-    AssignmentStatement
+    AssignmentStatement,
+    PatternModelScope,
+    ModelValueDeclaration,
+    CallableTransformation
 } from "./modelTransformationTypes.js";
 
 /**
@@ -159,7 +159,7 @@ export function generateModelTransformationRules(): {
      * Pattern collection append rule.
      * Format: name += expression
      *
-     * `name` must be a collection `out` parameter of the signature.
+     * `name` must be a collection `out` parameter of the transformation.
      */
     const PatternCollectionAppendRule = createRule("PatternCollectionAppendRule")
         .returns(PatternCollectionAppend)
@@ -265,10 +265,12 @@ export function generateModelTransformationRules(): {
      *
      * The block describes a graph of its own, matched independently of the enclosing
      * pattern and of every other block. Only structural elements are allowed inside it;
-     * `var`, `delete <name>` and nested condition blocks are deliberately not part of the
-     * rule, so that a condition always denotes a plain sub-graph.
+     * `var` and `delete <name>` are deliberately not part of the rule, so that a condition
+     * always denotes a plain sub-graph. A model scope block puts part of the condition graph
+     * into an input model; the validator rejects a condition block nested in another one
+     * (through a scope block).
      */
-    const PatternApplicationConditionRule = createRule("PatternApplicationConditionRule")
+    const PatternApplicationConditionRule: ParserRule<any> = createRule("PatternApplicationConditionRule")
         .returns(PatternApplicationCondition)
         .as(({ set, add }) => [
             or(set("kind", "forbid"), set("kind", "require")),
@@ -280,6 +282,38 @@ export function generateModelTransformationRules(): {
                     add("elements", PatternObjectInstanceRule),
                     add("elements", PatternLinkRule),
                     add("elements", WhereClauseRule),
+                    add("elements", () => PatternModelScopeRule),
+                    NEWLINE
+                )
+            ),
+            "}"
+        ]);
+
+    /**
+     * Model scope block rule.
+     * Format: in model { elements }
+     *
+     * The block's objects belong to the input model `model` (a `model` input or the variable
+     * of a loop over a `List<model>` input). It contains what finds and reads objects; the
+     * validator rejects whatever would change the (read-only) input model and nested scope
+     * blocks.
+     */
+    const PatternModelScopeRule: ParserRule<any> = createRule("PatternModelScopeRule")
+        .returns(PatternModelScope)
+        .as(({ set, add }) => [
+            "in",
+            set("model", ref(ModelValueDeclaration, ID)),
+            "{",
+            many(
+                or(
+                    add("elements", PatternVariableRule),
+                    add("elements", PatternObjectInstanceReferenceRule),
+                    add("elements", PatternObjectInstanceRule),
+                    add("elements", PatternLinkRule),
+                    add("elements", PatternObjectDeleteRule),
+                    add("elements", WhereClauseRule),
+                    add("elements", PatternApplicationConditionRule),
+                    add("elements", () => PatternModelScopeRule),
                     NEWLINE
                 )
             ),
@@ -304,6 +338,7 @@ export function generateModelTransformationRules(): {
                     add("elements", PatternObjectDeleteRule),
                     add("elements", WhereClauseRule),
                     add("elements", PatternApplicationConditionRule),
+                    add("elements", PatternModelScopeRule),
                     NEWLINE
                 )
             ),
@@ -477,13 +512,15 @@ export function generateModelTransformationRules(): {
 
     /**
      * Call statement rule.
-     * Format: call name(argument, ...) [-> (output, ...)]
+     * Format: call alias(argument, ...) [-> (output, ...)]
+     *
+     * The alias is the one of a path import; the callee resolves to the imported file's root.
      */
     const CallStatementRule = createRule("CallStatementRule")
         .returns(CallStatement)
         .as(({ set, add }) => [
             "call",
-            set("callee", ref(TransformationSignature, ID)),
+            set("callee", ref(CallableTransformation, ID)),
             "(",
             ...manySep(add("arguments", CallArgumentRule), ",", LeadingTrailing.TRAILING),
             ")",
@@ -572,8 +609,12 @@ export function generateModelTransformationRules(): {
         ]);
 
     /**
-     * Transformation parameter rule.
+     * Header declaration of an input or output.
      * Format: in name: Type [= default] | out name: Type
+     *
+     * The declarations are only part of the header (after `using` and the imports, before the
+     * first statement); the root rule places them, so a declaration after a statement does not
+     * parse. A default on an `out` parameter is rejected by the validator.
      */
     const TransformationParameterRule = createRule("TransformationParameterRule")
         .returns(TransformationParameter)
@@ -586,29 +627,14 @@ export function generateModelTransformationRules(): {
         ]);
 
     /**
-     * Transformation signature rule.
-     * Format: transformation name(parameter, ...)
+     * Path import of another transformation.
+     * Format: import "./file.mt" as alias
+     *
+     * Every `.mt` file is one transformation; the alias is its only name in this file.
      */
-    const TransformationSignatureRule = createRule("TransformationSignatureRule")
-        .returns(TransformationSignature)
-        .as(({ set, add }) => [
-            "transformation",
-            set("name", ID),
-            "(",
-            ...manySep(add("parameters", TransformationParameterRule), ",", LeadingTrailing.TRAILING),
-            ")"
-        ]);
-
-    /**
-     * Rule for imports of other transformations.
-     * Format: import { name [as alias], ... } from "./file.mt"
-     */
-    const { fileImportRule: TransformationFileImportRule } = generateImportRules(
-        transformationFileScopingConfig,
-        TransformationImport,
-        TransformationFileImport,
-        ID
-    );
+    const TransformationFileImportRule = createRule("TransformationFileImportRule")
+        .returns(TransformationFileImport)
+        .as(({ set }) => ["import", set("file", STRING), "as", set("name", ID)]);
 
     /**
      * Metamodel file import rule.
@@ -620,8 +646,8 @@ export function generateModelTransformationRules(): {
 
     /**
      * Root rule for Model Transformation language.
-     * Format: using "metamodel", then imports of other transformations, then the optional
-     * signature, then the statements.
+     * Format: using "metamodel", then the path imports of other transformations, then the
+     * header declarations (`in …` / `out …`, one per line), then the statements.
      */
     const ModelTransformationRule = createRule("ModelTransformationRule")
         .returns(ModelTransformation)
@@ -629,7 +655,7 @@ export function generateModelTransformationRules(): {
             many(NEWLINE),
             set("import", MetamodelFileImportRule),
             many(or(add("imports", TransformationFileImportRule), NEWLINE)),
-            optional(set("signature", TransformationSignatureRule)),
+            many(or(add("parameters", TransformationParameterRule), NEWLINE)),
             many(or(add("statements", StatementRule), NEWLINE))
         ]);
 

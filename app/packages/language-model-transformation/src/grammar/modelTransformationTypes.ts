@@ -1,7 +1,6 @@
 import { createInterface, createType, Optional, Ref, type ASTType, type BaseType } from "@mdeo/language-common";
 import { ExpressionConfig, generateExpressionTypes, TypeConfig, generateTypeTypes } from "@mdeo/language-expression";
 import { Class, Property } from "@mdeo/language-metamodel";
-import { FileScopingConfig, generateImportTypes } from "@mdeo/language-shared";
 import type { AstNode } from "langium";
 
 /**
@@ -66,7 +65,7 @@ export type PatternVariableType = ASTType<typeof PatternVariable>;
  *
  * Unlike {@link PatternVariable}, this does not declare a new variable; it updates the
  * value of an already-declared one: a `var` of an enclosing scope or an `out` parameter of the
- * transformation's signature. Like declarations, the reassignment is performed as
+ * transformation. Like declarations, the reassignment is performed as
  * part of the match, before any access in that match block.
  */
 export const PatternVariableReassignment = createInterface("PatternVariableReassignment").attrs({
@@ -197,17 +196,31 @@ export const WhereClause = createInterface("WhereClause").attrs({
 export type WhereClauseType = ASTType<typeof WhereClause>;
 
 /**
+ * Base of the blocks inside a pattern: application conditions (`forbid { … }`,
+ * `require { … }`) and model scope blocks (`in donor { … }`). The two may contain each other,
+ * so the element unions of both name this base instead of the other block type.
+ */
+export const PatternBlock = createInterface("PatternBlock").attrs({});
+
+/**
+ * Type representing a PatternBlock AST node.
+ */
+export type PatternBlockType = ASTType<typeof PatternBlock>;
+
+/**
  * Element type union for the body of an application-condition block.
  *
  * A condition block describes its own, separate graph, so it may only contain the
  * structural elements of that graph: object instances (and references to instances of
- * the enclosing pattern), links, and where clauses.
+ * the enclosing pattern), links, where clauses, and model scope blocks
+ * ({@link PatternModelScope}) that put part of the condition graph into an input model.
  */
 export const ApplicationConditionElement: BaseType<AstNode> = createType("ApplicationConditionElement").types(
     PatternObjectInstance,
     PatternObjectInstanceReference,
     PatternLink,
-    WhereClause
+    WhereClause,
+    PatternBlock
 );
 
 /**
@@ -232,16 +245,64 @@ export type ApplicationConditionElementType = ASTType<typeof ApplicationConditio
  * is only worth writing when it says something, so the editor leaves the blocks it
  * creates unnamed and shows them numbered instead.
  */
-export const PatternApplicationCondition = createInterface("PatternApplicationCondition").attrs({
-    kind: String,
-    name: Optional(String),
-    elements: [ApplicationConditionElement]
-});
+export const PatternApplicationCondition = createInterface("PatternApplicationCondition")
+    .extends(PatternBlock)
+    .attrs({
+        kind: String,
+        name: Optional(String),
+        elements: [ApplicationConditionElement]
+    });
 
 /**
  * Type representing a PatternApplicationCondition AST node.
  */
 export type PatternApplicationConditionType = ASTType<typeof PatternApplicationCondition>;
+
+/**
+ * Element type union for the body of a model scope block: everything that finds or reads
+ * objects of the scoped model. Nothing that changes a model is part of it; `create`/`delete`
+ * modifiers, `delete name` and property assignments (`=`) are parsed for better messages and
+ * rejected by the validator, since input models are read-only.
+ */
+export const ModelScopeElement: BaseType<AstNode> = createType("ModelScopeElement").types(
+    PatternVariable,
+    PatternObjectInstance,
+    PatternObjectInstanceReference,
+    PatternObjectInstanceDelete,
+    PatternLink,
+    WhereClause,
+    PatternBlock
+);
+
+/**
+ * Type representing a ModelScopeElement AST node.
+ */
+export type ModelScopeElementType = ASTType<typeof ModelScopeElement>;
+
+/**
+ * A model scope block of a pattern: the objects declared in it are objects of an input model
+ * instead of the model the transformation runs on (its implicit model).
+ *
+ * Format: `in model { ... }`, where `model` is a `model` input of the transformation or the
+ * variable of a `for … in` loop over a `List<model>` input.
+ *
+ * The block is not a scope of names: its objects and variables are visible to the rest of the
+ * pattern (and after it) exactly as if they were declared outside of it, so the implicit model
+ * can read them in expressions. Only the matching is scoped: the block's objects match objects
+ * of the scoped model only, and its links connect them only. A `forbid` / `require` block inside
+ * a scope block, or a scope block inside one, describes a condition graph in that model.
+ */
+export const PatternModelScope = createInterface("PatternModelScope")
+    .extends(PatternBlock)
+    .attrs({
+        model: Ref(() => ModelValueDeclaration),
+        elements: [ModelScopeElement]
+    });
+
+/**
+ * Type representing a PatternModelScope AST node.
+ */
+export type PatternModelScopeType = ASTType<typeof PatternModelScope>;
 
 /**
  * Base pattern element type union.
@@ -254,7 +315,8 @@ export const PatternElement: BaseType<AstNode> = createType("PatternElement").ty
     PatternObjectInstanceDelete,
     PatternLink,
     WhereClause,
-    PatternApplicationCondition
+    PatternApplicationCondition,
+    PatternModelScope
 );
 
 /**
@@ -444,14 +506,16 @@ export const StopStatement = createInterface("StopStatement").extends(BaseTransf
 export type StopStatementType = ASTType<typeof StopStatement>;
 
 /**
- * A parameter of a transformation's signature.
+ * An input or output of a transformation, declared in the header of the file (after `using`
+ * and the imports, before the first statement), one per line.
  * Format: `in name: Type [= default]` or `out name: Type`
  *
  * An `in` parameter is bound before the transformation's first statement: a model element
  * (a metamodel class type) is a bound object that patterns reference as `name { }`, a scalar
  * (`int`, `long`, `float`, `double`, `string`, `boolean` or an enum) is a value for
- * expressions. An `out` parameter starts as `null` and is assigned with `name = expression`
- * inside a pattern; the caller binds it after a successful call.
+ * expressions, a `model` (or `List<model>`) is another model of the transformation's metamodel
+ * that scope blocks (`in name { … }`) read. An `out` parameter starts as `null` and is assigned
+ * with `name = expression` inside a pattern; the caller binds it after a successful call.
  */
 export const TransformationParameter = createInterface("TransformationParameter").attrs({
     direction: String,
@@ -466,21 +530,16 @@ export const TransformationParameter = createInterface("TransformationParameter"
 export type TransformationParameterType = ASTType<typeof TransformationParameter>;
 
 /**
- * The signature of a callable transformation.
- * Format: `transformation name(param, ...)`
- *
- * A file with a signature can be imported and called from another transformation. A file
- * without one behaves exactly as before (and cannot be called).
+ * Base of the transformation root ({@link ModelTransformation}), the target of a call's callee
+ * reference. The callee is typed with this base instead of the root itself, which would make the
+ * root's type refer to itself (through its statements); use {@link getCallee} to get the root.
  */
-export const TransformationSignature = createInterface("TransformationSignature").attrs({
-    name: String,
-    parameters: [TransformationParameter]
-});
+export const CallableTransformation = createInterface("CallableTransformation").attrs({});
 
 /**
- * Type representing a TransformationSignature AST node.
+ * Type representing a CallableTransformation AST node.
  */
-export type TransformationSignatureType = ASTType<typeof TransformationSignature>;
+export type CallableTransformationType = ASTType<typeof CallableTransformation>;
 
 /**
  * A named argument of a call.
@@ -515,16 +574,18 @@ export type CallOutputType = ASTType<typeof CallOutput>;
 
 /**
  * Call of another transformation.
- * Format: `call name(argument, ...) [-> (output, ...)]`
+ * Format: `call alias(argument, ...) [-> (output, ...)]`
  *
- * The callee runs on the same model with its inputs bound. A callee that fails (a `match`
+ * The callee is the transformation a path import (`import "./file.mt" as alias`) names; the
+ * reference resolves to the root of the imported file. The callee runs on the same model with
+ * its inputs bound. A callee that fails (a `match`
  * that does not match, or `kill`) fails the call, and so the calling transformation; `stop` in
  * the callee only returns from the callee.
  */
 export const CallStatement = createInterface("CallStatement")
     .extends(BaseTransformationStatement)
     .attrs({
-        callee: Ref(() => TransformationSignature),
+        callee: Ref(() => CallableTransformation),
         arguments: [CallArgument],
         outputs: [CallOutput]
     });
@@ -622,7 +683,7 @@ export type AssignmentStatementType = ASTType<typeof AssignmentStatement>;
 
 /**
  * Everything a pattern can reference as an object (`name { }`, `delete name`, link ends):
- * object instances of patterns, element parameters of the signature, element outputs of
+ * object instances of patterns, element parameters of the transformation, element outputs of
  * calls and the variables of `for … in` loops.
  */
 export const ObjectInstanceDeclaration = createType("ObjectInstanceDeclaration").types(
@@ -638,8 +699,20 @@ export const ObjectInstanceDeclaration = createType("ObjectInstanceDeclaration")
 export type ObjectInstanceDeclarationType = ASTType<typeof ObjectInstanceDeclaration>;
 
 /**
+ * Everything that can denote a model value (the target of a scope block `in name { … }`): a
+ * `model` input of the transformation and the variable of a `for … in` loop over a
+ * `List<model>` input. Which of them really is a model value is checked by the validator.
+ */
+export const ModelValueDeclaration = createType("ModelValueDeclaration").types(TransformationParameter, ForInVariable);
+
+/**
+ * Type representing a ModelValueDeclaration AST node.
+ */
+export type ModelValueDeclarationType = ASTType<typeof ModelValueDeclaration>;
+
+/**
  * Everything a reassignment (`name = expression`) can assign: pattern variables and the
- * `out` parameters of the signature.
+ * `out` parameters of the transformation.
  */
 export const AssignableVariable = createType("AssignableVariable").types(PatternVariable, TransformationParameter);
 
@@ -722,24 +795,17 @@ export const MetamodelFileImport = createInterface("MetamodelFileImport").attrs(
 export type MetamodelFileImportType = ASTType<typeof MetamodelFileImport>;
 
 /**
- * File scoping configuration for transformations imported by other transformations.
+ * A path import of another transformation: every `.mt` file is one transformation, which this
+ * file calls by the alias.
+ * Format: `import "./file.mt" as alias`
+ *
+ * The alias is the only name of the imported transformation in this file; a call
+ * (`call alias(…)`) resolves to the root of the imported file.
  */
-export const transformationFileScopingConfig = new FileScopingConfig<TransformationSignatureType>(
-    "Transformation",
-    TransformationSignature
-);
-
-/**
- * Import types for transformations: `import { name [as alias], ... } from "./file.mt"`.
- */
-export const { importType: TransformationImport, fileImportType: TransformationFileImport } = generateImportTypes(
-    transformationFileScopingConfig
-);
-
-/**
- * Type representing a TransformationImport AST node.
- */
-export type TransformationImportType = ASTType<typeof TransformationImport>;
+export const TransformationFileImport = createInterface("TransformationFileImport").attrs({
+    file: String,
+    name: String
+});
 
 /**
  * Type representing a TransformationFileImport AST node.
@@ -748,17 +814,30 @@ export type TransformationFileImportType = ASTType<typeof TransformationFileImpo
 
 /**
  * Model Transformation root interface.
- * Contains the metamodel import, imports of other transformations, the optional signature and
- * the transformation statements.
+ * Contains the metamodel import, the path imports of other transformations, the header
+ * declarations of the inputs and outputs (`in …` / `out …` lines) and the transformation
+ * statements.
  */
-export const ModelTransformation = createInterface("ModelTransformation").attrs({
-    import: MetamodelFileImport,
-    imports: [TransformationFileImport],
-    signature: Optional(TransformationSignature),
-    statements: [TransformationStatement]
-});
+export const ModelTransformation = createInterface("ModelTransformation")
+    .extends(CallableTransformation)
+    .attrs({
+        import: MetamodelFileImport,
+        imports: [TransformationFileImport],
+        parameters: [TransformationParameter],
+        statements: [TransformationStatement]
+    });
 
 /**
  * Model Transformation AST type.
  */
 export type ModelTransformationType = ASTType<typeof ModelTransformation>;
+
+/**
+ * Returns the transformation a call calls: the root of the imported file its alias names.
+ *
+ * @param call The call statement
+ * @returns The callee's root, or undefined when the alias does not resolve
+ */
+export function getCallee(call: CallStatementType | undefined): ModelTransformationType | undefined {
+    return call?.callee?.ref as ModelTransformationType | undefined;
+}

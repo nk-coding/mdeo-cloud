@@ -10,6 +10,7 @@ import {
     MatchStatement,
     ModelTransformation,
     PatternObjectInstance,
+    PatternModelScope,
     TransformationParameter,
     WhileMatchStatement,
     typeTypes,
@@ -18,13 +19,13 @@ import {
     type ForInVariableType,
     type IfMatchStatementType,
     type ModelTransformationType,
+    type PatternModelScopeType,
     type PatternObjectInstanceType,
     type PatternType,
-    type TransformationParameterType,
-    type TransformationSignatureType
+    type TransformationParameterType
 } from "../grammar/modelTransformationTypes.js";
 
-const { AstUtils } = sharedImport("langium");
+const { AstUtils, UriUtils } = sharedImport("langium");
 
 /**
  * What the type of a transformation parameter denotes.
@@ -33,9 +34,22 @@ const { AstUtils } = sharedImport("langium");
  *   model graph) that patterns can reference as `name { }`;
  * - `scalar`: a primitive type or an enum of the metamodel, so the parameter is a value;
  * - `collection`: a `List<T>` or `Set<T>` of model elements or of scalars;
+ * - `model`: `model` or `List<model>`, another model (or several) of the transformation's
+ *   metamodel that scope blocks (`in name { … }`) read, see {@link getModelShape};
  * - `unsupported`: anything else (other generic types, lambdas, `Any`).
  */
-export type ParameterKind = "element" | "scalar" | "collection" | "unsupported";
+export type ParameterKind = "element" | "scalar" | "collection" | "model" | "unsupported";
+
+/**
+ * The name of the built-in type of model values (`in donor: model`, `in donors: List<model>`).
+ */
+export const MODEL_TYPE_NAME = "model";
+
+/**
+ * How a parameter typed with `model` holds models: one (`model`) or any number
+ * (`List<model>`).
+ */
+export type ModelShape = "single" | "list";
 
 /**
  * The collection types a collection parameter may have.
@@ -183,6 +197,61 @@ export class TransformationDeclarationResolver {
             return this.getLoopElementClass(declaration as ForInVariableType);
         }
         return undefined;
+    }
+
+    /**
+     * Whether the variable of a `for … in` loop is a model value: the loop runs over a
+     * `List<model>`. Without type inference, a loop directly over a `List<model>` parameter
+     * still counts.
+     *
+     * @param variable The loop variable
+     * @returns True when the loop runs over models
+     */
+    isModelLoopVariable(variable: ForInVariableType): boolean {
+        const statement = variable.$container as ForInStatementType | undefined;
+        const collection = statement?.collection as { $type?: string; name?: string } | undefined;
+        if (collection == undefined) {
+            return false;
+        }
+        const inference = this.inference?.();
+        if (inference != undefined) {
+            try {
+                const type = inference.inferType(statement!.collection);
+                if (!Array.isArray(type)) {
+                    const definition = (type as { definition?: { typeArgs?: Record<string, unknown> } } | undefined)
+                        ?.definition;
+                    const element = definition?.typeArgs?.["T"] as { package?: string; type?: string } | undefined;
+                    if (element != undefined) {
+                        return element.package === "builtin" && element.type === MODEL_TYPE_NAME;
+                    }
+                }
+            } catch {
+                // fall back to the declaration below
+            }
+        }
+        if (collection.name == undefined) {
+            return false;
+        }
+        const root = getTransformationRoot(this.reflection, variable);
+        const parameter = (root?.parameters ?? []).find((p) => p.name === collection.name);
+        return parameter != undefined && getModelShape(this.reflection, parameter) === "list";
+    }
+
+    /**
+     * Whether a declaration is a model value: a `model` input or the variable of a loop over a
+     * `List<model>` input. A `List<model>` input itself is not a model value (it holds models).
+     *
+     * @param declaration The declaration
+     * @returns True for model values
+     */
+    isModelValue(declaration: AstNode | undefined): boolean {
+        if (this.reflection.isInstance(declaration, TransformationParameter)) {
+            return getModelShape(this.reflection, declaration as TransformationParameterType) === "single";
+        }
+        if (this.reflection.isInstance(declaration, ForInVariable)) {
+            return this.isModelLoopVariable(declaration as ForInVariableType);
+        }
+        return false;
     }
 
     /**
@@ -341,6 +410,9 @@ export class TransformationDeclarationResolver {
         if (typeName == undefined) {
             return "unsupported";
         }
+        if (getModelShape(this.reflection, parameter) != undefined) {
+            return "model";
+        }
         if (typeName.hasTypeArgs) {
             return this.getCollectionShape(parameter) != undefined ? "collection" : "unsupported";
         }
@@ -352,6 +424,22 @@ export class TransformationDeclarationResolver {
             return "scalar";
         }
         return "unsupported";
+    }
+
+    /**
+     * Whether a parameter of scalar kind is typed with an enum of the metamodel (rather than a
+     * primitive type); for a collection, whether its elements are.
+     *
+     * @param parameter The parameter
+     * @returns True for enums and collections of enums
+     */
+    isEnumTyped(parameter: TransformationParameterType): boolean {
+        const typeName = parameterTypeName(this.reflection, parameter);
+        if (typeName == undefined) {
+            return false;
+        }
+        const name = typeName.hasTypeArgs ? typeName.typeArgs[0]?.name : typeName.name;
+        return name != undefined && this.resolveTypeName(parameter, name)?.kind === "enum";
     }
 
     /**
@@ -486,16 +574,18 @@ export function getTransformationRoot(reflection: AstReflection, node: AstNode):
 }
 
 /**
- * Lists the parameters of a signature that callers must pass: the `in` parameters without a
- * default value whose type is not nullable. A nullable input without a default is optional: it
- * is null when not passed (for an element input that pins an object of the first pattern, the
- * object is then matched freely).
+ * Lists the inputs of a transformation that callers must pass: the `in` declarations without a
+ * default value whose type is not nullable (model inputs included: they never have a default).
+ * A nullable input without a default is optional: it is null when not passed (for an element
+ * input that pins an object of the first pattern, the object is then matched freely).
  *
- * @param signature The signature (may be undefined)
+ * Works on a transformation loaded as an external AST as well (it only reads the declarations).
+ *
+ * @param transformation The transformation root (may be undefined)
  * @returns The required input parameters
  */
-export function requiredInputs(signature: TransformationSignatureType | undefined): TransformationParameterType[] {
-    return (signature?.parameters ?? []).filter(
+export function requiredInputs(transformation: ModelTransformationType | undefined): TransformationParameterType[] {
+    return (transformation?.parameters ?? []).filter(
         (p) => p.direction === "in" && p.defaultValue == undefined && !isNullableType(p)
     );
 }
@@ -511,14 +601,282 @@ function isNullableType(parameter: TransformationParameterType): boolean {
 }
 
 /**
- * Renders a signature as source text, for hovers and messages.
+ * Returns how a parameter holds models, from its type as written: `model` (or `model?`, which
+ * the validator rejects) holds one, `List<model>` any number. Other types, `Set<model>` and
+ * nested forms included, are not model parameters.
  *
- * @param signature The signature
- * @returns e.g. `transformation moveComponent(in maxCandidates: int = …, out moved: AllocationContext)`
+ * @param reflection The AST reflection
+ * @param parameter The parameter
+ * @returns The shape, or undefined when the parameter is not typed with `model`
  */
-export function renderSignature(signature: TransformationSignatureType): string {
-    const parameters = (signature.parameters ?? []).map((p) => renderParameter(p)).join(", ");
-    return `transformation ${signature.name}(${parameters})`;
+export function getModelShape(
+    reflection: AstReflection,
+    parameter: TransformationParameterType
+): ModelShape | undefined {
+    const typeName = parameterTypeName(reflection, parameter);
+    if (typeName == undefined) {
+        return undefined;
+    }
+    if (typeName.name === MODEL_TYPE_NAME && !typeName.hasTypeArgs) {
+        return "single";
+    }
+    const element = typeName.typeArgs[0];
+    if (
+        typeName.name === "List" &&
+        typeName.typeArgs.length === 1 &&
+        element.name === MODEL_TYPE_NAME &&
+        !element.hasTypeArgs
+    ) {
+        return "list";
+    }
+    return undefined;
+}
+
+/**
+ * What an `in` declaration of a transformation is, as the configuration (operator arguments,
+ * mutation and crossover classification) needs to know it.
+ *
+ * - `element`, `scalar`, `enum`: a single model element, primitive value or enum literal;
+ * - `collection`: a `List<T>` / `Set<T>` of elements, scalars or enums ({@link elementKind});
+ * - `model`: one input model (`model`); `modelList`: any number of them (`List<model>`);
+ * - `unsupported`: a type the transformation language rejects.
+ */
+export type TransformationInputKind =
+    "element" | "scalar" | "enum" | "collection" | "model" | "modelList" | "unsupported";
+
+/**
+ * One `in` declaration of a transformation, see {@link describeTransformationInputs}.
+ */
+export interface TransformationInputDescription {
+    /**
+     * The input's name.
+     */
+    name: string;
+    /**
+     * What the input is.
+     */
+    kind: TransformationInputKind;
+    /**
+     * For `collection`: what the elements are.
+     */
+    elementKind?: "element" | "scalar" | "enum";
+    /**
+     * For `collection` (and `modelList`): `List` or `Set`.
+     */
+    collection?: "List" | "Set";
+    /**
+     * The type as written, e.g. `List<Component>`, `int`, `Kind`, `model` (without `?`).
+     */
+    typeName: string;
+    /**
+     * The name of the type, or of the element type of a collection (e.g. `Component`, `int`,
+     * `Kind`, `model`).
+     */
+    baseTypeName: string;
+    /**
+     * Whether the type is written nullable (`T?`).
+     */
+    nullable: boolean;
+    /**
+     * Whether the declaration has a default value (`= …`).
+     */
+    hasDefault: boolean;
+    /**
+     * Whether a caller (or the configuration) may leave the input out: it has a default or a
+     * nullable type. The inverse of membership in {@link requiredInputs}.
+     */
+    optional: boolean;
+    /**
+     * The declaration itself.
+     */
+    parameter: TransformationParameterType;
+}
+
+/**
+ * Describes the `in` declarations of a transformation, for the configuration language: which
+ * inputs a file has, what each of them is and whether it must be supplied. Element, enum and
+ * scalar kinds are told apart by resolving the type names against the transformation's metamodel
+ * (and the metamodels it imports), so that metamodel must be loaded in `documents`; otherwise a
+ * class or enum type comes out as `unsupported`.
+ *
+ * @param transformation The transformation root (may be loaded as an external AST)
+ * @param reflection The AST reflection
+ * @param documents The Langium documents holding the transformation's metamodel
+ * @returns The inputs, in declaration order
+ */
+export function describeTransformationInputs(
+    transformation: ModelTransformationType | undefined,
+    reflection: AstReflection,
+    documents: LangiumDocuments
+): TransformationInputDescription[] {
+    const resolver = new TransformationDeclarationResolver(reflection, documents);
+    return (transformation?.parameters ?? [])
+        .filter((parameter) => parameter.direction === "in")
+        .map((parameter) => {
+            const typeName = parameterTypeName(reflection, parameter);
+            const nullable = typeName?.isNullable === true;
+            const hasDefault = parameter.defaultValue != undefined;
+            const base: Omit<TransformationInputDescription, "kind"> = {
+                name: parameter.name,
+                typeName: renderTypeName(typeName),
+                baseTypeName: (typeName?.hasTypeArgs ? typeName.typeArgs[0]?.name : typeName?.name) ?? "?",
+                nullable,
+                hasDefault,
+                optional: hasDefault || nullable,
+                parameter
+            };
+            const modelShape = getModelShape(reflection, parameter);
+            if (modelShape != undefined) {
+                return modelShape === "single"
+                    ? { ...base, kind: "model" as const }
+                    : { ...base, kind: "modelList" as const, collection: "List" as const };
+            }
+            const kind = resolver.getParameterKind(parameter);
+            const isEnum = resolver.isEnumTyped(parameter);
+            if (kind === "collection") {
+                const shape = resolver.getCollectionShape(parameter);
+                return {
+                    ...base,
+                    kind: "collection" as const,
+                    collection: shape?.collection,
+                    elementKind: shape?.elementKind === "element" ? "element" : isEnum ? "enum" : "scalar"
+                } satisfies TransformationInputDescription;
+            }
+            if (kind === "scalar") {
+                return { ...base, kind: isEnum ? ("enum" as const) : ("scalar" as const) };
+            }
+            return { ...base, kind: kind === "element" ? ("element" as const) : ("unsupported" as const) };
+        });
+}
+
+/**
+ * Renders a type name as written, without the nullable marker.
+ */
+function renderTypeName(typeName: ParameterTypeName | undefined): string {
+    if (typeName == undefined) {
+        return "?";
+    }
+    if (typeName.typeArgs.length === 0) {
+        return typeName.name;
+    }
+    return `${typeName.name}<${typeName.typeArgs.map((arg) => renderTypeName(arg)).join(", ")}>`;
+}
+
+/**
+ * Renders the header declarations of a transformation as source text, one per line, for
+ * hovers and messages.
+ *
+ * @param transformation The transformation root
+ * @returns e.g. `in maxCandidates: int = 0\nout moved: Component`, or a note when it declares
+ *   nothing
+ */
+export function renderDeclarations(transformation: ModelTransformationType): string {
+    const lines = (transformation.parameters ?? []).map((p) => renderParameter(p));
+    return lines.length > 0 ? lines.join("\n") : "// no inputs or outputs";
+}
+
+/**
+ * Returns the display name of a transformation: the base name of its file (e.g.
+ * `move-component.mt`), as used in diagnostics and the typed AST.
+ *
+ * @param transformation Any node of the transformation
+ * @returns The file's base name
+ */
+export function transformationDisplayName(transformation: AstNode): string {
+    return UriUtils.basename(AstUtils.getDocument(transformation).uri);
+}
+
+/**
+ * Lists the elements of a pattern (or of a block) with the elements of its model scope blocks
+ * in their place, recursively, so that what is declared in `in donor { … }` counts as declared
+ * in the pattern. `forbid` / `require` blocks are kept as they are (they have their own graph).
+ *
+ * @param reflection The AST reflection
+ * @param elements The elements of a pattern or block
+ * @returns The flattened elements, in declaration order
+ */
+export function flattenModelScopes(reflection: AstReflection, elements: readonly unknown[]): AstNode[] {
+    const result: AstNode[] = [];
+    for (const element of elements) {
+        if (reflection.isInstance(element, PatternModelScope)) {
+            result.push(...flattenModelScopes(reflection, (element as PatternModelScopeType).elements ?? []));
+        } else {
+            result.push(element as AstNode);
+        }
+    }
+    return result;
+}
+
+/**
+ * Returns the innermost model scope block a node is declared in.
+ *
+ * @param reflection The AST reflection
+ * @param node The node
+ * @returns The scope block, or undefined for nodes of the implicit model
+ */
+export function findEnclosingModelScope(reflection: AstReflection, node: AstNode): PatternModelScopeType | undefined {
+    return AstUtils.getContainerOfType(node.$container, (n) => reflection.isInstance(n, PatternModelScope)) as
+        PatternModelScopeType | undefined;
+}
+
+/**
+ * Stands for the model of a scope block whose target does not resolve; checks between models
+ * skip it (the linking error is reported already).
+ */
+export const UNRESOLVED_MODEL: unique symbol = Symbol("unresolved model");
+
+/**
+ * The model an object lives in: undefined for the implicit model, the model value's declaration
+ * (a `model` input or a loop variable) for an input model.
+ */
+export type ModelIdentity = AstNode | undefined | typeof UNRESOLVED_MODEL;
+
+/**
+ * Returns the model the context of a node is: the target of the innermost scope block containing
+ * it, or the implicit model.
+ *
+ * @param reflection The AST reflection
+ * @param node The node
+ * @returns The model
+ */
+export function contextModel(reflection: AstReflection, node: AstNode): ModelIdentity {
+    const scope = findEnclosingModelScope(reflection, node);
+    if (scope == undefined) {
+        return undefined;
+    }
+    return scope.model?.ref ?? UNRESOLVED_MODEL;
+}
+
+/**
+ * Returns the model an object declaration lives in: a pattern object declared in a scope block
+ * lives in the block's model; everything else (objects outside scope blocks, element
+ * parameters, call outputs and loop variables over elements) in the implicit model.
+ *
+ * @param reflection The AST reflection
+ * @param declaration The object declaration
+ * @returns The model
+ */
+export function declarationModel(reflection: AstReflection, declaration: AstNode | undefined): ModelIdentity {
+    if (declaration == undefined || !reflection.isInstance(declaration, PatternObjectInstance)) {
+        return undefined;
+    }
+    return contextModel(reflection, declaration);
+}
+
+/**
+ * Describes a model for messages.
+ *
+ * @param model The model
+ * @returns e.g. `the input model 'donor'` or `the transformed model`
+ */
+export function describeModel(model: ModelIdentity): string {
+    if (model == undefined) {
+        return "the transformed model";
+    }
+    if (model === UNRESOLVED_MODEL) {
+        return "an unknown model";
+    }
+    return `the input model '${(model as { name?: string }).name ?? "?"}'`;
 }
 
 /**

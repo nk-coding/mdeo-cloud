@@ -2,7 +2,7 @@ import type { LangiumCoreServices } from "langium";
 import type { AstSerializerAdditionalServices, PrintContext } from "@mdeo/language-common";
 import type { Doc } from "prettier";
 import { ID, STRING } from "@mdeo/language-common";
-import { registerImportSerializers, serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
+import { serializeNewlineSep, sharedImport } from "@mdeo/language-shared";
 import {
     PatternModifier,
     StopStatement,
@@ -61,14 +61,14 @@ import {
     PatternApplicationCondition,
     type PatternApplicationConditionType,
     TransformationParameter,
-    TransformationSignature,
     CallArgument,
     CallOutput,
     CallStatement,
-    TransformationImport,
     TransformationFileImport,
+    PatternModelScope,
     type TransformationParameterType,
-    type TransformationSignatureType,
+    type TransformationFileImportType,
+    type PatternModelScopeType,
     type CallArgumentType,
     type CallOutputType,
     type CallStatementType,
@@ -136,6 +136,7 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(PatternLink, (ctx) => printPatternLink(ctx));
     AstSerializer.registerNodeSerializer(WhereClause, (ctx) => printWhereClause(ctx));
     AstSerializer.registerNodeSerializer(PatternApplicationCondition, (ctx) => printPatternApplicationCondition(ctx));
+    AstSerializer.registerNodeSerializer(PatternModelScope, (ctx) => printPatternModelScope(ctx));
     AstSerializer.registerNodeSerializer(Pattern, (ctx) => printPattern(ctx));
 
     AstSerializer.registerNodeSerializer(StatementsScope, (ctx) => printStatementsScope(ctx));
@@ -155,7 +156,6 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(LambdaExpression, (ctx) => printLambdaExpression(ctx));
 
     AstSerializer.registerNodeSerializer(TransformationParameter, (ctx) => printTransformationParameter(ctx));
-    AstSerializer.registerNodeSerializer(TransformationSignature, (ctx) => printTransformationSignature(ctx));
     AstSerializer.registerNodeSerializer(CallArgument, (ctx) => printCallArgument(ctx));
     AstSerializer.registerNodeSerializer(CallOutput, (ctx) => printCallOutput(ctx));
     AstSerializer.registerNodeSerializer(CallStatement, (ctx) => printCallStatement(ctx));
@@ -165,7 +165,7 @@ export function registerModelTransformationSerializers(services: ModelTransforma
     AstSerializer.registerNodeSerializer(ForInVariable, (ctx) => printForInVariable(ctx));
     AstSerializer.registerNodeSerializer(ForInStatement, (ctx) => printForInStatement(ctx));
     AstSerializer.registerNodeSerializer(AssignmentStatement, (ctx) => printAssignmentStatement(ctx));
-    registerImportSerializers(services, doc.builders, TransformationImport, TransformationFileImport);
+    AstSerializer.registerNodeSerializer(TransformationFileImport, (ctx) => printTransformationFileImport(ctx));
 
     AstSerializer.registerNodeSerializer(MetamodelFileImport, (ctx) => printMetamodelFileImport(ctx));
     AstSerializer.registerNodeSerializer(ModelTransformation, (ctx) => printModelTransformation(ctx));
@@ -441,6 +441,26 @@ function printPatternApplicationCondition(context: PrintContext<PatternApplicati
 }
 
 /**
+ * Prints a model scope block (`in model { ... }`).
+ *
+ * @param context The print context.
+ * @returns The formatted scope block.
+ */
+function printPatternModelScope(context: PrintContext<PatternModelScopeType>): Doc {
+    const { path, printReference } = context;
+    const docs: Doc[] = ["in ", path.call((ref) => printReference(ref, ID), "model"), " {"];
+
+    const content = serializeNewlineSep(context, ["elements"], doc.builders);
+    if (content.length > 0) {
+        docs.push(indent([hardline, content]), hardline);
+    }
+
+    docs.push("}");
+
+    return group(docs);
+}
+
+/**
  * Prints a pattern node.
  *
  * @param context The print context.
@@ -650,13 +670,7 @@ function printMetamodelFileImport(context: PrintContext<MetamodelFileImportType>
 }
 
 /**
- * Prints the root model transformation node.
- *
- * @param context The print context.
- * @returns The formatted model transformation.
- */
-/**
- * Prints a parameter of a signature.
+ * Prints a header declaration.
  *
  * @param context The print context.
  * @returns The formatted parameter, e.g. `in maxCandidates: int = 0`.
@@ -672,18 +686,19 @@ function printTransformationParameter(context: PrintContext<TransformationParame
 }
 
 /**
- * Prints a signature, breaking the parameter list over lines when it does not fit.
+ * Prints a path import of another transformation.
  *
  * @param context The print context.
- * @returns The formatted signature.
+ * @returns The formatted import, e.g. `import "./generic/move-component.mt" as moveComponent`.
  */
-function printTransformationSignature(context: PrintContext<TransformationSignatureType>): Doc {
-    const { ctx, printPrimitive, getPrimitive, path, print } = context;
-    return group([
-        "transformation ",
-        printPrimitive(getPrimitive(ctx, "name"), ID),
-        printParenthesizedList(path.map(print, "parameters"))
-    ]);
+function printTransformationFileImport(context: PrintContext<TransformationFileImportType>): Doc {
+    const { ctx, printPrimitive, getPrimitive } = context;
+    return [
+        "import ",
+        printPrimitive(getPrimitive(ctx, "file"), STRING),
+        " as ",
+        printPrimitive(getPrimitive(ctx, "name"), ID)
+    ];
 }
 
 /**
@@ -745,6 +760,13 @@ function printCallStatement(context: PrintContext<CallStatementType>): Doc {
     return group(docs);
 }
 
+/**
+ * Prints the root model transformation node: the `using` line, the imports, the header
+ * declarations and the statements, separated by blank lines.
+ *
+ * @param context The print context.
+ * @returns The formatted model transformation.
+ */
 function printModelTransformation(context: PrintContext<ModelTransformationType>): Doc {
     const { ctx, path, print } = context;
     const docs: Doc[] = [];
@@ -758,9 +780,9 @@ function printModelTransformation(context: PrintContext<ModelTransformationType>
         docs.push(hardline);
     }
 
-    if (ctx.signature != undefined) {
+    if ((ctx.parameters ?? []).length > 0) {
         docs.push(hardline);
-        docs.push(path.call(print, "signature"));
+        docs.push(join(hardline, path.map(print, "parameters")));
         docs.push(hardline);
     }
 

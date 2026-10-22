@@ -3,33 +3,38 @@ import { sharedImport } from "@mdeo/language-shared";
 import type { AstNode, LangiumDocument, LangiumDocuments, MaybePromise } from "langium";
 import type { Hover, HoverParams } from "vscode-languageserver-protocol";
 import {
+    getCallee,
     CallArgument,
     CallOutput,
     CallStatement,
     PatternLinkEnd,
+    PatternModelScope,
     PatternObjectInstance,
     PatternObjectInstanceDelete,
     PatternObjectInstanceReference,
-    TransformationImport,
+    TransformationFileImport,
     TransformationParameter,
-    TransformationSignature,
+    ModelTransformation,
     type CallOutputType,
+    type ModelTransformationType,
     type PatternObjectInstanceType,
-    type TransformationParameterType,
-    type TransformationSignatureType
+    type TransformationFileImportType,
+    type TransformationParameterType
 } from "../grammar/modelTransformationTypes.js";
 import {
     TransformationDeclarationResolver,
     getTransformationRoot,
+    renderDeclarations,
     renderParameter,
-    renderSignature
+    transformationDisplayName
 } from "./transformationDeclarations.js";
+import { resolveRelativeDocument } from "@mdeo/language-shared";
 
 const { CstUtils, AstUtils, GrammarAST } = sharedImport("langium");
 
 /**
  * Hover provider of the Model Transformation language: the expression hovers, plus the
- * signatures of called and imported transformations and the parameters and outputs of calls.
+ * declarations of called and imported transformations and the parameters and outputs of calls.
  */
 export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
     private readonly documents: LangiumDocuments;
@@ -45,7 +50,8 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
     }
 
     /**
-     * Returns the hover for the parts of signatures and calls, if the position is on one.
+     * Returns the hover for the parts of imports, declarations and calls, if the position is on
+     * one.
      */
     private callHover(document: LangiumDocument, params: HoverParams): Hover | undefined {
         const rootCstNode = document.parseResult?.value?.$cstNode;
@@ -61,13 +67,19 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
         const feature = AstUtils.getContainerOfType(cstNode.grammarSource, GrammarAST.isAssignment)?.feature;
 
         if (this.reflection.isInstance(astNode, CallStatement) && feature === "callee") {
-            return this.signatureHover(astNode.callee?.ref);
+            return this.declarationsHover(getCallee(astNode));
         }
-        if (this.reflection.isInstance(astNode, TransformationImport) && feature === "entity") {
-            return this.signatureHover(astNode.entity?.ref as TransformationSignatureType | undefined);
+        if (
+            this.reflection.isInstance(astNode, TransformationFileImport) &&
+            (feature === "name" || feature === "file")
+        ) {
+            return this.declarationsHover(this.importedTransformation(astNode as TransformationFileImportType));
         }
-        if (this.reflection.isInstance(astNode, TransformationSignature) && feature === "name") {
-            return this.signatureHover(astNode);
+        if (this.reflection.isInstance(astNode, PatternModelScope) && feature === "model") {
+            const target = astNode.model?.ref;
+            return this.reflection.isInstance(target, TransformationParameter)
+                ? this.parameterHover(target as TransformationParameterType)
+                : undefined;
         }
         if (this.reflection.isInstance(astNode, TransformationParameter) && feature === "name") {
             return this.parameterHover(astNode);
@@ -101,16 +113,15 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
      * Hover for an object of the first pattern that an optional element input pins.
      */
     private pinnedObjectHover(object: PatternObjectInstanceType): Hover | undefined {
-        const parameter = (getTransformationRoot(this.reflection, object)?.signature?.parameters ?? []).find(
+        const parameter = (getTransformationRoot(this.reflection, object)?.parameters ?? []).find(
             (p) => p.name === object.name && this.declarations().getPinnedObject(p) === object
         );
         if (parameter == undefined) {
             return undefined;
         }
-        const signature = parameter.$container as TransformationSignatureType | undefined;
         return markdownHover(
             `${object.name}: ${object.class?.$refText ?? "?"}`,
-            `pinned by the optional input \`${renderParameter(parameter)}\` of \`${signature?.name ?? "?"}\`: bound to the element a caller passes, matched freely when none is passed`
+            `pinned by the optional input \`${renderParameter(parameter)}\` of \`${transformationDisplayName(parameter)}\`: bound to the element a caller passes, matched freely when none is passed`
         );
     }
 
@@ -135,14 +146,28 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
     }
 
     /**
-     * Hover showing a whole signature.
+     * Hover showing the `in` / `out` declarations of a transformation.
      */
-    private signatureHover(signature: TransformationSignatureType | undefined): Hover | undefined {
-        if (signature == undefined) {
+    private declarationsHover(transformation: ModelTransformationType | undefined): Hover | undefined {
+        if (transformation == undefined) {
             return undefined;
         }
-        const file = AstUtils.getDocument(signature).uri.path;
-        return markdownHover(renderSignature(signature), `Defined in \`${file}\``);
+        const file = AstUtils.getDocument(transformation).uri.path;
+        return markdownHover(renderDeclarations(transformation), `Declared in \`${file}\``);
+    }
+
+    /**
+     * Returns the root of the file a path import names, if it is a loaded transformation.
+     */
+    private importedTransformation(fileImport: TransformationFileImportType): ModelTransformationType | undefined {
+        if (fileImport.file == undefined) {
+            return undefined;
+        }
+        const target = resolveRelativeDocument(AstUtils.getDocument(fileImport), fileImport.file, this.documents);
+        const root = target?.parseResult?.value;
+        return root != undefined && this.reflection.isInstance(root, ModelTransformation)
+            ? (root as ModelTransformationType)
+            : undefined;
     }
 
     /**
@@ -152,7 +177,6 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
         if (parameter == undefined) {
             return undefined;
         }
-        const signature = parameter.$container as TransformationSignatureType | undefined;
         const nullable = (parameter.type as { isNullable?: boolean } | undefined)?.isNullable === true;
         const pinned = this.declarations().getPinnedObject(parameter);
         const role =
@@ -163,7 +187,7 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
                       ? "optional input"
                       : "required input"
                 : "output";
-        return markdownHover(renderParameter(parameter), `${role} of \`${signature?.name ?? "?"}\``);
+        return markdownHover(renderParameter(parameter), `${role} of \`${transformationDisplayName(parameter)}\``);
     }
 
     /**
@@ -171,11 +195,11 @@ export class ModelTransformationHoverProvider extends ExpressionHoverProvider {
      */
     private outputHover(output: CallOutputType): Hover | undefined {
         const parameter = output.parameter?.ref;
-        const signature = parameter?.$container as TransformationSignatureType | undefined;
         const typeText = parameter?.type?.$cstNode?.text ?? "?";
+        const callee = (output.$container as { callee?: { $refText?: string } } | undefined)?.callee?.$refText;
         return markdownHover(
             `${output.name}: ${typeText}`,
-            `bound by the call: output \`${parameter?.name ?? output.parameter?.$refText}\` of \`${signature?.name ?? "?"}\``
+            `bound by the call: output \`${parameter?.name ?? output.parameter?.$refText}\` of \`${callee ?? "?"}\``
         );
     }
 }

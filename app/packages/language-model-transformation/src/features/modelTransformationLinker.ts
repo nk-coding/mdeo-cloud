@@ -1,6 +1,7 @@
 import { sharedImport } from "@mdeo/language-shared";
 import type { AstNodeDescription, LangiumCoreServices, LinkingError, ReferenceInfo } from "langium";
 import {
+    getCallee,
     CallArgument,
     CallOutput,
     CallStatement,
@@ -13,7 +14,7 @@ const { DefaultLinker } = sharedImport("langium");
  * Linker of the Model Transformation language.
  *
  * It explains the references of calls that do not resolve: a callee that is not imported, and
- * an argument or output that names no parameter of the callee.
+ * an argument or output that names no `in` / `out` declaration of the callee.
  */
 export class ModelTransformationLinker extends DefaultLinker {
     constructor(services: LangiumCoreServices) {
@@ -28,7 +29,7 @@ export class ModelTransformationLinker extends DefaultLinker {
         if (refInfo.property === "callee" && this.reflection.isInstance(container, CallStatement.name)) {
             return {
                 ...error,
-                message: `Unknown transformation '${name}'. Import it first, e.g. import { ${name} } from "./${name}.mt".`
+                message: `Unknown transformation '${name}'. Import it first, e.g. import "./${name}.mt" as ${name}.`
             };
         }
         if (
@@ -37,12 +38,12 @@ export class ModelTransformationLinker extends DefaultLinker {
                 this.reflection.isInstance(container, CallOutput.name))
         ) {
             const call = container.$container as CallStatementType | undefined;
-            const signature = call?.callee?.ref;
-            if (signature != undefined) {
-                const parameters = (signature.parameters ?? []).map((p) => `${p.direction} ${p.name}`).join(", ");
+            const callee = getCallee(call);
+            if (callee != undefined) {
+                const parameters = (callee.parameters ?? []).map((p) => `${p.direction} ${p.name}`).join(", ");
                 return {
                     ...error,
-                    message: `'${name}' is not a parameter of '${signature.name}'${parameters.length > 0 ? ` (its parameters: ${parameters})` : " (it has no parameters)"}.`
+                    message: `'${name}' is not a parameter of '${call?.callee?.$refText}'${parameters.length > 0 ? ` (its parameters: ${parameters})` : " (it has no parameters)"}.`
                 };
             }
         }
