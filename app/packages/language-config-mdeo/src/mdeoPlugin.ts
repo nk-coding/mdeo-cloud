@@ -32,6 +32,7 @@ import { DefaultMdeoMetamodelResolver } from "./features/defaultMdeoMetamodelRes
 import type { MdeoMetamodelResolver } from "./features/mdeoMetamodelResolver.js";
 import { RunMdeoConfigActionHandler } from "./action-handlers/runMdeoConfigActionHandler.js";
 import { MdeoCompletionProvider } from "./features/mdeoCompletionProvider.js";
+import { MdeoHoverProvider } from "./features/mdeoHoverProvider.js";
 
 /**
  * Additional services required by the MDEO language plugin.
@@ -88,6 +89,7 @@ const configMdeoPlugin: LangiumLanguagePlugin<MdeoServices> = {
         },
         lsp: {
             CompletionProvider: (services) => new MdeoCompletionProvider(services as any),
+            HoverProvider: (services) => new MdeoHoverProvider(services),
             Formatter: (services) => new SerializerFormatter(services)
         },
         AstSerializer: (services) => new DefaultAstSerializer(services),
