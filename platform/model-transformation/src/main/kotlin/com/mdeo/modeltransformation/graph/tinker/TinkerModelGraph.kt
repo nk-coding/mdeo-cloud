@@ -82,10 +82,45 @@ class TinkerModelGraph private constructor(
         val (newGraph, newRegistry) = copyGraphShuffled()
         return TinkerModelGraph(newGraph, metamodel, newRegistry, metamodelPath).also {
             it.metadata = metadata?.deepCopy()
+            it.loadedModelInputs.addAll(loadedModelInputs)
             // The copy has identical statistics, so it can start from this graph's snapshot
             // instead of paying for its own O(V + E) pass on first use.
             it.statisticsCache.seedFrom(statisticsCache)
         }
+    }
+
+    /** The model-input slots loaded; see [modelInputSlots]. */
+    private val loadedModelInputs = LinkedHashSet<Int>()
+
+    override val modelInputSlots: Set<Int>
+        get() = loadedModelInputs
+
+    /**
+     * Loads [model] from its [ModelData] with [ModelDataGraphLoader], each vertex tagged with
+     * [slot] in the vertex property [ModelGraph.MODEL_SLOT_KEY]. A TinkerGraph vertex stores any
+     * property, so the tag survives the rebuild of [resetNondeterminism], which copies every
+     * property, and identifies the vertices [unloadModelInputs] removes whatever their IDs are by
+     * then.
+     */
+    override fun loadModelInput(slot: Int, model: ModelGraph) {
+        require(slot >= 1) { "A model-input slot is at least 1, not $slot" }
+        require(slot !in loadedModelInputs) { "Model-input slot $slot is already loaded" }
+        require(model !== this) { "A graph cannot be loaded into itself as a model input" }
+        require(model.modelInputSlots.isEmpty()) { "A model input must not have model inputs loaded itself" }
+        ModelDataGraphLoader().load(graph.traversal(), model.toModelData(), nameRegistry, metamodel, slot)
+        loadedModelInputs += slot
+    }
+
+    override fun unloadModelInputs() {
+        if (loadedModelInputs.isEmpty()) return
+        val vertices = graph.traversal().V().has(ModelGraph.MODEL_SLOT_KEY).toList()
+        for (vertex in vertices) {
+            nameRegistry.unregister(vertex.id())
+            vertex.remove()
+        }
+        loadedModelInputs.clear()
+        // the vertex count alone may come back to that of a stale snapshot taken with the inputs
+        statisticsCache.invalidate()
     }
 
     override fun resetNondeterminism(): Map<Any, Any> {
